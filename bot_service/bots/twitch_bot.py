@@ -1,18 +1,14 @@
 # bot_service/bots/twitch_bot.py
 """Главный файл Twitch бота - объединяет все модули"""
 import logging
-import json
-from datetime import datetime
-from core.datetime_utils import utcnow_naive
 from typing import List
-from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
 from utils.role_checker import RoleChecker
 from .twitch_bot_core import TwitchBotCore
 from .universal_command_handler import UniversalCommandHandler
-from features.tts.tts_api import TTSAPI
-from features.youtube.youtube_api_legacy import YouTubeAPI
-from features.drops.drops_service import DropsService
+from services.tts.tts_core import TTSAPI
+from services.youtube.youtube_service import YouTubeService
+from services.drops.drops_service import DropsService
 
 logger = logging.getLogger('bot_service')
 
@@ -24,7 +20,7 @@ class Bot(TwitchBotCore):
         
         # Инициализируем сервисы
         self.tts_api = TTSAPI()
-        self.youtube_api = YouTubeAPI()
+        self.youtube_service = YouTubeService()
         self.role_checker = RoleChecker()
         self.drops_service = None  # Будет инициализирован при подключении к каналу
         
@@ -57,15 +53,15 @@ class Bot(TwitchBotCore):
                 return
             
             # Проверяем в БД, не отправляли ли приветствие недавно
-            from core.database import SessionLocal, UserSettings
-            from datetime import datetime, timedelta
+            from core.database import SessionLocal
+            from repositories.user_settings_repository import UserSettingsRepository
+            from datetime import timedelta
             from core.datetime_utils import utcnow_naive
             
             db = SessionLocal()
             try:
-                settings = db.query(UserSettings).filter(
-                    UserSettings.channel_name == channel_name.lower()
-                ).first()
+                settings_repo = UserSettingsRepository(db)
+                settings = settings_repo.get_by_channel_name(channel_name)
                 
                 if settings and settings.bot_last_welcome_at:
                     time_diff = utcnow_naive() - settings.bot_last_welcome_at
@@ -122,12 +118,13 @@ class Bot(TwitchBotCore):
             logger.warning(f"[CONNECT] [DISCONNECT] Disconnecting from {channel_name} due to: {reason}")
             
             # Получаем user_id из БД по имени канала
-            from core.database import SessionLocal, User
+            from core.database import SessionLocal
+            from repositories.user_repository import UserRepository
+            
             db = SessionLocal()
             try:
-                user = db.query(User).filter(
-                    User.twitch_username == channel_name.lower()
-                ).first()
+                user_repo = UserRepository(db)
+                user = user_repo.get_by_twitch_username(channel_name)
                 
                 if user:
                     logger.info(f"[DELETE] [CLEANUP] Found user {user.id} for channel {channel_name}")
@@ -292,15 +289,13 @@ class Bot(TwitchBotCore):
         """Получает user_id для канала"""
         try:
             from core.database import get_db
-            from core.database import User, UserToken
+            from repositories.user_repository import UserRepository
             
             db = next(get_db())
             
             # Ищем пользователя по Twitch username (case-insensitive)
-            from sqlalchemy import func
-            user = db.query(User).filter(
-                func.lower(User.twitch_username) == channel_name.lower()
-            ).first()
+            user_repo = UserRepository(db)
+            user = user_repo.get_by_twitch_username(channel_name)
             
             if user:
                 return user.id

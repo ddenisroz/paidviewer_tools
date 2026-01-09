@@ -1,11 +1,12 @@
-/**
+﻿/**
  * Commands Queries - централизованные React Query queries для Commands
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { commandsService } from '../../services/api/services/commandsService';
-import { logger } from '../../utils/prodLogger';
+import { commandsService } from '@/services/api/services/commandsService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 

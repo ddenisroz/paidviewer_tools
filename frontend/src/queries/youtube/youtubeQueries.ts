@@ -1,11 +1,12 @@
-/**
+﻿/**
  * YouTube Queries - централизованные React Query queries для YouTube
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { youtubeService } from '../../services/api/services/youtubeService';
-import { logger } from '../../utils/prodLogger';
+import { youtubeService } from '@/services/api/services/youtubeService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 

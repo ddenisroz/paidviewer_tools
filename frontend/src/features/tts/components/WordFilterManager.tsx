@@ -2,12 +2,12 @@ import React, { useCallback, useState } from 'react';
 
 import { AlertCircle, ChevronDown, Plus, Trash2 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 
 
 import { useIntegrations } from '../../../context/IntegrationsContext';
@@ -25,12 +25,12 @@ const WordFilterManager: React.FC = React.memo(() => {
     const [newWord, setNewWord] = useState('');
     const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
     const [isWordFilterExpanded, setIsWordFilterExpanded] = useState(false);
-    
+
     // Используем useCallback для стабильной ссылки на функцию
     const toggleWordFilterExpanded = useCallback(() => {
         setIsWordFilterExpanded(prev => !prev);
     }, []);
-    
+
     const { integrations } = useIntegrations();
 
     // React Query hooks
@@ -60,11 +60,11 @@ const WordFilterManager: React.FC = React.memo(() => {
         },
     });
 
-    const wordsRaw = Array.isArray(wordsData) 
-        ? wordsData 
-        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words 
-           ?? (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words 
-           ?? []);
+    const wordsRaw = Array.isArray(wordsData)
+        ? wordsData
+        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words
+            ?? (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words
+            ?? []);
     const words: FilteredWord[] = (Array.isArray(wordsRaw) ? wordsRaw : []) as FilteredWord[];
     const isAdding = addWordMutation.isPending;
 
@@ -124,8 +124,8 @@ const WordFilterManager: React.FC = React.memo(() => {
     const hasPlatforms = availablePlatforms.length > 0;
 
     // Фильтруем слова по выбранной платформе
-    const filteredWords = selectedPlatform === 'all' 
-        ? words 
+    const filteredWords = selectedPlatform === 'all'
+        ? words
         : words.filter(word => word.platform === selectedPlatform);
 
     if (!hasPlatforms) {

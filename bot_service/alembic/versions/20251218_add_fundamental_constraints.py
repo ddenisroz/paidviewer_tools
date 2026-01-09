@@ -6,7 +6,6 @@ Create Date: 2025-12-18 12:00:00.000000
 
 """
 from alembic import op
-import sqlalchemy as sa
 from sqlalchemy.engine.reflection import Inspector
 
 revision = '20251218_fundamental'
@@ -24,21 +23,21 @@ def constraint_exists(conn, table_name, constraint_name):
         for uc in inspector.get_unique_constraints(table_name):
             if uc.get('name'):
                 constraints.append(uc['name'])
-    except:
+    except Exception:
         pass
     
     try:
         for fk in inspector.get_foreign_keys(table_name):
             if fk.get('name'):
                 constraints.append(fk['name'])
-    except:
+    except Exception:
         pass
     
     try:
         for cc in inspector.get_check_constraints(table_name):
             if cc.get('name'):
                 constraints.append(cc['name'])
-    except:
+    except Exception:
         pass
     
     return constraint_name in constraints
@@ -50,7 +49,7 @@ def index_exists(conn, table_name, index_name):
         inspector = Inspector.from_engine(conn)
         indexes = inspector.get_indexes(table_name)
         return any(idx.get('name') == index_name for idx in indexes)
-    except:
+    except Exception:
         return False
 
 
@@ -59,7 +58,7 @@ def table_exists(conn, table_name):
     try:
         inspector = Inspector.from_engine(conn)
         return table_name in inspector.get_table_names()
-    except:
+    except Exception:
         return False
 
 

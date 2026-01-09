@@ -182,14 +182,12 @@ async def retry_async(
             delay=1.0
         )
     """
-    last_exception = None
     current_delay = delay
 
     for attempt in range(max_retries + 1):
         try:
             return await func()
         except exceptions as e:
-            last_exception = e
             if attempt < max_retries:
                 logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {current_delay}s...")
                 await asyncio.sleep(current_delay)

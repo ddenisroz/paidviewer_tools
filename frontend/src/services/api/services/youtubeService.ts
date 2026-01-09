@@ -1,10 +1,10 @@
-/**
+﻿/**
  * YouTube Service - инкапсуляция всех YouTube API вызовов
  */
 import { apiClient } from '../client';
 
-import type { ApiResponse } from '../../../types/api';
-import type { YoutubeObsUrlResponse, YoutubeQueue, YoutubeSettings, YoutubeVideo } from '../../../types/youtube';
+import type { ApiResponse } from '@/types/api';
+import type { YoutubeObsUrlResponse, YoutubeQueue, YoutubeSettings, YoutubeVideo } from '@/types/youtube';
 import type { AxiosResponse } from 'axios';
 
 /**

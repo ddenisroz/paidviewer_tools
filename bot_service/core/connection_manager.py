@@ -223,7 +223,7 @@ class ConnectionManager(ConnectionManagerCore):
 
             # Получаем все активные сессии
             active_sessions = db.query(UserSession).filter(
-                UserSession.is_active == True
+                UserSession.is_active
             ).all()
 
             restored_count = 0
@@ -286,7 +286,7 @@ class ConnectionManager(ConnectionManagerCore):
                 if channel_name:
                     vk_channels.append(channel_name)
 
-            logger.info(f"📺 Found {len(vk_channels)} VK Live channels to listen: {vk_channels}")
+            logger.info(f"Found {len(vk_channels)} VK Live channels to listen: {vk_channels}")
             return vk_channels
         except Exception as e:
             logger.error(f"Error getting VK channels: {e}", exc_info=True)

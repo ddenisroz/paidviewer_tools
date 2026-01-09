@@ -1,11 +1,12 @@
-/**
+﻿/**
  * User Settings Queries - централизованные React Query queries для User Settings
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { userSettingsService } from '../../services/api/services/userSettingsService';
-import { logger } from '../../utils/prodLogger';
+import { userSettingsService } from '@/services/api/services/userSettingsService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 
 import type { ApiResponse } from '../../types';

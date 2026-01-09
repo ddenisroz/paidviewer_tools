@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 
 import { useSearchParams } from 'react-router-dom';
 import YouTube from 'react-youtube';
 
-import { logger } from '../../../utils/prodLogger';
+import { logger } from '@/shared/utils/prodLogger';
 
 interface YouTubeVideo {
     video_id: string;

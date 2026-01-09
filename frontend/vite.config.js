@@ -76,7 +76,7 @@ export default defineConfig({
             // Остальные vendor зависимости
             return 'vendor';
           }
-          
+
           // Context chunks - разделяем для lazy loading
           if (id.includes('/context/')) {
             if (id.includes('AuthContext') || id.includes('IntegrationsContext')) {
@@ -84,12 +84,12 @@ export default defineConfig({
             }
             return 'contexts';
           }
-          
+
           // UI components - один чанк для всех
           if (id.includes('/components/ui/')) {
             return 'ui-components';
           }
-          
+
           // Feature-based chunks
           if (id.includes('/features/admin/')) {
             return 'admin-feature';
@@ -100,17 +100,17 @@ export default defineConfig({
           if (id.includes('/features/drops/')) {
             return 'drops-feature';
           }
-          
+
           // Admin pages отдельно (используются редко)
           if (id.includes('/pages/admin/')) {
             return 'admin';
           }
-          
+
           // Drops pages отдельно
           if (id.includes('/pages/drops/') || id.includes('/pages/obs/')) {
             return 'drops';
           }
-          
+
           // Default - не разделяем
           return undefined;
         }
@@ -118,24 +118,24 @@ export default defineConfig({
     },
     // Оптимизация размера чанков
     chunkSizeWarningLimit: 1000,
-    
+
     // Минификация (esbuild быстрее чем terser)
     minify: 'esbuild',
-    
+
     // Увеличиваем производительность сборки
     target: 'esnext',
     cssCodeSplit: true,
-    
+
     // Включаем source maps только для разработки
     sourcemap: false,
-    
+
     // Оптимизация ассетов
     assetsInlineLimit: 4096, // Инлайним маленькие файлы
-    
+
     // Дополнительная оптимизация
     reportCompressedSize: false, // Ускоряет сборку
   },
-  
+
   // Оптимизация для разработки
   optimizeDeps: {
     include: [

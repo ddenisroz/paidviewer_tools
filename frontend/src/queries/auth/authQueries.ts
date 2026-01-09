@@ -1,11 +1,12 @@
-/**
+﻿/**
  * Auth Queries - централизованные React Query queries для Auth
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { authService } from '../../services/api/services/authService';
-import { logger } from '../../utils/prodLogger';
+import { authService } from '@/services/api/services/authService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 
 import type { ApiResponse } from '../../types';

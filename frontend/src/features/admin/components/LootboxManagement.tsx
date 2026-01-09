@@ -2,20 +2,20 @@
 
 import { Edit, Gift, Plus, Trash2, Trophy } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PageLoader } from '@/components/ui/loader';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
+import { lootboxService } from '@/services/api/services/lootboxService';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { PageLoader } from '@/shared/components/ui/loader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
-import { lootboxService } from '../../../services/api/services/lootboxService';
-import { logger } from '../../../utils/prodLogger';
 
 interface Lootbox {
     id: number;
@@ -82,7 +82,7 @@ const LootboxManagement: React.FC = () => {
     const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
     const [dialogType, setDialogType] = useState<DialogType>('lootbox');
 
-    // Формы
+    // �����
     const [lootboxForm, setLootboxForm] = useState<LootboxForm>({
         name: '',
         description: '',
@@ -116,7 +116,7 @@ const LootboxManagement: React.FC = () => {
     const loadData = async (): Promise<void> => {
         try {
             setIsLoading(true);
-            // Загружаем лутбоксы и достижения
+            // ��������� �������� � ����������
             const [lootboxesResponse, achievementsResponse] = await Promise.all([
                 lootboxService.getAdminLootboxes(),
                 lootboxService.getAdminAchievements()
@@ -126,7 +126,7 @@ const LootboxManagement: React.FC = () => {
             setAchievements((achievementsResponse.data?.data || achievementsResponse.data || []) as Achievement[]);
         } catch (error) {
             logger.error('Error loading lootbox management data:', error);
-            // Устанавливаем пустые массивы в случае ошибки
+            // ������������� ������ ������� � ������ ������
             setLootboxes([]);
             setAchievements([]);
         } finally {
@@ -137,20 +137,20 @@ const LootboxManagement: React.FC = () => {
     const handleCreateLootbox = async (): Promise<void> => {
         try {
             await lootboxService.createLootbox(lootboxForm as unknown as Record<string, unknown>);
-            toast.success('Лутбокс создан!');
+            toast.success('������� ������!');
             setIsDialogOpen(false);
             setLootboxForm({ name: '', description: '', type: 'free', price: 0 });
             loadData();
         } catch (error) {
             logger.error('Error creating lootbox:', error);
-            toast.error('Ошибка создания лутбокса');
+            toast.error('������ �������� ��������');
         }
     };
 
     const handleCreateReward = async (): Promise<void> => {
         try {
             await lootboxService.createReward(rewardForm as unknown as Record<string, unknown>);
-            toast.success('Награда создана!');
+            toast.success('������� �������!');
             setIsDialogOpen(false);
             setRewardForm({ 
                 lootbox_id: '', 
@@ -163,14 +163,14 @@ const LootboxManagement: React.FC = () => {
             loadData();
         } catch (error) {
             logger.error('Error creating reward:', error);
-            toast.error('Ошибка создания награды');
+            toast.error('������ �������� �������');
         }
     };
 
     const handleCreateAchievement = async (): Promise<void> => {
         try {
             await lootboxService.createAchievement(achievementForm as unknown as Record<string, unknown>);
-            toast.success('Достижение создано!');
+            toast.success('���������� �������!');
             setIsDialogOpen(false);
             setAchievementForm({ 
                 channel_name: '', 
@@ -184,7 +184,7 @@ const LootboxManagement: React.FC = () => {
             loadData();
         } catch (error) {
             logger.error('Error creating achievement:', error);
-            toast.error('Ошибка создания достижения');
+            toast.error('������ �������� ����������');
         }
     };
 
@@ -199,25 +199,25 @@ const LootboxManagement: React.FC = () => {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label htmlFor="name">Название лутбокса</Label>
+                            <Label htmlFor="name">�������� ��������</Label>
                             <Input
                                 id="name"
                                 value={lootboxForm.name}
                                 onChange={(e) => setLootboxForm({ ...lootboxForm, name: e.target.value })}
-                                placeholder="Например: Ежедневный лутбокс"
+                                placeholder="��������: ���������� �������"
                             />
                         </div>
                         <div>
-                            <Label htmlFor="description">Описание</Label>
+                            <Label htmlFor="description">��������</Label>
                             <Textarea
                                 id="description"
                                 value={lootboxForm.description}
                                 onChange={(e) => setLootboxForm({ ...lootboxForm, description: e.target.value })}
-                                placeholder="Описание лутбокса"
+                                placeholder="�������� ��������"
                             />
                         </div>
                         <div>
-                            <Label htmlFor="type">Тип</Label>
+                            <Label htmlFor="type">���</Label>
                             <Select 
                                 value={lootboxForm.type} 
                                 onValueChange={(value: 'free' | 'paid') => setLootboxForm({ ...lootboxForm, type: value })}
@@ -226,14 +226,14 @@ const LootboxManagement: React.FC = () => {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="free">Бесплатный</SelectItem>
-                                    <SelectItem value="paid">Платный</SelectItem>
+                                    <SelectItem value="free">����������</SelectItem>
+                                    <SelectItem value="paid">�������</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         {lootboxForm.type === 'paid' && (
                             <div>
-                                <Label htmlFor="price">Цена (руб.)</Label>
+                                <Label htmlFor="price">���� (���.)</Label>
                                 <Input
                                     id="price"
                                     type="number"
@@ -244,7 +244,7 @@ const LootboxManagement: React.FC = () => {
                             </div>
                         )}
                         <Button onClick={handleCreateLootbox} className="w-full">
-                            Создать лутбокс
+                            ������� �������
                         </Button>
                     </div>
                 );
@@ -253,13 +253,13 @@ const LootboxManagement: React.FC = () => {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label htmlFor="lootbox_id">Лутбокс</Label>
+                            <Label htmlFor="lootbox_id">�������</Label>
                             <Select 
                                 value={rewardForm.lootbox_id} 
                                 onValueChange={(value: string) => setRewardForm({ ...rewardForm, lootbox_id: value })}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Выберите лутбокс" />
+                                    <SelectValue placeholder="�������� �������" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {lootboxes.map((lootbox) => (
@@ -271,25 +271,25 @@ const LootboxManagement: React.FC = () => {
                             </Select>
                         </div>
                         <div>
-                            <Label htmlFor="name">Название награды</Label>
+                            <Label htmlFor="name">�������� �������</Label>
                             <Input
                                 id="name"
                                 value={rewardForm.name}
                                 onChange={(e) => setRewardForm({ ...rewardForm, name: e.target.value })}
-                                placeholder="Например: 100 очков"
+                                placeholder="��������: 100 �����"
                             />
                         </div>
                         <div>
-                            <Label htmlFor="description">Описание</Label>
+                            <Label htmlFor="description">��������</Label>
                             <Textarea
                                 id="description"
                                 value={rewardForm.description}
                                 onChange={(e) => setRewardForm({ ...rewardForm, description: e.target.value })}
-                                placeholder="Описание награды"
+                                placeholder="�������� �������"
                             />
                         </div>
                         <div>
-                            <Label htmlFor="type">Тип награды</Label>
+                            <Label htmlFor="type">��� �������</Label>
                             <Select 
                                 value={rewardForm.type} 
                                 onValueChange={(value: 'currency' | 'item' | 'special') => setRewardForm({ ...rewardForm, type: value })}
@@ -298,14 +298,14 @@ const LootboxManagement: React.FC = () => {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="currency">Валюта</SelectItem>
-                                    <SelectItem value="item">Предмет</SelectItem>
-                                    <SelectItem value="special">Особое</SelectItem>
+                                    <SelectItem value="currency">������</SelectItem>
+                                    <SelectItem value="item">�������</SelectItem>
+                                    <SelectItem value="special">������</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label htmlFor="value">Значение (JSON)</Label>
+                            <Label htmlFor="value">�������� (JSON)</Label>
                             <Textarea
                                 id="value"
                                 value={rewardForm.value}
@@ -314,7 +314,7 @@ const LootboxManagement: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <Label htmlFor="weight">Вес (вероятность)</Label>
+                            <Label htmlFor="weight">��� (�����������)</Label>
                             <Input
                                 id="weight"
                                 type="number"
@@ -324,7 +324,7 @@ const LootboxManagement: React.FC = () => {
                             />
                         </div>
                         <Button onClick={handleCreateReward} className="w-full">
-                            Создать награду
+                            ������� �������
                         </Button>
                     </div>
                 );
@@ -333,7 +333,7 @@ const LootboxManagement: React.FC = () => {
                 return (
                     <div className="space-y-4">
                         <div>
-                            <Label htmlFor="channel_name">Канал</Label>
+                            <Label htmlFor="channel_name">�����</Label>
                             <Input
                                 id="channel_name"
                                 value={achievementForm.channel_name}
@@ -342,25 +342,25 @@ const LootboxManagement: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <Label htmlFor="name">Название достижения</Label>
+                            <Label htmlFor="name">�������� ����������</Label>
                             <Input
                                 id="name"
                                 value={achievementForm.name}
                                 onChange={(e) => setAchievementForm({ ...achievementForm, name: e.target.value })}
-                                placeholder="Например: Первая неделя"
+                                placeholder="��������: ������ ������"
                             />
                         </div>
                         <div>
-                            <Label htmlFor="description">Описание</Label>
+                            <Label htmlFor="description">��������</Label>
                             <Textarea
                                 id="description"
                                 value={achievementForm.description}
                                 onChange={(e) => setAchievementForm({ ...achievementForm, description: e.target.value })}
-                                placeholder="Описание достижения"
+                                placeholder="�������� ����������"
                             />
                         </div>
                         <div>
-                            <Label htmlFor="type">Тип достижения</Label>
+                            <Label htmlFor="type">��� ����������</Label>
                             <Select 
                                 value={achievementForm.type} 
                                 onValueChange={(value: AchievementForm['type']) => setAchievementForm({ ...achievementForm, type: value })}
@@ -369,16 +369,16 @@ const LootboxManagement: React.FC = () => {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="daily_streak">Серия дней</SelectItem>
-                                    <SelectItem value="total_days">Всего дней</SelectItem>
-                                    <SelectItem value="total_messages">Сообщения</SelectItem>
-                                    <SelectItem value="total_donated">Донаты</SelectItem>
-                                    <SelectItem value="longest_streak">Самая длинная серия</SelectItem>
+                                    <SelectItem value="daily_streak">����� ����</SelectItem>
+                                    <SelectItem value="total_days">����� ����</SelectItem>
+                                    <SelectItem value="total_messages">���������</SelectItem>
+                                    <SelectItem value="total_donated">������</SelectItem>
+                                    <SelectItem value="longest_streak">����� ������� �����</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label htmlFor="requirement_value">Требуемое значение</Label>
+                            <Label htmlFor="requirement_value">��������� ��������</Label>
                             <Input
                                 id="requirement_value"
                                 type="number"
@@ -388,7 +388,7 @@ const LootboxManagement: React.FC = () => {
                             />
                         </div>
                         <div>
-                            <Label htmlFor="reward_type">Тип награды</Label>
+                            <Label htmlFor="reward_type">��� �������</Label>
                             <Select 
                                 value={achievementForm.reward_type} 
                                 onValueChange={(value: AchievementForm['reward_type']) => setAchievementForm({ ...achievementForm, reward_type: value })}
@@ -397,14 +397,14 @@ const LootboxManagement: React.FC = () => {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="free_lootbox">Бесплатный лутбокс</SelectItem>
-                                    <SelectItem value="paid_lootbox">Платный лутбокс</SelectItem>
-                                    <SelectItem value="special">Особое</SelectItem>
+                                    <SelectItem value="free_lootbox">���������� �������</SelectItem>
+                                    <SelectItem value="paid_lootbox">������� �������</SelectItem>
+                                    <SelectItem value="special">������</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <Label htmlFor="reward_value">Количество наград</Label>
+                            <Label htmlFor="reward_value">���������� ������</Label>
                             <Input
                                 id="reward_value"
                                 type="number"
@@ -414,7 +414,7 @@ const LootboxManagement: React.FC = () => {
                             />
                         </div>
                         <Button onClick={handleCreateAchievement} className="w-full">
-                            Создать достижение
+                            ������� ����������
                         </Button>
                     </div>
                 );
@@ -425,26 +425,26 @@ const LootboxManagement: React.FC = () => {
     };
 
     if (isLoading) {
-        return <PageLoader message="Загрузка лутбоксов..." />;
+        return <PageLoader message="�������� ���������..." />;
     }
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-white">Управление лутбоксами</h2>
+                <h2 className="text-2xl font-bold text-white">���������� ����������</h2>
                 <div className="flex space-x-2">
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
                             <Button onClick={() => openDialog('lootbox')} variant="outline">
                                 <Plus className="w-4 h-4 mr-2" />
-                                Лутбокс
+                                �������
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-md">
                             <DialogHeader>
-                                <DialogTitle>Создать лутбокс</DialogTitle>
+                                <DialogTitle>������� �������</DialogTitle>
                                 <DialogDescription>
-                                    Создайте новый лутбокс для канала
+                                    �������� ����� ������� ��� ������
                                 </DialogDescription>
                             </DialogHeader>
                             {renderDialog()}
@@ -455,14 +455,14 @@ const LootboxManagement: React.FC = () => {
                         <DialogTrigger asChild>
                             <Button onClick={() => openDialog('reward')} variant="outline">
                                 <Gift className="w-4 h-4 mr-2" />
-                                Награда
+                                �������
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-md">
                             <DialogHeader>
-                                <DialogTitle>Создать награду</DialogTitle>
+                                <DialogTitle>������� �������</DialogTitle>
                                 <DialogDescription>
-                                    Добавьте награду в лутбокс
+                                    �������� ������� � �������
                                 </DialogDescription>
                             </DialogHeader>
                             {renderDialog()}
@@ -473,14 +473,14 @@ const LootboxManagement: React.FC = () => {
                         <DialogTrigger asChild>
                             <Button onClick={() => openDialog('achievement')} variant="outline">
                                 <Trophy className="w-4 h-4 mr-2" />
-                                Достижение
+                                ����������
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-md">
                             <DialogHeader>
-                                <DialogTitle>Создать достижение</DialogTitle>
+                                <DialogTitle>������� ����������</DialogTitle>
                                 <DialogDescription>
-                                    Настройте достижение для пользователей
+                                    ��������� ���������� ��� �������������
                                 </DialogDescription>
                             </DialogHeader>
                             {renderDialog()}
@@ -491,9 +491,9 @@ const LootboxManagement: React.FC = () => {
 
             <Tabs defaultValue="lootboxes" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="lootboxes">Лутбоксы</TabsTrigger>
-                    <TabsTrigger value="achievements">Достижения</TabsTrigger>
-                    <TabsTrigger value="settings">Настройки</TabsTrigger>
+                    <TabsTrigger value="lootboxes">��������</TabsTrigger>
+                    <TabsTrigger value="achievements">����������</TabsTrigger>
+                    <TabsTrigger value="settings">���������</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="lootboxes" className="space-y-4">
@@ -507,7 +507,7 @@ const LootboxManagement: React.FC = () => {
                                             {lootbox.name}
                                         </span>
                                         <Badge variant={lootbox.type === 'free' ? 'default' : 'secondary'}>
-                                            {lootbox.type === 'free' ? 'Бесплатный' : 'Платный'}
+                                            {lootbox.type === 'free' ? '����������' : '�������'}
                                         </Badge>
                                     </CardTitle>
                                     <CardDescription className="text-gray-400">
@@ -518,20 +518,20 @@ const LootboxManagement: React.FC = () => {
                                     <div className="space-y-2">
                                         {lootbox.type === 'paid' && lootbox.price && (
                                             <p className="text-yellow-400 font-bold">
-                                                {lootbox.price} ₽
+                                                {lootbox.price} ?
                                             </p>
                                         )}
                                         <p className="text-sm text-gray-300">
-                                            Наград: {lootbox.rewards?.length || 0}
+                                            ������: {lootbox.rewards?.length || 0}
                                         </p>
                                         <div className="flex space-x-2">
                                             <Button size="sm" variant="outline">
                                                 <Edit className="w-4 h-4 mr-1" />
-                                                Изменить
+                                                ��������
                                             </Button>
                                             <Button size="sm" variant="destructive">
                                                 <Trash2 className="w-4 h-4 mr-1" />
-                                                Удалить
+                                                �������
                                             </Button>
                                         </div>
                                     </div>
@@ -557,22 +557,22 @@ const LootboxManagement: React.FC = () => {
                                 <CardContent>
                                     <div className="space-y-2">
                                         <p className="text-sm text-gray-300">
-                                            Тип: {achievement.type}
+                                            ���: {achievement.type}
                                         </p>
                                         <p className="text-sm text-gray-300">
-                                            Требование: {achievement.requirement_value}
+                                            ����������: {achievement.requirement_value}
                                         </p>
                                         <p className="text-sm text-gray-300">
-                                            Награда: {achievement.reward_type} x{achievement.reward_value}
+                                            �������: {achievement.reward_type} x{achievement.reward_value}
                                         </p>
                                         <div className="flex space-x-2">
                                             <Button size="sm" variant="outline">
                                                 <Edit className="w-4 h-4 mr-1" />
-                                                Изменить
+                                                ��������
                                             </Button>
                                             <Button size="sm" variant="destructive">
                                                 <Trash2 className="w-4 h-4 mr-1" />
-                                                Удалить
+                                                �������
                                             </Button>
                                         </div>
                                     </div>
@@ -585,14 +585,14 @@ const LootboxManagement: React.FC = () => {
                 <TabsContent value="settings" className="space-y-4">
                     <Card className="bg-gray-800 border-gray-700">
                         <CardHeader>
-                            <CardTitle className="text-white">OBS Интеграция</CardTitle>
+                            <CardTitle className="text-white">OBS ����������</CardTitle>
                             <CardDescription className="text-gray-400">
-                                Настройте интеграцию с OBS для анимаций
+                                ��������� ���������� � OBS ��� ��������
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
-                                <Label htmlFor="obs_url">WebSocket URL для OBS</Label>
+                                <Label htmlFor="obs_url">WebSocket URL ��� OBS</Label>
                                 <Input
                                     id="obs_url"
                                     value={`${import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'}/ws/obs/lootbox_yourchy`}
@@ -600,15 +600,15 @@ const LootboxManagement: React.FC = () => {
                                     className="bg-gray-700"
                                 />
                                 <p className="text-xs text-gray-400 mt-1">
-                                    Скопируйте этот URL в OBS WebSocket Source
+                                    ���������� ���� URL � OBS WebSocket Source
                                 </p>
                             </div>
                             <div>
-                                <Label>Lua скрипт для OBS</Label>
+                                <Label>Lua ������ ��� OBS</Label>
                                 <Textarea
-                                    value={`-- Вставьте этот код в OBS Scripts
+                                    value={`-- �������� ���� ��� � OBS Scripts
 local websocket_url = "${import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'}/ws/obs/lootbox_yourchy"
--- ... остальной код скрипта`}
+-- ... ��������� ��� �������`}
                                     readOnly
                                     className="bg-gray-700 font-mono text-xs"
                                     rows={10}

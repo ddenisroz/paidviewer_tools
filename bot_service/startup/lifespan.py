@@ -14,12 +14,11 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-from core.config import settings
 from core.database import get_db, init_db
 from core.connection_manager import get_connection_manager
 from core.background_tasks import background_tasks
-from features.tts.memory_tts_queue import memory_tts_queue
-from services.memory_websocket_manager import memory_websocket_manager
+from services.tts.memory_tts_queue import get_memory_tts_queue
+from services.memory_websocket_manager import get_memory_websocket_manager
 
 from .bot_registry import get_bot_registry
 from .bot_initializer import initialize_all_bots
@@ -36,19 +35,26 @@ async def _startup_database() -> None:
 async def _startup_services() -> None:
     """Запуск сервисов (TTS queue, WebSocket manager)."""
     try:
-        await memory_tts_queue.start()
-        logger.info("Memory TTS Queue started")
+        await get_memory_tts_queue().start()
+        # logger.info("Memory TTS Queue started") - Logged inside start()
     except Exception as e:
         logger.error(f"Failed to start Memory TTS Queue: {e}")
         raise
     
     try:
-        await memory_websocket_manager.start()
-        logger.info("Memory WebSocket Manager started")
+        await get_memory_websocket_manager().start()
+        # logger.info("Memory WebSocket Manager started") - Logged inside start()
     except Exception as e:
         logger.error(f"Failed to start Memory WebSocket Manager: {e}")
         raise
 
+    # [NEW] Start TTS Worker
+    try:
+        from services.tts.tts_worker import tts_worker
+        await tts_worker.start()
+    except Exception as e:
+        logger.error(f"Failed to start TTS Worker: {e}")
+        raise
 
 async def _startup_connection_manager() -> None:
     """Восстановление активных сессий."""
@@ -65,7 +71,6 @@ async def _startup_connection_manager() -> None:
     finally:
         db.close()
 
-
 async def _startup_background_tasks() -> None:
     """Запуск фоновых задач."""
     await background_tasks.start_all_tasks()
@@ -80,7 +85,6 @@ async def _startup_background_tasks() -> None:
     from services.vk_token_refresh_service import vk_token_refresh_service
     await vk_token_refresh_service.start()
     logger.info("VK token refresh service started")
-
 
 async def _shutdown_bots() -> None:
     """Остановка всех ботов."""
@@ -103,20 +107,26 @@ async def _shutdown_bots() -> None:
     # Останавливаем ботов через registry
     await registry.stop_all()
 
-
 async def _shutdown_services() -> None:
     """Остановка сервисов."""
     try:
-        await memory_tts_queue.stop()
-        logger.info("Memory TTS Queue stopped")
+        await get_memory_tts_queue().stop()
+        # logger.info("Memory TTS Queue stopped") - Logged inside stop()
     except Exception as e:
         logger.error(f"Error stopping Memory TTS Queue: {e}")
     
     try:
-        await memory_websocket_manager.stop()
-        logger.info("Memory WebSocket Manager stopped")
+        await get_memory_websocket_manager().stop()
+        # logger.info("Memory WebSocket Manager stopped") - Logged inside stop()
     except Exception as e:
         logger.error(f"Error stopping Memory WebSocket Manager: {e}")
+
+    # [NEW] Stop TTS Worker
+    try:
+        from services.tts.tts_worker import tts_worker
+        await tts_worker.stop()
+    except Exception as e:
+        logger.error(f"Error stopping TTS Worker: {e}")
 
 
 async def _shutdown_background_tasks() -> None:

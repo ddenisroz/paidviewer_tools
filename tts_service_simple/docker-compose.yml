@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  tts-service:
+    build: .
+    container_name: tts_simple
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+      - ./generated_audio:/app/generated_audio
+      - ./user_voices:/app/user_voices
+      - ./reference_audio:/app/reference_audio
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    restart: unless-stopped
+    environment:
+      - GPU_MAX_VRAM_GB=0
+      - GPU_PRIORITY=performance

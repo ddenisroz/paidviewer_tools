@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 
 import { 
   AlertCircle, 
@@ -12,20 +12,20 @@ import {
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-import { useAuth } from '../../../context/AuthContext';
-import { useIntegrations } from '../../../context/IntegrationsContext';
-import PageWrapper from '../../../shared/components/PageWrapper';
-import DonationSettings from '../components/DonationSettings';
-import DropsHistory from '../components/DropsHistory';
-import PointsRewards from '../components/PointsRewards';
-import RewardsManager from '../components/RewardsManager';
-import StreakSettings from '../components/StreakSettings';
-import StreakTracker from '../components/StreakTracker';
-import WidgetSettings from '../components/WidgetSettings';
+import { useAuth } from '@/context/AuthContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
+import DonationSettings from '@/features/drops/components/DonationSettings';
+import DropsHistory from '@/features/drops/components/DropsHistory';
+import PointsRewards from '@/features/drops/components/PointsRewards';
+import RewardsManager from '@/features/drops/components/RewardsManager';
+import StreakSettings from '@/features/drops/components/StreakSettings';
+import StreakTracker from '@/features/drops/components/StreakTracker';
+import WidgetSettings from '@/features/drops/components/WidgetSettings';
+import PageWrapper from '@/shared/components/PageWrapper';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent } from '@/shared/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 
 type TabType = 'streak' | 'donation' | 'points' | 'rewards' | 'history' | 'widget';
 

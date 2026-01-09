@@ -11,9 +11,9 @@ import React from 'react';
 
 import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import Skeleton from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import Skeleton from '@/shared/components/ui/skeleton';
 
 export interface StatsCardProps {
     title: string;

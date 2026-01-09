@@ -4,7 +4,6 @@
 """
 
 import sys
-import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -16,8 +15,8 @@ sys.path.insert(0, str(BOT_SERVICE_ROOT))
 env_path = BOT_SERVICE_ROOT / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
 
-from core.database import SessionLocal, User, UserSession
-from core.session_manager import session_manager
+from core.database import SessionLocal, User, UserSession  # noqa: E402
+from core.session_manager import session_manager  # noqa: E402
 
 
 def update_sessions():
@@ -25,7 +24,7 @@ def update_sessions():
     db = SessionLocal()
     try:
         # Находим всех админов
-        admins = db.query(User).filter(User.is_admin == True).all()
+        admins = db.query(User).filter(User.is_admin).all()
         
         if not admins:
             print("❌ Админы не найдены")
@@ -41,11 +40,11 @@ def update_sessions():
             # Находим активные сессии пользователя
             sessions = db.query(UserSession).filter(
                 UserSession.user_id == admin.id,
-                UserSession.is_active == True
+                UserSession.is_active
             ).all()
             
             if not sessions:
-                print(f"  ⚠️  Активных сессий не найдено")
+                print("  ⚠️  Активных сессий не найдено")
                 continue
             
             print(f"  Найдено активных сессий: {len(sessions)}")

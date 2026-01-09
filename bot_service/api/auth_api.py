@@ -1,16 +1,34 @@
 # bot_service/api/auth_api.py
-"""Authentication API endpoints"""
+"""
+Authentication API endpoints.
+Clean Architecture: uses UserRepository for data access.
+"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import logging
 
-from core.database import get_db, User
+from core.database import get_db
 from core.security_modern import limiter
+from core.session_manager import session_manager
+from core.token_utils import validate_platform_token
+from core.auth_handlers import auth_handlers
+from auth.auth import get_current_user
+from repositories.user_repository import UserRepository
 from starlette.requests import Request
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+# Reserved usernames
+RESERVED_NAMES = {'admin', 'root', 'system', 'bot', 'moderator', 'mod', 'guest'}
+
+
+@router.get("/me")
+async def get_me(current_user: dict = Depends(get_current_user)):
+    """Get current authenticated user."""
+    return current_user
 
 
 @router.get("/check-username")
@@ -20,46 +38,134 @@ async def check_username_availability(
     username: str = Query(..., min_length=3, max_length=25),
     db: Session = Depends(get_db)
 ):
-    """
-    Проверить доступность никнейма
-    
-    Args:
-        username: Никнейм для проверки
-        db: Database session
-        
-    Returns:
-        {"available": bool, "username": str}
-    """
+    """Проверить доступность никнейма"""
     try:
-        # Нормализуем никнейм
         username_normalized = username.strip().lower()
 
-        # Проверяем зарезервированные имена
-        reserved_names = ['admin', 'root', 'system', 'bot', 'moderator', 'mod', 'guest']
-        if username_normalized in reserved_names:
-            return {
-                "available": False,
-                "username": username,
-                "reason": "reserved"
-            }
+        # Check reserved names
+        if username_normalized in RESERVED_NAMES:
+            return {"available": False, "username": username, "reason": "reserved"}
 
-        # Проверяем существование в базе
-        existing_user = db.query(User).filter(
-            User.username.ilike(username)  # Case-insensitive поиск
-        ).first()
+        # Check database
+        repo = UserRepository(db)
+        if repo.is_username_taken(username):
+            return {"available": False, "username": username, "reason": "taken"}
 
-        if existing_user:
-            return {
-                "available": False,
-                "username": username,
-                "reason": "taken"
-            }
-
-        return {
-            "available": True,
-            "username": username
-        }
+        return {"available": True, "username": username}
 
     except Exception as e:
         logger.error(f"Error checking username availability: {e}")
         raise HTTPException(status_code=500, detail="Error checking username availability")
+
+
+@router.post("/logout")
+async def logout(current_user: dict = Depends(get_current_user)):
+    """Logout current user."""
+    return await auth_handlers.logout(current_user)
+
+
+@router.get("/status")
+async def auth_status(request: Request, db: Session = Depends(get_db)):
+    """Получить статус авторизации и интеграций."""
+    logger.info("=== AUTH STATUS REQUEST START ===")
+    session_id = request.cookies.get("session_id")
+    
+    if not session_id:
+        logger.info("[AUTH] No session_id found")
+        return {"authenticated": False}
+    
+    session_data = session_manager.validate_session(session_id)
+    if not session_data:
+        logger.info("[AUTH] Session validation failed")
+        return {"authenticated": False, "integrations": {}}
+    
+    user_id = session_data.get("user_id")
+    
+    if not user_id or user_id <= 0:
+        logger.info("[AUTH] Invalid user_id in session")
+        return {"authenticated": False, "integrations": {}}
+    
+    # Get user
+    repo = UserRepository(db)
+    user_data = {}
+    user = None
+    
+    try:
+        user = repo.get_by_id(user_id)
+        if user:
+            user_data = {
+                "id": user.id,
+                "twitch_username": user.twitch_username,
+                "vk_username": user.vk_username,
+                "vk_channel_name": user.vk_channel_name,
+                "is_admin": user.is_admin
+            }
+    except Exception as e:
+        logger.error(f"[ERROR] Error getting user data: {e}")
+        user_data = {
+            "id": user_id,
+            "twitch_username": None,
+            "vk_username": None,
+            "vk_channel_name": None,
+            "is_admin": session_data.get("is_admin", False)
+        }
+    
+    # Get integrations
+    integrations = await _get_user_integrations(user_id, user, repo)
+    
+    logger.info("=== AUTH STATUS REQUEST END ===")
+    return {
+        "authenticated": True,
+        "integrations": integrations,
+        "user": user_data
+    }
+
+
+async def _get_user_integrations(user_id: int, user, repo: UserRepository) -> dict:
+    """Получает интеграции пользователя с валидацией токенов."""
+    integrations = {}
+    
+    try:
+        user_tokens = repo.get_user_tokens(user_id)
+        
+        for token in user_tokens:
+            is_active = getattr(token, 'is_active', True)
+            if not is_active or not token.access_token:
+                continue
+            
+            # Validate token
+            try:
+                is_valid = await validate_platform_token(token)
+            except Exception:
+                is_valid = True  # Assume valid on network errors
+            
+            if not is_valid:
+                continue
+            
+            # VK: check it's a streamer OAuth token
+            if token.platform == 'vk':
+                if not token.refresh_token or not token.scopes:
+                    continue
+            
+            # Get username
+            username = None
+            if token.platform == 'twitch' and user:
+                username = user.twitch_username
+            elif token.platform == 'vk' and user:
+                username = user.vk_username
+            elif token.platform == 'donationalerts' and user:
+                username = getattr(user, 'donationalerts_username', None)
+            
+            integrations[token.platform] = {
+                "connected": True,
+                "enabled": True,
+                "platform_user_id": token.platform_user_id,
+                "avatar_url": token.avatar_url,
+                "username": username
+            }
+            
+    except Exception as e:
+        logger.error(f"[ERROR] Error fetching integrations: {e}")
+    
+    return integrations
+

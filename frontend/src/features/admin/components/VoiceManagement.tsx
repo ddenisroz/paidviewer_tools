@@ -1,26 +1,25 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Edit, Globe, Loader2, Mic, RefreshCw, Settings, TestTube2, Trash2, Upload, User as UserIcon, Users, Volume2, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PageLoader } from '@/components/ui/loader';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from "@/components/ui/slider";
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/components/ui/toast';
+import { TTS_SERVICE_URL } from '@/constants';
+import { useAuth } from '@/context/AuthContext';
+import { deleteVoice, getAdminVoices, getUsers, renameVoice, retranscribeVoice, testVoice, updateVoiceSettings, uploadVoice } from '@/services/unified-api';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { PageLoader } from '@/shared/components/ui/loader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Slider } from "@/shared/components/ui/slider";
+import { Textarea } from '@/shared/components/ui/textarea';
+import { useToast } from '@/shared/components/ui/toast';
+import { logger } from '@/shared/utils/prodLogger';
 
-import { TTS_SERVICE_URL } from '../../../constants';
-import { useAuth } from '../../../context/AuthContext';
-import { deleteVoice, getAdminVoices, getUsers, renameVoice, retranscribeVoice, testVoice, transcribeVoice, updateVoiceSettings, uploadVoice } from '../../../services/unified-api';
-import { logger } from '../../../utils/prodLogger';
-
-import type { TtsVoice } from '../../../types/tts';
+import type { TtsVoice } from '@/types/tts';
 
 interface VoiceManagementUser {
     id: number;
@@ -59,17 +58,17 @@ const VoiceManagement: React.FC = () => {
     const [uploadDialogOpen, setUploadDialogOpen] = useState<boolean>(false);
     const [testText, setTestText] = useState<string>("Привет, я бы хотел с тобой постримить, если честно, для меня бы это было честью. Постримить с таким великим стримером было бы реально круто.");
     const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
-    
+
     const [currentVoice, setCurrentVoice] = useState<TtsVoice | null>(null);
-    
+
     // Состояние для актуальных значений ползунков при тестировании
     const [testCfgStrength, setTestCfgStrength] = useState<number>(2.5);
     const [testSpeedPreset, setTestSpeedPreset] = useState<SpeedPreset>('normal');
-    
+
     // Состояние для фильтрации
     const [selectedUserFilter, setSelectedUserFilter] = useState<string>('all');
     const [searchQuery, setSearchQuery] = useState<string>('');
-    
+
     // Состояние для загрузки
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [voiceName, setVoiceName] = useState<string>('');
@@ -82,7 +81,7 @@ const VoiceManagement: React.FC = () => {
     const [ttsServiceWarning, setTtsServiceWarning] = useState<string | null>(null);
     const isUserClosingRef = useRef<boolean>(false);
     const queryClient = useQueryClient();
-    
+
     const { user } = useAuth();
     const audioContext: AudioContext | null = null;
     const audioSource: AudioBufferSourceNode | null = null;
@@ -98,11 +97,11 @@ const VoiceManagement: React.FC = () => {
             logger.log('[DEBUG] [ADMIN] Fetching voices...');
             const response = await getAdminVoices();
             logger.log('[DEBUG] [ADMIN] Raw response:', response);
-            
+
             const apiResponse = response as ApiResponse;
             const data = apiResponse?.data || response;
             logger.log('[DEBUG] [ADMIN] Extracted data:', data);
-            
+
             const dataWithWarning = data as { warning?: string };
             if (dataWithWarning?.warning) {
                 setTtsServiceWarning(dataWithWarning.warning);
@@ -110,14 +109,14 @@ const VoiceManagement: React.FC = () => {
             } else {
                 setTtsServiceWarning(null);
             }
-            
+
             let voicesArray: TtsVoice[] = [];
             if (Array.isArray(data)) {
                 voicesArray = data as TtsVoice[];
                 logger.log('[OK] [ADMIN] Data is array, using directly');
             } else {
                 const dataObj = data as { status?: string; success?: boolean; voices?: TtsVoice[] | VoicesResponse; data?: TtsVoice[]; global_voices?: TtsVoice[]; user_voices?: TtsVoice[] };
-                
+
                 if (dataObj?.status === 'success' && Array.isArray(dataObj.voices)) {
                     voicesArray = dataObj.voices;
                     logger.log('[OK] [ADMIN] Found voices in data.voices (status: success)');
@@ -149,7 +148,7 @@ const VoiceManagement: React.FC = () => {
                     voicesArray = [];
                 }
             }
-            
+
             logger.log('[OK] [ADMIN] Loaded voices:', voicesArray.length, 'voices');
             if (voicesArray.length > 0) {
                 logger.log('[OK] [ADMIN] First voice sample:', voicesArray[0]);
@@ -166,7 +165,7 @@ const VoiceManagement: React.FC = () => {
         if (voicesError) {
             logger.error('[ERROR] [ADMIN] Error loading voices:', voicesError);
             const error = voicesError as { message?: string; code?: string; response?: { status?: number; data?: { detail?: string } } };
-            
+
             if (error.message?.includes('connection') || error.message?.includes('timeout') || error.code === 'ECONNREFUSED') {
                 setTtsServiceWarning(`Ошибка подключения к TTS сервису: ${error.message || 'Сервис недоступен'}`);
             } else if (error.response?.status === 500 && error.response?.data?.detail?.includes('connection')) {
@@ -180,7 +179,7 @@ const VoiceManagement: React.FC = () => {
         queryKey: ['admin-voice-users'],
         queryFn: async (): Promise<VoiceManagementUser[]> => {
             const response = await getUsers();
-            
+
             let usersData: VoiceManagementUser[] = [];
             if (Array.isArray(response)) {
                 usersData = response as VoiceManagementUser[];
@@ -192,7 +191,7 @@ const VoiceManagement: React.FC = () => {
                     usersData = responseObj.users;
                 }
             }
-            
+
             return usersData;
         },
         staleTime: 5 * 60 * 1000,
@@ -211,26 +210,26 @@ const VoiceManagement: React.FC = () => {
 
     const voices = voicesData ?? [];
     const users = usersData ?? [];
-    
+
     useEffect(() => {
         setLoading(voicesLoading);
     }, [voicesLoading]);
 
     useEffect(() => {
         if (!editDialogOpen) return undefined;
-        
+
         const handleEscape = (e: KeyboardEvent): void => {
             if (e.key === 'Escape') {
                 setEditDialogOpen(false);
             }
         };
-        
+
         document.addEventListener('keydown', handleEscape);
         return (): void => {
             document.removeEventListener('keydown', handleEscape);
         };
     }, [editDialogOpen]);
-    
+
     useEffect(() => {
         if (editDialogOpen) {
             document.body.style.overflow = 'hidden';
@@ -243,19 +242,19 @@ const VoiceManagement: React.FC = () => {
 
     useEffect(() => {
         if (!uploadDialogOpen) return undefined;
-        
+
         const handleEscape = (e: KeyboardEvent): void => {
             if (e.key === 'Escape') {
                 setUploadDialogOpen(false);
             }
         };
-        
+
         document.addEventListener('keydown', handleEscape);
         return (): void => {
             document.removeEventListener('keydown', handleEscape);
         };
     }, [uploadDialogOpen]);
-    
+
     useEffect(() => {
         if (uploadDialogOpen) {
             document.body.style.overflow = 'hidden';
@@ -271,20 +270,20 @@ const VoiceManagement: React.FC = () => {
         if (!file) {
             return;
         }
-        
+
         const supportedFormats = ['.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff', '.au'];
         const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-        
+
         if (!supportedFormats.includes(fileExtension)) {
-            addToast({ 
-                type: 'error', 
-                title: 'Ошибка', 
-                message: `Неподдерживаемый формат файла. Поддерживаемые форматы: ${supportedFormats.join(', ')}` 
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: `Неподдерживаемый формат файла. Поддерживаемые форматы: ${supportedFormats.join(', ')}`
             });
             event.target.value = '';
             return;
         }
-        
+
         setUploadFile(file);
         const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
         setVoiceName(nameWithoutExt);
@@ -306,7 +305,7 @@ const VoiceManagement: React.FC = () => {
             const formData = new FormData();
             formData.append('file', uploadFile);
             formData.append('voice_name', voiceName.trim());
-            
+
             if (ownerId === 'user') {
                 const { uploadUserVoice } = await import('../../../services/unified-api');
                 formData.append('user_id', selectedUserId);
@@ -315,7 +314,7 @@ const VoiceManagement: React.FC = () => {
                 await uploadVoice(formData);
             }
 
-            const message = ownerId === 'global' 
+            const message = ownerId === 'global'
                 ? `Голос "${voiceName.trim()}" успешно загружен в глобальные голоса.`
                 : `Голос "${voiceName.trim()}" успешно загружен для пользователя.`;
             addToast({ type: 'success', title: 'Успех', message });
@@ -348,7 +347,7 @@ const VoiceManagement: React.FC = () => {
             addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось удалить голос.' });
         }
     };
-    
+
     const handleEdit = (voice: TtsVoice): void => {
         setCurrentVoice({ ...voice });
         setTestCfgStrength(voice.cfg_strength || 2.5);
@@ -358,26 +357,26 @@ const VoiceManagement: React.FC = () => {
 
 
     const handleReferenceTextChange = (value: string): void => {
-        setCurrentVoice(prev => prev ? {...prev, reference_text: value} : null);
+        setCurrentVoice(prev => prev ? { ...prev, reference_text: value } : null);
     };
 
     const handleRenameVoice = async (): Promise<void> => {
         if (!currentVoice) return;
-        
+
         const newName = prompt('Введите новое имя голоса:', currentVoice.name);
         if (!newName || newName.trim() === '' || newName === currentVoice.name) return;
-        
+
         try {
             await renameVoice(currentVoice.id, newName.trim());
-            
-            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, name: newName.trim()}
+
+            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+                voice.id === currentVoice.id
+                    ? { ...voice, name: newName.trim() }
                     : voice
             ));
-            
-            setCurrentVoice(prev => prev ? {...prev, name: newName.trim()} : null);
-            
+
+            setCurrentVoice(prev => prev ? { ...prev, name: newName.trim() } : null);
+
             addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
         } catch (error) {
             logger.error('Error renaming voice:', error);
@@ -387,24 +386,24 @@ const VoiceManagement: React.FC = () => {
 
     const handleSaveSettings = async (): Promise<void> => {
         if (!currentVoice) return;
-        
+
         try {
             const settings = {
                 cfg_strength: testCfgStrength,
                 speed_preset: testSpeedPreset,
                 reference_text: currentVoice.reference_text
             };
-            
+
             await updateVoiceSettings(currentVoice.id, settings);
-            
-            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, ...settings}
+
+            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+                voice.id === currentVoice.id
+                    ? { ...voice, ...settings }
                     : voice
             ));
-            
-            setCurrentVoice(prev => prev ? {...prev, ...settings} : null);
-            
+
+            setCurrentVoice(prev => prev ? { ...prev, ...settings } : null);
+
             isUserClosingRef.current = true;
             setEditDialogOpen(false);
             addToast({ type: 'success', title: 'Успех', message: 'Настройки голоса сохранены!' });
@@ -413,7 +412,7 @@ const VoiceManagement: React.FC = () => {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить настройки.' });
         }
     };
-    
+
 
     const handleTestVoice = async (): Promise<void> => {
         if (!currentVoice || !user) return;
@@ -424,17 +423,17 @@ const VoiceManagement: React.FC = () => {
                 currentVoice.id || 0,
                 testText
             );
-            
+
             const audioResponse = response as AudioResponse;
             const audioUrl = audioResponse.data?.audio_url || audioResponse.audio_url;
             if (audioUrl) {
                 const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${TTS_SERVICE_URL}${audioUrl}`;
-                
+
                 const audio = new Audio(fullAudioUrl);
-                
+
                 audio.oncanplay = () => {
                     setIsTestingVoice(false);
-                    
+
                     audio.play().then(() => {
                         setIsPlaying(true);
                         addToast({ type: 'success', title: 'Успех', message: 'Аудио воспроизводится!' });
@@ -444,11 +443,11 @@ const VoiceManagement: React.FC = () => {
                         addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио. Проверьте настройки браузера.' });
                     });
                 };
-                
+
                 audio.oncanplaythrough = () => {
                     setIsTestingVoice(false);
                 };
-                
+
                 audio.onloadeddata = () => {
                     audio.play().then(() => {
                         // Audio playing successfully
@@ -456,26 +455,26 @@ const VoiceManagement: React.FC = () => {
                         logger.error('Play error (onloadeddata):', playError);
                     });
                 };
-                
+
                 audio.onerror = () => {
                     logger.error('Audio error');
                     setIsTestingVoice(false);
                     addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить аудио файл.' });
                 };
-                
+
                 audio.onabort = () => {
                     setIsTestingVoice(false);
                     setIsPlaying(false);
                 };
-                
+
                 audio.onended = () => {
                     setIsPlaying(false);
                 };
-                
+
                 audio.onpause = () => {
                     setIsPlaying(false);
                 };
-                
+
                 setTimeout(() => {
                     if (audio.readyState >= 2) {
                         audio.play().then(() => {
@@ -498,47 +497,24 @@ const VoiceManagement: React.FC = () => {
         }
     };
 
-    const handleTranscribeVoice = async (): Promise<void> => {
-        if (!currentVoice || !currentVoice.reference_text?.trim()) return;
-        
-        setIsTranscribing(true);
-        try {
-            const response = await transcribeVoice(currentVoice.id);
-            const transcribeResponse = response as unknown as TranscribeResponse;
-            
-            setCurrentVoice(prev => prev ? {...prev, reference_text: transcribeResponse.data.reference_text} : null);
-            
-            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, reference_text: transcribeResponse.data.reference_text}
-                    : voice
-            ));
-            
-            addToast({ type: 'success', title: 'Успех', message: 'Транскрипция завершена успешно!' });
-        } catch {
-            logger.error('Error transcribing voice');
-            addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось выполнить транскрипцию аудио.' });
-        } finally {
-            setIsTranscribing(false);
-        }
-    };
+
 
     const handleRetranscribeVoice = async (): Promise<void> => {
         if (!currentVoice || !currentVoice.reference_text?.trim()) return;
-        
+
         setIsTranscribing(true);
         try {
             const response = await retranscribeVoice(currentVoice.id);
             const transcribeResponse = response as unknown as TranscribeResponse;
-            
-            setCurrentVoice(prev => prev ? {...prev, reference_text: transcribeResponse.data.reference_text} : null);
-            
-            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, reference_text: transcribeResponse.data.reference_text}
+
+            setCurrentVoice(prev => prev ? { ...prev, reference_text: transcribeResponse.data.reference_text } : null);
+
+            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+                voice.id === currentVoice.id
+                    ? { ...voice, reference_text: transcribeResponse.data.reference_text }
                     : voice
             ));
-            
+
             addToast({ type: 'success', title: 'Успех', message: 'Перетранскрипция завершена успешно!' });
         } catch (error) {
             logger.error('Error retranscribing voice:', error);
@@ -559,7 +535,7 @@ const VoiceManagement: React.FC = () => {
                     </h2>
                     <p className="text-gray-300 mt-1">Загрузка и управление всеми голосовыми сэмплами</p>
                 </div>
-                <Button 
+                <Button
                     className="bg-gray-600 hover:bg-gray-700"
                     onClick={() => setUploadDialogOpen(true)}
                 >
@@ -569,7 +545,7 @@ const VoiceManagement: React.FC = () => {
             </div>
 
             <Card className="bg-gray-800/50 border-gray-700">
-                 <CardHeader className="space-y-4">
+                <CardHeader className="space-y-4">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-xl font-bold">Список голосов</CardTitle>
                         <Badge variant="outline" className="text-sm">
@@ -584,8 +560,8 @@ const VoiceManagement: React.FC = () => {
                             className="max-w-xs"
                         />
                     </div>
-                 </CardHeader>
-                 <CardContent>
+                </CardHeader>
+                <CardContent>
                     {ttsServiceWarning && (
                         <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-600/50 rounded-lg">
                             <div className="flex items-start gap-3">
@@ -609,190 +585,190 @@ const VoiceManagement: React.FC = () => {
                         </div>
                     )}
                     <div className="space-y-8">
-                         {loading ? (
-                             <PageLoader message="Загрузка голосов..." />
-                         ) : (
-                             <>
-                                 <div>
-                                     <div className="flex items-center justify-between mb-4">
-                                         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                             <Users className="h-5 w-5 text-green-400" />
-                                             Пользовательские голоса
-                                             <Badge variant="outline" className="ml-2 text-green-400 border-green-400">
-                                                 {voices.filter(v => v.voice_type === 'user').length}
-                                             </Badge>
-                                         </h3>
-                                         {users.length > 0 && (
-                                             <Select value={selectedUserFilter} onValueChange={setSelectedUserFilter}>
-                                                 <SelectTrigger className="w-48">
-                                                     <SelectValue placeholder="Все пользователи" />
-                                                 </SelectTrigger>
-                                                 <SelectContent>
-                                                     <SelectItem value="all">Все пользователи</SelectItem>
-                                                     {users.map(u => (
-                                                         <SelectItem key={u.id} value={u.id.toString()}>
-                                                             {u.username || `User_${u.id}`}
-                                                         </SelectItem>
-                                                     ))}
-                                                 </SelectContent>
-                                             </Select>
-                                         )}
-                                     </div>
-                                     {(() => {
-                                         const userVoices = voices.filter(v => 
-                                             v.voice_type === 'user' && 
-                                             (selectedUserFilter === 'all' || v.owner_id === parseInt(selectedUserFilter)) &&
-                                             (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                                         );
-                                         return userVoices.length === 0 ? (
-                                             <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
-                                                 <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                                                 <p className="text-gray-400 text-lg mb-2">
-                                                     {selectedUserFilter !== 'all' ? 'У выбранного пользователя нет голосов' : 'Пользовательских голосов пока нет'}
-                                                 </p>
-                                             </div>
-                                         ) : (
-                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                                 {userVoices.map((voice) => (
-                                                     <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col h-full transition-all hover:border-slate-600 hover:shadow-lg">
-                                                         <CardHeader className="pb-3">
-                                                             <div className="flex items-center justify-between">
-                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                                     <Users className="h-4 w-4 text-green-400 flex-shrink-0"/>
-                                                                     <span className="truncate">{voice.name}</span>
-                                                                 </CardTitle>
-                                                             </div>
-                                                             <div className="text-xs text-gray-400 truncate mt-2">
-                                                                 {(() => {
-                                                                     const owner = users.find(u => u.id === voice.owner_id);
-                                                                     return owner ? (
-                                                                         <span className="truncate flex items-center gap-1">
-                                                                             <UserIcon className="h-3 w-3" />
-                                                                             {owner.username || `User_${owner.id}`}
-                                                                         </span>
-                                                                     ) : (
-                                                                         <span>Owner ID: {voice.owner_id}</span>
-                                                                     );
-                                                                 })()}
-                                                             </div>
-                                                         </CardHeader>
-                                                         <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                                                             <div className="flex gap-2">
-                                                                 <Button 
-                                                                     onClick={() => handleEdit(voice)} 
-                                                                     className="flex-1" 
-                                                                     variant="outline"
-                                                                     size="sm"
-                                                                 >
-                                                                     <Settings className="h-4 w-4 mr-1"/>
-                                                                     Настроить
-                                                                 </Button>
-                                                                 <Button 
-                                                                     onClick={(e) => handleDelete(voice.id, e)} 
-                                                                     variant="destructive"
-                                                                     size="sm"
-                                                                 >
-                                                                     <Trash2 className="h-4 w-4"/>
-                                                                 </Button>
-                                                             </div>
-                                                         </CardContent>
-                                                     </Card>
-                                                 ))}
-                                             </div>
-                                         );
-                                     })()}
-                                 </div>
+                        {loading ? (
+                            <PageLoader message="Загрузка голосов..." />
+                        ) : (
+                            <>
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                            <Users className="h-5 w-5 text-green-400" />
+                                            Пользовательские голоса
+                                            <Badge variant="outline" className="ml-2 text-green-400 border-green-400">
+                                                {voices.filter(v => v.voice_type === 'user').length}
+                                            </Badge>
+                                        </h3>
+                                        {users.length > 0 && (
+                                            <Select value={selectedUserFilter} onValueChange={setSelectedUserFilter}>
+                                                <SelectTrigger className="w-48">
+                                                    <SelectValue placeholder="Все пользователи" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">Все пользователи</SelectItem>
+                                                    {users.map(u => (
+                                                        <SelectItem key={u.id} value={u.id.toString()}>
+                                                            {u.username || `User_${u.id}`}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
+                                    {(() => {
+                                        const userVoices = voices.filter(v =>
+                                            v.voice_type === 'user' &&
+                                            (selectedUserFilter === 'all' || v.owner_id === parseInt(selectedUserFilter)) &&
+                                            (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                        );
+                                        return userVoices.length === 0 ? (
+                                            <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
+                                                <Users className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                                <p className="text-gray-400 text-lg mb-2">
+                                                    {selectedUserFilter !== 'all' ? 'У выбранного пользователя нет голосов' : 'Пользовательских голосов пока нет'}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                {userVoices.map((voice) => (
+                                                    <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col h-full transition-all hover:border-slate-600 hover:shadow-lg">
+                                                        <CardHeader className="pb-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                                                                    <Users className="h-4 w-4 text-green-400 flex-shrink-0" />
+                                                                    <span className="truncate">{voice.name}</span>
+                                                                </CardTitle>
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 truncate mt-2">
+                                                                {(() => {
+                                                                    const owner = users.find(u => u.id === voice.owner_id);
+                                                                    return owner ? (
+                                                                        <span className="truncate flex items-center gap-1">
+                                                                            <UserIcon className="h-3 w-3" />
+                                                                            {owner.username || `User_${owner.id}`}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span>Owner ID: {voice.owner_id}</span>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                        </CardHeader>
+                                                        <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                                                            <div className="flex gap-2">
+                                                                <Button
+                                                                    onClick={() => handleEdit(voice)}
+                                                                    className="flex-1"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                >
+                                                                    <Settings className="h-4 w-4 mr-1" />
+                                                                    Настроить
+                                                                </Button>
+                                                                <Button
+                                                                    onClick={(e) => handleDelete(voice.id, e)}
+                                                                    variant="destructive"
+                                                                    size="sm"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
 
-                                 <div className="border-t border-gray-700"></div>
+                                <div className="border-t border-gray-700"></div>
 
-                                 <div>
-                                     <div className="flex items-center justify-between mb-4">
-                                         <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                             <Globe className="h-5 w-5 text-blue-400" />
-                                             Глобальные голоса
-                                             <Badge variant="outline" className="ml-2 text-blue-400 border-blue-400">
-                                                 {voices.filter(v => v.voice_type === 'global').length}
-                                             </Badge>
-                                         </h3>
-                                     </div>
-                                     <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                                         <p className="text-blue-200 text-sm">
-                                             <strong>Глобальные голоса</strong> доступны всем пользователям платформы. 
-                                             Пользователи могут настраивать личные параметры (скорость, громкость, CFG) для каждого глобального голоса, 
-                                             но не могут изменять сам голос или удалять его.
-                                         </p>
-                                     </div>
-                                     {(() => {
-                                         const globalVoices = voices.filter(v => 
-                                             v.voice_type === 'global' &&
-                                             (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                                         );
-                                         return globalVoices.length === 0 ? (
-                                             <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
-                                                 <Globe className="h-16 w-16 text-gray-600 mx-auto mb-4" />
-                                                 <p className="text-gray-400 text-lg mb-2">Глобальных голосов пока нет</p>
+                                <div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                            <Globe className="h-5 w-5 text-blue-400" />
+                                            Глобальные голоса
+                                            <Badge variant="outline" className="ml-2 text-blue-400 border-blue-400">
+                                                {voices.filter(v => v.voice_type === 'global').length}
+                                            </Badge>
+                                        </h3>
+                                    </div>
+                                    <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                                        <p className="text-blue-200 text-sm">
+                                            <strong>Глобальные голоса</strong> доступны всем пользователям платформы.
+                                            Пользователи могут настраивать личные параметры (скорость, громкость, CFG) для каждого глобального голоса,
+                                            но не могут изменять сам голос или удалять его.
+                                        </p>
+                                    </div>
+                                    {(() => {
+                                        const globalVoices = voices.filter(v =>
+                                            v.voice_type === 'global' &&
+                                            (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                                        );
+                                        return globalVoices.length === 0 ? (
+                                            <div className="text-center py-12 bg-gray-800/30 rounded-lg border border-gray-700 border-dashed">
+                                                <Globe className="h-16 w-16 text-gray-600 mx-auto mb-4" />
+                                                <p className="text-gray-400 text-lg mb-2">Глобальных голосов пока нет</p>
                                                 <p className="text-gray-500 text-sm mb-4">Загрузите первый глобальный голос через кнопку "Загрузить голос" вверху страницы и выберите тип "Глобальный голос"</p>
-                                             </div>
-                                         ) : (
-                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                                 {globalVoices.map((voice) => (
-                                                     <Card key={voice.id} className="bg-slate-800 border-blue-500/30 flex flex-col h-full transition-all hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/20">
-                                                         <CardHeader className="pb-3">
-                                                             <div className="flex items-center justify-between">
-                                                                 <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                                     <Globe className="h-4 w-4 text-blue-400 flex-shrink-0"/>
-                                                                     <span className="truncate">{voice.name}</span>
-                                                                 </CardTitle>
-                                                                 <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
-                                                                     Глобальный
-                                                                 </Badge>
-                                                             </div>
-                                                             <div className="text-xs text-gray-400 mt-2">
-                                                                 Доступен всем пользователям
-                                                             </div>
-                                                         </CardHeader>
-                                                         <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                                                             <div className="flex gap-2">
-                                                                 <Button 
-                                                                     onClick={() => handleEdit(voice)} 
-                                                                     className="flex-1" 
-                                                                     variant="outline"
-                                                                     size="sm"
-                                                                 >
-                                                                     <Settings className="h-4 w-4 mr-1"/>
-                                                                     Настроить
-                                                                 </Button>
-                                                                 <Button 
-                                                                     onClick={(e) => handleDelete(voice.id, e)} 
-                                                                     variant="destructive"
-                                                                     size="sm"
-                                                                     title="Удалить глобальный голос"
-                                                                 >
-                                                                     <Trash2 className="h-4 w-4"/>
-                                                                 </Button>
-                                                             </div>
-                                                         </CardContent>
-                                                     </Card>
-                                                 ))}
-                                             </div>
-                                         );
-                                     })()}
-                                 </div>
-                             </>
-                         )}
-                     </div>
-                 </CardContent>
-             </Card>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                {globalVoices.map((voice) => (
+                                                    <Card key={voice.id} className="bg-slate-800 border-blue-500/30 flex flex-col h-full transition-all hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/20">
+                                                        <CardHeader className="pb-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
+                                                                    <Globe className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                                                                    <span className="truncate">{voice.name}</span>
+                                                                </CardTitle>
+                                                                <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
+                                                                    Глобальный
+                                                                </Badge>
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 mt-2">
+                                                                Доступен всем пользователям
+                                                            </div>
+                                                        </CardHeader>
+                                                        <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                                                            <div className="flex gap-2">
+                                                                <Button
+                                                                    onClick={() => handleEdit(voice)}
+                                                                    className="flex-1"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                >
+                                                                    <Settings className="h-4 w-4 mr-1" />
+                                                                    Настроить
+                                                                </Button>
+                                                                <Button
+                                                                    onClick={(e) => handleDelete(voice.id, e)}
+                                                                    variant="destructive"
+                                                                    size="sm"
+                                                                    title="Удалить глобальный голос"
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        </CardContent>
+                                                    </Card>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
             {uploadDialogOpen && ReactDOM.createPortal(
                 <>
-                    <div 
+                    <div
                         className="fixed inset-0 bg-black/80 z-[9999]"
                         onClick={() => setUploadDialogOpen(false)}
                     />
-                    
+
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
-                        <div 
+                        <div
                             className="bg-gray-900 rounded-lg max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -801,14 +777,14 @@ const VoiceManagement: React.FC = () => {
                                     <h2 className="text-xl font-bold text-white">Загрузка нового голоса</h2>
                                     <p className="text-sm text-gray-400 mt-1">Загрузите аудио файл для создания нового голоса. Поддерживаются все популярные форматы.</p>
                                 </div>
-                                <button 
-                                    onClick={() => setUploadDialogOpen(false)} 
+                                <button
+                                    onClick={() => setUploadDialogOpen(false)}
                                     className="text-gray-400 hover:text-white transition-colors"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            
+
                             <div className="flex-1 overflow-y-auto p-6">
                                 <div className="space-y-4">
                                     <div>
@@ -863,8 +839,8 @@ const VoiceManagement: React.FC = () => {
                                     {ownerId === 'user' && (
                                         <div>
                                             <Label htmlFor="selectedUserId">Пользователь</Label>
-                                            <Select 
-                                                value={selectedUserId} 
+                                            <Select
+                                                value={selectedUserId}
                                                 onValueChange={setSelectedUserId}
                                                 onOpenChange={(open) => {
                                                     if (open && users.length === 0) {
@@ -898,11 +874,11 @@ const VoiceManagement: React.FC = () => {
                                     )}
                                 </div>
                             </div>
-                            
+
                             <div className="border-t border-gray-700 p-4 flex justify-center gap-4">
-                                <Button 
-                                    onClick={() => setUploadDialogOpen(false)} 
-                                    variant="outline" 
+                                <Button
+                                    onClick={() => setUploadDialogOpen(false)}
+                                    variant="outline"
                                     className="w-28"
                                 >
                                     Отмена
@@ -928,26 +904,26 @@ const VoiceManagement: React.FC = () => {
 
             {editDialogOpen && currentVoice && ReactDOM.createPortal(
                 <>
-                    <div 
+                    <div
                         className="fixed inset-0 bg-black/80 z-[9999]"
                         onClick={() => setEditDialogOpen(false)}
                     />
-                    
+
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
-                        <div 
+                        <div
                             className="bg-gray-900 rounded-lg max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="border-b border-gray-700 p-4 flex items-center justify-between">
                                 <h2 className="text-xl font-bold text-white">Настройки голоса "{currentVoice?.name}"</h2>
-                                <button 
-                                    onClick={() => setEditDialogOpen(false)} 
+                                <button
+                                    onClick={() => setEditDialogOpen(false)}
                                     className="text-gray-400 hover:text-white transition-colors"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
-                            
+
                             <div className="flex-1 overflow-y-auto p-6">
                                 <div className="grid gap-6 py-4">
                                     <div className="space-y-4">
@@ -986,22 +962,22 @@ const VoiceManagement: React.FC = () => {
                                             </p>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <Label htmlFor="test-text">Текст для тестирования</Label>
                                         <Textarea
-                                          id="test-text"
-                                          value={testText}
-                                          onChange={(e) => setTestText(e.target.value)}
-                                          className="mt-1"
-                                          rows={3}
-                                          placeholder="Введите текст для тестирования голоса..."
+                                            id="test-text"
+                                            value={testText}
+                                            onChange={(e) => setTestText(e.target.value)}
+                                            className="mt-1"
+                                            rows={3}
+                                            placeholder="Введите текст для тестирования голоса..."
                                         />
                                     </div>
-                                    
+
                                     <div className="space-y-4">
                                         <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
-                                        
+
                                         <div>
                                             <Label htmlFor="cfg-strength">Стабильность синтеза: {testCfgStrength}</Label>
                                             <Slider
@@ -1017,17 +993,17 @@ const VoiceManagement: React.FC = () => {
                                                 className="mt-2"
                                             />
                                             <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                                [INFO] <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи. 
+                                                [INFO] <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи.
                                                 Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
                                             </div>
                                         </div>
-                                        
+
                                         <div>
                                             <Label htmlFor="speed-preset">Скорость речи: {
                                                 testSpeedPreset === 'very_slow' ? 'Очень медленный' :
-                                                testSpeedPreset === 'slow' ? 'Медленный' :
-                                                testSpeedPreset === 'normal' ? 'Нормальный' :
-                                                testSpeedPreset === 'fast' ? 'Быстрый' : 'Очень быстрый'
+                                                    testSpeedPreset === 'slow' ? 'Медленный' :
+                                                        testSpeedPreset === 'normal' ? 'Нормальный' :
+                                                            testSpeedPreset === 'fast' ? 'Быстрый' : 'Очень быстрый'
                                             }</Label>
                                             <Slider
                                                 id="speed-preset"
@@ -1036,15 +1012,15 @@ const VoiceManagement: React.FC = () => {
                                                 step={1}
                                                 value={[
                                                     testSpeedPreset === 'very_slow' ? 0 :
-                                                    testSpeedPreset === 'slow' ? 1 :
-                                                    testSpeedPreset === 'normal' ? 2 :
-                                                    testSpeedPreset === 'fast' ? 3 : 4
+                                                        testSpeedPreset === 'slow' ? 1 :
+                                                            testSpeedPreset === 'normal' ? 2 :
+                                                                testSpeedPreset === 'fast' ? 3 : 4
                                                 ]}
                                                 onValueChange={(value) => {
-                                                    const preset: SpeedPreset = value[0] === 0 ? 'very_slow' : 
-                                                                 value[0] === 1 ? 'slow' : 
-                                                                 value[0] === 2 ? 'normal' :
-                                                                 value[0] === 3 ? 'fast' : 'very_fast';
+                                                    const preset: SpeedPreset = value[0] === 0 ? 'very_slow' :
+                                                        value[0] === 1 ? 'slow' :
+                                                            value[0] === 2 ? 'normal' :
+                                                                value[0] === 3 ? 'fast' : 'very_fast';
                                                     setTestSpeedPreset(preset);
                                                     setCurrentVoice(prev => prev ? ({ ...prev, speed_preset: preset }) : null);
                                                 }}
@@ -1058,51 +1034,51 @@ const VoiceManagement: React.FC = () => {
                                                 <span>Очень быстрый</span>
                                             </div>
                                             <div className="text-xs text-gray-400 bg-gray-800 p-2 rounded mt-1">
-                                                [INFO] <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы. 
+                                                [INFO] <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы.
                                                 Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="border-t border-gray-700 p-4 flex justify-center gap-4">
-                                <Button 
-                                    onClick={handleTestVoice} 
-                                    variant="outline" 
+                                <Button
+                                    onClick={handleTestVoice}
+                                    variant="outline"
                                     disabled={isTestingVoice}
                                     className="w-32 whitespace-nowrap overflow-hidden text-ellipsis"
                                 >
                                     {isTestingVoice ? (
                                         <>
-                                            <Loader2 className="h-4 w-4 mr-2 animate-spin flex-shrink-0"/>
+                                            <Loader2 className="h-4 w-4 mr-2 animate-spin flex-shrink-0" />
                                             <span className="truncate">Тест...</span>
                                         </>
                                     ) : isPlaying ? (
                                         <>
-                                            <Volume2 className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                            <Volume2 className="h-4 w-4 mr-2 flex-shrink-0" />
                                             <span className="truncate">Воспроизводится</span>
                                         </>
                                     ) : (
                                         <>
-                                            <TestTube2 className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                            <TestTube2 className="h-4 w-4 mr-2 flex-shrink-0" />
                                             <span className="truncate">Тест</span>
                                         </>
                                     )}
                                 </Button>
-                                <Button 
-                                    onClick={handleRenameVoice} 
-                                    variant="outline" 
+                                <Button
+                                    onClick={handleRenameVoice}
+                                    variant="outline"
                                     className="w-32 whitespace-nowrap overflow-hidden text-ellipsis text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
                                 >
-                                    <Edit className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                    <Edit className="h-4 w-4 mr-2 flex-shrink-0" />
                                     <span className="truncate">Переименовать</span>
                                 </Button>
-                                <Button 
-                                    onClick={handleSaveSettings} 
+                                <Button
+                                    onClick={handleSaveSettings}
                                     className="w-32 whitespace-nowrap overflow-hidden text-ellipsis bg-green-600 hover:bg-green-700"
                                 >
-                                    <Settings className="h-4 w-4 mr-2 flex-shrink-0"/>
+                                    <Settings className="h-4 w-4 mr-2 flex-shrink-0" />
                                     <span className="truncate">Сохранить</span>
                                 </Button>
                             </div>

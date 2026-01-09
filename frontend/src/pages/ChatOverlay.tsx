@@ -1,18 +1,18 @@
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useSearchParams } from 'react-router-dom';
 
-import MessageContent from '../components/MessageContent';
-import useSharedWebSocket from '../hooks/useSharedWebSocket';
-import { chatboxService } from '../services/api/services/chatboxService';
-import { chatService } from '../services/api/services/chatService';
-import { twitchBadgesService } from '../services/twitchBadges';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { getAllEmotesForChannel } from '../utils/emotes';
-import { logger } from '../utils/prodLogger';
+import MessageContent from '@/features/chat/components/MessageContent';
+import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
+import { chatboxService } from '@/services/api/services/chatboxService';
+import { chatService } from '@/services/api/services/chatService';
+import { twitchBadgesService } from '@/services/twitchBadges';
+import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
+import { logger } from '@/shared/utils/prodLogger';
 
-import type { ApiResponse } from '../types/api';
-import type { ChatBoxSettings, ChatMessage, ContextMenu, WebSocketMessage } from '../types/chat';
+import type { ApiResponse } from '@/types/api';
+import type { ChatBoxSettings, ChatMessage, ContextMenu, WebSocketMessage } from '@/types/chat';
 import type { AxiosError } from 'axios';
 
 interface ChatHistoryApiResponse {

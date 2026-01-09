@@ -1,23 +1,23 @@
-import React, { lazy, Suspense, useState } from 'react';
+﻿import React, { lazy, Suspense, useState } from 'react';
 
-import { 
-  History, 
-  MessageCircle, 
-  Mic, 
-  Settings, 
-  Shield, 
+import {
+  History,
+  MessageCircle,
+  Mic,
+  Settings,
+  Shield,
   Users
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import Breadcrumbs from '@/components/admin/Breadcrumbs';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import Skeleton from '@/components/ui/skeleton';
+import { ADMIN_SECTION_COLORS, TRANSITIONS } from '@/constants/designSystem';
+import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent } from '@/shared/components/ui/card';
+import Skeleton from '@/shared/components/ui/skeleton';
 
-import { ADMIN_SECTION_COLORS, TRANSITIONS } from '../../../constants/designSystem';
-import { useAuth } from '../../../context/AuthContext';
 
 
 // Lazy load компонентов для оптимизации
@@ -69,7 +69,7 @@ const TabButton: React.FC<{
   onClick: () => void;
 }> = ({ tab, isActive, onClick }) => {
   const Icon = tab.icon;
-  
+
   return (
     <Button
       variant={isActive ? 'default' : 'ghost'}
@@ -125,8 +125,8 @@ const AdminPage: React.FC = () => {
             <p className="text-muted-foreground">
               У вас нет прав для доступа к админ панели
             </p>
-            <Button 
-              onClick={() => navigate('/dashboard')} 
+            <Button
+              onClick={() => navigate('/dashboard')}
               variant="outline"
               className="h-10"
             >
@@ -142,7 +142,7 @@ const AdminPage: React.FC = () => {
     <div className="min-h-screen p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Breadcrumbs */}
-        <Breadcrumbs 
+        <Breadcrumbs
           items={[
             { label: 'Админ панель', path: '/dashboard/dolbaebadmintts' },
             { label: TABS.find(t => t.id === activeTab)?.label || 'Обзор' }

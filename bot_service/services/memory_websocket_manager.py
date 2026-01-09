@@ -361,8 +361,8 @@ class MemoryWebSocketManager:
             user_id: ID пользователя
         """
         try:
-            from features.tts.memory_tts_queue import memory_tts_queue
-            await memory_tts_queue.enable_for_user(user_id)
+            from services.tts.memory_tts_queue import get_memory_tts_queue
+            await get_memory_tts_queue().enable_for_user(user_id)
             logger.info(f"User {user_id} connected - TTS generation enabled")
         except Exception as e:
             logger.error(f"Error handling user connect: {e}")
@@ -377,11 +377,21 @@ class MemoryWebSocketManager:
             user_id: ID пользователя
         """
         try:
-            from features.tts.memory_tts_queue import memory_tts_queue
-            await memory_tts_queue.disable_for_user(user_id)
+            from services.tts.memory_tts_queue import get_memory_tts_queue
+            await get_memory_tts_queue().disable_for_user(user_id)
             logger.info(f"User {user_id} fully disconnected - TTS generation disabled")
         except Exception as e:
             logger.error(f"Error handling user disconnect: {e}")
 
 # Глобальный экземпляр
-memory_websocket_manager = MemoryWebSocketManager()
+_memory_websocket_manager: Optional[MemoryWebSocketManager] = None
+
+def get_memory_websocket_manager() -> MemoryWebSocketManager:
+    """
+    Get or create the global MemoryWebSocketManager instance.
+    """
+    global _memory_websocket_manager
+    if _memory_websocket_manager is None:
+        _memory_websocket_manager = MemoryWebSocketManager()
+    return _memory_websocket_manager
+

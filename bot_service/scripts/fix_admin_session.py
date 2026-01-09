@@ -15,8 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from sqlalchemy import text
-from core.database import db_session
+from sqlalchemy import text  # noqa: E402
+from core.database import db_session  # noqa: E402
 
 
 def fix_admin_session():
@@ -59,7 +59,7 @@ def fix_admin_session():
                 """), {"user_id": user_id})
                 print(f"   ✅ Role обновлен: {role} → admin")
             else:
-                print(f"   ✅ Role уже admin")
+                print("   ✅ Role уже admin")
             
             # 2. Удаляем все старые сессии (чтобы пользователь перелогинился)
             result = db.execute(text("""
@@ -72,9 +72,9 @@ def fix_admin_session():
             
             if deleted_sessions:
                 print(f"   ✅ Удалено старых сессий: {len(deleted_sessions)}")
-                print(f"   ℹ️  Теперь войдите заново в frontend")
+                print("   ℹ️  Теперь войдите заново в frontend")
             else:
-                print(f"   ℹ️  Сессий не было, просто войдите в систему")
+                print("   ℹ️  Сессий не было, просто войдите в систему")
             
             print()
         

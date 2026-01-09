@@ -1,11 +1,12 @@
-/**
+﻿/**
  * Points Queries - централизованные React Query queries для Points
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { pointsService } from '../../services/api/services/pointsService';
-import { logger } from '../../utils/prodLogger';
+import { pointsService } from '@/services/api/services/pointsService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 
 import type { ApiResponse } from '../../types';

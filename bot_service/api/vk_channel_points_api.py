@@ -11,10 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from core.database import get_db, User, UserToken
+from core.database import get_db
 from auth.auth import get_current_user
 from utils.vk_api_client import VKLiveAPIClient, VKAPIError
 from core.token_encryption import decrypt_token, is_token_encrypted
+from repositories.user_token_repository import UserTokenRepository
+from repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,7 @@ class RewardDemandAction(BaseModel):
 
 def get_vk_token(user_id: int, db: Session) -> str:
     """
-    Получить VK OAuth токен пользователя
+    Получить VK OAuth токен пользователя через репозиторий
     
     Args:
         user_id: ID пользователя
@@ -68,11 +70,8 @@ def get_vk_token(user_id: int, db: Session) -> str:
     Raises:
         HTTPException: Если токен не найден
     """
-    user_token = db.query(UserToken).filter(
-        UserToken.user_id == user_id,
-        UserToken.platform == 'vk',
-        UserToken.is_active == True
-    ).first()
+    token_repo = UserTokenRepository(db)
+    user_token = token_repo.get_by_user_and_platform(user_id, 'vk')
     
     if not user_token or not user_token.access_token:
         raise HTTPException(
@@ -90,7 +89,7 @@ def get_vk_token(user_id: int, db: Session) -> str:
 
 def get_channel_url(user_id: int, db: Session) -> str:
     """
-    Получить VK channel URL пользователя
+    Получить VK channel URL пользователя через репозиторий
     
     Args:
         user_id: ID пользователя
@@ -102,7 +101,8 @@ def get_channel_url(user_id: int, db: Session) -> str:
     Raises:
         HTTPException: Если channel URL не найден
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    user_repo = UserRepository(db)
+    user = user_repo.get_by_id(user_id)
     
     if not user or not user.vk_channel_name:
         raise HTTPException(

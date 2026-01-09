@@ -2,26 +2,27 @@
 
 import { AlertTriangle, Loader2, Package, Sparkles } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
+import { DROPS_CONSTANTS } from '@/constants/drops';
+import { useDonationAlerts } from '@/context/DonationAlertsContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
+import { useDropsConfig } from '@/features/drops/hooks/useDropsConfig';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
+import { useAutoSave } from '@/shared/hooks/useAutoSave';
 import { toast } from '@/utils/toastManager';
 
-import { DROPS_CONSTANTS } from '../../../constants/drops';
-import { useDonationAlerts } from '../../../context/DonationAlertsContext';
-import { useIntegrations } from '../../../context/IntegrationsContext';
-import { useAutoSave } from '../../../hooks/useAutoSave';
-import { useDropsConfig } from '../../../hooks/useDropsConfig';
+
 import MythycClosed from '../../../images/lootboxes/mythyc/mythyc_closed.png';
 
 import DonationGrid from './DonationGrid';
 import DonationHistory from './DonationHistory';
 
 
-import type { DropsConfig } from '../../../types/drops';
+import type { DropsConfig } from '@/types/drops';
 
 interface DonationSettingsProps {
     user: Record<string, unknown>;
@@ -63,7 +64,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     mythical_donation_amount: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT]
   });
 
-  // Отслеживаем предыдущее состояние подключения DonationAlerts для автоматического включения donation drops
+  // ����������� ���������� ��������� ����������� DonationAlerts ��� ��������������� ��������� donation drops
   const [wasDonationAlertsConnected, setWasDonationAlertsConnected] = useState(donationalertsConnected);
 
   useEffect(() => {
@@ -84,14 +85,14 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     // Type assertion after null check
     const typedConfig = config as DropsConfig;
     
-    // Проверяем интеграцию DonationAlerts при загрузке (используем актуальное значение)
+    // ��������� ���������� DonationAlerts ��� �������� (���������� ���������� ��������)
     const currentDonationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
     const donationEnabledFromServer = typedConfig.donation_enabled ?? false;
-    // Если интеграция не подключена, принудительно ставим false
+    // ���� ���������� �� ����������, ������������� ������ false
     const donationEnabled = currentDonationalertsConnected ? donationEnabledFromServer : false;
     
-    // [OK] МИФИЧЕСКИЙ DROPS ДОСТУПЕН ТОЛЬКО С DONATIONALERTS
-    // Мифический drops работает на основе донатов, поэтому требует подключения DonationAlerts
+    // [OK] ���������� DROPS �������� ������ � DONATIONALERTS
+    // ���������� drops �������� �� ������ �������, ������� ������� ����������� DonationAlerts
     const mythicalEnabledFromServer = typedConfig.mythical_enabled ?? false;
     const mythicalEnabled = currentDonationalertsConnected ? mythicalEnabledFromServer : false;
     
@@ -116,14 +117,14 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     }
   }, [initialFormData, isInitialLoad]);
 
-  // [OK] ИСПРАВЛЕНИЕ: Используем функциональное обновление и удаляем formData из зависимостей
-  // чтобы избежать бесконечного цикла. Проверяем текущие значения через ref или функциональное обновление.
+  // [OK] �����������: ���������� �������������� ���������� � ������� formData �� ������������
+  // ����� �������� ������������ �����. ��������� ������� �������� ����� ref ��� �������������� ����������.
   useEffect(() => {
     if (!donationalertsConnected) {
-      // Отключаем donation и mythical drops если DonationAlerts отключен
-      // [OK] Используем функциональное обновление для чтения актуальных значений без добавления в зависимости
+      // ��������� donation � mythical drops ���� DonationAlerts ��������
+      // [OK] ���������� �������������� ���������� ��� ������ ���������� �������� ��� ���������� � �����������
       setFormData(prev => {
-        // [OK] Проверяем текущие значения и обновляем только если они true
+        // [OK] ��������� ������� �������� � ��������� ������ ���� ��� true
         if (prev.donation_enabled || prev.mythical_enabled) {
           return {
             ...prev,
@@ -131,10 +132,10 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
             mythical_enabled: false
           };
         }
-        return prev; // Не изменяем состояние если значения уже false
+        return prev; // �� �������� ��������� ���� �������� ��� false
       });
     }
-  }, [donationalertsConnected]); // [OK] Убираем formData из зависимостей для предотвращения бесконечного цикла
+  }, [donationalertsConnected]); // [OK] ������� formData �� ������������ ��� �������������� ������������ �����
 
   const mythicalEnabledDisplay = formData.mythical_enabled;
   const donationEnabledDisplay = donationalertsConnected ? formData.donation_enabled : false;
@@ -144,7 +145,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       const minInterval = payload.mythical_min_interval_hours ?? formData.mythical_min_interval_hours[0];
       const maxInterval = payload.mythical_max_interval_hours ?? formData.mythical_max_interval_hours[0];
       if (minInterval >= maxInterval) {
-        return 'Минимальный интервал должен быть меньше максимального';
+        return '����������� �������� ������ ���� ������ �������������';
       }
     }
     return null;
@@ -170,11 +171,11 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
   });
 
   useEffect(() => {
-    // Если DonationAlerts только что подключился (был false, стал true)
+    // ���� DonationAlerts ������ ��� ����������� (��� false, ���� true)
     if (donationalertsConnected && !wasDonationAlertsConnected && !formData.donation_enabled) {
-      // Автоматически включаем donation drops после подключения
+      // ������������� �������� donation drops ����� �����������
       setFormData(prev => ({ ...prev, donation_enabled: true }));
-      // Сохраняем автоматически через небольшую задержку, чтобы дать время обновиться состоянию
+      // ��������� ������������� ����� ��������� ��������, ����� ���� ����� ���������� ���������
       setTimeout(() => {
         const payload = {
           donation_enabled: true,
@@ -197,8 +198,8 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
   useEffect(() => {
     const handleDonationAlertsConnected = (event: CustomEvent) => {
       if (event.detail?.success) {
-        // Событие подключения - обновляем состояние для триггера автоматического включения
-        // Основная логика в useEffect выше
+        // ������� ����������� - ��������� ��������� ��� �������� ��������������� ���������
+        // �������� ������ � useEffect ����
       }
     };
 
@@ -237,7 +238,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
 
   return (
     <div className="space-y-4">
-      {/* Предупреждение если нет наград */}
+      {/* �������������� ���� ��� ������ */}
       {!hasRewards && (
         <Card className="border-l-4 border-l-orange-500 border-orange-500/20 bg-orange-500/5">
           <CardContent className="p-4">
@@ -247,7 +248,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
               </div>
               <div className="flex-1 space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Для работы donation drops необходимо настроить содержимое сундуков на вкладке <strong className="text-foreground">"Награды"</strong>.
+                  ��� ������ donation drops ���������� ��������� ���������� �������� �� ������� <strong className="text-foreground">"�������"</strong>.
                 </p>
                 <Button 
                   onClick={() => window.location.href = '/dashboard/drops?tab=rewards'}
@@ -256,7 +257,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                   className="h-8 text-xs"
                 >
                   <Package className="w-3.5 h-3.5 mr-1.5" />
-                  Настроить награды
+                  ��������� �������
                 </Button>
               </div>
             </div>
@@ -264,32 +265,32 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         </Card>
       )}
 
-      {/* Настройки донатов - компактно */}
+      {/* ��������� ������� - ��������� */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">Включить donation drops</Label>
-              <div title={!donationalertsConnected ? "Нажмите чтобы подключить DonationAlerts" : ""}>
+              <Label className="text-sm font-medium">�������� donation drops</Label>
+              <div title={!donationalertsConnected ? "������� ����� ���������� DonationAlerts" : ""}>
               <Switch
                 checked={donationEnabledDisplay}
                 onCheckedChange={async (checked) => {
                   if (checked) {
-                    // Проверяем интеграцию с DonationAlerts
+                    // ��������� ���������� � DonationAlerts
                     if (!donationalertsConnected) {
-                      // Автоматически включаем интеграцию DonationAlerts
-                      toast.info('Подключаем интеграцию DonationAlerts...', {
-                        description: 'Вы будете перенаправлены на страницу авторизации'
+                      // ������������� �������� ���������� DonationAlerts
+                      toast.info('���������� ���������� DonationAlerts...', {
+                        description: '�� ������ �������������� �� �������� �����������'
                       });
                       const connected = await daConnect();
                       
                       if (!connected) {
-                        toast.error('Не удалось подключить интеграцию DonationAlerts');
+                        toast.error('�� ������� ���������� ���������� DonationAlerts');
                         return;
                       }
                       
-                      // Если подключение успешно, daConnect() перенаправит на OAuth
-                      // После возврата с OAuth интеграция будет подключена
+                      // ���� ����������� �������, daConnect() ������������ �� OAuth
+                      // ����� �������� � OAuth ���������� ����� ����������
                       return;
                     }
                   }
@@ -309,7 +310,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         </CardContent>
       </Card>
 
-      {/* Информация о расчёте наград */}
+      {/* ���������� � ������� ������ */}
       {donationEnabledDisplay && (
         <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
           <CardContent className="pt-4 pb-4 space-y-3">
@@ -319,25 +320,25 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
               </div>
               <div className="flex-1 space-y-2 text-sm">
                 <p className="text-muted-foreground leading-relaxed">
-                  Зритель получает награду за донат через <strong className="text-foreground">DonationAlerts</strong>. Редкость зависит от суммы:
+                  ������� �������� ������� �� ����� ����� <strong className="text-foreground">DonationAlerts</strong>. �������� ������� �� �����:
                 </p>
                 
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_common[0]}₽</span>
+                    <span className="text-muted-foreground">�� {formData.donation_amount_common[0]}?</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_rare[0]}₽</span>
+                    <span className="text-muted-foreground">�� {formData.donation_amount_rare[0]}?</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_epic[0]}₽</span>
+                    <span className="text-muted-foreground">�� {formData.donation_amount_epic[0]}?</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_legendary[0]}₽</span>
+                    <span className="text-muted-foreground">�� {formData.donation_amount_legendary[0]}?</span>
                   </div>
                 </div>
               </div>
@@ -346,37 +347,37 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         </Card>
       )}
 
-          {/* Мифический lootbox - компактно */}
+          {/* ���������� lootbox - ��������� */}
           <Card className="border-2 border-pink-500/30 bg-gradient-to-br from-pink-500/10 to-purple-600/5">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2 text-pink-400">
-                  <img src={MythycClosed} alt="Мифический" className="w-10 h-10 flex-shrink-0" />
+                  <img src={MythycClosed} alt="����������" className="w-10 h-10 flex-shrink-0" />
                   <Sparkles className="w-5 h-5 flex-shrink-0" />
-                  <span>Мифический drops</span>
+                  <span>���������� drops</span>
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Label className="text-sm font-medium text-pink-300">Включить mythyc drops</Label>
-                  <div title="Мифический drops работает на основе донатов. Активация происходит только когда стрим онлайн.">
+                  <Label className="text-sm font-medium text-pink-300">�������� mythyc drops</Label>
+                  <div title="���������� drops �������� �� ������ �������. ��������� ���������� ������ ����� ����� ������.">
                     <Switch
                       checked={mythicalEnabledDisplay}
                       onCheckedChange={async (checked) => {
                         if (checked) {
-                          // Проверяем интеграцию с DonationAlerts
+                          // ��������� ���������� � DonationAlerts
                           if (!donationalertsConnected) {
-                            // Автоматически включаем интеграцию DonationAlerts
-                            toast.info('Подключаем интеграцию DonationAlerts...', {
-                              description: 'Вы будете перенаправлены на страницу авторизации'
+                            // ������������� �������� ���������� DonationAlerts
+                            toast.info('���������� ���������� DonationAlerts...', {
+                              description: '�� ������ �������������� �� �������� �����������'
                             });
                             const connected = await daConnect();
                             
                             if (!connected) {
-                              toast.error('Не удалось подключить интеграцию DonationAlerts');
+                              toast.error('�� ������� ���������� ���������� DonationAlerts');
                               return;
                             }
                             
-                            // Если подключение успешно, daConnect() перенаправит на OAuth
-                            // После возврата с OAuth интеграция будет подключена
+                            // ���� ����������� �������, daConnect() ������������ �� OAuth
+                            // ����� �������� � OAuth ���������� ����� ����������
                             return;
                           }
                         }
@@ -392,7 +393,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs">Мин. интервал (ч)</Label>
+                <Label className="text-xs">���. �������� (�)</Label>
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_min_interval_hours}
@@ -418,7 +419,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Макс. интервал (ч)</Label>
+                <Label className="text-xs">����. �������� (�)</Label>
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_max_interval_hours}
@@ -444,7 +445,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Длительность окна (м)</Label>
+                <Label className="text-xs">������������ ���� (�)</Label>
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_window_duration_minutes}
@@ -470,7 +471,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">Мин. сумма (₽)</Label>
+                <Label className="text-xs">���. ����� (?)</Label>
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_donation_amount}
@@ -501,10 +502,10 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         )}
       </Card>
 
-      {/* История донатов */}
+      {/* ������� ������� */}
       <DonationHistory user={user} platform={platform} channelName={channelName} />
 
-      {/* [OK] Убрали кнопку "Сохранить" - автосохранение работает автоматически */}
+      {/* [OK] ������ ������ "���������" - �������������� �������� ������������� */}
     </div>
   );
 };

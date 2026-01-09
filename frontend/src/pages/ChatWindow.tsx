@@ -1,14 +1,14 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import MessageContent from '../components/MessageContent';
-import { useAuth } from '../context/AuthContext';
-import { useChat } from '../context/ChatContext';
-import { twitchBadgesService } from '../services/twitchBadges';
-import { TwitchIcon, VKIcon } from '../shared/components/PlatformIcons';
-import { getAllEmotesForChannel } from '../utils/emotes';
-import { logger } from '../utils/prodLogger';
+import { useAuth } from '@/context/AuthContext';
+import { useChat } from '@/context/ChatContext';
+import MessageContent from '@/features/chat/components/MessageContent';
+import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
+import { twitchBadgesService } from '@/services/twitchBadges';
+import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { logger } from '@/shared/utils/prodLogger';
 
-import type { ChatMessage } from '../types/chat';
+import type { ChatMessage } from '@/types/chat';
 
 interface ChatSettings {
     font_size: number;

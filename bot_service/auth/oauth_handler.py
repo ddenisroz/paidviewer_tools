@@ -120,14 +120,14 @@ class OAuthHandler:
             logger.info(f"Checking platform fingerprint: {platform_fingerprint}")
 
             # Ищем существующие токены этой платформы
-            existing_tokens = db.query(UserToken).filter(
+            db.query(UserToken).filter(
                 UserToken.platform == platform,
                 UserToken.platform_user_id == user_data.platform_user_id
             ).all()
 
             # Инициализируем переменные
             existing_token = None
-            current_user_id = current_user.get('id') if current_user else None
+            current_user.get('id') if current_user else None
             # session_id уже получен из cookie
             # Если создается новая сессия, он будет переопределен
 
@@ -141,7 +141,7 @@ class OAuthHandler:
             json_query = "device_info->>'monitored_channel' = :channel"
 
             active_session = db.query(UserSession).filter(
-                UserSession.is_active == True,
+                UserSession.is_active,
                 text(json_query)
             ).params(channel=channel_name).first()
 

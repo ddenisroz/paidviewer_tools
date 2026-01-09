@@ -22,10 +22,10 @@ from pathlib import Path
 BOT_SERVICE_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(BOT_SERVICE_ROOT))
 
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-from core.database import engine, SessionLocal
-from models import User, UserToken, TTSUserSettings, YouTubeQueue, DropsHistory
+from sqlalchemy import event  # noqa: E402
+from sqlalchemy.engine import Engine  # noqa: E402
+from core.database import SessionLocal  # noqa: E402
+from models import User, TTSUserSettings, YouTubeQueue, DropsHistory  # noqa: E402
 
 # Configure logging
 logging.basicConfig(
@@ -195,7 +195,6 @@ def test_drops_history():
         
         for drop in history:
             user = drop.user  # Potential N+1
-            reward = drop.reward  # Potential N+1
             logger.debug(f"Drop for user {user.id if user else 'None'}")
         
         analyze_queries()

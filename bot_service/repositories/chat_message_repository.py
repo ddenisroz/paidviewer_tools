@@ -1,0 +1,201 @@
+# bot_service/repositories/chat_message_repository.py
+"""
+Репозиторий для работы с сообщениями чата.
+"""
+
+import logging
+from typing import Optional, List
+from datetime import datetime
+
+from sqlalchemy import func, desc
+from sqlalchemy.orm import Session
+
+from core.database import ChatMessage
+from repositories.base_repository import BaseRepository
+
+logger = logging.getLogger(__name__)
+
+
+class ChatMessageRepository(BaseRepository[ChatMessage]):
+    """
+    Репозиторий для ChatMessage.
+    
+    Использование:
+        repo = ChatMessageRepository(db)
+        messages = repo.get_by_channel(user_id, "channel_name", limit=50)
+    """
+    
+    def __init__(self, db: Session):
+        super().__init__(ChatMessage, db)
+    
+    def get_by_channel(
+        self,
+        user_id: int,
+        channel_name: str,
+        platform: Optional[str] = None,
+        limit: int = 50,
+        include_deleted: bool = False,
+    ) -> List[ChatMessage]:
+        """Получает сообщения канала."""
+        query = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            func.lower(ChatMessage.channel_name) == channel_name.lower(),
+        )
+        
+        if not include_deleted:
+            query = query.filter(ChatMessage.is_deleted.is_(False))
+        
+        if platform:
+            query = query.filter(ChatMessage.platform == platform)
+        
+        return query.order_by(ChatMessage.timestamp.desc()).limit(limit).all()
+    
+    def get_recent(self, user_id: int, limit: int = 100) -> List[ChatMessage]:
+        """Получает последние сообщения пользователя."""
+        return self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.is_deleted.is_(False),
+        ).order_by(ChatMessage.timestamp.desc()).limit(limit).all()
+
+    def get_history_by_platforms(
+        self, user_id: int, platforms: List[str], limit: int = 50
+    ) -> List[ChatMessage]:
+        """Получает историю сообщений для указанных платформ."""
+        return self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.platform.in_(platforms)
+        ).order_by(ChatMessage.timestamp.desc()).limit(limit).all()
+    
+    def create(
+        self,
+        user_id: int,
+        channel_name: str,
+        platform: str,
+        message: str,
+        author_username: Optional[str] = None,
+        author_id: Optional[str] = None,
+        role: Optional[str] = None,
+        badges: Optional[str] = None,
+    ) -> ChatMessage:
+        """Создаёт новое сообщение."""
+        chat_msg = ChatMessage(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=platform,
+            message=message,
+            author_username=author_username,
+            author_id=author_id,
+            role=role,
+            badges=badges,
+            timestamp=datetime.utcnow(),
+            is_deleted=False,
+        )
+        self.db.add(chat_msg)
+        self.db.commit()
+        self.db.refresh(chat_msg)
+        return chat_msg
+    
+    def soft_delete(self, message_id: int) -> bool:
+        """Soft delete сообщения."""
+        msg = self.db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
+        if msg:
+            msg.is_deleted = True
+            self.db.commit()
+            return True
+        return False
+    
+    def delete_by_user(self, user_id: int) -> int:
+        """Удаляет все сообщения пользователя."""
+        result = self.db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete()
+        self.db.commit()
+        return result
+    
+    def get_count_by_channel(self, user_id: int, channel_name: str) -> int:
+        """Получает количество сообщений в канале."""
+        return self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            func.lower(ChatMessage.channel_name) == channel_name.lower(),
+            ChatMessage.is_deleted.is_(False),
+        ).count()
+    
+    def get_paginated(
+        self,
+        channel_name: Optional[str] = None,
+        platform: Optional[str] = None,
+        page: int = 1,
+        limit: int = 100
+    ) -> tuple:
+        """Get paginated chat messages."""
+        query = self.db.query(ChatMessage)
+        if channel_name:
+            query = query.filter(ChatMessage.channel_name == channel_name)
+        if platform:
+            query = query.filter(ChatMessage.platform == platform)
+        
+        total = query.count()
+        offset = (page - 1) * limit
+        messages = query.order_by(ChatMessage.timestamp.desc()).offset(offset).limit(limit).all()
+        return messages, total
+    
+    def get_stats(self, channel_name: Optional[str] = None, platform: Optional[str] = None) -> dict:
+        """Get statistics for chat messages."""
+        from datetime import timedelta
+        from core.datetime_utils import utcnow_naive
+        
+        query = self.db.query(ChatMessage)
+        if channel_name:
+            query = query.filter(ChatMessage.channel_name == channel_name)
+        if platform:
+            query = query.filter(ChatMessage.platform == platform)
+        
+        yesterday = utcnow_naive() - timedelta(hours=24)
+        messages_24h = query.filter(ChatMessage.timestamp >= yesterday).count()
+        total_messages = query.count()
+        unique_viewers = query.distinct(ChatMessage.viewer_name).count()
+        
+        return {
+            "total_messages": total_messages,
+            "messages_24h": messages_24h,
+            "unique_viewers": unique_viewers
+        }
+
+    def get_messages_for_analysis(
+        self, user_id: int, platform: str, since: datetime, limit: int = 100
+    ) -> List[ChatMessage]:
+        """Get messages for psychology analysis."""
+        return self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.platform == platform,
+            ChatMessage.timestamp >= since,
+            ChatMessage.is_deleted.is_(False)
+        ).order_by(desc(ChatMessage.timestamp)).limit(limit).all()
+
+    # === Cleanup Methods ===
+
+    def delete_old_by_user_platform(
+        self, user_id: int, platform: str, cutoff_date: datetime
+    ) -> int:
+        """Delete old messages for user/platform before cutoff date."""
+        count = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.platform == platform,
+            ChatMessage.timestamp < cutoff_date
+        ).delete(synchronize_session=False)
+        return count
+
+    def count_by_user_channel_platform(
+        self, user_id: int, channel_name: str, platform: str
+    ) -> int:
+        """Count messages for user/channel/platform."""
+        return self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.channel_name == channel_name,
+            ChatMessage.platform == platform
+        ).count()
+
+    def count_by_user_platform(self, user_id: int, platform: str) -> int:
+        """Count messages for user/platform."""
+        return self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.platform == platform
+        ).count()

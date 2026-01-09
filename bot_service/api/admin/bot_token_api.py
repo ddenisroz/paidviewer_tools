@@ -8,7 +8,6 @@ import logging
 from typing import Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 
-from auth.auth import get_current_user
 from core.permissions import require_role, AppRole
 from services.bot_token_validator import bot_token_validator
 

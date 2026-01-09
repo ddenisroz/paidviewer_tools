@@ -3,7 +3,7 @@
 Модели безопасности и логирования.
 """
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
+    Column, Integer, String, DateTime, ForeignKey, JSON
 )
 from core.datetime_utils import utcnow_naive
 from models.base import Base

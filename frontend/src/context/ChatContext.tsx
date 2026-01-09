@@ -1,4 +1,4 @@
-// src/context/ChatContext.tsx
+﻿// src/context/ChatContext.tsx
 /**
  * Контекст чата - композиция хуков для управления чатом.
  * 
@@ -11,15 +11,15 @@
  */
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { useToast } from '../components/ui/toast';
-import { API_BASE_URL } from '../constants';
-import { useAudioUnlock } from '../hooks/useAudioUnlock';
-import { type BotStatusType, useBotConnection } from '../hooks/useBotConnection';
-import { useChatHistory } from '../hooks/useChatHistory';
-import { useChatMessages } from '../hooks/useChatMessages';
-import { useChatWebSocket } from '../hooks/useChatWebSocket';
-import useSharedWebSocket from '../hooks/useSharedWebSocket';
-import { logger } from '../utils/prodLogger';
+import { API_BASE_URL } from '@/constants';
+import { type BotStatusType, useBotConnection } from '@/features/admin/hooks/useBotConnection';
+import { useChatHistory } from '@/features/chat/hooks/useChatHistory';
+import { useChatMessages } from '@/features/chat/hooks/useChatMessages';
+import { useChatWebSocket } from '@/features/chat/hooks/useChatWebSocket';
+import { useToast } from '@/shared/components/ui/toast';
+import { useAudioUnlock } from '@/shared/hooks/useAudioUnlock';
+import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
 import { useIntegrations } from './IntegrationsContext';
@@ -27,7 +27,7 @@ import { useIntegrations } from './IntegrationsContext';
 
 // Import refactored hooks
 
-import type { ChatMessage } from '../types/chat';
+import type { ChatMessage } from '@/types/chat';
 
 export type WebSocketMessage = Record<string, unknown>;
 
@@ -40,7 +40,7 @@ interface ChatContextValue {
     sendMessage: (message: string, platforms?: string[]) => void;
     connectBotToChannels: (platforms?: string[]) => Promise<void>;
     disconnectBotFromChannels: () => Promise<void>;
-    getBotConnectionStatus: () => Promise<{ status: BotStatusType; [key: string]: unknown }>;
+    getBotConnectionStatus: () => Promise<{ status: BotStatusType;[key: string]: unknown }>;
     clearMessages: () => void;
     setMessages: (messages: ChatMessage[]) => void;
 }
@@ -61,17 +61,17 @@ interface ChatProviderProps {
 
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     // Auth and integrations
-    const { user, isAuthenticated, isGuest, isCheckingAuth } = useAuth();
+    const { user, isAuthenticated, isCheckingAuth } = useAuth();
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { addToast: _addToast } = useToast();
-    
+
     // State
     const [error, setError] = useState<string | null>(null);
     const [isConnected, setIsConnected] = useState<boolean>(false);
-    
+
     // Audio unlock hook
     useAudioUnlock();
-    
+
     // Messages hook
     const {
         messages,
@@ -81,7 +81,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         historyLoaded,
         setHistoryLoaded
     } = useChatMessages();
-    
+
     // Bot connection hook
     const {
         botStatus,
@@ -93,7 +93,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         isAuthenticated: !!isAuthenticated,
         isCheckingAuth: isCheckingAuth ?? false
     });
-    
+
     // WebSocket message handler hook
     const { lastJsonMessage, handleWebSocketMessage } = useChatWebSocket({
         integrations,
@@ -105,27 +105,24 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         onBotStatusChange: setBotStatus,
         onError: setError
     });
-    
+
     // User ID for WebSocket
-    const userId: number | string | undefined = isGuest 
-        ? (user as { session_id?: string })?.session_id 
-        : user?.id;
-    
+    const userId: number | string | undefined = user?.id;
+
     // WebSocket connection
     const { send: wsSendMessage } = useSharedWebSocket(
-        userId, 
+        userId,
         handleWebSocketMessage as (message: Record<string, unknown>) => void
     );
-    
+
     // Connection status
     useEffect(() => {
-        setIsConnected(!!(userId && (isAuthenticated || isGuest)));
-    }, [userId, isAuthenticated, isGuest]);
-    
+        setIsConnected(!!(userId && isAuthenticated));
+    }, [userId, isAuthenticated]);
+
     // Chat history loading
     useChatHistory({
         isAuthenticated: !!isAuthenticated,
-        isGuest: !!isGuest,
         isConnected,
         integrationsLoading,
         integrations,
@@ -135,7 +132,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             setHistoryLoaded(true);
         }
     });
-    
+
     // Clear messages on logout
     useEffect(() => {
         if (!isAuthenticated) {
@@ -177,15 +174,15 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
                 isConnected: false,
                 botStatus: 'disconnected' as BotStatusType,
                 error: 'Ошибка конфигурации: отсутствует URL сервиса',
-                sendMessage: () => {},
-                connectBotToChannels: async () => {},
-                disconnectBotFromChannels: async () => {},
+                sendMessage: () => { },
+                connectBotToChannels: async () => { },
+                disconnectBotFromChannels: async () => { },
                 getBotConnectionStatus: async () => ({ status: 'disconnected' as BotStatusType }),
-                clearMessages: () => {},
-                setMessages: () => {}
+                clearMessages: () => { },
+                setMessages: () => { }
             };
         }
-        
+
         return {
             messages,
             lastJsonMessage,
@@ -200,16 +197,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             setMessages
         };
     }, [
-        messages, 
-        lastJsonMessage, 
-        isConnected, 
-        botStatus, 
-        error, 
-        sendMessage, 
-        connectBotToChannels, 
-        disconnectBotFromChannels, 
-        getBotConnectionStatus, 
-        clearMessages, 
+        messages,
+        lastJsonMessage,
+        isConnected,
+        botStatus,
+        error,
+        sendMessage,
+        connectBotToChannels,
+        disconnectBotFromChannels,
+        getBotConnectionStatus,
+        clearMessages,
         setMessages
     ]);
 

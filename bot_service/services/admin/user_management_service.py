@@ -8,10 +8,12 @@ from typing import List
 
 from sqlalchemy.orm import Session
 
-from core.database import User
 from core.datetime_utils import utcnow_naive
 from core.user_cache_invalidation import invalidate_user_cache
 from models.pydantic_models import UserPublic
+
+
+from repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -21,14 +23,16 @@ class UserManagementService:
 
     async def get_users(self, db: Session) -> List[UserPublic]:
         """Получить список всех пользователей."""
-        users = db.query(User).all()
+        repo = UserRepository(db)
+        users = repo.get_all()
         return [UserPublic.model_validate(user) for user in users]
 
     async def update_user(
         self, user_id: int, request: dict, db: Session
     ) -> dict:
         """Обновить пользователя."""
-        user = db.query(User).filter(User.id == user_id).first()
+        repo = UserRepository(db)
+        user = repo.get(user_id)
         if not user:
             return {"error": "User not found"}
 
@@ -50,7 +54,7 @@ class UserManagementService:
                 user.role = request['role']
                 changes.append(f"role: {old_role} -> {request['role']}")
 
-        db.commit()
+        repo.update(user)
 
         if changes:
             invalidate_user_cache(user_id, f"updated: {', '.join(changes)}")
@@ -60,12 +64,12 @@ class UserManagementService:
 
     async def delete_user(self, user_id: int, db: Session) -> dict:
         """Удалить пользователя."""
-        user = db.query(User).filter(User.id == user_id).first()
+        repo = UserRepository(db)
+        user = repo.get(user_id)
         if not user:
             return {"error": "User not found"}
 
-        db.delete(user)
-        db.commit()
+        repo.delete(user)
 
         logger.info(f"[DELETE] User {user_id} deleted")
         return {"message": f"User {user_id} deleted successfully"}
@@ -74,7 +78,8 @@ class UserManagementService:
         self, user_id: int, request: dict, db: Session
     ) -> dict:
         """Заблокировать пользователя."""
-        user = db.query(User).filter(User.id == user_id).first()
+        repo = UserRepository(db)
+        user = repo.get(user_id)
         if not user:
             return {"error": "User not found"}
 
@@ -84,7 +89,7 @@ class UserManagementService:
         user.blocked_reason = reason
         user.blocked_at = utcnow_naive()
 
-        db.commit()
+        repo.update(user)
 
         invalidate_user_cache(user_id, f"blocked: {reason}")
 
@@ -93,7 +98,8 @@ class UserManagementService:
 
     async def unblock_user(self, user_id: int, db: Session) -> dict:
         """Разблокировать пользователя."""
-        user = db.query(User).filter(User.id == user_id).first()
+        repo = UserRepository(db)
+        user = repo.get(user_id)
         if not user:
             return {"error": "User not found"}
 
@@ -101,7 +107,7 @@ class UserManagementService:
         user.blocked_reason = None
         user.blocked_at = None
 
-        db.commit()
+        repo.update(user)
 
         invalidate_user_cache(user_id, "unblocked")
 

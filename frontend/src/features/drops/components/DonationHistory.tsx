@@ -1,11 +1,11 @@
-import React from 'react';
+﻿import React from 'react';
 
 import { DollarSign, History } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useDropsHistory } from '@/queries/drops/dropsQueries';
+import { Badge } from '@/shared/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 
-import { useDropsHistory } from '../../../queries/drops/dropsQueries';
 
 import type { DonationEntry } from '../../../types';
 

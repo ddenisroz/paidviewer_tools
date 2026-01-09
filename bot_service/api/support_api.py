@@ -1,15 +1,26 @@
 # bot_service/api/support_api.py
-"""API для системы поддержки"""
+"""API для системы поддержки.
+
+Clean Architecture: uses SupportTicketRepository for data access.
+"""
 from fastapi import APIRouter, Depends, HTTPException, Form
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
+from typing import Optional, List
+
 from core.database import get_db, SupportTicket, TicketResponse
 from auth.auth import get_current_user
 from validators.input_validators import sanitize_input
 from core.datetime_utils import utcnow_naive
+from repositories.support_repository import SupportTicketRepository
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# PYDANTIC MODELS
+# ============================================================================
 
 class CreateTicketRequest(BaseModel):
     subject: str
@@ -17,51 +28,56 @@ class CreateTicketRequest(BaseModel):
     priority: str = "normal"
 
     @field_validator('subject')
-
-
     @classmethod
-
-
     def sanitize_subject(cls, v):
-        """Санитизация темы тикета"""
         return sanitize_input(v, max_length=100)
 
     @field_validator('message')
-
-
     @classmethod
-
-
     def sanitize_message(cls, v):
-        """Санитизация сообщения"""
         return sanitize_input(v, max_length=2000)
 
     @field_validator('priority')
-
-
     @classmethod
-
-
     def validate_priority(cls, v):
-        """Валидация приоритета"""
         if v not in ['low', 'normal', 'high', 'critical']:
             raise ValueError("Invalid priority")
         return v
+
 
 class RespondTicketRequest(BaseModel):
     message: str
 
     @field_validator('message')
-
-
     @classmethod
-
-
     def sanitize_message(cls, v):
-        """Санитизация сообщения ответа"""
         return sanitize_input(v, max_length=2000)
 
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+
+def format_ticket(ticket: SupportTicket) -> dict:
+    """Format ticket for API response."""
+    return {
+        'id': ticket.id,
+        'user_id': ticket.user_id,
+        'subject': ticket.subject,
+        'status': ticket.status,
+        'priority': ticket.priority,
+        'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
+        'updated_at': ticket.updated_at.isoformat() if ticket.updated_at else None
+    }
+
+
+
+# ============================================================================
+# ENDPOINTS
+# ============================================================================
+
 router = APIRouter(prefix="/api/support", tags=["support"])
+
 
 @router.get("/tickets")
 async def get_support_tickets(
@@ -71,71 +87,32 @@ async def get_support_tickets(
 ):
     """Получить тикеты поддержки"""
     try:
-        query = db.query(SupportTicket)
-
-        # Если не админ, показываем только свои тикеты
-        if not user.get('is_admin', False):
-            query = query.filter(SupportTicket.user_id == user['id'])
-        elif status:
-            query = query.filter(SupportTicket.status == status)
-
-        tickets = query.order_by(SupportTicket.created_at.desc()).all()
-
-        ticket_data = []
-        for ticket in tickets:
-            ticket_data.append({
-                'id': ticket.id,
-                'user_id': ticket.user_id,
-                'subject': ticket.subject,
-                'status': ticket.status,
-                'priority': ticket.priority,
-                'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
-                'updated_at': ticket.updated_at.isoformat() if ticket.updated_at else None
-            })
-
-        return {
-            "success": True,
-            "tickets": ticket_data,
-            "total": len(ticket_data)
-        }
+        ticket_repo = SupportTicketRepository(db)
+        if user.get('is_admin', False):
+            tickets = ticket_repo.get_all_tickets(status)
+        else:
+            tickets = ticket_repo.get_by_user_id(user['id'])
+        
+        return {"success": True, "tickets": [format_ticket(t) for t in tickets], "total": len(tickets)}
     except Exception as e:
         logger.error(f"Error getting support tickets: {e}")
         return {"success": False, "error": str(e)}
+
 
 @router.get("/my-tickets")
 async def get_my_tickets(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить мои тикеты поддержки (только текущего пользователя)"""
-    return await _get_my_tickets_impl(user, db)
-
-async def _get_my_tickets_impl(user: dict, db: Session):
+    """Получить мои тикеты поддержки"""
     try:
-        tickets = db.query(SupportTicket).filter(
-            SupportTicket.user_id == user['id']
-        ).order_by(SupportTicket.created_at.desc()).all()
-
-        ticket_data = []
-        for ticket in tickets:
-            ticket_data.append({
-                'id': ticket.id,
-                'user_id': ticket.user_id,
-                'subject': ticket.subject,
-                'status': ticket.status,
-                'priority': ticket.priority,
-                'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
-                'updated_at': ticket.updated_at.isoformat() if ticket.updated_at else None
-            })
-
-        return {
-            "success": True,
-            "tickets": ticket_data,
-            "total": len(ticket_data)
-        }
+        ticket_repo = SupportTicketRepository(db)
+        tickets = ticket_repo.get_by_user_id(user['id'])
+        return {"success": True, "tickets": [format_ticket(t) for t in tickets], "total": len(tickets)}
     except Exception as e:
         logger.error(f"Error getting user tickets: {e}")
         return {"success": False, "error": str(e)}
+
 
 @router.get("/tickets/{ticket_id}")
 async def get_ticket(
@@ -145,46 +122,32 @@ async def get_ticket(
 ):
     """Получить конкретный тикет"""
     try:
-        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        ticket_repo = SupportTicketRepository(db)
+        ticket = ticket_repo.get(ticket_id)
         if not ticket:
             raise HTTPException(status_code=404, detail="Ticket not found")
-
-        # Проверяем права доступа
+        
         if not user.get('is_admin', False) and user['id'] != ticket.user_id:
             raise HTTPException(status_code=403, detail="Access denied")
-
-        # Получаем ответы на тикет
-        responses = db.query(TicketResponse).filter(
-            TicketResponse.ticket_id == ticket_id
-        ).order_by(TicketResponse.created_at.asc()).all()
-
-        response_data = []
-        for response in responses:
-            response_data.append({
-                'id': response.id,
-                'user_id': response.user_id,
-                'message': response.message,
-                'is_admin': response.is_admin,
-                'created_at': response.created_at.isoformat() if response.created_at else None
-            })
-
-        return {
-            "success": True,
-            "ticket": {
-                'id': ticket.id,
-                'user_id': ticket.user_id,
-                'subject': ticket.subject,
-                'description': ticket.description,
-                'status': ticket.status,
-                'priority': ticket.priority,
-                'created_at': ticket.created_at.isoformat() if ticket.created_at else None,
-                'updated_at': ticket.updated_at.isoformat() if ticket.updated_at else None,
-                'responses': response_data
-            }
-        }
+        
+        responses = ticket_repo.get_responses(ticket_id)
+        response_data = [
+            {'id': r.id, 'user_id': r.user_id, 'message': r.message, 'is_admin': r.is_admin, 
+             'created_at': r.created_at.isoformat() if r.created_at else None}
+            for r in responses
+        ]
+        
+        ticket_data = format_ticket(ticket)
+        ticket_data['description'] = ticket.description
+        ticket_data['responses'] = response_data
+        
+        return {"success": True, "ticket": ticket_data}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting ticket {ticket_id}: {e}")
         return {"success": False, "error": str(e)}
+
 
 @router.post("/tickets")
 async def create_ticket(
@@ -196,40 +159,29 @@ async def create_ticket(
 ):
     """Создать новый тикет поддержки"""
     try:
-        # Санитизируем входные данные
         subject = sanitize_input(subject, max_length=100)
         message = sanitize_input(message, max_length=2000)
-
-        # Валидируем приоритет
+        
         if priority not in ['low', 'normal', 'high', 'critical']:
             raise HTTPException(status_code=400, detail="Invalid priority value")
-
-        # Создаем новый тикет
-        ticket = SupportTicket(
+        
+        ticket_repo = SupportTicketRepository(db)
+        ticket = ticket_repo.create_ticket(
             user_id=user['id'],
+            user_name=user.get('username'),
             subject=subject,
-            message=message,  # Изменено с description на message
-            status='open',
-            priority=priority,
-            created_at=utcnow_naive()
+            message=message,
+            priority=priority
         )
-
-        db.add(ticket)
-        db.commit()
-        db.refresh(ticket)
-
+        
         logger.info(f"New support ticket created: {ticket.id} by user {user['id']}")
-        return {
-            "success": True,
-            "ticket_id": ticket.id,
-            "message": "Ticket created successfully"
-        }
+        return {"success": True, "ticket_id": ticket.id, "message": "Ticket created successfully"}
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error creating ticket: {e}")
-        db.rollback()
         return {"success": False, "error": str(e)}
+
 
 @router.post("/tickets/{ticket_id}/respond")
 async def respond_to_ticket(
@@ -240,48 +192,38 @@ async def respond_to_ticket(
 ):
     """Ответить на тикет"""
     try:
-        # Санитизируем сообщение
         message = sanitize_input(message, max_length=2000)
-
-        # Проверяем существование тикета
-        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        
+        ticket_repo = SupportTicketRepository(db)
+        ticket = ticket_repo.get(ticket_id)
         if not ticket:
             raise HTTPException(status_code=404, detail="Ticket not found")
-
-        # Проверяем права доступа
+        
         if not user.get('is_admin', False) and user['id'] != ticket.user_id:
             raise HTTPException(status_code=403, detail="Access denied")
-
-        # Создаем ответ
-        response = TicketResponse(
+        
+        ticket_repo.add_response(
             ticket_id=ticket_id,
-            user_id=user['id'],
+            author_id=user['id'],
+            author_name=user.get('username', ''),
             message=message,
-            is_admin=user.get('is_admin', False),
-            created_at=utcnow_naive()
+            is_admin_response=user.get('is_admin', False)
         )
-
-        db.add(response)
-
-        # Обновляем статус тикета
+        
+        # Update ticket status based on response
         if ticket.status == 'closed':
-            ticket.status = 'reopened'
+            ticket_repo.update_status(ticket_id, 'reopened')
         elif ticket.status == 'open' and user.get('is_admin', False):
-            ticket.status = 'in_progress'
-
-        ticket.updated_at = utcnow_naive()
-
-        db.commit()
-
+            ticket_repo.update_status(ticket_id, 'in_progress')
+        
         logger.info(f"Response added to ticket {ticket_id} by user {user['id']}")
         return {"success": True, "message": "Response added successfully"}
-
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error responding to ticket {ticket_id}: {e}")
-        db.rollback()
         return {"success": False, "error": str(e)}
+
 
 @router.post("/tickets/{ticket_id}/close")
 async def close_ticket(
@@ -291,25 +233,21 @@ async def close_ticket(
 ):
     """Закрыть тикет"""
     try:
-        # Проверяем существование тикета
-        ticket = db.query(SupportTicket).filter(SupportTicket.id == ticket_id).first()
+        ticket_repo = SupportTicketRepository(db)
+        ticket = ticket_repo.get(ticket_id)
         if not ticket:
             raise HTTPException(status_code=404, detail="Ticket not found")
-
-        # Проверяем права доступа
+        
         if not user.get('is_admin', False) and user['id'] != ticket.user_id:
             raise HTTPException(status_code=403, detail="Access denied")
-
-        # Закрываем тикет
-        ticket.status = 'closed'
-        ticket.updated_at = utcnow_naive()
-
-        db.commit()
-
+        
+        ticket_repo.update_status(ticket_id, 'closed')
+        
         logger.info(f"Ticket {ticket_id} closed by user {user['id']}")
         return {"success": True, "message": "Ticket closed successfully"}
-
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error closing ticket {ticket_id}: {e}")
-        db.rollback()
         return {"success": False, "error": str(e)}
+

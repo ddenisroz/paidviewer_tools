@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from models.base import Base, engine, init_db
-import logging
+from models.base import Base, engine, init_db  # noqa: E402
+import logging  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,20 +25,6 @@ def reset_database():
     logger.info("🗑️ Удаление всех таблиц...")
     
     # Импортируем все модели для регистрации в metadata
-    from models import (
-        User, UserSettings, UserSession, UserToken, AdminUser,
-        TTSUserSettings, TTSBlockedUser, FilteredWord, LocalTTSEndpoint, AudioSettings, UserVoiceSettings,
-        YouTubeQueue,
-        ChannelPoints, ChannelReward, PointsTransaction, RewardQueue,
-        BotCommand,
-        BlockedBot, BlockedChannel, WhitelistedChannel,
-        PsychologyAnalysis, ChatMessage, UserProgression,
-        DropsType, DropsQuality, DropsConfig, DropsReward, UserStreak, DropsHistory, MythicalDropsSession, StreamSession,
-        Achievement, UserAchievement, DonationAlert,
-        SupportTicket, TicketResponse,
-        SecurityLog, SystemLog,
-        ChatBoxSettings,
-    )
     
     # Удаляем все таблицы
     Base.metadata.drop_all(bind=engine)

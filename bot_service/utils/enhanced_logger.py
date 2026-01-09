@@ -50,25 +50,25 @@ def log_function_call(logger_name: str):
         @wraps(func)
         async def async_wrapper(*args, **kwargs):
             logger = logging.getLogger(logger_name)
-            logger.info(f"→ Calling {func.__name__}")
+            logger.info(f">> Calling {func.__name__}")
             try:
                 result = await func(*args, **kwargs)
-                logger.info(f"✓ {func.__name__} completed successfully")
+                logger.info(f"[OK] {func.__name__} completed successfully")
                 return result
             except Exception as e:
-                logger.error(f"✗ {func.__name__} failed: {str(e)}")
+                logger.error(f"[Err] {func.__name__} failed: {str(e)}")
                 raise
 
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             logger = logging.getLogger(logger_name)
-            logger.info(f"→ Calling {func.__name__}")
+            logger.info(f">> Calling {func.__name__}")
             try:
                 result = func(*args, **kwargs)
-                logger.info(f"✓ {func.__name__} completed successfully")
+                logger.info(f"[OK] {func.__name__} completed successfully")
                 return result
             except Exception as e:
-                logger.error(f"✗ {func.__name__} failed: {str(e)}")
+                logger.error(f"[Err] {func.__name__} failed: {str(e)}")
                 raise
 
         import asyncio
@@ -102,7 +102,7 @@ def log_response(endpoint: str, status: int, data: Any = None, elapsed: float = 
 def log_database_query(operation: str, table: str, filters: dict = None):
     """Логирование запроса к базе данных"""
     db_logger = logging.getLogger('database_system')
-    db_logger.debug(f"🗄️  {operation} on {table} | Filters: {filters}")
+    db_logger.debug(f"[DB] {operation} on {table} | Filters: {filters}")
 
 def log_websocket_event(event_type: str, user_id: Any, data: Any = None):
     """Логирование WebSocket события"""
@@ -115,7 +115,7 @@ def log_platform_api_call(platform: str, endpoint: str, status: int = None, erro
     if error:
         platform_logger.error(f"[ERROR] API Error: {endpoint} | Error: {error}")
     else:
-        platform_logger.info(f"✓ API Call: {endpoint} | Status: {status}")
+        platform_logger.info(f"[OK] API Call: {endpoint} | Status: {status}")
 
 def get_system_metrics():
     """Получить системные метрики для API"""

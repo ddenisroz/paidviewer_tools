@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, ForeignKey
 )
+from sqlalchemy.orm import relationship
 from core.datetime_utils import utcnow_naive
 from models.base import Base
 
@@ -89,3 +90,6 @@ class RewardQueue(Base):
     moderator_note = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     processed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+    reward = relationship("ChannelReward")

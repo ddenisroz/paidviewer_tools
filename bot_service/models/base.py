@@ -20,11 +20,16 @@ if not DATABASE_URL:
 IS_POSTGRESQL = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")
 
 # Allow SQLite for testing
-import os
-IS_TESTING = os.getenv("TESTING", "false").lower() == "true"
+import os  # noqa: E402
+# Check both env var and settings (settings might not be loaded yet if circular, but here it is imported)
+IS_TESTING = os.getenv("TESTING", "false").lower() == "true" or getattr(settings, 'testing', False)
 
 if not IS_POSTGRESQL and not IS_TESTING:
-    raise ValueError(f"Only PostgreSQL is supported. Current DATABASE_URL: {DATABASE_URL[:50]}...")
+     # Relaxed check: Allow SQLite in development if explicitly not strictly enforcing
+     if settings.is_development:
+         logger.warning("[WARN] Using SQLite in Development. Some PostgreSQL-specific features (JSONB) may fail.")
+     else:
+        raise ValueError(f"Only PostgreSQL is supported. Current DATABASE_URL: {DATABASE_URL[:50]}...")
 
 # Создаем движок SQLAlchemy
 # Оптимизированный connection pooling для PostgreSQL
@@ -121,7 +126,7 @@ def init_db():
                 db_bot = BlockedBot(bot_name=bot_name)
                 db.add(db_bot)
         db.commit()
-        logger.info("🤖 Initialized default blocked bots in database")
+        logger.info("[DB] Initialized default blocked bots in database")
     except Exception as e:
         logger.error(f"Error initializing blocked bots: {e}")
         db.rollback()
@@ -152,4 +157,4 @@ def init_db():
     finally:
         db.close()
 
-    logger.info("✅ База данных инициализирована")
+    logger.info("База данных инициализирована")

@@ -1,11 +1,12 @@
-/**
+﻿/**
  * Chat Queries - централизованные React Query queries для Chat
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { chatService } from '../../services/api/services/chatService';
-import { logger } from '../../utils/prodLogger';
+import { chatService } from '@/services/api/services/chatService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 

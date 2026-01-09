@@ -2,16 +2,17 @@
 """Основные системные API endpoints"""
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from core.database import get_db, User
+from core.database import get_db
 from auth.auth import get_current_user
 from core.datetime_utils import utcnow_naive
-# from monitoring.modern_monitor import modern_monitor  # Удалено - используем enhanced_logger
+from repositories.user_repository import UserRepository
 import logging
 import secrets
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/system", tags=["system"])
+
 
 @router.get("/health")
 async def health_check():
@@ -29,9 +30,10 @@ async def system_status(
 ):
     """Получить статус системы"""
     try:
-        # Базовая статистика
-        total_users = db.query(User).count()
-        active_users = db.query(User).filter(User.is_active == True).count()
+        # Используем репозиторий вместо прямых db.query
+        user_repo = UserRepository(db)
+        total_users = user_repo.count_all()
+        active_users = user_repo.count_active()
 
         return {
             "success": True,
@@ -105,8 +107,9 @@ async def generate_api_key(
         # Генерируем новый API ключ
         api_key = secrets.token_urlsafe(32)
 
-        # Обновляем API ключ пользователя в БД
-        user_obj = db.query(User).filter(User.id == user['id']).first()
+        # Обновляем API ключ пользователя в БД через репозиторий
+        user_repo = UserRepository(db)
+        user_obj = user_repo.get_by_id(user['id'])
         if user_obj:
             user_obj.api_key = api_key
             db.commit()

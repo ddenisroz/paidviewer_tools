@@ -1,12 +1,12 @@
-import React from 'react';
+﻿import React from 'react';
 
 import { AlertCircle, Settings, Wrench } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { useAuth } from '@/context/AuthContext';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent } from '@/shared/components/ui/card';
 
-import { useAuth } from '../context/AuthContext';
 import PageWrapper from '../shared/components/PageWrapper';
 
 const AnalyticsPage: React.FC = () => {

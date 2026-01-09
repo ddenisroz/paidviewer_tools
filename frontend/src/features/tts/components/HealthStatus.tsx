@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { RefreshCw } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/components/ui/button';
 import { useInterval } from '@/hooks/useInterval';
 
 interface HealthStatusProps {
@@ -14,7 +14,7 @@ interface HealthStatusProps {
 
 const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, checkTtsHealth, isWhitelisted }) => {
     const [checkingDuration, setCheckingDuration] = useState(0);
-    
+
     // Используем современный хук useInterval вместо ручного setInterval
     useInterval(() => {
         if (isChecking) {
@@ -71,7 +71,7 @@ const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, chec
             </div>
         );
     }
-    
+
     // Если TTS сервер недоступен
     if (!isHealthy) {
         return (

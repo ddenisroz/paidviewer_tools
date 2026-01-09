@@ -179,7 +179,7 @@ class BackgroundTasks:
                     thirty_days_ago = utcnow_naive() - timedelta(days=30)
 
                     deleted_users = db.query(User).filter(
-                        User.is_blocked == True,
+                        User.is_blocked,
                         User.blocked_reason == "account_deleted",
                         User.blocked_at < thirty_days_ago
                     ).all()
@@ -226,8 +226,7 @@ class BackgroundTasks:
         """
         from core.database import SessionLocal, UserToken
         from core.datetime_utils import utcnow_naive
-        from api.vk_api import VKLiveAPI
-        from api.twitch_api import TwitchAPI
+        from services.token_refresh_service import TokenRefreshService
 
         while True:
             try:
@@ -254,25 +253,16 @@ class BackgroundTasks:
                     for token in expiring_tokens:
                         try:
                             logger.info(f"[REFRESH] [TOKEN REFRESH] Refreshing {token.platform} token for user {token.user_id}")
+                            
+                            # Use TokenRefreshService internal method to refresh specific token object
+                            # We can also use refresh_if_needed, but we already have the token object.
+                            # Calling protected method _refresh_token for efficiency as we are in backend service.
+                            success = await TokenRefreshService._refresh_token(token, db)
 
-                            if token.platform == 'vk':
-                                vk_api = VKLiveAPI()
-                                new_token = await vk_api._refresh_user_token(token.user_id)
-
-                                if new_token:
-                                    logger.info(f"[OK] [TOKEN REFRESH] Successfully refreshed VK token for user {token.user_id}")
-                                else:
-                                    logger.error(f"[ERROR] [TOKEN REFRESH] Failed to refresh VK token for user {token.user_id}")
-
-                            elif token.platform == 'twitch':
-                                connection_manager = get_connection_manager()
-                                twitch_api = TwitchAPI(connection_manager)
-                                success = await twitch_api._refresh_user_token(token.user_id)
-
-                                if success:
-                                    logger.info(f"[OK] [TOKEN REFRESH] Successfully refreshed Twitch token for user {token.user_id}")
-                                else:
-                                    logger.error(f"[ERROR] [TOKEN REFRESH] Failed to refresh Twitch token for user {token.user_id}")
+                            if success:
+                                logger.info(f"[OK] [TOKEN REFRESH] Successfully refreshed {token.platform} token for user {token.user_id}")
+                            else:
+                                logger.error(f"[ERROR] [TOKEN REFRESH] Failed to refresh {token.platform} token for user {token.user_id}")
 
                             # Небольшая пауза между обновлениями
                             await asyncio.sleep(1)

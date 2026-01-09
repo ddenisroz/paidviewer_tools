@@ -8,7 +8,6 @@ Usage:
 """
 
 import sys
-import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -20,7 +19,7 @@ sys.path.insert(0, str(BOT_SERVICE_ROOT))
 env_path = BOT_SERVICE_ROOT / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
 
-from core.database import SessionLocal, User
+from core.database import SessionLocal, User  # noqa: E402
 
 
 def make_admin(user_id=None, username=None):
@@ -39,11 +38,11 @@ def make_admin(user_id=None, username=None):
             return False
         
         if not user:
-            print(f"❌ Пользователь не найден")
+            print("❌ Пользователь не найден")
             return False
         
         if user.is_admin:
-            print(f"✅ Пользователь уже является админом:")
+            print("✅ Пользователь уже является админом:")
             print(f"   ID: {user.id}")
             print(f"   Twitch: {user.twitch_username or 'не настроен'}")
             print(f"   VK: {user.vk_username or 'не настроен'}")
@@ -53,7 +52,7 @@ def make_admin(user_id=None, username=None):
         user.is_admin = True
         db.commit()
         
-        print(f"✅ Пользователь теперь администратор:")
+        print("✅ Пользователь теперь администратор:")
         print(f"   ID: {user.id}")
         print(f"   Twitch: {user.twitch_username or 'не настроен'}")
         print(f"   VK: {user.vk_username or 'не настроен'}")

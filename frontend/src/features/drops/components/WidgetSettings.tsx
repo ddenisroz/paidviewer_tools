@@ -2,17 +2,17 @@
 
 import { Copy, ExternalLink, Loader2, Monitor, Settings2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
+import { useDropsConfig, useGenerateDropsWidgetUrl, useUpdateDropsConfig } from '@/queries/drops/dropsQueries';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
+import { useAutoSave } from '@/shared/hooks/useAutoSave';
 import { toast } from '@/utils/toastManager';
 
-import { useAutoSave } from '../../../hooks/useAutoSave';
-import { useDropsConfig, useGenerateDropsWidgetUrl, useUpdateDropsConfig } from '../../../queries/drops/dropsQueries';
 
-import type { DropsConfig } from '../../../types/drops';
+import type { DropsConfig } from '@/types/drops';
 
 interface WidgetSettingsProps {
     user: Record<string, unknown>;
@@ -29,14 +29,14 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // [OK] НОВЫЙ КОД: Используем централизованные hooks
+  // [OK] ����� ���: ���������� ���������������� hooks
   const { data: config, isLoading: _configLoading } = useDropsConfig(channelName, {
     enabled: !!user && !!channelName,
   });
   
   const updateConfigMutation = useUpdateDropsConfig(channelName, {
     onSuccess: () => {
-      // Автосохранение работает тихо, без toast
+      // �������������� �������� ����, ��� toast
     },
   });
   
@@ -55,7 +55,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     widget_result_duration_ms: [5500]
   });
 
-  // Загружаем конфигурацию и генерируем URL виджета при монтировании
+  // ��������� ������������ � ���������� URL ������� ��� ������������
   useEffect(() => {
     if (config) {
       setFormData({
@@ -66,24 +66,24 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     }
   }, [config]);
 
-  // Генерируем URL виджета при монтировании
+  // ���������� URL ������� ��� ������������
   useEffect(() => {
     if (user && channelName && !widgetUrl) {
       generateWidgetUrlMutation.mutate(false);
     }
   }, [user, channelName]);
 
-  // [OK] Автосохранение с дебаунсом
+  // [OK] �������������� � ���������
   const { autoSave } = useAutoSave(
     (payload: Partial<DropsConfig>) => updateConfigMutation.mutate(payload),
     1000,
     () => {
-      if (!user || !channelName || !config) return 'Недостаточно данных для сохранения';
+      if (!user || !channelName || !config) return '������������ ������ ��� ����������';
       return null;
     }
   );
 
-  // [OK] Автосохранение при изменении полей
+  // [OK] �������������� ��� ��������� �����
   useEffect(() => {
     if (config) {
       const payload = {
@@ -101,7 +101,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     autoSave
   ]);
   
-  // Очистка таймера при размонтировании
+  // ������� ������� ��� ���������������
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
@@ -117,28 +117,28 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
   const copyWidgetUrl = () => {
     if (widgetUrl) {
       navigator.clipboard.writeText(widgetUrl);
-      toast.success('URL скопирован в буфер обмена');
+      toast.success('URL ���������� � ����� ������');
     }
   };
 
   return (
     <div className="space-y-4">
-      {/* Настройки анимации */}
+      {/* ��������� �������� */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Settings2 className="w-5 h-5" />
-            Настройки анимации
+            ��������� ��������
           </CardTitle>
           <CardDescription className="text-xs">
-            Длительность фаз анимации открытия сундуков в OBS виджете
+            ������������ ��� �������� �������� �������� � OBS �������
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Крутка (мс)</Label>
+                <Label className="text-sm">������ (��)</Label>
                 <span className="text-lg font-semibold">{formData.widget_spinning_duration_ms[0]}</span>
               </div>
               <Slider
@@ -152,7 +152,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Открытие (мс)</Label>
+                <Label className="text-sm">�������� (��)</Label>
                 <span className="text-lg font-semibold">{formData.widget_opening_duration_ms[0]}</span>
               </div>
               <Slider
@@ -166,7 +166,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">Результат (мс)</Label>
+                <Label className="text-sm">��������� (��)</Label>
                 <span className="text-lg font-semibold">{formData.widget_result_duration_ms[0]}</span>
               </div>
               <Slider
@@ -179,27 +179,27 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
             </div>
           </div>
 
-          {/* [OK] Убрали кнопки - автосохранение работает автоматически */}
+          {/* [OK] ������ ������ - �������������� �������� ������������� */}
           <p className="text-xs text-muted-foreground italic">
-            Настройки сохраняются автоматически при изменении
+            ��������� ����������� ������������� ��� ���������
           </p>
         </CardContent>
       </Card>
 
-      {/* URL виджета */}
+      {/* URL ������� */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Monitor className="w-5 h-5" />
-            OBS Виджет
+            OBS ������
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* [OK] Убрали инструкцию OBS */}
+          {/* [OK] ������ ���������� OBS */}
           {widgetUrl ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">URL виджета</Label>
+                <Label className="text-sm">URL �������</Label>
                 <Button
                   variant="outline"
                   size="sm"
@@ -210,12 +210,12 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   {generateWidgetUrlMutation.isPending ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      Перегенерация...
+                      �������������...
                     </>
                   ) : (
                     <>
                       <Settings2 className="w-3 h-3" />
-                      Перегенерировать
+                      ����������������
                     </>
                   )}
                 </Button>
@@ -233,7 +233,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   className="gap-2"
                 >
                   <Copy className="w-4 h-4" />
-                  Копировать
+                  ����������
                 </Button>
                 <Button
                   variant="outline"
@@ -242,14 +242,14 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   className="gap-2"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  Открыть виджет
+                  ������� ������
                 </Button>
               </div>
             </div>
           ) : (
             <div className="p-4 border rounded-lg bg-muted/50">
               <p className="text-sm text-muted-foreground">
-                URL виджета загружается...
+                URL ������� �����������...
               </p>
             </div>
           )}

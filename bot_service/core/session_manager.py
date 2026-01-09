@@ -207,7 +207,7 @@ class SessionManager:
 
             user_sessions = db.query(UserSession).filter(
                 UserSession.user_id == user_id,
-                UserSession.is_active == True,
+                UserSession.is_active,
                 text(json_query)
             ).params(channel=channel_name).all()
 
@@ -362,7 +362,7 @@ class SessionManager:
         """Завершает все авторизованные сессии для указанного канала."""
         def _terminate(session_db: Session):
             all_sessions = session_db.query(UserSession).filter(
-                UserSession.is_active == True
+                UserSession.is_active
             ).all()
 
             # Фильтруем по каналу в device_info
@@ -396,7 +396,7 @@ class SessionManager:
         def _terminate(session_db: Session):
             sessions = session_db.query(UserSession).filter(
                 UserSession.user_id == user_id,
-                UserSession.is_active == True
+                UserSession.is_active
             ).all()
 
             if not sessions:
@@ -558,7 +558,7 @@ class SessionManager:
                 cutoff_date = utcnow_naive() - timedelta(days=days_old)
 
                 old_sessions = db.query(UserSession).filter(
-                    UserSession.is_active == False,
+                    not UserSession.is_active,
                     UserSession.last_activity < cutoff_date
                 ).all()
 
@@ -594,11 +594,11 @@ class SessionManager:
         try:
             with db_session() as db:
                 total_sessions = db.query(UserSession).count()
-                active_sessions = db.query(UserSession).filter(UserSession.is_active == True).count()
+                active_sessions = db.query(UserSession).filter(UserSession.is_active).count()
 
                 cutoff_date = utcnow_naive() - timedelta(days=7)
                 old_inactive = db.query(UserSession).filter(
-                    UserSession.is_active == False,
+                    not UserSession.is_active,
                     UserSession.last_activity < cutoff_date
                 ).count()
 

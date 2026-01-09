@@ -1,4 +1,5 @@
-import { REGEX, TIMEOUTS, VALIDATION } from '../constants';
+﻿import { REGEX, TIMEOUTS, VALIDATION } from '@/constants';
+
 import { formatDate as formatDateUtil, formatRelativeTime as formatRelativeTimeUtil } from '../shared/utils/formatUtils';
 import { capitalize as capitalizeUtil, stripHtml as stripHtmlUtil, truncateString as truncateUtil } from '../shared/utils/stringUtils';
 

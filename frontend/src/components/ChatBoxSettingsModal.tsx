@@ -1,30 +1,30 @@
-// src/components/ChatBoxSettingsModal.tsx
+﻿// src/components/ChatBoxSettingsModal.tsx
 import React, { useEffect, useState } from 'react';
 
 import { Check, Copy, RefreshCw, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from '@/utils/toastManager';
 
-import { chatboxService } from '../services/api/services/chatboxService';
-import { 
-    extractSettingsFromResponse, 
-    loadGoogleFont, 
-    normalizeChatBoxSettings 
-} from '../utils/chatboxHelpers';
-import { logger } from '../utils/prodLogger';
 
-import AnimationSettings from './chatbox/AnimationSettings';
-import ColorSettings from './chatbox/ColorSettings';
-import FontSettings from './chatbox/FontSettings';
-import PlatformSettings from './chatbox/PlatformSettings';
-import PreviewPanel from './chatbox/PreviewPanel';
+import AnimationSettings from '@/features/chatbox/components/AnimationSettings';
+import ColorSettings from '@/features/chatbox/components/ColorSettings';
+import FontSettings from '@/features/chatbox/components/FontSettings';
+import PlatformSettings from '@/features/chatbox/components/PlatformSettings';
+import PreviewPanel from '@/features/chatbox/components/PreviewPanel';
+import {
+    extractSettingsFromResponse,
+    loadGoogleFont,
+    normalizeChatBoxSettings
+} from '@/features/chatbox/utils/chatboxHelpers';
+import { chatboxService } from '@/services/api/services/chatboxService';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { logger } from '@/shared/utils/prodLogger';
+import { toast } from '@/shared/utils/toastManager';
 
-import type { ApiResponse } from '../types/api';
-import type { ChatBoxSettings } from '../types/chatbox';
+import type { ApiResponse } from '@/types/api';
+import type { ChatBoxSettings } from '@/types/chatbox';
 import type { AxiosResponse } from 'axios';
 
 interface ChatBoxSettingsModalProps {
@@ -77,7 +77,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
-    
+
     useEffect(() => {
         if (isOpen) {
             loadSettings();
@@ -87,29 +87,29 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             setSettings(DEFAULT_SETTINGS);
             setLoading(false);
         }
-        
+
         return () => {
             document.body.style.overflow = '';
         };
     }, [isOpen]);
-    
+
     useEffect(() => {
         if (settings?.font_family) {
             loadGoogleFont(settings.font_family);
         }
     }, [settings?.font_family]);
-    
+
     useEffect(() => {
         if (!isOpen) return undefined;
-        
+
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
-        
+
         document.addEventListener('keydown', handleEscape);
         return () => document.removeEventListener('keydown', handleEscape);
     }, [isOpen, onClose]);
-    
+
     const loadSettings = async () => {
         try {
             setLoading(true);
@@ -123,16 +123,16 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             setLoading(false);
         }
     };
-    
+
     const handleSave = async (regenerateToken = false) => {
         try {
             setSaving(true);
             const response = await chatboxService.saveSettings(
-                { ...settings, version: settings.version || 1 }, 
+                { ...settings, version: settings.version || 1 },
                 regenerateToken
             ) as AxiosResponse<ApiResponse<ChatBoxSettings>>;
             const updatedSettings = extractSettingsFromResponse(response);
-            
+
             setSettings(prev => ({ ...prev, ...updatedSettings }));
             toast.success('Настройки сохранены');
             if (onSave) onSave(updatedSettings);
@@ -143,20 +143,20 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             setSaving(false);
         }
     };
-    
+
     const handleChange = (key: keyof ChatBoxSettings, value: string | number | boolean) => {
         setSettings(prev => ({ ...prev, [key]: value }));
     };
-    
+
     const copyToClipboard = () => {
         navigator.clipboard.writeText(settings.widget_url);
         setCopied(true);
         toast.success('URL скопирован');
         setTimeout(() => setCopied(false), 2000);
     };
-    
+
     if (!isOpen) return null;
-    
+
     if (loading) {
         const loadingContent = (
             <>
@@ -170,13 +170,13 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         );
         return ReactDOM.createPortal(loadingContent, document.body);
     }
-    
+
     const modalContent = (
         <>
             <div className="fixed inset-0 bg-black/80 z-[9999]" onClick={onClose} />
-            
+
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
-                <div 
+                <div
                     className="bg-gray-900 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto border border-gray-700"
                     onClick={(e) => e.stopPropagation()}
                 >
@@ -186,7 +186,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                             <X className="w-5 h-5" />
                         </button>
                     </div>
-                    
+
                     <div className="flex-1 overflow-y-auto p-6">
                         <div className="grid grid-cols-2 gap-6 h-full">
                             <div className="space-y-6">
@@ -218,7 +218,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                         </Button>
                                     </div>
                                 </div>
-                                
+
                                 <FontSettings
                                     fontFamily={settings.font_family}
                                     fontSize={settings.font_size}
@@ -227,7 +227,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                     onFontSizeChange={(value) => handleChange('font_size', value)}
                                     onTextStrokeWidthChange={(value) => handleChange('text_stroke_width', value)}
                                 />
-                                
+
                                 <ColorSettings
                                     backgroundColor={settings.background_color || '#000000'}
                                     backgroundOpacity={settings.background_opacity}
@@ -238,7 +238,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                     onTextStrokeColorChange={(value) => handleChange('text_stroke_color', value)}
                                     onBorderRadiusChange={(value) => handleChange('border_radius', value)}
                                 />
-                                
+
                                 <AnimationSettings
                                     animationType={settings.animation_type}
                                     animationDuration={settings.animation_duration}
@@ -247,7 +247,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                     onAnimationDurationChange={(value) => handleChange('animation_duration', value)}
                                     onMessageFadeSecondsChange={(value) => handleChange('message_fade_seconds', value)}
                                 />
-                                
+
                                 <PlatformSettings
                                     showPlatformIcons={settings.show_platform_icons}
                                     showBadges={settings.show_badges}
@@ -267,13 +267,13 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                     onChatWidthChange={(value) => handleChange('chat_width', value)}
                                 />
                             </div>
-                            
+
                             <div>
                                 <PreviewPanel settings={settings} previewMessages={PREVIEW_MESSAGES} />
                             </div>
                         </div>
                     </div>
-                    
+
                     <div className="border-t border-gray-700 p-4 flex justify-end gap-2">
                         <Button variant="outline" onClick={onClose} className="border-gray-600">
                             Отмена
@@ -286,7 +286,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             </div>
         </>
     );
-    
+
     return ReactDOM.createPortal(modalContent, document.body);
 };
 

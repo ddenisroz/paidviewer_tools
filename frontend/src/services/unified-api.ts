@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Унифицированный API клиент
  * Объединяет работу с Bot и TTS сервисами в удобном интерфейсе
  */
 
 import { ttsService } from './api/services';
 
-import type { ApiResponse } from '../types/api';
-import type { TtsVoice } from '../types/tts';
+import type { ApiResponse } from '@/types/api';
+import type { TtsVoice } from '@/types/tts';
 import type { AxiosResponse } from 'axios';
 
 // Реэкспортируем сервисы для удобства использования

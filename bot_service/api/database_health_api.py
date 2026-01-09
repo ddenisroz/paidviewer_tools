@@ -6,8 +6,7 @@ Provides endpoints for monitoring database connection pool,
 query performance, and overall database health.
 """
 import logging
-from typing import Dict, Any
-from datetime import datetime, timedelta
+from core.datetime_utils import utcnow_naive
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
@@ -49,7 +48,7 @@ async def get_pool_status(current_user: dict = Depends(get_current_user)):
                 "pool_size": 1,
                 "pool_class": pool_class,
                 "note": "StaticPool does not support connection pooling metrics",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": utcnow_naive().isoformat()
             }
         
         # For real connection pools (QueuePool, etc.)
@@ -83,7 +82,7 @@ async def get_pool_status(current_user: dict = Depends(get_current_user)):
             "overflow": overflow,
             "total": total,
             "utilization_percent": round(utilization, 2),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": utcnow_naive().isoformat()
         }
     except Exception as e:
         logger.error(f"Error getting pool status: {e}")
@@ -108,15 +107,15 @@ async def database_health_check(
         raise HTTPException(status_code=403, detail="Admin access required")
     
     health_data = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": utcnow_naive().isoformat(),
         "checks": {}
     }
     
     # 1. Connectivity check
     try:
-        start_time = datetime.utcnow()
+        start_time = utcnow_naive()
         db.execute(text("SELECT 1"))
-        response_time_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
+        response_time_ms = (utcnow_naive() - start_time).total_seconds() * 1000
         
         health_data["checks"]["connectivity"] = {
             "status": "healthy",
@@ -245,7 +244,7 @@ async def get_slow_queries(
         return {
             "slow_queries": queries,
             "count": len(queries),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": utcnow_naive().isoformat()
         }
     except Exception as e:
         logger.error(f"Error getting slow queries: {e}")
@@ -290,7 +289,7 @@ async def get_table_statistics(
         
         return {
             "tables": tables,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": utcnow_naive().isoformat()
         }
     except Exception as e:
         logger.error(f"Error getting table stats: {e}")
@@ -345,7 +344,7 @@ async def get_index_usage(
         return {
             "indexes": indexes,
             "unused_count": sum(1 for idx in indexes if idx["is_unused"]),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": utcnow_naive().isoformat()
         }
     except Exception as e:
         logger.error(f"Error getting index usage: {e}")

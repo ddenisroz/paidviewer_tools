@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
-import { authService } from '../services/api/services/authService';
-import { logger } from '../utils/prodLogger';
+import { authService } from '@/services/api/services/authService';
+import { logger } from '@/shared/utils/prodLogger';
 
-import type { ApiResponse } from '../types/api';
+import type { ApiResponse } from '@/types/api';
 
 interface DonationAlertsResponse {
   user_id?: string | number;

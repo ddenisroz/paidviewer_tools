@@ -13,9 +13,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from core.database import get_db, User, UserToken
-from sqlalchemy.orm import Session
-import logging
+from core.database import get_db, User, UserToken  # noqa: E402
+from sqlalchemy.orm import Session  # noqa: E402
+import logging  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

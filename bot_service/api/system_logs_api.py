@@ -1,13 +1,15 @@
-"""API для системных логов и истории действий администраторов"""
+"""
+API для системных логов и истории действий администраторов.
+Clean Architecture: uses SystemLogRepository for data access.
+"""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, and_
 from typing import Optional
-from datetime import timedelta
 
-from core.database import get_db, SystemLog, User
+from core.database import get_db
 from core.datetime_utils import utcnow_naive
 from auth.auth import get_current_user
+from repositories.system_log_repository import SystemLogRepository
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,49 +17,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["system-logs"])
 
 
-class SystemLogService:
-    """Сервис для работы с системными логами"""
-
-    @staticmethod
-    def log_action(
-        db: Session,
-        admin_id: int,
-        action_type: str,
-        description: str = None,
-        target_user_id: int = None,
-        target_resource: str = None,
-        old_value: dict = None,
-        new_value: dict = None,
-        ip_address: str = None,
-        user_agent: str = None,
-        details: dict = None,
-        status: str = "success",
-        error_message: str = None
-    ) -> SystemLog:
-        """Логирует действие администратора"""
-        try:
-            log_entry = SystemLog(
-                admin_id=admin_id,
-                action_type=action_type,
-                description=description,
-                target_user_id=target_user_id,
-                target_resource=target_resource,
-                old_value=old_value,
-                new_value=new_value,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details=details,
-                status=status,
-                error_message=error_message,
-                timestamp=utcnow_naive()
-            )
-            db.add(log_entry)
-            db.commit()
-            return log_entry
-        except Exception as e:
-            logger.error(f"Error logging action: {e}")
-            db.rollback()
-            return None
+def _format_user_name(user, fallback_id: int = None) -> str:
+    """Format user display name."""
+    if user:
+        return user.twitch_username or user.vk_username or f"User {user.id}"
+    return f"Unknown {fallback_id}" if fallback_id else "Unknown"
 
 
 @router.get("/logs")
@@ -74,48 +38,43 @@ async def get_system_logs(
 ):
     """Получить логи действий администраторов с фильтрацией"""
     try:
-        # Проверяем права доступа - только админы
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
 
-        # Строим фильтры
-        filters = []
+        repo = SystemLogRepository(db)
+        logs, total_count = repo.get_filtered_paginated(
+            action_type=action_type,
+            admin_id=admin_id,
+            target_user_id=target_user_id,
+            status=status,
+            days=days,
+            limit=limit,
+            offset=offset
+        )
 
-        # Временной диапазон
-        cutoff_date = utcnow_naive() - timedelta(days=days)
-        filters.append(SystemLog.timestamp >= cutoff_date)
+        # Batch fetch all users (fix N+1 query problem)
+        user_ids = set()
+        for log in logs:
+            if log.admin_id:
+                user_ids.add(log.admin_id)
+            if log.target_user_id:
+                user_ids.add(log.target_user_id)
+        users_map = repo.get_users_by_ids(list(user_ids))
 
-        if action_type:
-            filters.append(SystemLog.action_type == action_type)
-
-        if admin_id:
-            filters.append(SystemLog.admin_id == admin_id)
-
-        if target_user_id:
-            filters.append(SystemLog.target_user_id == target_user_id)
-
-        if status:
-            filters.append(SystemLog.status == status)
-
-        # Получаем логи
-        logs = db.query(SystemLog).filter(and_(*filters)) if filters else db.query(SystemLog)
-        total_count = logs.count()
-        logs = logs.order_by(desc(SystemLog.timestamp)).limit(limit).offset(offset).all()
-
-        # Форматируем результаты
+        # Format results
         formatted_logs = []
         for log in logs:
-            admin_user = db.query(User).filter(User.id == log.admin_id).first()
-            target_user = db.query(User).filter(User.id == log.target_user_id).first() if log.target_user_id else None
+            admin_user = users_map.get(log.admin_id)
+            target_user = users_map.get(log.target_user_id) if log.target_user_id else None
 
             formatted_logs.append({
                 "id": log.id,
                 "admin_id": log.admin_id,
-                "admin_name": admin_user.twitch_username or admin_user.vk_username or f"User {log.admin_id}" if admin_user else f"Unknown {log.admin_id}",
+                "admin_name": _format_user_name(admin_user, log.admin_id),
                 "action_type": log.action_type,
                 "description": log.description,
                 "target_user_id": log.target_user_id,
-                "target_user_name": target_user.twitch_username or target_user.vk_username or f"User {log.target_user_id}" if target_user else None,
+                "target_user_name": _format_user_name(target_user, log.target_user_id) if target_user else None,
                 "target_resource": log.target_resource,
                 "old_value": log.old_value,
                 "new_value": log.new_value,
@@ -152,28 +111,13 @@ async def get_logs_statistics(
 ):
     """Получить статистику по логам (количество действий по типам)"""
     try:
-        # Проверяем права доступа - только админы
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
 
-        cutoff_date = utcnow_naive() - timedelta(days=days)
-
-        # Считаем логи по типам действий
-        from sqlalchemy import func, case
-        action_stats = db.query(
-            SystemLog.action_type,
-            func.count(SystemLog.id).label('count'),
-            func.sum(case((SystemLog.status == 'success', 1), else_=0)).label('success_count'),
-            func.sum(case((SystemLog.status == 'failed', 1), else_=0)).label('failed_count')
-        ).filter(SystemLog.timestamp >= cutoff_date).group_by(SystemLog.action_type).all()
-
-        # Считаем логи по админам
-        admin_stats = db.query(
-            SystemLog.admin_id,
-            func.count(SystemLog.id).label('count')
-        ).filter(SystemLog.timestamp >= cutoff_date).group_by(SystemLog.admin_id).order_by(desc(func.count(SystemLog.id))).limit(10).all()
-
-        # Форматируем результаты
+        repo = SystemLogRepository(db)
+        
+        # Action stats
+        action_stats = repo.get_action_stats(days)
         action_data = []
         for action_type, count, success, failed in action_stats:
             action_data.append({
@@ -184,12 +128,17 @@ async def get_logs_statistics(
                 "success_rate": round((success / count * 100), 2) if count > 0 else 0
             })
 
+        # Top admins
+        admin_stats = repo.get_top_admins(days)
+        admin_ids = [admin_id for admin_id, _ in admin_stats]
+        users_map = repo.get_users_by_ids(admin_ids)
+        
         admin_data = []
         for admin_id, count in admin_stats:
-            admin_user = db.query(User).filter(User.id == admin_id).first()
+            admin_user = users_map.get(admin_id)
             admin_data.append({
                 "admin_id": admin_id,
-                "admin_name": admin_user.twitch_username or admin_user.vk_username or f"User {admin_id}" if admin_user else f"Unknown {admin_id}",
+                "admin_name": _format_user_name(admin_user, admin_id),
                 "action_count": count
             })
 
@@ -198,7 +147,7 @@ async def get_logs_statistics(
             "data": {
                 "actions_by_type": action_data,
                 "top_admins": admin_data,
-                "total_logs": db.query(SystemLog).filter(SystemLog.timestamp >= cutoff_date).count(),
+                "total_logs": repo.get_total_count(days),
                 "days": days
             },
             "timestamp": utcnow_naive().isoformat()
@@ -218,18 +167,15 @@ async def get_available_actions(
 ):
     """Получить список доступных типов действий"""
     try:
-        # Проверяем права доступа - только админы
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Admin access required")
 
-        from sqlalchemy import distinct
-
-        # Получаем все уникальные типы действий
-        action_types = db.query(distinct(SystemLog.action_type)).all()
+        repo = SystemLogRepository(db)
+        action_types = repo.get_distinct_action_types()
 
         return {
             "success": True,
-            "data": [action[0] for action in action_types if action[0]],
+            "data": action_types,
             "timestamp": utcnow_naive().isoformat()
         }
 
@@ -238,3 +184,15 @@ async def get_available_actions(
     except Exception as e:
         logger.error(f"Error getting available actions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Re-export SystemLogRepository for backward compatibility with other modules
+# that import SystemLogService from here
+class SystemLogService:
+    """Backward compatible wrapper - use SystemLogRepository directly."""
+    
+    @staticmethod
+    def log_action(db: Session, admin_id: int, action_type: str, **kwargs):
+        repo = SystemLogRepository(db)
+        return repo.log_action(admin_id=admin_id, action_type=action_type, **kwargs)
+

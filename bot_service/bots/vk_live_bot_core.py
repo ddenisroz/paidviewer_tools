@@ -32,7 +32,7 @@ class VKLiveBotCore:
         self.ws_task: Optional[asyncio.Task] = None
 
         # Инициализируем TTS API для обработки сообщений
-        from features.tts.tts_api import TTSAPI
+        from services.tts.tts_core import TTSAPI
         self.tts_api = TTSAPI()
 
         # Универсальная система команд
@@ -75,17 +75,19 @@ class VKLiveBotCore:
             db = next(get_db())
             try:
                 # Ищем пользователя по vk_channel_name (case-insensitive)
-                from sqlalchemy import func
-                user = db.query(User).filter(func.lower(User.vk_channel_name) == channel_id.lower()).first()
+                from repositories.user_repository import UserRepository
+                from repositories.user_token_repository import UserTokenRepository
+                
+                user_repo = UserRepository(db)
+                token_repo = UserTokenRepository(db)
+                
+                user = user_repo.get_by_vk_channel_name(channel_id)
                 if not user:
                     logger.error(f"[ERROR] User not found for VK channel: {channel_id}")
                     return False
 
                 # Получаем OAuth токен пользователя
-                user_token = db.query(UserToken).filter(
-                    UserToken.user_id == user.id,
-                    UserToken.platform == 'vk'
-                ).first()
+                user_token = token_repo.get_by_user_and_platform(user.id, 'vk')
 
                 if not user_token or not user_token.access_token:
                     logger.error(f"[ERROR] No VK OAuth token found for channel: {channel_id}")
@@ -222,7 +224,7 @@ class VKLiveBotCore:
             user = author.get("nick", author.get("name", "Unknown"))  # nick - правильное поле для VK Live
             user_id = str(author.get("id", ""))
             channel_id = message.get("channel", "")  # HTTP polling передает channel в этом поле
-            platform = message.get("platform", "vk")
+            message.get("platform", "vk")
             is_owner = author.get("is_owner", False) or author.get("is_broadcaster", False)
             is_moderator = author.get("is_moderator", False)
 
@@ -250,15 +252,14 @@ class VKLiveBotCore:
 
             # 1.5. [OK] НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
             try:
-                from features.drops.drops_service import DropsService
-                from core.database import get_db, User
-                from sqlalchemy import func
+                from services.drops.drops_service import DropsService
+                from core.database import get_db
+                from repositories.user_repository import UserRepository
 
                 db = get_db().__next__()
                 try:
-                    channel_owner = db.query(User).filter(
-                        func.lower(User.vk_channel_name) == channel_id.lower()
-                    ).first()
+                    user_repo = UserRepository(db)
+                    channel_owner = user_repo.get_by_vk_channel_name(channel_id)
 
                     if channel_owner:
                         drops_service = DropsService(db)
@@ -351,18 +352,19 @@ class VKLiveBotCore:
                     logger.info(f"[REWARD] [VK MSG] Detected reward from ChatBot: '{reward_title}'")
 
                     # Ищем reward_id TTS награды из настроек пользователя
-                    from core.database import SessionLocal, User, TTSUserSettings
+                    from core.database import SessionLocal
+                    from repositories.user_repository import UserRepository
+                    from repositories.tts_settings_repository import TTSSettingsRepository
+                    
                     db = SessionLocal()
                     try:
-                        from sqlalchemy import func
-                        channel_owner = db.query(User).filter(
-                            func.lower(User.vk_channel_name) == channel_id.lower()
-                        ).first()
+                        user_repo = UserRepository(db)
+                        tts_settings_repo = TTSSettingsRepository(db)
+                        
+                        channel_owner = user_repo.get_by_vk_channel_name(channel_id)
 
                         if channel_owner:
-                            tts_settings = db.query(TTSUserSettings).filter(
-                                TTSUserSettings.user_id == channel_owner.id
-                            ).first()
+                            tts_settings = tts_settings_repo.get_settings(channel_owner.id)
 
                             # Если название награды содержит "TTS" - считаем что это TTS награда
                             if tts_settings and tts_settings.tts_reward_ids and 'tts' in reward_title.lower():

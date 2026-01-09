@@ -1,13 +1,13 @@
-// src/context/UserSettingsContext.tsx
+﻿// src/context/UserSettingsContext.tsx
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
-import { useSaveUserSettings, useUserSettings as useUserSettingsQuery } from '../queries/userSettings/userSettingsQueries';
-import cacheManager, { CACHE_CONFIG } from '../utils/cacheManager';
-import Logger from '../utils/prodLogger';
+import { useSaveUserSettings, useUserSettings as useUserSettingsQuery } from '@/queries/userSettings/userSettingsQueries';
+import cacheManager, { CACHE_CONFIG } from '@/shared/utils/cacheManager';
+import Logger from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
 
-import type { UserSettings } from '../types/user';
+import type { UserSettings } from '@/types/user';
 
 const logger = new Logger('USER_SETTINGS');
 

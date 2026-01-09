@@ -4,16 +4,17 @@
 """
 
 import logging
-from typing import List
 
 from sqlalchemy.orm import Session
 
-from core.database import WhitelistedChannel
 from models.pydantic_models import (
     WhitelistedChannelPublic,
     AddToWhitelistRequest,
     WhitelistResponse,
 )
+
+
+from repositories.whitelisted_channel_repository import WhitelistedChannelRepository
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,8 @@ class WhitelistService:
 
     async def get_whitelist(self, db: Session) -> WhitelistResponse:
         """Получить список каналов в whitelist."""
-        channels = db.query(WhitelistedChannel).all()
+        repo = WhitelistedChannelRepository(db)
+        channels = repo.get_all()
         return WhitelistResponse(
             whitelist_users=[
                 WhitelistedChannelPublic.model_validate(ch) for ch in channels
@@ -34,19 +36,16 @@ class WhitelistService:
         self, request: AddToWhitelistRequest, db: Session
     ) -> dict:
         """Добавить канал в whitelist."""
+        repo = WhitelistedChannelRepository(db)
         username = request.username.lower()
 
-        existing = db.query(WhitelistedChannel).filter(
-            WhitelistedChannel.channel_name == username
-        ).first()
+        existing = repo.get_by_name(username)
 
         if existing:
             logger.warning(f"[WARN] WHITELIST: Channel '{username}' already exists")
             return {"message": f"User {username} is already in whitelist"}
 
-        channel = WhitelistedChannel(channel_name=username)
-        db.add(channel)
-        db.commit()
+        repo.add_channel(username)
 
         logger.info(f"[OK] WHITELIST: Channel '{username}' added")
         return {"message": f"User {username} added to whitelist"}
@@ -55,18 +54,16 @@ class WhitelistService:
         self, request: AddToWhitelistRequest, db: Session
     ) -> dict:
         """Удалить канал из whitelist."""
+        repo = WhitelistedChannelRepository(db)
         username = request.username.lower()
 
-        channel = db.query(WhitelistedChannel).filter(
-            WhitelistedChannel.channel_name == username
-        ).first()
+        channel = repo.get_by_name(username)
 
         if not channel:
             logger.warning(f"[WARN] WHITELIST: Channel '{username}' not found")
             return {"message": f"User {username} not found in whitelist"}
 
-        db.delete(channel)
-        db.commit()
+        repo.remove_channel(channel)
 
         logger.info(f"[DELETE] WHITELIST: Channel '{username}' removed")
         return {"message": f"User {username} removed from whitelist"}

@@ -2,10 +2,9 @@
 """
 Модели пользователей, сессий и токенов.
 """
-from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, ForeignKey, JSON,
-    UniqueConstraint, CheckConstraint, Index
+    UniqueConstraint, CheckConstraint
 )
 from core.datetime_utils import utcnow_naive
 from models.base import Base

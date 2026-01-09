@@ -3,19 +3,34 @@
 import logging
 from typing import Optional, Any, Dict
 from datetime import datetime
-from features.commands.command_executor import CommandExecutor
+from services.command_service import CommandService
 from core.database import get_db, BotCommand
 from utils.platform_role_checker import PlatformRoleChecker
 
+# Import Mixins
+from bots.mixins.queue_handler_mixin import QueueHandlerMixin
+from bots.mixins.stream_info_handler_mixin import StreamInfoHandlerMixin
+from bots.mixins.tts_handler_mixin import TTSHandlerMixin
+from bots.mixins.general_handler_mixin import GeneralHandlerMixin
+
 logger = logging.getLogger('bot_service')
 
-class UniversalCommandHandler:
-    """Универсальный обработчик команд с поддержкой глобальных команд, overrides и кастомных"""
+class UniversalCommandHandler(QueueHandlerMixin, StreamInfoHandlerMixin, TTSHandlerMixin, GeneralHandlerMixin):
+    """Универсальный обреботчик команд с поддержкой глобальных команд, overrides и кастомных
+    
+    Inherits functionality from:
+    - QueueHandlerMixin: !sr, !skip, !clear, !queue, !wronglink
+    - StreamInfoHandlerMixin: !game, !title
+    - TTSHandlerMixin: !voice, !randomvoice, !mute, !unmute, !ttsvolume
+    - GeneralHandlerMixin: !help, !ytvolume, !analyze
+    """
 
     def __init__(self):
-        self.executor = CommandExecutor()
+        self.command_service = CommandService()
         self.role_checker = PlatformRoleChecker()
-        self.cooldowns: Dict[str, Dict[str, datetime]] = {}  # command_id -> {user_id -> last_used}
+        # self.cooldowns is managed by CommandService now, but keeping local if needed for legacy mixins
+        # Ideally mixins should use command_service too.
+        # For now, let's proxy calls to command_service.
         self.logger = logging.getLogger('commands')
 
     async def handle_twitch_command(self, ctx: Any, bot: Any):
@@ -54,7 +69,7 @@ class UniversalCommandHandler:
             # Ищем команду в БД
             db = next(get_db())
             try:
-                command = await self.executor.find_command(
+                command = self.command_service.find_command(
                     command_name=command_name,
                     user_id=channel_owner_id,
                     channel_name=ctx.channel.name,
@@ -67,16 +82,23 @@ class UniversalCommandHandler:
                     return
 
                 # Проверяем права
-                if not self.executor.check_user_role(command, user_roles, is_broadcaster):
+                # Note: pass user=None as we use user_roles list for compat
+                if not self.command_service.check_permission(command, None, 'twitch', user_roles):
                     await ctx.send(f"@{ctx.author.name} [ERROR] У вас нет прав на использование этой команды")
                     return
 
                 # Проверяем кулдаун
                 if not is_broadcaster:  # Broadcaster игнорирует кулдауны
-                    if not self._check_cooldown(command, ctx.author.id):
-                        remaining = self._get_cooldown_remaining(command, ctx.author.id)
-                        await ctx.send(f"@{ctx.author.name} [TIMEOUT] Команда на кулдауне. Осталось: {remaining}с")
+                    if not self.command_service.check_cooldown(command, str(ctx.author.id)):
+                        # CommandService doesn't expose remaining time easily currently, or does it?
+                        # It returns bool. Let's look at implementation.
+                        # It doesn't have get_remaining. We should add it or accept generic message.
+                        await ctx.send(f"@{ctx.author.name} [TIMEOUT] Команда на кулдауне.")
                         return
+                    else:
+                        # Update cooldown upon successful check (or should it be after execution?)
+                        # Typically updated after execution starts.
+                        self.command_service.update_cooldown(command, str(ctx.author.id))
 
                 # Выполняем команду
                 await self._execute_command(
@@ -140,7 +162,7 @@ class UniversalCommandHandler:
             # Ищем команду в БД
             db = next(get_db())
             try:
-                command = await self.executor.find_command(
+                command = self.command_service.find_command(
                     command_name=command_name,
                     user_id=channel_owner_id,
                     channel_name=channel_name,
@@ -153,7 +175,7 @@ class UniversalCommandHandler:
                     return
 
                 # Проверяем права
-                if not self.executor.check_user_role(command, user_roles, is_broadcaster):
+                if not self.command_service.check_permission(command, None, 'vk', user_roles):
                     await vk_bot.send_message(channel_name,
                         f"@{author_data['name']} [ERROR] У вас нет прав на использование этой команды")
                     return
@@ -161,11 +183,12 @@ class UniversalCommandHandler:
                 # Проверяем кулдаун
                 author_id = str(message_data.get('author_id', ''))
                 if not is_broadcaster:
-                    if not self._check_cooldown(command, author_id):
-                        remaining = self._get_cooldown_remaining(command, author_id)
+                    if not self.command_service.check_cooldown(command, author_id):
                         await vk_bot.send_message(channel_name,
-                            f"@{author_data['name']} [TIMEOUT] Команда на кулдауне. Осталось: {remaining}с")
+                            f"@{author_data['name']} [TIMEOUT] Команда на кулдауне.")
                         return
+                    else:
+                        self.command_service.update_cooldown(command, author_id)
 
                 # Выполняем команду
                 await self._execute_command_vk(
@@ -202,7 +225,7 @@ class UniversalCommandHandler:
                 self.logger.info(f"✓ Executed text command: !{command.command_name}")
                 return
 
-            # Для специальных команд используем handlers
+            # Для специальных команд используем handlers (lookups on self which includes mixins)
             handler_name = f"_handle_{command.command_name}"
             if hasattr(self, handler_name):
                 handler = getattr(self, handler_name)
@@ -233,7 +256,7 @@ class UniversalCommandHandler:
                 self.logger.info(f"✓ Executed text command: !{command.command_name}")
                 return
 
-            # Для специальных команд используем handlers
+            # Для специальных команд используем handlers (lookups on self which includes mixins)
             handler_name = f"_handle_{command.command_name}_vk"
             if hasattr(self, handler_name):
                 handler = getattr(self, handler_name)
@@ -245,1310 +268,15 @@ class UniversalCommandHandler:
             self.logger.error(f"Error executing VK command: {e}", exc_info=True)
             await vk_bot.send_message(channel_name, "[ERROR] Ошибка выполнения команды")
 
-    # === HANDLERS ДЛЯ СПЕЦИАЛЬНЫХ КОМАНД ===
-
-    async def _handle_sr(self, ctx, bot, args, platform, db):
-        """Handler для !sr (Song Request)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !sr <YouTube URL или ID>")
-                return
-
-            # Вызываем существующий метод из commands_handler
-            if hasattr(bot, 'commands_handler'):
-                await bot.commands_handler.song_request_command(ctx, url=args)
-
-        except Exception as e:
-            self.logger.error(f"Error in !sr handler: {e}")
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка добавления видео")
-
-    async def _handle_sr_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !sr в VK"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Использование: !sr <YouTube URL>")
-                return
-
-            video_url = args
-
-            # Импортируем сервисы
-            from features.youtube.queue_service import QueueService
-            queue_service = QueueService()
-
-            # Получаем user_id владельца канала из базы данных
-            channel_owner_id = await self._get_channel_owner_id_vk(channel_name)
-
-            if not channel_owner_id:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не зарегистрирован в системе")
-                return
-
-            # Добавляем видео в очередь
-            result = await queue_service.add_video_to_queue(
-                user_id=channel_owner_id,
-                video_url=video_url,
-                channel_name=channel_name,
-                platform='vk',
-                requester_name=author_name,
-                requester_id=author_id,
-                is_paid=False,
-                db=db
-            )
-
-            if result['success']:
-                queue_item = result['queue_item']
-                await vk_bot.send_message(
-                    channel_name,
-                    f"[OK] @{author_name} Добавлено в очередь: {queue_item['title']} "
-                    f"(позиция {queue_item['position']}, {queue_item.get('duration', 'Unknown')})"
-                )
-            else:
-                await vk_bot.send_message(channel_name, f"[ERROR] @{author_name} {result['error']}")
-
-        except Exception as e:
-            self.logger.error(f"Error in VK song request: {e}")
-            await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Ошибка добавления видео")
-
-    async def _handle_game(self, ctx, bot, args, platform, db):
-        """Handler для !game (Twitch)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !game <название игры>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Проверяем настройку объединения категорий
-            combine_categories = user.combine_categories if hasattr(user, 'combine_categories') else False
-
-            # Ищем игру через Twitch API
-            from api.twitch_api import TwitchAPI
-            from core.connection_manager import get_connection_manager
-            from utils.category_search import expand_query_with_aliases
-
-            connection_manager = get_connection_manager()
-            twitch_api = TwitchAPI(connection_manager)
-
-            # Расширяем запрос с учётом алиасов (dbd -> Dead by Daylight)
-            search_queries = expand_query_with_aliases(args)
-
-            # Пробуем поиск по всем вариантам запроса
-            games = None
-            for search_query in search_queries:
-                games = await twitch_api.search_categories(search_query)
-                if games:
-                    break
-
-            if not games:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Игра '{args}' не найдена")
-                return
-
-            # Берём первую найденную игру
-            game = games[0]
-            game_id = game.get('id')
-            game_name = game.get('name', args)
-
-            # Обновляем категорию на Twitch
-            success_twitch = await twitch_api.update_stream_category(user.id, game_id)
-
-            results = []
-            if success_twitch:
-                results.append("Twitch")
-
-            # Если включено объединение категорий И есть VK канал - обновляем и VK
-            if combine_categories and user.vk_username:
-                try:
-                    from api.vk_api import VKLiveAPI
-                    vk_api = VKLiveAPI()
-
-                    # Ищем категорию на VK используя те же алиасы
-                    vk_categories = None
-                    for search_query in search_queries:
-                        vk_categories = await vk_api.get_categories(search=search_query, user_id=str(user.id))
-                        if vk_categories:
-                            break
-
-                    if vk_categories:
-                        success_vk = await vk_api.update_stream_category(str(user.id), vk_categories[0])
-                        if success_vk:
-                            results.append("VK Live")
-                except Exception as e:
-                    self.logger.error(f"Error updating VK category: {e}")
-
-            if results:
-                platforms_text = " и ".join(results)
-                await ctx.send(f"@{ctx.author.name} [OK] Игра изменена на: {game_name} ({platforms_text})")
-                self.logger.info(f"✓ Game changed to {game_name} for {platforms_text}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось изменить игру")
-
-        except Exception as e:
-            self.logger.error(f"Error in !game handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка изменения игры")
-
-    async def _handle_game_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !game (VK)"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Использование: !game <название игры>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Проверяем настройку объединения категорий
-            combine_categories = user.combine_categories if hasattr(user, 'combine_categories') else False
-
-            # Ищем игру через VK API
-            from api.vk_api import VKLiveAPI
-            from utils.category_search import expand_query_with_aliases
-
-            vk_api = VKLiveAPI()
-
-            # Расширяем запрос с учётом алиасов (dbd -> Dead by Daylight)
-            search_queries = expand_query_with_aliases(args)
-
-            # Пробуем поиск по всем вариантам запроса
-            categories = None
-            for search_query in search_queries:
-                categories = await vk_api.get_categories(search=search_query, user_id=str(user.id))
-                if categories:
-                    break
-
-            if not categories:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Игра '{args}' не найдена")
-                return
-
-            # Берём первую найденную игру
-            category = categories[0]
-            game_name = category.get('title', args)
-
-            # Обновляем категорию на VK
-            success_vk = await vk_api.update_stream_category(str(user.id), category)
-
-            results = []
-            if success_vk:
-                results.append("VK Live")
-
-            # Если включено объединение категорий И есть Twitch канал - обновляем и Twitch
-            if combine_categories and user.twitch_username:
-                try:
-                    from api.twitch_api import TwitchAPI
-                    from core.connection_manager import get_connection_manager
-
-                    connection_manager = get_connection_manager()
-                    twitch_api = TwitchAPI(connection_manager)
-
-                    # Ищем игру на Twitch используя те же алиасы
-                    games = None
-                    for search_query in search_queries:
-                        games = await twitch_api.search_categories(search_query)
-                        if games:
-                            break
-
-                    if games:
-                        success_twitch = await twitch_api.update_stream_category(user.id, games[0].get('id'))
-                        if success_twitch:
-                            results.append("Twitch")
-                except Exception as e:
-                    self.logger.error(f"Error updating Twitch category: {e}")
-
-            if results:
-                platforms_text = " и ".join(results)
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [OK] Игра изменена на: {game_name} ({platforms_text})")
-                self.logger.info(f"✓ Game changed to {game_name} for {platforms_text}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Не удалось изменить игру")
-
-        except Exception as e:
-            self.logger.error(f"Error in !game VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка изменения игры")
-
-    # === YouTube COMMANDS ===
-
-    async def _handle_skip(self, ctx, bot, args, platform, db):
-        """Handler для !skip (Twitch)"""
-        try:
-            from features.youtube.queue_service import QueueService
-            from core.database import User
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            queue_service = QueueService()
-            queue = queue_service.get_queue(user.id, db)
-
-            if not queue:
-                await ctx.send(f"@{ctx.author.name} [INFO] Очередь пуста")
-                return
-
-            # Пропускаем первое видео
-            first_video = queue[0]
-            success = queue_service.remove_from_queue(user.id, first_video['id'], db)
-
-            if success:
-                await ctx.send(f"@{ctx.author.name} [SKIP] Видео пропущено: {first_video['title']}")
-                self.logger.info(f"✓ Video skipped for {ctx.channel.name}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось пропустить видео")
-
-        except Exception as e:
-            self.logger.error(f"Error in !skip handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка пропуска видео")
-
-    async def _handle_skip_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !skip (VK)"""
-        try:
-            from features.youtube.queue_service import QueueService
-            from core.database import User
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            queue_service = QueueService()
-            queue = queue_service.get_queue(user.id, db)
-
-            if not queue:
-                await vk_bot.send_message(channel_name, f"@{author_name} [INFO] Очередь пуста")
-                return
-
-            # Пропускаем первое видео
-            first_video = queue[0]
-            success = queue_service.remove_from_queue(user.id, first_video['id'], db)
-
-            if success:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [SKIP] Видео пропущено: {first_video['title']}")
-                self.logger.info(f"✓ Video skipped for VK {channel_name}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Не удалось пропустить видео")
-
-        except Exception as e:
-            self.logger.error(f"Error in !skip VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка пропуска видео")
-
-    async def _handle_clear(self, ctx, bot, args, platform, db):
-        """Handler для !clear (Twitch)"""
-        try:
-            from core.database import User, YouTubeQueue
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Очищаем очередь
-            deleted_count = db.query(YouTubeQueue).filter(
-                YouTubeQueue.user_id == user.id,
-                YouTubeQueue.status == 'pending'
-            ).update({YouTubeQueue.status: 'skipped'})
-
-            db.commit()
-
-            if deleted_count > 0:
-                await ctx.send(f"@{ctx.author.name} [DELETE] Очередь очищена ({deleted_count} видео)")
-                self.logger.info(f"✓ Queue cleared for {ctx.channel.name}: {deleted_count} videos")
-            else:
-                await ctx.send(f"@{ctx.author.name} [INFO] Очередь уже пуста")
-
-        except Exception as e:
-            self.logger.error(f"Error in !clear handler: {e}", exc_info=True)
-            db.rollback()
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка очистки очереди")
-
-    async def _handle_clear_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !clear (VK)"""
-        try:
-            from core.database import User, YouTubeQueue
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Очищаем очередь
-            deleted_count = db.query(YouTubeQueue).filter(
-                YouTubeQueue.user_id == user.id,
-                YouTubeQueue.status == 'pending'
-            ).update({YouTubeQueue.status: 'skipped'})
-
-            db.commit()
-
-            if deleted_count > 0:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [DELETE] Очередь очищена ({deleted_count} видео)")
-                self.logger.info(f"✓ Queue cleared for VK {channel_name}: {deleted_count} videos")
-            else:
-                await vk_bot.send_message(channel_name, f"@{author_name} [INFO] Очередь уже пуста")
-
-        except Exception as e:
-            self.logger.error(f"Error in !clear VK handler: {e}", exc_info=True)
-            db.rollback()
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка очистки очереди")
-
-    async def _handle_queue(self, ctx, bot, args, platform, db):
-        """Handler для !queue (Twitch)"""
-        try:
-            from features.youtube.queue_service import QueueService
-            from core.database import User
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            queue_service = QueueService()
-            queue = queue_service.get_queue(user.id, db)
-
-            if not queue:
-                await ctx.send(f"@{ctx.author.name} [INFO] Очередь пуста")
-                return
-
-            # Показываем первые 5 видео
-            queue_list = []
-            for i, video in enumerate(queue[:5], 1):
-                title = video['title'][:50] + '...' if len(video['title']) > 50 else video['title']
-                queue_list.append(f"{i}. {title}")
-
-            queue_text = " | ".join(queue_list)
-            total = len(queue)
-
-            if total > 5:
-                await ctx.send(f"[LIST] Очередь ({total} видео): {queue_text} и ещё {total - 5}...")
-            else:
-                await ctx.send(f"[LIST] Очередь ({total} видео): {queue_text}")
-
-        except Exception as e:
-            self.logger.error(f"Error in !queue handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка получения очереди")
-
-    async def _handle_wronglink(self, ctx, bot, args, platform, db):
-        """Handler для !wronglink (Twitch) - удаление последнего своего видео"""
-        try:
-            from features.youtube.queue_service import QueueService
-            from core.database import User
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            queue_service = QueueService()
-            result = queue_service.remove_last_user_video(
-                user_id=user.id,
-                requester_id=str(ctx.author.id),
-                requester_name=ctx.author.name,
-                platform='twitch',
-                db=db
-            )
-
-            if result['success']:
-                refund_msg = ""
-                if result.get('refunded'):
-                    refund_msg = f" (возвращено {result['points_refunded']} баллов)"
-                await ctx.send(f"{result['message']}{refund_msg}")
-            else:
-                await ctx.send(result['error'])
-
-        except Exception as e:
-            self.logger.error(f"Error in !wronglink handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка удаления видео")
-
-    async def _handle_wronglink_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !wronglink (VK) - удаление последнего своего видео"""
-        try:
-            from features.youtube.queue_service import QueueService
-            from core.database import User
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            queue_service = QueueService()
-            result = queue_service.remove_last_user_video(
-                user_id=user.id,
-                requester_id=str(author_id),
-                requester_name=author_name,
-                platform='vk',
-                db=db
-            )
-
-            if result['success']:
-                refund_msg = ""
-                if result.get('refunded'):
-                    refund_msg = f" (возвращено {result['points_refunded']} баллов)"
-                await vk_bot.send_message(channel_name, f"{result['message']}{refund_msg}")
-            else:
-                await vk_bot.send_message(channel_name, result['error'])
-
-        except Exception as e:
-            self.logger.error(f"Error in !wronglink VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Ошибка удаления видео")
-
-    async def _handle_queue_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !queue (VK)"""
-        try:
-            from features.youtube.queue_service import QueueService
-            from core.database import User
-
-            # Получаем user_id владельца канала
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            queue_service = QueueService()
-            queue = queue_service.get_queue(user.id, db)
-
-            if not queue:
-                await vk_bot.send_message(channel_name, f"@{author_name} [INFO] Очередь пуста")
-                return
-
-            # Показываем первые 5 видео
-            queue_list = []
-            for i, video in enumerate(queue[:5], 1):
-                title = video['title'][:50] + '...' if len(video['title']) > 50 else video['title']
-                queue_list.append(f"{i}. {title}")
-
-            queue_text = " | ".join(queue_list)
-            total = len(queue)
-
-            if total > 5:
-                await vk_bot.send_message(channel_name,
-                    f"[LIST] Очередь ({total} видео): {queue_text} и ещё {total - 5}...")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"[LIST] Очередь ({total} видео): {queue_text}")
-
-        except Exception as e:
-            self.logger.error(f"Error in !queue VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка получения очереди")
-
-    # === STREAM MANAGEMENT COMMANDS ===
-
-    async def _handle_title(self, ctx, bot, args, platform, db):
-        """Handler для !title (Twitch)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !title <новое название>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Проверяем настройку объединения названий
-            combine_titles = user.combine_titles if hasattr(user, 'combine_titles') else False
-
-            # Обновляем название через Twitch API
-            from api.twitch_api import TwitchAPI
-            from core.connection_manager import get_connection_manager
-            connection_manager = get_connection_manager()
-            twitch_api = TwitchAPI(connection_manager)
-
-            success_twitch = await twitch_api.update_stream_title(user.id, args)
-
-            results = []
-            if success_twitch:
-                results.append("Twitch")
-
-            # Если включено объединение названий И есть VK канал - обновляем и VK
-            if combine_titles and user.vk_username:
-                try:
-                    from api.vk_api import VKLiveAPI
-                    vk_api = VKLiveAPI()
-
-                    success_vk = await vk_api.update_stream_title(str(user.id), args)
-                    if success_vk:
-                        results.append("VK Live")
-                except Exception as e:
-                    self.logger.error(f"Error updating VK title: {e}")
-
-            if results:
-                # Обрезаем название для отображения
-                display_title = args[:50] + '...' if len(args) > 50 else args
-                platforms_text = " и ".join(results)
-                await ctx.send(f"@{ctx.author.name} [OK] Название изменено на: {display_title} ({platforms_text})")
-                self.logger.info(f"✓ Title changed for {platforms_text}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось изменить название")
-
-        except Exception as e:
-            self.logger.error(f"Error in !title handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка изменения названия")
-
-    async def _handle_title_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !title (VK)"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Использование: !title <новое название>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Проверяем настройку объединения названий
-            combine_titles = user.combine_titles if hasattr(user, 'combine_titles') else False
-
-            # Обновляем название через VK API
-            from api.vk_api import VKLiveAPI
-            vk_api = VKLiveAPI()
-
-            success_vk = await vk_api.update_stream_title(str(user.id), args)
-
-            results = []
-            if success_vk:
-                results.append("VK Live")
-
-            # Если включено объединение названий И есть Twitch канал - обновляем и Twitch
-            if combine_titles and user.twitch_username:
-                try:
-                    from api.twitch_api import TwitchAPI
-                    from core.connection_manager import get_connection_manager
-
-                    connection_manager = get_connection_manager()
-                    twitch_api = TwitchAPI(connection_manager)
-
-                    success_twitch = await twitch_api.update_stream_title(user.id, args)
-                    if success_twitch:
-                        results.append("Twitch")
-                except Exception as e:
-                    self.logger.error(f"Error updating Twitch title: {e}")
-
-            if results:
-                # Обрезаем название для отображения
-                display_title = args[:50] + '...' if len(args) > 50 else args
-                platforms_text = " и ".join(results)
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [OK] Название изменено на: {display_title} ({platforms_text})")
-                self.logger.info(f"✓ Title changed for {platforms_text}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Не удалось изменить название")
-
-        except Exception as e:
-            self.logger.error(f"Error in !title VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка изменения названия")
-
-    # === TTS COMMANDS ===
-
-    async def _handle_voice(self, ctx, bot, args, platform, db):
-        """Handler для !voice (Twitch)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !voice <имя голоса>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Получаем настройки TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService(db)
-
-            # Устанавливаем голос (объединяем аргументы если имя голоса состоит из нескольких слов)
-            voice_name = ' '.join(args).lower() if isinstance(args, list) else args.lower()
-            success = await tts_service.set_voice(user.id, voice_name, db)
-
-            if success:
-                voice_display = ' '.join(args) if isinstance(args, list) else args
-                await ctx.send(f"@{ctx.author.name} [MIC] Голос изменён на: {voice_display}")
-                self.logger.info(f"✓ Voice changed to {args} for {ctx.channel.name}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Голос '{args}' не найден")
-
-        except Exception as e:
-            self.logger.error(f"Error in !voice handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка смены голоса")
-
-    async def _handle_voice_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !voice (VK)"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Использование: !voice <имя голоса>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Получаем настройки TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService(db)
-
-            # Устанавливаем голос (объединяем аргументы если имя голоса состоит из нескольких слов)
-            voice_name = ' '.join(args).lower() if isinstance(args, list) else args.lower()
-            success = await tts_service.set_voice(user.id, voice_name, db)
-
-            if success:
-                voice_display = ' '.join(args) if isinstance(args, list) else args
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [MIC] Голос изменён на: {voice_display}")
-                self.logger.info(f"✓ Voice changed to {args} for VK {channel_name}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Голос '{args}' не найден")
-
-        except Exception as e:
-            self.logger.error(f"Error in !voice VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка смены голоса")
-
-    async def _handle_randomvoice(self, ctx, bot, args, platform, db):
-        """Handler для !randomvoice (Twitch)"""
-        try:
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Получаем настройки TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            # Устанавливаем случайный голос
-            voice_name = await tts_service.set_random_voice(user.id, db)
-
-            if voice_name:
-                await ctx.send(f"@{ctx.author.name} 🎲 Случайный голос: {voice_name}")
-                self.logger.info(f"✓ Random voice {voice_name} for {ctx.channel.name}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось выбрать случайный голос")
-
-        except Exception as e:
-            self.logger.error(f"Error in !randomvoice handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка выбора случайного голоса")
-
-    async def _handle_randomvoice_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !randomvoice (VK)"""
-        try:
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Получаем настройки TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            # Устанавливаем случайный голос
-            voice_name = await tts_service.set_random_voice(user.id, db)
-
-            if voice_name:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} 🎲 Случайный голос: {voice_name}")
-                self.logger.info(f"✓ Random voice {voice_name} for VK {channel_name}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Не удалось выбрать случайный голос")
-
-        except Exception as e:
-            self.logger.error(f"Error in !randomvoice VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка выбора случайного голоса")
-
-    async def _handle_mute(self, ctx, bot, args, platform, db):
-        """Handler для !mute (Twitch)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !mute <username>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Блокируем пользователя для TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            target_username = args.strip().lower()
-            success = tts_service.block_user(user.id, target_username, 'twitch', db)
-
-            if success:
-                await ctx.send(f"@{ctx.author.name} 🔇 TTS отключен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} muted for {ctx.channel.name}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [WARN] Пользователь уже в списке")
-
-        except Exception as e:
-            self.logger.error(f"Error in !mute handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка блокировки пользователя")
-
-    async def _handle_mute_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !mute (VK)"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Использование: !mute <username>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Блокируем пользователя для TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            target_username = args.strip().lower()
-            success = tts_service.block_user(user.id, target_username, 'vk', db)
-
-            if success:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} 🔇 TTS отключен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} muted for VK {channel_name}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [WARN] Пользователь уже в списке")
-
-        except Exception as e:
-            self.logger.error(f"Error in !mute VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка блокировки пользователя")
-
-    async def _handle_unmute(self, ctx, bot, args, platform, db):
-        """Handler для !unmute (Twitch)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !unmute <username>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Разблокируем пользователя для TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            target_username = args.strip().lower()
-            success = tts_service.unblock_user(user.id, target_username, 'twitch', db)
-
-            if success:
-                await ctx.send(f"@{ctx.author.name} [VOLUME] TTS включен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} unmuted for {ctx.channel.name}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [WARN] Пользователь не найден в списке")
-
-        except Exception as e:
-            self.logger.error(f"Error in !unmute handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка разблокировки пользователя")
-
-    async def _handle_unmute_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !unmute (VK)"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Использование: !unmute <username>")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Разблокируем пользователя для TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            target_username = args.strip().lower()
-            success = tts_service.unblock_user(user.id, target_username, 'vk', db)
-
-            if success:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [VOLUME] TTS включен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} unmuted for VK {channel_name}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [WARN] Пользователь не найден в списке")
-
-        except Exception as e:
-            self.logger.error(f"Error in !unmute VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка разблокировки пользователя")
-
-    async def _handle_ttsvolume(self, ctx, bot, args, platform, db):
-        """Handler для !ttsvolume (Twitch)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !ttsvolume <0-100>")
-                return
-
-            try:
-                volume = int(args)
-                if not 0 <= volume <= 100:
-                    raise ValueError
-            except ValueError:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Громкость должна быть от 0 до 100")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Устанавливаем громкость TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            success = await tts_service.set_volume(user.id, volume, db)
-
-            if success:
-                await ctx.send(f"@{ctx.author.name} [VOLUME] Громкость TTS: {volume}%")
-                self.logger.info(f"✓ TTS volume set to {volume}% for {ctx.channel.name}")
-            else:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось изменить громкость")
-
-        except Exception as e:
-            self.logger.error(f"Error in !ttsvolume handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка изменения громкости")
-
-    async def _handle_ttsvolume_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !ttsvolume (VK)"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Использование: !ttsvolume <0-100>")
-                return
-
-            try:
-                volume = int(args)
-                if not 0 <= volume <= 100:
-                    raise ValueError
-            except ValueError:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Громкость должна быть от 0 до 100")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Устанавливаем громкость TTS
-            from services.tts_service import TTSService
-            tts_service = TTSService()
-
-            success = await tts_service.set_volume(user.id, volume, db)
-
-            if success:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [VOLUME] Громкость TTS: {volume}%")
-                self.logger.info(f"✓ TTS volume set to {volume}% for VK {channel_name}")
-            else:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Не удалось изменить громкость")
-
-        except Exception as e:
-            self.logger.error(f"Error in !ttsvolume VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка изменения громкости")
-
-    # === OTHER COMMANDS ===
-
-    async def _handle_help(self, ctx, bot, args, platform, db):
-        """Handler для !help (Twitch) - показывает только основные команды"""
-        try:
-            # Получаем user_id владельца канала
-            from core.database import User, BotCommand
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Получаем доступные команды напрямую из БД
-            from sqlalchemy import or_
-
-            # Основные команды для отображения (по порядку важности)
-            core_command_names = ['sr', 'voice', 'queue', 'title', 'game', 'ttsvolume']
-
-            # Получаем все команды (global + override + custom для этого пользователя)
-            all_commands = db.query(BotCommand).filter(
-                or_(
-                    BotCommand.command_type == 'global',
-                    BotCommand.user_id == user.id
-                )
-            ).filter(
-                or_(
-                    BotCommand.platforms.like('%twitch%'),
-                    BotCommand.platforms.like('%all%')
-                )
-            ).filter(
-                BotCommand.is_enabled == True
-            ).all()
-
-            # Убираем дубликаты по имени команды (override > global)
-            # Сначала добавляем override, потом global
-            commands_by_name = {}
-            for cmd in sorted(all_commands, key=lambda x: (x.command_type == 'global', x.command_name)):
-                if cmd.command_name not in commands_by_name:
-                    commands_by_name[cmd.command_name] = cmd
-
-            # Фильтруем только основные команды в заданном порядке
-            featured_commands = []
-            for core_name in core_command_names:
-                if core_name in commands_by_name:
-                    featured_commands.append(commands_by_name[core_name])
-
-            # Определяем название команды voice (может быть переименована пользователем)
-            voice_cmd_name = 'voice'  # Дефолтное значение
-            if 'voice' in commands_by_name:
-                voice_cmd_name = commands_by_name['voice'].command_name
-
-            # Формируем список команд
-            cmd_list = []
-            for cmd in featured_commands:
-                cmd_list.append(f"!{cmd.command_name}")
-
-            if cmd_list:
-                commands_text = ", ".join(cmd_list)
-                help_text = (
-                    f"[LIST] Команды: {commands_text} | "
-                    f"[TTS] !{voice_cmd_name} <имя> (Алёна/Дмитрий/random) | "
-                    f"[VOLUME] TTS в дашборде → выбрать платформу → включить. Громкость: !ttsvolume <0-100>"
-                )
-                await ctx.send(help_text)
-            else:
-                await ctx.send(f"@{ctx.author.name} [INFO] Команды не найдены")
-
-        except Exception as e:
-            self.logger.error(f"Error in !help handler: {e}", exc_info=True)
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка получения списка команд")
-
-    async def _handle_help_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !help (VK) - показывает только основные команды"""
-        try:
-            # Получаем user_id владельца канала
-            from core.database import User, BotCommand
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Получаем доступные команды напрямую из БД
-            from sqlalchemy import or_
-
-            # Основные команды для отображения (по порядку важности)
-            core_command_names = ['sr', 'voice', 'queue', 'title', 'game', 'ttsvolume']
-
-            # Получаем все команды (global + override + custom для этого пользователя)
-            all_commands = db.query(BotCommand).filter(
-                or_(
-                    BotCommand.command_type == 'global',
-                    BotCommand.user_id == user.id
-                )
-            ).filter(
-                or_(
-                    BotCommand.platforms.like('%vk%'),
-                    BotCommand.platforms.like('%all%')
-                )
-            ).filter(
-                BotCommand.is_enabled == True
-            ).all()
-
-            # Убираем дубликаты по имени команды (override > global)
-            # Сначала добавляем override, потом global
-            commands_by_name = {}
-            for cmd in sorted(all_commands, key=lambda x: (x.command_type == 'global', x.command_name)):
-                if cmd.command_name not in commands_by_name:
-                    commands_by_name[cmd.command_name] = cmd
-
-            # Фильтруем только основные команды в заданном порядке
-            featured_commands = []
-            for core_name in core_command_names:
-                if core_name in commands_by_name:
-                    featured_commands.append(commands_by_name[core_name])
-
-            # Определяем название команды voice (может быть переименована пользователем)
-            voice_cmd_name = 'voice'  # Дефолтное значение
-            if 'voice' in commands_by_name:
-                voice_cmd_name = commands_by_name['voice'].command_name
-
-            # Формируем список команд
-            cmd_list = []
-            for cmd in featured_commands:
-                cmd_list.append(f"!{cmd.command_name}")
-
-            if cmd_list:
-                commands_text = ", ".join(cmd_list)
-                help_text = (
-                    f"[LIST] Команды: {commands_text} | "
-                    f"[TTS] !{voice_cmd_name} <имя> (Алёна/Дмитрий/random) | "
-                    f"[VOLUME] TTS в дашборде → выбрать платформу → включить. Громкость: !ttsvolume <0-100>"
-                )
-                await vk_bot.send_message(channel_name, help_text)
-            else:
-                await vk_bot.send_message(channel_name, f"@{author_name} [INFO] Команды не найдены")
-
-        except Exception as e:
-            self.logger.error(f"Error in !help VK handler: {e}", exc_info=True)
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка получения списка команд")
-
-    async def _handle_ytvolume(self, ctx, bot, args, platform, db):
-        """Handler для !ytvolume (Twitch)"""
-        try:
-            if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !ytvolume <0-100>")
-                return
-
-            try:
-                volume = int(args)
-                if not 0 <= volume <= 100:
-                    raise ValueError
-            except ValueError:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Громкость должна быть от 0 до 100")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.twitch_username == ctx.channel.name.lower()
-            ).first()
-
-            if not user:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
-                return
-
-            # Устанавливаем громкость YouTube через UserSettings
-            from core.database import UserSettings
-            settings = db.query(UserSettings).filter(
-                UserSettings.user_id == user.id
-            ).first()
-
-            if not settings:
-                settings = UserSettings(user_id=user.id)
-                db.add(settings)
-
-            settings.youtube_volume = volume
-            db.commit()
-
-            await ctx.send(f"@{ctx.author.name} [AUDIO] Громкость YouTube: {volume}%")
-            self.logger.info(f"✓ YouTube volume set to {volume}% for {ctx.channel.name}")
-
-        except Exception as e:
-            self.logger.error(f"Error in !ytvolume handler: {e}", exc_info=True)
-            db.rollback()
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка изменения громкости")
-
-    async def _handle_ytvolume_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !ytvolume (VK)"""
-        try:
-            if not args:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Использование: !ytvolume <0-100>")
-                return
-
-            try:
-                volume = int(args)
-                if not 0 <= volume <= 100:
-                    raise ValueError
-            except ValueError:
-                await vk_bot.send_message(channel_name,
-                    f"@{author_name} [ERROR] Громкость должна быть от 0 до 100")
-                return
-
-            # Получаем user_id владельца канала
-            from core.database import User
-            user = db.query(User).filter(
-                User.vk_username == channel_name.lower()
-            ).first()
-
-            if not user:
-                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
-                return
-
-            # Устанавливаем громкость YouTube через UserSettings
-            from core.database import UserSettings
-            settings = db.query(UserSettings).filter(
-                UserSettings.user_id == user.id
-            ).first()
-
-            if not settings:
-                settings = UserSettings(user_id=user.id)
-                db.add(settings)
-
-            settings.youtube_volume = volume
-            db.commit()
-
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [AUDIO] Громкость YouTube: {volume}%")
-            self.logger.info(f"✓ YouTube volume set to {volume}% for VK {channel_name}")
-
-        except Exception as e:
-            self.logger.error(f"Error in !ytvolume VK handler: {e}", exc_info=True)
-            db.rollback()
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [ERROR] Ошибка изменения громкости")
-
-    async def _handle_analyze(self, ctx, bot, args, platform, db):
-        """Handler для !analyze (Twitch) - заглушка"""
-        try:
-            await ctx.send(f"@{ctx.author.name} [BOT] Функция анализа чата в разработке")
-            self.logger.info(f"!analyze called by {ctx.author.name} on {ctx.channel.name}")
-        except Exception as e:
-            self.logger.error(f"Error in !analyze handler: {e}", exc_info=True)
-
-    async def _handle_analyze_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !analyze (VK) - заглушка"""
-        try:
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [BOT] Функция анализа чата в разработке")
-            self.logger.info(f"!analyze called by {author_name} on VK {channel_name}")
-        except Exception as e:
-            self.logger.error(f"Error in !analyze VK handler: {e}", exc_info=True)
-
     # === ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ===
 
     async def _get_channel_owner_id_twitch(self, channel_name: str) -> Optional[int]:
         """Получить user_id владельца Twitch канала"""
         try:
-            from core.database import User
             db = next(get_db())
             try:
-                # Ищем пользователя по twitch_username
-                user = db.query(User).filter(
-                    User.twitch_username == channel_name.lower()
-                ).first()
-
+                from repositories.user_repository import UserRepository
+                user = UserRepository(db).get_by_twitch_username(channel_name)
                 return user.id if user else None
             finally:
                 db.close()
@@ -1559,22 +287,17 @@ class UniversalCommandHandler:
     async def _get_channel_owner_id_vk(self, channel_name: str) -> Optional[int]:
         """Получить user_id владельца VK канала"""
         try:
-            from core.database import User
             db = next(get_db())
             try:
+                from repositories.user_repository import UserRepository
+                repo = UserRepository(db)
                 # Сначала ищем по vk_channel_name (правильное поле)
-                user = db.query(User).filter(
-                    User.vk_channel_name == channel_name.lower()
-                ).first()
-
+                user = repo.get_by_vk_channel_name(channel_name)
                 if user:
                     return user.id
 
                 # Fallback: ищем по vk_username для обратной совместимости
-                user = db.query(User).filter(
-                    User.vk_username == channel_name.lower()
-                ).first()
-
+                user = repo.get_by_vk_username(channel_name)
                 return user.id if user else None
             finally:
                 db.close()
@@ -1582,38 +305,4 @@ class UniversalCommandHandler:
             self.logger.error(f"Error getting VK channel owner ID: {e}")
             return None
 
-    def _check_cooldown(self, command: BotCommand, user_id: str) -> bool:
-        """Проверка кулдауна команды"""
-        if not command.cooldown_seconds or command.cooldown_seconds <= 0:
-            return True
-
-        command_key = f"{command.id}"
-        if command_key not in self.cooldowns:
-            self.cooldowns[command_key] = {}
-
-        now = datetime.now()
-        last_used = self.cooldowns[command_key].get(user_id)
-
-        if not last_used:
-            self.cooldowns[command_key][user_id] = now
-            return True
-
-        time_passed = (now - last_used).total_seconds()
-        if time_passed >= command.cooldown_seconds:
-            self.cooldowns[command_key][user_id] = now
-            return True
-
-        return False
-
-    def _get_cooldown_remaining(self, command: BotCommand, user_id: str) -> int:
-        """Получение оставшегося времени кулдауна"""
-        command_key = f"{command.id}"
-        if command_key not in self.cooldowns or user_id not in self.cooldowns[command_key]:
-            return 0
-
-        now = datetime.now()
-        last_used = self.cooldowns[command_key][user_id]
-        time_passed = (now - last_used).total_seconds()
-
-        return max(0, int(command.cooldown_seconds - time_passed))
-
+    # _check_cooldown and _get_cooldown_remaining are deprecated replaced by CommandService

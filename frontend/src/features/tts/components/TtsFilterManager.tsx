@@ -3,13 +3,13 @@ import React, { useCallback, useState } from 'react';
 
 import { AlertCircle, ChevronDown, Plus, UserX, X } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { toast } from '@/utils/toastManager';
 
 import { useAuth } from '../../../context/AuthContext';
@@ -107,15 +107,15 @@ const TtsFilterManager: React.FC = React.memo(() => {
         },
     });
 
-    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData) 
-        ? blockedUsersData 
+    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData)
+        ? blockedUsersData
         : ((blockedUsersData as { data?: { blocked_users?: BlockedUser[] } } | undefined)?.data?.blocked_users ?? []);
-    
-    const wordsRaw = Array.isArray(wordsData) 
-        ? wordsData 
-        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words 
-           ?? (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words 
-           ?? []);
+
+    const wordsRaw = Array.isArray(wordsData)
+        ? wordsData
+        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words
+            ?? (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words
+            ?? []);
     const words: FilteredWord[] = (Array.isArray(wordsRaw) ? wordsRaw : []) as FilteredWord[];
     const addingUser = blockUserMutation.isPending;
     const addingWord = addWordMutation.isPending;
@@ -176,7 +176,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
         }
 
         const channelName = getChannelName(selectedUserPlatform);
-        
+
         if (!channelName) {
             toast.error(`Не удалось получить имя канала для платформы ${selectedUserPlatform}`);
             return;
@@ -230,7 +230,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
 
     return (
         <Card className="border-gray-700 bg-gray-900/30" data-testid="tts-filter-card">
-            <CardHeader 
+            <CardHeader
                 className="cursor-pointer hover:bg-gray-800/20 transition-colors"
                 onClick={toggleExpanded}
                 data-testid="tts-filter-header"
@@ -239,8 +239,8 @@ const TtsFilterManager: React.FC = React.memo(() => {
                     <CardTitle className="text-base font-semibold text-white">
                         Фильтры и заблокированные
                     </CardTitle>
-                    <ChevronDown 
-                        className={`h-5 w-5 transition-transform duration-300 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`} 
+                    <ChevronDown
+                        className={`h-5 w-5 transition-transform duration-300 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}
                     />
                 </div>
             </CardHeader>
@@ -294,7 +294,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
                                         {addingUser ? 'Добавление...' : 'Заглушить'}
                                     </Button>
                                 </div>
-                                
+
                                 {availablePlatforms.length === 0 && (
                                     <p className="text-sm text-gray-400">
                                         Подключите хотя бы одну платформу (Twitch или VK Live) чтобы заглушать пользователей
@@ -365,8 +365,8 @@ const TtsFilterManager: React.FC = React.memo(() => {
                                             </SelectContent>
                                         </Select>
                                     )}
-                                    <Button 
-                                        onClick={addWord} 
+                                    <Button
+                                        onClick={addWord}
                                         disabled={addingWord || !newWord.trim()}
                                         className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
                                     >
@@ -374,7 +374,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
                                         {addingWord ? 'Добавление...' : 'Добавить'}
                                     </Button>
                                 </div>
-                                
+
                                 {availablePlatforms.length === 0 && (
                                     <p className="text-sm text-gray-400">
                                         Подключите хотя бы одну платформу (Twitch или VK Live) чтобы фильтровать слова
@@ -402,8 +402,8 @@ const TtsFilterManager: React.FC = React.memo(() => {
                                                         {getPlatformLabel(word.platform || 'all')}
                                                     </Badge>
                                                 </div>
-                                                <Button 
-                                                    variant="ghost" 
+                                                <Button
+                                                    variant="ghost"
                                                     size="sm"
                                                     onClick={() => removeWord(word.id)}
                                                     className="text-red-400 hover:text-red-300 hover:bg-red-900/20"

@@ -1,24 +1,20 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle2, RefreshCw, Settings } from 'lucide-react';
+import { AlertCircle, CheckCircle2, RefreshCw, Settings, Volume2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { toast } from '@/utils/toastManager';
-
-import { useAuth } from '../../../context/AuthContext';
-import { useIntegrations } from '../../../context/IntegrationsContext';
-import { useTts } from '../../../context/TtsContext';
-import { queryKeys } from '../../../queries/queryKeys';
-import { 
-    useRegenerateTtsObsUrl, 
-    useSaveTtsAudioSettings, 
-    useSaveTtsModeSettings, 
-    useSaveTtsPlatformSettings, 
+import { useAuth } from '@/context/AuthContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
+import { useTts } from '@/context/TtsContext';
+import TtsChannelPointsMode from '@/features/tts/components/TtsChannelPointsMode';
+import TtsFilterManager from '@/features/tts/components/TtsFilterManager';
+import { queryKeys } from '@/queries/queryKeys';
+import {
+    useRegenerateTtsObsUrl,
+    useSaveTtsAudioSettings,
+    useSaveTtsModeSettings,
+    useSaveTtsPlatformSettings,
     useSaveTtsSettings,
     useSetTtsEngine,
     useSetTtsListeningMode,
@@ -28,15 +24,18 @@ import {
     useTtsPlatformSettings,
     useTtsSettings,
     useTtsStatus
-} from '../../../queries/tts/ttsQueries';
-import { ttsService } from '../../../services/api/services/ttsService';
-import PageWrapper from '../../../shared/components/PageWrapper';
-import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
-import { logger } from '../../../utils/prodLogger';
-import { getQueryCache } from '../../../utils/queryPersist';
-import { getTtsWebSocketUrl } from '../../../utils/urlUtils';
-import TtsChannelPointsMode from '../components/TtsChannelPointsMode';
-import TtsFilterManager from '../components/TtsFilterManager';
+} from '@/queries/tts/ttsQueries';
+import { ttsService } from '@/services/api/services/ttsService';
+import PageWrapper from '@/shared/components/PageWrapper';
+import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
+import { logger } from '@/shared/utils/prodLogger';
+import { getQueryCache } from '@/shared/utils/queryPersist';
+import { getTtsWebSocketUrl } from '@/shared/utils/urlUtils';
+import { toast } from '@/utils/toastManager';
 
 import type { ApiResponse } from '@/types';
 import type { AxiosError } from 'axios';
@@ -94,9 +93,9 @@ const TtsMainPageContent: React.FC = () => {
     const { ttsEnabled: _ttsEnabled, isWhitelisted, initializeTts: _initializeTts, engineStatus, isCheckingHealth } = useTts();
     const isHealthy = engineStatus.loaded;
     const isChecking = isCheckingHealth;
-    const { isAuthenticated, user, isGuest } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const { integrations } = useIntegrations();
-    
+
     const [basicTtsEnabled, setBasicTtsEnabled] = useState<boolean>(false);
     const [aiTtsEnabled, setAiTtsEnabled] = useState<boolean>(false);
     const [ttsTriggerMode, setTtsTriggerMode] = useState<'all_messages' | 'channel_points'>('all_messages');
@@ -105,12 +104,12 @@ const TtsMainPageContent: React.FC = () => {
     const [obsUrl, setObsUrl] = useState<string>('');
     const [showObsUrl, setShowObsUrl] = useState<boolean>(false);
     const [localVolume, setLocalVolume] = useState<number>(50);
-    
+
     const [platformSettings, setPlatformSettings] = useState<PlatformSettings>({
         enabled_platforms: ['twitch', 'vk'],
         global_enabled: true
     });
-    
+
     const [ttsSettings, setTtsSettings] = useState<TtsSettingsState>({
         enable7TV: true,
         enableTwitch: true,
@@ -118,18 +117,18 @@ const TtsMainPageContent: React.FC = () => {
         filterMentions: false,
         version: 1,
     });
-    
+
     const [_localTtsConfig, _setLocalTtsConfig] = useState<unknown>(null);
     const [isSavingMode, setIsSavingMode] = useState<boolean>(false);
     const [isRegeneratingUrl, setIsRegeneratingUrl] = useState<boolean>(false);
-    
+
     const volumeDebounceRef = useRef<NodeJS.Timeout | null>(null);
     const settingsDebounceRef = useRef<NodeJS.Timeout | null>(null);
-    
+
     const queryClient = useQueryClient();
-    const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
-    const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
-    const _hasAnyIntegration = isGuest || isTwitchConnected || isVkConnected;
+    const isTwitchConnected = integrations.twitch?.enabled;
+    const isVkConnected = integrations.vk?.enabled;
+    const _hasAnyIntegration = isTwitchConnected || isVkConnected;
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
     const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled;
 
@@ -166,7 +165,7 @@ const TtsMainPageContent: React.FC = () => {
             const axiosError = error as AxiosError<{ detail?: string }>;
             logger.error('Error saving TTS settings:', error);
             if (axiosError.response?.status === 409) {
-                toast.warning('Настройки были обновлены. Перезагружаю...');
+                toast.warning('Настройки были изменены. Обновление...');
                 setTimeout(() => queryClient.invalidateQueries({ queryKey: queryKeys.tts.settings() }), 1500);
             }
         }
@@ -201,7 +200,7 @@ const TtsMainPageContent: React.FC = () => {
         initialData: () => getQueryCache(['tts-status']) || undefined
     });
     const ttsStatusData = ttsStatusResponse?.data;
-    
+
     const isF5TTSDataLoading = isLoadingTtsStatus || isWhitelisted === null || isChecking;
     const canUseF5TTS = !isF5TTSDataLoading && (hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false));
 
@@ -241,13 +240,13 @@ const TtsMainPageContent: React.FC = () => {
             const statusData = ttsStatusData as TtsStatusData;
             const enabled = statusData.enabled || false;
             const engineType = statusData.engine_type || 'gtts';
-            
+
             const basicEnabled = enabled && engineType === 'gtts';
             const aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local');
-            
+
             setBasicTtsEnabled(prev => prev !== basicEnabled ? basicEnabled : prev);
             setAiTtsEnabled(prev => prev !== aiEnabled ? aiEnabled : prev);
-            
+
             if (engineType === 'local' || engineType === 'cloud') {
                 setTtsEngine(prev => prev !== engineType ? engineType : prev);
             } else {
@@ -256,11 +255,11 @@ const TtsMainPageContent: React.FC = () => {
         }
     }, [ttsStatusData]);
 
-    // [OK] ИСПРАВЛЕНИЕ: Слушаем событие tts-status-changed для синхронизации с QuickActionsBar
+    // [OK] Обновление: слушаем событие tts-status-changed для синхронизации с QuickActionsBar
     useEffect(() => {
         const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
             logger.log('[REFRESH] TtsMainPage: Received tts-status-changed event:', event.detail);
-            // Инвалидируем кэш чтобы перезагрузить данные
+            // Инвалидируем кэш для обновления статуса
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
         };
 
@@ -279,7 +278,7 @@ const TtsMainPageContent: React.FC = () => {
                 filterMentions: settingsData.filterMentions ?? prev.filterMentions,
                 version: settingsData.version ?? prev.version,
             }));
-            
+
             if (settingsData.listeningMode) {
                 setListeningMode(prev => prev !== settingsData.listeningMode ? settingsData.listeningMode! : prev);
             }
@@ -340,24 +339,24 @@ const TtsMainPageContent: React.FC = () => {
     }, [listeningMode, isAuthenticated, user?.id]);
 
     const handleGlobalTtsToggle = (): void => {
-        if (!isGuest && !isTwitchConnected && !isVkConnected) {
+        if (!isTwitchConnected && !isVkConnected) {
             toast.error('Для использования TTS необходимо подключить хотя бы одну платформу');
             return;
         }
-        
+
         const newState = !isAnyTtsEnabled;
-        
-        // [OK] ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
+
+        // [OK] Оптимистичное обновление UI
         if (newState) {
             setBasicTtsEnabled(true);
         } else {
             setBasicTtsEnabled(false);
             setAiTtsEnabled(false);
         }
-        
+
         toggleTtsMutation.mutate(newState, {
             onSuccess: () => {
-                // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                // [OK] Инвалидируем кэш для получения актуального статуса
                 queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                 window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: newState } }));
             },
@@ -376,7 +375,7 @@ const TtsMainPageContent: React.FC = () => {
 
     const handleTtsModeChange = (mode: 'all_messages' | 'channel_points'): void => {
         if (isSavingMode || saveTtsModeSettingsMutation.isPending) return;
-        
+
         setIsSavingMode(true);
         saveTtsModeSettingsMutation.mutate({ tts_mode: mode }, {
             onSuccess: (response) => {
@@ -397,20 +396,20 @@ const TtsMainPageContent: React.FC = () => {
 
     const handleBasicTtsToggle = (): void => {
         const newValue = !basicTtsEnabled;
-        
-        // [OK] ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
+
+        // [OK] Оптимистичное обновление UI
         if (newValue) {
             setBasicTtsEnabled(true);
             setAiTtsEnabled(false);
         } else {
             setBasicTtsEnabled(false);
         }
-        
+
         toggleTtsMutation.mutate(newValue, {
             onSuccess: () => {
-                // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                // [OK] Инвалидируем кэш для получения актуального статуса
                 queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
-                
+
                 if (newValue && aiTtsEnabled) {
                     switchEngineMutation.mutate('gtts', {
                         onSuccess: () => {
@@ -419,7 +418,7 @@ const TtsMainPageContent: React.FC = () => {
                     });
                 } else {
                     window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: newValue } }));
-                    toast.success(newValue ? 'Google TTS включён' : 'TTS отключён');
+                    toast.success(newValue ? 'Google TTS включен' : 'TTS выключен');
                 }
             },
             onError: (error: unknown) => {
@@ -436,27 +435,27 @@ const TtsMainPageContent: React.FC = () => {
             toast.error('F5-TTS недоступен');
             return;
         }
-        
+
         const newValue = !aiTtsEnabled;
-        
-        // [OK] ИСПРАВЛЕНИЕ: Оптимистичное обновление UI
+
+        // [OK] Оптимистичное обновление UI
         if (newValue) {
             setAiTtsEnabled(true);
             setBasicTtsEnabled(true);
         } else {
             setAiTtsEnabled(false);
         }
-        
+
         if (newValue && !isAnyTtsEnabled) {
             toggleTtsMutation.mutate(true, {
                 onSuccess: () => {
-                    // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                    // [OK] Инвалидируем кэш для получения актуального статуса
                     queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                     setBasicTtsEnabled(true);
                     const engineType = ttsEngine === 'local' ? 'local' : 'cloud';
                     switchEngineMutation.mutate(engineType, {
                         onSuccess: () => {
-                            toast.success('F5-TTS включён');
+                            toast.success('F5-TTS включен');
                             window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
                         },
                         onError: (error: unknown) => {
@@ -476,11 +475,11 @@ const TtsMainPageContent: React.FC = () => {
             const engineType = newValue ? (ttsEngine === 'local' ? 'local' : 'cloud') : 'gtts';
             switchEngineMutation.mutate(engineType, {
                 onSuccess: () => {
-                    // [OK] ИСПРАВЛЕНИЕ: Инвалидируем кэш для обновления всех компонентов
+                    // [OK] Инвалидируем кэш для получения актуального статуса
                     queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
-                    
+
                     if (newValue) {
-                        toast.success('F5-TTS включён');
+                        toast.success('F5-TTS включен');
                         window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
                     } else {
                         toast.success('Переключено на Google TTS');
@@ -510,11 +509,11 @@ const TtsMainPageContent: React.FC = () => {
 
     const handleVolumeChange = useCallback((value: number): void => {
         setLocalVolume(value);
-        
+
         if (volumeDebounceRef.current) {
             clearTimeout(volumeDebounceRef.current);
         }
-        
+
         volumeDebounceRef.current = setTimeout(() => {
             saveAudioSettingsMutation.mutate({ websiteVolume: value });
         }, 300);
@@ -523,13 +522,13 @@ const TtsMainPageContent: React.FC = () => {
     const handleTtsSettingChange = useCallback((key: keyof TtsSettingsState, value: boolean | number): void => {
         const newSettings = { ...ttsSettings, [key]: value };
         setTtsSettings(newSettings);
-        
+
         if (settingsDebounceRef.current) {
             clearTimeout(settingsDebounceRef.current);
         }
-        
+
         settingsDebounceRef.current = setTimeout(() => {
-            // Преобразуем TtsSettingsState в Partial<TtsSettings>
+            // Приведение TtsSettingsState к Partial<TtsSettings>
             const ttsSettingsPayload = {
                 enable_7tv: newSettings.enable7TV,
                 enable_twitch: newSettings.enableTwitch,
@@ -546,9 +545,9 @@ const TtsMainPageContent: React.FC = () => {
         const newEnabledPlatforms = currentPlatforms.includes(platform)
             ? currentPlatforms.filter(p => p !== platform)
             : [...currentPlatforms, platform];
-            
+
         setPlatformSettings(prev => ({ ...prev, enabled_platforms: newEnabledPlatforms }));
-        
+
         savePlatformSettingsMutation.mutate({ enabled_platforms: newEnabledPlatforms }, {
             onSuccess: () => {
                 window.dispatchEvent(new CustomEvent('tts-settings-changed', {
@@ -566,7 +565,7 @@ const TtsMainPageContent: React.FC = () => {
             if (token) {
                 const url = getTtsWebSocketUrl(token);
                 setObsUrl(url);
-                toast.success('Токен обновлён, URL скопирован в буфер обмена');
+                toast.success('Токен обновлен, URL скопирован в буфер обмена');
                 navigator.clipboard.writeText(url);
                 logger.log('OBS URL regenerated:', url);
             } else {
@@ -604,7 +603,7 @@ const TtsMainPageContent: React.FC = () => {
                                 Для использования TTS необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => navigate('/login')}
                             className="gap-2"
                         >
@@ -617,7 +616,7 @@ const TtsMainPageContent: React.FC = () => {
         );
     }
 
-    if (!isGuest && !isTwitchConnected && !isVkConnected) {
+    if (!isTwitchConnected && !isVkConnected) {
         return (
             <PageWrapper title="Text to Speech">
                 <Card className="border-gray-700">
@@ -627,18 +626,18 @@ const TtsMainPageContent: React.FC = () => {
                         </div>
                         <div className="space-y-2 max-w-md">
                             <h3 className="text-xl font-semibold text-gray-200">
-                                Нет подключенных интеграций
+                                Нет подключенных платформ
                             </h3>
                             <p className="text-gray-400 text-sm">
                                 Для использования TTS необходимо подключить хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => navigate('/dashboard/settings')}
                             className="gap-2"
                         >
                             <Settings className="w-4 h-4" />
-                            Перейти в настройки
+                            Перейти к настройкам
                         </Button>
                     </CardContent>
                 </Card>
@@ -649,13 +648,14 @@ const TtsMainPageContent: React.FC = () => {
     return (
         <PageWrapper title="Text to Speech">
             <div className="space-y-4 max-w-5xl mx-auto">
+                {/* Главный переключатель TTS */}
                 <div className="flex items-center justify-between p-4 rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-900/80 to-gray-800/50 backdrop-blur-sm hover:border-gray-600/50 transition-all cursor-pointer" onClick={handleGlobalTtsToggle}>
                     <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isAnyTtsEnabled ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-gray-600'}`} />
                         <div>
                             <div className="text-sm font-bold text-white">Озвучка сообщений</div>
                             <div className="text-xs text-gray-400">
-                                {isAnyTtsEnabled ? 'Активна' : 'Отключена'}
+                                {isAnyTtsEnabled ? 'Включена' : 'Выключена'}
                             </div>
                         </div>
                     </div>
@@ -670,10 +670,11 @@ const TtsMainPageContent: React.FC = () => {
                 {isAnyTtsEnabled && (
                     <>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* Настройки голоса */}
                             <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex flex-col">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base font-bold text-white">Управление</CardTitle>
+                                        <CardTitle className="text-base font-bold text-white">Движок синтеза</CardTitle>
                                         <div className="flex items-center gap-2">
                                             {isChecking ? (
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-400">
@@ -683,20 +684,21 @@ const TtsMainPageContent: React.FC = () => {
                                             ) : isHealthy ? (
                                                 <div className="flex items-center gap-1.5 text-xs text-green-400">
                                                     <CheckCircle2 className="w-3.5 h-3.5" />
-                                                    F5-TTS доступен
+                                                    F5-TTS Доступен
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-1.5 text-xs text-yellow-400">
                                                     <AlertCircle className="w-3.5 h-3.5" />
-                                                    F5-TTS недоступен
+                                                    F5-TTS Недоступен
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4 flex-1 flex flex-col">
+                                    {/* Режим триггера */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Режим включения</label>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Режим триггера</label>
                                         <TtsChannelPointsMode
                                             ttsMode={ttsTriggerMode}
                                             onModeChange={handleTtsModeChange}
@@ -706,20 +708,20 @@ const TtsMainPageContent: React.FC = () => {
                                         />
                                     </div>
 
+                                    {/* Основной движок */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Алгоритм озвучки</label>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Основной движок</label>
                                         <div className="space-y-2">
                                             <div
                                                 onClick={handleBasicTtsToggle}
-                                                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-                                                    basicTtsEnabled && !aiTtsEnabled
-                                                        ? 'bg-purple-600/15 border border-gray-700/50'
-                                                        : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
-                                                }`}
+                                                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${basicTtsEnabled && !aiTtsEnabled
+                                                    ? 'bg-purple-600/15 border border-gray-700/50'
+                                                    : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
+                                                    }`}
                                             >
                                                 <div>
                                                     <div className="text-sm font-semibold text-white">Google TTS</div>
-                                                    <div className="text-xs text-gray-400">Быстрый, стабильный</div>
+                                                    <div className="text-xs text-gray-400">Базовый, бесплатно</div>
                                                 </div>
                                                 <Switch
                                                     checked={basicTtsEnabled && !aiTtsEnabled}
@@ -730,13 +732,12 @@ const TtsMainPageContent: React.FC = () => {
                                             </div>
                                             <div
                                                 onClick={!isHealthy || !canUseF5TTS || isF5TTSDataLoading ? undefined : handleAiTtsToggle}
-                                                className={`group flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
-                                                    !isHealthy || !canUseF5TTS || isF5TTSDataLoading
-                                                        ? 'opacity-50 cursor-not-allowed bg-gray-800/20 border border-gray-700/30'
-                                                        : aiTtsEnabled
-                                                            ? 'cursor-pointer bg-purple-600/15 border border-gray-700/50'
-                                                            : 'cursor-pointer bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
-                                                }`}
+                                                className={`group flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${!isHealthy || !canUseF5TTS || isF5TTSDataLoading
+                                                    ? 'opacity-50 cursor-not-allowed bg-gray-800/20 border border-gray-700/30'
+                                                    : aiTtsEnabled
+                                                        ? 'cursor-pointer bg-purple-600/15 border border-gray-700/50'
+                                                        : 'cursor-pointer bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
+                                                    }`}
                                             >
                                                 <div>
                                                     <div className="text-sm font-semibold text-white flex items-center gap-2">
@@ -746,12 +747,12 @@ const TtsMainPageContent: React.FC = () => {
                                                         )}
                                                     </div>
                                                     <div className="text-xs text-gray-400">
-                                                        {isF5TTSDataLoading 
-                                                            ? 'Загрузка данных...' 
-                                                            : !isHealthy 
-                                                                ? 'Сервис недоступен' 
-                                                                : !canUseF5TTS 
-                                                                    ? 'Требуется whitelist' 
+                                                        {isF5TTSDataLoading
+                                                            ? 'Проверка статуса...'
+                                                            : !isHealthy
+                                                                ? 'Сервис недоступен'
+                                                                : !canUseF5TTS
+                                                                    ? 'Требуется whitelist'
                                                                     : 'Качественная озвучка'}
                                                     </div>
                                                 </div>
@@ -766,241 +767,166 @@ const TtsMainPageContent: React.FC = () => {
                                         </div>
                                     </div>
 
+                                    {/* Cloud / Local селектор */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Движок</label>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Сервер обработки</label>
                                         <div className="grid grid-cols-2 gap-2">
                                             <button
                                                 onClick={() => handleEngineChange('cloud')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                                    ttsEngine === 'cloud'
-                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
-                                                }`}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${ttsEngine === 'cloud'
+                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                    }`}
                                             >
                                                 Cloud
                                             </button>
                                             <button
                                                 onClick={() => handleEngineChange('local')}
                                                 disabled={!hasLocalSetup}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                                    !hasLocalSetup
-                                                        ? 'opacity-40 cursor-not-allowed bg-gray-800/30 text-gray-600'
-                                                        : ttsEngine === 'local'
-                                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
-                                                }`}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${!hasLocalSetup
+                                                    ? 'opacity-40 cursor-not-allowed bg-gray-800/30 text-gray-600'
+                                                    : ttsEngine === 'local'
+                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                    }`}
                                             >
                                                 Local
                                             </button>
                                         </div>
                                     </div>
 
+                                    {/* Режим прослушивания (Website/OBS) */}
                                     <div className="flex-1 flex flex-col">
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Вывод звука</label>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Режим вывода звука</label>
                                         <div className="grid grid-cols-2 gap-2 mb-3">
                                             <button
                                                 onClick={() => handleListeningModeChange('website')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                                    listeningMode === 'website'
-                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
-                                                }`}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
+                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                    }`}
                                             >
-                                                Сайт
+                                                Браузер
                                             </button>
                                             <button
                                                 onClick={() => handleListeningModeChange('obs')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                                                    listeningMode === 'obs'
-                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
-                                                }`}
+                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
+                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                    }`}
                                             >
                                                 OBS
                                             </button>
                                         </div>
-                                        
-                                        <div className="flex-1 flex items-center justify-center pt-4 border-t border-gray-700/30">
-                                            {listeningMode === 'website' ? (
-                                                <div className="w-full">
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <label className="text-xs font-semibold text-gray-400">Громкость</label>
-                                                        <span className="text-sm font-bold text-purple-300 bg-purple-600/20 px-3 py-1 rounded-lg">
-                                                            {localVolume}%
-                                                        </span>
-                                                    </div>
-                                                    <Slider
-                                                        value={[localVolume]}
-                                                        onValueChange={(val) => handleVolumeChange(val[0])}
-                                                        min={0}
-                                                        max={100}
-                                                        step={1}
-                                                        className="w-full"
-                                                    />
+
+                                        {/* Громкость в браузере */}
+                                        {listeningMode === 'website' && (
+                                            <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 mt-auto">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-xs font-medium text-gray-300">Громкость браузера</span>
+                                                    <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">{localVolume}%</span>
                                                 </div>
-                                            ) : (
-                                                <div className="w-full space-y-2">
-                                                    <label className="text-xs text-gray-400 block font-semibold">OBS Browser Source:</label>
-                                                    <div className="flex gap-2">
-                                                        <div className="relative flex-1">
-                                                            <input
-                                                                type="text"
-                                                                value={obsUrl || 'Загрузка...'}
-                                                                readOnly
-                                                                className={`w-full bg-gray-900/50 border border-gray-700/50 text-gray-300 text-xs px-3 py-2 rounded focus:outline-none focus:border-purple-500 transition-all ${!showObsUrl ? 'blur-sm select-none' : ''}`}
-                                                            />
-                                                            {!showObsUrl && obsUrl && (
-                                                                <button
-                                                                    onClick={() => setShowObsUrl(true)}
-                                                                    className="absolute inset-0 flex items-center justify-center bg-gray-900/80 hover:bg-gray-900/60 transition-colors rounded text-xs text-purple-300 font-medium"
-                                                                >
-                                                                    Показать URL
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                if (obsUrl) {
-                                                                    navigator.clipboard.writeText(obsUrl);
-                                                                    toast.success('Скопировано');
-                                                                }
-                                                            }}
-                                                            disabled={!obsUrl}
-                                                            className="px-3 text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20 disabled:opacity-50"
+                                                <Slider
+                                                    value={[localVolume]}
+                                                    min={0}
+                                                    max={100}
+                                                    step={1}
+                                                    onValueChange={(val) => handleVolumeChange(val[0])}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Настроить OBS */}
+                                        {listeningMode === 'obs' && (
+                                            <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 mt-auto">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-xs font-medium text-gray-300">OBS Источник</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => setShowObsUrl(!showObsUrl)}
+                                                            className="text-[10px] text-blue-400 hover:underline"
                                                         >
-                                                            Copy
-                                                        </Button>
+                                                            {showObsUrl ? 'Скрыть URL' : 'Показать URL'}
+                                                        </button>
+                                                        <button
+                                                            onClick={handleRegenerateObsUrl}
+                                                            className="text-[10px] text-red-400 hover:underline"
+                                                            disabled={isRegeneratingUrl}
+                                                        >
+                                                            {isRegeneratingUrl ? 'Обновление...' : 'Сбросить'}
+                                                        </button>
                                                     </div>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={handleRegenerateObsUrl}
-                                                        disabled={isRegeneratingUrl}
-                                                        className="w-full text-xs border-purple-600/50 text-purple-300 hover:bg-purple-600/20"
-                                                    >
-                                                        <RefreshCw className={`w-3 h-3 mr-1 ${isRegeneratingUrl ? 'animate-spin' : ''}`} />
-                                                        Обновить токен
-                                                    </Button>
                                                 </div>
-                                            )}
-                                        </div>
+
+                                                {showObsUrl ? (
+                                                    <div
+                                                        className="text-[10px] bg-black/50 p-2 rounded text-gray-400 font-mono break-all cursor-pointer hover:text-white transition-colors"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(obsUrl);
+                                                            toast.success('Скопировано');
+                                                        }}
+                                                    >
+                                                        {obsUrl || 'Генерация...'}
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-[10px] text-gray-500 italic">
+                                                        Добавьте этот URL в Browser Source в OBS
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            <div className="space-y-4 flex flex-col">
-                                <Card className={`border-gray-700/50 bg-gray-900/50 backdrop-blur-sm transition-all ${ttsTriggerMode === 'all_messages' ? 'opacity-50' : ''}`}>
+                            <div className="space-y-4">
+                                {/* Платформы */}
+                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
                                     <CardHeader className="pb-3">
-                                        <CardTitle className="text-base font-bold text-white">Озвучка за баллы</CardTitle>
+                                        <CardTitle className="text-base font-bold text-white">Платформы</CardTitle>
                                     </CardHeader>
-                                    <CardContent className="h-[160px] flex items-center p-0">
-                                        {ttsTriggerMode === 'channel_points' ? (
-                                            <div className="w-full px-6">
-                                                <TtsChannelPointsMode
-                                                    ttsMode={ttsTriggerMode}
-                                                    onModeChange={handleTtsModeChange}
-                                                    isSaving={isSavingMode}
-                                                    showModeSelector={false}
-                                                />
+                                    <CardContent className="grid grid-cols-2 gap-3">
+                                        {(['twitch', 'vk'] as const).map(platform => (
+                                            <div
+                                                key={platform}
+                                                onClick={() => handlePlatformToggle(platform)}
+                                                className={`
+                                                    cursor-pointer relative overflow-hidden rounded-xl border transition-all duration-300
+                                                    ${platformSettings.enabled_platforms?.includes(platform)
+                                                        ? platform === 'twitch'
+                                                            ? 'bg-purple-900/40 border-purple-500/50 hover:bg-purple-900/60'
+                                                            : 'bg-blue-900/40 border-blue-500/50 hover:bg-blue-900/60'
+                                                        : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50 hover:border-gray-600/50'
+                                                    }
+                                                `}
+                                            >
+                                                <div className="p-4 flex flex-col items-center gap-3">
+                                                    <div className={`
+                                                        w-10 h-10 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110
+                                                        ${platformSettings.enabled_platforms?.includes(platform)
+                                                            ? platform === 'twitch' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
+                                                            : 'bg-gray-700 text-gray-400'
+                                                        }
+                                                    `}>
+                                                        {platform === 'twitch' ? <TwitchIcon className="w-5 h-5" /> : <VKIcon className="w-5 h-5" />}
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <div className="text-sm font-semibold text-white capitalize">{platform}</div>
+                                                        <div className={`text-xs ${platformSettings.enabled_platforms?.includes(platform) ? 'text-green-400' : 'text-gray-500'}`}>
+                                                            {platformSettings.enabled_platforms?.includes(platform) ? 'Активно' : 'Отключено'}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <div className="w-full text-center px-6">
-                                                <p className="text-sm text-gray-400">Выберите режим "За баллы канала" для настройки наград</p>
-                                            </div>
-                                        )}
+                                        ))}
                                     </CardContent>
                                 </Card>
 
-                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex-1 flex flex-col">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base font-bold text-white">Дополнительно</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4 flex-1">
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-400 mb-2">Смайлы</label>
-                                            <div className="space-y-2">
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">7TV</span>
-                                                    <Switch
-                                                        checked={ttsSettings.enable7TV}
-                                                        onCheckedChange={(checked) => handleTtsSettingChange('enable7TV', checked)}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">Twitch</span>
-                                                    <Switch
-                                                        checked={ttsSettings.enableTwitch}
-                                                        onCheckedChange={(checked) => handleTtsSettingChange('enableTwitch', checked)}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-semibold text-gray-400 mb-2">Фильтры</label>
-                                            <div className="space-y-2">
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">Пропускать ответы</span>
-                                                    <Switch
-                                                        checked={ttsSettings.filterReplies}
-                                                        onCheckedChange={(checked) => handleTtsSettingChange('filterReplies', checked)}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                                <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                    <span className="text-xs text-gray-300 font-medium">Пропускать упоминания</span>
-                                                    <Switch
-                                                        checked={ttsSettings.filterMentions}
-                                                        onCheckedChange={(checked) => handleTtsSettingChange('filterMentions', checked)}
-                                                        className="scale-90 data-[state=checked]:bg-purple-600"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {(isTwitchConnected || isVkConnected) && (
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-400 mb-2">Платформы</label>
-                                                <div className="space-y-2">
-                                                    {isTwitchConnected && (
-                                                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                            <div className="flex items-center gap-2">
-                                                                <TwitchIcon className="w-4 h-4 text-purple-400" />
-                                                                <span className="text-xs text-gray-300 font-medium">Twitch</span>
-                                                            </div>
-                                                            <Switch
-                                                                checked={platformSettings.enabled_platforms?.includes('twitch')}
-                                                                onCheckedChange={() => handlePlatformToggle('twitch')}
-                                                                className="scale-90 data-[state=checked]:bg-purple-600"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                    {isVkConnected && (
-                                                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-gray-800/30 border border-gray-700/50">
-                                                            <div className="flex items-center gap-2">
-                                                                <VKIcon className="w-4 h-4 text-blue-400" />
-                                                                <span className="text-xs text-gray-300 font-medium">VK</span>
-                                                            </div>
-                                                            <Switch
-                                                                checked={platformSettings.enabled_platforms?.includes('vk')}
-                                                                onCheckedChange={() => handlePlatformToggle('vk')}
-                                                                className="scale-90 data-[state=checked]:bg-purple-600"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
+                                {/* Фильтры */}
+                                <TtsFilterManager />
                             </div>
                         </div>
-
-                        <TtsFilterManager />
                     </>
                 )}
             </div>
@@ -1008,8 +934,6 @@ const TtsMainPageContent: React.FC = () => {
     );
 };
 
-export default TtsMainPageContent;
-
-
-
-
+// Экспортируем обертку компонента
+const TtsMainPage = () => <TtsMainPageContent />;
+export default TtsMainPage;

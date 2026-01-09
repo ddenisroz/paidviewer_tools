@@ -132,7 +132,7 @@ def init_global_commands():
         for cmd_data in global_commands:
             # Проверяем, есть ли уже такая глобальная команда
             existing = db.query(BotCommand).filter(
-                BotCommand.user_id == None,
+                BotCommand.user_id is None,
                 BotCommand.command_type == 'global',
                 BotCommand.command_name == cmd_data["command_name"]
             ).first()

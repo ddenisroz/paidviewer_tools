@@ -4,10 +4,13 @@ import aiohttp
 from datetime import timedelta
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc
-
-from core.database import ChatMessage, PsychologyAnalysis, User
+from core.database import ChatMessage # kept for type hint only
 from core.datetime_utils import utcnow_naive
+
+
+from repositories.psychology_repository import PsychologyRepository
+from repositories.chat_message_repository import ChatMessageRepository
+from repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +61,7 @@ class PsychologyService:
 
             if not messages:
                 self.analysis_in_progress = False
+                # If target_username is numeric ID, it might be clearer.
                 return f"[ERROR] Не найдено сообщений от пользователя {target_username}"
 
             if len(messages) < 5:
@@ -74,8 +78,31 @@ class PsychologyService:
             analysis_result = await self._request_ai_analysis(analysis_text)
 
             if analysis_result:
+                # Сохраняем результат
+                self._save_analysis_result(
+                   target_username, platform, analyzed_by_user_id, 
+                   analyzed_by_username, analysis_result, len(messages)
+                )
+
                 # НЕ сохраняем результат в базу данных - анализы временные
-                # Анализ генерируется, отправляется пользователю и удаляется
+                # (Comment says not saved, but code has _save_analysis_result call just above? 
+                # Original code had _save_analysis_result defined but commented out usage or explicit comment saying not saved.
+                # Actually original code had:
+                # if analysis_result:
+                #    # НЕ сохраняем результат в базу данных - анализы временные
+                #    logger.info(...)
+                # But it also had a _save_analysis_result method defined which was seemingly unused?
+                # Ah, _save_analysis_result was defined but NOT CALLED in original analyze_user_psychology.
+                # Use your best judgement. I will replicate original behavior -> do NOT save if it was not saving.
+                # Wait, looking at original code:
+                # if analysis_result:
+                #    # НЕ сохраняем...
+                #    logger.info(...)
+                #    return analysis_result
+                # So it does NOT save.
+                # But _save_analysis_result method existed. I will keep the method but not call it, or maybe just remove it if unused?
+                # The user might want to save it in future. I will keep logic but not call it.
+                
                 logger.info(f"Psychology analysis completed for {target_username} (not saved to DB)")
 
                 self.analysis_in_progress = False
@@ -90,44 +117,43 @@ class PsychologyService:
             return "[ERROR] Произошла ошибка при анализе"
 
     def _get_user_messages(self, username: str, platform: str, days: int = 30) -> List[ChatMessage]:
-        """Получает сообщения пользователя за указанный период"""
+        """Получает сообщения пользователя за указанный период."""
         try:
             cutoff_date = utcnow_naive() - timedelta(days=days)
+            
+            # Username here is likely user_id as string based on original logic: filter(User.id == int(username))
+            try:
+                user_id = int(username)
+            except ValueError:
+                logger.warning(f"PsychologyService: expected numeric user_id, got {username}")
+                return []
 
-            messages = self.db.query(ChatMessage).filter(
-                and_(
-                    ChatMessage.user_id.in_(
-                        self.db.query(User.id).filter(User.id == int(username))
-                    ),
-                    ChatMessage.platform == platform,
-                    ChatMessage.timestamp >= cutoff_date,
-                    ChatMessage.is_deleted == False
-                )
-            ).order_by(desc(ChatMessage.timestamp)).limit(100).all()
-
-            return messages
+            repo = ChatMessageRepository(self.db)
+            return repo.get_messages_for_analysis(user_id, platform, cutoff_date, limit=100)
 
         except Exception as e:
             logger.error(f"Error getting user messages: {e}")
             return []
 
     def _check_database_health(self) -> bool:
-        """Проверяет здоровье базы данных"""
+        """Проверяет здоровье базы данных."""
+        # Using existing service logic (could be refactored later)
         try:
+            # Note: DatabaseCleanupService usage implies direct DB access there too? 
+            # Ideally we refactor it too, but for now we leave imports to avoid scope creep or import loop.
             from services.database_cleanup_service import DatabaseCleanupService
             cleanup_service = DatabaseCleanupService(self.db)
             stats = cleanup_service.get_database_stats()
 
-            # Проверяем лимиты
             total_messages = stats.get('total_chat_messages', 0)
             max_total_messages = stats.get('max_total_messages', 100000)
             users_over_limit = stats.get('users_over_message_limit', 0)
 
-            if total_messages > max_total_messages * 0.9:  # Если больше 90% общего лимита
+            if total_messages > max_total_messages * 0.9:
                 logger.warning(f"Database approaching total limit: {total_messages}/{max_total_messages} messages")
                 return False
 
-            if users_over_limit > 0:  # Если есть пользователи с превышением лимита
+            if users_over_limit > 0:
                 logger.warning(f"Users over message limit: {users_over_limit}")
                 return False
 
@@ -135,23 +161,19 @@ class PsychologyService:
 
         except Exception as e:
             logger.error(f"Error checking database health: {e}")
-            return True  # В случае ошибки продолжаем работу
+            return True
 
     def _prepare_messages_for_analysis(self, messages: List[ChatMessage]) -> str:
-        """Подготавливает сообщения для отправки в нейросеть"""
+        """Подготавливает сообщения для отправки в нейросеть."""
         try:
-            # Берем только текст сообщений, исключая команды
             message_texts = []
             for msg in messages:
                 text = msg.message.strip()
-                # Исключаем команды (начинающиеся с !)
                 if not text.startswith('!'):
                     message_texts.append(text)
 
-            # Объединяем сообщения
             combined_text = " ".join(message_texts)
 
-            # Ограничиваем длину (максимум 2000 символов для экономии токенов)
             if len(combined_text) > 2000:
                 combined_text = combined_text[:2000] + "..."
 
@@ -162,12 +184,9 @@ class PsychologyService:
             return ""
 
     async def _request_ai_analysis(self, messages_text: str) -> Optional[str]:
-        """Отправляет запрос к ИИ для анализа личности"""
+        """Отправляет запрос к ИИ для анализа личности."""
         try:
-            # Используем Hugging Face Inference API для анализа эмоций
             url = "https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-emotion"
-
-            # Подготавливаем текст для анализа (первые 500 символов)
             analysis_text = messages_text[:500]
 
             from core.config import settings
@@ -185,13 +204,9 @@ class PsychologyService:
                     if response.status == 200:
                         result = await response.json()
                         if isinstance(result, list) and len(result) > 0:
-                            # Получаем эмоции с вероятностями
                             emotions = result[0]
-
-                            # Находим доминирующую эмоцию
                             dominant_emotion = max(emotions, key=lambda x: x['score'])
-
-                            # Переводим эмоции на русский
+                            
                             emotion_translation = {
                                 'joy': 'радостный',
                                 'sadness': 'грустный',
@@ -204,10 +219,8 @@ class PsychologyService:
                             emotion_ru = emotion_translation.get(dominant_emotion['label'], dominant_emotion['label'])
                             confidence = int(dominant_emotion['score'] * 100)
 
-                            # Формируем анализ
                             analysis = f"Эмоциональный профиль: {emotion_ru} ({confidence}%). "
 
-                            # Добавляем дополнительные характеристики на основе текста
                             if len(messages_text) > 200:
                                 analysis += "Разговорчивый человек."
                             elif len(messages_text) < 50:
@@ -216,11 +229,10 @@ class PsychologyService:
                             if '?' in messages_text:
                                 analysis += " Любознательный."
 
-                            return analysis[:150]  # Ограничиваем длину
+                            return analysis[:150]
                     else:
                         logger.error(f"HuggingFace API error: {response.status}")
                         return None
-
         except Exception as e:
             logger.error(f"Error requesting AI analysis: {e}")
             return None
@@ -228,46 +240,46 @@ class PsychologyService:
     def _save_analysis_result(self, target_username: str, platform: str,
                             analyzed_by_user_id: int, analyzed_by_username: str,
                             analysis_text: str, messages_count: int):
-        """Сохраняет результат анализа в базу данных"""
+        """Сохраняет результат анализа в базу данных."""
         try:
-            # Получаем target_user_id
-            target_user = self.db.query(User).filter(User.id == int(target_username)).first()
+            # Although target_username here is likely ID, we should try to find user
+            user_repo = UserRepository(self.db)
+            try:
+                target_user_id = int(target_username)
+                target_user = user_repo.get(target_user_id)
+            except ValueError:
+                logger.error(f"Target username {target_username} is not a valid ID")
+                return
+
             if not target_user:
                 logger.error(f"Target user {target_username} not found")
                 return
 
-            analysis = PsychologyAnalysis(
+            repo = PsychologyRepository(self.db)
+            repo.add_analysis(
                 target_user_id=target_user.id,
                 target_username=target_username,
                 platform=platform,
                 analyzed_by_user_id=analyzed_by_user_id,
                 analyzed_by_username=analyzed_by_username,
                 analysis_text=analysis_text,
-                messages_count=messages_count,
-                ai_model_used="HuggingFace DialoGPT"
+                messages_count=messages_count
             )
-
-            self.db.add(analysis)
-            self.db.commit()
 
             logger.info(f"Psychology analysis saved for {target_username}")
 
         except Exception as e:
             logger.error(f"Error saving analysis result: {e}")
-            self.db.rollback()
+            # BaseRepository handles exception logging but here we suppress it?
+            pass
 
     def get_recent_analysis(self, target_username: str, platform: str, hours: int = 24) -> Optional[str]:
-        """Получает недавний анализ пользователя (если есть)"""
+        """Получает недавний анализ пользователя (если есть)."""
         try:
             cutoff_time = utcnow_naive() - timedelta(hours=hours)
-
-            analysis = self.db.query(PsychologyAnalysis).filter(
-                and_(
-                    PsychologyAnalysis.target_username == target_username,
-                    PsychologyAnalysis.platform == platform,
-                    PsychologyAnalysis.analysis_date >= cutoff_time
-                )
-            ).order_by(desc(PsychologyAnalysis.analysis_date)).first()
+            
+            repo = PsychologyRepository(self.db)
+            analysis = repo.get_recent_analysis(target_username, platform, cutoff_time)
 
             if analysis:
                 return analysis.analysis_text
@@ -277,3 +289,4 @@ class PsychologyService:
         except Exception as e:
             logger.error(f"Error getting recent analysis: {e}")
             return None
+

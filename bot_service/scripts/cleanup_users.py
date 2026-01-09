@@ -78,7 +78,7 @@ def cleanup_users(db, keep_admins=True):
 
     # 1. Получаем список пользователей для удаления
     if keep_admins:
-        users_to_delete = db.query(User).filter(User.is_admin == False).all()
+        users_to_delete = db.query(User).filter(not User.is_admin).all()
         print("[LIST] Удаление пользователей (сохраняем админов)...")
     else:
         users_to_delete = db.query(User).all()
@@ -213,7 +213,7 @@ def main():
         print("="*60)
 
         # Финальная статистика
-        stats_after = show_database_stats(db)
+        show_database_stats(db)
 
         print("\n[OK] Очистка завершена успешно!")
         print(f"[PACKAGE] Резервная копия сохранена: {backup_path}")

@@ -11,7 +11,8 @@ import './styles/design-system.css'
 // Initialize Sentry before React
 
 // Lazy load non-critical providers для ускорения начальной загрузки
-import { ToastProvider } from './components/ui/toast'
+import { ToastProvider } from '@/shared/components/ui/toast'
+
 import { AudioPriorityProvider } from './context/AudioPriorityContext'
 import { AuthProvider } from './context/AuthContext'
 import { ChatProvider } from './context/ChatContext'
@@ -47,18 +48,18 @@ interface ConditionalContextWrapperProps {
 
 const ConditionalContextWrapper: React.FC<ConditionalContextWrapperProps> = ({ children }) => {
   const location = useLocation();
-  
+
   // Для overlay страниц (OBS виджеты) нужен только Toast
-  const isOverlayRoute = 
+  const isOverlayRoute =
     location.pathname.startsWith('/chat-overlay') ||
     location.pathname.startsWith('/tts-obs') ||
     location.pathname.startsWith('/youtube-obs') ||
     location.pathname.startsWith('/drops-widget');
-  
+
   if (isOverlayRoute) {
     return <ToastProvider>{children}</ToastProvider>;
   }
-  
+
   // Для основного приложения - только Core провайдеры
   // Остальные (TtsHealth, Player, DonationAlerts, etc.) теперь локальные
   // и находятся в Layout.jsx или на конкретных страницах
@@ -76,22 +77,22 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   // StrictMode отключен: создает двойные WebSocket подключения в dev режиме
   // <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ConditionalContextWrapper>
-          <App />
-        </ConditionalContextWrapper>
-      </BrowserRouter>
-    </QueryClientProvider>
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <ConditionalContextWrapper>
+        <App />
+      </ConditionalContextWrapper>
+    </BrowserRouter>
+  </QueryClientProvider>
   // </React.StrictMode>
 );
 
 // Font loading detection - prevent FOUT (Flash of Unstyled Text)
-(function() {
+(function () {
   // Mark fonts as loaded immediately to prevent hiding content
   // With font-display: fallback, content is always visible with system font
   document.body.classList.add('fonts-loaded', 'loaded');
-  
+
   // Force font load check to prevent layout shift
   if (document.fonts && document.fonts.check) {
     // Check if Inter font is loaded, if not it will use fallback seamlessly

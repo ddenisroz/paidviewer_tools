@@ -68,68 +68,41 @@ async def validate_platform_token(token) -> bool:
     """
     from core.token_validation_cache import token_validation_cache
 
-    logger.info(f"[DEBUG] VALIDATE_TOKEN START: platform={token.platform}, user_id={token.user_id}")
+    logger.debug(f"[DEBUG] VALIDATE_TOKEN START: platform={token.platform}, user_id={token.user_id}")
 
     # Проверяем кеш
     cached_result = token_validation_cache.get(token.user_id, token.platform)
     if cached_result is not None:
-        logger.info(f"[START] [CACHE HIT] Token validation for user {token.user_id}, platform {token.platform}: {cached_result}")
         return cached_result
 
     try:
         import httpx
         from core.token_encryption import decrypt_token
+        # Use TokenRefreshService for auto-refresh logic
+        from services.token_refresh_service import TokenRefreshService
+        from core.database import SessionLocal # Need a session for refresh if needed
 
         # Расшифровываем токен если он зашифрован
         access_token = decrypt_token(token.access_token) if token.access_token else None
 
         if not access_token:
             logger.warning(f"No access token for {token.platform}")
-            is_valid = False
-            token_validation_cache.set(token.user_id, token.platform, is_valid)
-            return is_valid
+            token_validation_cache.set(token.user_id, token.platform, False)
+            return False
 
-        # Проверяем истек ли токен по времени
+        # Проверяем истек ли токен по времени (если expires_at существует)
         if token.expires_at and token.expires_at < utcnow_naive():
             logger.warning(f"Token for {token.platform} expired at {token.expires_at}, attempting auto-refresh...")
-
-            # Пытаемся автоматически обновить токен
-            if token.platform == 'twitch':
-                from api.twitch_api import TwitchAPI
-                from services.memory_websocket_manager import memory_websocket_manager
-                twitch_api = TwitchAPI(memory_websocket_manager)
-                refresh_success = await twitch_api._refresh_user_token(token.user_id)
-
-                if refresh_success:
-                    logger.info(f"[OK] {token.platform.upper()} token auto-refreshed (expired)")
-                    # Инвалидируем кеш и возвращаем True
-                    token_validation_cache.invalidate(token.user_id, token.platform)
-                    return True
-                else:
-                    logger.error(f"[ERROR] Failed to auto-refresh expired {token.platform} token")
-                    is_valid = False
-                    token_validation_cache.set(token.user_id, token.platform, is_valid)
-                    return is_valid
-
-            elif token.platform == 'vk':
-                from api.vk_api import VKLiveAPI
-                vk_api = VKLiveAPI()
-                new_access_token = await vk_api._refresh_user_token(token.user_id)
-
-                if new_access_token:
-                    logger.info(f"[OK] {token.platform.upper()} token auto-refreshed (expired)")
-                    token_validation_cache.invalidate(token.user_id, token.platform)
-                    return True
-                else:
-                    logger.error(f"[ERROR] Failed to auto-refresh expired {token.platform} token")
-                    is_valid = False
-                    token_validation_cache.set(token.user_id, token.platform, is_valid)
-                    return is_valid
+            
+            refreshed = await TokenRefreshService.refresh_if_needed(token.user_id, token.platform)
+            if refreshed:
+                logger.info(f"[OK] {token.platform.upper()} token auto-refreshed (expired state)")
+                token_validation_cache.invalidate(token.user_id, token.platform)
+                return True
             else:
-                # Для других платформ без refresh - возвращаем False
-                is_valid = False
-                token_validation_cache.set(token.user_id, token.platform, is_valid)
-                return is_valid
+                logger.error(f"[ERROR] Failed to auto-refresh expired {token.platform} token")
+                token_validation_cache.set(token.user_id, token.platform, False)
+                return False
 
         # Валидация через API платформы
         is_valid = False
@@ -137,96 +110,73 @@ async def validate_platform_token(token) -> bool:
         if token.platform == 'twitch':
             async with httpx.AsyncClient(timeout=TOKEN_VALIDATION_TIMEOUT) as client:
                 try:
-                    logger.debug(f"[DEBUG] Validating Twitch token for user {token.user_id}, token length: {len(access_token) if access_token else 0}")
                     response = await client.get(
                         "https://id.twitch.tv/oauth2/validate",
                         headers={"Authorization": f"OAuth {access_token}"}
                     )
                     if response.status_code == 200:
-                        logger.info(f"[OK] Twitch token valid for user {token.user_id}")
                         is_valid = True
                     elif response.status_code == 401:
-                        logger.warning("[WARN] Twitch token expired or invalid, attempting refresh...")
-
-                        # Пытаемся обновить токен через refresh_token
-                        from api.twitch_api import TwitchAPI
-                        from services.memory_websocket_manager import memory_websocket_manager
-                        twitch_api = TwitchAPI(memory_websocket_manager)
-                        refresh_success = await twitch_api._refresh_user_token(token.user_id)
-
-                        if refresh_success:
-                            logger.info("[OK] Twitch token successfully auto-refreshed!")
-                            is_valid = True
-                            # Инвалидируем кеш чтобы при следующей проверке взять свежий токен
-                            token_validation_cache.invalidate(token.user_id, 'twitch')
-                        else:
-                            logger.error("[ERROR] Failed to refresh Twitch token")
-                            is_valid = False
+                        logger.warning("[WARN] Twitch token expired (401), attempting refresh...")
+                        is_valid = await TokenRefreshService.refresh_on_401(token.user_id, 'twitch')
                     else:
-                        response_text = await response.text()
-                        logger.warning(f"[WARN] Twitch token validation failed: status={response.status_code}, response={response_text}")
+                        logger.warning(f"[WARN] Twitch token validation failed: {response.status_code}")
                         is_valid = False
                 except Exception as e:
-                    logger.warning(f"[WARN] Twitch token validation network error: {type(e).__name__}: {str(e)}")
-                    # При сетевых ошибках считаем токен валидным (не можем проверить)
-                    is_valid = True
+                    logger.warning(f"[WARN] Twitch validation network error: {e}")
+                    is_valid = True # Fail open on network error
 
         elif token.platform == 'vk':
-            logger.info("[DEBUG] Validating VK Live token via API...")
-
+            # VK Validation (using dev endpoint as in original code)
             async with httpx.AsyncClient(timeout=TOKEN_VALIDATION_TIMEOUT, verify=False) as client:
                 try:
-                    # Используем dev API (только он доступен, SSL verification отключена)
                     response = await client.get(
                         "https://apidev.live.vkvideo.ru/v1/current_user",
                         headers={"Authorization": f"Bearer {access_token}"}
                     )
-
                     if response.status_code == 200:
-                        logger.info("[OK] VK Live token is valid")
                         is_valid = True
                     elif response.status_code == 401:
-                        logger.warning("[WARN] VK Live token expired or invalid, attempting refresh...")
-
-                        # Пытаемся обновить токен через refresh_token
-                        from api.vk_api import VKLiveAPI
-                        vk_api = VKLiveAPI()
-                        new_access_token = await vk_api._refresh_user_token(token.user_id)
-
-                        if new_access_token:
-                            logger.info("[OK] VK token successfully auto-refreshed!")
-                            is_valid = True
-                        else:
-                            logger.error("[ERROR] Failed to refresh VK token")
-                            is_valid = False
+                         logger.warning("[WARN] VK token expired (401), attempting refresh...")
+                         is_valid = await TokenRefreshService.refresh_on_401(token.user_id, 'vk')
                     else:
-                        logger.warning(f"[ERROR] VK Live token validation failed: status={response.status_code}")
-                        is_valid = False
-
+                         is_valid = False
                 except Exception as e:
-                    logger.error(f"[ERROR] Error validating VK token: {e}")
+                    logger.warning(f"[WARN] VK validation error: {e}")
                     is_valid = False
 
         elif token.platform == 'donationalerts':
             async with httpx.AsyncClient(timeout=TOKEN_VALIDATION_TIMEOUT) as client:
-                response = await client.get(
-                    "https://www.donationalerts.com/api/v1/user/oauth",
-                    headers={"Authorization": f"Bearer {access_token}"}
-                )
-                is_valid = response.status_code == 200
-
+                try:
+                    response = await client.get(
+                        "https://www.donationalerts.com/api/v1/user/oauth",
+                        headers={"Authorization": f"Bearer {access_token}"}
+                    )
+                    if response.status_code == 200:
+                        is_valid = True
+                    elif response.status_code == 401:
+                         logger.warning("[WARN] DA token expired (401), attempting refresh...")
+                         is_valid = await TokenRefreshService.refresh_on_401(token.user_id, 'donationalerts')
+                    else:
+                        is_valid = False
+                except Exception as e:
+                     logger.warning(f"[WARN] DA validation error: {e}")
+                     is_valid = False
         else:
-            logger.warning(f"Unknown platform for token validation: {token.platform}")
+            # Unknown platform
             is_valid = False
 
-        # Кешируем результат
-        token_validation_cache.set(token.user_id, token.platform, is_valid)
-        logger.info(f"[OK] VALIDATE_TOKEN END: platform={token.platform}, user_id={token.user_id}, valid={is_valid}")
+        # Кешируем и возвращаем
+        if is_valid:
+             # Если рефреш произошел, то токен изменился в БД, но наш current 'access_token' variable устарел.
+             # Однако мы просто возвращаем True. Caller должен заново запросить токен из БД если ему нужен access_token.
+             token_validation_cache.invalidate(token.user_id, token.platform)
+        else:
+             token_validation_cache.set(token.user_id, token.platform, False)
+             
         return is_valid
 
     except Exception as e:
         logger.error(f"Error validating token for {token.platform}: {e}", exc_info=True)
-        # Кешируем ошибку как невалидный токен
-        is_valid = False
-        token_validation_cache.set(token.user_id, token.platform, is_valid)
-        return is_valid
+        token_validation_cache.set(token.user_id, token.platform, False)
+        return False

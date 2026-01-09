@@ -1,30 +1,65 @@
 ﻿import React, { useEffect, useState } from 'react';
 
-import { 
+import {
     Bot,
     CheckCircle,
     RefreshCw,
     Square
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/loader';
+import { TTS_SERVICE_URL } from '@/constants';
+import { useTts } from '@/context/TtsContext';
+import { adminService } from '@/services/api/services/adminService';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent } from '@/shared/components/ui/card';
+import { PageLoader } from '@/shared/components/ui/loader';
+import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
-import { TTS_SERVICE_URL } from '../../../constants';
-import { useTts } from '../../../context/TtsContext';
-import { adminService } from '../../../services/api/services/adminService';
-import { logger } from '../../../utils/prodLogger';
-import {
-  type BotData,
-  getBotServiceDescription,
-  getBotServiceStatus,
-  parseBotsResponse,
-  parseTtsResponse,
-  type TtsStatus
-} from '../utils/botManagementHelpers';
+
+// Types for bot management
+export interface BotData {
+    name: string;
+    status: 'running' | 'stopped' | 'error';
+    connections?: number;
+}
+
+export interface TtsStatus {
+    status: string;
+    healthy: boolean;
+    available: boolean;
+    error?: string;
+    url?: string;
+}
+
+// Helper functions
+function parseBotsResponse(data: { bots?: BotData[] }): BotData[] {
+    return data?.bots || [];
+}
+
+function parseTtsResponse(data: { status?: string; healthy?: boolean; url?: string }): TtsStatus {
+    return {
+        status: data?.status || 'unknown',
+        healthy: data?.healthy || false,
+        available: data?.healthy || false,
+        url: data?.url,
+    };
+}
+
+function getBotServiceStatus(bots: BotData[]): 'running' | 'error' | 'stopped' {
+    if (bots.length === 0) return 'stopped';
+    const hasError = bots.some(b => b.status === 'error');
+    if (hasError) return 'error';
+    const hasRunning = bots.some(b => b.status === 'running');
+    return hasRunning ? 'running' : 'stopped';
+}
+
+function getBotServiceDescription(bots: BotData[]): string {
+    if (bots.length === 0) return 'Нет подключенных ботов';
+    const running = bots.filter(b => b.status === 'running').length;
+    return `${running} из ${bots.length} ботов активно`;
+}
 
 type RestartingState = Record<string, boolean>;
 
@@ -58,9 +93,9 @@ const BotManagementPage: React.FC = () => {
         } catch (error: unknown) {
             logger.error('Error loading TTS status:', error);
             const err = error as { response?: { data?: { detail?: string } }; message?: string };
-            setTtsStatus({ 
-                status: 'error', 
-                healthy: false, 
+            setTtsStatus({
+                status: 'error',
+                healthy: false,
                 available: false,
                 error: err.response?.data?.detail || err.message || 'Failed to check TTS status',
                 url: TTS_SERVICE_URL
@@ -100,7 +135,7 @@ const BotManagementPage: React.FC = () => {
     const getBotServiceStatusBadge = (): React.ReactNode => {
         switch (currentBotStatus) {
             case 'running':
-                return <Badge variant="outline" className="text-green-600 border-green-600">Работает</Badge>;
+                return <Badge variant="outline" className="text-green-600 border-green-600">Запущен</Badge>;
             case 'error':
                 return <Badge variant="outline" className="text-red-600 border-red-600">Ошибка</Badge>;
             default:
@@ -121,7 +156,7 @@ const BotManagementPage: React.FC = () => {
     if (loading) {
         return (
             <div className="container mx-auto p-6">
-                <PageLoader message="Загрузка статуса ботов..." />
+                <PageLoader message="Загрузка статуса систем..." />
             </div>
         );
     }
@@ -135,10 +170,10 @@ const BotManagementPage: React.FC = () => {
                         Управление ботами
                     </h1>
                     <p className="text-muted-foreground mt-2">
-                        Мониторинг и управление ботов Twitch и VK Live
+                        Управление и мониторинг ботов Twitch и VK Live
                     </p>
                 </div>
-                
+
                 <div className="flex items-center space-x-4">
                     <Button onClick={loadBotsStatus} variant="outline">
                         <RefreshCw className="w-4 h-4 mr-2" />
@@ -171,14 +206,14 @@ const BotManagementPage: React.FC = () => {
                                     </p>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
                                 <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={restartBotService}
                                     disabled={restarting['bot_service']}
-                                    className={currentBotStatus === 'running' 
+                                    className={currentBotStatus === 'running'
                                         ? "border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
                                         : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
                                     }
@@ -205,26 +240,26 @@ const BotManagementPage: React.FC = () => {
                                 <div>
                                     <h3 className="text-lg font-semibold flex items-center space-x-2">
                                         <span>TTS Engine</span>
-                                        <Badge 
-                                            variant="outline" 
+                                        <Badge
+                                            variant="outline"
                                             className={
-                                                ttsStatus?.healthy 
-                                                    ? "text-green-600 border-green-600" 
+                                                ttsStatus?.healthy
+                                                    ? "text-green-600 border-green-600"
                                                     : "text-red-600 border-red-600"
                                             }
                                         >
-                                            {ttsStatus?.healthy ? 'Готов' : 'Недоступен'}
+                                            {ttsStatus?.healthy ? 'Активен' : 'Недоступен'}
                                         </Badge>
                                     </h3>
                                     <p className="text-sm text-slate-400">
-                                        Движок синтеза речи • Статус: {ttsStatus?.status || 'Проверяется...'} • URL: {ttsStatus?.url || TTS_SERVICE_URL}
+                                        Статус синтеза речи и очередь: {ttsStatus?.status || 'Подключение...'} • URL: {ttsStatus?.url || TTS_SERVICE_URL}
                                         {ttsStatus?.error && (
                                             <span className="text-red-400 block mt-1">Ошибка: {ttsStatus.error}</span>
                                         )}
                                     </p>
                                 </div>
                             </div>
-                            
+
                             <div className="flex items-center space-x-2">
                                 {!ttsStatus?.healthy && (
                                     <Button

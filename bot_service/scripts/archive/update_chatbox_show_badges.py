@@ -15,7 +15,7 @@ def main():
     try:
         # Обновляем все записи где show_badges = False на True
         updated_count = db.query(ChatBoxSettings).filter(
-            ChatBoxSettings.show_badges == False
+            not ChatBoxSettings.show_badges
         ).update({"show_badges": True})
 
         db.commit()

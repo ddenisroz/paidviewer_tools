@@ -1,16 +1,16 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { History, RefreshCw, Search } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { useDropsHistory } from '@/queries/drops/dropsQueries';
+import { queryKeys } from '@/queries/queryKeys';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
 
 
-import { useDropsHistory } from '../../../queries/drops/dropsQueries';
-import { queryKeys } from '../../../queries/queryKeys';
 
 interface DropsHistoryProps {
     user: Record<string, unknown>;

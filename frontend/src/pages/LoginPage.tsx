@@ -1,14 +1,13 @@
-// src/pages/LoginPage.tsx
+﻿// src/pages/LoginPage.tsx
 import React, { useEffect, useState } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
-import CookieConsent from '@/components/CookieConsent';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-
-import { API_BASE_URL } from '../constants';
-import { useAuth } from '../context/AuthContext';
-import { logger } from '../utils/prodLogger';
+import { API_BASE_URL } from '@/constants';
+import { useAuth } from '@/context/AuthContext';
+import CookieConsent from '@/shared/components/CookieConsent';
+import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
+import { logger } from '@/shared/utils/prodLogger';
 
 interface TwitchIconProps {
     className?: string;

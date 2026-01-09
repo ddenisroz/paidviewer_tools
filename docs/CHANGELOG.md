@@ -4,6 +4,119 @@
 
 ---
 
+## [0.05-final] - 2026-01-09
+
+### Code Quality & ESLint Fixes
+**Статус:** ✅ Завершено
+
+Выполнен финальный проход по качеству кода фронтенда:
+- **0 ESLint Errors** (исправлены все 15 оставшихся ошибок)
+- **Dead Code Removal**: Удалены неиспользуемые файлы (`GuestTtsCard.tsx`, redundant `WordFilterManager.tsx`, `BlacklistManager.tsx`)
+- **Fixes**:
+    - `apiErrorHandler.ts`: исправлены `no-case-declarations` (scope wrapping)
+    - `TtsQuickSettings.tsx`, `YoutubeIntegrationPage.tsx`: убраны неиспользуемые переменные
+    - `sentry.ts`: `no-console` -> `logger`, `no-explicit-any` fixed
+    - Test files cleanup
+
+## [0.05-dev] - 2026-01-08
+
+### API Layer Refactoring — Clean Architecture
+**Статус:** ✅ Завершено (95%)
+
+Полный рефакторинг API слоя — все `db.query` вызовы вынесены в репозитории.
+
+#### Отрефакторенные файлы (21+)
+**Высокий приоритет:**
+- `admin/tickets.py` → SupportTicketRepository
+- `drops/rewards_routes.py` → DropsRewardRepository
+- `system_logs_api.py` → SystemLogRepository
+- `tts/local_routes.py` → LocalTTSRepository
+- `chatbox_api.py` → ChatBoxRepository
+- `admin/channels.py` → BlockedChannelRepository
+
+**Средний приоритет:**
+- `auth_api.py`, `stream_history_api.py`, `admin/voices.py`, `admin/system.py`, `admin/users.py`
+
+**Дополнительно:**
+- `active_channels_api.py`, `youtube/settings_routes.py`, `tts/voices_routes.py`
+- `drops/webhooks_routes.py`, `drops/config_routes.py`
+- `vk_api.py`, `vk/vk_stream.py`, `tts/channel_points_routes.py`
+
+#### Созданные репозитории (4 новых)
+- `BlockedChannelRepository`, `ChatBoxRepository`, `SystemLogRepository`, `DropsRewardRepository`
+
+#### Расширенные репозитории
+- `UserRepository` (+5 методов)
+- `UserTokenRepository` (+2 метода)
+- `UserSettingsRepository` (+1 метод)
+- `ChatMessageRepository` (+2 метода)
+- `UserVoiceSettingsRepository` (+1 метод)
+- `LocalTTSRepository` (+3 метода)
+
+### Bots Layer Refactoring — Clean Architecture
+**Статус:** ✅ Завершено (100%)
+
+Бот-слой полностью переведен на использование репозиториев и сервисов. Прямые обращения к БД (`db.query`) удалены из хендлеров команд и миксинов.
+
+#### Отрефакторенные компоненты (Bots)
+- **Core:** `twitch_bot_core.py`, `vk_live_bot_core.py`, `twitch_bot.py`
+- **Mixins:** `queue_handler_mixin.py`, `general_handler_mixin.py`, `tts_handler_mixin.py`, `stream_info_handler_mixin.py`
+- **Command Handlers:** `song_request_handler.py`, `stream_handlers.py`, `tts_handlers.py`
+- **Universal Handler:** `universal_command_handler.py`
+
+#### Использованные репозитории
+- `CommandRepository`: Добавлен метод `get_all_enabled_commands`
+- `UserRepository`: Активно используется во всех хендлерах для поиска владельцев каналов
+- `UserTokenRepository`: Используется для проверки токенов Twitch/VK
+- `AudioSettingsRepository`, `TTSSettingsRepository`: Используются для TTS команд
+- `QueueService`: Инкапсулирует работу с очередью (вместо прямых запросов к `YouTubeQueue`)
+
+### Services Layer Refactoring — Clean Architecture
+**Статус:** ✅ Завершено (98%)
+
+Сервисный слой полностью переведен на использование репозиториев. Удалены прямые вызовы `db.query`.
+
+#### Отрефакторенные сервисы (Ключевые)
+- **YouTube Queue:** `queue_service.py` (Pessimistic locking via Repo)
+- **Drops System:** `drops_mythical_service.py`, `drops_service.py`
+- **Stream Info:** `stream_info_service.py`
+- **Moderation:** `moderation_service.py`, `chat_service.py`
+- **Sync & Auth:** `platform_sync_service.py`, `twitch_bot_oauth_service.py`
+
+#### Новые репозитории и методы
+- `BlockedUserRepository`: для управления блокировками
+- `PointsRepository`: `get_user_points_for_update` (для безопасного списания)
+- `UserTokenRepository`: `get_active_token_by_session` (для Drops)
+
+---
+
+## [0.04-dev] - 2026-01-06
+
+### Refactoring & Architecture
+- **Structure**: Removed `.kiro` and legacy files. Created `deploy/` directory for infrastructure configs.
+- **Backend Clean Architecture**:
+    - Created `BotControlService` to decouple logic from `bot_control_api.py`.
+    - Moved monolithic `api/twitch_api.py` to `services/twitch_legacy_service.py` (Preparation for refactoring).
+    - Updated all core dependencies to use the new service location.
+    - Created `docs/AGENT_CONTEXT.md` to track architectural state and technical debt.
+    - **Refactored `stream_info_api.py`**: Moved business logic to new `StreamInfoService`.
+    - Created `StreamInfoService`: Unified platform handling via `PlatformRegistry`.
+    - Created `schemas/stream.py`: Introduced Pydantic models for stream updates.
+    - **Cleanup**: Deleted unused `bot_service/api/twitch/` directory (Removed duplicated dead code).
+- **Legacy Twitch Client Migration Complete**:
+    - Refactored `core/token_utils.py`: Uses `TokenRefreshService` instead of direct `TwitchAPI` calls.
+    - Refactored `core/background_tasks.py`: Token refresh task now uses `TokenRefreshService`.
+    - Refactored `core/auth_handlers.py`: OAuth callback uses `PlatformRegistry.twitch` for authentication.
+    - Refactored `api/tts/channel_points_routes.py`: Reward creation/deletion uses `TwitchPlatform`.
+    - Refactored `bots/mixins/stream_info_handler_mixin.py`: Game/Title commands use `PlatformRegistry`.
+    - Refactored `bots/command_handlers/stream_handlers.py`: All Twitch operations use `TwitchPlatform`.
+    - Implemented `create_reward`, `update_reward`, `delete_reward` in `TwitchPlatform`.
+    - **Result**: Zero active usages of `twitch_legacy_service` (only harmless logger name remains).
+- **VK Client Migration Complete**:
+    - Refactored `bots/mixins/stream_info_handler_mixin.py`: All VK operations use `VKPlatform`.
+    - Refactored `startup/bot_initializer.py`: Token refresh uses `TokenRefreshService`.
+    - **Result**: Zero usages of `from api.vk_api import VKLiveAPI`.
+
 ## Dec 18, 2025 - Full Project Audit & Healing
 
 ### Комплексный аудит проекта

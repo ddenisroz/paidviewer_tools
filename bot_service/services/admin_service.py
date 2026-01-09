@@ -18,7 +18,6 @@ from typing import List
 from sqlalchemy.orm import Session
 
 from models.pydantic_models import (
-    WhitelistedChannelPublic,
     AddToWhitelistRequest,
     WhitelistResponse,
     BlockedBotPublic,

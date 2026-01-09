@@ -1,3 +1,4 @@
+# bot_service/services/twitch_bot_oauth_service.py
 """
 Сервис для управления OAuth токеном Twitch бота с автообновлением.
 
@@ -16,7 +17,7 @@ from core.database import db_session
 from models.bot_token import BotToken
 from core.token_encryption import encrypt_token, decrypt_token
 from core.datetime_utils import utcnow_naive
-from core.retry_utils import retry_async
+from repositories.bot_token_repository import BotTokenRepository
 
 logger = logging.getLogger(__name__)
 
@@ -37,12 +38,6 @@ class TwitchBotOAuthService:
     def get_authorization_url(state: str) -> str:
         """
         Получить URL для OAuth авторизации бота.
-        
-        Args:
-            state: CSRF protection token
-            
-        Returns:
-            str: URL для редиректа пользователя
         """
         if not settings.twitch_client_id:
             raise ValueError("TWITCH_CLIENT_ID not configured")
@@ -65,17 +60,6 @@ class TwitchBotOAuthService:
     async def exchange_code_for_token(code: str) -> Dict[str, Any]:
         """
         Обменять authorization code на access token и refresh token.
-        
-        Args:
-            code: Authorization code из callback
-            
-        Returns:
-            dict: {
-                'access_token': str,
-                'refresh_token': str,
-                'expires_in': int,
-                'scope': list
-            }
         """
         if not all([settings.twitch_client_id, settings.twitch_client_secret]):
             raise ValueError("Twitch credentials not configured")
@@ -110,12 +94,6 @@ class TwitchBotOAuthService:
     async def get_bot_user_info(access_token: str) -> Dict[str, Any]:
         """
         Получить информацию о боте через API.
-        
-        Args:
-            access_token: Access token бота
-            
-        Returns:
-            dict: {'id': str, 'login': str, 'display_name': str}
         """
         if not settings.twitch_client_id:
             raise ValueError("TWITCH_CLIENT_ID not configured")
@@ -155,25 +133,12 @@ class TwitchBotOAuthService:
     ) -> bool:
         """
         Сохранить токен бота в базу данных.
-        
-        Args:
-            access_token: Access token
-            refresh_token: Refresh token
-            expires_in: Время жизни токена в секундах
-            scopes: Список разрешений
-            bot_user_id: ID бота на Twitch
-            bot_login: Login бота
-            db: Database session (опционально)
-            
-        Returns:
-            bool: True если успешно сохранено
         """
         def _save(session_db: Session) -> bool:
             try:
+                repo = BotTokenRepository(session_db)
                 # Ищем существующий токен бота
-                bot_token = session_db.query(BotToken).filter(
-                    BotToken.platform == 'twitch'
-                ).first()
+                bot_token = repo.get_by_platform('twitch')
                 
                 expires_at = utcnow_naive() + timedelta(seconds=expires_in)
                 
@@ -198,10 +163,9 @@ class TwitchBotOAuthService:
                         bot_user_id=bot_user_id,
                         bot_login=bot_login
                     )
-                    session_db.add(bot_token)
                     logger.info(f"[CREATE] Created Twitch bot token for {bot_login}")
                 
-                session_db.commit()
+                repo.save(bot_token)
                 return True
                 
             except Exception as e:
@@ -219,19 +183,10 @@ class TwitchBotOAuthService:
     async def get_bot_token(db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
         """
         Получить токен бота из базы данных.
-        
-        Returns:
-            dict: {
-                'access_token': str,
-                'refresh_token': str,
-                'expires_at': datetime,
-                'bot_login': str
-            } или None
         """
         def _get(session_db: Session) -> Optional[Dict[str, Any]]:
-            bot_token = session_db.query(BotToken).filter(
-                BotToken.platform == 'twitch'
-            ).first()
+            repo = BotTokenRepository(session_db)
+            bot_token = repo.get_by_platform('twitch')
             
             if not bot_token:
                 return None
@@ -254,15 +209,11 @@ class TwitchBotOAuthService:
     async def refresh_bot_token(db: Optional[Session] = None) -> bool:
         """
         Обновить токен бота используя refresh_token.
-        
-        Returns:
-            bool: True если успешно обновлено
         """
         def _refresh(session_db: Session) -> bool:
             try:
-                bot_token = session_db.query(BotToken).filter(
-                    BotToken.platform == 'twitch'
-                ).first()
+                repo = BotTokenRepository(session_db)
+                bot_token = repo.get_by_platform('twitch')
                 
                 if not bot_token or not bot_token.refresh_token:
                     logger.error("[ERROR] No bot token or refresh token found")
@@ -297,7 +248,7 @@ class TwitchBotOAuthService:
                     bot_token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
                     bot_token.updated_at = utcnow_naive()
                     
-                    session_db.commit()
+                    repo.save(bot_token)
                     
                     logger.info(f"[OK] Twitch bot token refreshed for {bot_token.bot_login}")
                     logger.info(f"[INFO] New token expires in: {data['expires_in']} seconds")
@@ -310,7 +261,7 @@ class TwitchBotOAuthService:
                     if error_data.get("message") == "Invalid refresh token":
                         logger.error("[ERROR] Refresh token is invalid - need to re-authorize bot")
                         bot_token.refresh_token = None
-                        session_db.commit()
+                        repo.save(bot_token)
                     
                     return False
                 
@@ -333,14 +284,10 @@ class TwitchBotOAuthService:
     async def refresh_if_needed(db: Optional[Session] = None) -> bool:
         """
         Проверить и обновить токен если истекает в течение 7 дней.
-        
-        Returns:
-            bool: True если токен валиден или успешно обновлен
         """
         def _check_and_refresh(session_db: Session) -> bool:
-            bot_token = session_db.query(BotToken).filter(
-                BotToken.platform == 'twitch'
-            ).first()
+            repo = BotTokenRepository(session_db)
+            bot_token = repo.get_by_platform('twitch')
             
             if not bot_token:
                 logger.warning("[WARN] No Twitch bot token found in database")

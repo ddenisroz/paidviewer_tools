@@ -1,6 +1,6 @@
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
-import { logger } from '../utils/prodLogger';
+import { logger } from '@/shared/utils/prodLogger';
 
 type AudioSource = 'youtube' | 'tts' | null;
 

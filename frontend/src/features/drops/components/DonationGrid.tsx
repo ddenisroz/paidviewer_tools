@@ -1,14 +1,14 @@
-import React from 'react';
+﻿import React from 'react';
 
 import { Minus, Plus } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
+import { DROPS_CONSTANTS } from '@/constants/drops';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
 
 
-import { DROPS_CONSTANTS } from '../../../constants/drops';
 import CommonClosed from '../../../images/lootboxes/common/common_closed.png';
 import EpicClosed from '../../../images/lootboxes/epic/epic_closed.png';
 import LegendaryClosed from '../../../images/lootboxes/legendary/legendary_closed.png';

@@ -21,33 +21,33 @@ import React from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
-import { Controller, FieldValues, Path, useForm } from 'react-hook-form';
+import { Controller, ControllerRenderProps, FieldValues, Path, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { Button } from '@/shared/components/ui/button';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
+import { Textarea } from '@/shared/components/ui/textarea';
 
 
 // ============================================
 // TYPES
 // ============================================
 
-export type FieldType = 
-  | 'text' 
-  | 'email' 
-  | 'password' 
-  | 'number' 
-  | 'textarea' 
-  | 'checkbox' 
-  | 'switch' 
-  | 'select' 
+export type FieldType =
+  | 'text'
+  | 'email'
+  | 'password'
+  | 'number'
+  | 'textarea'
+  | 'checkbox'
+  | 'switch'
+  | 'select'
   | 'slider'
   | 'custom';
 
@@ -69,7 +69,7 @@ export interface FieldConfig<T extends FieldValues> {
   rows?: number; // For textarea
   disabled?: boolean;
   hidden?: boolean;
-  customRender?: (field: any, error?: string) => React.ReactNode;
+  customRender?: (field: ControllerRenderProps<T, Path<T>>, error?: string) => React.ReactNode;
 }
 
 export interface FormBuilderProps<T extends FieldValues> {
@@ -113,6 +113,7 @@ export function FormBuilder<T extends FieldValues>({
   } = useForm<T>({
     // @ts-expect-error - Zod resolver type incompatibility with react-hook-form
     resolver: zodResolver(schema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     defaultValues: defaultValues as any,
   });
 

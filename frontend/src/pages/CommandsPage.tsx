@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 
-import { 
-    AlertCircle, 
-    CheckCircle2, 
-    ChevronDown, 
-    Clock, 
+import {
+    AlertCircle,
+    CheckCircle2,
+    ChevronDown,
+    Clock,
     Crown,
     Edit2,
     Filter,
@@ -26,25 +26,9 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PageLoader } from '@/components/ui/loader';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { TABLE_CLASSES } from '@/constants/designSystem';
-
-
-import { useAuth } from '../context/AuthContext';
-import { useIntegrations } from '../context/IntegrationsContext';
+import { useAuth } from '@/context/AuthContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
 import {
     useCommands,
     useCreateCommand,
@@ -52,10 +36,27 @@ import {
     useDeleteCommand,
     useToggleCommand,
     useUpdateCommand,
-} from '../queries/commands/commandsQueries';
+} from '@/queries/commands/commandsQueries';
+import { Alert, AlertDescription } from '@/shared/components/ui/alert';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { PageLoader } from '@/shared/components/ui/loader';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Switch } from '@/shared/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Textarea } from '@/shared/components/ui/textarea';
+
+
+
 import PageWrapper from '../shared/components/PageWrapper';
 
-import type { Command as ChatCommand } from '../types';
+import type { Command as ChatCommand } from '@/features/drops/types';
 
 
 
@@ -114,7 +115,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             'broadcaster': 'broadcaster'
         };
         const mappedRole = roleMap[role] || role;
-        
+
         const roleOptions: RoleOption[] = [
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
             { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
@@ -137,7 +138,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             'broadcaster': 'broadcaster'
         };
         const mappedRole = roleMap[role] || role;
-        
+
         const roleOptions: RoleOption[] = [
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
             { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
@@ -148,12 +149,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
         return option ? option.label : `[WARN] ${role}`;
     };
 
-    const getPlatformLabel = (platforms: string | undefined): string => {
-        if (platforms === 'twitch,vk') return 'Все платформы';
-        if (platforms === 'twitch') return 'Twitch';
-        if (platforms === 'vk') return 'VK Live';
-        return platforms || 'Все платформы';
-    };
+
 
     const getTagConfig = (tag: string): TagConfig => {
         const tagConfig: Record<string, TagConfig> = {
@@ -196,7 +192,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                 <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
                     {command.description || 'Описание команды не указано'}
                 </p>
-                
+
                 {command.response && (
                     <div className="p-2 bg-muted/30 rounded-md border-l-2 border-primary/20">
                         <p className="text-xs font-medium text-primary mb-1">Ответ:</p>
@@ -235,9 +231,9 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                             const config = getTagConfig(tag);
                             const IconComponent = config.icon;
                             return (
-                                <Badge 
-                                    key={tag} 
-                                    variant="outline" 
+                                <Badge
+                                    key={tag}
+                                    variant="outline"
                                     className={`text-xs px-2 py-0.5 flex items-center gap-1 ${config.color}`}
                                 >
                                     <IconComponent className="h-3 w-3" />
@@ -262,7 +258,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                         <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => onDelete(command.id!)}
+                            onClick={() => onDelete(Number(command.id!))}
                             className={TABLE_CLASSES.actionButton}
                         >
                             <Trash2 className="h-4 w-4" />
@@ -333,38 +329,35 @@ const PlatformStatusBanner: React.FC<PlatformStatusBannerProps> = ({ integration
     return null;
 };
 
-interface CommandsData {
-    basic_commands: ChatCommand[];
-    custom_commands: ChatCommand[];
-}
+
 
 const CommandsPage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
-    
+
     // Все хуки должны быть вызваны до любых условных return
     const { data: commandsData, isLoading: loading, isInitialLoading: initialLoading } = useCommands({
         enabled: !!isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
     });
-    
+
     const createCommandMutation = useCreateCommand();
     const createOverrideMutation = useCreateCommandOverride();
     const updateCommandMutation = useUpdateCommand();
     const toggleCommandMutation = useToggleCommand();
     const deleteCommandMutation = useDeleteCommand();
-    
+
     const [basicSearchTerm, setBasicSearchTerm] = useState<string>('');
     const [selectedBasicTags, setSelectedBasicTags] = useState<string[]>([]);
     const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
     const [tagSearchTerm, setTagSearchTerm] = useState<string>('');
     const [platformFilter, setPlatformFilter] = useState<string>('all'); // 'all', 'twitch', 'vk'
     const [customSearchTerm, setCustomSearchTerm] = useState<string>('');
-    
+
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
     const [editingCommand, setEditingCommand] = useState<ChatCommand | null>(null);
-    
+
     const [createForm, setCreateForm] = useState<CreateForm>({
         command_name: '',
         response_text: '',
@@ -373,7 +366,7 @@ const CommandsPage: React.FC = () => {
         cooldown_seconds: 0,
         is_enabled: true
     });
-    
+
     const [editForm, setEditForm] = useState<EditForm>({
         is_enabled: true,
         platforms: 'twitch,vk',
@@ -381,17 +374,17 @@ const CommandsPage: React.FC = () => {
         cooldown_seconds: 0,
         response_text: ''
     });
-    
+
     const basicCommands = commandsData?.basic_commands || [];
     const customCommands = commandsData?.custom_commands || [];
-    
+
     // Все хуки должны быть вызваны до любых условных return (правило React Hooks)
     const basicTags = useMemo(() => {
         return [...new Set(basicCommands.flatMap((cmd: ChatCommand) => {
             return Array.isArray(cmd.tags) ? cmd.tags : [];
         }))] as string[];
     }, [basicCommands]);
-    
+
     if (!isAuthenticated) {
         return (
             <PageWrapper title="Команды">
@@ -408,7 +401,7 @@ const CommandsPage: React.FC = () => {
                                 Для использования управления командами необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => navigate('/login')}
                             className="gap-2"
                         >
@@ -420,7 +413,7 @@ const CommandsPage: React.FC = () => {
             </PageWrapper>
         );
     }
-    
+
     const roleOptions: RoleOption[] = [
         { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
         { value: 'vip', label: 'VIP и выше', icon: <Star className="h-3 w-3" /> },
@@ -447,20 +440,20 @@ const CommandsPage: React.FC = () => {
 
     const availablePlatforms = platformOptions.filter(opt => opt.enabled);
     const platformsToShow = availablePlatforms.length > 0 ? availablePlatforms : platformOptions;
-    
+
     const getFilteredBasicCommands = (): ChatCommand[] => {
         return basicCommands.filter((command: ChatCommand) => {
             const matchesSearch = command.name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
-                                command.description?.toLowerCase().includes(basicSearchTerm.toLowerCase());
-            
-            const matchesTags = selectedBasicTags.length === 0 || selectedBasicTags.some(selectedTag => 
+                command.description?.toLowerCase().includes(basicSearchTerm.toLowerCase());
+
+            const matchesTags = selectedBasicTags.length === 0 || selectedBasicTags.some(selectedTag =>
                 command.tags && Array.isArray(command.tags) && command.tags.includes(selectedTag)
             );
-            
-            const matchesPlatform = platformFilter === 'all' || 
-                                  command.platform === 'all' ||
-                                  command.platform === platformFilter;
-            
+
+            const matchesPlatform = platformFilter === 'all' ||
+                command.platform === 'all' ||
+                command.platform === platformFilter;
+
             return matchesSearch && matchesTags && matchesPlatform;
         });
     };
@@ -468,12 +461,12 @@ const CommandsPage: React.FC = () => {
     const getFilteredCustomCommands = (): ChatCommand[] => {
         return customCommands.filter((command: ChatCommand) => {
             const matchesSearch = command.name.toLowerCase().includes(customSearchTerm.toLowerCase()) ||
-                                command.response?.toLowerCase().includes(customSearchTerm.toLowerCase());
-            
-            const matchesPlatform = platformFilter === 'all' || 
-                                  command.platform === 'all' ||
-                                  command.platform === platformFilter;
-            
+                command.response?.toLowerCase().includes(customSearchTerm.toLowerCase());
+
+            const matchesPlatform = platformFilter === 'all' ||
+                command.platform === 'all' ||
+                command.platform === platformFilter;
+
             return matchesSearch && matchesPlatform;
         });
     };
@@ -481,8 +474,8 @@ const CommandsPage: React.FC = () => {
     const areAllTagsSelected = selectedBasicTags.length === basicTags.length && basicTags.length > 0;
 
     const toggleTag = (tag: string): void => {
-        setSelectedBasicTags(prev => 
-            prev.includes(tag) 
+        setSelectedBasicTags(prev =>
+            prev.includes(tag)
                 ? prev.filter(t => t !== tag)
                 : [...prev, tag]
         );
@@ -506,7 +499,7 @@ const CommandsPage: React.FC = () => {
             cooldown: createForm.cooldown_seconds,
             enabled: createForm.is_enabled
         };
-        
+
         createCommandMutation.mutate(commandData, {
             onSuccess: () => {
                 setIsCreateDialogOpen(false);
@@ -524,7 +517,7 @@ const CommandsPage: React.FC = () => {
 
     const handleUpdateCommand = (commandId: number | undefined): void => {
         if (!commandId || !editingCommand) return;
-        
+
         if (editingCommand.command_type === 'global') {
             createOverrideMutation.mutate({
                 command_name: editingCommand.name,
@@ -548,7 +541,7 @@ const CommandsPage: React.FC = () => {
                 cooldown: editForm.cooldown_seconds,
                 enabled: editForm.is_enabled
             };
-            
+
             updateCommandMutation.mutate({ commandId, command: commandData }, {
                 onSuccess: () => {
                     setIsEditDialogOpen(false);
@@ -585,12 +578,7 @@ const CommandsPage: React.FC = () => {
         setIsEditDialogOpen(true);
     };
 
-    const getPlatformLabel = (platforms: string | undefined): string => {
-        if (platforms === 'twitch,vk') return 'Все платформы';
-        if (platforms === 'twitch') return 'Twitch';
-        if (platforms === 'vk') return 'VK Live';
-        return platforms || 'Все платформы';
-    };
+
 
     if (initialLoading && basicCommands.length === 0 && customCommands.length === 0) {
         return (
@@ -620,9 +608,9 @@ const CommandsPage: React.FC = () => {
                         <CardContent>
                             <div className="flex items-center justify-between mb-4">
                                 {(basicSearchTerm || selectedBasicTags.length > 0 || platformFilter !== 'all') && (
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
                                         onClick={() => {
                                             setBasicSearchTerm('');
                                             setSelectedBasicTags([]);
@@ -645,7 +633,7 @@ const CommandsPage: React.FC = () => {
                                         />
                                     </div>
                                 </div>
-                                
+
                                 <Select value={platformFilter} onValueChange={setPlatformFilter}>
                                     <SelectTrigger className="w-[180px]">
                                         <SelectValue placeholder="Все платформы" />
@@ -674,7 +662,7 @@ const CommandsPage: React.FC = () => {
                                         </SelectItem>
                                     </SelectContent>
                                 </Select>
-                                
+
                                 <div className="relative">
                                     <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                                         <PopoverTrigger asChild>
@@ -724,28 +712,27 @@ const CommandsPage: React.FC = () => {
                                                     basicTags
                                                         .filter(tag => tag.toLowerCase().includes(tagSearchTerm.toLowerCase()))
                                                         .map(tag => {
-                                                        const config = getTagConfig(tag);
-                                                        const IconComponent = config.icon;
-                                                        const isSelected = selectedBasicTags.includes(tag);
-                                                        return (
-                                                            <div
-                                                                key={tag}
-                                                                className={`flex items-center space-x-3 p-2.5 hover:bg-muted/70 cursor-pointer rounded-md transition-colors ${
-                                                                    isSelected ? 'bg-muted/50' : ''
-                                                                }`}
-                                                                onClick={() => toggleTag(tag)}
-                                                            >
-                                                                <Checkbox
-                                                                    checked={isSelected}
-                                                                    onChange={() => toggleTag(tag)}
-                                                                />
-                                                                <div className={`p-1.5 rounded-md ${config.color}`}>
-                                                                    <IconComponent className="h-3.5 w-3.5" />
+                                                            const config = getTagConfig(tag);
+                                                            const IconComponent = config.icon;
+                                                            const isSelected = selectedBasicTags.includes(tag);
+                                                            return (
+                                                                <div
+                                                                    key={tag}
+                                                                    className={`flex items-center space-x-3 p-2.5 hover:bg-muted/70 cursor-pointer rounded-md transition-colors ${isSelected ? 'bg-muted/50' : ''
+                                                                        }`}
+                                                                    onClick={() => toggleTag(tag)}
+                                                                >
+                                                                    <Checkbox
+                                                                        checked={isSelected}
+                                                                        onChange={() => toggleTag(tag)}
+                                                                    />
+                                                                    <div className={`p-1.5 rounded-md ${config.color}`}>
+                                                                        <IconComponent className="h-3.5 w-3.5" />
+                                                                    </div>
+                                                                    <span className="text-sm flex-1 font-medium">{tag}</span>
                                                                 </div>
-                                                                <span className="text-sm flex-1 font-medium">{tag}</span>
-                                                            </div>
-                                                        );
-                                                    })
+                                                            );
+                                                        })
                                                 ) : (
                                                     <div className="p-3 text-sm text-muted-foreground text-center">
                                                         Нет тегов
@@ -756,7 +743,7 @@ const CommandsPage: React.FC = () => {
                                     </Popover>
                                 </div>
                             </div>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
                                 {getFilteredBasicCommands().map((command: ChatCommand) => (
                                     <div key={command.id || command.name} className="transition-all duration-200">
@@ -836,8 +823,8 @@ const CommandsPage: React.FC = () => {
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue placeholder="Выберите платформы">
-                                                            {createForm.platforms === 'twitch,vk' || !createForm.platforms 
-                                                                ? 'Все платформы' 
+                                                            {createForm.platforms === 'twitch,vk' || !createForm.platforms
+                                                                ? 'Все платформы'
                                                                 : getPlatformLabel(createForm.platforms)}
                                                         </SelectValue>
                                                     </SelectTrigger>
@@ -905,9 +892,9 @@ const CommandsPage: React.FC = () => {
                                 <>
                                     <div className="flex items-center justify-between mb-4">
                                         {(customSearchTerm || platformFilter !== 'all') && (
-                                            <Button 
-                                                variant="ghost" 
-                                                size="sm" 
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
                                                 onClick={() => {
                                                     setCustomSearchTerm('');
                                                     setPlatformFilter('all');
@@ -918,47 +905,47 @@ const CommandsPage: React.FC = () => {
                                         )}
                                     </div>
                                     <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                                    <div className="flex-1">
-                                        <div className="relative">
-                                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                                            <Input
-                                                placeholder="Поиск кастомных команд..."
-                                                value={customSearchTerm}
-                                                onChange={(e) => setCustomSearchTerm(e.target.value)}
-                                                className="pl-10"
-                                            />
+                                        <div className="flex-1">
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                                <Input
+                                                    placeholder="Поиск кастомных команд..."
+                                                    value={customSearchTerm}
+                                                    onChange={(e) => setCustomSearchTerm(e.target.value)}
+                                                    className="pl-10"
+                                                />
+                                            </div>
                                         </div>
+
+                                        <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                                            <SelectTrigger className="w-[180px]">
+                                                <SelectValue placeholder="Все платформы" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Все платформы</SelectItem>
+                                                <SelectItem value="twitch">
+                                                    <div className="flex items-center gap-2">
+                                                        {integrations?.twitch?.enabled ? (
+                                                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                                        ) : (
+                                                            <XCircle className="h-3 w-3 text-gray-400" />
+                                                        )}
+                                                        Twitch
+                                                    </div>
+                                                </SelectItem>
+                                                <SelectItem value="vk">
+                                                    <div className="flex items-center gap-2">
+                                                        {integrations?.vk?.enabled ? (
+                                                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                                                        ) : (
+                                                            <XCircle className="h-3 w-3 text-gray-400" />
+                                                        )}
+                                                        VK Live
+                                                    </div>
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
-                                    
-                                    <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                                        <SelectTrigger className="w-[180px]">
-                                            <SelectValue placeholder="Все платформы" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Все платформы</SelectItem>
-                                            <SelectItem value="twitch">
-                                                <div className="flex items-center gap-2">
-                                                    {integrations?.twitch?.enabled ? (
-                                                        <CheckCircle2 className="h-3 w-3 text-green-600" />
-                                                    ) : (
-                                                        <XCircle className="h-3 w-3 text-gray-400" />
-                                                    )}
-                                                    Twitch
-                                                </div>
-                                            </SelectItem>
-                                            <SelectItem value="vk">
-                                                <div className="flex items-center gap-2">
-                                                    {integrations?.vk?.enabled ? (
-                                                        <CheckCircle2 className="h-3 w-3 text-green-600" />
-                                                    ) : (
-                                                        <XCircle className="h-3 w-3 text-gray-400" />
-                                                    )}
-                                                    VK Live
-                                                </div>
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
                                 </>
                             )}
                             {!loading && customCommands.length === 0 ? (
@@ -1010,7 +997,7 @@ const CommandsPage: React.FC = () => {
                                     }))}
                                 />
                             </div>
-                            
+
                             {editingCommand.command_type === 'custom' && (
                                 <div>
                                     <Label htmlFor="edit_response">Ответ команды</Label>
@@ -1024,7 +1011,7 @@ const CommandsPage: React.FC = () => {
                                     />
                                 </div>
                             )}
-                            
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <Label>Платформы</Label>
@@ -1037,8 +1024,8 @@ const CommandsPage: React.FC = () => {
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Выберите платформы">
-                                                {editForm.platforms === 'twitch,vk' || !editForm.platforms 
-                                                    ? 'Все платформы' 
+                                                {editForm.platforms === 'twitch,vk' || !editForm.platforms
+                                                    ? 'Все платформы'
                                                     : getPlatformLabel(editForm.platforms)}
                                             </SelectValue>
                                         </SelectTrigger>
@@ -1075,7 +1062,7 @@ const CommandsPage: React.FC = () => {
                                     </Select>
                                 </div>
                             </div>
-                            
+
                             <div>
                                 <Label htmlFor="edit_cooldown">Кулдаун (секунды)</Label>
                                 <Input
@@ -1095,7 +1082,7 @@ const CommandsPage: React.FC = () => {
                         <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                             Отмена
                         </Button>
-                        <Button onClick={() => handleUpdateCommand(editingCommand?.id)}>
+                        <Button onClick={() => handleUpdateCommand(editingCommand?.id ? Number(editingCommand.id) : undefined)}>
                             <Save className="h-4 w-4 mr-2" />
                             Сохранить
                         </Button>

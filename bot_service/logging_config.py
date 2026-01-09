@@ -5,9 +5,16 @@ from pathlib import Path
 import sys
 
 class QuietLoggingConfig:
-    """Тихая конфигурация логирования для production"""
+    """
+    Тихая конфигурация логирования для production.
+
+    DEPRECATED: Use core/structured_logging.py instead.
+    """
 
     def __init__(self, service_name: str = "bot_service"):
+        import warnings
+        warnings.warn("logging_config is deprecated, use core.structured_logging", DeprecationWarning, stacklevel=2)
+        
         self.service_name = service_name
         self.logs_dir = Path("logs")
         self.logs_dir.mkdir(exist_ok=True)
@@ -142,7 +149,7 @@ class QuietLoggingConfig:
         """Настройка специфичных логгеров для разных компонентов"""
 
         # Twitch API - только INFO и выше
-        twitch_logger = logging.getLogger('api.twitch_api')
+        twitch_logger = logging.getLogger('services.twitch_legacy_service')
         twitch_logger.setLevel(logging.INFO)
 
         # Bot service - INFO и выше

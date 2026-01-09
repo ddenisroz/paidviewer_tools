@@ -111,6 +111,11 @@ class Settings(BaseSettings):
     google_tts_api_key: Optional[str] = Field(default=None, description="Google Cloud TTS API key")
     huggingface_token: Optional[str] = Field(default=None, description="HuggingFace API token")
 
+    # === REDIS & CELERY ===
+    redis_url: str = Field(default="redis://localhost:6379/0", description="Redis URL")
+    celery_broker_url: str = Field(default="redis://localhost:6379/0", description="Celery broker URL")
+    celery_result_backend: str = Field(default="redis://localhost:6379/1", description="Celery result backend")
+
     # === GTTS SETTINGS ===
     gtts_voice: str = Field(default="com", description="gTTS accent/voice (tld parameter)")
 

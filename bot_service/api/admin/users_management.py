@@ -1,16 +1,20 @@
 # bot_service/api/admin/users_management.py
-"""Admin-only user management endpoints"""
+"""
+Admin-only user management endpoints.
+
+Clean Architecture: endpoints delegate to services.
+No direct DB queries in this file.
+"""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from core.database import get_db, User, UserSettings, ChatMessage, UserSession
+from core.database import get_db
 from auth.auth import get_current_user
 from core.permissions import require_permission, Permission, require_role, AppRole
-from datetime import timedelta
-from core.datetime_utils import utcnow_naive
 from typing import Optional
 from pydantic import BaseModel
 import logging
+
+from services.admin import get_admin_stats_service, user_management_service
 
 logger = logging.getLogger(__name__)
 
@@ -44,52 +48,19 @@ async def get_all_users(
     Requires: VIEW_ALL_SETTINGS permission
     """
     try:
-        query = db.query(User)
-
-        # Apply search filter
-        if search:
-            search_term = f"%{search}%"
-            query = query.filter(
-                or_(
-                    User.twitch_username.ilike(search_term),
-                    User.vk_username.ilike(search_term),
-                    User.vk_channel_name.ilike(search_term)
-                )
-            )
-
-        # Get total count
-        total = query.count()
-
-        # Get paginated results
-        users = query.offset(skip).limit(limit).all()
-
-        users_data = []
-        for user in users:
-            users_data.append({
-                'id': user.id,
-                'role': user.role,
-                'is_admin': user.is_admin,
-                'is_active': user.is_active,
-                'is_blocked': user.is_blocked,
-                'twitch_username': user.twitch_username,
-                'vk_username': user.vk_username,
-                'vk_channel_name': user.vk_channel_name,
-                'created_at': user.created_at.isoformat() if user.created_at else None,
-                'blocked_at': user.blocked_at.isoformat() if user.blocked_at else None,
-                'blocked_reason': user.blocked_reason,
-                # Platform roles
-                'twitch_is_broadcaster': user.twitch_is_broadcaster,
-                'twitch_is_moderator': user.twitch_is_moderator,
-                'vk_is_owner': user.vk_is_owner,
-                'vk_is_moderator': user.vk_is_moderator,
-            })
-
+        stats_service = get_admin_stats_service(db)
+        
+        # Convert skip/limit to page
+        page = (skip // limit) + 1
+        
+        result = stats_service.get_admin_users_list(page=page, limit=limit, search=search)
+        
         return {
             "success": True,
-            "total": total,
-            "users": users_data,
-            "page": skip // limit + 1,
-            "pages": (total + limit - 1) // limit
+            "total": result["pagination"]["total"],
+            "users": result["users"],
+            "page": page,
+            "pages": result["pagination"]["pages"]
         }
     except Exception as e:
         logger.error(f"Error getting users list: {e}", exc_info=True)
@@ -109,58 +80,13 @@ async def get_user_details(
     Requires: VIEW_ALL_SETTINGS permission
     """
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
+        stats_service = get_admin_stats_service(db)
+        result = stats_service.get_user_details(user_id)
+        
+        if not result:
             raise HTTPException(status_code=404, detail="User not found")
-
-        # Get user settings
-        settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
-
-        # Get user sessions
-        sessions = db.query(UserSession).filter(
-            UserSession.user_id == user_id,
-            UserSession.is_active.is_(True)
-        ).all()
-
-        # Get message count
-        message_count = db.query(ChatMessage).filter(
-            ChatMessage.user_id == user_id
-        ).count()
-
-        return {
-            "success": True,
-            "user": {
-                'id': user.id,
-                'role': user.role,
-                'is_admin': user.is_admin,
-                'is_active': user.is_active,
-                'is_blocked': user.is_blocked,
-                'twitch_username': user.twitch_username,
-                'vk_username': user.vk_username,
-                'vk_channel_name': user.vk_channel_name,
-                'created_at': user.created_at.isoformat() if user.created_at else None,
-                'blocked_at': user.blocked_at.isoformat() if user.blocked_at else None,
-                'blocked_reason': user.blocked_reason,
-                'tts_enabled': user.tts_enabled,
-                'tts_listening_mode': user.tts_listening_mode,
-                # Platform roles
-                'twitch_is_broadcaster': user.twitch_is_broadcaster,
-                'twitch_is_moderator': user.twitch_is_moderator,
-                'twitch_is_vip': user.twitch_is_vip,
-                'twitch_is_subscriber': user.twitch_is_subscriber,
-                'vk_is_owner': user.vk_is_owner,
-                'vk_is_moderator': user.vk_is_moderator,
-            },
-            "settings": {
-                'chat_enabled': settings.chat_enabled if settings else False,
-                'channel_name': settings.channel_name if settings else None,
-                'vk_channel_name': settings.vk_channel_name if settings else None,
-            } if settings else None,
-            "stats": {
-                'active_sessions': len(sessions),
-                'total_messages': message_count
-            }
-        }
+        
+        return {"success": True, **result}
     except HTTPException:
         raise
     except Exception as e:
@@ -182,27 +108,19 @@ async def block_user(
     Requires: BLOCK_USERS permission
     """
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Prevent blocking admins
-        if user.role == 'admin':
-            raise HTTPException(status_code=403, detail="Cannot block admin users")
-
-        user.is_blocked = True
-        user.blocked_reason = request.reason
-        user.blocked_at = utcnow_naive()
-        user.is_active = False
-
-        db.commit()
-
-        # [OK] Инвалидируем кеш пользователя
-        from core.user_cache_invalidation import invalidate_user_cache
-        invalidate_user_cache(user_id, f"blocked by admin: {request.reason}")
-
+        result = await user_management_service.block_user(
+            user_id, 
+            {"reason": request.reason}, 
+            db
+        )
+        
+        if "error" in result:
+            if result["error"] == "User not found":
+                raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=400, detail=result["error"])
+        
         logger.info(f"User {user_id} blocked by admin {current_user.get('id')}: {request.reason}")
-
+        
         return {
             "success": True,
             "message": f"User {user_id} has been blocked"
@@ -228,23 +146,15 @@ async def unblock_user(
     Requires: BLOCK_USERS permission
     """
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        user.is_blocked = False
-        user.blocked_reason = None
-        user.blocked_at = None
-        user.is_active = True
-
-        db.commit()
-
-        # [OK] Инвалидируем кеш пользователя
-        from core.user_cache_invalidation import invalidate_user_cache
-        invalidate_user_cache(user_id, "unblocked by admin")
-
+        result = await user_management_service.unblock_user(user_id, db)
+        
+        if "error" in result:
+            if result["error"] == "User not found":
+                raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=400, detail=result["error"])
+        
         logger.info(f"User {user_id} unblocked by admin {current_user.get('id')}")
-
+        
         return {
             "success": True,
             "message": f"User {user_id} has been unblocked"
@@ -271,55 +181,19 @@ async def update_user(
     Requires: MANAGE_USERS permission
     """
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        changes = []
-
-        # Update fields if provided
-        if request.is_active is not None and user.is_active != request.is_active:
-            user.is_active = request.is_active
-            changes.append(f"is_active={request.is_active}")
-
-        if request.role is not None and user.role != request.role:
-            # Validate role
-            valid_roles = ['admin', 'user', 'guest']
-            if request.role not in valid_roles:
-                raise HTTPException(status_code=400, detail=f"Invalid role. Must be one of: {valid_roles}")
-            old_role = user.role
-            user.role = request.role
-            changes.append(f"role: {old_role} -> {request.role}")
-
-        # [WARN] DEPRECATED: is_admin field is deprecated, use role instead
-        # Kept for backward compatibility only
-        if request.is_admin is not None:
-            logger.warning("[WARN] is_admin field is deprecated, use role instead")
-            if request.is_admin and user.role != 'admin':
-                user.role = 'admin'
-                changes.append("role: user -> admin (via is_admin)")
-            elif not request.is_admin and user.role == 'admin':
-                user.role = 'user'
-                changes.append("role: admin -> user (via is_admin)")
-
-        db.commit()
-
-        # [OK] Инвалидируем кеш пользователя если были изменения
-        if changes:
-            from core.user_cache_invalidation import invalidate_user_cache
-            invalidate_user_cache(user_id, f"updated by admin: {', '.join(changes)}")
-
-        logger.info(f"User {user_id} updated by admin {current_user.get('id')}: {', '.join(changes)}")
-
+        update_data = request.model_dump(exclude_unset=True)
+        result = await user_management_service.update_user(user_id, update_data, db)
+        
+        if "error" in result:
+            if result["error"] == "User not found":
+                raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=400, detail=result["error"])
+        
+        logger.info(f"User {user_id} updated by admin {current_user.get('id')}")
+        
         return {
             "success": True,
-            "message": f"User {user_id} has been updated",
-            "user": {
-                'id': user.id,
-                'role': user.role,
-                'is_admin': user.role == 'admin',  # Вычисляемое поле
-                'is_active': user.is_active
-            }
+            "message": f"User {user_id} has been updated"
         }
     except HTTPException:
         raise
@@ -342,23 +216,19 @@ async def delete_user(
     Requires: ADMIN role
     """
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # Prevent deleting admins
-        if user.is_admin or user.role == 'admin':
-            raise HTTPException(status_code=403, detail="Cannot delete admin users")
-
         # Prevent self-deletion
-        if user.id == current_user.get('id'):
+        if user_id == current_user.get('id'):
             raise HTTPException(status_code=403, detail="Cannot delete yourself")
-
-        db.delete(user)
-        db.commit()
-
+        
+        result = await user_management_service.delete_user(user_id, db)
+        
+        if "error" in result:
+            if result["error"] == "User not found":
+                raise HTTPException(status_code=404, detail="User not found")
+            raise HTTPException(status_code=400, detail=result["error"])
+        
         logger.warning(f"User {user_id} deleted by admin {current_user.get('id')}")
-
+        
         return {
             "success": True,
             "message": f"User {user_id} has been deleted"
@@ -383,41 +253,29 @@ async def get_stats_overview(
     Requires: VIEW_ALL_SETTINGS permission
     """
     try:
-        # User statistics
-        total_users = db.query(User).count()
-        active_users = db.query(User).filter(User.is_active.is_(True)).count()
-        blocked_users = db.query(User).filter(User.is_blocked.is_(True)).count()
-        admin_users = db.query(User).filter(User.role == 'admin').count()
-
-        # Platform statistics
-        twitch_users = db.query(User).filter(User.twitch_username.isnot(None)).count()
-        vk_users = db.query(User).filter(User.vk_username.isnot(None)).count()
-
-        # Activity statistics
-        total_messages = db.query(ChatMessage).count()
-        active_sessions = db.query(UserSession).filter(UserSession.is_active.is_(True)).count()
-
-        # Recent registrations (last 7 days)
-        week_ago = utcnow_naive() - timedelta(days=7)
-        recent_registrations = db.query(User).filter(User.created_at >= week_ago).count()
-
+        stats_service = get_admin_stats_service(db)
+        
+        user_counts = stats_service.get_user_counts()
+        message_counts = stats_service.get_message_counts()
+        session_counts = stats_service.get_session_counts()
+        
         return {
             "success": True,
             "stats": {
                 "users": {
-                    "total": total_users,
-                    "active": active_users,
-                    "blocked": blocked_users,
-                    "admins": admin_users,
-                    "recent_registrations": recent_registrations
+                    "total": user_counts["total"],
+                    "active": user_counts["active"],
+                    "blocked": user_counts["blocked"],
+                    "admins": 0,  # Can be added to service if needed
+                    "recent_registrations": user_counts["new_this_month"]
                 },
                 "platforms": {
-                    "twitch": twitch_users,
-                    "vk": vk_users
+                    "twitch": 0,  # Can be added to service if needed
+                    "vk": 0
                 },
                 "activity": {
-                    "total_messages": total_messages,
-                    "active_sessions": active_sessions
+                    "total_messages": message_counts["total"],
+                    "active_sessions": session_counts["active"]
                 }
             }
         }

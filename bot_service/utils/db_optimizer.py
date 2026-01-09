@@ -6,7 +6,7 @@
 
 import logging
 from typing import List, Dict, Any, Optional
-from datetime import timedelta
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session, joinedload
 
 from core.datetime_utils import utcnow_naive

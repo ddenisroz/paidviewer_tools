@@ -1,14 +1,14 @@
-import React, { lazy, Suspense } from 'react';
+﻿import React, { lazy, Suspense } from 'react';
 
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
-import AppErrorBoundary from './components/ErrorBoundary/AppErrorBoundary';
-import RouteErrorBoundary from './components/ErrorBoundary/RouteErrorBoundary';
-import Layout from './components/Layout';
-import { ConnectionStatus } from './components/layout/ConnectionStatus';
-import { AdminSkeleton, DashboardSkeleton, FormSkeleton, PageSkeleton } from './components/ui/PageSkeleton';
-import { useCacheWebSocketSync } from './hooks/useCacheWebSocketSync';
+import AppErrorBoundary from '@/shared/components/ErrorBoundary/AppErrorBoundary';
+import RouteErrorBoundary from '@/shared/components/ErrorBoundary/RouteErrorBoundary';
+import { ConnectionStatus } from '@/shared/components/layout/ConnectionStatus';
+import Layout from '@/shared/components/layout/Layout';
+import { AdminSkeleton, DashboardSkeleton, FormSkeleton, PageSkeleton } from '@/shared/components/ui/PageSkeleton';
+import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 
 // Critical pages - загружаем сразу (только auth flow)
 import AuthCallbackPage from './pages/AuthCallbackPage';
@@ -37,14 +37,14 @@ const DropsWidget = lazy(() => import('./pages/obs/DropsWidget'));
 const App: React.FC = () => {
     // Инициализируем WebSocket синхронизацию кэша
     useCacheWebSocketSync();
-    
+
     return (
         <>
             {/* Task 6.5: Connection status indicator */}
             <ConnectionStatus />
-            
+
             {/* Smart Toast Manager - bottom-right, не перекрывает контент */}
-            <Toaster 
+            <Toaster
                 position="bottom-right"
                 richColors
                 expand={false}
@@ -75,203 +75,203 @@ const App: React.FC = () => {
             />
             <AppErrorBoundary>
                 <Routes>
-                        {/* Public Routes */}
-                        <Route path="/login" element={
-                            <RouteErrorBoundary routeName="Login">
-                                <LoginPage />
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/auth/callback" element={
-                            <RouteErrorBoundary routeName="Auth Callback">
-                                <AuthCallbackPage />
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/auth/vk/callback" element={
-                            <RouteErrorBoundary routeName="VK Auth Callback">
-                                <AuthCallbackPage />
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/donationalerts/callback" element={
-                            <RouteErrorBoundary routeName="DonationAlerts Callback">
-                                <DonationAlertsCallback />
-                            </RouteErrorBoundary>
-                        } />
-                        
-                        {/* OBS Widgets - minimal loading */}
-                        <Route path="/tts-obs/:token" element={
-                            <RouteErrorBoundary routeName="TTS OBS Widget">
-                                <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                    <ObsTtsPage />
-                                </Suspense>
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/youtube-obs/:token" element={
-                            <RouteErrorBoundary routeName="YouTube OBS Widget">
-                                <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                    <ObsYoutubePage />
-                                </Suspense>
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/drops-widget/:token" element={
-                            <RouteErrorBoundary routeName="Drops Widget">
-                                <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                    <DropsWidget />
-                                </Suspense>
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/chat-overlay" element={
-                            <RouteErrorBoundary routeName="Chat Overlay">
-                                <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                    <ChatOverlay />
-                                </Suspense>
-                            </RouteErrorBoundary>
-                        } />
-                        <Route path="/chat-window" element={
-                            <RouteErrorBoundary routeName="Chat Window">
-                                <Suspense fallback={<PageSkeleton />}>
-                                    <ChatWindow />
-                                </Suspense>
-                            </RouteErrorBoundary>
-                        } />
+                    {/* Public Routes */}
+                    <Route path="/login" element={
+                        <RouteErrorBoundary routeName="Login">
+                            <LoginPage />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/auth/callback" element={
+                        <RouteErrorBoundary routeName="Auth Callback">
+                            <AuthCallbackPage />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/auth/vk/callback" element={
+                        <RouteErrorBoundary routeName="VK Auth Callback">
+                            <AuthCallbackPage />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/donationalerts/callback" element={
+                        <RouteErrorBoundary routeName="DonationAlerts Callback">
+                            <DonationAlertsCallback />
+                        </RouteErrorBoundary>
+                    } />
 
-                        {/* Protected Routes with Layout */}
-                        <Route path="/" element={<AuthGuard />}>
-                            <Route element={<Layout />}>
-                                <Route index element={<Navigate to="/dashboard" replace />} />
-                                
-                                {/* Dashboard - main page */}
-                                <Route path="dashboard" element={
-                                    <RouteErrorBoundary routeName="Dashboard">
-                                        <Suspense fallback={<DashboardSkeleton />}>
-                                            <HomePage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                
-                                {/* TTS Routes */}
-                                <Route path="dashboard/tts" element={
-                                    <RouteErrorBoundary routeName="TTS">
-                                        <Suspense fallback={<PageSkeleton />}>
-                                            <TtsMainPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/tts/voices" element={
-                                    <RouteErrorBoundary routeName="Voice Management">
-                                        <Suspense fallback={<PageSkeleton />}>
-                                            <VoiceManagementPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/tts/local" element={
-                                    <RouteErrorBoundary routeName="Local TTS Settings">
-                                        <Suspense fallback={<FormSkeleton />}>
-                                            <LocalTTSSettingsPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                
-                                {/* Settings */}
-                                <Route path="dashboard/settings" element={
-                                    <RouteErrorBoundary routeName="Settings">
-                                        <Suspense fallback={<FormSkeleton />}>
-                                            <SettingsPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                
-                                {/* Media Routes */}
-                                <Route path="dashboard/youtube" element={
-                                    <RouteErrorBoundary routeName="YouTube">
-                                        <Suspense fallback={<PageSkeleton />}>
-                                            <YoutubeIntegrationPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/points" element={
-                                    <RouteErrorBoundary routeName="Points">
-                                        <Suspense fallback={<PageSkeleton />}>
-                                            <PointsManagementPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/drops" element={
-                                    <RouteErrorBoundary routeName="Drops">
-                                        <Suspense fallback={<PageSkeleton />}>
-                                            <DropsMainPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                
-                                {/* Analytics & Commands */}
-                                <Route path="dashboard/chat-analysis" element={
-                                    <RouteErrorBoundary routeName="Analytics">
-                                        <Suspense fallback={<PageSkeleton />}>
-                                            <AnalyticsPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/commands" element={
-                                    <RouteErrorBoundary routeName="Commands">
-                                        <Suspense fallback={<PageSkeleton />}>
-                                            <CommandsPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                
-                                {/* Admin Routes */}
-                                <Route path="dashboard/dolbaebadmintts" element={
-                                    <RouteErrorBoundary routeName="Admin">
-                                        <Suspense fallback={<AdminSkeleton />}>
-                                            <AdminPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/dolbaebadmintts/sessions" element={
-                                    <RouteErrorBoundary routeName="Admin Sessions">
-                                        <Suspense fallback={<AdminSkeleton />}>
-                                            <AdminPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/dolbaebadmintts/users" element={
-                                    <RouteErrorBoundary routeName="Admin Users">
-                                        <Suspense fallback={<AdminSkeleton />}>
-                                            <AdminPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/dolbaebadmintts/bots" element={
-                                    <RouteErrorBoundary routeName="Admin Bots">
-                                        <Suspense fallback={<AdminSkeleton />}>
-                                            <AdminPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/dolbaebadmintts/monitoring" element={
-                                    <RouteErrorBoundary routeName="Admin Monitoring">
-                                        <Suspense fallback={<AdminSkeleton />}>
-                                            <AdminPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/dolbaebadmintts/blocked-channels" element={
-                                    <RouteErrorBoundary routeName="Admin Blocked Channels">
-                                        <Suspense fallback={<AdminSkeleton />}>
-                                            <AdminPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                                <Route path="dashboard/dolbaebadmintts/support" element={
-                                    <RouteErrorBoundary routeName="Admin Support">
-                                        <Suspense fallback={<AdminSkeleton />}>
-                                            <AdminPage />
-                                        </Suspense>
-                                    </RouteErrorBoundary>
-                                } />
-                            </Route>
+                    {/* OBS Widgets - minimal loading */}
+                    <Route path="/tts-obs/:token" element={
+                        <RouteErrorBoundary routeName="TTS OBS Widget">
+                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
+                                <ObsTtsPage />
+                            </Suspense>
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/youtube-obs/:token" element={
+                        <RouteErrorBoundary routeName="YouTube OBS Widget">
+                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
+                                <ObsYoutubePage />
+                            </Suspense>
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/drops-widget/:token" element={
+                        <RouteErrorBoundary routeName="Drops Widget">
+                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
+                                <DropsWidget />
+                            </Suspense>
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/chat-overlay" element={
+                        <RouteErrorBoundary routeName="Chat Overlay">
+                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
+                                <ChatOverlay />
+                            </Suspense>
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/chat-window" element={
+                        <RouteErrorBoundary routeName="Chat Window">
+                            <Suspense fallback={<PageSkeleton />}>
+                                <ChatWindow />
+                            </Suspense>
+                        </RouteErrorBoundary>
+                    } />
+
+                    {/* Protected Routes with Layout */}
+                    <Route path="/" element={<AuthGuard />}>
+                        <Route element={<Layout />}>
+                            <Route index element={<Navigate to="/dashboard" replace />} />
+
+                            {/* Dashboard - main page */}
+                            <Route path="dashboard" element={
+                                <RouteErrorBoundary routeName="Dashboard">
+                                    <Suspense fallback={<DashboardSkeleton />}>
+                                        <HomePage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+
+                            {/* TTS Routes */}
+                            <Route path="dashboard/tts" element={
+                                <RouteErrorBoundary routeName="TTS">
+                                    <Suspense fallback={<PageSkeleton />}>
+                                        <TtsMainPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/tts/voices" element={
+                                <RouteErrorBoundary routeName="Voice Management">
+                                    <Suspense fallback={<PageSkeleton />}>
+                                        <VoiceManagementPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/tts/local" element={
+                                <RouteErrorBoundary routeName="Local TTS Settings">
+                                    <Suspense fallback={<FormSkeleton />}>
+                                        <LocalTTSSettingsPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+
+                            {/* Settings */}
+                            <Route path="dashboard/settings" element={
+                                <RouteErrorBoundary routeName="Settings">
+                                    <Suspense fallback={<FormSkeleton />}>
+                                        <SettingsPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+
+                            {/* Media Routes */}
+                            <Route path="dashboard/youtube" element={
+                                <RouteErrorBoundary routeName="YouTube">
+                                    <Suspense fallback={<PageSkeleton />}>
+                                        <YoutubeIntegrationPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/points" element={
+                                <RouteErrorBoundary routeName="Points">
+                                    <Suspense fallback={<PageSkeleton />}>
+                                        <PointsManagementPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/drops" element={
+                                <RouteErrorBoundary routeName="Drops">
+                                    <Suspense fallback={<PageSkeleton />}>
+                                        <DropsMainPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+
+                            {/* Analytics & Commands */}
+                            <Route path="dashboard/chat-analysis" element={
+                                <RouteErrorBoundary routeName="Analytics">
+                                    <Suspense fallback={<PageSkeleton />}>
+                                        <AnalyticsPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/commands" element={
+                                <RouteErrorBoundary routeName="Commands">
+                                    <Suspense fallback={<PageSkeleton />}>
+                                        <CommandsPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+
+                            {/* Admin Routes */}
+                            <Route path="dashboard/dolbaebadmintts" element={
+                                <RouteErrorBoundary routeName="Admin">
+                                    <Suspense fallback={<AdminSkeleton />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/dolbaebadmintts/sessions" element={
+                                <RouteErrorBoundary routeName="Admin Sessions">
+                                    <Suspense fallback={<AdminSkeleton />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/dolbaebadmintts/users" element={
+                                <RouteErrorBoundary routeName="Admin Users">
+                                    <Suspense fallback={<AdminSkeleton />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/dolbaebadmintts/bots" element={
+                                <RouteErrorBoundary routeName="Admin Bots">
+                                    <Suspense fallback={<AdminSkeleton />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/dolbaebadmintts/monitoring" element={
+                                <RouteErrorBoundary routeName="Admin Monitoring">
+                                    <Suspense fallback={<AdminSkeleton />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/dolbaebadmintts/blocked-channels" element={
+                                <RouteErrorBoundary routeName="Admin Blocked Channels">
+                                    <Suspense fallback={<AdminSkeleton />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
+                            <Route path="dashboard/dolbaebadmintts/support" element={
+                                <RouteErrorBoundary routeName="Admin Support">
+                                    <Suspense fallback={<AdminSkeleton />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
                         </Route>
-                    </Routes>
+                    </Route>
+                </Routes>
             </AppErrorBoundary>
         </>
     );

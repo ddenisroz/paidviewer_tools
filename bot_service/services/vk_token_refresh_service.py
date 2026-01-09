@@ -7,12 +7,14 @@ VK Token Refresh Service - автоматическое обновление т�
 import asyncio
 import httpx
 import structlog
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 
 from core.database import get_db, UserToken
 from core.config import settings
+from core.datetime_utils import utcnow_naive
+from repositories.user_token_repository import UserTokenRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -110,26 +112,31 @@ class VKTokenRefreshService:
         и обновляет их используя refresh_token.
         """
         with next(get_db()) as db:
+            repo = UserTokenRepository(db)
             # Найти токены, которые истекут в течение 24 часов
-            expiring_soon = datetime.utcnow() + timedelta(hours=24)
+            expiring_soon = utcnow_naive() + timedelta(hours=24)
             
-            tokens = db.query(UserToken).filter(
-                UserToken.platform == 'vk',
-                UserToken.expires_at <= expiring_soon,
-                UserToken.expires_at > datetime.utcnow(),  # Еще не истекли
-                UserToken.refresh_token.isnot(None)
-            ).all()
+            tokens = repo.get_expiring_tokens('vk', expiring_soon)
+            # Дополнительно фильтруем, чтобы не обновлять те, что еще совсем свежие (хотя get_expiring_tokens берет <= threshold)
+            # В оригинале было: UserToken.expires_at > utcnow_naive()
+            # Добавим это фильтрование здесь, если репо возвращает и истекшие
+            # Repos get_expiring_tokens returns <= threshold and is_active=True.
+            # It might include expired ones. Original code updated valid-but-soon-expiring.
+            # Expired ones might fail refresh if too old? VK refresh tokens live long.
+            # Let's keep it safe.
             
-            if not tokens:
+            valid_tokens = [t for t in tokens if t.refresh_token and (not t.expires_at or t.expires_at > utcnow_naive())]
+            
+            if not valid_tokens:
                 logger.debug("vk_token_refresh_no_tokens_to_refresh")
                 return
                 
             logger.info(
                 "vk_token_refresh_checking",
-                tokens_count=len(tokens)
+                tokens_count=len(valid_tokens)
             )
             
-            for token in tokens:
+            for token in valid_tokens:
                 try:
                     await self._refresh_token(token, db)
                     
@@ -144,7 +151,7 @@ class VKTokenRefreshService:
                     # Если refresh_token невалиден - деактивировать токен
                     if "invalid_grant" in str(e).lower():
                         token.is_active = False
-                        db.commit()
+                        db.commit() # Save state
                         logger.warning(
                             "vk_token_deactivated",
                             user_id=token.user_id,
@@ -168,7 +175,7 @@ class VKTokenRefreshService:
         logger.info(
             "vk_token_refreshing",
             user_id=token.user_id,
-            expires_at=token.expires_at.isoformat()
+            expires_at=token.expires_at.isoformat() if token.expires_at else "None"
         )
         
         # Подготовить данные для запроса
@@ -196,7 +203,7 @@ class VKTokenRefreshService:
             token.refresh_token = token_data['refresh_token']
             
         if 'expires_in' in token_data:
-            token.expires_at = datetime.utcnow() + timedelta(
+            token.expires_at = utcnow_naive() + timedelta(
                 seconds=token_data['expires_in']
             )
             
@@ -211,30 +218,12 @@ class VKTokenRefreshService:
     async def refresh_token_manually(self, user_id: int) -> bool:
         """
         Вручную обновить токен пользователя
-        
-        Используется когда нужно немедленно обновить токен,
-        не дожидаясь фоновой задачи.
-        
-        Args:
-            user_id: ID пользователя
-            
-        Returns:
-            bool: True если токен обновлен, False если не найден или ошибка
-            
-        Example:
-            >>> service = VKTokenRefreshService()
-            >>> success = await service.refresh_token_manually(user_id=123)
-            >>> if success:
-            ...     print("Токен обновлен")
         """
         with next(get_db()) as db:
-            token = db.query(UserToken).filter(
-                UserToken.user_id == user_id,
-                UserToken.platform == 'vk',
-                UserToken.refresh_token.isnot(None)
-            ).first()
+            repo = UserTokenRepository(db)
+            token = repo.get_by_user_and_platform(user_id, 'vk')
             
-            if not token:
+            if not token or not token.refresh_token:
                 logger.warning(
                     "vk_token_refresh_manual_not_found",
                     user_id=user_id
@@ -256,28 +245,15 @@ class VKTokenRefreshService:
     async def get_token_status(self, user_id: int) -> Optional[dict]:
         """
         Получить статус токена пользователя
-        
-        Args:
-            user_id: ID пользователя
-            
-        Returns:
-            dict: Информация о токене или None если не найден
-            
-        Example:
-            >>> status = await service.get_token_status(user_id=123)
-            >>> print(f"Токен истекает: {status['expires_at']}")
-            >>> print(f"Осталось часов: {status['hours_until_expiry']}")
         """
         with next(get_db()) as db:
-            token = db.query(UserToken).filter(
-                UserToken.user_id == user_id,
-                UserToken.platform == 'vk'
-            ).first()
+            repo = UserTokenRepository(db)
+            token = repo.get_by_user_and_platform(user_id, 'vk')
             
             if not token:
                 return None
                 
-            now = datetime.utcnow()
+            now = utcnow_naive()
             time_until_expiry = token.expires_at - now if token.expires_at else None
             
             return {

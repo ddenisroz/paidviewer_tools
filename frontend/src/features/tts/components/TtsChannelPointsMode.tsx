@@ -3,11 +3,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Trash2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent } from '@/shared/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
 import { toast } from '@/utils/toastManager';
 
 import { useAuth } from '../../../context/AuthContext';
@@ -18,36 +18,36 @@ import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
 import { logger } from '../../../utils/prodLogger';
 
 interface TtsChannelPointsModeProps {
-    ttsMode: string;
-    onModeChange: (mode: 'all_messages' | 'channel_points') => void;
-    isSaving: boolean;
-    showModeSelector?: boolean;
-    showRewards?: boolean;
+  ttsMode: string;
+  onModeChange: (mode: 'all_messages' | 'channel_points') => void;
+  isSaving: boolean;
+  showModeSelector?: boolean;
+  showRewards?: boolean;
 }
 
 interface RewardForm {
-    title: string;
-    cost: number;
-    cooldown: number;
+  title: string;
+  cost: number;
+  cooldown: number;
 }
 
 /**
  * Компонент для управления режимом TTS (все сообщения / за баллы канала)
  */
-const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({ 
-    ttsMode, 
-    onModeChange, 
-    isSaving, 
-    showModeSelector = true, 
-    showRewards = true 
+const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
+  ttsMode,
+  onModeChange,
+  isSaving,
+  showModeSelector = true,
+  showRewards = true
 }) => {
-  const { user, isGuest } = useAuth();
+  const { user } = useAuth();
   const { integrations } = useIntegrations();
   const queryClient = useQueryClient();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  
+
   // Форма создания награды
   const [rewardForm, setRewardForm] = useState<RewardForm>({
     title: '',
@@ -118,7 +118,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
 
     if (createTtsRewardMutation.isPending || !selectedPlatform) return;
     setSaving(true);
-    
+
     createTtsRewardMutation.mutate({
       platform: selectedPlatform,
       title: rewardForm.title,
@@ -166,13 +166,13 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
         };
       });
     }
-    
+
     deleteTtsRewardMutation.mutate(platform);
   };
 
-  const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
-  const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
-  
+  const isTwitchConnected = integrations?.twitch?.enabled;
+  const isVkConnected = integrations?.vk?.enabled;
+
   const connectedPlatforms: string[] = [];
   if (isTwitchConnected) connectedPlatforms.push('twitch');
   if (isVkConnected) connectedPlatforms.push('vk');
@@ -181,112 +181,110 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
     <div className="space-y-3">
       {/* Выбор режима - показываем только если showModeSelector=true */}
       {showModeSelector && (
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={() => onModeChange('all_messages')}
-          disabled={isSaving}
-          className={`p-3 rounded-lg border-2 transition-all text-left ${
-            ttsMode === 'all_messages'
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onModeChange('all_messages')}
+            disabled={isSaving}
+            className={`p-3 rounded-lg border-2 transition-all text-left ${ttsMode === 'all_messages'
               ? 'border-purple-500 bg-purple-500/10 text-white'
               : 'border-gray-700 hover:border-purple-500/50 text-gray-400'
-          }`}
-        >
-          <div className="font-semibold text-sm mb-0.5">Все сообщения</div>
-          <div className="text-xs text-gray-400">Стандартный режим</div>
-        </button>
+              }`}
+          >
+            <div className="font-semibold text-sm mb-0.5">Все сообщения</div>
+            <div className="text-xs text-gray-400">Стандартный режим</div>
+          </button>
 
-        <button
-          onClick={() => onModeChange('channel_points')}
-          disabled={isSaving || !isTwitchConnected}
-          className={`p-3 rounded-lg border-2 transition-all text-left ${
-            !isTwitchConnected
+          <button
+            onClick={() => onModeChange('channel_points')}
+            disabled={isSaving || !isTwitchConnected}
+            className={`p-3 rounded-lg border-2 transition-all text-left ${!isTwitchConnected
               ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
               : ttsMode === 'channel_points'
                 ? 'border-green-500 bg-green-500/10 text-white'
                 : 'border-gray-700 hover:border-green-500/50 text-gray-400'
-          }`}
-        >
-          <div className="font-semibold text-sm mb-0.5">За баллы канала</div>
-          <div className="text-xs text-gray-400">
-            {!isTwitchConnected ? 'Требуется Twitch' : 'Только с наградой'}
-          </div>
-        </button>
-      </div>
+              }`}
+          >
+            <div className="font-semibold text-sm mb-0.5">За баллы канала</div>
+            <div className="text-xs text-gray-400">
+              {!isTwitchConnected ? 'Требуется Twitch' : 'Только с наградой'}
+            </div>
+          </button>
+        </div>
       )}
 
       {/* Настройка наград */}
       {ttsMode === 'channel_points' && showRewards && (
         <div className={showModeSelector ? "pt-3 border-t border-gray-700/30" : "py-0"}>
           <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            {connectedPlatforms.map(platform => (
-              <Card key={platform} className="border-gray-700 bg-gray-800/30">
-                <CardContent className="p-3">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      {platform === 'twitch' ? (
-                        <TwitchIcon className="w-4 h-4 text-purple-400" />
-                      ) : (
-                        <VKIcon className="w-4 h-4 text-blue-400" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-semibold text-sm text-white truncate">
-                          {platform === 'twitch' ? 'Twitch' : 'VK Live'}
-                        </div>
-                        {isLoadingRewards ? (
-                          <div className="text-xs text-gray-400 flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Загрузка...
-                          </div>
-                        ) : ttsRewardIds[platform] ? (
-                          <div className="text-xs text-green-400">
-                            ✓ Создана
-                          </div>
+            <div className="grid grid-cols-2 gap-2">
+              {connectedPlatforms.map(platform => (
+                <Card key={platform} className="border-gray-700 bg-gray-800/30">
+                  <CardContent className="p-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        {platform === 'twitch' ? (
+                          <TwitchIcon className="w-4 h-4 text-purple-400" />
                         ) : (
-                          <div className="text-xs text-yellow-400">
-                            ⚠ Не создана
+                          <VKIcon className="w-4 h-4 text-blue-400" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-white truncate">
+                            {platform === 'twitch' ? 'Twitch' : 'VK Live'}
                           </div>
+                          {isLoadingRewards ? (
+                            <div className="text-xs text-gray-400 flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Загрузка...
+                            </div>
+                          ) : ttsRewardIds[platform] ? (
+                            <div className="text-xs text-green-400">
+                              ✓ Создана
+                            </div>
+                          ) : (
+                            <div className="text-xs text-yellow-400">
+                              ⚠ Не создана
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end">
+                        {isLoadingRewards ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled
+                            className="w-full text-xs opacity-50 cursor-not-allowed"
+                          >
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                            Загрузка...
+                          </Button>
+                        ) : ttsRewardIds[platform] ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteReward(platform)}
+                            className="text-red-400 hover:bg-red-600/20 border-red-600/50 w-full text-xs"
+                          >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Удалить
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => openCreateDialog(platform)}
+                            className="w-full bg-green-600 hover:bg-green-700 text-xs"
+                          >
+                            Создать
+                          </Button>
                         )}
                       </div>
                     </div>
-
-                    <div className="flex justify-end">
-                      {isLoadingRewards ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled
-                          className="w-full text-xs opacity-50 cursor-not-allowed"
-                        >
-                          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                          Загрузка...
-                        </Button>
-                      ) : ttsRewardIds[platform] ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteReward(platform)}
-                          className="text-red-400 hover:bg-red-600/20 border-red-600/50 w-full text-xs"
-                        >
-                          <Trash2 className="w-3 h-3 mr-1" />
-                          Удалить
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => openCreateDialog(platform)}
-                          className="w-full bg-green-600 hover:bg-green-700 text-xs"
-                        >
-                          Создать
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
             {connectedPlatforms.length === 0 && (
               <div className="text-sm text-gray-400 p-4 border rounded-lg bg-gray-800/30 border-gray-700">
@@ -295,7 +293,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
             )}
           </div>
         </div>
-        )}
+      )}
 
       {/* Диалог создания награды */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -348,15 +346,15 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
           </div>
 
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowCreateDialog(false)}
               className="border-gray-700 text-gray-300 hover:bg-gray-800"
             >
               Отмена
             </Button>
-            <Button 
-              onClick={handleCreateReward} 
+            <Button
+              onClick={handleCreateReward}
               disabled={saving}
               className="bg-purple-600 hover:bg-purple-700"
             >

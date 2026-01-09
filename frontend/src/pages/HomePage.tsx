@@ -1,21 +1,21 @@
-// src/pages/HomePage.tsx
+﻿// src/pages/HomePage.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { MessageCircle, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 
-import ChatCard from '../components/ChatCard';
-import QuickActionsBar from '../components/QuickActionsBar';
-import StreamManagementCards from '../components/StreamManagementCards';
-import StreamStatus from '../components/StreamStatus';
-import { useAuth } from '../context/AuthContext';
-import { useIntegrations } from '../context/IntegrationsContext';
-import { useTwitchStreamInfo, useVkStreamInfo } from '../queries/stream/streamQueries';
-import { getAndClearReturnUrl } from '../utils/oauthRedirect';
-import { logger } from '../utils/prodLogger';
+import { useAuth } from '@/context/AuthContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
+import ChatCard from '@/features/chat/components/ChatCard';
+import QuickActionsBar from '@/features/home/components/QuickActionsBar';
+import StreamManagementCards from '@/features/stream/components/StreamManagementCards';
+import StreamStatus from '@/features/stream/components/StreamStatus';
+import { useTwitchStreamInfo, useVkStreamInfo } from '@/queries/stream/streamQueries';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent } from '@/shared/components/ui/card';
+import { logger } from '@/shared/utils/prodLogger';
+import { getAndClearReturnUrl } from '@/utils/urlUtils';
 
 interface _StreamHistory {
     status?: string;
@@ -29,10 +29,10 @@ const HomePage: React.FC = () => {
     const { integrations } = useIntegrations();
     const [_titleLinked, setTitleLinked] = useState(false);
     const [_categoryLinked, setCategoryLinked] = useState(false);
-    
+
     useEffect(() => {
         if (!isAuthenticated) return;
-        
+
         const returnUrl = getAndClearReturnUrl();
         if (returnUrl) {
             logger.log('[REFRESH] [OAuth] Redirecting back from dashboard to:', returnUrl);
@@ -40,7 +40,7 @@ const HomePage: React.FC = () => {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    
+
 
     const { data: twitchStreamInfo } = useTwitchStreamInfo({
         enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
@@ -61,22 +61,22 @@ const HomePage: React.FC = () => {
         refetchOnWindowFocus: false,
         retry: 1,
     });
-    
+
     const hasAnyIntegration = useMemo<boolean>(() => {
         return integrations?.twitch?.enabled || integrations?.vk?.enabled;
     }, [integrations]);
-    
+
     const streamData = useMemo(() => {
         const twitchData = integrations?.twitch?.enabled ? {
             isLive: (twitchStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (twitchStreamInfo?.data?.viewers ?? 0) as number
         } : undefined;
-        
+
         const vkData = integrations?.vk?.enabled ? {
             isLive: (vkStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (vkStreamInfo?.data?.viewers ?? 0) as number
         } : undefined;
-        
+
         return {
             twitch: twitchData,
             vk: vkData
@@ -85,12 +85,12 @@ const HomePage: React.FC = () => {
 
     return (
         <div className="space-y-8 pb-20">
-            <StreamStatus 
+            <StreamStatus
                 integrations={integrations}
                 streamData={streamData}
                 isLoading={false}
             />
-            
+
             <div className="space-y-6 max-w-6xl mx-auto overflow-visible">
                 {!isAuthenticated ? (
                     <Card className="border-gray-700">
@@ -106,7 +106,7 @@ const HomePage: React.FC = () => {
                                     Для использования функций бота необходимо войти через Twitch или VK Live
                                 </p>
                             </div>
-                            <Button 
+                            <Button
                                 onClick={() => navigate('/login')}
                                 className="gap-2"
                             >
@@ -129,7 +129,7 @@ const HomePage: React.FC = () => {
                                     Для использования функций бота необходимо подключить хотя бы одну платформу (Twitch или VK Live)
                                 </p>
                             </div>
-                            <Button 
+                            <Button
                                 onClick={() => navigate('/dashboard/settings')}
                                 className="gap-2"
                             >
@@ -140,16 +140,16 @@ const HomePage: React.FC = () => {
                     </Card>
                 ) : (
                     <>
-                        <StreamManagementCards 
+                        <StreamManagementCards
                             onTitleLinkStateChange={setTitleLinked}
                             onCategoryLinkStateChange={setCategoryLinked}
                         />
-                        
-                        <ChatCard 
+
+                        <ChatCard
                             integrations={integrations}
                             isOnHomePage={true}
                         />
-                        
+
                         <QuickActionsBar />
                     </>
                 )}
@@ -159,4 +159,3 @@ const HomePage: React.FC = () => {
 };
 
 export default HomePage;
-

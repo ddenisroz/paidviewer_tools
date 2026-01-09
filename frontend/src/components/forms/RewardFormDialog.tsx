@@ -1,10 +1,10 @@
-﻿import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 
 import { z } from 'zod';
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import pointsApi from '@/services/pointsApi';
 import { type FieldConfig, FormBuilder } from '@/shared/components';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { logger } from '@/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 import { rewardSchema } from '@/utils/validationSchemas';
@@ -73,23 +73,23 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
     const commonFields: FieldConfig<RewardFormData>[] = [
       {
         name: 'title',
-        label: 'Название',
+        label: '��������',
         type: 'text',
-        placeholder: 'Например: Приветствие',
+        placeholder: '��������: �����������',
       },
       {
         name: 'description',
-        label: 'Описание (опционально)',
+        label: '�������� (�����������)',
         type: 'textarea',
-        placeholder: 'Что получит зритель за эту награду?',
+        placeholder: '��� ������� ������� �� ��� �������?',
         rows: 2,
       },
       {
         name: 'cost',
-        label: 'Стоимость',
+        label: '���������',
         type: 'number',
         min: 1,
-        description: platform === 'twitch' ? 'Channel Points' : 'Баллы VK Live',
+        description: platform === 'twitch' ? 'Channel Points' : '����� VK Live',
       },
     ];
 
@@ -98,31 +98,31 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
         ...commonFields,
         {
           name: 'repair_timeout',
-          label: 'Кулдаун (секунды)',
+          label: '������� (�������)',
           type: 'number',
           min: 0,
-          placeholder: '0 = без кулдауна',
-          description: 'Время восстановления награды (0 = без ограничений)',
+          placeholder: '0 = ��� ��������',
+          description: '����� �������������� ������� (0 = ��� �����������)',
         },
         {
           name: 'max_uses_count',
-          label: 'Макс. использований',
+          label: '����. �������������',
           type: 'number',
           min: 0,
-          placeholder: '0 = без лимита',
-          description: 'Всего (0 = ∞)',
+          placeholder: '0 = ��� ������',
+          description: '����� (0 = ?)',
         },
         {
           name: 'max_uses_count_per_user',
-          label: 'Макс. на юзера',
+          label: '����. �� �����',
           type: 'number',
           min: 0,
-          placeholder: '0 = без лимита',
-          description: 'На 1 человека (0 = ∞)',
+          placeholder: '0 = ��� ������',
+          description: '�� 1 �������� (0 = ?)',
         },
         {
           name: 'is_message_required',
-          label: 'Требовать сообщение от зрителя',
+          label: '��������� ��������� �� �������',
           type: 'checkbox',
         },
       ];
@@ -133,31 +133,31 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
       ...commonFields,
       {
         name: 'global_cooldown_seconds',
-        label: 'Глобальный кулдаун (секунды)',
+        label: '���������� ������� (�������)',
         type: 'number',
         min: 0,
-        placeholder: '0 = без кулдауна',
-        description: 'Время между использованиями награды всеми зрителями',
+        placeholder: '0 = ��� ��������',
+        description: '����� ����� ��������������� ������� ����� ���������',
       },
       {
         name: 'max_per_stream',
-        label: 'Макс. за стрим',
+        label: '����. �� �����',
         type: 'number',
         min: 0,
-        placeholder: '0 = без лимита',
-        description: 'Всего (0 = ∞)',
+        placeholder: '0 = ��� ������',
+        description: '����� (0 = ?)',
       },
       {
         name: 'max_per_user_per_stream',
-        label: 'Макс. на юзера за стрим',
+        label: '����. �� ����� �� �����',
         type: 'number',
         min: 0,
-        placeholder: '0 = без лимита',
-        description: 'На 1 человека (0 = ∞)',
+        placeholder: '0 = ��� ������',
+        description: '�� 1 �������� (0 = ?)',
       },
       {
         name: 'should_redemptions_skip_request_queue',
-        label: 'Пропускать очередь модерации',
+        label: '���������� ������� ���������',
         type: 'checkbox',
       },
     ];
@@ -198,17 +198,17 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
 
       if (reward) {
         await pointsApi.updateReward(platform, String(reward.id), rewardData);
-        toast.success('Награда обновлена');
+        toast.success('������� ���������');
       } else {
         await pointsApi.createReward(platform, rewardData);
-        toast.success('Награда создана');
+        toast.success('������� �������');
       }
 
       onSuccess();
       onClose();
     } catch (err) {
       logger.error('Error saving reward:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Ошибка сохранения награды';
+      const errorMessage = err instanceof Error ? err.message : '������ ���������� �������';
       toast.error(errorMessage);
     } finally {
       setSaving(false);
@@ -219,9 +219,9 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{reward ? 'Редактировать награду' : 'Создать награду'}</DialogTitle>
+          <DialogTitle>{reward ? '������������� �������' : '������� �������'}</DialogTitle>
           <DialogDescription>
-            {reward ? 'Измените параметры награды' : 'Укажите параметры новой награды'}
+            {reward ? '�������� ��������� �������' : '������� ��������� ����� �������'}
           </DialogDescription>
         </DialogHeader>
 
@@ -232,8 +232,8 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
             fields={fields}
             defaultValues={defaultValues}
             onSubmit={onSubmit}
-            submitLabel={reward ? 'Сохранить' : 'Создать'}
-            cancelLabel="Отмена"
+            submitLabel={reward ? '���������' : '�������'}
+            cancelLabel="������"
             onCancel={onClose}
             showCancelButton
             loading={saving}

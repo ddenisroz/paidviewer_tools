@@ -10,11 +10,10 @@ Twitch Interactive Features API (Hype Train, Clips)
 """
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
 from typing import Optional
 import httpx
 
-from auth.dependencies import get_current_user
+from auth.auth import get_current_user
 from core.config import settings
 from core.database import User
 
@@ -26,16 +25,15 @@ router = APIRouter(prefix="/api/twitch/interactive", tags=["twitch-interactive"]
 # === Helper Functions ===
 
 async def get_twitch_token(user: User) -> str:
-    """Получить Twitch OAuth токен пользователя"""
-    from core.database import UserToken, get_db
+    """Получить Twitch OAuth токен пользователя через репозиторий"""
+    from core.database import get_db
     from core.token_encryption import decrypt_token, is_token_encrypted
+    from repositories.user_token_repository import UserTokenRepository
     
     db = next(get_db())
     try:
-        user_token = db.query(UserToken).filter(
-            UserToken.user_id == user.id,
-            UserToken.platform == 'twitch'
-        ).first()
+        token_repo = UserTokenRepository(db)
+        user_token = token_repo.get_by_user_and_platform(user.id, 'twitch')
         
         if not user_token or not user_token.access_token:
             logger.error(
@@ -54,6 +52,7 @@ async def get_twitch_token(user: User) -> str:
         return token
     finally:
         db.close()
+
 
 
 async def make_twitch_api_request(

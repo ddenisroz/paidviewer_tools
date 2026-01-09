@@ -1,14 +1,14 @@
-/**
+﻿/**
  * Admin Dashboard - Overview страница с метриками и быстрыми действиями
  */
 
 import React from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Activity, 
-  ArrowRight, 
-  CheckCircle, 
+import {
+  Activity,
+  ArrowRight,
+  CheckCircle,
   Clock,
   Database,
   MessageCircle,
@@ -19,18 +19,17 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import api from '@/services/api/client';
 import { StatsGrid } from '@/shared/components';
-
-import { 
-  calculateStoragePercent, 
-  createStatsCards, 
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import {
+  calculateStoragePercent,
+  createStatsCards,
   type DashboardStats,
-  getStorageColorClass 
-} from '../utils/dashboardHelpers';
+  getStorageColorClass
+} from '@/shared/utils/dashboardHelpers';
 
 // Re-export type for local use
 type Stats = DashboardStats;
@@ -46,7 +45,7 @@ const QuickAction: React.FC<{
   variant?: 'default' | 'destructive';
 }> = ({ title, description, icon: Icon, onClick, variant = 'default' }) => {
   return (
-    <Card 
+    <Card
       className="hover:shadow-lg transition-all duration-200 cursor-pointer hover:border-primary"
       onClick={onClick}
     >
@@ -153,8 +152,8 @@ const AdminDashboard: React.FC = () => {
             isOnline={stats?.bots?.vk_online || false}
             connections={stats?.bots?.vk_connections || 0}
           />
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="w-full mt-2"
             onClick={() => navigate('/dashboard/dolbaebadmintts/bots')}
           >
@@ -181,7 +180,7 @@ const AdminDashboard: React.FC = () => {
               <span className="font-medium">{storagePercent.toFixed(1)}%</span>
             </div>
             <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-              <div 
+              <div
                 className={cn('h-full transition-all duration-500', getStorageColorClass(storagePercent))}
                 style={{ width: `${storagePercent}%` }}
               />
@@ -200,21 +199,21 @@ const AdminDashboard: React.FC = () => {
             icon={Users}
             onClick={() => navigate('/dashboard/dolbaebadmintts/users')}
           />
-          
+
           <QuickAction
             title="Управление голосами"
             description="Глобальные и пользовательские голоса"
             icon={Mic}
             onClick={() => navigate('/dashboard/dolbaebadmintts')}
           />
-          
+
           <QuickAction
             title="Тикеты поддержки"
             description="Обработка запросов пользователей"
             icon={MessageCircle}
             onClick={() => navigate('/dashboard/dolbaebadmintts/support')}
           />
-          
+
           <QuickAction
             title="Мониторинг системы"
             description="Логи, ошибки и производительность"

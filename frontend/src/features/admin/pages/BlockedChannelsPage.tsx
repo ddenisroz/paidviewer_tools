@@ -2,14 +2,14 @@
 
 import { AlertCircle, Plus, Shield, Trash2 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { adminService } from '@/services/api/services/adminService';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
-import { adminService } from '../../../services/api/services/adminService';
-import { logger } from '../../../utils/prodLogger';
 
 import type { ApiResponse } from '../../../types';
 
@@ -36,7 +36,7 @@ const BlockedChannelsPage: React.FC = () => {
       setBlockedChannels(data.data?.blocked_channels || []);
     } catch (error) {
       logger.error('Error loading blocked channels:', error);
-      toast.error('Ошибка загрузки заблокированных каналов');
+      toast.error('������ �������� ��������������� �������');
     } finally {
       setLoading(false);
     }
@@ -44,7 +44,7 @@ const BlockedChannelsPage: React.FC = () => {
 
   const addBlockedChannel = async (): Promise<void> => {
     if (!newChannel.trim()) {
-      toast.error('Введите название канала');
+      toast.error('������� �������� ������');
       return;
     }
 
@@ -52,15 +52,15 @@ const BlockedChannelsPage: React.FC = () => {
       setAddingChannel(true);
       await adminService.blockChannel({
         channel_name: newChannel.trim(),
-        reason: 'Заблокировано администратором'
+        reason: '������������� ���������������'
       });
       
-      toast.success('Канал заблокирован');
+      toast.success('����� ������������');
       setNewChannel('');
       await loadBlockedChannels();
     } catch (error) {
       logger.error('Error adding blocked channel:', error);
-      toast.error('Ошибка блокировки канала');
+      toast.error('������ ���������� ������');
     } finally {
       setAddingChannel(false);
     }
@@ -69,11 +69,11 @@ const BlockedChannelsPage: React.FC = () => {
   const removeBlockedChannel = async (channelId: number): Promise<void> => {
     try {
       await adminService.unblockChannel(channelId);
-      toast.success('Канал разблокирован');
+      toast.success('����� �������������');
       await loadBlockedChannels();
     } catch (error) {
       logger.error('Error removing blocked channel:', error);
-      toast.error('Ошибка разблокировки канала');
+      toast.error('������ ������������� ������');
     }
   };
 
@@ -102,26 +102,26 @@ const BlockedChannelsPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold mb-2 text-foreground flex items-center">
             <Shield className="w-8 h-8 mr-3 text-red-500" />
-            Заблокированные каналы
+            ��������������� ������
           </h1>
           <div className="text-muted-foreground mt-2 space-y-1">
-            <p>[PIN] <strong>Назначение:</strong> Отключение бота от каналов, где он забанен или не нужен</p>
-            <p>[WARN] Бот автоматически покинет заблокированный канал и больше не подключится</p>
+            <p>[PIN] <strong>����������:</strong> ���������� ���� �� �������, ��� �� ������� ��� �� �����</p>
+            <p>[WARN] ��� ������������� ������� ��������������� ����� � ������ �� �����������</p>
           </div>
         </div>
         
         <Badge variant="secondary" className="text-lg px-4 py-2">
-          {blockedChannels.length} заблокировано
+          {blockedChannels.length} �������������
         </Badge>
       </div>
 
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Список заблокированных каналов</CardTitle>
+            <CardTitle>������ ��������������� �������</CardTitle>
             <Button onClick={() => setShowAddForm(!showAddForm)} variant="outline" size="sm">
               {showAddForm ? <AlertCircle className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-              {showAddForm ? 'Отмена' : 'Добавить канал'}
+              {showAddForm ? '������' : '�������� �����'}
             </Button>
           </div>
         </CardHeader>
@@ -130,7 +130,7 @@ const BlockedChannelsPage: React.FC = () => {
             <div className="p-4 border rounded-lg bg-muted/30">
               <div className="flex gap-2">
                 <Input
-                  placeholder="Название канала (например: username)"
+                  placeholder="�������� ������ (��������: username)"
                   value={newChannel}
                   onChange={(e) => setNewChannel(e.target.value)}
                   onKeyPress={(e) => {
@@ -140,7 +140,7 @@ const BlockedChannelsPage: React.FC = () => {
                   }}
                 />
                 <Button onClick={addBlockedChannel} disabled={addingChannel || !newChannel.trim()}>
-                  {addingChannel ? 'Добавление...' : 'Добавить'}
+                  {addingChannel ? '����������...' : '��������'}
                 </Button>
               </div>
             </div>
@@ -149,7 +149,7 @@ const BlockedChannelsPage: React.FC = () => {
           {blockedChannels.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>Нет заблокированных каналов</p>
+              <p>��� ��������������� �������</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -167,7 +167,7 @@ const BlockedChannelsPage: React.FC = () => {
                     )}
                     {channel.blocked_at && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        Заблокирован: {new Date(channel.blocked_at).toLocaleString()}
+                        ������������: {new Date(channel.blocked_at).toLocaleString()}
                       </p>
                     )}
                   </div>

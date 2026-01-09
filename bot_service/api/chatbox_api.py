@@ -1,12 +1,15 @@
 # api/chatbox_api.py
-"""API для настроек ChatBox виджета для OBS"""
+"""
+API для настроек ChatBox виджета для OBS.
+Clean Architecture: uses ChatBoxRepository for data access.
+"""
 import logging
-import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, ConfigDict
-from core.database import get_db, ChatBoxSettings
+from core.database import get_db
 from auth.auth import get_current_user
+from repositories.chatbox_repository import ChatBoxRepository
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +21,20 @@ class ChatBoxSettingsCreate(BaseModel):
     """Модель для создания/обновления настроек ChatBox"""
     # Шрифт
     font_family: str = Field(default='Inter, system-ui, sans-serif')
-    font_size: int = Field(default=16, ge=8, le=32)  # от 8 до 32px
+    font_size: int = Field(default=16, ge=8, le=32)
     font_weight: str = Field(default='normal')
-    text_stroke_width: int = Field(default=0, ge=0, le=3)  # Толщина контура текста в px (0-3)
-    text_stroke_color: str = Field(default='#000000')  # Цвет контура текста
+    text_stroke_width: int = Field(default=0, ge=0, le=3)
+    text_stroke_color: str = Field(default='#000000')
 
     # Фон
     background_color: str = Field(default='#000000')
     background_opacity: float = Field(default=0.5, ge=0.0, le=1.0)
 
     # Отображение
-    max_messages: int = Field(default=20, ge=1, le=50)  # от 1 до 50 сообщений
+    max_messages: int = Field(default=20, ge=1, le=50)
     show_platform_icons: bool = Field(default=True)
     show_roles: bool = Field(default=False)
-    show_badges: bool = Field(default=True)  # Включено по умолчанию для Twitch badges
+    show_badges: bool = Field(default=True)
     show_avatars: bool = Field(default=False)
 
     # Цвета текста
@@ -42,18 +45,18 @@ class ChatBoxSettingsCreate(BaseModel):
     message_spacing: int = Field(default=8, ge=0, le=32)
     border_radius: int = Field(default=8, ge=0, le=32)
     animation_duration: int = Field(default=300, ge=0, le=2000)
-    animation_type: str = Field(default='fade')  # fade, slide-right, slide-left, scale, bounce
-    chat_direction: str = Field(default='vertical')  # vertical или horizontal
-    chat_width: int = Field(default=100, ge=20, le=100)  # Ширина чата в vw (20-100%)
-    message_fade_seconds: int = Field(default=60, ge=10, le=60)  # 10-60 сек, 60 = не исчезают
+    animation_type: str = Field(default='fade')
+    chat_direction: str = Field(default='vertical')
+    chat_width: int = Field(default=100, ge=20, le=100)
+    message_fade_seconds: int = Field(default=60, ge=10, le=60)
 
-    # v0.03 - Поддержка 7TV эмодзи, ссылок и загрузки изображений
-    show_7tv_emotes: bool = Field(default=True)  # Показывать смайлики 7TV
-    show_links: bool = Field(default=True)  # Показывать ссылки из чата
-    auto_load_images: bool = Field(default=True)  # Загружать картинки/гифки сразу или как ссылки
+    # v0.03 - 7TV, links, images
+    show_7tv_emotes: bool = Field(default=True)
+    show_links: bool = Field(default=True)
+    auto_load_images: bool = Field(default=True)
 
     # Version для защиты от race conditions
-    version: int = Field(default=1, ge=1)  # Инкрементируется при каждом обновлении
+    version: int = Field(default=1, ge=1)
 
 
 class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
@@ -63,12 +66,48 @@ class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
     id: int
     user_id: int
     widget_token: str
-    widget_url: str  # Полная ссылка для OBS
+    widget_url: str
 
 
-def generate_widget_token() -> str:
-    """Генерирует уникальный токен для виджета (32 символа)"""
-    return secrets.token_urlsafe(24)  # 24 bytes = ~32 chars in base64url
+def _settings_to_response(settings, widget_url: str) -> ChatBoxSettingsResponse:
+    """Convert settings model to response."""
+    return ChatBoxSettingsResponse(
+        id=settings.id,
+        user_id=settings.user_id,
+        widget_token=settings.widget_token,
+        widget_url=widget_url,
+        font_family=settings.font_family,
+        font_size=settings.font_size,
+        font_weight=settings.font_weight,
+        text_stroke_width=settings.text_stroke_width or 0,
+        text_stroke_color=settings.text_stroke_color or '#000000',
+        background_color=settings.background_color,
+        background_opacity=settings.background_opacity,
+        max_messages=settings.max_messages,
+        show_platform_icons=settings.show_platform_icons,
+        show_roles=settings.show_roles,
+        show_badges=settings.show_badges,
+        show_avatars=settings.show_avatars,
+        text_color=settings.text_color,
+        username_color=settings.username_color,
+        message_spacing=settings.message_spacing,
+        border_radius=settings.border_radius,
+        animation_duration=settings.animation_duration,
+        animation_type=settings.animation_type,
+        chat_direction=settings.chat_direction,
+        chat_width=settings.chat_width,
+        message_fade_seconds=settings.message_fade_seconds,
+        show_7tv_emotes=settings.show_7tv_emotes,
+        show_links=settings.show_links,
+        auto_load_images=settings.auto_load_images,
+        version=settings.version if hasattr(settings, 'version') else 1
+    )
+
+
+def _get_widget_url(token: str) -> str:
+    """Build widget URL from token."""
+    from core.config import settings as app_settings
+    return f"{app_settings.frontend_url}/chat-overlay?token={token}"
 
 
 @router.get("/settings", response_model=ChatBoxSettingsResponse)
@@ -77,163 +116,51 @@ async def get_chatbox_settings(
     db: Session = Depends(get_db)
 ):
     """Получить текущие настройки ChatBox пользователя"""
-    logger.info(f"[PACKAGE] [CHATBOX] Getting settings for user {current_user['id']}")
-
     user_id = current_user["id"]
-    settings = db.query(ChatBoxSettings).filter(ChatBoxSettings.user_id == user_id).first()
+    logger.info(f"[CHATBOX] Getting settings for user {user_id}")
 
-    if not settings:
-        # Создаем настройки по умолчанию
-        logger.info(f"[PACKAGE] [CHATBOX] Creating default settings for user {user_id}")
-        token = generate_widget_token()
-        settings = ChatBoxSettings(
-            user_id=user_id,
-            widget_token=token
-        )
-        db.add(settings)
-        db.commit()
-        db.refresh(settings)
+    repo = ChatBoxRepository(db)
+    settings = repo.get_or_create(user_id)
+    
+    widget_url = _get_widget_url(settings.widget_token)
+    response = _settings_to_response(settings, widget_url)
 
-    # Формируем полную ссылку для OBS
-    from core.config import settings as app_settings
-    widget_url = f"{app_settings.frontend_url}/chat-overlay?token={settings.widget_token}"
-
-    response = ChatBoxSettingsResponse(
-        id=settings.id,
-        user_id=settings.user_id,
-        widget_token=settings.widget_token,
-        widget_url=widget_url,
-        font_family=settings.font_family,
-        font_size=settings.font_size,
-        font_weight=settings.font_weight,
-        text_stroke_width=settings.text_stroke_width or 0,
-        text_stroke_color=settings.text_stroke_color or '#000000',
-        background_color=settings.background_color,
-        background_opacity=settings.background_opacity,
-        max_messages=settings.max_messages,
-        show_platform_icons=settings.show_platform_icons,
-        show_roles=settings.show_roles,
-        show_badges=settings.show_badges,
-        show_avatars=settings.show_avatars,
-        text_color=settings.text_color,
-        username_color=settings.username_color,
-        message_spacing=settings.message_spacing,
-        border_radius=settings.border_radius,
-        animation_duration=settings.animation_duration,
-        animation_type=settings.animation_type,
-        chat_direction=settings.chat_direction,
-        chat_width=settings.chat_width,
-        message_fade_seconds=settings.message_fade_seconds,
-        show_7tv_emotes=settings.show_7tv_emotes,
-        show_links=settings.show_links,
-        auto_load_images=settings.auto_load_images,
-        version=settings.version if hasattr(settings, 'version') else 1
-    )
-
-    logger.info(f"[PACKAGE] [CHATBOX] Settings retrieved for user {user_id}")
+    logger.info(f"[CHATBOX] Settings retrieved for user {user_id}")
     return response
 
 
 @router.post("/settings", response_model=ChatBoxSettingsResponse)
 async def save_chatbox_settings(
     settings_data: ChatBoxSettingsCreate,
-    regenerate_token: bool = False,  # Параметр для перегенерации токена
+    regenerate_token: bool = False,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Сохранить настройки ChatBox и опционально перегенерировать токен"""
-    logger.info(f"[PACKAGE] [CHATBOX] Saving settings for user {current_user['id']}, regenerate_token={regenerate_token}")
-
     user_id = current_user["id"]
-    settings = db.query(ChatBoxSettings).filter(ChatBoxSettings.user_id == user_id).first()
+    logger.info(f"[CHATBOX] Saving settings for user {user_id}, regenerate_token={regenerate_token}")
 
-    logger.info(f"[PACKAGE] [CHATBOX] [DEBUG] DEBUG: Existing settings found in DB: {settings is not None}")
-    if settings:
-        logger.info(f"[PACKAGE] [CHATBOX] [DEBUG] DEBUG: Current token in DB: {settings.widget_token}")
-    else:
-        logger.info("[PACKAGE] [CHATBOX] [DEBUG] DEBUG: No existing settings, will create new")
-
-    if not settings:
-        # Создаем новые настройки
-        logger.info(f"[PACKAGE] [CHATBOX] Creating new settings for user {user_id}")
-        token = generate_widget_token()
-        settings = ChatBoxSettings(
+    repo = ChatBoxRepository(db)
+    
+    try:
+        settings = repo.update_settings(
             user_id=user_id,
-            widget_token=token,
-            **settings_data.dict()
+            settings_data=settings_data.model_dump(),
+            client_version=settings_data.version,
+            regenerate_token=regenerate_token
         )
-        db.add(settings)
-    else:
-        # [OK] VERSION CHECK: Проверяем что версия совпадает (защита от race conditions)
-        client_version = settings_data.version if hasattr(settings_data, 'version') else None
-        if client_version is not None and hasattr(settings, 'version'):
-            if settings.version != client_version:
-                logger.warning(f"Version conflict for user {user_id}: DB version={settings.version}, client version={client_version}")
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Data was updated. Current version: {settings.version}"
-                )
+    except ValueError as e:
+        # Version conflict
+        logger.warning(f"Version conflict for user {user_id}: {e}")
+        raise HTTPException(status_code=409, detail=str(e))
 
-        # Обновляем существующие настройки
-        logger.info(f"[PACKAGE] [CHATBOX] Updating settings for user {user_id}")
-        # Исключаем версию из обновления (обновляем отдельно)
-        update_dict = {k: v for k, v in settings_data.dict().items() if k != 'version'}
-        for key, value in update_dict.items():
-            setattr(settings, key, value)
+    widget_url = _get_widget_url(settings.widget_token)
+    response = _settings_to_response(settings, widget_url)
 
-        # [OK] INCREMENT VERSION: Инкрементируем версию после обновления
-        if hasattr(settings, 'version'):
-            settings.version += 1
+    logger.info(f"[CHATBOX] Settings saved for user {user_id}")
 
-        # Перегенерация токена если запрошено
-        if regenerate_token:
-            old_token = settings.widget_token
-            new_token = generate_widget_token()
-            settings.widget_token = new_token
-            logger.info(f"[PACKAGE] [CHATBOX] Token regenerated for user {user_id}: {old_token[:8]}... -> {new_token[:8]}...")
-
-    db.commit()
-    db.refresh(settings)
-
-    # Формируем ссылку для OBS
-    widget_url = f"{app_settings.frontend_url}/chat-overlay?token={settings.widget_token}"
-
-    response = ChatBoxSettingsResponse(
-        id=settings.id,
-        user_id=settings.user_id,
-        widget_token=settings.widget_token,
-        widget_url=widget_url,
-        font_family=settings.font_family,
-        font_size=settings.font_size,
-        font_weight=settings.font_weight,
-        text_stroke_width=settings.text_stroke_width or 0,
-        text_stroke_color=settings.text_stroke_color or '#000000',
-        background_color=settings.background_color,
-        background_opacity=settings.background_opacity,
-        max_messages=settings.max_messages,
-        show_platform_icons=settings.show_platform_icons,
-        show_roles=settings.show_roles,
-        show_badges=settings.show_badges,
-        show_avatars=settings.show_avatars,
-        text_color=settings.text_color,
-        username_color=settings.username_color,
-        message_spacing=settings.message_spacing,
-        border_radius=settings.border_radius,
-        animation_duration=settings.animation_duration,
-        animation_type=settings.animation_type,
-        chat_direction=settings.chat_direction,
-        chat_width=settings.chat_width,
-        message_fade_seconds=settings.message_fade_seconds,
-        show_7tv_emotes=settings.show_7tv_emotes,
-        show_links=settings.show_links,
-        auto_load_images=settings.auto_load_images,
-        version=settings.version if hasattr(settings, 'version') else 1
-    )
-
-    logger.info(f"[PACKAGE] [CHATBOX] Settings saved for user {user_id}")
-
-    # [REFRESH] Отправляем WebSocket событие для обновления ChatOverlay в реальном времени
-    from services.memory_websocket_manager import memory_websocket_manager
+    # WebSocket event for real-time update
+    from services.memory_websocket_manager import get_memory_websocket_manager
 
     settings_update_event = {
         "type": "chatbox_settings_updated",
@@ -265,8 +192,8 @@ async def save_chatbox_settings(
         }
     }
 
-    await memory_websocket_manager.send_to_user(user_id, settings_update_event)
-    logger.info(f"[REFRESH] [CHATBOX] Sent settings update event to user {user_id} WebSocket connections")
+    await get_memory_websocket_manager().send_to_user(user_id, settings_update_event)
+    logger.info(f"[CHATBOX] Sent settings update event to user {user_id}")
 
     return response
 
@@ -277,24 +204,22 @@ async def get_settings_by_token(
     db: Session = Depends(get_db)
 ):
     """Получить настройки ChatBox по токену (для OBS виджета, без авторизации)"""
-    logger.info(f"[PACKAGE] [CHATBOX] [DEBUG] REQUEST: Getting settings by token: {token}")
+    logger.info(f"[CHATBOX] Getting settings by token: {token[:8]}...")
 
-    settings = db.query(ChatBoxSettings).filter(ChatBoxSettings.widget_token == token).first()
+    repo = ChatBoxRepository(db)
+    settings = repo.get_by_token(token)
 
     if not settings:
-        logger.warning(f"[PACKAGE] [CHATBOX] Settings not found for token: {token[:8]}...")
+        logger.warning(f"[CHATBOX] Settings not found for token: {token[:8]}...")
         raise HTTPException(status_code=404, detail="ChatBox settings not found for this token")
 
-    logger.info(f"[PACKAGE] [CHATBOX] Settings found for user {settings.user_id}")
-
-    # Получаем информацию о пользователе для channel name
-    from core.database import User
-    user = db.query(User).filter(User.id == settings.user_id).first()
-    channel_name = user.twitch_username if user else None
+    logger.info(f"[CHATBOX] Settings found for user {settings.user_id}")
+    
+    channel_name = repo.get_user_channel_name(settings.user_id)
 
     return {
         "user_id": settings.user_id,
-        "channel_name": channel_name,  # Добавлено для загрузки channel-specific badges
+        "channel_name": channel_name,
         "font_family": settings.font_family,
         "font_size": settings.font_size,
         "font_weight": settings.font_weight,
@@ -321,4 +246,5 @@ async def get_settings_by_token(
         "auto_load_images": settings.auto_load_images,
         "version": settings.version if hasattr(settings, 'version') else 1
     }
+
 

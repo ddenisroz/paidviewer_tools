@@ -10,7 +10,7 @@ import {
     XCircle
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/shared/components/ui/badge';
 
 interface StatusBadgeProps {
     status?: string;

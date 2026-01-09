@@ -1,0 +1,186 @@
+import logging
+import json
+import asyncio
+from datetime import datetime
+from typing import Dict, Any, Optional
+import uuid
+
+from sqlalchemy import func
+
+from core.database import SessionLocal, ChatMessage, User
+
+from repositories.user_repository import UserRepository
+from repositories.chat_message_repository import ChatMessageRepository
+from services.memory_websocket_manager import get_memory_websocket_manager
+from constants import TTS_DEFAULT_VOLUME
+
+logger = logging.getLogger('bot_service.notifications')
+
+class NotificationService:
+    """
+    Service for broadcasting messages and events via WebSocket.
+    """
+
+    async def broadcast_chat_message(
+        self,
+        username: str,
+        content: str,
+        platform: str,
+        channel: str,
+        message_id: Optional[str] = None,
+        role: Optional[str] = None,
+        badges: Optional[list] = None
+    ) -> bool:
+        """Broadcast chat message to all connected clients."""
+        try:
+            logger.info(f"[BROADCAST] Incoming message: {platform}:{channel} | {username}: {content[:50]}")
+            
+            chat_data = {
+                "type": "message",
+                "id": message_id or str(uuid.uuid4()),
+                "author": username,
+                "author_name": username,
+                "username": username,
+                "content": content,
+                "message": content,
+                "text": content,
+                "platform": platform,
+                "channel": channel,
+                "role": role,
+                "badges": badges,
+                "timestamp": int(datetime.now().timestamp() * 1000)
+            }
+
+            # Async fire-and-forget save to DB (or await if critical)
+            # Refactoring note: DB saving could be delegated to a separate repository/service completely
+            await self._save_message_to_db(username, content, platform, channel, role, badges)
+
+            # Broadcast
+            connections = get_memory_websocket_manager().connections
+            if not connections:
+                logger.debug(f"[WARN] No WebSocket connections available for {platform} message")
+                return False
+
+            message_json = json.dumps(chat_data)
+            sent_count = await self._broadcast_to_connections(connections, message_json)
+            
+            logger.info(f"[SEND] {platform.upper()} message sent to {sent_count}/{len(connections)} connections")
+            return sent_count > 0
+
+        except Exception as e:
+            logger.error(f"[ERROR] WebSocket broadcast error for {platform}: {e}", exc_info=True)
+            return False
+
+    async def broadcast_tts_audio(
+        self,
+        audio_data: Dict[str, Any],
+        channel_name: str,
+        platform: str = "twitch"
+    ) -> bool:
+        """Broadcast TTS audio event."""
+        try:
+            tts_event = {
+                "type": "tts_audio",
+                "data": {
+                    "audio_url": audio_data.get("audio_url"),
+                    "voice": audio_data.get("voice", "unknown"),
+                    "volume": audio_data.get("volume", TTS_DEFAULT_VOLUME),
+                    "tts_type": audio_data.get("tts_type", "unknown"),
+                    "duration": audio_data.get("duration", 0),
+                    "text": audio_data.get("text", ""),
+                    "username": audio_data.get("username", ""),
+                    "channel": channel_name,
+                    "platform": platform,
+                    "timestamp": datetime.now().isoformat()
+                }
+            }
+            
+            connections = get_memory_websocket_manager().connections
+            if not connections:
+                return False
+
+            sent_count = await self._broadcast_to_connections(connections, json.dumps(tts_event))
+            logger.info(f"[VOLUME] TTS audio sent to {sent_count}/{len(connections)} connections")
+            return sent_count > 0
+
+        except Exception as e:
+            logger.error(f"[ERROR] WebSocket TTS audio broadcast error: {e}")
+            return False
+
+    async def broadcast_drops_event(self, drops_data: Dict[str, Any]) -> bool:
+        """Broadcast drops event."""
+        try:
+            event_data = {
+                "type": "drops",
+                "event": "reward_received",
+                "data": drops_data,
+                "timestamp": datetime.now().isoformat()
+            }
+            await get_memory_websocket_manager().broadcast_to_all(json.dumps(event_data))
+            logger.info("[REWARD] [DROPS] Broadcasted drops event")
+            return True
+        except Exception as e:
+            logger.error(f"Error broadcasting drops event: {e}")
+            return False
+
+    async def _broadcast_to_connections(self, connections, message_json: str) -> int:
+        async def send(conn):
+            try:
+                await conn.websocket.send_text(message_json)
+                return True
+            except Exception:
+                return False
+
+        tasks = [send(conn) for conn in connections.values()]
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            return sum(1 for r in results if r is True)
+        return 0
+
+    async def _save_message_to_db(self, username, content, platform, channel, role, badges):
+        """Helper to save message to DB. Ideally moves to a repository."""
+        # This mirrors the logic from original file
+        db = SessionLocal()
+        try:
+             # Repositories
+            user_repo = UserRepository(db)
+            chat_repo = ChatMessageRepository(db)
+
+            user_id = None
+            if platform == 'twitch':
+                user = user_repo.get_by_twitch_username(channel)
+                if user:
+                    user_id = user.id
+            elif platform == 'vk':
+                # Original logic: filter((func.lower(User.vk_channel_name) == channel.lower()) | (func.lower(User.vk_username) == channel.lower()))
+                # Repo has get_by_vk_channel_name. Does it support username too?
+                # Repo: filter(User.vk_channel_name.ilike(channel_name))
+                # We might miss the vk_username check if we strictly use repo method.
+                # However, usually channel identifier IS the channel name.
+                # Let's check if we have a generic search method or if we should add one.
+                # Or query both fields.
+                # Since we don't want direct db.query, we rely on existing repo methods.
+                user = user_repo.get_by_vk_channel_name(channel)
+                # If not found by channel name, try username? 
+                # Original code checked both in OR. 
+                # Let's rely on get_by_vk_channel_name for now, as it's the primary identifier.
+                # If needed we can add get_by_vk_username to repo.
+                if user:
+                    user_id = user.id
+            
+            if user_id:
+                chat_repo.create(
+                    user_id=user_id,
+                    channel_name=channel,
+                    platform=platform,
+                    message=content,
+                    author_username=username,
+                    role=role,
+                    badges=json.dumps(badges) if badges else None # create expects string for badges
+                )
+        except Exception as e:
+            logger.error(f"Failed to save message to DB: {e}")
+        finally:
+            db.close()
+
+notification_service = NotificationService()

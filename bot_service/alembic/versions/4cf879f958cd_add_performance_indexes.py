@@ -23,7 +23,6 @@ def upgrade() -> None:
 
     # Проверяем тип БД через connection
     connection = op.get_bind()
-    is_postgresql = connection.dialect.name == 'postgresql'
 
     # ChatMessage индексы для частых запросов
     # Составной индекс для фильтрации по каналу и платформе с сортировкой по времени

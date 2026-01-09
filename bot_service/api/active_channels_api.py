@@ -1,9 +1,13 @@
 # bot_service/api/active_channels_api.py
-"""API для активных каналов"""
+"""
+API для активных каналов.
+Clean Architecture: uses UserSettingsRepository for data access.
+"""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from core.database import get_db, UserSettings
+from core.database import get_db
 from auth.auth import get_current_user
+from repositories.user_settings_repository import UserSettingsRepository
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,10 +21,8 @@ async def get_active_channels(
 ):
     """Получить список активных каналов"""
     try:
-        # Получаем каналы с включенным чатом
-        channels = db.query(UserSettings).filter(
-            UserSettings.chat_enabled.is_(True)
-        ).all()
+        repo = UserSettingsRepository(db)
+        channels = repo.get_with_chat_enabled()
 
         channels_data = []
         for channel in channels:
@@ -52,3 +54,4 @@ async def get_active_channels(
     except Exception as e:
         logger.error(f"Error getting active channels: {e}")
         return {"success": False, "error": str(e)}
+

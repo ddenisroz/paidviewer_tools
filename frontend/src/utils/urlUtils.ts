@@ -1,78 +1,80 @@
+// src/utils/urlUtils.ts
 /**
- * URL utilities
+ * URL utility functions.
  */
 
-export const getApiBaseUrl = (): string => {
-  const url = import.meta.env.VITE_BOT_SERVICE_URL as string | undefined;
-  if (!url) {
-    throw new Error('VITE_BOT_SERVICE_URL environment variable is required');
-  }
-  return url;
+/**
+ * Get the API base URL based on environment.
+ */
+export const getApiUrl = (): string => {
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+    if (import.meta.env.DEV) {
+        return 'http://localhost:8000';
+    }
+    return window.location.origin;
 };
 
-export const getTtsServiceUrl = (): string => {
-  const url = import.meta.env.VITE_TTS_SERVICE_URL as string | undefined;
-  if (!url) {
-    throw new Error('VITE_TTS_SERVICE_URL environment variable is required');
-  }
-  return url;
+/**
+ * Build URL with query parameters.
+ */
+export const buildUrlWithParams = (
+    baseUrl: string,
+    params: Record<string, string | number | boolean | null | undefined>
+): string => {
+    const url = new URL(baseUrl, window.location.origin);
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    return url.toString();
 };
 
-export const getWebSocketBaseUrl = (): string => {
-  const apiUrl = getApiBaseUrl();
-  const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
-  const wsBaseUrl = apiUrl.replace(/^https?:\/\//, '');
-  return `${wsProtocol}://${wsBaseUrl}`;
+/**
+ * Extract query parameter from URL.
+ */
+export const getQueryParam = (name: string, url: string = window.location.href): string | null => {
+    const urlObj = new URL(url);
+    return urlObj.searchParams.get(name);
 };
 
-export const getTtsWebSocketUrl = (token: string): string => {
-  const wsBaseUrl = getWebSocketBaseUrl();
-  return `${wsBaseUrl}/ws/tts/${token}`;
+/**
+ * Check if URL is external.
+ */
+export const isExternalUrl = (url: string): boolean => {
+    try {
+        const urlObj = new URL(url, window.location.origin);
+        return urlObj.origin !== window.location.origin;
+    } catch {
+        return false;
+    }
 };
 
-export const getChatWebSocketUrl = (userId: string | number): string => {
-  const wsBaseUrl = getWebSocketBaseUrl();
-  return `${wsBaseUrl}/ws/chat/${userId}`;
+/**
+ * Save current URL as return URL.
+ */
+export const saveReturnUrl = (): void => {
+    localStorage.setItem('returnUrl', window.location.pathname + window.location.search);
 };
 
-export const getObsWebSocketUrl = (token: string): string => {
-  const wsBaseUrl = getWebSocketBaseUrl();
-  return `${wsBaseUrl}/ws/obs/${token}`;
+/**
+ * Get and clear return URL.
+ */
+export const getAndClearReturnUrl = (): string | null => {
+    const url = localStorage.getItem('returnUrl');
+    if (url) {
+        localStorage.removeItem('returnUrl');
+    }
+    return url;
 };
 
-export const getChatWidgetWebSocketUrl = (userId: string | number): string => {
-  const wsBaseUrl = getWebSocketBaseUrl();
-  return `${wsBaseUrl}/ws/chat-widget/${userId}`;
+export default {
+    getApiUrl,
+    buildUrlWithParams,
+    getQueryParam,
+    isExternalUrl,
+    saveReturnUrl,
+    getAndClearReturnUrl,
 };
-
-export const getLootboxWidgetWebSocketUrl = (userId: string | number): string => {
-  const wsBaseUrl = getWebSocketBaseUrl();
-  return `${wsBaseUrl}/ws/lootbox-widget/${userId}`;
-};
-
-export const getYoutubeObsWebSocketUrl = (token: string): string => {
-  const wsBaseUrl = getWebSocketBaseUrl();
-  return `${wsBaseUrl}/ws/youtube-obs/${token}`;
-};
-
-export const getAudioUrl = (filename: string): string => {
-  const apiUrl = getApiBaseUrl();
-  return `${apiUrl}/audio/${filename}`;
-};
-
-export const getTtsApiUrl = (endpoint: string): string => {
-  const apiUrl = getApiBaseUrl();
-  return `${apiUrl}/api/tts/${endpoint}`;
-};
-
-export const getAuthUrl = (endpoint: string): string => {
-  const apiUrl = getApiBaseUrl();
-  return `${apiUrl}/auth/${endpoint}`;
-};
-
-export const getApiUrl = (endpoint: string): string => {
-  const apiUrl = getApiBaseUrl();
-  return `${apiUrl}/api/${endpoint}`;
-};
-
-

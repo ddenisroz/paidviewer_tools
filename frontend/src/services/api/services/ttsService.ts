@@ -1,8 +1,9 @@
-/**
+﻿/**
  * TTS Service - инкапсуляция всех TTS API вызовов
  * Использует единый API клиент
  */
-import { logger } from '../../../utils/prodLogger';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { apiClient, ttsApiClient } from '../client';
 
 import type { ApiResponse, BlockedUser, FilteredWord, LocalTtsConfig, TtsSettings, TtsStatus, TtsVoice } from '../../../types';

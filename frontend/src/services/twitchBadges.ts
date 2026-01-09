@@ -1,4 +1,4 @@
-import { logger } from '../utils/prodLogger';
+﻿import { logger } from '@/shared/utils/prodLogger';
 
 type BadgeImages = { image_url_1x?: string; image_url_2x?: string; image_url_4x?: string };
 type BadgeSet = Record<string, BadgeImages>; // version -> images

@@ -1,11 +1,12 @@
-/**
+﻿/**
  * Drops Queries - централизованные React Query queries для Drops
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { dropsService } from '../../services/api/services/dropsService';
-import { logger } from '../../utils/prodLogger';
+import { dropsService } from '@/services/api/services/dropsService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 

@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
-from sqlalchemy import text, inspect
-from core.database import db_session, engine
+from sqlalchemy import text  # noqa: E402
+from core.database import db_session  # noqa: E402
 
 
 def show_all_tables():
@@ -50,7 +50,7 @@ def show_all_tables():
             try:
                 count_result = db.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
                 row_count = count_result.scalar()
-            except:
+            except Exception:
                 row_count = "N/A"
             
             print(f"📋 {table_name}")

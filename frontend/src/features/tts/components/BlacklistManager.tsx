@@ -3,11 +3,11 @@ import React, { useCallback, useState } from 'react';
 
 import { ChevronDown, Plus, UserX, X } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { toast } from '@/utils/toastManager';
 
 import { useAuth } from '../../../context/AuthContext';
@@ -24,12 +24,12 @@ const BlacklistManager: React.FC = React.memo(() => {
     const [newUsername, setNewUsername] = useState('');
     const [isBlacklistExpanded, setIsBlacklistExpanded] = useState(false);
     const [selectedPlatform, setSelectedPlatform] = useState<string>('twitch'); // По умолчанию Twitch
-    
+
     // Используем useCallback для стабильной ссылки на функцию
     const toggleBlacklistExpanded = useCallback(() => {
         setIsBlacklistExpanded(prev => !prev);
     }, []);
-    
+
     const { integrations } = useIntegrations();
     const { user } = useAuth();
 
@@ -68,8 +68,8 @@ const BlacklistManager: React.FC = React.memo(() => {
         },
     });
 
-    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData) 
-        ? blockedUsersData 
+    const blacklist: BlockedUser[] = Array.isArray(blockedUsersData)
+        ? blockedUsersData
         : ((blockedUsersData as { data?: { blocked_users?: BlockedUser[] } } | undefined)?.data?.blocked_users ?? []);
     const adding = blockUserMutation.isPending;
 
@@ -99,7 +99,7 @@ const BlacklistManager: React.FC = React.memo(() => {
         }
 
         const channelName = getChannelName(selectedPlatform);
-        
+
         if (!channelName) {
             toast.error(`Не удалось получить имя канала для платформы ${selectedPlatform}`);
             return;
@@ -115,7 +115,7 @@ const BlacklistManager: React.FC = React.memo(() => {
     // Удаление пользователя из черного списка
     const removeFromBlacklist = (userId: number, username: string, platform: string) => {
         const channelName = getChannelName(platform);
-        
+
         if (!channelName) {
             toast.error(`Не удалось получить имя канала для платформы ${platform}`);
             return;

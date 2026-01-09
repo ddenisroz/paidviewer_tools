@@ -121,9 +121,8 @@ async def refresh_vk_token_if_needed(user_id: int, access_token: str) -> Optiona
     logger.info("[VK] Token expired, attempting refresh...")
     
     try:
-        from api.vk_api import VKLiveAPI
-        vk_api = VKLiveAPI()
-        new_token = await vk_api._refresh_user_token(user_id)
+        from services.token_refresh_service import TokenRefreshService
+        new_token = await TokenRefreshService.refresh_on_401(user_id, 'vk')
         
         if new_token:
             logger.info("[OK] VK token refreshed")
@@ -215,7 +214,7 @@ async def initialize_twitch_bot(channels: Optional[List[str]] = None) -> bool:
         
         logger.info("=" * 80)
         logger.info("[TWITCH] Creating Twitch bot instance...")
-        logger.info(f"[TWITCH] Token validated: ✅")
+        logger.info("[TWITCH] Token validated: OK")
         logger.info(f"[TWITCH] Bot user: {validation_result.get('login', 'unknown')}")
         logger.info(f"[TWITCH] Channels to connect: {channels}")
         logger.info("=" * 80)

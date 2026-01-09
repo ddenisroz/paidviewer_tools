@@ -8,8 +8,10 @@ from typing import List
 
 from sqlalchemy.orm import Session
 
-from core.database import BlockedBot
 from models.pydantic_models import BlockedBotPublic, AddBlockedBotRequest
+
+
+from repositories.blocked_bot_repository import BlockedBotRepository
 
 logger = logging.getLogger(__name__)
 
@@ -19,42 +21,38 @@ class BlockedBotsService:
 
     async def get_blocked_bots(self, db: Session) -> List[BlockedBotPublic]:
         """Получить список заблокированных ботов."""
-        bots = db.query(BlockedBot).all()
+        repo = BlockedBotRepository(db)
+        bots = repo.get_all()
         return [BlockedBotPublic.model_validate(bot) for bot in bots]
 
     async def add_blocked_bot(
         self, request: AddBlockedBotRequest, db: Session
     ) -> dict:
         """Добавить бота в список заблокированных."""
+        repo = BlockedBotRepository(db)
         bot_name = request.bot_name.lower()
 
-        existing = db.query(BlockedBot).filter(
-            BlockedBot.bot_name == bot_name
-        ).first()
+        existing = repo.get_by_name(bot_name)
 
         if existing:
             return {"message": f"Bot {bot_name} is already blocked"}
 
-        bot = BlockedBot(bot_name=bot_name)
-        db.add(bot)
-        db.commit()
+        repo.add_bot(bot_name)
 
         logger.info(f"[OK] Bot {bot_name} added to blocked list")
         return {"message": f"Bot {bot_name} added to blocked list"}
 
     async def remove_blocked_bot(self, bot_name: str, db: Session) -> dict:
         """Удалить бота из списка заблокированных."""
+        repo = BlockedBotRepository(db)
         bot_name = bot_name.lower()
 
-        bot = db.query(BlockedBot).filter(
-            BlockedBot.bot_name == bot_name
-        ).first()
+        bot = repo.get_by_name(bot_name)
 
         if not bot:
             return {"message": f"Bot {bot_name} not found in blocked list"}
 
-        db.delete(bot)
-        db.commit()
+        repo.remove_bot(bot)
 
         logger.info(f"[DELETE] Bot {bot_name} removed from blocked list")
         return {"message": f"Bot {bot_name} removed from blocked list"}

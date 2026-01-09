@@ -83,7 +83,7 @@ def main():
                 else:
                     # Для INSERT/UPDATE/DELETE
                     db.commit()
-                    print(f"✅ Запрос выполнен успешно\n")
+                    print("✅ Запрос выполнен успешно\n")
                 
             except KeyboardInterrupt:
                 print("\n\n👋 До свидания!")

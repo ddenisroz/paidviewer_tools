@@ -9,22 +9,27 @@ from core.config import settings
 
 def setup_logging():
     """Настройка логирования с использованием современной конфигурации"""
-    from logging_config import bot_logging_config
-
+    from core.structured_logging import setup_structured_logging
+    
     # Настраиваем логирование
-    logger = bot_logging_config.setup_logging(settings.log_level)
-
-    # Логируем успешную настройку
-    logger.info("=== BOT SERVICE STARTED ===")
+    setup_structured_logging()
+    
+    # Возвращаем логгер
+    import logging
+    logger = logging.getLogger("bot_service")
+    logger.info("=== BOT SERVICE STARTED (Structured Logging) ===")
 
     return logger
 
-def create_app() -> FastAPI:
+from typing import Optional, Callable
+
+def create_app(lifespan: Optional[Callable] = None) -> FastAPI:
     """Создание и настройка FastAPI приложения"""
     app = FastAPI(
         title="TTS Bot Service",
         description="Сервис для управления TTS ботом",
-        version="2.0.0"
+        version="2.0.0",
+        lifespan=lifespan
     )
 
     # Добавляем централизованные обработчики исключений

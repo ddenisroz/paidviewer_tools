@@ -5,13 +5,12 @@ import {
   Filter, Loader, RefreshCw, Target, User, XCircle
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { adminService } from '@/services/api/services/adminService';
+import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
-
-import { adminService } from '../../../services/api/services/adminService';
-import { logger } from '../../../utils/prodLogger';
 
 interface AdminLog {
   id: number;
@@ -72,7 +71,7 @@ interface LogItemProps {
 
 const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getStatusBg }) => {
   const [expanded, setExpanded] = useState<boolean>(false);
-  
+
   return (
     <div className="border border-slate-700 rounded-lg p-4 hover:bg-slate-700/30 transition-all">
       <div className="flex items-start justify-between gap-3">
@@ -87,7 +86,7 @@ const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getSt
                 {log.description || 'Операция'}
               </span>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-400">
               <div className="flex items-center gap-1">
                 <User className="w-3 h-3" />
@@ -104,7 +103,7 @@ const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getSt
                 <span>{formatTime(log.timestamp)}</span>
               </div>
             </div>
-            
+
             {(log.old_value || log.new_value || log.details || log.error_message || log.user_agent) && (
               <div className="mt-2">
                 <Button
@@ -167,8 +166,8 @@ const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getSt
             {log.status === 'success'
               ? 'Успех'
               : log.status === 'failed'
-              ? 'Ошибка'
-              : 'Предупреждение'}
+                ? 'Ошибка'
+                : 'Предупреждение'}
           </Badge>
         </div>
       </div>
@@ -387,8 +386,8 @@ const SystemLogsPage: React.FC = () => {
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Обновить
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => {
                   if (logs.length === 0) {
                     toast.error('Нет данных для экспорта');
@@ -407,7 +406,7 @@ const SystemLogsPage: React.FC = () => {
                       log.timestamp || ''
                     ].join(','))
                   ].join('\n');
-                  const blob = new Blob([`\ufeff${  csvContent}`], { type: 'text/csv;charset=utf-8;' });
+                  const blob = new Blob([`\ufeff${csvContent}`], { type: 'text/csv;charset=utf-8;' });
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement('a');
                   link.href = url;
@@ -508,8 +507,8 @@ const SystemLogsPage: React.FC = () => {
                       : admin.action_count % 10 >= 2 &&
                         admin.action_count % 10 <= 4 &&
                         (admin.action_count % 100 < 10 || admin.action_count % 100 >= 20)
-                      ? 'ия'
-                      : 'ий'}
+                        ? 'ия'
+                        : 'ий'}
                   </Badge>
                 </div>
               ))}

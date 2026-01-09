@@ -1,11 +1,12 @@
-/**
+﻿/**
  * TTS Queries - централизованные React Query queries для TTS
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { ttsService } from '../../services/api/services/ttsService';
-import { logger } from '../../utils/prodLogger';
+import { ttsService } from '@/services/api/services/ttsService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 

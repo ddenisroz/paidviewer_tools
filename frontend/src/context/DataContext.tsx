@@ -1,16 +1,16 @@
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { useToast } from '../components/ui/toast';
-import { expandQueryWithAliases } from '../constants/categoryAliases';
-import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo } from '../queries/stream/streamQueries';
-import { streamService } from '../services/api/services/streamService';
-import { logger } from '../utils/prodLogger';
-import { getQueryCache, setQueryCache } from '../utils/queryPersist';
+import { expandQueryWithAliases } from '@/constants/categoryAliases';
+import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo } from '@/queries/stream/streamQueries';
+import { streamService } from '@/services/api/services/streamService';
+import { useToast } from '@/shared/components/ui/toast';
+import { logger } from '@/shared/utils/prodLogger';
+import { getQueryCache, setQueryCache } from '@/shared/utils/queryPersist';
 
 import { useAuth } from './AuthContext';
 import { useIntegrations } from './IntegrationsContext';
 
-import type { StreamCategory, StreamData, StreamHistory, UpdateStreamPayload } from '../types/stream';
+import type { StreamCategory, StreamData, StreamHistory, UpdateStreamPayload } from '@/types/stream';
 
 function normalizeString(str: string): string {
     return str
@@ -22,14 +22,14 @@ function normalizeString(str: string): string {
 
 function levenshteinDistance(a: string, b: string): number {
     const matrix: number[][] = [];
-    
+
     for (let i = 0; i <= b.length; i++) {
         matrix[i] = [i];
     }
     for (let j = 0; j <= a.length; j++) {
         matrix[0][j] = j;
     }
-    
+
     for (let i = 1; i <= b.length; i++) {
         for (let j = 1; j <= a.length; j++) {
             if (b.charAt(i - 1) === a.charAt(j - 1)) {
@@ -43,30 +43,30 @@ function levenshteinDistance(a: string, b: string): number {
             }
         }
     }
-    
+
     return matrix[b.length][a.length];
 }
 
 function calculateRelevance(categoryName: string, query: string): number {
     const catLower = categoryName.toLowerCase();
     const queryLower = query.toLowerCase();
-    
+
     const catNormalized = normalizeString(categoryName);
     const queryNormalized = normalizeString(query);
-    
+
     if (catNormalized === queryNormalized) return 0;
     if (catLower === queryLower) return 0.5;
     if (catNormalized.startsWith(queryNormalized)) return 1;
-    
+
     const catWords = catNormalized.split(/\s+/).filter(w => w.length > 0);
     const queryWords = queryNormalized.split(/\s+/).filter(w => w.length > 0);
-    
+
     if (catWords.length > 0 && queryWords.length > 0 && catWords[0] === queryWords[0]) {
         const allWordsPresent = queryWords.every(qw => catWords.some(cw => cw === qw || cw.startsWith(qw)));
         if (allWordsPresent) return 2;
         return 3;
     }
-    
+
     const exactMatches = queryWords.filter(qw => catWords.some(cw => cw === qw)).length;
     if (exactMatches === queryWords.length) {
         const wordsInOrder = queryWords.every((qw, idx) => {
@@ -75,33 +75,33 @@ function calculateRelevance(categoryName: string, query: string): number {
         });
         return wordsInOrder ? 4 : 5;
     }
-    
+
     const startsWithMatches = queryWords.filter(qw => catWords.some(cw => cw.startsWith(qw))).length;
     if (startsWithMatches === queryWords.length) {
         return 6;
     }
-    
+
     if (exactMatches > queryWords.length / 2) {
         return 7 + (queryWords.length - exactMatches);
     }
-    
+
     if (catNormalized.includes(queryNormalized)) {
         return 10;
     }
-    
+
     if (exactMatches > 0) {
         return 12 + (5 - exactMatches);
     }
-    
+
     if (startsWithMatches > 0) {
         return 15 + (5 - startsWithMatches);
     }
-    
+
     const partialMatches = queryWords.filter(qw => catWords.some(cw => cw.includes(qw))).length;
     if (partialMatches > 0) {
         return 20 + (5 - partialMatches);
     }
-    
+
     if (queryNormalized.length <= 5) {
         let matchCount = 0;
         let lastIndex = -1;
@@ -115,15 +115,15 @@ function calculateRelevance(categoryName: string, query: string): number {
         const fuzzyScore = matchCount / queryNormalized.length;
         if (fuzzyScore > 0.8) return 30;
     }
-    
+
     const distance = levenshteinDistance(catNormalized, queryNormalized);
     const maxLength = Math.max(catNormalized.length, queryNormalized.length);
     const similarity = 1 - (distance / maxLength);
-    
+
     if (similarity > 0.8) {
         return 25 + Math.floor(distance);
     }
-    
+
     const wordFuzzyMatches = queryWords.filter(qw => {
         return catWords.some(cw => {
             const wordDist = levenshteinDistance(cw, qw);
@@ -132,27 +132,27 @@ function calculateRelevance(categoryName: string, query: string): number {
             return wordSim > 0.75;
         });
     }).length;
-    
+
     if (wordFuzzyMatches === queryWords.length) {
         return 28;
     } else if (wordFuzzyMatches > queryWords.length / 2) {
         return 30 + (queryWords.length - wordFuzzyMatches);
     }
-    
+
     return 100;
 }
 
 function sortCategoriesByRelevance(categories: StreamCategory[], query: string): StreamCategory[] {
     if (!query || query.trim() === '') return categories;
-    
+
     return [...categories].sort((a, b) => {
         const scoreA = calculateRelevance(a.name, query);
         const scoreB = calculateRelevance(b.name, query);
-        
+
         if (scoreA !== scoreB) {
             return scoreA - scoreB;
         }
-        
+
         return a.name.localeCompare(b.name);
     });
 }
@@ -218,7 +218,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
     const [initialData, setInitialData] = useState<StreamData>(getCachedStreamData);
     const [currentData, setCurrentData] = useState<StreamData>(getCachedStreamData);
-    
+
     useEffect(() => {
         const cached = getQueryCache(['stream-data', user?.id]);
         if (cached && ((cached as StreamData).twitch?.title || (cached as StreamData).twitch?.category || (cached as StreamData).vk?.title || (cached as StreamData).vk?.category)) {
@@ -226,7 +226,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             setCurrentData(cached as StreamData);
         }
     }, [user?.id, integrations.twitch?.enabled, integrations.vk?.enabled]);
-    
+
     const [categories, setCategories] = useState<CategoriesState>({
         twitch: [],
         vk: [],
@@ -237,14 +237,14 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         history: false,
         categories: false,
     });
-    
+
     const [streamHistory, setStreamHistory] = useState<StreamHistory | null>(null);
-    
+
     const [status, setStatus] = useState<StatusState>({
         saveTitle: 'idle',
         saveCategory: 'idle',
     });
-    
+
     const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
     const updateStreamMutation = useUpdateStream({
@@ -253,7 +253,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         },
     });
 
-    const { data: historyData, isLoading: isLoadingHistory, refetch: refetchHistory } = useStreamHistory({
+    const { data: historyData, isLoading: isLoadingHistory, refetch: _refetchHistory } = useStreamHistory({
         enabled: !!isAuthenticated,
         refetchInterval: 30000,
         refetchOnMount: false,
@@ -263,7 +263,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     useEffect(() => {
         setLoading(prev => ({ ...prev, history: isLoadingHistory }));
     }, [isLoadingHistory]);
-    
+
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (historyData) {
@@ -272,14 +272,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
     }, [historyData]);
 
-    const loadStreamHistory = useCallback(async (_force: boolean = false): Promise<void> => {
-        if (!isAuthenticated) {
-            return;
-        }
-        if (_force) {
-            await refetchHistory();
-        }
-    }, [isAuthenticated, refetchHistory]);
+
 
     const { data: twitchData, isLoading: isLoadingTwitch, refetch: refetchTwitch } = useTwitchStreamInfo({
         enabled: !!isAuthenticated && !!integrations.twitch?.enabled,
@@ -362,7 +355,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                     changesFound = true;
                 }
             }
-            
+
             if (integrations.vk?.enabled) {
                 if (initialData.vk.title !== currentData.vk.title) {
                     payload.vk!.title = currentData.vk.title;
@@ -376,7 +369,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                         type: (currentData.vk.category as { type?: string }).type || "games",
                         cover_url: (currentData.vk.category as { box_art_url?: string; cover_url?: string }).box_art_url || (currentData.vk.category as { cover_url?: string }).cover_url || ""
                     };
-                    
+
                     payload.vk!.category = vkCategoryPayload;
                     payload.vk!.category_id = currentData.vk.category?.id;
                     changesFound = true;
@@ -408,59 +401,59 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             onError: (error: unknown) => {
                 setStatus(prev => ({ ...prev, [statusType]: 'error' }));
                 logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
-                
+
                 const errorResponse = error as { response?: { status?: number } };
                 if (errorResponse.response?.status === 401) {
-                    addToast({ 
-                        type: 'error', 
-                        title: 'Токен истек', 
-                        message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.' 
+                    addToast({
+                        type: 'error',
+                        title: 'Токен истек',
+                        message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.'
                     });
                 } else {
                     addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить изменения. Данные откатываются...' });
                 }
-                
+
                 logger.log('[REFRESH] [DATA CONTEXT] Rolling back to server data...');
                 loadStreamData(true);
                 setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
             },
         });
     }, [initialData, currentData, integrations.twitch?.enabled, integrations.vk?.enabled, loadStreamData, addToast, updateStreamMutation]);
-    
+
     const searchCategories = useCallback(async (platform: 'twitch' | 'vk', query: string): Promise<StreamCategory[]> => {
-        logger.log('DataContext: Searching categories:', { 
-            platform, 
-            query, 
+        logger.log('DataContext: Searching categories:', {
+            platform,
+            query,
             enabled: integrations[platform]?.enabled,
             isAuthenticated,
-            integrationsLoading 
+            integrationsLoading
         });
-        
+
         if (!isAuthenticated) {
             logger.log('DataContext: User not authenticated, skipping search');
-            addToast({ 
-                type: 'error', 
-                title: 'Требуется авторизация', 
-                message: 'Пожалуйста, войдите в систему для поиска категорий.' 
+            addToast({
+                type: 'error',
+                title: 'Требуется авторизация',
+                message: 'Пожалуйста, войдите в систему для поиска категорий.'
             });
             return [];
         }
-        
+
         if (integrationsLoading) {
             logger.log('DataContext: Integrations still loading, skipping search');
             return [];
         }
-        
+
         if (!integrations[platform]?.enabled) {
             logger.log('DataContext: Platform not enabled, skipping search');
             return [];
         }
-        
+
         setLoading(prev => ({ ...prev, categories: true }));
         try {
             const expandedQueries = expandQueryWithAliases(query);
             logger.log('[DEBUG] DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
-            
+
             const requests = expandedQueries.map(async (searchQuery: string) => {
                 try {
                     if (platform === 'twitch') {
@@ -476,15 +469,15 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                     return { categories: [] };
                 }
             });
-            
+
             const responses = await Promise.all(requests);
             logger.log('[DEBUG] DataContext: All API responses received');
-            
+
             const allCategories = new Map<string, StreamCategory>();
-            
+
             for (const response of responses) {
                 let categoryData: StreamCategory[] = [];
-                
+
                 const responseData = response as { data?: { categories?: StreamCategory[] } | StreamCategory[] };
                 if (platform === 'vk' && responseData.data && typeof responseData.data === 'object' && 'categories' in responseData.data) {
                     categoryData = Array.isArray(responseData.data.categories) ? responseData.data.categories : [];
@@ -495,42 +488,42 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                 } else if (responseData.data && typeof responseData.data === 'object') {
                     categoryData = Array.isArray(responseData.data) ? responseData.data : [];
                 }
-                
+
                 categoryData.forEach(cat => {
                     if (cat.id && !allCategories.has(cat.id)) {
                         allCategories.set(cat.id, cat);
                     }
                 });
             }
-            
+
             let mergedCategories = Array.from(allCategories.values());
             mergedCategories = sortCategoriesByRelevance(mergedCategories, query);
-            
-            logger.log('[TARGET] DataContext: Smart search complete:', { 
-                query, 
+
+            logger.log('[TARGET] DataContext: Smart search complete:', {
+                query,
                 totalFound: mergedCategories.length,
                 top3: mergedCategories.slice(0, 3).map(c => c.name)
             });
-            
-            setCategories(prev => ({...prev, [platform]: mergedCategories}));
-            
+
+            setCategories(prev => ({ ...prev, [platform]: mergedCategories }));
+
             return mergedCategories;
         } catch (error: unknown) {
             logger.error(`Error searching ${platform} categories:`, error);
             const errorResponse = error as { response?: { status?: number }; message?: string };
             if (errorResponse.response?.status === 401) {
                 logger.log('DataContext: Authentication required for category search');
-                addToast({ 
-                    type: 'error', 
-                    title: 'Требуется авторизация', 
-                    message: 'Пожалуйста, войдите в систему для поиска категорий.' 
+                addToast({
+                    type: 'error',
+                    title: 'Требуется авторизация',
+                    message: 'Пожалуйста, войдите в систему для поиска категорий.'
                 });
             } else {
                 logger.log('DataContext: Other error during search:', errorResponse.message);
-                addToast({ 
-                    type: 'error', 
-                    title: 'Ошибка поиска', 
-                    message: `Не удалось найти категории: ${errorResponse.message || 'Неизвестная ошибка'}` 
+                addToast({
+                    type: 'error',
+                    title: 'Ошибка поиска',
+                    message: `Не удалось найти категории: ${errorResponse.message || 'Неизвестная ошибка'}`
                 });
             }
             return [];

@@ -1,11 +1,12 @@
-/**
+﻿/**
  * Stream Queries - централизованные React Query queries для Stream
  */
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { streamService } from '../../services/api/services/streamService';
-import { logger } from '../../utils/prodLogger';
+import { streamService } from '@/services/api/services/streamService';
+import { logger } from '@/shared/utils/prodLogger';
+
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 

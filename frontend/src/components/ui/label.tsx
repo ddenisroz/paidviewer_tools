@@ -1,22 +1,29 @@
-import * as React from "react"
+// src/components/ui/label.tsx
+/**
+ * Label component for form inputs.
+ */
 
-import * as LabelPrimitive from "@radix-ui/react-label"
-import { cva, type VariantProps } from "class-variance-authority";
+import React from 'react';
 
-import { cn } from "@/lib/utils"
+interface LabelProps extends React.LabelHTMLAttributes<HTMLLabelElement> {
+    required?: boolean;
+}
 
-const labelVariants = cva(
-  "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-)
+export const Label: React.FC<LabelProps> = ({
+    children,
+    required = false,
+    className = '',
+    ...props
+}) => {
+    return (
+        <label
+            className={`block text-sm font-medium text-gray-300 mb-1 ${className}`}
+            {...props}
+        >
+            {children}
+            {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+    );
+};
 
-const Label = React.forwardRef<
-  React.ElementRef<typeof LabelPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> &
-    VariantProps<typeof labelVariants>
->(({ className, ...props }, ref) => (
-  <LabelPrimitive.Root ref={ref} className={cn(labelVariants(), className)} {...props} />
-))
-Label.displayName = LabelPrimitive.Root.displayName
-
-export { Label }
-
+export default Label;

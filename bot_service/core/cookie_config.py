@@ -33,7 +33,7 @@ def get_cookie_settings(
     """
     is_production = settings.environment.lower() == "production"
 
-    settings = {
+    cookie_settings = {
         "key": key,
         "value": value,
         "httponly": httponly,
@@ -43,18 +43,18 @@ def get_cookie_settings(
     }
 
     if max_age is not None:
-        settings["max_age"] = max_age
+        cookie_settings["max_age"] = max_age
 
     # Логируем для отладки (только в dev)
     if not is_production:
         logger.debug(
             f"🍪 Cookie '{key}' settings: "
-            f"secure={settings['secure']}, "
+            f"secure={cookie_settings['secure']}, "
             f"httponly={httponly}, "
             f"samesite={samesite}"
         )
 
-    return settings
+    return cookie_settings
 
 
 def is_production() -> bool:

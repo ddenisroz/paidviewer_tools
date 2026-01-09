@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 
 import { useNavigate } from 'react-router-dom';
 
-import { useAuth } from '../context/AuthContext';
-import { logger } from '../utils/prodLogger';
+import { useAuth } from '@/context/AuthContext';
+import { logger } from '@/shared/utils/prodLogger';
 
 const AuthCallbackPage: React.FC = () => {
     const navigate = useNavigate();

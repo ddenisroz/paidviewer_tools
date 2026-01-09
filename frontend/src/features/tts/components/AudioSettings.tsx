@@ -1,11 +1,11 @@
-// src/components/tts/AudioSettings.tsx
+﻿// src/components/tts/AudioSettings.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Slider } from '@/shared/components/ui/slider';
 
 // logger available for debugging
-// import { logger } from '../../../utils/prodLogger';
+// import { logger } from '@/shared/utils/prodLogger';
 
 interface AudioSettingsState {
     websiteVolume: number;

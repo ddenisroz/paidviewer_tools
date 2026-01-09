@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 
 import { z } from 'zod';
 
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { FormBuilder } from '@/shared/components';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
 import { voiceUploadSchema } from '@/utils/validationSchemas';
 
 
@@ -33,7 +33,7 @@ export const VoiceUploadForm: React.FC<VoiceUploadFormProps> = ({
 
     setFileError('');
     await onSubmit({
-      voice_name: data.voice_name,
+      voice_name: data.voice_name || data.name || '',
       reference_text: data.reference_text,
       file,
     });
@@ -69,7 +69,7 @@ export const VoiceUploadForm: React.FC<VoiceUploadFormProps> = ({
         loading={isSubmitting}
         formClassName="space-y-4"
       />
-      
+
       {/* File upload field - outside FormBuilder */}
       <div className="space-y-2 -mt-4">
         <Label>Аудио файл</Label>

@@ -1,14 +1,13 @@
 ﻿import React, { useEffect, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
-import axios, { type AxiosError } from 'axios';
-import { 
-    AlertCircle, 
-    AlertTriangle, 
-    CheckCircle, 
-    Copy, 
-    Cpu, 
-    ExternalLink, 
+import {
+    AlertCircle,
+    AlertTriangle,
+    CheckCircle,
+    Copy,
+    Cpu,
+    ExternalLink,
     HardDrive,
     Loader2,
     Mic,
@@ -23,29 +22,36 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
 import { TABLE_CLASSES } from '@/constants/designSystem';
+import { useAuth } from '@/context/AuthContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
+import {
+    useCreateVoiceMutation,
+    useDeleteVoiceMutation,
+    useLocalVoicesQuery,
+    useUploadSampleMutation
+} from '@/queries/tts/localVoicesQueries';
+import {
+    useLocalTtsConfig,
+    useSaveLocalTtsConfig,
+    useTestLocalTtsConnection,
+    useToggleLocalTts
+} from '@/queries/tts/ttsQueries';
+import PageWrapper from '@/shared/components/PageWrapper';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
-import { Badge } from '../../../components/ui/badge';
-import { Button } from '../../../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../../components/ui/dialog';
-import { Input } from '../../../components/ui/input';
-import { Label } from '../../../components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
-import { Textarea } from '../../../components/ui/textarea';
-import { useAuth } from '../../../context/AuthContext';
-import { useIntegrations } from '../../../context/IntegrationsContext';
-import { 
-  useLocalTtsConfig, 
-  useSaveLocalTtsConfig, 
-  useTestLocalTtsConnection, 
-  useToggleLocalTts 
-} from '../../../queries/tts/ttsQueries';
-import PageWrapper from '../../../shared/components/PageWrapper';
-import { logger } from '../../../utils/prodLogger';
-
-import type { ApiResponse } from '../../../types/api';
+import type { ApiResponse } from '@/types/api';
+import type { AxiosError } from 'axios';
 
 interface LocalTtsConfigState {
     endpoint_url: string;
@@ -96,31 +102,37 @@ interface NewVoice {
 
 const LocalTTSSettingsPage: React.FC = () => {
     const navigate = useNavigate();
-    const { isAuthenticated, user, isGuest } = useAuth();
+    const { isAuthenticated, user } = useAuth();
     const { integrations } = useIntegrations();
-    
-    const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
-    const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
-    
+
+    const isTwitchConnected = integrations.twitch?.enabled;
+    const isVkConnected = integrations.vk?.enabled;
+
     const [config, setConfig] = useState<LocalTtsConfigState>({
         endpoint_url: 'http://localhost:8001',
         api_key: '',
         use_local: false
     });
-    
+
     const [testing, setTesting] = useState<boolean>(false);
     const [saving, setSaving] = useState<boolean>(false);
     const [testResult, setTestResult] = useState<TestResult | null>(null);
     const [healthData, setHealthData] = useState<HealthData | null>(null);
     const [statusData, setStatusData] = useState<StatusData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
-    
-    const [voices, setVoices] = useState<Voice[]>([]);
-    const [loadingVoices, setLoadingVoices] = useState<boolean>(false);
+
+    // TanStack Query for voices (replaces manual axios calls)
+    const { data: voicesData, isLoading: loadingVoices, refetch: refetchVoices } = useLocalVoicesQuery(config.endpoint_url);
+    const voices = (voicesData || []) as Voice[];
+
+    const createVoiceMutation = useCreateVoiceMutation(config.endpoint_url);
+    const uploadSampleMutation = useUploadSampleMutation(config.endpoint_url);
+    const deleteVoiceMutation = useDeleteVoiceMutation(config.endpoint_url);
+
     const [isCreateVoiceDialogOpen, setIsCreateVoiceDialogOpen] = useState<boolean>(false);
     const [newVoice, setNewVoice] = useState<NewVoice>({ name: '', language: 'ru', description: '' });
     const [_selectedVoice, _setSelectedVoice] = useState<Voice | null>(null);
-    const [uploadingFile, setUploadingFile] = useState<boolean>(false);
+    const uploadingFile = uploadSampleMutation.isPending;
     const [currentTab, setCurrentTab] = useState<'connection' | 'voices'>('connection');
     const [_isWhitelisted, _setIsWhitelisted] = useState<boolean>(true);
     const [_whitelistChecked, _setWhitelistChecked] = useState<boolean>(true);
@@ -129,7 +141,7 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     const { data: configData, isLoading: configLoading, error: configError } = useLocalTtsConfig({
     });
-    
+
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (configData) {
@@ -140,7 +152,7 @@ const LocalTTSSettingsPage: React.FC = () => {
             });
         }
     }, [configData]);
-    
+
     useEffect(() => {
         if (configError) {
             logger.error('Error loading config:', configError);
@@ -159,17 +171,17 @@ const LocalTTSSettingsPage: React.FC = () => {
                 setHealthData(data.health_data || null);
                 setStatusData(data.status_data || null);
             } else {
-                setTestResult({ 
-                    success: false, 
-                    message: data.error || 'Не удалось подключиться' 
+                setTestResult({
+                    success: false,
+                    message: data.error || 'Не удалось подключиться'
                 });
             }
         },
         onError: (error) => {
             const axiosError = error as AxiosError<{ detail?: string }>;
-            setTestResult({ 
-                success: false, 
-                message: axiosError.response?.data?.detail || 'Ошибка подключения к серверу' 
+            setTestResult({
+                success: false,
+                message: axiosError.response?.data?.detail || 'Ошибка соединения с сервером'
             });
         },
         onMutate: () => {
@@ -193,7 +205,7 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     const saveConfigMutation = useSaveLocalTtsConfig({
         onSuccess: () => {
-            // Toast уже показан в hook
+            // Toast обработан в hook
         },
         onError: (error: unknown) => {
             logger.error('Error saving config:', error);
@@ -238,47 +250,22 @@ const LocalTTSSettingsPage: React.FC = () => {
         toast.success('[LIST] Скопировано в буфер обмена');
     };
 
-    const loadVoices = async (): Promise<void> => {
-        if (!config.endpoint_url) return;
-        
-        try {
-            setLoadingVoices(true);
-            const response = await axios.get(`${config.endpoint_url}/api/voices/list`);
-            setVoices((response.data.voices || []) as Voice[]);
-        } catch (error: unknown) {
-            logger.error('Error loading voices:', error);
-            toast.error('Ошибка загрузки голосов');
-        } finally {
-            setLoadingVoices(false);
-        }
-    };
-
-    const createVoice = async (): Promise<void> => {
+    // Using TanStack Query mutation instead of direct axios
+    const createVoice = (): void => {
         if (!newVoice.name.trim()) {
             toast.error('Введите название голоса');
             return;
         }
 
-        try {
-            const formData = new FormData();
-            formData.append('name', newVoice.name);
-            formData.append('language', newVoice.language);
-            formData.append('description', newVoice.description);
-
-            const _response = await axios.post(
-                `${config.endpoint_url}/api/voices/create`,
-                formData
-            );
-
-            toast.success('[OK] Голос создан! Загрузите референсные аудио.');
-            setIsCreateVoiceDialogOpen(false);
-            setNewVoice({ name: '', language: 'ru', description: '' });
-            loadVoices();
-        } catch (error: unknown) {
-            const axiosError = error as AxiosError<{ detail?: string }>;
-            logger.error('Error creating voice:', error);
-            toast.error(axiosError.response?.data?.detail || 'Ошибка создания голоса');
-        }
+        createVoiceMutation.mutate(
+            { name: newVoice.name, language: newVoice.language, description: newVoice.description },
+            {
+                onSuccess: () => {
+                    setIsCreateVoiceDialogOpen(false);
+                    setNewVoice({ name: '', language: 'ru', description: '' });
+                }
+            }
+        );
     };
 
     const [sampleDialogOpen, setSampleDialogOpen] = useState<boolean>(false);
@@ -287,39 +274,6 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [sampleFile, setSampleFile] = useState<File | null>(null);
     const [_isTranscribing, _setIsTranscribing] = useState<boolean>(false);
 
-    const uploadSample = async (voiceId: number, file: File, text: string): Promise<void> => {
-        try {
-            setUploadingFile(true);
-            const formData = new FormData();
-            formData.append('file', file);
-            if (text) {
-                formData.append('sample_text', text);
-            }
-
-            const response = await axios.post(
-                `${config.endpoint_url}/api/voices/${voiceId}/upload`,
-                formData
-            );
-
-            toast.success(
-                response.data.transcription 
-                    ? '[OK] Сэмпл загружен и транскрибирован'
-                    : '[OK] Сэмпл загружен'
-            );
-            
-            loadVoices();
-            setSampleDialogOpen(false);
-            setSampleText('');
-            setSampleFile(null);
-        } catch (error: unknown) {
-            const axiosError = error as AxiosError<{ detail?: string }>;
-            logger.error('Error uploading sample:', error);
-            toast.error(axiosError.response?.data?.detail || 'Ошибка загрузки сэмпла');
-        } finally {
-            setUploadingFile(false);
-        }
-    };
-
     const openSampleDialog = (voiceId: number): void => {
         setCurrentSampleVoiceId(voiceId);
         setSampleText('');
@@ -327,36 +281,39 @@ const LocalTTSSettingsPage: React.FC = () => {
         setSampleDialogOpen(true);
     };
 
+    // Using TanStack Query mutation instead of direct axios
     const handleSampleUpload = (): void => {
         if (!sampleFile || !currentSampleVoiceId) {
             toast.error('Выберите файл');
             return;
         }
-        uploadSample(currentSampleVoiceId, sampleFile, sampleText);
+        uploadSampleMutation.mutate(
+            { voiceId: currentSampleVoiceId, file: sampleFile, sampleText },
+            {
+                onSuccess: () => {
+                    setSampleDialogOpen(false);
+                    setSampleText('');
+                    setSampleFile(null);
+                }
+            }
+        );
     };
 
-    const deleteVoice = async (voiceId: number): Promise<void> => {
+    // Using TanStack Query mutation instead of direct axios
+    const deleteVoice = (voiceId: number): void => {
         if (!confirm('Удалить голос со всеми сэмплами?')) return;
-
-        try {
-            await axios.delete(`${config.endpoint_url}/api/voices/${voiceId}`);
-            toast.success('[DELETE] Голос удалён');
-            loadVoices();
-        } catch (error: unknown) {
-            logger.error('Error deleting voice:', error);
-            toast.error('Ошибка удаления голоса');
-        }
+        deleteVoiceMutation.mutate(voiceId);
     };
 
     useEffect(() => {
         if (testResult?.success && currentTab === 'voices') {
-            loadVoices();
+            refetchVoices();
         }
-    }, [testResult, currentTab]);
+    }, [testResult, currentTab, refetchVoices]);
 
     if (!isAuthenticated) {
         return (
-            <PageWrapper title="Локальный TTS">
+            <PageWrapper title="Настройка TTS">
                 <Card className="border-gray-700">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
@@ -367,10 +324,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 Требуется авторизация
                             </h3>
                             <p className="text-gray-400 text-sm">
-                                Для использования локального TTS необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+                                Для использования управления TTS необходимо войти в систему и подключить одну из платформ (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => navigate('/login')}
                             className="gap-2"
                         >
@@ -383,9 +340,9 @@ const LocalTTSSettingsPage: React.FC = () => {
         );
     }
 
-    if (!isGuest && !isTwitchConnected && !isVkConnected) {
+    if (!isTwitchConnected && !isVkConnected) {
         return (
-            <PageWrapper title="Локальный TTS">
+            <PageWrapper title="Настройка TTS">
                 <Card className="border-gray-700">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
@@ -396,10 +353,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 Нет подключенных интеграций
                             </h3>
                             <p className="text-gray-400 text-sm">
-                                Для использования локального TTS необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+                                Для использования управления TTS необходимо подключить хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => navigate('/dashboard/settings')}
                             className="gap-2"
                         >
@@ -439,7 +396,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         <CardHeader>
                             <CardTitle className="text-blue-400 flex items-center gap-2">
                                 <ExternalLink className="w-5 h-5" />
-                                Как установить локальный TTS сервис?
+                                Как запустить локальный TTS сервер?
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -447,7 +404,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="flex items-start gap-3">
                                     <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">1</span>
                                     <div>
-                                        <p className="font-medium">Перейдите в папку проекта:</p>
+                                        <p className="font-medium">Перейдите в папку сервиса:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
                                             cd tts_service_simple
                                         </code>
@@ -467,9 +424,9 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="flex items-start gap-3">
                                     <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">3</span>
                                     <div>
-                                        <p className="font-medium">Запустите сервис:</p>
+                                        <p className="font-medium">Запустите сервер:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            start.bat  # Windows<br/>
+                                            start.bat  # Windows<br />
                                             ./start.sh # Linux/Mac
                                         </code>
                                     </div>
@@ -478,9 +435,9 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="flex items-start gap-3">
                                     <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">4</span>
                                     <div>
-                                        <p className="font-medium">Найдите API ключ в файле <code>config.json</code></p>
+                                        <p className="font-medium">Укажите API ключ в файле <code>config.json</code></p>
                                         <p className="text-muted-foreground text-xs mt-1">
-                                            Откройте файл и скопируйте значение поля "api_key"
+                                            Скопируйте ключ и вставьте в поле "api_key"
                                         </p>
                                     </div>
                                 </div>
@@ -509,7 +466,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="space-y-2">
-                                <Label htmlFor="endpoint_url">URL сервиса</Label>
+                                <Label htmlFor="endpoint_url">URL сервера</Label>
                                 <Input
                                     id="endpoint_url"
                                     value={config.endpoint_url}
@@ -522,7 +479,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="api_key">API ключ</Label>
+                                <Label htmlFor="api_key">API Ключ</Label>
                                 <div className="flex gap-2">
                                     <Input
                                         id="api_key"
@@ -542,7 +499,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Найдите в файле tts_service_simple/config.json
+                                    Находится в файле tts_service_simple/config.json
                                 </p>
                             </div>
 
@@ -582,11 +539,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                             </div>
 
                             {testResult && (
-                                <div className={`p-4 rounded-lg flex items-center gap-3 ${
-                                    testResult.success 
-                                        ? 'bg-green-500/10 border border-green-500/30' 
-                                        : 'bg-red-500/10 border border-red-500/30'
-                                }`}>
+                                <div className={`p-4 rounded-lg flex items-center gap-3 ${testResult.success
+                                    ? 'bg-green-500/10 border border-green-500/30'
+                                    : 'bg-red-500/10 border border-red-500/30'
+                                    }`}>
                                     {testResult.success ? (
                                         <CheckCircle className="w-5 h-5 text-green-400" />
                                     ) : (
@@ -605,7 +561,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Zap className="w-5 h-5" />
-                                    Статус сервиса
+                                    Статус сервера
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -614,7 +570,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                         <p className="text-sm text-muted-foreground">Статус</p>
                                         <p className="text-lg font-semibold flex items-center gap-2">
                                             <CheckCircle className="w-5 h-5 text-green-400" />
-                                            {healthData.status === 'healthy' ? 'Работает' : 'Ошибка'}
+                                            {healthData.status === 'healthy' ? 'Доступен' : 'Ошибка'}
                                         </p>
                                     </div>
 
@@ -646,7 +602,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     )}
 
                                     <div className="space-y-2">
-                                        <p className="text-sm text-muted-foreground">Uptime</p>
+                                        <p className="text-sm text-muted-foreground">Аптайм</p>
                                         <p className="text-lg font-semibold">
                                             {healthData.uptime ? `${Math.floor(healthData.uptime / 3600)}ч ${Math.floor((healthData.uptime % 3600) / 60)}м` : 'N/A'}
                                         </p>
@@ -662,13 +618,13 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                 <p className="text-lg font-semibold">{statusData.stats.total_requests}</p>
                                             </div>
                                             <div>
-                                                <p className="text-xs text-muted-foreground">Успешных</p>
+                                                <p className="text-xs text-muted-foreground">Успешно</p>
                                                 <p className="text-lg font-semibold text-green-400">
                                                     {statusData.stats.successful_requests}
                                                 </p>
                                             </div>
                                             <div>
-                                                <p className="text-xs text-muted-foreground">Ошибок</p>
+                                                <p className="text-xs text-muted-foreground">Ошибки</p>
                                                 <p className="text-lg font-semibold text-red-400">
                                                     {statusData.stats.failed_requests}
                                                 </p>
@@ -705,9 +661,9 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <div>
                                         <p className="font-medium">Использовать локальный TTS</p>
                                         <p className="text-sm text-muted-foreground">
-                                            {config.use_local 
-                                                ? 'Бот использует локальный сервис для генерации озвучки'
-                                                : 'Бот использует облачный сервис (если доступен)'
+                                            {config.use_local
+                                                ? 'Все запросы озвучки идут через локальный сервис'
+                                                : 'Все запросы озвучки идут через облако (или по умолчанию)'
                                             }
                                         </p>
                                     </div>
@@ -715,7 +671,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                         onClick={toggleService}
                                         variant={config.use_local ? 'default' : 'outline'}
                                     >
-                                        {config.use_local ? 'Включено' : 'Выключено'}
+                                        {config.use_local ? 'Включено' : 'Отключено'}
                                     </Button>
                                 </div>
                             </CardContent>
@@ -733,7 +689,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                         Управление голосами
                                     </CardTitle>
                                     <p className="text-sm text-muted-foreground mt-1">
-                                        Создавайте и загружайте собственные голоса для клонирования
+                                        Добавление и управление собственными голосами для клонирования
                                     </p>
                                 </div>
                                 <Dialog open={isCreateVoiceDialogOpen} onOpenChange={setIsCreateVoiceDialogOpen}>
@@ -745,7 +701,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     </DialogTrigger>
                                     <DialogContent>
                                         <DialogHeader>
-                                            <DialogTitle>Создать новый голос</DialogTitle>
+                                            <DialogTitle>Создание нового голоса</DialogTitle>
                                         </DialogHeader>
                                         <div className="space-y-4">
                                             <div>
@@ -753,7 +709,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                 <Input
                                                     value={newVoice.name}
                                                     onChange={(e) => setNewVoice({ ...newVoice, name: e.target.value })}
-                                                    placeholder="Например: Мой голос"
+                                                    placeholder="Пример: Мой голос"
                                                 />
                                             </div>
                                             <div>
@@ -813,7 +769,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                             </Badge>
                                                         </CardTitle>
                                                         <p className="text-xs text-muted-foreground mt-1">
-                                                            {voice.language === 'ru' ? '🇷🇺 Русский' : '🇬🇧 English'}
+                                                            {voice.language === 'ru' ? 'RU Русский' : 'EN English'}
                                                         </p>
                                                     </div>
                                                     {voice.type === 'custom' && (
@@ -842,14 +798,14 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                             className="w-full"
                                                             disabled={uploadingFile}
                                                         >
-                                                            <Upload className="h-4 w-4 mr-2" />
+                                                            <Upload className="w-4 h-4 mr-2" />
                                                             Загрузить сэмпл
                                                         </Button>
                                                     </>
                                                 )}
                                                 {voice.type === 'base' && (
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Предустановленный голос
+                                                    <p className="text-xs text-muted-foreground italic">
+                                                        Базовые голоса нельзя изменять
                                                     </p>
                                                 )}
                                             </CardContent>
@@ -859,96 +815,49 @@ const LocalTTSSettingsPage: React.FC = () => {
                             )}
                         </CardContent>
                     </Card>
-
-                    <Card className="bg-blue-500/10 border-blue-500/30">
-                        <CardHeader>
-                            <CardTitle className="text-blue-400 text-sm">
-                                [INFO] Рекомендации по записи
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 text-sm">
-                            <p>• <strong>Формат:</strong> WAV 16-bit, 48000 Hz (лучшее качество)</p>
-                            <p>• <strong>Длительность:</strong> 3-10 секунд на сэмпл</p>
-                            <p>• <strong>Количество:</strong> Минимум 3, рекомендуется 5-10 сэмплов</p>
-                            <p>• <strong>Качество:</strong> Чистая речь без фонового шума и музыки</p>
-                            <p>• <strong>Интонация:</strong> Нейтральная, естественная</p>
-                            <p>• <strong>Разнообразие:</strong> Используйте разные фразы</p>
-                        </CardContent>
-                    </Card>
                 </TabsContent>
+
+                <Dialog open={sampleDialogOpen} onOpenChange={setSampleDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Загрузка сэмпла</DialogTitle>
+                            <DialogDescription>
+                                Загрузите аудиофайл (wav/mp3) с голосом. Желательно от 10 секунд до 2 минут.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div>
+                                <Label>Текст сэмпла (для улучшения качества)</Label>
+                                <Textarea
+                                    value={sampleText}
+                                    onChange={(e) => setSampleText(e.target.value)}
+                                    placeholder="Текст, который произносится в аудио..."
+                                    className="h-24"
+                                />
+                            </div>
+                            <div>
+                                <Label>Файл</Label>
+                                <Input
+                                    type="file"
+                                    onChange={(e) => setSampleFile(e.target.files?.[0] || null)}
+                                    accept=".wav,.mp3,.ogg"
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setSampleDialogOpen(false)}>
+                                Отмена
+                            </Button>
+                            <Button onClick={handleSampleUpload} disabled={uploadingFile || !sampleFile}>
+                                {uploadingFile && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Загрузить
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </Tabs>
-
-            <Dialog open={sampleDialogOpen} onOpenChange={setSampleDialogOpen}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>Загрузить аудио сэмпл</DialogTitle>
-                        <DialogDescription>
-                            Загрузите аудио файл с референсным текстом для клонирования голоса
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div>
-                            <Label htmlFor="sample-text">Референсный текст (опционально)</Label>
-                            <Textarea
-                                id="sample-text"
-                                value={sampleText}
-                                onChange={(e) => setSampleText(e.target.value)}
-                                placeholder="Что произносится в аудио? (если не указать, будет автотранскрибировано)"
-                                className="mt-1"
-                                rows={3}
-                            />
-                            <p className="text-xs text-muted-foreground mt-1">
-                                [INFO] Если оставить пустым, текст будет извлечён автоматически через Whisper
-                            </p>
-                        </div>
-
-                        <div>
-                            <Label>Аудио файл</Label>
-                            <Input
-                                type="file"
-                                accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
-                                onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                        setSampleFile(file);
-                                    }
-                                }}
-                                className="mt-1"
-                            />
-                            {sampleFile && (
-                                <p className="text-xs text-green-400 mt-1">
-                                    ✓ Выбран: {sampleFile.name}
-                                </p>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Поддерживаемые форматы: WAV, MP3, FLAC, OGG, M4A, AAC, WMA, AIFF, AU
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                Будет автоматически конвертировано в WAV 48kHz Mono 16-bit
-                            </p>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setSampleDialogOpen(false)}
-                        >
-                            Отмена
-                        </Button>
-                        <Button
-                            onClick={handleSampleUpload}
-                            disabled={!sampleFile || uploadingFile}
-                        >
-                            {uploadingFile ? 'Загрузка...' : 'Загрузить'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 };
 
 export default LocalTTSSettingsPage;
-
-
-

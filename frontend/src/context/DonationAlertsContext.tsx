@@ -1,9 +1,9 @@
-// src/context/DonationAlertsContext.tsx
+﻿// src/context/DonationAlertsContext.tsx
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
-import { API_BASE_URL } from '../constants';
-import { saveReturnUrl } from '../utils/oauthRedirect';
-import { logger } from '../utils/prodLogger';
+import { API_BASE_URL } from '@/constants';
+import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
 
@@ -45,14 +45,14 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
         try {
             setIsLoading(true);
             setError(null);
-            
+
             const response = await fetch(`${API_BASE_URL}/api/donationalerts/status`, {
                 credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
                 }
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 setIsConnected(data.connected || false);
@@ -77,7 +77,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
         try {
             setIsLoading(true);
             setError(null);
-            
+
             const response = await fetch(`${API_BASE_URL}/api/donationalerts/connect`, {
                 method: 'POST',
                 credentials: 'include',
@@ -92,7 +92,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             }
 
             const data = await response.json();
-            
+
             if (data.auth_url) {
                 saveReturnUrl();
                 window.location.href = data.auth_url;
@@ -114,7 +114,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
         try {
             setIsLoading(true);
             setError(null);
-            
+
             const response = await fetch(`${API_BASE_URL}/api/donationalerts/disconnect`, {
                 method: 'POST',
                 credentials: 'include',
@@ -153,7 +153,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
         };
 
         window.addEventListener('donationalerts_connected', handleDonationAlertsConnected as EventListener);
-        
+
         return () => {
             window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected as EventListener);
         };

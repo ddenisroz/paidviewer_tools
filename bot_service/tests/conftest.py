@@ -19,6 +19,10 @@ from sqlalchemy.pool import StaticPool
 # Set testing environment
 os.environ["TESTING"] = "true"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
+os.environ["TWITCH_CLIENT_ID"] = "test_client_id"
+os.environ["TWITCH_CLIENT_SECRET"] = "test_client_secret"
+os.environ["VK_TOKEN"] = "test_vk_token"
+os.environ["OPENAI_API_KEY"] = "test_openai_key"
 
 # Add bot_service to path
 import sys
@@ -27,9 +31,9 @@ BOT_SERVICE_ROOT = Path(__file__).parent.parent
 if str(BOT_SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(BOT_SERVICE_ROOT))
 
-from core.database import Base, get_db
-from main import app
-from models import User, UserToken, TTSUserSettings, YouTubeQueue, DropsConfig
+from core.database import Base, get_db  # noqa: E402
+from main import app  # noqa: E402
+from models import User, UserToken, TTSUserSettings, YouTubeQueue, DropsConfig  # noqa: E402
 
 # Test database setup
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -254,6 +258,42 @@ def admin_user(db: Session) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+@pytest.fixture
+def test_user_token(db: Session, test_user: User) -> str:
+    """
+    Create a JWT token for a regular test user.
+    
+    Returns:
+        JWT token string
+    """
+    from core.security_modern import modern_security_manager
+    
+    token = modern_security_manager.create_access_token({
+        "user_id": test_user.id,
+        "sub": str(test_user.id),
+        "is_admin": False,
+    })
+    return token
+
+
+@pytest.fixture
+def test_admin_token(db: Session, admin_user: User) -> str:
+    """
+    Create a JWT token for an admin user.
+    
+    Returns:
+        JWT token string for admin access
+    """
+    from core.security_modern import modern_security_manager
+    
+    token = modern_security_manager.create_access_token({
+        "user_id": admin_user.id,
+        "sub": str(admin_user.id),
+        "is_admin": True,
+    })
+    return token
 
 
 @pytest.fixture

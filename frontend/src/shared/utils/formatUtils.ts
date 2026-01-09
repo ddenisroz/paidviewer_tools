@@ -1,4 +1,4 @@
-import { logger } from '../../utils/prodLogger';
+﻿import { logger } from '@/shared/utils/prodLogger';
 
 export const formatDate = (date: string | Date, locale: string = 'ru-RU'): string => {
   if (!date) return 'Не указано';

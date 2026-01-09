@@ -5,8 +5,7 @@ import { SearchBar } from '../SearchBar';
 
 describe('SearchBar', () => {
     const mockOnChange = vi.fn();
-    const mockOnFilterChange = vi.fn();
-    const mockOnFilterRemove = vi.fn();
+
     const mockOnClearAll = vi.fn();
 
     beforeEach(() => {
@@ -88,7 +87,7 @@ describe('SearchBar', () => {
             // Find the clear button (X icon)
             const buttons = screen.getAllByRole('button');
             const clearButton = buttons.find(btn => btn.querySelector('svg'));
-            
+
             if (clearButton) {
                 await user.click(clearButton);
                 expect(mockOnChange).toHaveBeenCalledWith('');

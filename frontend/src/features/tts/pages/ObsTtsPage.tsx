@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 
 import { useParams } from 'react-router-dom';
 
-import { TTS_SERVICE_URL, WS_BASE_URL } from '../../../constants';
+import { TTS_SERVICE_URL, WS_BASE_URL } from '@/constants';
 
 const ObsTtsPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
@@ -20,7 +20,7 @@ const ObsTtsPage: React.FC = () => {
         const connect = (): void => {
             const wsUrl = `${WS_BASE_URL}/ws/tts/${token}`;
             setStatus(`Connecting to ${wsUrl}...`);
-            
+
             ws.current = new WebSocket(wsUrl);
 
             ws.current.onopen = (): void => {
@@ -39,7 +39,7 @@ const ObsTtsPage: React.FC = () => {
                     } else if (message.type === 'tts_error') {
                         setStatus(`Error: ${message.message || 'Unknown error'}`);
                     }
-                } catch (error) {
+                } catch {
                     // Ошибка обработки WebSocket сообщения
                 }
             };
@@ -67,26 +67,26 @@ const ObsTtsPage: React.FC = () => {
         if (audioQueue.length > 0 && !isPlaying) {
             const nextAudioUrl = audioQueue[0];
             setIsPlaying(true);
-            
+
             const audio = new Audio(nextAudioUrl);
-            
+
             audio.oncanplaythrough = (): void => {
                 audio.play().catch(() => {
                     setIsPlaying(false);
                     setAudioQueue(prevQueue => prevQueue.slice(1));
                 });
             };
-            
+
             audio.onended = (): void => {
                 setIsPlaying(false);
                 setAudioQueue(prevQueue => prevQueue.slice(1));
             };
-            
+
             audio.onerror = (): void => {
                 setIsPlaying(false);
                 setAudioQueue(prevQueue => prevQueue.slice(1));
             };
-            
+
             audio.load();
         }
     }, [audioQueue, isPlaying]);

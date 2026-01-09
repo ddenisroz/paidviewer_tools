@@ -1,44 +1,44 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Edit, Globe, Lock, Settings, TestTube2, Trash2, Upload, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PageLoader } from '@/components/ui/loader';
-import { Slider } from "@/components/ui/slider";
-import { Textarea } from '@/components/ui/textarea';
-
-import { useToast } from '../../../components/ui/toast';
-import { TTS_SERVICE_URL } from '../../../constants';
-import { useAuth } from '../../../context/AuthContext';
-import { useIntegrations } from '../../../context/IntegrationsContext';
-import { useTts } from '../../../context/TtsContext';
-import { useButtonPosition } from '../../../hooks/useButtonPosition';
-import { useLoadingState } from '../../../hooks/useLoadingState';
-import { useWhitelistStatus } from '../../../queries/tts/ttsQueries';
-import { ttsService } from '../../../services/api/services/ttsService';
-import { 
-    deleteUserVoice, 
-    getGlobalVoices, 
-    getUserVoices, 
-    renameUserVoice, 
+import { TTS_SERVICE_URL } from '@/constants';
+import { useAuth } from '@/context/AuthContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
+import { useTts } from '@/context/TtsContext';
+import TtsErrorCard from '@/features/tts/components/TtsErrorCard';
+import { useWhitelistStatus } from '@/queries/tts/ttsQueries';
+import { ttsService } from '@/services/api/services/ttsService';
+import {
+    deleteUserVoice,
+    getGlobalVoices,
+    getUserVoices,
+    renameUserVoice,
     retranscribeUserVoice,
     testVoice,
     updateUserVoiceSettings,
     uploadUserVoice
-} from '../../../services/unified-api';
-import PageWrapper from '../../../shared/components/PageWrapper';
-import { logger } from '../../../utils/prodLogger';
-import TtsErrorCard from '../components/TtsErrorCard';
+} from '@/services/unified-api';
+import PageWrapper from '@/shared/components/PageWrapper';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { PageLoader } from '@/shared/components/ui/loader';
+import { Slider } from "@/shared/components/ui/slider";
+import { Textarea } from '@/shared/components/ui/textarea';
+import { useToast } from '@/shared/components/ui/toast';
+import { useButtonPosition } from '@/shared/hooks/useButtonPosition';
+import { useLoadingState } from '@/shared/hooks/useLoadingState';
+import { logger } from '@/shared/utils/prodLogger';
 
-import type { TtsVoice } from '../../../types/tts';
+
+import type { TtsVoice } from '@/types/tts';
 
 interface WhitelistStatus {
     is_whitelisted: boolean;
@@ -72,13 +72,13 @@ const VoiceManagementPageContent: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
     const { getButtonPosition: _getButtonPosition } = useButtonPosition();
-    const { user, isGuest, isAuthenticated } = useAuth();
+    const { user, isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
     const [loading, setLoading] = useState<boolean>(true);
-    
-    const isTwitchConnected = integrations.twitch?.enabled || (isGuest && user?.platform === 'twitch');
-    const isVkConnected = integrations.vk?.enabled || (isGuest && user?.platform === 'vk');
-    const _hasAnyIntegration = isTwitchConnected || isVkConnected || isGuest;
+
+    const isTwitchConnected = integrations?.twitch?.enabled;
+    const isVkConnected = integrations?.vk?.enabled;
+    const _hasAnyIntegration = isTwitchConnected || isVkConnected;
     const [uploadDialogOpen, setUploadDialogOpen] = useState<boolean>(false);
     const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
     const [renameDialogOpen, setRenameDialogOpen] = useState<boolean>(false);
@@ -93,7 +93,7 @@ const VoiceManagementPageContent: React.FC = () => {
     const [voiceVolumes, _setVoiceVolumes] = useState<Record<string, number>>({});
     const fileInputRef = React.useRef<HTMLInputElement | null>(null);
     const voiceVolumeSaveTimeout = React.useRef<Record<string, NodeJS.Timeout>>({});
-    
+
     const { initializeTts: _initializeTts, engineStatus, isCheckingHealth, checkTtsHealth: _checkTtsHealth } = useTts();
     const isHealthy = engineStatus.loaded;
     const isChecking = isCheckingHealth;
@@ -101,14 +101,14 @@ const VoiceManagementPageContent: React.FC = () => {
     const queryClient = useQueryClient();
     let _audioContext: AudioContext | null = null;
     let _audioSource: AudioBufferSourceNode | null = null;
-    
+
     const showLoader = useLoadingState(isChecking);
 
     const _loadVoiceVolume = async (_voiceName: string): Promise<number> => {
         return 50.0;
     };
 
-    const _saveVoiceVolume = async (_voiceName: string, _volumeLevel: number): Promise<void> => {
+    const saveVoiceVolume = async (_voiceName: string, _volumeLevel: number): Promise<void> => {
         // No-op: volume is managed via UserVoiceSettings in admin panel
     };
 
@@ -141,7 +141,7 @@ const VoiceManagementPageContent: React.FC = () => {
         }
     }, [globalVoicesError, globalVoicesErrorData]);
 
-    const userId = user?.isGuest ? -1 : user?.id;
+    const userId = user?.id;
     const { data: userVoicesData = [], isLoading: userVoicesLoading, isError: userVoicesError, error: userVoicesErrorData } = useQuery<TtsVoice[]>({
         queryKey: ['user-voices', userId],
         queryFn: async () => {
@@ -243,7 +243,7 @@ const VoiceManagementPageContent: React.FC = () => {
             const transcribeResponse = response as TranscribeResponse;
             const newReferenceText = transcribeResponse?.data?.reference_text || transcribeResponse?.reference_text;
             if (newReferenceText && currentVoice) {
-                setCurrentVoice({...currentVoice, reference_text: newReferenceText});
+                setCurrentVoice({ ...currentVoice, reference_text: newReferenceText });
                 addToast({ type: 'success', title: 'Успех', message: 'Референсный текст обновлён!' });
             }
             queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
@@ -292,7 +292,7 @@ const VoiceManagementPageContent: React.FC = () => {
     const globalVoices = globalVoicesData ?? [];
     const userVoices = userVoicesData ?? [];
     const enabledVoiceIds = enabledVoicesData ?? [];
-    
+
     useEffect(() => {
         if (whitelistStatus) {
             logger.info('Voice management whitelist status:', {
@@ -301,7 +301,7 @@ const VoiceManagementPageContent: React.FC = () => {
                 platform: whitelistStatus.platform,
                 message: whitelistStatus.message,
                 user: user?.id,
-                isGuest: user?.isGuest
+                isGuest: false
             });
         }
     }, [whitelistStatus, user]);
@@ -316,28 +316,28 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>): void => {
         event.stopPropagation();
-        
+
         const file = event.target.files?.[0];
-        
+
         if (!file) {
             return;
         }
-        
+
         const supportedFormats = ['.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff', '.au'];
         const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-        
+
         if (!supportedFormats.includes(fileExtension)) {
-            addToast({ 
-                type: 'error', 
-                title: 'Ошибка', 
-                message: `Неподдерживаемый формат файла. Поддерживаемые форматы: ${supportedFormats.join(', ')}` 
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: `Неподдерживаемый формат файла. Поддерживаемые форматы: ${supportedFormats.join(', ')}`
             });
             if (event.target) {
                 event.target.value = '';
             }
             return;
         }
-        
+
         setUploadFile(file);
         const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
         setVoiceName(nameWithoutExt);
@@ -348,50 +348,45 @@ const VoiceManagementPageContent: React.FC = () => {
             addToast({ type: 'error', title: 'Ошибка', message: 'Выберите файл и введите имя голоса.' });
             return;
         }
-        
-        if (user?.isGuest) {
-            addToast({ type: 'error', title: 'Ошибка', message: 'Гости не могут загружать свои голоса. Авторизуйтесь через Twitch или VK.' });
-            return;
-        }
-        
+
         const uploadUserId = user?.id;
         if (!uploadUserId) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось определить пользователя.' });
             return;
         }
-        
+
         const formData = new FormData();
         formData.append('file', uploadFile);
         formData.append('voice_name', voiceName.trim());
         formData.append('user_id', uploadUserId.toString());
-        
+
         uploadVoiceMutation.mutate({ userId: uploadUserId, formData });
     };
 
     const handleDelete = async (voiceId: number, voiceType?: string): Promise<void> => {
         if (!whitelistStatus?.can_manage_voices) {
-            addToast({ 
-                type: 'error', 
-                title: 'Ошибка', 
-                message: 'У вас нет доступа к удалению голосов. Обратитесь к администратору.' 
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: 'У вас нет доступа к удалению голосов. Обратитесь к администратору.'
             });
             return;
         }
-        
+
         if (voiceType === 'global') {
             addToast({ type: 'error', title: 'Ошибка', message: 'Вы не можете удалять глобальные голоса.' });
             return;
         }
-        
+
         const voiceToDelete = userVoices.find(v => v.id === voiceId);
         if (!voiceToDelete || !user || !window.confirm(`Вы уверены, что хотите удалить свой голос "${voiceToDelete.name}"?`)) {
             return;
         }
 
-        deleteVoiceMutation.mutate({ 
-            voiceId, 
+        deleteVoiceMutation.mutate({
+            voiceId,
             userId: user.id,
-            voiceName: voiceToDelete.name 
+            voiceName: voiceToDelete.name
         });
     };
 
@@ -402,42 +397,42 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const handleTranscribe = async (): Promise<void> => {
         if (!currentVoice || !user) return;
-        
+
         if (currentVoice.voice_type === 'global') {
             addToast({ type: 'error', title: 'Ошибка', message: 'Вы не можете изменять глобальные голоса.' });
             return;
         }
-        
-        transcribeVoiceMutation.mutate({ 
-            voiceId: currentVoice.id, 
-            userId: user.id 
+
+        transcribeVoiceMutation.mutate({
+            voiceId: currentVoice.id,
+            userId: user.id
         });
     };
 
     const handleReferenceTextChange = (value: string): void => {
-        setCurrentVoice(prev => prev ? {...prev, reference_text: value} : null);
+        setCurrentVoice(prev => prev ? { ...prev, reference_text: value } : null);
     };
 
     const handleRenameVoice = (): void => {
         if (!currentVoice) return;
-        
+
         if (currentVoice.voice_type === 'global') {
             addToast({ type: 'error', title: 'Ошибка', message: 'Вы не можете переименовывать глобальные голоса.' });
             return;
         }
-        
+
         setNewVoiceName(currentVoice.name);
         setRenameDialogOpen(true);
     };
 
     const handleConfirmRename = async (): Promise<void> => {
         if (!currentVoice || !user || !newVoiceName.trim()) return;
-        
+
         if (newVoiceName.trim() === currentVoice.name) {
             setRenameDialogOpen(false);
             return;
         }
-        
+
         renameVoiceMutation.mutate({
             voiceId: currentVoice.id,
             userId: user.id,
@@ -447,37 +442,37 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const handleSaveSettings = async (): Promise<void> => {
         if (!currentVoice || !user) return;
-        
+
         const settings = {
             cfg_strength: currentVoice.cfg_strength,
             speed_preset: currentVoice.speed_preset,
             reference_text: currentVoice.reference_text
         };
-        
+
         if (currentVoice.voice_type === 'global') {
-            queryClient.setQueryData(['global-voices'], (prev: TtsVoice[] = []) => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, ...settings}
+            queryClient.setQueryData(['global-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+                voice.id === currentVoice.id
+                    ? { ...voice, ...settings }
                     : voice
             ));
         } else {
-            queryClient.setQueryData(['user-voices', userId], (prev: TtsVoice[] = []) => prev.map(voice => 
-                voice.id === currentVoice.id 
-                    ? {...voice, ...settings}
+            queryClient.setQueryData(['user-voices', userId], (prev: TtsVoice[] = []) => prev.map(voice =>
+                voice.id === currentVoice.id
+                    ? { ...voice, ...settings }
                     : voice
             ));
         }
-        
+
         updateVoiceSettingsMutation.mutate(
             { voiceId: currentVoice.id, userId: user.id, settings },
             {
                 onSuccess: () => {
-                    addToast({ 
-                        type: 'success', 
-                        title: 'Успех', 
-                        message: currentVoice.voice_type === 'global' 
-                            ? 'Настройки применены к вашему профилю' 
-                            : 'Настройки голоса сохранены!' 
+                    addToast({
+                        type: 'success',
+                        title: 'Успех',
+                        message: currentVoice.voice_type === 'global'
+                            ? 'Настройки применены к вашему профилю'
+                            : 'Настройки голоса сохранены!'
                     });
                 },
                 onError: () => {
@@ -509,10 +504,10 @@ const VoiceManagementPageContent: React.FC = () => {
             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
         });
     };
-    
+
     const handleTestVoice = async (): Promise<void> => {
         if (!currentVoice || !user) return;
-        
+
         setIsTestingVoice(true);
         try {
             logger.log('Testing voice with parameters:', {
@@ -521,12 +516,12 @@ const VoiceManagementPageContent: React.FC = () => {
                 speed_preset: currentVoice.speed_preset,
                 volume: voiceVolumes[currentVoice.name] || 50
             });
-            
+
             const response = await testVoice(
                 currentVoice.id,
                 testText
             );
-            
+
             const testResponse = response.data as TestVoiceResponse;
             const audioUrl = testResponse.audio_url;
             if (audioUrl) {
@@ -535,13 +530,13 @@ const VoiceManagementPageContent: React.FC = () => {
                     if (!audioUrl.startsWith('http')) {
                         fullAudioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
                     }
-                    
+
                     logger.log('Playing test audio:', fullAudioUrl);
                     const audio = new Audio(fullAudioUrl);
-                    
+
                     const volumeLevel = voiceVolumes[currentVoice.name] || 50;
                     audio.volume = volumeLevel / 100;
-                    
+
                     audio.oncanplaythrough = () => {
                         logger.log('Test audio ready to play with volume:', audio.volume);
                         audio.play().catch((e: unknown) => {
@@ -549,16 +544,16 @@ const VoiceManagementPageContent: React.FC = () => {
                             addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось воспроизвести аудио.' });
                         });
                     };
-                    
+
                     audio.onended = () => {
                         logger.log('Test audio playback ended');
                     };
-                    
+
                     audio.onerror = (e: unknown) => {
                         logger.error("Error loading test audio:", fullAudioUrl, e);
                         addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось загрузить аудио файл.' });
                     };
-                    
+
                     audio.load();
                 } catch (error: unknown) {
                     logger.error("Error creating audio:", error);
@@ -599,17 +594,17 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const handleToggleVoiceEnabled = async (voiceId: number): Promise<void> => {
         if (!userId) return;
-        
+
         const isCurrentlyEnabled = enabledVoiceIds.includes(voiceId);
         const newEnabledIds = isCurrentlyEnabled
             ? enabledVoiceIds.filter(id => id !== voiceId)
             : [...enabledVoiceIds, voiceId];
-        
+
         if (newEnabledIds.length === 0) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Необходимо оставить хотя бы один голос включенным' });
             return;
         }
-        
+
         updateEnabledVoicesMutation.mutate({ userId, voiceIds: newEnabledIds });
     };
 
@@ -629,7 +624,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                 Для использования управления голосами необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => navigate('/login')}
                             className="gap-2"
                         >
@@ -652,7 +647,7 @@ const VoiceManagementPageContent: React.FC = () => {
         );
     }
 
-    if (!isGuest && !isTwitchConnected && !isVkConnected) {
+    if (!isTwitchConnected && !isVkConnected) {
         return (
             <PageWrapper title="Управление голосами">
                 <Card className="border-gray-700">
@@ -668,7 +663,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                 Для использования управления голосами необходимо подключить хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button 
+                        <Button
                             onClick={() => navigate('/dashboard/settings')}
                             className="gap-2"
                         >
@@ -694,17 +689,15 @@ const VoiceManagementPageContent: React.FC = () => {
     }
 
     return (
-        <PageWrapper 
+        <PageWrapper
             title="Управление голосами"
             description={
-                user?.isGuest
-                    ? "Гостевой режим: используйте только глобальные голоса. Для загрузки собственных голосов авторизуйтесь через Twitch или VK."
-                    : whitelistStatus && !whitelistStatus.can_manage_voices
-                        ? whitelistStatus.message
-                        : ""
+                whitelistStatus && !whitelistStatus.can_manage_voices
+                    ? whitelistStatus.message
+                    : ""
             }
         >
-            <input 
+            <input
                 ref={(el) => {
                     fileInputRef.current = el;
                     if (el) {
@@ -713,18 +706,18 @@ const VoiceManagementPageContent: React.FC = () => {
                         };
                     }
                 }}
-                type="file" 
+                type="file"
                 accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
                 style={{ display: 'none', pointerEvents: 'auto' }}
             />
 
-            {!user?.isGuest && !loading && whitelistStatus && whitelistStatus.can_manage_voices === false && (
+            {!loading && whitelistStatus && whitelistStatus.can_manage_voices === false && (
                 <div className="mb-6 bg-orange-900/20 border border-orange-500/50 rounded-lg p-4 flex items-start gap-3">
                     <Lock className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
                         <h3 className="text-orange-300 font-semibold mb-1">Вы не состоите в whitelist</h3>
                         <p className="text-orange-200/80 text-sm">
-                            Для доступа к управлению голосами необходимо быть в белом списке (whitelist). 
+                            Для доступа к управлению голосами необходимо быть в белом списке (whitelist).
                             Обратитесь к администратору для получения доступа.
                         </p>
                         <p className="text-orange-200/60 text-xs mt-2">
@@ -733,24 +726,8 @@ const VoiceManagementPageContent: React.FC = () => {
                     </div>
                 </div>
             )}
-            
-            {user?.isGuest && !loading && whitelistStatus && whitelistStatus.can_manage_voices === false && (
-                <div className="mb-6 bg-blue-900/20 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
-                    <AlertCircle className="h-5 w-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                        <h3 className="text-blue-300 font-semibold mb-1">Канал не в whitelist</h3>
-                        <p className="text-blue-200/80 text-sm">
-                            Канал, к которому вы подключились, не находится в whitelist. F5-TTS (AI озвучка) недоступен.
-                        </p>
-                        <p className="text-blue-200/60 text-xs mt-2">
-                            [INFO] Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
-                        </p>
-                        <p className="text-blue-200/60 text-xs mt-1">
-                            [INFO] Для получения доступа к F5-TTS обратитесь к администратору для добавления канала в whitelist.
-                        </p>
-                    </div>
-                </div>
-            )}
+
+
 
             {loading ? (
                 <div className="col-span-full text-center py-12">
@@ -769,7 +746,7 @@ const VoiceManagementPageContent: React.FC = () => {
                         </p>
                     </div>
                 </div>
-            ) : !user?.isGuest && whitelistStatus?.can_manage_voices && globalVoices.length === 0 && userVoices.length === 0 ? (
+            ) : whitelistStatus?.can_manage_voices && globalVoices.length === 0 && userVoices.length === 0 ? (
                 <div className="col-span-full">
                     <div className="text-center py-12">
                         <User className="h-16 w-16 mx-auto mb-4 text-slate-500" />
@@ -790,9 +767,9 @@ const VoiceManagementPageContent: React.FC = () => {
                                     Загрузить свой голос
                                 </Button>
                             </DialogTrigger>
-                            <DialogContent 
+                            <DialogContent
                                 key="upload-dialog"
-                                className="max-w-md" 
+                                className="max-w-md"
                                 onOpenAutoFocus={(e) => e.preventDefault()}
                                 onCloseAutoFocus={(e) => e.preventDefault()}
                             >
@@ -830,13 +807,13 @@ const VoiceManagementPageContent: React.FC = () => {
                                     </div>
                                     <div>
                                         <Label htmlFor="voice-name">Имя голоса</Label>
-                                        <Input 
+                                        <Input
                                             id="voice-name"
                                             type="text"
-                                            value={voiceName} 
-                                            onChange={(e) => setVoiceName(e.target.value)} 
+                                            value={voiceName}
+                                            onChange={(e) => setVoiceName(e.target.value)}
                                             placeholder="Введите имя голоса"
-                                            className="mt-1" 
+                                            className="mt-1"
                                         />
                                         <p className="text-xs text-slate-400 mt-1">
                                             Имя будет использоваться для выбора голоса в TTS
@@ -849,15 +826,15 @@ const VoiceManagementPageContent: React.FC = () => {
                                     </div>
                                 </div>
                                 <DialogFooter className="flex justify-center gap-4">
-                                    <Button 
-                                        onClick={() => setUploadDialogOpen(false)} 
+                                    <Button
+                                        onClick={() => setUploadDialogOpen(false)}
                                         variant="outline"
                                         className="w-28"
                                     >
                                         Отмена
                                     </Button>
-                                    <Button 
-                                        onClick={handleUpload} 
+                                    <Button
+                                        onClick={handleUpload}
                                         disabled={isUploading || !uploadFile || !voiceName.trim()}
                                         className="w-36 bg-green-600 hover:bg-green-700"
                                     >
@@ -870,7 +847,7 @@ const VoiceManagementPageContent: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-8">
-                    {!user?.isGuest && whitelistStatus?.can_manage_voices && (
+                    {whitelistStatus?.can_manage_voices && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
@@ -898,9 +875,9 @@ const VoiceManagementPageContent: React.FC = () => {
                                             Загрузить свой голос
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent 
+                                    <DialogContent
                                         key="upload-dialog"
-                                        className="max-w-md" 
+                                        className="max-w-md"
                                         onOpenAutoFocus={(e) => e.preventDefault()}
                                         onCloseAutoFocus={(e) => e.preventDefault()}
                                     >
@@ -938,13 +915,13 @@ const VoiceManagementPageContent: React.FC = () => {
                                             </div>
                                             <div>
                                                 <Label htmlFor="voice-name">Имя голоса</Label>
-                                                <Input 
+                                                <Input
                                                     id="voice-name"
                                                     type="text"
-                                                    value={voiceName} 
-                                                    onChange={(e) => setVoiceName(e.target.value)} 
+                                                    value={voiceName}
+                                                    onChange={(e) => setVoiceName(e.target.value)}
                                                     placeholder="Введите имя голоса"
-                                                    className="mt-1" 
+                                                    className="mt-1"
                                                 />
                                                 <p className="text-xs text-slate-400 mt-1">
                                                     Имя будет использоваться для выбора голоса в TTS
@@ -957,15 +934,15 @@ const VoiceManagementPageContent: React.FC = () => {
                                             </div>
                                         </div>
                                         <DialogFooter className="flex justify-center gap-4">
-                                            <Button 
-                                                onClick={() => setUploadDialogOpen(false)} 
+                                            <Button
+                                                onClick={() => setUploadDialogOpen(false)}
                                                 variant="outline"
                                                 className="w-28"
                                             >
                                                 Отмена
                                             </Button>
-                                            <Button 
-                                                onClick={handleUpload} 
+                                            <Button
+                                                onClick={handleUpload}
                                                 disabled={isUploading || !uploadFile || !voiceName.trim()}
                                                 className="w-36 bg-green-600 hover:bg-green-700"
                                             >
@@ -995,30 +972,30 @@ const VoiceManagementPageContent: React.FC = () => {
                                                                 onCheckedChange={() => handleToggleVoiceEnabled(voice.id)}
                                                                 className="flex-shrink-0"
                                                             />
-                                                            <User className="h-3.5 w-3.5 text-green-400 flex-shrink-0"/>
+                                                            <User className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
                                                             <span className="truncate">{voice.name}</span>
                                                         </CardTitle>
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
                                                     <div className="flex gap-1.5">
-                                                        <Button 
-                                                            className="flex-1 h-7 text-xs px-2" 
-                                                            variant="outline" 
-                                                            size="sm" 
+                                                        <Button
+                                                            className="flex-1 h-7 text-xs px-2"
+                                                            variant="outline"
+                                                            size="sm"
                                                             onClick={() => handleEdit(voice)}
                                                         >
-                                                            <Settings className="h-3 w-3 mr-1"/>
+                                                            <Settings className="h-3 w-3 mr-1" />
                                                             Настроить
                                                         </Button>
-                                                        <Button 
-                                                            className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20" 
-                                                            variant="ghost" 
-                                                            size="sm" 
+                                                        <Button
+                                                            className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                                            variant="ghost"
+                                                            size="sm"
                                                             onClick={() => handleDelete(voice.id, voice.voice_type)}
                                                             title="Удалить голос"
                                                         >
-                                                            <Trash2 className="h-3 w-3"/>
+                                                            <Trash2 className="h-3 w-3" />
                                                         </Button>
                                                     </div>
                                                 </CardContent>
@@ -1030,7 +1007,7 @@ const VoiceManagementPageContent: React.FC = () => {
                         </div>
                     )}
 
-                    {!user?.isGuest && userVoices.length > 0 && whitelistStatus?.can_manage_voices && globalVoices.length > 0 && (
+                    {userVoices.length > 0 && whitelistStatus?.can_manage_voices && globalVoices.length > 0 && (
                         <hr className="border-slate-700" />
                     )}
 
@@ -1068,13 +1045,13 @@ const VoiceManagementPageContent: React.FC = () => {
                                                     </div>
                                                 </CardHeader>
                                                 <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
-                                                    <Button 
-                                                        className="w-full h-7 text-xs px-2" 
-                                                        variant="outline" 
-                                                        size="sm" 
+                                                    <Button
+                                                        className="w-full h-7 text-xs px-2"
+                                                        variant="outline"
+                                                        size="sm"
                                                         onClick={() => handleEdit(voice)}
                                                     >
-                                                        <Settings className="h-3 w-3 mr-1"/>
+                                                        <Settings className="h-3 w-3 mr-1" />
                                                         Настроить
                                                     </Button>
                                                 </CardContent>
@@ -1089,9 +1066,9 @@ const VoiceManagementPageContent: React.FC = () => {
             )}
 
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                <DialogContent 
+                <DialogContent
                     key={`edit-dialog-${currentVoice?.id || 'new'}`}
-                    className="max-w-lg" 
+                    className="max-w-lg"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                     onCloseAutoFocus={(e) => e.preventDefault()}
                 >
@@ -1108,7 +1085,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                     </p>
                                 </div>
                             )}
-                            
+
                             <div>
                                 <Label htmlFor="reference-text">Референсный текст</Label>
                                 <Textarea
@@ -1135,7 +1112,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                     </div>
                                 )}
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="voice-volume">Индивидуальная громкость</Label>
@@ -1163,7 +1140,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                     />
                                 </div>
                             </div>
-                            
+
                             <div>
                                 <Label htmlFor="test-text">Текст для тестирования</Label>
                                 <Textarea
@@ -1174,10 +1151,10 @@ const VoiceManagementPageContent: React.FC = () => {
                                     rows={3}
                                 />
                             </div>
-                            
+
                             <div className="space-y-4">
                                 <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
-                                
+
                                 <div>
                                     <Label htmlFor="cfg-strength">Стабильность синтеза: {currentVoice.cfg_strength}</Label>
                                     <Slider
@@ -1190,13 +1167,13 @@ const VoiceManagementPageContent: React.FC = () => {
                                         className="mt-2"
                                     />
                                 </div>
-                                
+
                                 <div>
                                     <Label htmlFor="speed-preset">Скорость речи: {
                                         currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
-                                        currentVoice.speed_preset === 'slow' ? 'Медленный' :
-                                        currentVoice.speed_preset === 'normal' ? 'Нормальный' :
-                                        currentVoice.speed_preset === 'fast' ? 'Быстрый' : 'Очень быстрый'
+                                            currentVoice.speed_preset === 'slow' ? 'Медленный' :
+                                                currentVoice.speed_preset === 'normal' ? 'Нормальный' :
+                                                    currentVoice.speed_preset === 'fast' ? 'Быстрый' : 'Очень быстрый'
                                     }</Label>
                                     <Slider
                                         id="speed-preset"
@@ -1205,15 +1182,15 @@ const VoiceManagementPageContent: React.FC = () => {
                                         step={1}
                                         value={[
                                             currentVoice.speed_preset === 'very_slow' ? 0 :
-                                            currentVoice.speed_preset === 'slow' ? 1 :
-                                            currentVoice.speed_preset === 'normal' ? 2 :
-                                            currentVoice.speed_preset === 'fast' ? 3 : 4
+                                                currentVoice.speed_preset === 'slow' ? 1 :
+                                                    currentVoice.speed_preset === 'normal' ? 2 :
+                                                        currentVoice.speed_preset === 'fast' ? 3 : 4
                                         ]}
                                         onValueChange={(value) => {
-                                            const preset = value[0] === 0 ? 'very_slow' : 
-                                                         value[0] === 1 ? 'slow' : 
-                                                         value[0] === 2 ? 'normal' :
-                                                         value[0] === 3 ? 'fast' : 'very_fast';
+                                            const preset = value[0] === 0 ? 'very_slow' :
+                                                value[0] === 1 ? 'slow' :
+                                                    value[0] === 2 ? 'normal' :
+                                                        value[0] === 3 ? 'fast' : 'very_fast';
                                             logger.log('Speed preset changed to:', preset);
                                             setCurrentVoice(prev => prev ? ({ ...prev, speed_preset: preset }) : null);
                                         }}
@@ -1232,24 +1209,24 @@ const VoiceManagementPageContent: React.FC = () => {
                     )}
                     <DialogFooter className="flex-wrap gap-2">
                         <Button onClick={handleTestVoice} variant="outline" disabled={isTestingVoice} className="flex-1 min-w-[100px]">
-                            <TestTube2 className="h-4 w-4 mr-2"/>{isTestingVoice ? 'Генерирую...' : 'Тест'}
+                            <TestTube2 className="h-4 w-4 mr-2" />{isTestingVoice ? 'Генерирую...' : 'Тест'}
                         </Button>
                         {currentVoice?.voice_type === 'user' && (
                             <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[140px] text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
-                                <Edit className="h-4 w-4 mr-2"/>Переименовать
+                                <Edit className="h-4 w-4 mr-2" />Переименовать
                             </Button>
                         )}
                         <Button onClick={handleSaveSettings} className="flex-1 min-w-[120px] bg-blue-600 hover:bg-blue-700">
-                            <Settings className="h-4 w-4 mr-2"/>Сохранить
+                            <Settings className="h-4 w-4 mr-2" />Сохранить
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
-                <DialogContent 
+                <DialogContent
                     key="rename-dialog"
-                    className="max-w-md" 
+                    className="max-w-md"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                     onCloseAutoFocus={(e) => e.preventDefault()}
                 >
@@ -1277,13 +1254,13 @@ const VoiceManagementPageContent: React.FC = () => {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button 
-                            variant="outline" 
+                        <Button
+                            variant="outline"
                             onClick={() => setRenameDialogOpen(false)}
                         >
                             Отмена
                         </Button>
-                        <Button 
+                        <Button
                             onClick={handleConfirmRename}
                             disabled={!newVoiceName.trim() || newVoiceName.trim() === currentVoice?.name}
                         >

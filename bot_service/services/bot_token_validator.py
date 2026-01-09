@@ -14,7 +14,7 @@
 import logging
 import asyncio
 from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import httpx
 
@@ -67,7 +67,7 @@ class BotTokenValidator:
                 self.twitch_token_valid = True
                 self.last_twitch_check = utcnow_naive()
                 
-                logger.info(f"[OK] [BOT TOKEN] Twitch bot token is VALID")
+                logger.info("[OK] [BOT TOKEN] Twitch bot token is VALID")
                 logger.info(f"[INFO] Bot user: {data.get('login')} (ID: {data.get('user_id')})")
                 logger.info(f"[INFO] Token expires in: {data.get('expires_in', 'unknown')} seconds")
                 
@@ -146,7 +146,7 @@ class BotTokenValidator:
                 self.vk_token_valid = True
                 self.last_vk_check = utcnow_naive()
                 
-                logger.info(f"[OK] [BOT TOKEN] VK Live bot token is VALID")
+                logger.info("[OK] [BOT TOKEN] VK Live bot token is VALID")
                 logger.info(f"[INFO] Bot user: {data.get('username', 'unknown')}")
                 
                 return {
@@ -208,8 +208,8 @@ class BotTokenValidator:
         # Сводка
         logger.info("=" * 80)
         logger.info("[BOT TOKEN] Validation Summary:")
-        logger.info(f"  Twitch: {'✅ VALID' if results['twitch']['valid'] else '❌ INVALID'}")
-        logger.info(f"  VK Live: {'✅ VALID' if results['vk']['valid'] else '❌ INVALID (optional)' if results['vk'].get('optional') else '❌ INVALID'}")
+        logger.info(f"  Twitch: {'[VALID]' if results['twitch']['valid'] else '[INVALID]'}")
+        logger.info(f"  VK Live: {'[VALID]' if results['vk']['valid'] else '[INVALID] (optional)' if results['vk'].get('optional') else '[INVALID]'}")
         logger.info("=" * 80)
         
         return results

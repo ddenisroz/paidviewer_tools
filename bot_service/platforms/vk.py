@@ -5,6 +5,15 @@ import logging
 from typing import Optional, Dict, Any, List
 from .base import StreamingPlatform, PlatformConfig
 
+# [REF] Integrations
+from integrations.vk.client import VKClient
+from integrations.vk.oauth import VKOAuth
+from integrations.base import TokenInfo
+
+# [REF] Services
+from services.user_service import UserService
+from core.database import get_db, User
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,16 +33,30 @@ class VKPlatform(StreamingPlatform):
         )
         super().__init__(config)
 
-        # Import VKLiveAPI lazily to avoid circular imports
-        self._vk_api = None
+        # Initialize Integration Components
+        self.oauth = VKOAuth()
+        self.client = VKClient(self.oauth)
+        self.user_service = UserService()
 
-    @property
-    def vk_api(self):
-        """Lazy load VKLiveAPI instance"""
-        if self._vk_api is None:
-            from api.vk_api import VKLiveAPI
-            self._vk_api = VKLiveAPI()
-        return self._vk_api
+    async def _get_user_context(self, user_id: int):
+        """Helper to get token and channel info."""
+        db = next(get_db())
+        try:
+            token = self.user_service.get_user_token(user_id, 'vk', db)
+            user = db.query(User).filter(User.id == user_id).first()
+            
+            if not token or not user:
+                return None, None
+
+            decrypted_token = self.user_service.decrypt_access_token(token.access_token)
+            token_info = TokenInfo(
+                access_token=decrypted_token,
+                refresh_token=token.refresh_token,
+                scopes=token.scopes
+            )
+            return token_info, user.vk_channel_name
+        finally:
+            db.close()
 
     async def authenticate(self, code: str) -> Dict[str, Any]:
         """
@@ -45,10 +68,17 @@ class VKPlatform(StreamingPlatform):
         Returns:
             Dict containing access_token, refresh_token, expires_in, scopes
         """
-        # VK authentication is handled in auth/vk_auth.py
-        # This method is here for interface compliance
-        # The actual OAuth flow uses the existing vk_auth.py implementation
-        raise NotImplementedError("VK authentication is handled by auth/vk_auth.py")
+        try:
+            token_info = await self.oauth.exchange_code(code)
+            return {
+                "access_token": token_info.access_token,
+                "refresh_token": token_info.refresh_token,
+                "expires_in": token_info.expires_in,
+                "scope": token_info.scopes
+            }
+        except Exception as e:
+            logger.error(f"VK authentication error: {e}")
+            raise
 
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
         """
@@ -61,10 +91,10 @@ class VKPlatform(StreamingPlatform):
             Dict containing user info
         """
         try:
-            user_info = await self.vk_api._get_current_user_info(access_token)
+            token_info = TokenInfo(access_token=access_token)
+            user_info = await self.client.get_current_user(token_info)
             if not user_info:
                 raise Exception("Failed to get user info from VK Live")
-
             return user_info
         except Exception as e:
             logger.error(f"Error getting VK user info: {e}")
@@ -82,7 +112,12 @@ class VKPlatform(StreamingPlatform):
             True if successful, False otherwise
         """
         try:
-            return await self.vk_api.update_stream_title(str(user_id), title)
+            token_info, channel_name = await self._get_user_context(user_id)
+            if not token_info or not channel_name:
+                logger.warning(f"No VK token or channel name for user {user_id}")
+                return False
+
+            return await self.client.update_stream(channel_name, token_info, title=title)
         except Exception as e:
             logger.error(f"Error updating VK stream title: {e}")
             return False
@@ -99,7 +134,12 @@ class VKPlatform(StreamingPlatform):
             True if successful, False otherwise
         """
         try:
-            return await self.vk_api.update_stream_category(str(user_id), category_id)
+            token_info, channel_name = await self._get_user_context(user_id)
+            if not token_info or not channel_name:
+                logger.warning(f"No VK token or channel name for user {user_id}")
+                return False
+
+            return await self.client.update_stream(channel_name, token_info, category_id=category_id)
         except Exception as e:
             logger.error(f"Error updating VK stream category: {e}")
             return False
@@ -114,15 +154,11 @@ class VKPlatform(StreamingPlatform):
         Returns:
             List of category dicts with id, name, box_art_url
         """
-        try:
-            # VK API requires user_id for category search
-            # For now, return empty list as this needs user context
-            # This should be called with user_id parameter in actual usage
-            logger.warning("search_categories called without user_id context")
-            return []
-        except Exception as e:
-            logger.error(f"Error searching VK categories: {e}")
-            return []
+        # VK search usually requires a user token. 
+        # Platform abstraction assumes generic search, but VK API is strict.
+        # We might need a system token or just return empty for unauthenticated search.
+        logger.warning("search_categories called without user_id context (not supported by VK directly)")
+        return []
 
     async def search_categories_for_user(self, query: str, user_id: int) -> List[Dict[str, Any]]:
         """
@@ -136,8 +172,11 @@ class VKPlatform(StreamingPlatform):
             List of category dicts with id, name, box_art_url
         """
         try:
-            categories = await self.vk_api.search_categories(query, str(user_id))
-            return categories if categories else []
+            token_info, _ = await self._get_user_context(user_id)
+            if not token_info:
+                return []
+            
+            return await self.client.search_categories(query, token_info)
         except Exception as e:
             logger.error(f"Error searching VK categories: {e}")
             return []
@@ -152,10 +191,16 @@ class VKPlatform(StreamingPlatform):
         Returns:
             Dict with stream info if online, None if offline
         """
-        # VK API requires user_id, not username
-        # This needs to be adapted for VK's authentication model
-        logger.warning("get_stream_status called with username, but VK requires user_id")
-        return None
+        # VK usually needs channel_name (url)
+        # Public info might be fetchable without token if we implement public scrapper or specific API
+        # but VKClient.get_stream_info prefers a token.
+        # Minimal implementation using just channel_name if Client supports it (it does pass token=None)
+        try:
+            # Construct dummy token or pass None
+            return await self.client.get_stream_info(username, TokenInfo(access_token=""))
+        except Exception as e:
+            logger.error(f"Error getting VK stream status: {e}")
+            return None
 
     async def get_stream_status_for_user(self, user_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -168,8 +213,11 @@ class VKPlatform(StreamingPlatform):
             Dict with stream info
         """
         try:
-            stream_info = await self.vk_api.get_stream_info(str(user_id))
-            return stream_info
+            token_info, channel_name = await self._get_user_context(user_id)
+            if not token_info or not channel_name:
+                return None
+            
+            return await self.client.get_stream_info(channel_name, token_info)
         except Exception as e:
             logger.error(f"Error getting VK stream status: {e}")
             return None
@@ -184,9 +232,8 @@ class VKPlatform(StreamingPlatform):
         Returns:
             Dict with channel info
         """
-        # VK API requires user_id, not username
-        logger.warning("get_channel_info called with username, but VK requires user_id")
-        return None
+        # Reusing get_stream_info as it returns channel/stream data
+        return await self.get_stream_status(username)
 
     async def send_chat_message(self, user_id: int, message: str) -> bool:
         """
@@ -199,8 +246,6 @@ class VKPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
-        # This would require bot integration
-        # For now, return False as it's not implemented in the abstraction
         logger.warning("send_chat_message not yet implemented for VK platform abstraction")
         return False
 
@@ -216,7 +261,12 @@ class VKPlatform(StreamingPlatform):
             Reward ID if successful, None otherwise
         """
         try:
-            return await self.vk_api.create_reward(str(user_id), reward_data)
+            token_info, channel_name = await self._get_user_context(user_id)
+            if not token_info or not channel_name:
+                return None
+            
+            result = await self.client.create_custom_reward(channel_name, token_info, reward_data)
+            return result.get("id") if result else None
         except Exception as e:
             logger.error(f"Error creating VK reward: {e}")
             return None
@@ -234,7 +284,11 @@ class VKPlatform(StreamingPlatform):
             True if successful, False otherwise
         """
         try:
-            return await self.vk_api.update_reward(str(user_id), reward_id, reward_data)
+            token_info, channel_name = await self._get_user_context(user_id)
+            if not token_info or not channel_name:
+                return False
+            
+            return await self.client.update_custom_reward(channel_name, reward_id, token_info, reward_data)
         except Exception as e:
             logger.error(f"Error updating VK reward: {e}")
             return False
@@ -251,7 +305,11 @@ class VKPlatform(StreamingPlatform):
             True if successful, False otherwise
         """
         try:
-            return await self.vk_api.delete_reward(str(user_id), reward_id)
+            token_info, channel_name = await self._get_user_context(user_id)
+            if not token_info or not channel_name:
+                return False
+            
+            return await self.client.delete_custom_reward(channel_name, reward_id, token_info)
         except Exception as e:
             logger.error(f"Error deleting VK reward: {e}")
             return False
@@ -267,12 +325,5 @@ class VKPlatform(StreamingPlatform):
         Returns:
             List of role strings (broadcaster, moderator, vip, viewer)
         """
-        # This would use the existing platform_role_checker utility
-        try:
-            # This requires author_data from chat context
-            # For now, return empty list as it needs chat integration
-            logger.debug(f"get_user_roles called for {username} on {channel_name}")
-            return []
-        except Exception as e:
-            logger.error(f"Error getting VK user roles: {e}")
-            return []
+        logger.debug(f"get_user_roles called for {username} on {channel_name}")
+        return []

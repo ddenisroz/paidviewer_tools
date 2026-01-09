@@ -1,0 +1,95 @@
+# repositories/tts_settings_repository.py
+"""
+Repository for TTS User Settings.
+Follows Clean Architecture - abstracts all database access for TTSUserSettings.
+"""
+from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
+
+from repositories.base_repository import BaseRepository
+from models.tts import TTSUserSettings
+
+
+class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
+    """Repository for TTSUserSettings CRUD operations."""
+    
+    def __init__(self, db: Session):
+        super().__init__(TTSUserSettings, db)
+    
+    def get_by_user_id(self, user_id: int) -> Optional[TTSUserSettings]:
+        """Get TTS settings by user ID."""
+        return self.db.query(TTSUserSettings).filter(
+            TTSUserSettings.user_id == user_id
+        ).first()
+    
+    def get_by_session_id(self, session_id: str) -> Optional[TTSUserSettings]:
+        """Get TTS settings by session ID (for guests)."""
+        return self.db.query(TTSUserSettings).filter(
+            TTSUserSettings.session_id == session_id
+        ).first()
+    
+    def get_or_create(
+        self,
+        user_id: Optional[int] = None,
+        session_id: Optional[str] = None
+    ) -> TTSUserSettings:
+        """Get existing settings or create defaults."""
+        if user_id:
+            settings = self.get_by_user_id(user_id)
+        elif session_id:
+            settings = self.get_by_session_id(session_id)
+        else:
+            raise ValueError("Either user_id or session_id must be provided")
+        
+        if not settings:
+            settings = TTSUserSettings(
+                user_id=user_id,
+                session_id=session_id
+            )
+            self.db.add(settings)
+            self.db.commit()
+            self.db.refresh(settings)
+        
+        return settings
+    
+    def update_settings(
+        self,
+        settings: TTSUserSettings,
+        data: Dict[str, Any]
+    ) -> TTSUserSettings:
+        """Update TTS settings with provided data."""
+        for key, value in data.items():
+            if hasattr(settings, key):
+                setattr(settings, key, value)
+        
+        self.db.commit()
+        self.db.refresh(settings)
+        return settings
+    
+    def get_settings_dict(self, settings: TTSUserSettings) -> Dict[str, Any]:
+        """Convert settings to dictionary for API response."""
+        return {
+            "enable_7tv": settings.enable_7tv,
+            "enable_twitch": settings.enable_twitch,
+            "enable_lexicon_filter": settings.enable_lexicon_filter,
+            "enable_custom_lexicon": settings.enable_custom_lexicon,
+            "engine": settings.engine,
+            "voice": settings.voice,
+            "listening_mode": settings.listening_mode,
+            "max_message_length": settings.max_message_length,
+            "skip_commands": settings.skip_commands,
+            "use_local_tts": settings.use_local_tts,
+            "filter_replies": settings.filter_replies,
+            "filter_mentions": settings.filter_mentions,
+            "tts_mode": settings.tts_mode,
+            "tts_reward_ids": settings.tts_reward_ids or {},
+            "enabled_platforms": settings.enabled_platforms or ["twitch", "vk"],
+        }
+    
+    def delete_by_user_id(self, user_id: int) -> int:
+        """Delete settings by user ID."""
+        result = self.db.query(TTSUserSettings).filter(
+            TTSUserSettings.user_id == user_id
+        ).delete()
+        self.db.commit()
+        return result

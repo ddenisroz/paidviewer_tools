@@ -4,8 +4,8 @@ import logging
 from typing import List, Optional
 from twitchio.ext import commands
 from core.connection_manager import ConnectionManager
-from features.tts.tts_api import TTSAPI
-from features.youtube.youtube_api_legacy import YouTubeAPI
+from services.tts.tts_core import TTSAPI
+from services.youtube.youtube_service import YouTubeService
 
 # Настройка логирования для TwitchIO
 logging.getLogger('twitchio').setLevel(logging.INFO)
@@ -19,14 +19,17 @@ class TwitchBotCore(commands.Bot):
 
     def __init__(self, token: str, initial_channels: List[str], connection_manager: ConnectionManager):
         logger.info("[BOT] CREATING TWITCH BOT")
-        logger.info(f"[INFO] Token: {token[:10]}...")
+        logger.info("[INFO] Token: [CENSORED]")
         logger.info(f"[CHANNELS] Initial channels: {initial_channels}")
         logger.info(f"[DEBUG] Token length: {len(token)}")
         logger.info(f"[DEBUG] Number of channels: {len(initial_channels)}")
 
         self.connection_manager = connection_manager
         self.tts_api = TTSAPI()
-        self.youtube_api = YouTubeAPI()
+        # self.youtube_api is deprecated, use services.youtube.youtube_service if needed
+        # Initializing service here if needed, or in specific handlers
+        from services.youtube.youtube_service import YouTubeService
+        self.youtube_service = YouTubeService()
 
         logger.info("[WRENCH] Initializing TwitchIO Bot...")
         logger.info(f"[DEBUG] Calling super().__init__ with token and {len(initial_channels)} channels")
@@ -42,7 +45,7 @@ class TwitchBotCore(commands.Bot):
     async def event_ready(self):
         """Вызывается когда бот готов к работе"""
         logger.info('=' * 80)
-        logger.info('[BOT] ⚡ TWITCH BOT READY! ⚡')
+        logger.info('[BOT] TWITCH BOT READY!')
         logger.info('=' * 80)
         logger.info(f'[INFO] Bot logged in as: {self.nick}')
         logger.info(f'[ID] Bot user id: {self.user_id}')
@@ -51,7 +54,7 @@ class TwitchBotCore(commands.Bot):
         logger.info('[BOT] BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS')
 
         for channel in self.connected_channels:
-            logger.info(f'[OK] ✅ MONITORING CHAT: {channel.name}')
+            logger.info(f'[OK] MONITORING CHAT: {channel.name}')
         
         logger.info('=' * 80)
 
@@ -90,16 +93,16 @@ class TwitchBotCore(commands.Bot):
                 if 'badges' in message.tags:
                     # Формат: "broadcaster/1,subscriber/12"
                     badges_str = message.tags.get('badges', '')
-                    logger.info(f"🎖️ [BADGES RAW] {message.author.name}: '{badges_str}'")
+                    logger.info(f"[BADGES RAW] {message.author.name}: '{badges_str}'")
                     if badges_str:
                         badges_list = badges_str.split(',')
-                        logger.info(f"🎖️ [BADGES PARSED] {message.author.name}: {badges_list}")
+                        logger.info(f"[BADGES PARSED] {message.author.name}: {badges_list}")
                 else:
                     logger.warning(f"[WARN] [BADGES] 'badges' not in tags for {message.author.name}")
             else:
                 logger.warning(f"[WARN] [BADGES] No tags attribute or empty tags for {message.author.name}")
 
-            logger.debug(f"👤 [ROLE] {message.author.name}: role={role}, badges={badges_list}")
+            logger.debug(f"[ROLE] {message.author.name}: role={role}, badges={badges_list}")
 
             # Отправляем в chatbox
             await broadcast_chat_message(
@@ -113,15 +116,15 @@ class TwitchBotCore(commands.Bot):
 
             # [OK] НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
             try:
-                from features.drops.drops_service import DropsService
-                from core.database import get_db, User
+                from services.drops.drops_service import DropsService
+                from core.database import get_db
+                from repositories.user_repository import UserRepository
 
                 # Ищем user_id владельца канала по имени канала
                 db = next(get_db())
                 try:
-                    channel_owner = db.query(User).filter(
-                        User.twitch_username == message.channel.name.lower()
-                    ).first()
+                    user_repo = UserRepository(db)
+                    channel_owner = user_repo.get_by_twitch_username(message.channel.name)
 
                     if channel_owner:
                         drops_service = DropsService(db)

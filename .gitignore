@@ -136,6 +136,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Ruff
+.ruff_cache/
+
+# Benchmarks
+.benchmarks/
+
 # Node.js
 node_modules/
 npm-debug.log*
@@ -307,16 +313,12 @@ docker-compose.prod.yml
 env.production.example
 *.prod
 
-# Test and temporary files (добавлено при очистке)
-test_*.py
-*_test.py
-check_*.py
-seed_*.py
-create_*.py
-add_*.py
-demo_*.py
-temp_*.py
-tmp_*.py
+# Test output and temporary files (added during cleanup)
+pytest_*.txt
+*_output.txt
+*_log.txt
+regression_log.txt
+*.har
 
 # Old backups (keep only recent)
 */backups/*/*.db

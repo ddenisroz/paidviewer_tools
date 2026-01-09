@@ -2,15 +2,15 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 import { useLocation } from 'react-router-dom';
 
-import { useToast } from '../components/ui/toast';
-import { useButtonPosition } from '../hooks/useButtonPosition';
-import { useGlobalVoices, useToggleTts, useTtsHealth, useTtsStatus } from '../queries/tts/ttsQueries';
-import { logger } from '../utils/prodLogger';
+import { useGlobalVoices, useToggleTts, useTtsHealth, useTtsStatus } from '@/queries/tts/ttsQueries';
+import { useToast } from '@/shared/components/ui/toast';
+import { useButtonPosition } from '@/shared/hooks/useButtonPosition';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { AuthContext } from './AuthContext';
 
 
-import type { TtsVoice } from '../types/tts';
+import type { TtsVoice } from '@/types/tts';
 
 interface EngineStatus {
     loaded: boolean;
@@ -64,21 +64,21 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const [notificationCallback, setNotificationCallback] = useState<((message: string, type?: string) => void) | null>(null);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const [isToggling, setIsToggling] = useState<boolean>(false);
-    
-    const isGuest = user?.is_guest || user?.id === -1;
-    
+
+
+
     const ttsRelatedPaths = ['/dashboard/tts', '/tts'];
     const isTtsPage = ttsRelatedPaths.some(path => location.pathname.startsWith(path));
-    
-    const channelName = user?.isGuest ? user.username : null;
-    
+
+    const channelName = null;
+
     const { data: healthData, isLoading: isCheckingHealth, error: healthError } = useTtsHealth({
-        enabled: !isGuest && isTtsPage,
+        enabled: !!user && isTtsPage,
         refetchInterval: 30 * 1000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
-    
+
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (healthData) {
@@ -91,21 +91,21 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             }
         }
     }, [healthData]);
-    
+
     useEffect(() => {
         if (healthError) {
             logger.error("TTS Health check failed:", healthError);
             setEngineStatus({ loaded: false, error: "Не удается подключиться к TTS сервису" });
         }
     }, [healthError]);
-    
+
     const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
         enabled: !!user,
         refetchInterval: 30 * 1000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
-    
+
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (statusData) {
@@ -121,11 +121,11 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             }
         }
     }, [statusData]);
-    
+
     const { data: voicesData } = useGlobalVoices({
         enabled: !!user && engineStatus.loaded,
     });
-    
+
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (voicesData) {
@@ -137,12 +137,12 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             }
         }
     }, [voicesData]);
-    
+
     const toggleTtsMutation = useToggleTts({
         onSuccess: (data: unknown, enabled: boolean) => {
             setTtsEnabled(enabled);
-            window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-                detail: { enabled } 
+            window.dispatchEvent(new CustomEvent('tts-status-changed', {
+                detail: { enabled }
             }));
             const message = enabled ? "Озвучка сообщений включена." : "Озвучка сообщений отключена.";
             if (notificationCallback) {
@@ -175,7 +175,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             await refetchStatus();
         }
     }, [user, refetchStatus]);
-    
+
     const checkTtsHealth = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
         return { isHealthy: engineStatus.loaded, isChecking: isCheckingHealth };
     }, [engineStatus.loaded, isCheckingHealth]);
@@ -202,7 +202,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         if (isToggling || toggleTtsMutation.isPending) {
             return;
         }
-        
+
         if (!engineStatus.loaded) {
             const errorMessage = engineStatus.error || "TTS движок не готов. Попробуйте обновить страницу.";
             if (notificationCallback) {

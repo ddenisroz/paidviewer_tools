@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Единый API клиент для всех запросов
  * Заменяет множественные axios instances (botService, api, adminApi, ttsService)
  */
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
-import { API_BASE_URL, TTS_SERVICE_URL } from '../../constants';
-import { shouldRetryRequest } from '../../utils/apiErrorHandler';
-import { logger } from '../../utils/prodLogger';
+import { API_BASE_URL, TTS_SERVICE_URL } from '@/constants';
+import { shouldRetryRequest } from '@/shared/utils/apiErrorHandler';
+import { logger } from '@/shared/utils/prodLogger';
 
 /**
  * Конфигурация для создания API клиента

@@ -2,19 +2,19 @@
 
 import { AlertCircle, Archive, CheckCircle, Clock, Eye, MessageCircle, Search, Send } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { PageLoader } from '@/components/ui/loader';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { supportService } from '@/services/api/services/supportService';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent } from '@/shared/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
+import { Input } from '@/shared/components/ui/input';
+import { Label } from '@/shared/components/ui/label';
+import { PageLoader } from '@/shared/components/ui/loader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Textarea } from '@/shared/components/ui/textarea';
+import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
-import { supportService } from '../../../services/api/services/supportService';
-import { logger } from '../../../utils/prodLogger';
 
 import type { ApiResponse } from '../../../types';
 
@@ -63,7 +63,7 @@ const SupportTicketsPage: React.FC = () => {
       setTickets(data.data?.tickets || []);
     } catch (error) {
       logger.error('Error loading tickets:', error);
-      toast.error('Ошибка при загрузке тикетов');
+      toast.error('������ ��� �������� �������');
     } finally {
       setLoading(false);
     }
@@ -80,7 +80,7 @@ const SupportTicketsPage: React.FC = () => {
       setResponses(data.data?.responses || []);
     } catch (error) {
       logger.error('Error loading responses:', error);
-      toast.error('Ошибка при загрузке ответов');
+      toast.error('������ ��� �������� �������');
     }
   };
 
@@ -92,16 +92,16 @@ const SupportTicketsPage: React.FC = () => {
       const response = await supportService.sendAdminResponse(selectedTicket.id, newResponse);
 
       if (response && typeof response === 'object' && 'ok' in response && response.ok) {
-        toast.success('Ответ отправлен');
+        toast.success('����� ���������');
         setNewResponse('');
         loadTicketResponses(selectedTicket.id);
         loadTickets();
       } else {
-        toast.error('Ошибка при отправке ответа');
+        toast.error('������ ��� �������� ������');
       }
     } catch (error) {
       logger.error('Error sending response:', error);
-      toast.error('Ошибка при отправке ответа');
+      toast.error('������ ��� �������� ������');
     } finally {
       setIsSubmittingResponse(false);
     }
@@ -115,14 +115,14 @@ const SupportTicketsPage: React.FC = () => {
         status: newStatus,
         admin_notes: adminNotes
       });
-      toast.success('Тикет обновлен');
+      toast.success('����� ��������');
       setIsDialogOpen(false);
       setSelectedTicket(null);
       setAdminNotes('');
       loadTickets();
     } catch (error) {
       logger.error('Error updating ticket:', error);
-      toast.error('Ошибка при обновлении тикета');
+      toast.error('������ ��� ���������� ������');
     }
   };
 
@@ -133,11 +133,11 @@ const SupportTicketsPage: React.FC = () => {
       setTickets(prev => prev.map(ticket => 
         ticket.id === ticketId ? { ...ticket, is_archived: true } : ticket
       ));
-      toast.success('Тикет архивирован');
+      toast.success('����� �����������');
       loadTickets();
     } catch (error) {
       logger.error('Error archiving ticket:', error);
-      toast.error('Ошибка архивирования тикета');
+      toast.error('������ ������������� ������');
     }
   };
 
@@ -148,18 +148,18 @@ const SupportTicketsPage: React.FC = () => {
       setTickets(prev => prev.map(ticket => 
         ticket.id === ticketId ? { ...ticket, is_archived: false } : ticket
       ));
-      toast.success('Тикет извлечен из архива');
+      toast.success('����� �������� �� ������');
     } catch (error) {
       logger.error('Error unarchiving ticket:', error);
-      toast.error('Ошибка извлечения тикета из архива');
+      toast.error('������ ���������� ������ �� ������');
     }
   };
 
   const getStatusBadge = (status: string): React.ReactNode => {
     const statusConfig: Record<string, { color: string; icon: React.ComponentType<{ className?: string }>; text: string }> = {
-      open: { color: 'bg-blue-500', icon: Clock, text: 'Открыт' },
-      in_progress: { color: 'bg-yellow-500', icon: AlertCircle, text: 'В работе' },
-      closed: { color: 'bg-green-500', icon: CheckCircle, text: 'Закрыт' }
+      open: { color: 'bg-blue-500', icon: Clock, text: '������' },
+      in_progress: { color: 'bg-yellow-500', icon: AlertCircle, text: '� ������' },
+      closed: { color: 'bg-green-500', icon: CheckCircle, text: '������' }
     };
 
     const config = statusConfig[status] || statusConfig.open;
@@ -202,7 +202,7 @@ const SupportTicketsPage: React.FC = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <Input
-                  placeholder="Поиск по теме, сообщению или имени..."
+                  placeholder="����� �� ����, ��������� ��� �����..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -211,13 +211,13 @@ const SupportTicketsPage: React.FC = () => {
             </div>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Статус" />
+                <SelectValue placeholder="������" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Все статусы</SelectItem>
-                <SelectItem value="open">Открытые</SelectItem>
-                <SelectItem value="in_progress">В работе</SelectItem>
-                <SelectItem value="closed">Закрытые</SelectItem>
+                <SelectItem value="all">��� �������</SelectItem>
+                <SelectItem value="open">��������</SelectItem>
+                <SelectItem value="in_progress">� ������</SelectItem>
+                <SelectItem value="closed">��������</SelectItem>
               </SelectContent>
             </Select>
             <Button 
@@ -226,10 +226,10 @@ const SupportTicketsPage: React.FC = () => {
               className="flex items-center gap-2"
             >
               <Archive className="h-4 w-4" />
-              {showArchived ? 'Скрыть архив' : 'Показать архив'}
+              {showArchived ? '������ �����' : '�������� �����'}
             </Button>
             <Button onClick={loadTickets} variant="outline">
-              Обновить
+              ��������
             </Button>
           </div>
         </CardContent>
@@ -237,14 +237,14 @@ const SupportTicketsPage: React.FC = () => {
 
       <div className="space-y-4">
         {loading ? (
-          <PageLoader message="Загрузка тикетов..." />
+          <PageLoader message="�������� �������..." />
         ) : filteredTickets.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
               <MessageCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Тикеты не найдены</h3>
+              <h3 className="text-lg font-semibold mb-2">������ �� �������</h3>
               <p className="text-muted-foreground">
-                {searchTerm ? 'Попробуйте изменить поисковый запрос' : 'Пока нет тикетов поддержки'}
+                {searchTerm ? '���������� �������� ��������� ������' : '���� ��� ������� ���������'}
               </p>
             </CardContent>
           </Card>
@@ -260,10 +260,10 @@ const SupportTicketsPage: React.FC = () => {
                     </div>
                     
                     <div className="text-sm text-muted-foreground mb-3">
-                      <p><strong>От:</strong> {ticket.user_name} {ticket.user_email && `(${ticket.user_email})`}</p>
-                      <p><strong>Создан:</strong> {formatDate(ticket.created_at)}</p>
+                      <p><strong>��:</strong> {ticket.user_name} {ticket.user_email && `(${ticket.user_email})`}</p>
+                      <p><strong>������:</strong> {formatDate(ticket.created_at)}</p>
                       {ticket.updated_at !== ticket.created_at && (
-                        <p><strong>Обновлен:</strong> {formatDate(ticket.updated_at)}</p>
+                        <p><strong>��������:</strong> {formatDate(ticket.updated_at)}</p>
                       )}
                     </div>
 
@@ -273,7 +273,7 @@ const SupportTicketsPage: React.FC = () => {
 
                     {ticket.admin_notes && (
                       <div className="bg-blue-900 border border-blue-500 p-3 rounded-lg mb-3">
-                        <p className="text-sm font-medium text-white mb-1">Заметки администратора:</p>
+                        <p className="text-sm font-medium text-white mb-1">������� ��������������:</p>
                         <p className="text-sm text-white whitespace-pre-wrap">{ticket.admin_notes}</p>
                       </div>
                     )}
@@ -293,7 +293,7 @@ const SupportTicketsPage: React.FC = () => {
                       }}
                     >
                       <Eye className="h-4 w-4 mr-2" />
-                      Управление
+                      ����������
                     </Button>
                     {ticket.status === 'closed' && !ticket.is_archived && (
                       <Button
@@ -303,7 +303,7 @@ const SupportTicketsPage: React.FC = () => {
                         className="text-orange-600 hover:text-orange-700"
                       >
                         <Archive className="h-4 w-4 mr-2" />
-                        Архивировать
+                        ������������
                       </Button>
                     )}
                     {ticket.is_archived && (
@@ -314,7 +314,7 @@ const SupportTicketsPage: React.FC = () => {
                         className="text-green-600 hover:text-green-700"
                       >
                         <Archive className="h-4 w-4 mr-2" />
-                        Из архива
+                        �� ������
                       </Button>
                     )}
                   </div>
@@ -328,30 +328,30 @@ const SupportTicketsPage: React.FC = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Управление тикетом #{selectedTicket?.id}</DialogTitle>
+            <DialogTitle>���������� ������� #{selectedTicket?.id}</DialogTitle>
             <DialogDescription>
-              Измените статус тикета и добавьте заметки
+              �������� ������ ������ � �������� �������
             </DialogDescription>
           </DialogHeader>
 
           {selectedTicket && (
             <div className="space-y-4">
               <div>
-                <Label>Тема</Label>
+                <Label>����</Label>
                 <p className="font-medium">{selectedTicket.subject}</p>
               </div>
 
               <div>
-                <Label>Сообщение</Label>
+                <Label>���������</Label>
                 <div className="bg-gray-800/50 border border-gray-600/30 p-3 rounded-lg">
                   <p className="text-sm text-white whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedTicket.message}</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <Label>Переписка:</Label>
+                <Label>���������:</Label>
                 {responses.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Пока нет ответов</p>
+                  <p className="text-muted-foreground text-sm">���� ��� �������</p>
                 ) : (
                   responses.map((response) => (
                     <div
@@ -365,7 +365,7 @@ const SupportTicketsPage: React.FC = () => {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm text-white">
-                            {response.is_admin_response ? 'Администрация' : 'Пользователь'}
+                            {response.is_admin_response ? '�������������' : '������������'}
                           </span>
                           <span className="text-xs text-gray-400">
                             {formatDate(response.created_at)}
@@ -373,7 +373,7 @@ const SupportTicketsPage: React.FC = () => {
                         </div>
                         {response.is_admin_response && !response.is_read && (
                           <Badge variant="destructive" className="text-xs">
-                            Не прочитано
+                            �� ���������
                           </Badge>
                         )}
                       </div>
@@ -384,10 +384,10 @@ const SupportTicketsPage: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="admin_response">Ответ пользователю:</Label>
+                <Label htmlFor="admin_response">����� ������������:</Label>
                 <Textarea
                   id="admin_response"
-                  placeholder="Введите ответ пользователю..."
+                  placeholder="������� ����� ������������..."
                   value={newResponse}
                   onChange={(e) => setNewResponse(e.target.value)}
                   rows={3}
@@ -401,12 +401,12 @@ const SupportTicketsPage: React.FC = () => {
                     {isSubmittingResponse ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Отправка...
+                        ��������...
                       </>
                     ) : (
                       <>
                         <Send className="h-4 w-4 mr-2" />
-                        Отправить
+                        ���������
                       </>
                     )}
                   </Button>
@@ -414,24 +414,24 @@ const SupportTicketsPage: React.FC = () => {
               </div>
 
               <div>
-                <Label htmlFor="status">Статус</Label>
+                <Label htmlFor="status">������</Label>
                 <Select value={newStatus} onValueChange={(value) => setNewStatus(value as 'open' | 'in_progress' | 'closed')}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="open">Открыт</SelectItem>
-                    <SelectItem value="in_progress">В работе</SelectItem>
-                    <SelectItem value="closed">Закрыт</SelectItem>
+                    <SelectItem value="open">������</SelectItem>
+                    <SelectItem value="in_progress">� ������</SelectItem>
+                    <SelectItem value="closed">������</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div>
-                <Label htmlFor="admin_notes">Заметки администратора</Label>
+                <Label htmlFor="admin_notes">������� ��������������</Label>
                 <Textarea
                   id="admin_notes"
-                  placeholder="Добавьте заметки о решении проблемы..."
+                  placeholder="�������� ������� � ������� ��������..."
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   rows={4}
@@ -440,10 +440,10 @@ const SupportTicketsPage: React.FC = () => {
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Отмена
+                  ������
                 </Button>
                 <Button onClick={handleUpdateTicket}>
-                  Сохранить изменения
+                  ��������� ���������
                 </Button>
               </div>
             </div>

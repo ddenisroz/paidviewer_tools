@@ -1,12 +1,29 @@
-# TTS_TTV_0.02 - Text-to-Speech Bot для Twitch & VK Live
+# AI Python TTS & Twitch Bot 🤖
 
-![Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
-![Version](https://img.shields.io/badge/version-0.03-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)
+![React](https://img.shields.io/badge/React-18.2.0-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-**TTS бот для стримеров** с поддержкой облачного (Google TTS) и локального (F5-TTS) синтеза, YouTube заказов, системы баллов и интеграции с донатами.
+Комплексное решение для Twitch-стримеров с ИИ-озвучкой (TTS), интеграцией Twitch/VK/DonationAlerts и современным веб-интерфейсом.
 
----
+## 🚀 Текущий Статус (Refactoring 2026) -> **Stable 1.0.0 Candidate**
+
+Проект прошел масштабный рефакторинг для соответствия **Clean Architecture**:
+*   ✨ **Чистая Архитектура**: Разделение на API, Service, Repository слои.
+*   🎤 **VoiceManagementService**: Централизованное управление голосами и TTS провайдерами.
+*   🔌 **Изолированные Интеграции**: Модульные сервисы для Twitch, VK, DonationAlerts (Legacy-код удален).
+*   🔇 **TTS Service Simple**: Выделен в изолированный микросервис.
+*   💅 **Современный Frontend**: Feature-based структура, TypeScript строгая типизация.
+
+## ✨ Основные Возможности
+*   **ИИ Озвучка (TTS)**: Поддержка локальных (Silero) и облачных моделей.
+*   **Управление Голосами**: Глобальные пресеты, пользовательские голоса, настройки скорости/высоты.
+*   **Интеграции**:
+    *   **Twitch**: Чат, награды (Channel Points), команды, события.
+    *   **VK Live**: Отслеживание комментариев.
+    *   **DonationAlerts**: Озвучка донатов.
+*   **Веб-Панель**: Управление ботом, медиа-плеер, история событий.
 
 ## Быстрый старт (5 минут)
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -12,14 +12,12 @@ import {
     Volume2
 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/loader';
-
-
-import { adminService } from '../../../services/api/services/adminService';
-import { logger } from '../../../utils/prodLogger';
+import { adminService } from '@/services/api/services/adminService';
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { PageLoader } from '@/shared/components/ui/loader';
+import { logger } from '@/shared/utils/prodLogger';
 
 interface Metrics {
     users?: {

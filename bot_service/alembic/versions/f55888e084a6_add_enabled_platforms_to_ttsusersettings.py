@@ -32,7 +32,7 @@ def upgrade() -> None:
     # Добавляем unique constraint если его еще нет (игнорируем если уже есть)
     try:
         op.create_unique_constraint(None, 'users', ['vk_channel_name'])
-    except:
+    except Exception:
         pass  # Constraint уже существует
     # ### end Alembic commands ###
 

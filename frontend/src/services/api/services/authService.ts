@@ -1,7 +1,8 @@
-/**
+﻿/**
  * Auth Service - инкапсуляция всех Auth API вызовов
  */
-import { API_BASE_URL } from '../../../constants';
+import { API_BASE_URL } from '@/constants';
+
 import { apiClient } from '../client';
 
 import type { ApiResponse, User } from '../../../types';

@@ -1,13 +1,13 @@
-﻿// src/components/TtsQuickSettings.tsx
+// src/components/TtsQuickSettings.tsx
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Settings, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { useTts } from '@/context/TtsContext';
 import { useLocalTtsConfig, useSetTtsEngine, useToggleTts, useTtsStatus, useWhitelistStatus } from '@/queries/tts/ttsQueries';
+import { Button } from '@/shared/components/ui/button';
+import { Switch } from '@/shared/components/ui/switch';
 import { logger } from '@/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
@@ -22,17 +22,17 @@ const TtsQuickSettings: React.FC = () => {
     const audioUnlockedRef = useRef(false);
     const initializedRef = useRef(false);
 
-    // Синхронизация с TtsContext после загрузки
+    // Синхронизация с TtsContext (push events)
     useEffect(() => {
-        // FIX: Убираем проверку initializedRef.current для немедленного обновления toggle
+        // FIX: Следим за initializedRef.current для предотвращения лишних toggle
         setTtsEnabled(contextTtsEnabled);
         logger.info('TtsQuickSettings: Synced with TtsContext', { contextTtsEnabled });
     }, [contextTtsEnabled]);
 
-    // Слушаем изменения Basic TTS из настроек
+    // Следим за статусом Basic TTS (из событий)
     useEffect(() => {
         const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
-            // FIX: Убираем проверку initializedRef.current для немедленного обновления toggle
+            // FIX: Следим за initializedRef.current для предотвращения лишних toggle
             logger.info('TtsQuickSettings: Received tts-status-changed event', event.detail);
             setTtsEnabled(event.detail.enabled);
         };
@@ -41,18 +41,18 @@ const TtsQuickSettings: React.FC = () => {
         return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange as EventListener);
     }, []);
 
-    // Слушаем изменения AI TTS из настроек
+    // Следим за статусом AI TTS (из событий)
     useEffect(() => {
         const handleAiTtsChange = (event: CustomEvent<{ enabled: boolean; engineType: string; isWhitelisted?: boolean }>) => {
             logger.info('TtsQuickSettings: Received ai-tts-changed event', event.detail);
             const { enabled, engineType, isWhitelisted: whitelisted } = event.detail;
-            
-            // Обновляем состояние только если это действительно F5-TTS
-            // enabled = true означает включен F5-TTS (local или cloud для whitelisted)
-            // enabled = false означает выключен (переключились на обычный cloud)
+
+            // Определяем состояние именно для переключателя F5-TTS
+            // enabled = true означает включен F5-TTS (local или cloud если whitelisted)
+            // enabled = false означает выключен (переключен на обычный cloud)
             const isTtsEnabled = enabled && ((engineType === 'local') || (engineType === 'cloud' && whitelisted));
             setAiTtsEnabled(isTtsEnabled ?? false);
-            
+
             logger.info('TtsQuickSettings: AI TTS state updated:', {
                 enabled,
                 engineType,
@@ -65,7 +65,7 @@ const TtsQuickSettings: React.FC = () => {
         return () => window.removeEventListener('ai-tts-changed', handleAiTtsChange as EventListener);
     }, []);
 
-    // [OK] НОВЫЙ КОД: Используем централизованные hooks для загрузки данных
+    // [OK] Новый код: используем типизированные hooks для получения данных
     const { data: ttsStatusResponse } = useTtsStatus(null, {
         refetchInterval: 30000, // Обновляем каждые 30 секунд
         staleTime: 30 * 1000,
@@ -73,40 +73,40 @@ const TtsQuickSettings: React.FC = () => {
     const ttsStatusData = ttsStatusResponse?.data;
 
     const { data: localTtsConfigResponse } = useLocalTtsConfig({
-        retry: false, // Не повторяем при ошибке
+        retry: false, // Не повторять при ошибке
     });
     const localTtsConfigData = localTtsConfigResponse?.data;
 
     const { data: whitelistStatusResponse } = useWhitelistStatus({
-        retry: false, // Не повторяем при ошибке
+        retry: false, // Не повторять при ошибке
     });
     const whitelistStatusData = whitelistStatusResponse?.data as { is_whitelisted?: boolean } | undefined;
 
-    // [OK] НОВЫЙ КОД: Синхронизируем состояние с данными из React Query
+    // [OK] Новый код: инициализируем состояние с данными из React Query
     useEffect(() => {
         if (ttsStatusData) {
             setTtsEnabled(ttsStatusData.enabled || false);
-            
-            // Проверяем whitelist статус
+
+            // Состояние whitelist статуса
             const whitelistStatus = whitelistStatusData?.is_whitelisted || false;
-            
-            // Локальный TTS доступен если настроен И здоров (не требуется whitelist)
+
+            // Локальный TTS доступен если настроен и здоров (не проверяем whitelist)
             const isConfigured = localTtsConfigData?.configured || false;
             const isHealthy = localTtsConfigData?.healthy !== false;
             const hasLocalSetup = ttsStatusData.has_local_setup || false;
-            
-            // Доступен = настроен И здоров (whitelist не требуется для локального TTS)
+
+            // Доступен = настроен и здоров (whitelist не требуется для локального TTS)
             setAiTtsAvailable(isConfigured && isHealthy);
-            
-            // aiTtsEnabled = включен И (настроен локальный ИЛИ в whitelist)
-            // Проверяем: engine_type === 'local' (локальный F5-TTS) ИЛИ (engine_type === 'cloud' И в whitelist)
+
+            // aiTtsEnabled = включен и (является локальным или в whitelist)
+            // Критерий: engine_type === 'local' (локальный F5-TTS) ИЛИ (engine_type === 'cloud' и в whitelist)
             const engineType = ttsStatusData.engine_type;
             const isF5TtsEnabled = (engineType === 'local') || (engineType === 'cloud' && whitelistStatus);
             setAiTtsEnabled(isF5TtsEnabled);
-            
-            // Отмечаем что инициализация завершена
+
+            // Помечаем что инициализация завершена
             initializedRef.current = true;
-            
+
             logger.info('TtsQuickSettings: Loaded initial state', {
                 ttsEnabled: ttsStatusData.enabled,
                 aiTtsEnabled: engineType === 'local',
@@ -121,13 +121,13 @@ const TtsQuickSettings: React.FC = () => {
 
     const isWhitelisted = whitelistStatusData?.is_whitelisted || false;
 
-    // [OK] НОВЫЙ КОД: Используем централизованные hooks для переключения TTS и движка
+    // [OK] Новый код: используем типизированные hooks для переключения TTS и движка
     const toggleTtsMutation = useToggleTts({
         onSuccess: (response, enabled) => {
             setTtsEnabled(enabled);
-            // Уведомляем TtsContext о изменении (через custom event)
-            window.dispatchEvent(new CustomEvent('tts-status-changed', { 
-                detail: { enabled } 
+            // Уведомляем TtsContext и остальное (через custom event)
+            window.dispatchEvent(new CustomEvent('tts-status-changed', {
+                detail: { enabled }
             }));
             // toast уже показан в hook
         },
@@ -139,7 +139,7 @@ const TtsQuickSettings: React.FC = () => {
             if (axiosError.response?.status === 401) {
                 toast.error('Требуется авторизация');
             } else if (axiosError.code === 'ERR_NETWORK') {
-                toast.error('Сервер недоступен. Проверьте, запущен ли bot_service');
+                toast.error('Ошибка соединения. Проверьте, запущен ли bot_service');
             }
             // toast уже показан в hook
         },
@@ -148,20 +148,20 @@ const TtsQuickSettings: React.FC = () => {
     const setEngineMutation = useSetTtsEngine({
         onSuccess: (response, engineType) => {
             setAiTtsEnabled(engineType !== 'gtts');
-            
-            // Уведомляем другие компоненты об изменении с полными данными
-            window.dispatchEvent(new CustomEvent('ai-tts-changed', { 
-                detail: { 
+
+            // Уведомляем другие компоненты об изменении в движке синтеза
+            window.dispatchEvent(new CustomEvent('ai-tts-changed', {
+                detail: {
                     enabled: engineType !== 'gtts',
                     engineType: engineType,
                     isWhitelisted
-                } 
+                }
             }));
-            
+
             if (engineType === 'gtts') {
-                toast.success('Переключено на базовый TTS');
+                toast.success('Переключено на обычный TTS');
             } else {
-                toast.success(`Движок: ${engineType === 'cloud' ? 'Облачный F5-TTS' : 'Локальный F5-TTS'}`);
+                toast.success(`Успех: ${engineType === 'cloud' ? 'Облачный F5-TTS' : 'Локальный F5-TTS'}`);
             }
         },
         onError: (error: unknown) => {
@@ -173,17 +173,17 @@ const TtsQuickSettings: React.FC = () => {
             } else if (axiosError.response?.status === 403) {
                 toast.error('F5-TTS доступен только для пользователей из whitelist');
             } else if (axiosError.code === 'ERR_NETWORK') {
-                toast.error('Сервер недоступен');
+                toast.error('Ошибка соединения');
             }
             // toast уже показан в hook
         },
     });
 
-    // Слушаем изменения whitelist статуса (например, после добавления в whitelist в админке)
+    // Слушаем изменение whitelist статуса (например, когда добавились в whitelist в админке)
     useEffect(() => {
         const handleWhitelistChange = () => {
             logger.info('TtsQuickSettings: Whitelist changed, invalidating queries...');
-            // React Query автоматически обновит данные при изменении whitelist
+            // React Query автоматические обновит данные при изменении whitelist
         };
 
         window.addEventListener('whitelist-changed', handleWhitelistChange);
@@ -193,7 +193,7 @@ const TtsQuickSettings: React.FC = () => {
     // Разблокировка audio context при клике
     const unlockAudioContext = useCallback(async () => {
         if (audioUnlockedRef.current) return;
-        
+
         try {
             if (!audioContextRef.current) {
                 const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -201,27 +201,27 @@ const TtsQuickSettings: React.FC = () => {
                     audioContextRef.current = new AudioContextClass();
                 }
             }
-            
+
             if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
                 await audioContextRef.current.resume();
             }
-            
+
             if (!audioContextRef.current) {
                 logger.warn('[TTS] AudioContext not available');
                 return;
             }
-            
-            // Проигрываем беззвучный звук для разблокировки
+
+            // Создаем короткий звук для разблокировки
             const oscillator = audioContextRef.current.createOscillator();
             const gainNode = audioContextRef.current.createGain();
-            
+
             gainNode.gain.value = 0.01;
             oscillator.connect(gainNode);
             gainNode.connect(audioContextRef.current.destination);
-            
+
             oscillator.start(0);
             oscillator.stop(0.1);
-            
+
             audioUnlockedRef.current = true;
             logger.info('[OK] Audio unlocked for TTS playback');
         } catch (err) {
@@ -231,15 +231,15 @@ const TtsQuickSettings: React.FC = () => {
 
     const handleToggleTts = (enabled: boolean) => {
         if (toggleTtsMutation.isPending) return;
-        
+
         setLoading(true);
-        
+
         if (enabled) {
             // Разблокируем audio при включении
             unlockAudioContext();
         }
-        
-        // [OK] НОВЫЙ КОД: Используем централизованный mutation
+
+        // [OK] Новый код: используем типизированные mutation
         toggleTtsMutation.mutate(enabled, {
             onSettled: () => {
                 setLoading(false);
@@ -247,24 +247,24 @@ const TtsQuickSettings: React.FC = () => {
         });
     };
 
-    const handleToggleAiTts = (_enabled: boolean) => {
-        // Проверяем доступность локального TTS
+    const _handleToggleAiTts = (enabled: boolean) => {
+        // Проверка доступности локального TTS
         if (enabled && !aiTtsAvailable && !isWhitelisted) {
-            toast.error('F5-TTS не настроен. Перейдите в настройки для его настройки.');
+            toast.error('F5-TTS не доступен. Настройте в настройках или для облака.');
             return;
         }
-        
+
         if (setEngineMutation.isPending || toggleTtsMutation.isPending) return;
-        
+
         setLoading(true);
-        
+
         if (enabled) {
-            // При включении F5-TTS сначала включаем базовую TTS как fallback (если еще не включена)
+            // При включении F5-TTS должны включить обычный TTS как fallback (если он не включен)
             if (!ttsEnabled) {
                 toggleTtsMutation.mutate(true, {
                     onSuccess: () => {
-                        logger.info('[OK] Базовая TTS включена как fallback для F5-TTS');
-                        // После включения базовой TTS переключаем движок
+                        logger.info('[OK] Обычный TTS включен как fallback для F5-TTS');
+                        // После активации обычного TTS включаем нужный движок
                         const newEngine = isWhitelisted ? 'cloud' : 'local';
                         setEngineMutation.mutate(newEngine, {
                             onSettled: () => {
@@ -278,7 +278,7 @@ const TtsQuickSettings: React.FC = () => {
                     },
                 });
             } else {
-                // Если базовая TTS уже включена, просто переключаем движок
+                // Если обычный TTS уже включен, просто переключаем движок
                 const newEngine = isWhitelisted ? 'cloud' : 'local';
                 setEngineMutation.mutate(newEngine, {
                     onSettled: () => {
@@ -287,7 +287,7 @@ const TtsQuickSettings: React.FC = () => {
                 });
             }
         } else {
-            // При выключении F5-TTS переключаемся на базовый TTS, но НЕ выключаем базовую TTS
+            // При отключении F5-TTS переключаемся на обычный TTS, но не выключаем систему TTS
             setEngineMutation.mutate('gtts', {
                 onSettled: () => {
                     setLoading(false);
@@ -296,14 +296,14 @@ const TtsQuickSettings: React.FC = () => {
         }
     };
 
-    // Автоотключение TTS теперь управляется бэкендом через WebSocket disconnect + таймер
-    // Если пользователь не переподключится в течение 15 секунд - TTS отключится автоматически
-    // Это позволяет сохранить TTS при перезагрузке страницы
+    // Автоматическое TTS должно отключаться только через WebSocket disconnect + таймер
+    // Если пользователь не переподключился в течение 15 секунд - TTS выключается принудительно
+    // Это поведение регулирует backend
 
     return (
         <div className="border border-border rounded-lg p-3 bg-background/50">
             <div className="flex items-center justify-between gap-3">
-                {/* Статус */}
+                {/* Иконка */}
                 <div className="flex items-center gap-2">
                     {ttsEnabled ? (
                         <Volume2 className="w-4 h-4 text-purple-400" />
@@ -343,4 +343,3 @@ const TtsQuickSettings: React.FC = () => {
 };
 
 export default TtsQuickSettings;
-

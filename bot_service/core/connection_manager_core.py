@@ -268,8 +268,8 @@ class ConnectionManagerCore:
             has_active_bots = False
 
             # 1. Проверяем WebSocket соединения через memory_websocket_manager (сайт)
-            from services.memory_websocket_manager import memory_websocket_manager
-            user_connections = memory_websocket_manager.get_user_connections(user_id)
+            from services.memory_websocket_manager import get_memory_websocket_manager
+            user_connections = get_memory_websocket_manager().get_user_connections(user_id)
 
             if user_connections:
                 # Проверяем, есть ли хотя бы одно активное соединение

@@ -1,9 +1,9 @@
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { integrationsService } from '../services/api/services/integrationsService';
-import { ttsService } from '../services/api/services/ttsService';
-import { saveReturnUrl } from '../utils/oauthRedirect';
-import { logger } from '../utils/prodLogger';
+import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
+import { integrationsService } from '@/services/api/services/integrationsService';
+import { ttsService } from '@/services/api/services/ttsService';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
 
@@ -42,15 +42,15 @@ interface IntegrationsProviderProps {
 
 export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ children }) => {
     const { isAuthenticated, user, integrationsNeedRefresh, markIntegrationsRefreshed, refreshAuthStatus } = useAuth();
-    
+
     const getInitialIntegrations = (): IntegrationsState => {
         if (user?.integrations) {
             return {
-                twitch: { 
+                twitch: {
                     enabled: !!user.integrations.twitch?.connected,
                     username: (user.integrations.twitch as { username?: string })?.username || null
                 },
-                vk: { 
+                vk: {
                     enabled: !!user.integrations.vk?.connected,
                     username: (user.integrations.vk as { username?: string })?.username || null
                 },
@@ -60,22 +60,22 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 },
             };
         }
-        
+
         return {
             twitch: { enabled: false, username: null },
             vk: { enabled: false, username: null },
             donationalerts: { enabled: false, username: null },
         };
     };
-    
+
     const [integrations, setIntegrations] = useState<IntegrationsState>(getInitialIntegrations);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [initialLoad, setInitialLoad] = useState<boolean>(!user?.integrations);
 
     const fetchIntegrations = useCallback(async (): Promise<void> => {
         if (isAuthenticated === false) {
-            setIntegrations({ 
-                twitch: { enabled: false, username: null }, 
+            setIntegrations({
+                twitch: { enabled: false, username: null },
                 vk: { enabled: false, username: null },
                 donationalerts: { enabled: false, username: null }
             });
@@ -86,11 +86,11 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
 
         if (isAuthenticated === true && user?.integrations) {
             const newIntegrations: IntegrationsState = {
-                twitch: { 
+                twitch: {
                     enabled: !!user.integrations.twitch?.connected,
                     username: (user.integrations.twitch as { username?: string })?.username || null
                 },
-                vk: { 
+                vk: {
                     enabled: !!user.integrations.vk?.connected,
                     username: (user.integrations.vk as { username?: string })?.username || null
                 },
@@ -99,13 +99,13 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                     username: (user.integrations.donationalerts as { username?: string })?.username || null
                 },
             };
-            
+
             setIntegrations(prev => {
-                const hasChanged = 
+                const hasChanged =
                     prev.twitch.enabled !== newIntegrations.twitch.enabled ||
                     prev.vk.enabled !== newIntegrations.vk.enabled ||
                     prev.donationalerts.enabled !== newIntegrations.donationalerts.enabled;
-                
+
                 return hasChanged ? newIntegrations : prev;
             });
             setIsLoading(false);
@@ -136,7 +136,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
         };
 
         window.addEventListener('auth_refresh_required', handleAuthRefresh);
-        
+
         return () => {
             window.removeEventListener('auth_refresh_required', handleAuthRefresh);
         };
@@ -151,7 +151,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
             try {
                 setIsLoading(true);
                 await integrationsService.disconnectTwitch();
-                
+
                 try {
                     const ttsSettingsResponse = await ttsService.getPlatformSettings();
                     const currentPlatforms = (ttsSettingsResponse.data as { enabled_platforms?: string[] }).enabled_platforms || [];
@@ -159,16 +159,16 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                     await ttsService.savePlatformSettings({
                         enabled_platforms: updatedPlatforms
                     });
-                    
+
                     window.dispatchEvent(new CustomEvent('tts-settings-changed', {
                         detail: { enabledPlatforms: updatedPlatforms }
                     }));
-                    
+
                     logger.log('[REFRESH] Automatically removed twitch from TTS enabled_platforms');
                 } catch (ttsError) {
                     logger.error('Error updating TTS settings after disconnect:', ttsError);
                 }
-                
+
                 await refreshAuthStatus(true);
                 await fetchIntegrations();
             } catch (error) {
@@ -189,7 +189,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
             try {
                 setIsLoading(true);
                 await integrationsService.disconnectVk();
-                
+
                 try {
                     const ttsSettingsResponse = await ttsService.getPlatformSettings();
                     const currentPlatforms = (ttsSettingsResponse.data as { enabled_platforms?: string[] }).enabled_platforms || [];
@@ -197,16 +197,16 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                     await ttsService.savePlatformSettings({
                         enabled_platforms: updatedPlatforms
                     });
-                    
+
                     window.dispatchEvent(new CustomEvent('tts-settings-changed', {
                         detail: { enabledPlatforms: updatedPlatforms }
                     }));
-                    
+
                     logger.log('[REFRESH] Automatically removed vk from TTS enabled_platforms');
                 } catch (ttsError) {
                     logger.error('Error updating TTS settings after disconnect:', ttsError);
                 }
-                
+
                 await refreshAuthStatus(true);
                 await fetchIntegrations();
             } catch (error) {

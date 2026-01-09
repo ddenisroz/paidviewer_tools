@@ -66,8 +66,7 @@ class CSRFProtectionMiddleware(BaseHTTPMiddleware):
     def _generate_csrf_token(self, request: Request) -> str:
         """Генерирует CSRF токен"""
         # Используем session ID + secret key для генерации токена
-        session_id = request.session.get("session_id", "")
-        token_data = f"{session_id}:{self.secret_key}"
+        request.session.get("session_id", "")
         return secrets.token_urlsafe(32)
 
     async def _validate_csrf_token(self, request: Request) -> bool:

@@ -83,12 +83,21 @@ def censor_sensitive_data(logger: Any, method_name: str, event_dict: EventDict) 
     return censor_dict(event_dict)
 
 
+_SETUP_DONE = False
+
 def setup_structured_logging():
     """
     Configure structured logging for the application.
     
     Call this once at application startup, before any logging occurs.
+    Idempotent: subsequent calls will be ignored.
     """
+    global _SETUP_DONE
+    if _SETUP_DONE:
+        return
+    _SETUP_DONE = True
+
+    # Determine processors based on environment
     # Determine processors based on environment
     processors: list[Processor] = [
         # Add log level
@@ -124,11 +133,11 @@ def setup_structured_logging():
     if settings.is_production or getattr(settings, 'enable_json_logs', False):
         # JSON for production (machine-readable)
         processors.append(structlog.processors.JSONRenderer())
-        renderer = structlog.processors.JSONRenderer()
+        structlog.processors.JSONRenderer()
     else:
         # Console for development (human-readable)
         processors.append(structlog.dev.ConsoleRenderer(colors=True))
-        renderer = structlog.dev.ConsoleRenderer(colors=True)
+        structlog.dev.ConsoleRenderer(colors=True)
     
     # Configure structlog
     structlog.configure(
@@ -147,6 +156,19 @@ def setup_structured_logging():
         stream=sys.stdout,
         level=logging.INFO if settings.is_production else logging.DEBUG,
     )
+    
+    # Redirect warnings to logging
+    logging.captureWarnings(True)
+
+    # Silence noisy libraries
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("fastapi").setLevel(logging.WARNING)
+    logging.getLogger("watchfiles").setLevel(logging.CRITICAL)
+    logging.getLogger("watchfiles.main").setLevel(logging.CRITICAL)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     
     # Setup log rotation if enabled
     if getattr(settings, 'enable_log_rotation', True):
@@ -175,7 +197,7 @@ def setup_log_rotation():
     handler = RotatingFileHandler(
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10 MB
-        backupCount=30,  # Keep 30 files
+        backupCount=10,  # Keep 10 files
     )
     
     # Add handler to root logger

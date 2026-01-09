@@ -1,5 +1,5 @@
 # bot_service/models.py
-from pydantic import BaseModel, validator, Field
+from pydantic import BaseModel, field_validator, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 import re
@@ -10,14 +10,14 @@ class WhitelistedChannelPublic(BaseModel):
     channel_name: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AddToWhitelistRequest(BaseModel):
     username: str = Field(..., min_length=1, max_length=50, pattern=r'^[a-zA-Z0-9_]+$')
 
-    @validator('username')
-    def validate_username(cls, v):
+    @field_validator('username')
+    @classmethod
+    def validate_username(cls, v: str) -> str:
         if not re.match(r'^[a-zA-Z0-9_]+$', v):
             raise ValueError('Username can only contain letters, numbers and underscores')
         return v.lower().strip()
@@ -38,8 +38,7 @@ class YouTubeVideoPublic(BaseModel):
     requester_name: Optional[str] = None  # Имя заказчика
     channel_title: Optional[str] = None  # Название YouTube канала
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class QueueResponse(BaseModel):
     current_video: Optional[YouTubeVideoPublic] = None
@@ -52,8 +51,7 @@ class BlockedBotPublic(BaseModel):
     bot_name: str
     added_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AddBlockedBotRequest(BaseModel):
     bot_name: str
@@ -67,8 +65,7 @@ class UserPublic(BaseModel):
     blocked_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Stream management models
 class UpdateTitleRequest(BaseModel):

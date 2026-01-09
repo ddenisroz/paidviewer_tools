@@ -1,0 +1,63 @@
+# bot_service/api/tts/synthesis_routes.py
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
+
+from core.database import get_db
+from auth.auth import get_current_user
+from services.tts.tts_service import TTSService
+
+logger = logging.getLogger('bot_service')
+
+tts_router = APIRouter(prefix="/api/tts", tags=["tts"])
+
+def get_tts_service(db: Session = Depends(get_db)) -> TTSService:
+    return TTSService(db)
+
+@tts_router.post("/synthesize")
+async def synthesize_text(
+    request: Request,
+    user: dict = Depends(get_current_user),
+    service: TTSService = Depends(get_tts_service)
+):
+    """
+    Experimental endpoint for synthesis via new Architecture.
+    Delegates to TTSService.
+    """
+    try:
+        data = await request.json()
+        text = data.get("text")
+        voice = data.get("voice", "female_1") 
+        # Optional params
+        channel = data.get("channel")
+        platform = data.get("platform", "twitch")
+        priority = data.get("priority", 1)
+
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+
+        result = await service.synthesize(
+            text=text,
+            user=user,
+            voice=voice,
+            channel=channel,
+            platform=platform,
+            priority=priority
+        )
+
+        if not result.get("success"):
+            # Check for specific errors like Rate Limit
+            if "Rate limit" in result.get("error", ""):
+                 raise HTTPException(status_code=429, detail=result.get("error"))
+            raise HTTPException(status_code=500, detail=result.get("error"))
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Synthesis error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+

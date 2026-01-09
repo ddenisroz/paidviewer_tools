@@ -10,7 +10,6 @@ Dependency Injection для FastAPI.
 from functools import lru_cache
 from typing import Generator
 
-from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from models.base import SessionLocal

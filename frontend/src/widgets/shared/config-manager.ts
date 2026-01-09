@@ -1,4 +1,4 @@
-import { logger } from '../../utils/prodLogger';
+﻿import { logger } from '@/shared/utils/prodLogger';
 
 declare global {
   interface Window {

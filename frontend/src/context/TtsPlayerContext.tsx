@@ -1,6 +1,6 @@
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
+﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import { logger } from '../utils/prodLogger';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { useAudioPriority } from './AudioPriorityContext';
 

@@ -1,14 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 
 import { useParams } from 'react-router-dom';
+
+import { dropsService } from '@/services/api/services/dropsService';
+import { logger } from '@/shared/utils/prodLogger';
 
 import CommonOpened from '../../images/lootboxes/common/common_opened.png';
 import EpicOpened from '../../images/lootboxes/epic/epic_opened.png';
 import LegendaryOpened from '../../images/lootboxes/legendary/legendary_opened.png';
 import MythycOpened from '../../images/lootboxes/mythyc/mythyc_opened.png';
 import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
-import { dropsService } from '../../services/api/services/dropsService';
-import { logger } from '../../utils/prodLogger';
 
 const QUALITY_IMAGES: Record<string, string> = {
   'common': CommonOpened,

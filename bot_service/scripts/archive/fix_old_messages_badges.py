@@ -44,7 +44,7 @@ def fix_broadcaster_badges():
                     ChatMessage.platform == 'twitch',
                     func.lower(ChatMessage.channel_name) == user.twitch_username.lower(),
                     func.lower(ChatMessage.author_username) == user.twitch_username.lower(),
-                    ChatMessage.badges == None  # Только сообщения без badges
+                    ChatMessage.badges is None  # Только сообщения без badges
                 ).all()
 
                 logger.info(f"  Found {len(messages)} broadcaster messages without badges")
@@ -68,7 +68,7 @@ def fix_broadcaster_badges():
                     ChatMessage.platform == 'vk',
                     func.lower(ChatMessage.channel_name) == user.vk_username.lower(),
                     func.lower(ChatMessage.author_username) == user.vk_username.lower(),
-                    ChatMessage.role == None  # Только сообщения без role
+                    ChatMessage.role is None  # Только сообщения без role
                 ).all()
 
                 logger.info(f"  Found {len(messages)} owner messages without role")
@@ -85,8 +85,8 @@ def fix_broadcaster_badges():
 
         # Статистика
         total_messages = db.query(ChatMessage).count()
-        messages_with_badges = db.query(ChatMessage).filter(ChatMessage.badges != None).count()
-        messages_with_role = db.query(ChatMessage).filter(ChatMessage.role != None).count()
+        messages_with_badges = db.query(ChatMessage).filter(ChatMessage.badges is not None).count()
+        messages_with_role = db.query(ChatMessage).filter(ChatMessage.role is not None).count()
 
         logger.info("\n[STATS] STATISTICS:")
         logger.info(f"  Total messages: {total_messages}")

@@ -1,4 +1,4 @@
-import { logger } from '../../utils/prodLogger';
+﻿import { logger } from '@/shared/utils/prodLogger';
 
 type ChatRole = 'moderator' | 'vip' | 'subscriber' | 'normal';
 type Platform = 'twitch' | 'vk';
@@ -117,24 +117,25 @@ class ChatWidget {
   }
 
   private applyConfig(): void {
+    if (!this.config) return;
     const root = document.documentElement;
-    const config = this.config!;
-    root.style.setProperty('--widget-width', `${config.width  }px`);
-    root.style.setProperty('--widget-height', `${config.height  }px`);
+    const config = this.config;
+    root.style.setProperty('--widget-width', `${config.width}px`);
+    root.style.setProperty('--widget-height', `${config.height}px`);
     root.style.setProperty('--background-color', config.backgroundColor);
     root.style.setProperty('--background-image', config.backgroundImage);
-    root.style.setProperty('--border-radius', `${config.borderRadius  }px`);
+    root.style.setProperty('--border-radius', `${config.borderRadius}px`);
     root.style.setProperty('--border-color', config.borderColor);
-    root.style.setProperty('--border-width', `${config.borderWidth  }px`);
+    root.style.setProperty('--border-width', `${config.borderWidth}px`);
     root.style.setProperty('--message-bg', config.messageBg);
-    root.style.setProperty('--message-border-radius', `${config.messageBorderRadius  }px`);
-    root.style.setProperty('--message-margin', `${config.messageMargin  }px`);
-    root.style.setProperty('--message-padding', `${config.messagePadding  }px`);
+    root.style.setProperty('--message-border-radius', `${config.messageBorderRadius}px`);
+    root.style.setProperty('--message-margin', `${config.messageMargin}px`);
+    root.style.setProperty('--message-padding', `${config.messagePadding}px`);
     root.style.setProperty('--font-family', config.fontFamily);
-    root.style.setProperty('--font-size', `${config.fontSize  }px`);
+    root.style.setProperty('--font-size', `${config.fontSize}px`);
     root.style.setProperty('--font-weight', config.fontWeight);
     root.style.setProperty('--text-color', config.textColor);
-    root.style.setProperty('--animation-duration', `${config.animationDuration  }s`);
+    root.style.setProperty('--animation-duration', `${config.animationDuration}s`);
     root.style.setProperty('--animation-type', config.animationType);
     root.style.setProperty('--moderator-color', config.colors.moderator);
     root.style.setProperty('--vip-color', config.colors.vip);
@@ -146,7 +147,7 @@ class ChatWidget {
   private connectWebSocket(): void {
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get('user') || 'default';
-    const base = this.config?.wsUrl || (window.location.protocol === 'https:' ? `wss://${  window.location.host}` : `ws://${  window.location.host}`);
+    const base = this.config?.wsUrl || (window.location.protocol === 'https:' ? `wss://${window.location.host}` : `ws://${window.location.host}`);
     const wsUrl = `${base}/ws/chat-widget/${userId}`;
     if (!wsUrl || wsUrl.includes('null')) {
       logger.warn('Invalid WebSocket URL:', wsUrl);
@@ -206,7 +207,8 @@ class ChatWidget {
   }
 
   private renderMessage(message: ChatMessage): void {
-    const messagesContainer = document.getElementById('chat-messages')!;
+    const messagesContainer = document.getElementById('chat-messages');
+    if (!messagesContainer) return;
     const messageElement = document.createElement('div');
     messageElement.className = `chat-message ${message.role} ${this.config?.animationType}`;
     messageElement.id = `message-${message.id}`;

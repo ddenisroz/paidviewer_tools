@@ -91,24 +91,24 @@ class FileValidator:
     """Класс для валидации загружаемых файлов"""
 
     @staticmethod
-    def validate_audio_file(
-        file: UploadFile,
-        max_size_mb: int = MAX_VOICE_FILE_SIZE_MB
+    def validate_audio_metadata(
+        filename: str,
+        content_type: str
     ) -> Tuple[bool, str]:
         """
-        Валидирует аудио файл
-        Returns: (is_valid, error_message)
+        Валидирует метаданные аудио файла (имя, тип).
+        Decoupled from FastAPI UploadFile.
         """
         try:
             # Проверка типа контента
-            if file.content_type not in ALLOWED_AUDIO_TYPES:
-                logger.warning(f"Invalid audio file type: {file.content_type}")
+            if content_type not in ALLOWED_AUDIO_TYPES:
+                logger.warning(f"Invalid audio file type: {content_type}")
                 allowed_types = ', '.join(ALLOWED_AUDIO_TYPES)
                 return False, f"Неподдерживаемый формат. Разрешены: {allowed_types}"
 
             # Проверка расширения файла
-            if file.filename:
-                _, ext = os.path.splitext(file.filename)
+            if filename:
+                _, ext = os.path.splitext(filename)
                 ext = ext.lower()
                 allowed_extensions = {'.wav', '.mp3', '.ogg', '.webm', '.aac', '.flac', '.mpeg'}
                 if ext not in allowed_extensions:
@@ -117,8 +117,39 @@ class FileValidator:
             return True, ""
 
         except Exception as e:
-            logger.error(f"Error validating audio file: {e}")
-            return False, f"Ошибка при валидации файла: {str(e)}"
+            logger.error(f"Error validating audio metadata: {e}")
+            return False, f"Ошибка при валидации: {str(e)}"
+
+    @staticmethod
+    def validate_audio_file(
+        file: UploadFile,
+        max_size_mb: int = MAX_VOICE_FILE_SIZE_MB
+    ) -> Tuple[bool, str]:
+        """
+        Валидирует аудио файл (Wrapper for UploadFile)
+        """
+        return FileValidator.validate_audio_metadata(file.filename, file.content_type)
+
+    @staticmethod
+    def validate_size_limit(
+        size: int,
+        max_size_mb: int
+    ) -> Tuple[bool, str]:
+        """
+        Валидирует размер файла (bytes).
+        """
+        try:
+            max_size_bytes = max_size_mb * 1024 * 1024
+
+            if size > max_size_bytes:
+                size_mb = size / (1024 * 1024)
+                return False, f"Размер файла ({size_mb:.2f} MB) превышает максимум ({max_size_mb} MB)"
+
+            return True, ""
+
+        except Exception as e:
+            logger.error(f"Error validating size: {e}")
+            return False, f"Ошибка при проверке размера: {str(e)}"
 
     @staticmethod
     def validate_file_size(
@@ -126,21 +157,11 @@ class FileValidator:
         max_size_mb: int = MAX_VOICE_FILE_SIZE_MB
     ) -> Tuple[bool, str]:
         """
-        Валидирует размер файла
-        Returns: (is_valid, error_message)
+        Валидирует размер файла (Wrapper for UploadFile)
         """
-        try:
-            max_size_bytes = max_size_mb * 1024 * 1024
-
-            if file.size and file.size > max_size_bytes:
-                size_mb = file.size / (1024 * 1024)
-                return False, f"Размер файла ({size_mb:.2f} MB) превышает максимум ({max_size_mb} MB)"
-
-            return True, ""
-
-        except Exception as e:
-            logger.error(f"Error validating file size: {e}")
-            return False, f"Ошибка при проверке размера: {str(e)}"
+        if file.size is None:
+             return True, "" # Cannot validate if None
+        return FileValidator.validate_size_limit(file.size, max_size_mb)
 
     @staticmethod
     def validate_image_file(file: UploadFile) -> Tuple[bool, str]:

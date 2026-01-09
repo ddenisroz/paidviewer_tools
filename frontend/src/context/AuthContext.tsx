@@ -1,260 +1,131 @@
-﻿// src/context/AuthContext.tsx
-import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
-import { toast } from '@/utils/toastManager';
+import { authLogger as logger } from '../shared/utils/prodLogger';
+import { getSharedWebSocket } from '../shared/utils/sharedWebSocket';
+import { useAuthStore } from '../store/useAuthStore';
 
-import { useAuthStatus, useLogout } from '../queries/auth/authQueries';
-import { authService } from '../services/api/services/authService';
-import { logger } from '../utils/prodLogger';
+import type { User } from '@/types/user';
 
-import type { User, UserIntegrations } from '../types/user';
 
-// Глобальный флаг для предотвращения множественных проверок аутентификации
-const _globalAuthCheckInProgress = false;
-const _globalLastAuthCheckTime = 0;
-
-interface AuthStatusData {
-  authenticated: boolean;
-  user: User;
-  integrations?: UserIntegrations;
+interface AuthContextType {
+    user: User | null;
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    isCheckingAuth: boolean;
+    integrationsNeedRefresh: boolean;
+    loginWithTwitch: () => void;
+    loginWithVk: () => void;
+    logout: () => Promise<void>;
+    checkAuthStatus: () => Promise<void>;
+    refreshAuthStatus: (force?: boolean) => Promise<void>;
+    markIntegrationsRefreshed: () => void;
+    isWhitelisted: (platform: string, channel: string) => boolean;
 }
 
-interface AuthContextValue {
-  user: User | null;
-  isAuthenticated: boolean | null;
-  isCheckingAuth: boolean;
-  isGuest: boolean;
-  integrations: UserIntegrations;
-  loginWithTwitch: () => void;
-  loginWithVk: () => void;
-  logout: () => Promise<void>;
-  integrationsNeedRefresh: boolean;
-  markIntegrationsRefreshed: () => void;
-  triggerIntegrationsRefresh: () => void;
-  refreshAuthStatus: (force?: boolean) => Promise<void>;
-}
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-export const useAuth = (): AuthContextValue => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-    const getCachedUser = (): User | null => {
-        try {
-            const cached = localStorage.getItem('cached_user');
-            if (cached) {
-                return JSON.parse(cached) as User;
-            }
-        } catch (e) {
-            logger.error('Failed to parse cached user:', e);
-        }
-        return null;
-    };
-
-    const [user, setUser] = useState<User | null>(getCachedUser);
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(getCachedUser() ? true : null);
-    const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true);
-    const [integrationsNeedRefresh, setIntegrationsNeedRefresh] = useState<boolean>(false);
-
-    const { data: authStatusData, isLoading: isCheckingAuthStatus, isError, error, refetch: refetchAuthStatus } = useAuthStatus({
-        enabled: true,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
-    });
-
-    useEffect(() => {
-        if (authStatusData) {
-            const { authenticated, user: userData, integrations } = authStatusData as unknown as AuthStatusData;
-            
-            if (authenticated) {
-                const newUser: User = { ...userData, integrations };
-                setIsAuthenticated(true);
-                setUser(newUser);
-                try {
-                    localStorage.setItem('cached_user', JSON.stringify(newUser));
-                } catch (e) {
-                    logger.error('Failed to cache user:', e);
-                }
-            } else {
-                setIsAuthenticated(false);
-                setUser(null);
-                localStorage.removeItem('cached_user');
-            }
-            
-            const currentUrl = new URL(window.location.href);
-            const hasAuthParams = currentUrl.searchParams.has('auth') || 
-                                  currentUrl.searchParams.has('success') || 
-                                  currentUrl.searchParams.has('error') ||
-                                  currentUrl.searchParams.has('auth_link');
-            
-            if (hasAuthParams) {
-                const authPlatform = currentUrl.searchParams.get('auth') || currentUrl.searchParams.get('auth_link');
-                const authSuccess = currentUrl.searchParams.get('success') === '1';
-                
-                currentUrl.searchParams.delete('auth');
-                currentUrl.searchParams.delete('success');
-                currentUrl.searchParams.delete('error');
-                currentUrl.searchParams.delete('auth_link');
-                
-                window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search);
-                logger.debug('Auth URL params cleaned');
-                
-                if (authSuccess || authPlatform) {
-                    logger.log(`[REFRESH] [AUTH] OAuth success for ${authPlatform}, triggering integrations refresh`);
-                    setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('auth_refresh_required'));
-                    }, 200);
-                }
-            }
-        }
-    }, [authStatusData]);
-
-    useEffect(() => {
-        if (isError && error) {
-            logger.error('Authentication check failed:', error);
-            const axiosError = error as { response?: { status?: number } };
-            if (axiosError.response && (axiosError.response.status === 401 || axiosError.response.status === 403)) {
-                setIsAuthenticated(false);
-                setUser(null);
-                localStorage.removeItem('cached_user');
-            }
-        }
-    }, [isError, error]);
-
-    useEffect(() => {
-        setIsCheckingAuth(isCheckingAuthStatus);
-    }, [isCheckingAuthStatus]);
-
-    const checkAuthStatus = useCallback(async (force: boolean = false): Promise<void> => {
-        if (force) {
-            await refetchAuthStatus();
-        }
-    }, [refetchAuthStatus]);
-
-    useEffect(() => {
-        const handleAuthRefresh = (): void => {
-            logger.info('AuthContext: Received auth_refresh_required event, forcing refresh...');
-            checkAuthStatus(true);
-        };
-
-        window.addEventListener('auth_refresh_required', handleAuthRefresh);
-        
-        return () => {
-            window.removeEventListener('auth_refresh_required', handleAuthRefresh);
-        };
-    }, [checkAuthStatus]);
-
-    useEffect(() => {
-        let mounted = true;
-        
-        const clearLegacySessions = async (): Promise<void> => {
-            if (isAuthenticated && user?.id && user.id > 0 && mounted) {
-                try {
-                    const { apiClient } = await import('../services/api/client');
-                    await apiClient.post('/api/sessions/clear-legacy');
-                    // Убрали toast - это техническая операция
-                } catch {
-                    // Тихо игнорируем ошибки - это не критично
-                }
-            }
-        };
-        
-        clearLegacySessions();
-        
-        return () => {
-            mounted = false;
-        };
-    }, [isAuthenticated, user?.id]);
-
-    const loginWithTwitch = useCallback((): void => {
-        authService.loginWithTwitch();
-    }, []);
-
-    const loginWithVk = useCallback((): void => {
-        try {
-            logger.log('[AUTH CONTEXT] loginWithVk() called');
-            authService.loginWithVk();
-            logger.log('🔵 [AUTH CONTEXT] loginWithVk() executed');
-        } catch (error) {
-            logger.error('[ERROR] [AUTH CONTEXT] VK login error:', error);
-            toast.error('Ошибка при входе через VK Live.');
-        }
-    }, []);
-
-    const logoutMutation = useLogout({
-        onSuccess: async (): Promise<void> => {
-            const userId = user?.id;
-            setIsAuthenticated(false);
-            setUser(null);
-            
-            if (userId) {
-                const cacheManager = await import('../utils/cacheManager');
-                cacheManager.default.invalidateUser(userId);
-                logger.info('[AUTH] User cache cleared on logout');
-                
-                const { clearAllQueryCache } = await import('../utils/queryPersist');
-                clearAllQueryCache();
-                logger.info('[AUTH] Query cache cleared on logout');
-            }
-            
-            try {
-                const { getSharedWebSocket } = await import('../utils/sharedWebSocket');
-                if (userId !== undefined) {
-                    const wsManager = getSharedWebSocket(userId);
-                    if (wsManager) {
-                        wsManager.cleanup();
-                        logger.info('[AUTH] WebSocket cleaned up on logout');
-                    }
-                }
-            } catch (error) {
-                logger.error('[AUTH] Failed to cleanup WebSocket:', error);
-            }
-        },
-    });
-
-    const logout = useCallback(async (): Promise<void> => {
-        logoutMutation.mutate();
-    }, [logoutMutation]);
-
-    const markIntegrationsRefreshed = useCallback((): void => {
-        setIntegrationsNeedRefresh(false);
-    }, []);
-    
-    const triggerIntegrationsRefresh = useCallback((): void => {
-        setIntegrationsNeedRefresh(true);
-    }, []);
-
-    const isGuest = user?.is_guest === true || user?.id === -1;
-
-    const value = useMemo<AuthContextValue>(() => ({
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const {
         user,
         isAuthenticated,
-        isCheckingAuth,
-        isGuest,
-        integrations: user?.integrations || {},
+        isLoading,
+        checkAuth,
         loginWithTwitch,
         loginWithVk,
-        logout,
-        integrationsNeedRefresh,
-        markIntegrationsRefreshed,
-        triggerIntegrationsRefresh,
-        refreshAuthStatus: checkAuthStatus
-    }), [user, isAuthenticated, isCheckingAuth, isGuest, integrationsNeedRefresh, loginWithTwitch, loginWithVk, logout, markIntegrationsRefreshed, triggerIntegrationsRefresh, checkAuthStatus]);
+        logout
+    } = useAuthStore();
+
+
+
+    // Track if we have performed the initial check
+    const [initialCheckDone, setInitialCheckDone] = useState(false);
+
+    // isCheckingAuth logic: if store is loading OR we haven't done initial check
+    const isCheckingAuth = isLoading || !initialCheckDone;
+
+    const [integrationsNeedRefresh, setIntegrationsNeedRefresh] = useState(false);
+
+    // Initial auth check and URL param handling
+    useEffect(() => {
+        const initAuth = async () => {
+            // Check for auth params in URL
+            const currentUrl = new URL(window.location.href);
+            const hasAuthParams = currentUrl.searchParams.has('auth') ||
+                currentUrl.searchParams.has('success') ||
+                currentUrl.searchParams.has('error');
+
+            if (hasAuthParams) {
+                window.history.replaceState({}, '', window.location.pathname);
+            }
+
+            await checkAuth();
+            setInitialCheckDone(true);
+        };
+
+        if (!initialCheckDone) {
+            initAuth();
+        }
+    }, [checkAuth, initialCheckDone]);
+
+    // WebSocket management
+    useEffect(() => {
+        if (user?.id) {
+            logger.info(`[AuthContext] Initializing WebSocket for user ${user.id}`);
+            const wsManager = getSharedWebSocket(user.id);
+
+            return () => {
+                logger.info('[AuthContext] Cleaning up WebSocket');
+                wsManager.cleanup();
+            };
+        }
+    }, [user?.id]);
+
+    const isWhitelisted = (platform: string, channel: string): boolean => {
+        if (!user) return false;
+        if (user.is_admin) return true;
+
+        if (user.whitelisted_channels) {
+            if (platform === 'twitch' && user.whitelisted_channels.twitch === channel) return true;
+            if (platform === 'vk' && user.whitelisted_channels.vk === channel) return true;
+        }
+
+        return false;
+    };
+
+    const refreshAuthStatus = async (_force?: boolean) => {
+        await checkAuth();
+    };
+
+    const markIntegrationsRefreshed = () => {
+        setIntegrationsNeedRefresh(false);
+    };
 
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider value={{
+            user,
+            isAuthenticated,
+            isLoading,
+            isCheckingAuth,
+            integrationsNeedRefresh,
+            loginWithTwitch,
+            loginWithVk,
+            logout,
+            checkAuthStatus: checkAuth,
+            refreshAuthStatus,
+            markIntegrationsRefreshed,
+            isWhitelisted
+        }}>
             {children}
         </AuthContext.Provider>
     );
 };
 
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+};

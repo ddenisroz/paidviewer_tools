@@ -57,7 +57,6 @@ def block_user(user_id: int, reason: str, db: Session):
         db: Database session
     """
     from core.database import User
-    from datetime import datetime
     from core.datetime_utils import utcnow_naive
     
     user = db.query(User).filter(User.id == user_id).first()

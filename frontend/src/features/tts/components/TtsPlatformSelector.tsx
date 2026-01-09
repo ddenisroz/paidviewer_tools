@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 
 import { Mic, MicOff, Monitor, Volume2 } from 'lucide-react';
 
 // useAuth available but not currently needed
-// import { useAuth } from '../../../context/AuthContext';
-import { useSaveTtsPlatformSettings, useTtsPlatformSettings } from '../../../queries/tts/ttsQueries';
-import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
-import { logger } from '../../../utils/prodLogger';
+// import { useAuth } from '@/context/AuthContext';
+import { useSaveTtsPlatformSettings, useTtsPlatformSettings } from '@/queries/tts/ttsQueries';
+import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { logger } from '@/shared/utils/prodLogger';
 
 interface TtsPlatformSettings {
   enabled_platforms: string[];

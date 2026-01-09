@@ -50,7 +50,7 @@ class VKLiveHTTPPolling:
             except asyncio.CancelledError:
                 pass
             self.poll_task = None
-        logger.info(f"🛑 Stopped HTTP polling for channel: {self.channel_url}")
+        logger.info(f"[STOP] Stopped HTTP polling for channel: {self.channel_url}")
 
     async def _poll_loop(self):
         """Основной цикл polling"""
@@ -82,7 +82,7 @@ class VKLiveHTTPPolling:
                     # Интервал растет: 0.5 -> 1 -> 2 -> 4 -> 8 -> 16 -> max_interval
                     current_interval = min(poll_interval * (2 ** (self.error_count - 1)), max_interval)
                     if self.error_count % 5 == 0:  # Логируем каждую 5-ю ошибку
-                        logger.warning(f"⏱️ Increased polling interval to {current_interval}s due to errors")
+                        logger.warning(f"[WAIT] Increased polling interval to {current_interval}s due to errors")
                 else:
                     current_interval = poll_interval
 
@@ -149,7 +149,7 @@ class VKLiveHTTPPolling:
                 # Получаем текущее время в секундах (VK использует Unix timestamp)
                 import time
                 self.last_message_time = int(time.time()) - 10  # Последние 10 секунд
-                logger.info(f"📅 Initialized polling timestamp: {self.last_message_time}")
+                logger.info(f"[INIT] Initialized polling timestamp: {self.last_message_time}")
 
             # Пропускаем уже обработанные сообщения
             if message_id in self.seen_message_ids:
@@ -213,7 +213,7 @@ class VKLiveHTTPPolling:
 
             # Отправляем в обработчик
             if self.message_handler:
-                logger.info(f"📩 [VK HTTP] {author_nick}: {message_text}")
+                logger.info(f"[MSG] [VK HTTP] {author_nick}: {message_text}")
                 await self.message_handler(processed_message)
 
         except Exception as e:

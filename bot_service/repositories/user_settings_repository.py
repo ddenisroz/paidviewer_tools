@@ -1,0 +1,58 @@
+# bot_service/repositories/user_settings_repository.py
+"""
+Repository for UserSettings CRUD operations.
+Handles settings for both authenticated users and guests.
+"""
+from typing import Optional, Dict, Any, List
+from sqlalchemy.orm import Session
+
+from models.user import UserSettings
+from repositories.base_repository import BaseRepository
+
+
+class UserSettingsRepository(BaseRepository[UserSettings]):
+    """
+    Repository for UserSettings entities.
+    """
+    
+    def __init__(self, db: Session):
+        super().__init__(UserSettings, db)
+
+    def get_by_filters(self, filters: Dict[str, Any]) -> Optional[UserSettings]:
+        """
+        Get settings by generic filters (e.g. from UserIdentityService).
+        Example filters: {'user_id': 1} or {'session_id': 'abc'}
+        """
+        return self.db.query(UserSettings).filter_by(**filters).first()
+
+    def get_by_user_id(self, user_id: int) -> Optional[UserSettings]:
+        """Get settings by user ID."""
+        return self.db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
+
+    def get_by_session_id(self, session_id: str) -> Optional[UserSettings]:
+        """Get settings by session ID (for guests)."""
+        return self.db.query(UserSettings).filter(UserSettings.session_id == session_id).first()
+
+    def create_default(self, user_data: Dict[str, Any]) -> UserSettings:
+        """
+        Create default settings for user/guest.
+        user_data should contain 'user_id' or 'session_id'.
+        """
+        settings = UserSettings(**user_data)
+        self.db.add(settings)
+        self.db.commit()
+        self.db.refresh(settings)
+        return settings
+    
+    def get_with_chat_enabled(self) -> List[UserSettings]:
+        """Get all settings where chat is enabled."""
+        return self.db.query(UserSettings).filter(
+            UserSettings.chat_enabled.is_(True)
+        ).all()
+
+    def delete_by_user_id(self, user_id: int) -> int:
+        """Delete settings for a user."""
+        return self.db.query(UserSettings).filter(
+            UserSettings.user_id == user_id
+        ).delete()
+

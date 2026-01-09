@@ -39,25 +39,25 @@ def upgrade():
         # Индекс на twitch_username (уже unique, но добавим для JOIN оптимизации)
         try:
             op.create_index('idx_users_twitch_username', 'users', ['twitch_username'])
-        except:
+        except Exception:
             pass  # Может уже существовать
 
         # Индекс на vk_username
         try:
             op.create_index('idx_users_vk_username', 'users', ['vk_username'])
-        except:
+        except Exception:
             pass
 
         # Индекс на created_at для сортировки
         try:
             op.create_index('idx_users_created_at', 'users', ['created_at'])
-        except:
+        except Exception:
             pass
 
         # Индекс на is_active для фильтрации
         try:
             op.create_index('idx_users_is_active', 'users', ['is_active'])
-        except:
+        except Exception:
             pass
 
     # === USER_TOKENS TABLE ===
@@ -65,19 +65,19 @@ def upgrade():
         # Композитный индекс user_id + platform (частый запрос)
         try:
             op.create_index('idx_user_tokens_user_platform', 'user_tokens', ['user_id', 'platform'])
-        except:
+        except Exception:
             pass
 
         # Индекс на platform_user_id для поиска по внешнему ID
         try:
             op.create_index('idx_user_tokens_platform_user_id', 'user_tokens', ['platform_user_id'])
-        except:
+        except Exception:
             pass
 
         # Индекс на is_active для фильтрации активных токенов
         try:
             op.create_index('idx_user_tokens_is_active', 'user_tokens', ['is_active'])
-        except:
+        except Exception:
             pass
 
     # === USER_SESSIONS TABLE ===
@@ -85,13 +85,13 @@ def upgrade():
         # Композитный индекс user_id + is_active
         try:
             op.create_index('idx_user_sessions_user_active', 'user_sessions', ['user_id', 'is_active'])
-        except:
+        except Exception:
             pass
 
         # Индекс на session_id (частый поиск)
         try:
             op.create_index('idx_user_sessions_session_id', 'user_sessions', ['session_id'])
-        except:
+        except Exception:
             pass
 
     # === BOT_COMMANDS TABLE ===
@@ -99,13 +99,13 @@ def upgrade():
         # Композитный индекс user_id + is_enabled
         try:
             op.create_index('idx_bot_commands_user_enabled', 'bot_commands', ['user_id', 'is_enabled'])
-        except:
+        except Exception:
             pass
 
         # Индекс на command_name для поиска команд
         try:
             op.create_index('idx_bot_commands_command_name', 'bot_commands', ['command_name'])
-        except:
+        except Exception:
             pass
 
     # === CHAT_MESSAGES TABLE ===
@@ -113,19 +113,19 @@ def upgrade():
         # Композитный индекс user_id + platform
         try:
             op.create_index('idx_chat_messages_user_platform', 'chat_messages', ['user_id', 'platform'])
-        except:
+        except Exception:
             pass
 
         # Индекс на created_at для сортировки по времени
         try:
             op.create_index('idx_chat_messages_created_at', 'chat_messages', ['created_at'])
-        except:
+        except Exception:
             pass
 
         # Индекс на channel_name для фильтрации по каналу
         try:
             op.create_index('idx_chat_messages_channel', 'chat_messages', ['channel_name'])
-        except:
+        except Exception:
             pass
 
     # === FILTERED_WORDS TABLE ===
@@ -133,7 +133,7 @@ def upgrade():
         # Композитный индекс user_id + word
         try:
             op.create_index('idx_filtered_words_user_word', 'filtered_words', ['user_id', 'word'])
-        except:
+        except Exception:
             pass
 
     # === STREAM_DATA TABLE (если существует) ===
@@ -141,13 +141,13 @@ def upgrade():
         # Композитный индекс user_id + platform
         try:
             op.create_index('idx_stream_data_user_platform', 'stream_data', ['user_id', 'platform'])
-        except:
+        except Exception:
             pass
 
         # Индекс на is_live для поиска активных стримов
         try:
             op.create_index('idx_stream_data_is_live', 'stream_data', ['is_live'])
-        except:
+        except Exception:
             pass
 
 
@@ -161,81 +161,81 @@ def downgrade():
     if 'users' in tables:
         try:
             op.drop_index('idx_users_twitch_username', 'users')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_users_vk_username', 'users')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_users_created_at', 'users')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_users_is_active', 'users')
-        except:
+        except Exception:
             pass
 
     if 'user_tokens' in tables:
         try:
             op.drop_index('idx_user_tokens_user_platform', 'user_tokens')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_user_tokens_platform_user_id', 'user_tokens')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_user_tokens_is_active', 'user_tokens')
-        except:
+        except Exception:
             pass
 
     if 'user_sessions' in tables:
         try:
             op.drop_index('idx_user_sessions_user_active', 'user_sessions')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_user_sessions_session_id', 'user_sessions')
-        except:
+        except Exception:
             pass
 
     if 'bot_commands' in tables:
         try:
             op.drop_index('idx_bot_commands_user_enabled', 'bot_commands')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_bot_commands_command_name', 'bot_commands')
-        except:
+        except Exception:
             pass
 
     if 'chat_messages' in tables:
         try:
             op.drop_index('idx_chat_messages_user_platform', 'chat_messages')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_chat_messages_created_at', 'chat_messages')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_chat_messages_channel', 'chat_messages')
-        except:
+        except Exception:
             pass
 
     if 'filtered_words' in tables:
         try:
             op.drop_index('idx_filtered_words_user_word', 'filtered_words')
-        except:
+        except Exception:
             pass
 
     if 'stream_data' in tables:
         try:
             op.drop_index('idx_stream_data_user_platform', 'stream_data')
-        except:
+        except Exception:
             pass
         try:
             op.drop_index('idx_stream_data_is_live', 'stream_data')
-        except:
+        except Exception:
             pass

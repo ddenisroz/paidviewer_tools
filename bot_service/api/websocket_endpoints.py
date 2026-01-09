@@ -14,7 +14,8 @@ from fastapi import APIRouter, WebSocket
 
 from core.database import ChatMessage, User, get_db
 from core.connection_manager import get_connection_manager
-from services.memory_websocket_manager import memory_websocket_manager
+from services.memory_websocket_manager import get_memory_websocket_manager
+from repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,8 @@ async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
     def _db_query():
         db = next(get_db())
         try:
-            user = db.query(User).filter(User.id == user_id).first()
+            user_repo = UserRepository(db)
+            user = user_repo.get_by_id(user_id)
             if not user:
                 return []
             
@@ -44,11 +46,10 @@ async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
             if not platforms:
                 return []
             
-            # Один запрос для всех платформ
-            messages = db.query(ChatMessage).filter(
-                ChatMessage.user_id == user_id,
-                ChatMessage.platform.in_(platforms)
-            ).order_by(ChatMessage.timestamp.desc()).limit(50).all()
+            # Используем репозиторий для получения истории
+            from repositories.chat_message_repository import ChatMessageRepository
+            chat_repo = ChatMessageRepository(db)
+            messages = chat_repo.get_history_by_platforms(user_id, platforms, limit=50)
             
             messages.sort(key=lambda x: x.timestamp)
             return messages
@@ -136,7 +137,7 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
         conn_mgr.cancel_tts_disconnect(user_id_int)
     
     # Добавляем соединение в manager
-    conn_id = await memory_websocket_manager.add_connection(
+    conn_id = await get_memory_websocket_manager().add_connection(
         websocket,
         user_id_int,
         f"user_{user_id}",
@@ -155,7 +156,7 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
                 message = json.loads(data)
                 
                 if message.get("type") == "ping":
-                    await memory_websocket_manager.handle_ping(conn_id)
+                    await get_memory_websocket_manager().handle_ping(conn_id)
                     logger.debug(f"🏓 Ping/Pong with user {user_id}")
                     continue
                 
@@ -167,7 +168,7 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
     except Exception as e:
         logger.info(f"[WS] WebSocket disconnected for user {user_id}: {e}")
     finally:
-        await memory_websocket_manager.remove_connection(conn_id)
+        await get_memory_websocket_manager().remove_connection(conn_id)
         logger.info(f"[OK] Connection removed: {conn_id}")
         
         # Планируем отключение TTS
@@ -181,7 +182,8 @@ async def _schedule_tts_disconnect(user_id: int) -> None:
     
     db = next(get_db())
     try:
-        user = db.query(User).filter(User.id == user_id).first()
+        user_repo = UserRepository(db)
+        user = user_repo.get_by_id(user_id)
         
         if user:
             username = user.twitch_username or user.vk_username or f"user_{user_id}"

@@ -1,4 +1,4 @@
-import { logger } from '../../utils/prodLogger';
+﻿import { logger } from '@/shared/utils/prodLogger';
 
 type Handler = (data?: Record<string, unknown>) => void;
 
@@ -88,12 +88,15 @@ class WidgetWebSocket {
     if (!this.messageHandlers.has(event)) {
       this.messageHandlers.set(event, []);
     }
-    this.messageHandlers.get(event)!.push(handler);
+    const handlers = this.messageHandlers.get(event);
+    if (handlers) {
+      handlers.push(handler);
+    }
   }
 
   public off(event: string, handler: Handler): void {
-    if (this.messageHandlers.has(event)) {
-      const handlers = this.messageHandlers.get(event)!;
+    const handlers = this.messageHandlers.get(event);
+    if (handlers) {
       const index = handlers.indexOf(handler);
       if (index > -1) {
         handlers.splice(index, 1);
@@ -102,8 +105,9 @@ class WidgetWebSocket {
   }
 
   private emit(event: string, data?: Record<string, unknown>): void {
-    if (this.messageHandlers.has(event)) {
-      this.messageHandlers.get(event)!.forEach((handler) => {
+    const handlers = this.messageHandlers.get(event);
+    if (handlers) {
+      handlers.forEach((handler) => {
         try {
           handler(data);
         } catch (error) {

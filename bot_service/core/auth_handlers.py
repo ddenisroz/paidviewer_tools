@@ -9,8 +9,6 @@ from core.database import get_db
 from core.config import settings
 from auth.auth import get_current_user
 from services.user_identity_service import UserIdentityService, UserType
-from api.twitch_api import TwitchAPI
-from core.connection_manager import get_connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +16,12 @@ class AuthHandlers:
     """Класс для обработки аутентификации"""
 
     def __init__(self):
-        connection_manager = get_connection_manager()
-        self.twitch_api = TwitchAPI(connection_manager)
+        # We don't need TwitchAPI here anymore.
+        pass
 
     async def twitch_login(self):
         """Twitch OAuth login"""
+        from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f"{settings.backend_url}/auth/twitch/callback"
         scope = "user:read:email channel:manage:broadcast"
@@ -32,6 +31,7 @@ class AuthHandlers:
 
     async def api_twitch_login(self):
         """API endpoint для Twitch login"""
+        from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f"{settings.backend_url}/auth/twitch/callback"
         scope = "user:read:email channel:manage:broadcast"
@@ -41,6 +41,7 @@ class AuthHandlers:
 
     async def api_twitch_auth(self):
         """API endpoint для Twitch auth"""
+        from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f"{settings.backend_url}/auth/twitch/callback"
         scope = "user:read:email channel:manage:broadcast"
@@ -63,16 +64,27 @@ class AuthHandlers:
                     current_user_from_session = session_data
                     logger.info(f"Found existing session for user_id: {session_data.get('user_id')}")
 
+            # Use Platform Registry for Authentication
+            from platforms.registry import platform_registry
+            twitch_platform = platform_registry.get('twitch')
+            
+            if not twitch_platform:
+                 raise HTTPException(status_code=500, detail="Twitch platform not initialized")
+
             # Получаем токен доступа
             logger.info("Getting access token from Twitch...")
-            token_data = await self.twitch_api.get_user_access_token(code)
+            token_data = await twitch_platform.authenticate(code)
 
             if not token_data:
                 raise HTTPException(status_code=400, detail="Failed to get access token")
 
             access_token = token_data.get("access_token")
             refresh_token = token_data.get("refresh_token")
-            scopes = token_data.get("scopes", [])  # Получаем scopes из token_data
+            scopes = token_data.get("scope", []) 
+            
+            # Ensure scopes is a list
+            if isinstance(scopes, str):
+                scopes = scopes.split(" ")
 
             logger.info(f"Twitch scopes received: {scopes}")
 
@@ -81,14 +93,14 @@ class AuthHandlers:
 
             # Получаем информацию о пользователе
             logger.info("Getting user data from Twitch...")
-            user_data = await self.twitch_api.get_user_from_token(access_token)
+            user_data = await twitch_platform.get_user_info(access_token)
 
             if not user_data:
                 logger.error("Failed to get user data from Twitch")
                 raise HTTPException(status_code=400, detail="Failed to get user info")
 
             twitch_user_id = user_data.get("id")
-            twitch_username = user_data.get("display_name")
+            twitch_username = user_data.get("display_name") or user_data.get("login") # Fallback to login if display_name missing
 
             logger.info(f"Twitch user data: id={twitch_user_id}, username={twitch_username}")
 
@@ -123,6 +135,7 @@ class AuthHandlers:
                 is_admin=False
             )
 
+            # --- Remaining Logic (Settings, Bot Connection, Session) ---
             user_id = user.id
             logger.info(f"[OK] User resolved: ID={user_id}, twitch_username={user.twitch_username}")
 
@@ -163,7 +176,7 @@ class AuthHandlers:
                 logger.info("[LINK] Integration linking - using current session")
                 session_id = request.cookies.get("session_id")
                 if not session_id:
-                    # Если по какой-то причине cookie нет - создаем новую сессию
+                     # Если по какой-то причине cookie нет - создаем новую сессию
                     logger.warning("No session cookie found during integration linking, creating new session")
                     device_info = {
                         "user_agent": request.headers.get("user-agent"),
@@ -208,6 +221,7 @@ class AuthHandlers:
 
             # Создаем ответ с httpOnly cookie
             from fastapi.responses import RedirectResponse
+            from core.config import settings
 
             # Используем 302 вместо 307 для лучшей совместимости с cookies
             response = RedirectResponse(url=f"{settings.frontend_url}/dashboard", status_code=302)
@@ -216,12 +230,8 @@ class AuthHandlers:
             response.delete_cookie(key="session_id", path="/")
 
             # Устанавливаем новую cookie
-            # httpOnly=False для development чтобы JavaScript мог читать cookie
-            # В production нужно будет использовать httpOnly=True с правильным HTTPS
-            # Production-ready cookie settings с автоматическим secure=True в prod
             from core.cookie_config import get_session_cookie_settings
             cookie_settings = get_session_cookie_settings(session_id)
-            # Note: httponly=False для development доступа через JS, в prod будет True
             response.set_cookie(**cookie_settings)
 
             logger.info("Twitch callback completed successfully, redirecting to dashboard")

@@ -16,18 +16,18 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-import sys
-import os
+import sys  # noqa: E402
+import os  # noqa: E402
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 # Загружаем .env файл для получения DATABASE_URL
-from dotenv import load_dotenv
+from dotenv import load_dotenv  # noqa: E402
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
 load_dotenv(dotenv_path=env_path)
 
-from core.database import Base
+from core.database import Base  # noqa: E402
 # Импортируем все модели для автогенерации миграций
-from core.database import *
+from core.database import *  # noqa: F403, E402
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

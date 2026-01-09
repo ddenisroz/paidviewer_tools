@@ -1,4 +1,4 @@
-# services/stream_session_service.py
+# bot_service/services/stream_session_service.py
 """
 Сервис для отслеживания сессий трансляций
 Отслеживает начало и конец трансляций для правильного подсчета стриков
@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from core.database import StreamSession, UserStreak
 from core.datetime_utils import utcnow_naive
+from repositories.stream_session_repository import StreamSessionRepository
+from repositories.drops_history_repository import DropsHistoryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,8 @@ class StreamSessionService:
 
     def __init__(self, db: Session):
         self.db = db
+        self.session_repo = StreamSessionRepository(db)
+        self.streak_repo = DropsHistoryRepository(db)
 
     def get_or_create_active_session(
         self,
@@ -42,28 +46,19 @@ class StreamSessionService:
             return None
 
         # Ищем активную сессию для этого канала и платформы
-        query = self.db.query(StreamSession).filter(
-            StreamSession.channel_name == channel_name,
-            StreamSession.platform == platform,
-            StreamSession.is_active == True
+        active_session = self.session_repo.get_active_session(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id
         )
-
-        if user_id:
-            query = query.filter(StreamSession.user_id == user_id)
-        elif session_id:
-            query = query.filter(StreamSession.session_id == session_id)
-        else:
-            return None
-
-        active_session = query.first()
 
         if active_session:
             # Обновляем название если оно изменилось
             if title and active_session.title != title:
                 active_session.title = title
                 active_session.updated_at = utcnow_naive()
-                self.db.commit()
-                self.db.refresh(active_session)
+                self.session_repo.update_session(active_session)
 
             return active_session
 
@@ -81,9 +76,7 @@ class StreamSessionService:
             is_active=True,
             title=title
         )
-        self.db.add(new_session)
-        self.db.commit()
-        self.db.refresh(new_session)
+        self.session_repo.add_session(new_session)
 
         logger.info(f"🎬 [STREAM SESSION] Created new session for {channel_name} ({platform})")
 
@@ -97,30 +90,24 @@ class StreamSessionService:
         platform: str = "twitch"
     ):
         """Закрывает все старые активные сессии для канала/платформы"""
-        query = self.db.query(StreamSession).filter(
-            StreamSession.channel_name == channel_name,
-            StreamSession.platform == platform,
-            StreamSession.is_active == True
+        old_sessions = self.session_repo.get_old_active_sessions(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id
         )
-
-        if user_id:
-            query = query.filter(StreamSession.user_id == user_id)
-        elif session_id:
-            query = query.filter(StreamSession.session_id == session_id)
-        else:
-            return
-
-        old_sessions = query.all()
+        
         now = utcnow_naive()
-
+        count = 0
         for session in old_sessions:
             session.is_active = False
             session.ended_at = now
             session.updated_at = now
+            self.session_repo.update_session(session)
+            count += 1
 
-        if old_sessions:
-            self.db.commit()
-            logger.info(f"[SECURITY] [STREAM SESSION] Closed {len(old_sessions)} old sessions for {channel_name} ({platform})")
+        if count > 0:
+            logger.info(f"[SECURITY] [STREAM SESSION] Closed {count} old sessions for {channel_name} ({platform})")
 
     def end_session(
         self,
@@ -134,26 +121,18 @@ class StreamSessionService:
         Returns:
             True если сессия была найдена и закрыта, False иначе
         """
-        query = self.db.query(StreamSession).filter(
-            StreamSession.channel_name == channel_name,
-            StreamSession.platform == platform,
-            StreamSession.is_active == True
+        session = self.session_repo.get_active_session(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id
         )
-
-        if user_id:
-            query = query.filter(StreamSession.user_id == user_id)
-        elif session_id:
-            query = query.filter(StreamSession.session_id == session_id)
-        else:
-            return False
-
-        session = query.first()
 
         if session:
             session.is_active = False
             session.ended_at = utcnow_naive()
             session.updated_at = utcnow_naive()
-            self.db.commit()
+            self.session_repo.update_session(session)
             logger.info(f"[SECURITY] [STREAM SESSION] Ended session for {channel_name} ({platform})")
             return True
 
@@ -167,19 +146,12 @@ class StreamSessionService:
         platform: str = "twitch"
     ) -> Optional[StreamSession]:
         """Получить последнюю сессию трансляции (активную или завершенную)"""
-        query = self.db.query(StreamSession).filter(
-            StreamSession.channel_name == channel_name,
-            StreamSession.platform == platform
+        return self.session_repo.get_last_session(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id
         )
-
-        if user_id:
-            query = query.filter(StreamSession.user_id == user_id)
-        elif session_id:
-            query = query.filter(StreamSession.session_id == session_id)
-        else:
-            return None
-
-        return query.order_by(StreamSession.started_at.desc()).first()
 
     def get_active_session(
         self,
@@ -189,20 +161,12 @@ class StreamSessionService:
         platform: str = "twitch"
     ) -> Optional[StreamSession]:
         """Получить активную сессию трансляции"""
-        query = self.db.query(StreamSession).filter(
-            StreamSession.channel_name == channel_name,
-            StreamSession.platform == platform,
-            StreamSession.is_active == True
+        return self.session_repo.get_active_session(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id
         )
-
-        if user_id:
-            query = query.filter(StreamSession.user_id == user_id)
-        elif session_id:
-            query = query.filter(StreamSession.session_id == session_id)
-        else:
-            return None
-
-        return query.first()
 
     def mark_viewer_attended_stream(
         self,
@@ -230,21 +194,14 @@ class StreamSessionService:
         if not active_session:
             return False
 
-        # Обновляем UserStreak
-        query = self.db.query(UserStreak).filter(
-            UserStreak.channel_name == channel_name,
-            UserStreak.platform == platform,
-            UserStreak.viewer_id == viewer_id
+        # Обновляем UserStreak через репозиторий
+        streak = self.streak_repo.get_user_streak(
+            viewer_id=viewer_id,
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id
         )
-
-        if user_id:
-            query = query.filter(UserStreak.user_id == user_id)
-        elif session_id:
-            query = query.filter(UserStreak.session_id == session_id)
-        else:
-            return False
-
-        streak = query.first()
 
         if streak:
             # Обновляем только если это новая сессия
@@ -253,8 +210,7 @@ class StreamSessionService:
                 streak.last_stream_attended_at = utcnow_naive()
                 streak.updated_at = utcnow_naive()
                 try:
-                    self.db.commit()
-                    self.db.refresh(streak)
+                    self.streak_repo.update_streak(streak)
                     logger.debug(f"[OK] [STREAM SESSION] Marked viewer {viewer_id} attended stream session {active_session.id}")
                     return True
                 except Exception as e:
@@ -293,20 +249,13 @@ class StreamSessionService:
             return True
 
         # Получаем UserStreak
-        query = self.db.query(UserStreak).filter(
-            UserStreak.channel_name == channel_name,
-            UserStreak.platform == platform,
-            UserStreak.viewer_id == viewer_id
+        streak = self.streak_repo.get_user_streak(
+            viewer_id=viewer_id,
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id
         )
-
-        if user_id:
-            query = query.filter(UserStreak.user_id == user_id)
-        elif session_id:
-            query = query.filter(UserStreak.session_id == session_id)
-        else:
-            return False
-
-        streak = query.first()
 
         if not streak:
             # Если нет стрика, считаем что зритель "посетил" (первая трансляция)
@@ -314,4 +263,3 @@ class StreamSessionService:
 
         # Проверяем, совпадает ли last_stream_session_id с последней сессией
         return streak.last_stream_session_id == last_session.id
-

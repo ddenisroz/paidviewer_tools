@@ -1,7 +1,6 @@
 # bot_service/vk_live_websocket.py
 import asyncio
 import json
-import logging
 import aiohttp
 import websockets
 from typing import Dict, Optional, Callable
