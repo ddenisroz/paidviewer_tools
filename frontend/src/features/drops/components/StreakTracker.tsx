@@ -15,8 +15,8 @@ import { toast } from '@/utils/toastManager';
 import type { Streak } from '../../../types';
 
 interface StreakTrackerProps {
-    user: Record<string, unknown>;
-    channelName: string;
+  user: Record<string, unknown>;
+  channelName: string;
 }
 
 const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
@@ -27,14 +27,14 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
   const [offset, setOffset] = useState(0);
   const limit = 50;
 
-  // Check if streak is enabled (����� ������, ��� platform)
+  // Check if streak is enabled (общий конфиг, без platform)
   const { data: config } = useDropsConfig(channelName);
 
-  // ���������, ������� �� ����� ���� �� �� ����� ���������
+  // Проверяем, включен ли стрик хотя бы на одной платформе
   const streakEnabled = (config?.streak_enabled_twitch || config?.streak_enabled_vk) ?? false;
 
   useEffect(() => {
-    // Load streaks always if we have required data (����� ���������� ��� ���� ��������)
+    // Load streaks always if we have required data (общая статистика для всех платформ)
     if (user && channelName) {
       loadStreaks(true);
     } else {
@@ -56,12 +56,12 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
 
     try {
       setLoading(true);
-      // [START] FIX: ��������� ����� ���������� ������� (��� ���������� �� platform)
+      // [START] FIX: Загружаем общую статистику стриков (без фильтрации по platform)
       const response = await dropsService.getStreaks(channelName, {
-        limit, 
-        offset: currentOffset 
+        limit,
+        offset: currentOffset
       });
-      
+
       if (response.data.success) {
         const newStreaks = response.data.data || [];
         if (newStreaks.length === 0) {
@@ -75,7 +75,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
       }
     } catch (error) {
       logger.error('Error loading streaks:', error);
-      toast.error('������ �������� �������');
+      toast.error('Ошибка загрузки стриков');
       setStreaks([]);
       setHasMore(false);
     } finally {
@@ -90,12 +90,12 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
     }
   };
 
-  const filteredStreaks = streaks.filter(streak => 
+  const filteredStreaks = streaks.filter(streak =>
     streak.viewer_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return '�� �������';
+    if (!dateString) return 'Не активно';
     const date = new Date(dateString);
     return new Intl.DateTimeFormat('ru-RU', {
       year: 'numeric',
@@ -115,11 +115,11 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
   };
 
   const getStreakBadge = (days: number): { text: string; emoji: string } => {
-    if (days >= 60) return { text: '�������', emoji: '[CROWN]' };
-    if (days >= 30) return { text: '����', emoji: '[POINTS]' };
-    if (days >= 14) return { text: '������', emoji: '[TROPHY]' };
-    if (days >= 7) return { text: '��������', emoji: '[STAR]' };
-    return { text: '�������', emoji: '[SPROUT]' };
+    if (days >= 60) return { text: 'Легенда', emoji: '👑' };
+    if (days >= 30) return { text: 'Эпик', emoji: '💎' };
+    if (days >= 14) return { text: 'Мастер', emoji: '🏆' };
+    if (days >= 7) return { text: 'Активный', emoji: '⭐' };
+    return { text: 'Новичок', emoji: '🌱' };
   };
 
 
@@ -128,28 +128,28 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5" />
-          ������ ��������
+          Стрики зрителей
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* ����� */}
+        {/* Поиск */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="����� �� ����� �������..."
+            placeholder="Поиск по имени зрителя..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
         </div>
 
-        {/* ������� ������� */}
+        {/* Таблица стриков */}
         <div className="border rounded-lg overflow-hidden">
           {filteredStreaks.length === 0 && !loading ? (
             <div className="text-center py-12 text-muted-foreground">
               <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>��� �������� �������</p>
-              <p className="text-xs mt-1">������ �������� ����� ������� ������ ������� �����������</p>
+              <p>Нет активных стриков</p>
+              <p className="text-xs mt-1">Стрики появятся когда зрители начнут активно участвовать</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -157,18 +157,18 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
                 <thead className="bg-muted">
                   <tr>
                     <th className="text-left p-3 font-medium text-sm">#</th>
-                    <th className="text-left p-3 font-medium text-sm">�������</th>
-                    <th className="text-center p-3 font-medium text-sm">�������</th>
-                    <th className="text-center p-3 font-medium text-sm">��������</th>
-                    <th className="text-center p-3 font-medium text-sm">���������</th>
-                    <th className="text-right p-3 font-medium text-sm">����������</th>
+                    <th className="text-left p-3 font-medium text-sm">Зритель</th>
+                    <th className="text-center p-3 font-medium text-sm">Текущий</th>
+                    <th className="text-center p-3 font-medium text-sm">Максимум</th>
+                    <th className="text-center p-3 font-medium text-sm">Сообщений</th>
+                    <th className="text-right p-3 font-medium text-sm">Активность</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredStreaks.map((streak, index) => {
                     const badge = getStreakBadge(streak.current_streak);
                     const colorClass = getStreakColor(streak.current_streak);
-                    
+
                     return (
                       <tr key={`${streak.viewer_name}-${streak.current_streak}`} className="hover:bg-muted/50 transition-colors">
                         <td className="p-3 text-sm text-muted-foreground">
@@ -177,8 +177,8 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{streak.viewer_name}</span>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={`text-xs bg-gradient-to-r ${colorClass} border-transparent text-white`}
                             >
                               {badge.emoji} {badge.text}
@@ -188,19 +188,19 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-base font-semibold">{streak.current_streak}</span>
-                            <span className="text-xs text-muted-foreground">�������</span>
+                            <span className="text-xs text-muted-foreground">стримов</span>
                           </div>
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-base font-semibold">{streak.max_streak}</span>
-                            <span className="text-xs text-muted-foreground">�������</span>
+                            <span className="text-xs text-muted-foreground">стримов</span>
                           </div>
                         </td>
                         <td className="p-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <span className="text-base font-semibold">{streak.messages_this_stream}</span>
-                            <span className="text-xs text-muted-foreground">�����.</span>
+                            <span className="text-xs text-muted-foreground">сообщ.</span>
                           </div>
                         </td>
                         <td className="p-3 text-right">
@@ -218,7 +218,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
           )}
         </div>
 
-        {/* ��������� ��� */}
+        {/* Загрузить еще */}
         {hasMore && (
           <div className="flex justify-center pt-4">
             <Button
@@ -226,7 +226,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
               onClick={handleLoadMore}
               disabled={loading}
             >
-              {loading ? '��������...' : '��������� ���'}
+              {loading ? 'Загрузка...' : 'Загрузить еще'}
             </Button>
           </div>
         )}
@@ -236,5 +236,3 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
 };
 
 export default StreakTracker;
-
-

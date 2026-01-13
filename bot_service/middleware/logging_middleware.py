@@ -73,7 +73,7 @@ class StructuredLoggingMiddleware(BaseHTTPMiddleware):
             )
         
         # Log request
-        logger.info(
+        logger.debug(
             "request_started",
             client_ip=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent"),
@@ -90,7 +90,7 @@ class StructuredLoggingMiddleware(BaseHTTPMiddleware):
             duration_ms = (time.time() - start_time) * 1000
             
             # Log response
-            logger.info(
+            logger.debug(
                 "request_completed",
                 status_code=response.status_code,
                 duration_ms=round(duration_ms, 2),

@@ -43,13 +43,13 @@ const App: React.FC = () => {
             {/* Task 6.5: Connection status indicator */}
             <ConnectionStatus />
 
-            {/* Smart Toast Manager - bottom-right, не перекрывает контент */}
+            {/* Toast Manager - top-right, legacy position */}
             <Toaster
-                position="bottom-right"
+                position="top-right"
                 richColors
-                expand={false}
+                expand={true}
                 visibleToasts={3}
-                duration={2500}
+                duration={4000}
                 closeButton
                 toastOptions={{
                     className: 'toast-notification',
@@ -58,6 +58,7 @@ const App: React.FC = () => {
                         border: '1px solid hsl(var(--border))',
                         color: 'hsl(var(--foreground))',
                         pointerEvents: 'auto',
+                        zIndex: 99999,
                     },
                     classNames: {
                         toast: 'toast-base',
@@ -278,4 +279,3 @@ const App: React.FC = () => {
 }
 
 export default App;
-

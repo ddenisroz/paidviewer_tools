@@ -1,6 +1,6 @@
 # bot_service/utils/db_optimizer.py
 """
-⚡ Оптимизатор запросов к базе данных
+Database Query Optimizer
 Кэширование, batch операции и оптимизированные запросы
 """
 

@@ -14,7 +14,7 @@ import { useQuickActionsHandlers } from './quickactions/useQuickActionsHandlers'
 const QuickActionsBar: React.FC = () => {
     const navigate = useNavigate();
     const logic = useQuickActionsLogic();
-    
+
     useQuickActionsHandlers({
         channelName: logic.channelName,
         platform: logic.platform,
@@ -39,7 +39,7 @@ const QuickActionsBar: React.FC = () => {
             <div className="flex items-center justify-center gap-3 px-6 py-4">
                 <ActionButton
                     icon={logic.ttsState ? Volume2 : VolumeX}
-                    label="TTS ����"
+                    label="TTS чата"
                     isActive={logic.ttsState}
                     onClick={() => navigate('/dashboard/tts')}
                 />
@@ -47,7 +47,7 @@ const QuickActionsBar: React.FC = () => {
                 {logic.isDropsEnabled && (
                     <ActionButton
                         icon={Zap}
-                        label="����� drops"
+                        label="Стрик drops"
                         isActive={logic.streakEnabled}
                         onClick={() => navigate('/dashboard/drops?tab=streak')}
                     />

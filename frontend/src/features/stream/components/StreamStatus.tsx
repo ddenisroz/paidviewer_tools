@@ -2,7 +2,7 @@
 
 import { Twitch, Users, Wifi, WifiOff } from 'lucide-react';
 
-import { VKIcon } from '@/shared/components/PlatformIcons';
+import { VKIcon, TwitchIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent } from '@/shared/components/ui/card';
 
@@ -28,11 +28,11 @@ interface StreamStatusProps {
 const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, isLoading = false }) => {
     const twitchEnabled = integrations?.twitch?.enabled;
     const vkEnabled = integrations?.vk?.enabled;
-    
+
     // Получаем данные о стримах
     const twitchStream = streamData?.twitch;
     const vkStream = streamData?.vk;
-    
+
     // Если загружается, показываем пустые карточки с анимацией
     if (isLoading) {
         return (
@@ -47,14 +47,14 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                                 <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
                             </div>
                             <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-                
+
                 {/* Пустая VK карточка - точно такой же размер как финальная */}
                 <Card className="border-muted-foreground/20 bg-muted/5">
                     <CardContent className="p-4">
@@ -65,9 +65,9 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                                 <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
                             </div>
                             <div className="flex space-x-1">
-                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                             </div>
                         </div>
                     </CardContent>
@@ -83,7 +83,7 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                 <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0">
-                            <Twitch className="h-6 w-6 text-purple-500 flex-shrink-0" />
+                            <TwitchIcon className="h-6 w-6 text-[#9146FF] flex-shrink-0" />
                             <div className="font-medium text-sm whitespace-nowrap">Twitch</div>
                         </div>
                         <div className="flex items-center gap-3 flex-shrink-0">
@@ -116,7 +116,7 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                     </div>
                 </CardContent>
             </Card>
-            
+
             {/* VK Live статус */}
             <Card className={`${vkEnabled ? 'border-red-500/20 bg-red-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
                 <CardContent className="p-4">

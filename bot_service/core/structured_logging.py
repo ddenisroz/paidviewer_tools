@@ -143,7 +143,7 @@ def setup_structured_logging():
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(
-            logging.INFO if settings.is_production else logging.DEBUG
+            logging.INFO  # Always use INFO level to reduce noise
         ),
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
@@ -154,7 +154,7 @@ def setup_structured_logging():
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=logging.INFO if settings.is_production else logging.DEBUG,
+        level=logging.INFO,  # Always use INFO level to reduce noise
     )
     
     # Redirect warnings to logging

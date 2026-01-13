@@ -145,7 +145,7 @@ class SharedWebSocketManager {
     const handler = handlers[data.type as string];
     if (handler) {
       handler(data);
-    } else {
+    } else if (data.type !== 'state_reconciliation_required') {
       this.logger.debug?.(`[${this.tabId}] Unknown message type: ${data.type}`);
     }
   }

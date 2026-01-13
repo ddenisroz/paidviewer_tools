@@ -1,5 +1,5 @@
 // src/features/chat/hooks/useChatActions.ts
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 import { chatService } from '@/services/api/services/chatService';
 import { logger } from '@/shared/utils/prodLogger';
@@ -23,7 +23,7 @@ interface UseChatActionsReturn {
 export const useChatActions = (_user?: User | null): UseChatActionsReturn => {
     const [ttsBlockedUsers, setTtsBlockedUsers] = useState<Set<string>>(new Set());
 
-    const loadBlockedUsers = async (): Promise<void> => {
+    const loadBlockedUsers = useCallback(async (): Promise<void> => {
         try {
             logger.log('[CHAT] Loading muted users...');
 
@@ -47,9 +47,9 @@ export const useChatActions = (_user?: User | null): UseChatActionsReturn => {
             const errorMessage = err.response?.data?.detail || err.message || 'Не удалось загрузить список заблокированных пользователей';
             toast.error(`Ошибка загрузки: ${errorMessage}`);
         }
-    };
+    }, []);
 
-    const handleContextMenuAction = async (action: string, msg: ChatMessage, currentUser?: User | null): Promise<void> => {
+    const handleContextMenuAction = useCallback(async (action: string, msg: ChatMessage, currentUser?: User | null): Promise<void> => {
         const username = msg.author_name || msg.author;
         const platform = msg.platform;
 
@@ -104,7 +104,7 @@ export const useChatActions = (_user?: User | null): UseChatActionsReturn => {
             const err = error as { response?: { data?: { detail?: string } } };
             toast.error(err.response?.data?.detail || 'Ошибка выполнения действия');
         }
-    };
+    }, []);
 
     return {
         ttsBlockedUsers,

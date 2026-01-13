@@ -82,12 +82,25 @@ class Logger {
   warn(...args: unknown[]) { this._log('WARN', '[WARN]', ...args); }
   error(...args: unknown[]) { this._log('ERROR', '[ERROR]', ...args); }
   success(...args: unknown[]) { this._log('INFO', '[OK]', ...args); }
-  api(method: string, endpoint: string, data?: unknown) { this._log('DEBUG', '[API]', `${method} ${endpoint}`, data); }
-  apiResponse(status: number, endpoint: string, data?: unknown) {
-    const emoji = status < 400 ? '[OK]' : '[ERROR]';
-    this._log('DEBUG', emoji, `[${status}] ${endpoint}`, data);
+  api(method: string, endpoint: string, data?: unknown) {
+    // Only log mutations or if specific debug flag is on
+    if (!['GET', 'OPTIONS'].includes(method)) {
+      this._log('DEBUG', '[API]', `${method} ${endpoint}`, data);
+    }
   }
-  ws(event: string, data?: unknown) { this._log('DEBUG', '[CONNECT]', `WS: ${event}`, data); }
+  apiResponse(status: number, endpoint: string, data?: unknown) {
+    // Only log errors
+    if (status >= 400) {
+      const emoji = '[ERROR]';
+      this._log('ERROR', emoji, `[${status}] ${endpoint}`, data);
+    }
+  }
+  ws(event: string, data?: unknown) {
+    // Reduce WS chatter
+    if (event !== 'ping' && event !== 'pong') {
+      this._log('DEBUG', '[CONNECT]', `WS: ${event}`, data);
+    }
+  }
   log(...args: unknown[]) { this.info(...args); }
 }
 

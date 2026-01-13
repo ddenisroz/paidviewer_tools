@@ -22,17 +22,10 @@ interface UsernameInputProps {
   onValidationChange?: (isValid: boolean) => void;
 }
 
-export const UsernameInput: React.FC<UsernameInputProps> = ({
-  value,
-  onChange,
-  label = 'Никнейм',
-  placeholder = 'Введите никнейм',
-  required = false,
-  disabled = false,
-  className = '',
-  showValidation = true,
-  onValidationChange,
-}) => {
+const useUsernameValidation = (
+  value: string,
+  onValidationChange?: (isValid: boolean) => void
+) => {
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [available, setAvailable] = useState<boolean | undefined>();
@@ -72,60 +65,65 @@ export const UsernameInput: React.FC<UsernameInputProps> = ({
     };
   }, [value, onValidationChange]);
 
-  const getValidationIcon = () => {
-    if (!showValidation || !value || value.trim().length === 0) {
-      return null;
-    }
+  return { checking, error, available };
+};
 
-    if (checking) {
-      return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-    }
+const ValidationIcon: React.FC<{
+  checking: boolean;
+  error?: string;
+  available?: boolean;
+}> = ({ checking, error, available }) => {
+  if (checking) return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+  if (error) return <XCircle className="h-4 w-4 text-red-500" />;
+  if (available) return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+  return null;
+};
 
-    if (error) {
-      return <XCircle className="h-4 w-4 text-red-500" />;
-    }
+const ValidationMessage: React.FC<{
+  checking: boolean;
+  error?: string;
+  available?: boolean;
+}> = ({ checking, error, available }) => {
+  if (checking) {
+    return (
+      <p className="text-xs text-blue-500 flex items-center gap-1 mt-1">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Проверка доступности...
+      </p>
+    );
+  }
+  if (error) {
+    return (
+      <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
+        <AlertCircle className="h-3 w-3" />
+        {error}
+      </p>
+    );
+  }
+  if (available) {
+    return (
+      <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
+        <CheckCircle2 className="h-3 w-3" />
+        Никнейм доступен
+      </p>
+    );
+  }
+  return null;
+};
 
-    if (available) {
-      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-    }
-
-    return null;
-  };
-
-  const getValidationMessage = () => {
-    if (!showValidation || !value || value.trim().length === 0) {
-      return null;
-    }
-
-    if (checking) {
-      return (
-        <p className="text-xs text-blue-500 flex items-center gap-1 mt-1">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          Проверка доступности...
-        </p>
-      );
-    }
-
-    if (error) {
-      return (
-        <p className="text-xs text-red-500 flex items-center gap-1 mt-1">
-          <AlertCircle className="h-3 w-3" />
-          {error}
-        </p>
-      );
-    }
-
-    if (available) {
-      return (
-        <p className="text-xs text-green-500 flex items-center gap-1 mt-1">
-          <CheckCircle2 className="h-3 w-3" />
-          Никнейм доступен
-        </p>
-      );
-    }
-
-    return null;
-  };
+export const UsernameInput: React.FC<UsernameInputProps> = ({
+  value,
+  onChange,
+  label = 'Никнейм',
+  placeholder = 'Введите никнейм',
+  required = false,
+  disabled = false,
+  className = '',
+  showValidation = true,
+  onValidationChange,
+}) => {
+  const { checking, error, available } = useUsernameValidation(value, onValidationChange);
+  const showDetailValidations = showValidation && !(!value || value.trim().length === 0);
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -147,10 +145,12 @@ export const UsernameInput: React.FC<UsernameInputProps> = ({
           className={`pr-10 ${error ? 'border-red-500' : available ? 'border-green-500' : ''}`}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          {getValidationIcon()}
+          {showDetailValidations && <ValidationIcon checking={checking} error={error} available={available} />}
         </div>
       </div>
-      {getValidationMessage()}
+
+      {showDetailValidations && <ValidationMessage checking={checking} error={error} available={available} />}
+
       {showValidation && !error && !checking && !available && value && value.trim().length > 0 && (
         <p className="text-xs text-muted-foreground mt-1">
           Минимум 3 символа, только латинские буквы, цифры и подчеркивание

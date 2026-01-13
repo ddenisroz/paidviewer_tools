@@ -23,29 +23,29 @@ import type { DropsConfig } from '@/types/drops';
 import type { User, UserIntegrations } from '@/types/user';
 
 interface StreakSettingsProps {
-    user: User;
-    channelName: string;
-    hasRewards?: boolean;
-    integrations?: UserIntegrations;
+  user: User;
+  channelName: string;
+  hasRewards?: boolean;
+  integrations?: UserIntegrations;
 }
 
 interface StreakSettingsFormData {
-    streak_days_common: number[];
-    streak_days_rare: number[];
-    streak_days_epic: number[];
-    streak_days_legendary: number[];
-    streak_messages_required: number[];
-    streak_reset_on_skip: boolean;
-    streak_enabled_twitch: boolean;
-    streak_enabled_vk: boolean;
+  streak_days_common: number[];
+  streak_days_rare: number[];
+  streak_days_epic: number[];
+  streak_days_legendary: number[];
+  streak_messages_required: number[];
+  streak_reset_on_skip: boolean;
+  streak_enabled_twitch: boolean;
+  streak_enabled_vk: boolean;
 }
 
 const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasRewards = false, integrations }) => {
   const twitchAvailable = integrations?.twitch?.connected && user?.twitch_username;
   const vkAvailable = integrations?.vk?.connected && (user?.vk_username || user?.vk_channel_name);
-  
+
   const { config, isLoading, isInitialLoad, setIsInitialLoad, saveMutation } = useDropsConfig(channelName);
-  
+
   const [formData, setFormData] = useState<StreakSettingsFormData>({
     streak_days_common: [DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_COMMON],
     streak_days_rare: [DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_RARE],
@@ -60,8 +60,8 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   useEffect(() => {
     const handleDropsConfigChange = (event: CustomEvent) => {
       const { streak_enabled, channel, platform: eventPlatform, source } = event.detail;
-      // [OK] �����������: ��������� ��������� ��������� ������ ���� ������� ������ �� QuickActionsBar
-      // ���� ������� ������ �� useDropsConfig (��� ����������� saveMutation), �� ��������� ��� ��������� ����� setFormData
+      // [OK] ИСПРАВЛЕНИЕ: Обновляем локальное состояние только если событие пришло от QuickActionsBar
+      // Если событие пришло от useDropsConfig (наш собственный saveMutation), то состояние уже обновлено через setFormData
       if (channel === channelName && streak_enabled !== undefined && eventPlatform && source === 'QuickActionsBar') {
         if (eventPlatform === 'twitch') {
           setFormData(prev => ({ ...prev, streak_enabled_twitch: streak_enabled }));
@@ -74,13 +74,13 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     window.addEventListener('drops-config-changed', handleDropsConfigChange as EventListener);
     return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange as EventListener);
   }, [channelName]);
-  
+
   const initialFormData = useMemo(() => {
     if (!config) return null;
-    
+
     // Type assertion after null check
     const typedConfig = config as DropsConfig;
-    
+
     return {
       streak_days_common: [typedConfig.streak_days_common ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_COMMON],
       streak_days_rare: [typedConfig.streak_days_rare ?? DROPS_CONSTANTS.STREAK.DEFAULT_DAYS_RARE],
@@ -92,22 +92,22 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       streak_enabled_vk: typedConfig.streak_enabled_vk ?? false
     };
   }, [config]);
-  
-  // [OK] �������������: ��������� ������ ��� ������ ��������
+
+  // [OK] ИНИЦИАЛИЗАЦИЯ: Загружаем данные при первой загрузке
   useEffect(() => {
     if (initialFormData && isInitialLoad) {
       setFormData(initialFormData);
       setIsInitialLoad(false);
     }
   }, [initialFormData, isInitialLoad]);
-  
-  // [OK] �������������: �������������� formData � config �� React Query
-  // ��������� ��� ����, ������� streak_enabled (fallback ���� ������� �� ���� ����������)
+
+  // [OK] СИНХРОНИЗАЦИЯ: Синхронизируем formData с config из React Query
+  // Обновляем все поля, включая streak_enabled (fallback если событие не было обработано)
   useEffect(() => {
     if (!isInitialLoad && config && initialFormData) {
       setFormData(prev => {
-        // [OK] ���������, ���������� �� �������� � config
-        const needsUpdate = 
+        // [OK] Проверяем, изменились ли значения в config
+        const needsUpdate =
           prev.streak_days_common[0] !== initialFormData.streak_days_common[0] ||
           prev.streak_days_rare[0] !== initialFormData.streak_days_rare[0] ||
           prev.streak_days_epic[0] !== initialFormData.streak_days_epic[0] ||
@@ -116,8 +116,8 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
           prev.streak_reset_on_skip !== initialFormData.streak_reset_on_skip ||
           prev.streak_enabled_twitch !== initialFormData.streak_enabled_twitch ||
           prev.streak_enabled_vk !== initialFormData.streak_enabled_vk;
-        
-        // ��������� ������ ���� �������� ���������� (������������� ������ ����������)
+
+        // Обновляем только если значения изменились (предотвращаем лишние обновления)
         if (needsUpdate) {
           return {
             ...prev,
@@ -151,33 +151,33 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       streak_messages_required: formData.streak_messages_required[0],
       streak_reset_on_skip: formData.streak_reset_on_skip
     };
-    
-    // [OK] �������� streak_enabled ������ ���� explicitly requested (��� handlePlatformToggle)
+
+    // [OK] Включаем streak_enabled только если explicitly requested (для handlePlatformToggle)
     if (includeEnabledFlags) {
       payload.streak_enabled_twitch = formData.streak_enabled_twitch;
       payload.streak_enabled_vk = formData.streak_enabled_vk;
     }
-    
+
     return payload;
   };
 
   const handlePlatformToggle = (platform: string, enabled: boolean) => {
     if (!hasRewards && enabled) {
-      toast.error('������� ��������� ���������� �������� �� ������� "�������"');
+      toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"');
       return;
     }
-    
+
     const platformKey = platform === 'twitch' ? 'streak_enabled_twitch' : 'streak_enabled_vk';
     setFormData(prev => ({ ...prev, [platformKey]: enabled }));
     autoSave({ ...createPayload(), [platformKey]: enabled });
   };
-  
-  // [OK] �����������: �������������� ������ ��� ��������, �� ��� streak_enabled_twitch/vk
-  // streak_enabled_twitch/vk ����������� �������� ����� handlePlatformToggle
-  // ��� ������������� ��������� ���������� ��� ���������� �� QuickActionsBar
+
+  // [OK] ИСПРАВЛЕНИЕ: Автосохранение только для настроек, НЕ для streak_enabled_twitch/vk
+  // streak_enabled_twitch/vk сохраняются отдельно через handlePlatformToggle
+  // Это предотвращает повторное сохранение при обновлении из QuickActionsBar
   useEffect(() => {
     if (!isInitialLoad && config) {
-      // [OK] ������� payload ��� streak_enabled ����� ��� ��������������
+      // [OK] Создаем payload БЕЗ streak_enabled полей для автосохранения
       autoSave(createPayload(false));
     }
   }, [
@@ -189,8 +189,8 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     formData.streak_reset_on_skip,
     isInitialLoad,
     autoSave
-    // [OK] ���������: formData.streak_enabled_twitch, formData.streak_enabled_vk
-    // ��� ���� ����������� �������� ����� handlePlatformToggle
+    // [OK] ИСКЛЮЧЕНО: formData.streak_enabled_twitch, formData.streak_enabled_vk
+    // Эти поля сохраняются отдельно через handlePlatformToggle
   ]);
 
   const resetStatsMutation = useMutation({
@@ -200,32 +200,30 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     onSuccess: (response) => {
       const responseData = response?.data as { data?: { deleted_count?: number } } | undefined;
       const deletedCount = responseData?.data?.deleted_count || 0;
-      toast.success(`���������� ������� �������� (������� ${deletedCount} �������)`);
+      toast.success(`Статистика стриков сброшена (удалено ${deletedCount} записей)`);
       queryClient.invalidateQueries({ queryKey: ['drops-streak-stats', channelName] });
     },
     onError: (err: Error) => {
-      toast.error('������ ������ ����������');
+      toast.error('Ошибка сброса статистики');
       logger.error('Error resetting streak statistics:', err);
     },
   });
 
   const handleResetStatistics = async () => {
     if (!user || !channelName) {
-      toast.error('������������ ������');
+      toast.error('Недостаточно данных');
       return;
     }
 
-    if (!confirm('�� �������, ��� ������ �������� ��� ���������� �������? ��� �������� ����������!')) {
+    if (!confirm('Вы уверены, что хотите сбросить всю статистику стриков? Это действие необратимо!')) {
       return;
     }
 
     resetStatsMutation.mutate();
   };
-  
+
   const _isStreakEnabledAnywhere = formData.streak_enabled_twitch || formData.streak_enabled_vk;
 
-  // ���������� loader ������ ���� ��� ��������� �������� � ������ ��� �� ���������
-  // ���� config === null ����� ��������, ������ ������ ���������� - ���������� ����� � ���������� ����������
   if (isLoading && isInitialLoad) {
     return (
       <div className="space-y-4">
@@ -239,8 +237,8 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       </div>
     );
   }
-  
-  // ���� config �� ���������� (������ ����������), ���������� ��������������
+
+  // Если config не загрузился (ошибка валидации), показываем предупреждение
   if (!config && !isLoading) {
     return (
       <div className="space-y-4">
@@ -252,7 +250,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">
-                  �� ������� ��������� ��������� �������. ���������, ��� ������ ������� �� <strong className="text-foreground font-mono">����� 8000</strong>.
+                  Не удалось загрузить настройки стриков. Убедитесь, что сервер запущен на <strong className="text-foreground font-mono">порту 8000</strong>.
                 </p>
               </div>
             </div>
@@ -264,7 +262,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
 
   return (
     <div className="space-y-4">
-      {/* �������������� ���� ��� ������ */}
+      {/* Предупреждение если нет наград */}
       {!hasRewards && (
         <Card className="border-l-4 border-l-orange-500 border-orange-500/20 bg-orange-500/5">
           <CardContent className="p-4">
@@ -274,34 +272,34 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
                   <AlertTriangle className="h-4 w-4 text-orange-400" />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  ��� ������ ������� ������� ��������� ���������� �������� �� ������� <strong className="text-foreground">"�������"</strong>
+                  Для работы системы стриков необходимо сначала настроить содержимое сундуков на вкладке <strong className="text-foreground">"Награды"</strong>
                 </p>
               </div>
-              <Button 
+              <Button
                 onClick={() => window.location.href = '/dashboard/drops?tab=rewards'}
                 variant="outline"
                 size="sm"
                 className="h-8 text-xs flex-shrink-0"
               >
                 <Package className="w-3.5 h-3.5 mr-1.5" />
-                ���������
+                Настроить
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* ��������� ���� ������ - ������ ����� */}
+      {/* Календарь дней стрика - поднят вверх */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            {/* �������� ��������� - ����� */}
+            {/* Заголовок календаря - слева */}
             <div className="flex items-center gap-2">
               <Gift className="w-5 h-5 text-primary" />
-              <h3 className="text-lg font-semibold">������� �������</h3>
+              <h3 className="text-lg font-semibold">Календарь стриков</h3>
             </div>
-            
-            {/* ������������� ��� ������ ��������� - ������ */}
+
+            {/* Переключатели для каждой платформы - справа */}
             <div className="flex items-center gap-4 flex-wrap">
               {twitchAvailable && (
                 <div className="flex items-center gap-2">
@@ -325,29 +323,29 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
           </div>
         </CardHeader>
         <CardContent>
-          <StreakCalendar 
-            formData={formData as unknown as { streak_days_common: number[]; streak_days_rare: number[]; streak_days_epic: number[]; streak_days_legendary: number[]; [key: string]: number[] }} 
-            setFormData={setFormData as unknown as React.Dispatch<React.SetStateAction<{ streak_days_common: number[]; streak_days_rare: number[]; streak_days_epic: number[]; streak_days_legendary: number[]; [key: string]: number[] }>>} 
+          <StreakCalendar
+            formData={formData as unknown as { streak_days_common: number[]; streak_days_rare: number[]; streak_days_epic: number[]; streak_days_legendary: number[];[key: string]: number[] }}
+            setFormData={setFormData as unknown as React.Dispatch<React.SetStateAction<{ streak_days_common: number[]; streak_days_rare: number[]; streak_days_epic: number[]; streak_days_legendary: number[];[key: string]: number[] }>>}
           />
         </CardContent>
       </Card>
 
 
 
-      {/* ����� ��������� - ���������� ���� */}
+      {/* Общие настройки - перемещены вниз */}
       <Card>
         <CardContent className="space-y-4 pt-6">
-          {/* ��������� ��� ������� ��� */}
+          {/* Сообщений для засчета дня */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm">��������� ��� ������� ������</Label>
+              <Label className="text-sm">Сообщений для засчета стрима</Label>
               <span className="text-lg font-semibold">{formData.streak_messages_required[0]}</span>
             </div>
             <Slider
               value={formData.streak_messages_required}
               onValueChange={(value) => {
-                setFormData({...formData, streak_messages_required: value});
-                // �������������� ��� � useEffect
+                setFormData({ ...formData, streak_messages_required: value });
+                // Автосохранение уже в useEffect
               }}
               min={1}
               max={100}
@@ -355,27 +353,26 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
             />
           </div>
 
-          {/* ����� ��� �������� */}
+          {/* Сброс при пропуске */}
           <div className="flex items-center justify-between p-3 border rounded-lg">
             <div>
-              <Label className="text-sm font-medium">����� ��� ��������</Label>
-              <p className="text-xs text-muted-foreground">�������� ����� ��� ������������ �� ����� ������</p>
+              <Label className="text-sm font-medium">Сброс при пропуске</Label>
+              <p className="text-xs text-muted-foreground">Обнулять стрик при неактивности во время стрима</p>
             </div>
             <Switch
               checked={formData.streak_reset_on_skip}
               onCheckedChange={(checked) => {
-                setFormData({...formData, streak_reset_on_skip: checked});
-                // �������������� ��� � useEffect
+                setFormData({ ...formData, streak_reset_on_skip: checked });
+                // Автосохранение уже в useEffect
               }}
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* [OK] ������ ������ "���������" - �������������� �������� ������������� */}
-      {/* ������ ������ ���������� */}
+      {/* Кнопка сброса статистики */}
       <div className="flex items-center gap-3 justify-end">
-        <Button 
+        <Button
           onClick={handleResetStatistics}
           disabled={resetStatsMutation.isPending}
           size="sm"
@@ -383,7 +380,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
           className="gap-2"
         >
           <AlertTriangle className="w-4 h-4" />
-          {resetStatsMutation.isPending ? '�����...' : '�������� ���������� �������'}
+          {resetStatsMutation.isPending ? 'Сброс...' : 'Сбросить статистику стриков'}
         </Button>
       </div>
     </div>
@@ -391,5 +388,3 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
 };
 
 export default StreakSettings;
-
-

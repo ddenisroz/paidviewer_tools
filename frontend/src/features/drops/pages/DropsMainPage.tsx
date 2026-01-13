@@ -1,8 +1,8 @@
 ﻿import React, { useEffect, useState } from 'react';
 
-import { 
-  AlertCircle, 
-  Coins, 
+import {
+  AlertCircle,
+  Coins,
   DollarSign,
   History,
   Monitor,
@@ -83,7 +83,7 @@ const DropsMainPage: React.FC = () => {
                 Для использования системы лояльности необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
               </p>
             </div>
-            <Button 
+            <Button
               onClick={() => navigate('/login')}
               className="gap-2"
             >
@@ -96,7 +96,40 @@ const DropsMainPage: React.FC = () => {
     );
   }
 
-  // Guard clause for null channelName or user
+  // Check for connected integrations (from legacy)
+  const hasAnyIntegration = (integrations?.twitch?.enabled && user?.twitch_username) ||
+    (integrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name));
+
+  if (!hasAnyIntegration) {
+    return (
+      <PageWrapper title="Drops система">
+        <Card className="border-gray-700">
+          <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-gray-500" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-xl font-semibold text-gray-200">
+                Нет подключенных интеграций
+              </h3>
+              <p className="text-gray-400 text-sm">
+                Для использования системы лояльности необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate('/dashboard/settings')}
+              className="gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              Перейти в настройки
+            </Button>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
+  }
+
+  // Guard clause for null channelName or user (loading state)
   if (!channelName || !user) {
     return (
       <PageWrapper title="Drops система">

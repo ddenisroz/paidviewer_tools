@@ -135,7 +135,7 @@ class DropsCalculationService:
         quality_name: str
     ) -> Tuple[bool, Optional[str]]:
         """Validate that probabilities sum to 1.0 and all rewards have valid weights"""
-        logger.debug(f"✔️ [DROPS CALC] Validating probabilities for {channel_name} (quality: {quality_name})")
+        logger.debug(f"[DROPS CALC] Validating probabilities for {channel_name} (quality: {quality_name})")
 
         from repositories.drops_reward_repository import DropsRewardRepository
         reward_repo = DropsRewardRepository(self.db)

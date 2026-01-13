@@ -112,7 +112,7 @@ async def get_vk_categories(
         user_id = current_user.get('id') if current_user else None
         session_id = current_user.get('session_id') if current_user else None
 
-        logger.info(f"📺 [VK CATEGORIES] Fetching for user {user_id} with search: '{search}'")
+        logger.info(f"[VK CATEGORIES] Fetching for user {user_id} with search: '{search}'")
 
         # Helper to get VK token through repository
         from repositories.user_token_repository import UserTokenRepository

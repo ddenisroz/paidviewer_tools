@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -16,10 +16,10 @@ interface DeleteAccountModalProps {
 
 const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose }) => {
     const [confirmText, setConfirmText] = useState('');
-    
+
     const deleteAccountMutation = useDeleteAccount({
         onSuccess: () => {
-            // �������� ��� ��������� � mutation
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ mutation
         },
     });
 
@@ -27,7 +27,7 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
 
     const handleDelete = () => {
         if (confirmText !== 'Delete') {
-            toast.error('������� "Delete" ��� �������������');
+            toast.error('пїЅпїЅпїЅпїЅпїЅпїЅпїЅ "Delete" пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ');
             return;
         }
 
@@ -51,7 +51,7 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
                     <div className="flex items-center gap-3">
                         <AlertTriangle className="h-6 w-6 text-red-500" />
                         <h2 className="text-xl font-bold text-white">
-                            ������� �������
+                            пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
                         </h2>
                     </div>
                     {!isDeleting && (
@@ -68,23 +68,23 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
                 <div className="p-6 space-y-4">
                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
                         <p className="text-red-400 font-semibold mb-2">
-                            [WARN] ��� �������� ����������!
+                            [WARN] пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ!
                         </p>
                         <p className="text-gray-300 text-sm">
-                            ����� �������:
+                            пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ:
                         </p>
                         <ul className="list-disc list-inside text-gray-400 text-sm mt-2 space-y-1">
-                            <li>��� ������ ���������� (Twitch, VK Live)</li>
-                            <li>��� ��������� TTS � ����</li>
-                            <li>������� ���������</li>
-                            <li>��������� OBS ��������</li>
-                            <li>������ �������</li>
+                            <li>пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ (Twitch, VK Live)</li>
+                            <li>пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ TTS пїЅ пїЅпїЅпїЅпїЅ</li>
+                            <li>пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</li>
+                            <li>пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ OBS пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</li>
+                            <li>пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ</li>
                         </ul>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                            ������� <span className="font-mono bg-gray-700 px-1.5 py-0.5 rounded text-red-400">Delete</span> ��� �������������:
+                            пїЅпїЅпїЅпїЅпїЅпїЅпїЅ <span className="font-mono bg-gray-700 px-1.5 py-0.5 rounded text-red-400">Delete</span> пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ:
                         </label>
                         <Input
                             type="text"
@@ -105,7 +105,7 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
                         onClick={handleClose}
                         disabled={isDeleting}
                     >
-                        ������
+                        пїЅпїЅпїЅпїЅпїЅпїЅ
                     </Button>
                     <Button
                         variant="destructive"
@@ -116,10 +116,10 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
                         {isDeleting ? (
                             <>
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                ��������...
+                                пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ...
                             </>
                         ) : (
-                            '������� �������'
+                            'пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ'
                         )}
                     </Button>
                 </div>

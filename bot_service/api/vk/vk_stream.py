@@ -200,7 +200,7 @@ class VKStream(VKAuth):
     async def _update_stream(self, user_id: str, payload: Dict[str, Any], session_id: Optional[str] = None) -> bool:
         """Helper to update stream data (title, category)."""
         try:
-            logger.info(f"📺 [VK API] _update_stream called for user {user_id} with payload: {payload}")
+            logger.info(f"[VK API] _update_stream called for user {user_id} with payload: {payload}")
 
             token = self._get_user_token(user_id, session_id)
             if not token:

@@ -69,5 +69,12 @@ export const authService = {
       params: { code, state },
     });
   },
-};
 
+  /**
+   * Clear legacy sessions for current user
+   * @returns Promise с ответом API
+   */
+  async clearLegacySessions(): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post('/api/sessions/clear-legacy');
+  },
+};

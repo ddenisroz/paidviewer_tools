@@ -15,31 +15,31 @@ import { toast } from '@/utils/toastManager';
 import type { DropsConfig } from '@/types/drops';
 
 interface WidgetSettingsProps {
-    user: Record<string, unknown>;
-    channelName: string;
+  user: Record<string, unknown>;
+  channelName: string;
 }
 
 interface FormData {
-    widget_spinning_duration_ms: number[];
-    widget_opening_duration_ms: number[];
-    widget_result_duration_ms: number[];
+  widget_spinning_duration_ms: number[];
+  widget_opening_duration_ms: number[];
+  widget_result_duration_ms: number[];
 }
 
 const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) => {
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // [OK] ����� ���: ���������� ���������������� hooks
+
+  // [OK] React Query hooks
   const { data: config, isLoading: _configLoading } = useDropsConfig(channelName, {
     enabled: !!user && !!channelName,
   });
-  
+
   const updateConfigMutation = useUpdateDropsConfig(channelName, {
     onSuccess: () => {
-      // �������������� �������� ����, ��� toast
+      // toast suppressed
     },
   });
-  
+
   const generateWidgetUrlMutation = useGenerateDropsWidgetUrl({
     onSuccess: (response) => {
       const responseData = response as { success?: boolean; data?: { url?: string } };
@@ -55,7 +55,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     widget_result_duration_ms: [5500]
   });
 
-  // ��������� ������������ � ���������� URL ������� ��� ������������
+  // Init settings
   useEffect(() => {
     if (config) {
       setFormData({
@@ -66,24 +66,24 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     }
   }, [config]);
 
-  // ���������� URL ������� ��� ������������
+  // Load widget URL
   useEffect(() => {
     if (user && channelName && !widgetUrl) {
       generateWidgetUrlMutation.mutate(false);
     }
   }, [user, channelName]);
 
-  // [OK] �������������� � ���������
+  // [OK] Auto-save
   const { autoSave } = useAutoSave(
     (payload: Partial<DropsConfig>) => updateConfigMutation.mutate(payload),
     1000,
     () => {
-      if (!user || !channelName || !config) return '������������ ������ ��� ����������';
+      if (!user || !channelName || !config) return 'Недостаточно данных для сохранения';
       return null;
     }
   );
 
-  // [OK] �������������� ��� ��������� �����
+  // [OK] Trigger auto-save on change
   useEffect(() => {
     if (config) {
       const payload = {
@@ -100,8 +100,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     config,
     autoSave
   ]);
-  
-  // ������� ������� ��� ���������������
+
   useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
@@ -117,33 +116,33 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
   const copyWidgetUrl = () => {
     if (widgetUrl) {
       navigator.clipboard.writeText(widgetUrl);
-      toast.success('URL ���������� � ����� ������');
+      toast.success('URL скопирован в буфер обмена');
     }
   };
 
   return (
     <div className="space-y-4">
-      {/* ��������� �������� */}
+      {/* Настройки анимации */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Settings2 className="w-5 h-5" />
-            ��������� ��������
+            Настройки анимации
           </CardTitle>
           <CardDescription className="text-xs">
-            ������������ ��� �������� �������� �������� � OBS �������
+            Длительность фаз анимации открытия сундуков в OBS виджете
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">������ (��)</Label>
+                <Label className="text-sm">Крутка (мс)</Label>
                 <span className="text-lg font-semibold">{formData.widget_spinning_duration_ms[0]}</span>
               </div>
               <Slider
                 value={formData.widget_spinning_duration_ms}
-                onValueChange={(value) => setFormData({...formData, widget_spinning_duration_ms: value})}
+                onValueChange={(value) => setFormData({ ...formData, widget_spinning_duration_ms: value })}
                 min={500}
                 max={5000}
                 step={100}
@@ -152,12 +151,12 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">�������� (��)</Label>
+                <Label className="text-sm">Открытие (мс)</Label>
                 <span className="text-lg font-semibold">{formData.widget_opening_duration_ms[0]}</span>
               </div>
               <Slider
                 value={formData.widget_opening_duration_ms}
-                onValueChange={(value) => setFormData({...formData, widget_opening_duration_ms: value})}
+                onValueChange={(value) => setFormData({ ...formData, widget_opening_duration_ms: value })}
                 min={500}
                 max={3000}
                 step={100}
@@ -166,12 +165,12 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">��������� (��)</Label>
+                <Label className="text-sm">Результат (мс)</Label>
                 <span className="text-lg font-semibold">{formData.widget_result_duration_ms[0]}</span>
               </div>
               <Slider
                 value={formData.widget_result_duration_ms}
-                onValueChange={(value) => setFormData({...formData, widget_result_duration_ms: value})}
+                onValueChange={(value) => setFormData({ ...formData, widget_result_duration_ms: value })}
                 min={2000}
                 max={15000}
                 step={500}
@@ -179,27 +178,27 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
             </div>
           </div>
 
-          {/* [OK] ������ ������ - �������������� �������� ������������� */}
+          {/* [OK] Removed save button - auto-save works */}
           <p className="text-xs text-muted-foreground italic">
-            ��������� ����������� ������������� ��� ���������
+            Настройки сохраняются автоматически при изменении
           </p>
         </CardContent>
       </Card>
 
-      {/* URL ������� */}
+      {/* URL виджета */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Monitor className="w-5 h-5" />
-            OBS ������
+            OBS Виджет
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* [OK] ������ ���������� OBS */}
+          {/* [OK] Instructions removed */}
           {widgetUrl ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label className="text-sm">URL �������</Label>
+                <Label className="text-sm">URL виджета</Label>
                 <Button
                   variant="outline"
                   size="sm"
@@ -210,12 +209,12 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   {generateWidgetUrlMutation.isPending ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      �������������...
+                      Перегенерация...
                     </>
                   ) : (
                     <>
                       <Settings2 className="w-3 h-3" />
-                      ����������������
+                      Перегенерировать
                     </>
                   )}
                 </Button>
@@ -233,7 +232,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   className="gap-2"
                 >
                   <Copy className="w-4 h-4" />
-                  ����������
+                  Копировать
                 </Button>
                 <Button
                   variant="outline"
@@ -242,14 +241,14 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   className="gap-2"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  ������� ������
+                  Открыть виджет
                 </Button>
               </div>
             </div>
           ) : (
             <div className="p-4 border rounded-lg bg-muted/50">
               <p className="text-sm text-muted-foreground">
-                URL ������� �����������...
+                URL виджета загружается...
               </p>
             </div>
           )}
@@ -261,5 +260,3 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 };
 
 export default WidgetSettings;
-
-

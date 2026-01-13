@@ -52,7 +52,13 @@ class UserRepository(BaseRepository[User]):
     
     def is_username_taken(self, username: str) -> bool:
         """Check if username is already taken (case-insensitive)."""
-        return self.db.query(User).filter(User.username.ilike(username)).first() is not None
+        from sqlalchemy import or_
+        return self.db.query(User).filter(
+            or_(
+                User.twitch_username.ilike(username),
+                User.vk_username.ilike(username)
+            )
+        ).first() is not None
     
     def get_user_tokens(self, user_id: int) -> List[UserToken]:
         """Get all tokens for a user."""

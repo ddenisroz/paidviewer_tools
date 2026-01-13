@@ -67,7 +67,7 @@ async def notify_queue_update(user_id: int = None, session_id: str = None, db: S
                 "timestamp": time.time()
             }
         )
-        logger.debug(f"📺 Sent youtube_queue_update to {target_id}")
+        logger.debug(f"[YOUTUBE] Sent youtube_queue_update to {target_id}")
     except Exception as e:
         logger.error(f"Error sending youtube_queue_update: {e}")
 
@@ -163,7 +163,7 @@ async def get_queue(
         # Текущее видео - первое в очереди (все уже отфильтрованы по status='pending')
         current_video = queue_items[0] if queue_items and len(queue_items) > 0 else None
 
-        logger.debug(f"📺 [Queue] User {user_id}: {len(queue_items)} videos, current: {current_video['title'] if current_video else 'None'}")
+        logger.debug(f"[QUEUE] User {user_id}: {len(queue_items)} videos, current: {current_video['title'] if current_video else 'None'}")
 
         return {
             "queue": queue_items,

@@ -11,7 +11,7 @@
 import React, { useState } from 'react';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { 
+import {
     Ban, CheckCircle, Edit, MessageCircle, Plus, RefreshCw, Shield,
     Trash2, Twitch, UserCheck, UserX, Wifi
 } from 'lucide-react';
@@ -46,7 +46,7 @@ interface UsersApiResponse {
 
 const UserManagementPage: React.FC = () => {
     const queryClient = useQueryClient();
-    
+
     // Dialogs state
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [blockDialogOpen, setBlockDialogOpen] = useState(false);
@@ -86,12 +86,12 @@ const UserManagementPage: React.FC = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-            toast.success('������������ ��������');
+            toast.success('Пользователь обновлен');
             setEditDialogOpen(false);
         },
         onError: (error: unknown) => {
             logger.error('Error updating user:', error);
-            toast.error('������ ���������� ������������');
+            toast.error('Ошибка обновления пользователя');
         },
     });
 
@@ -101,12 +101,12 @@ const UserManagementPage: React.FC = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-            toast.success('������������ ������������');
+            toast.success('Пользователь заблокирован');
             setBlockDialogOpen(false);
         },
         onError: (error: unknown) => {
             logger.error('Error blocking user:', error);
-            toast.error('������ ���������� ������������');
+            toast.error('Ошибка блокировки пользователя');
         },
     });
 
@@ -116,11 +116,11 @@ const UserManagementPage: React.FC = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-            toast.success('������������ �������������');
+            toast.success('Пользователь разблокирован');
         },
         onError: (error: unknown) => {
             logger.error('Error unblocking user:', error);
-            toast.error('������ �������������');
+            toast.error('Ошибка разблокировки');
         },
     });
 
@@ -130,11 +130,11 @@ const UserManagementPage: React.FC = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-            toast.success('������������ ������');
+            toast.success('Пользователь удален');
         },
         onError: (error: unknown) => {
             logger.error('Error deleting user:', error);
-            toast.error('������ �������� ������������');
+            toast.error('Ошибка удаления пользователя');
         },
     });
 
@@ -142,39 +142,39 @@ const UserManagementPage: React.FC = () => {
         mutationFn: async ({ twitchChannel, vkChannel }: { twitchChannel: string; vkChannel: string }) => {
             const results: string[] = [];
             const errors: string[] = [];
-            
+
             if (twitchChannel && twitchChannel.trim()) {
                 try {
                     await adminService.addToWhitelist({ username: twitchChannel.trim(), platform: 'twitch' });
                     results.push(`Twitch: ${twitchChannel.trim()}`);
                 } catch (err) {
                     const typedErr = err as { response?: { data?: { error?: string } }; message?: string };
-                    errors.push(`Twitch: ${typedErr.response?.data?.error || typedErr.message || '������'}`);
+                    errors.push(`Twitch: ${typedErr.response?.data?.error || typedErr.message || 'Ошибка'}`);
                 }
             }
-            
+
             if (vkChannel && vkChannel.trim()) {
                 try {
                     await adminService.addToWhitelist({ username: vkChannel.trim(), platform: 'vk' });
                     results.push(`VK: ${vkChannel.trim()}`);
                 } catch (err) {
                     const typedErr = err as { response?: { data?: { error?: string } }; message?: string };
-                    errors.push(`VK: ${typedErr.response?.data?.error || typedErr.message || '������'}`);
+                    errors.push(`VK: ${typedErr.response?.data?.error || typedErr.message || 'Ошибка'}`);
                 }
             }
-            
+
             if (results.length === 0) {
-                throw new Error(errors.length > 0 ? errors.join('; ') : '������� ���� �� ���� �����');
+                throw new Error(errors.length > 0 ? errors.join('; ') : 'Укажите хотя бы один канал');
             }
-            
+
             return { success: true, platforms: results, errors: errors.length > 0 ? errors : null };
         },
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
             if (data.errors) {
-                toast.success(`���������: ${data.platforms.join(', ')}. ������: ${data.errors.join('; ')}`, { duration: 5000 });
+                toast.success(`Добавлено: ${data.platforms.join(', ')}. Ошибки: ${data.errors.join('; ')}`, { duration: 5000 });
             } else {
-                toast.success(`��������� � whitelist: ${data.platforms.join(', ')}`);
+                toast.success(`Добавлено в whitelist: ${data.platforms.join(', ')}`);
             }
             setWhitelistDialogOpen(false);
             setWhitelistForm({ twitch_channel: '', vk_channel: '' });
@@ -182,14 +182,14 @@ const UserManagementPage: React.FC = () => {
         onError: (error) => {
             logger.error('Error adding to whitelist:', error);
             const typedErr = error as { response?: { data?: { error?: string } }; message?: string };
-            toast.error(typedErr.response?.data?.error || typedErr.message || '������ ���������� � whitelist');
+            toast.error(typedErr.response?.data?.error || typedErr.message || 'Ошибка добавления в whitelist');
         },
     });
 
     const toggleWhitelistMutation = useMutation({
-        mutationFn: async ({ channelName, platform, isWhitelisted }: { 
-            channelName: string; 
-            platform: 'twitch' | 'vk'; 
+        mutationFn: async ({ channelName, platform, isWhitelisted }: {
+            channelName: string;
+            platform: 'twitch' | 'vk';
             isWhitelisted: boolean;
         }) => {
             if (isWhitelisted) {
@@ -202,20 +202,20 @@ const UserManagementPage: React.FC = () => {
         onSuccess: (variables) => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
             toast.success(
-                variables.isWhitelisted 
-                    ? `${variables.channelName} ������ �� whitelist (${variables.platform})`
-                    : `${variables.channelName} �������� � whitelist (${variables.platform})`
+                variables.isWhitelisted
+                    ? `${variables.channelName} удален из whitelist (${variables.platform})`
+                    : `${variables.channelName} добавлен в whitelist (${variables.platform})`
             );
         },
         onError: (error) => {
             logger.error('Error toggling whitelist:', error);
-            toast.error('������ ��������� whitelist');
+            toast.error('Ошибка изменения whitelist');
         },
     });
 
     // Helper functions
     const formatDate = (dateString: string | undefined): string => {
-        if (!dateString) return '�� �������';
+        if (!dateString) return 'Не указано';
         return new Date(dateString).toLocaleString('ru-RU');
     };
 
@@ -244,7 +244,7 @@ const UserManagementPage: React.FC = () => {
     const handleToggleWhitelist = async (user: User): Promise<void> => {
         const channelName = user.twitch_username || user.vk_username;
         if (!channelName) {
-            toast.error('� ������������ ��� ���� �� ����������');
+            toast.error('У пользователя нет имени ни на одной платформе');
             return;
         }
         toggleWhitelistMutation.mutate({
@@ -256,7 +256,7 @@ const UserManagementPage: React.FC = () => {
 
     const handleAddToWhitelist = async (): Promise<void> => {
         if (!whitelistForm.twitch_channel.trim() && !whitelistForm.vk_channel.trim()) {
-            toast.error('������� ���� �� ���� �����');
+            toast.error('Укажите хотя бы один канал');
             return;
         }
         addToWhitelistMutation.mutate({
@@ -271,9 +271,9 @@ const UserManagementPage: React.FC = () => {
             'Twitch': user.twitch_username || '',
             'VK': user.vk_username || '',
             'VK Channel': user.vk_channel_name || '',
-            'Admin': user.is_admin ? '��' : '���',
-            'Blocked': user.is_blocked ? '��' : '���',
-            'Whitelisted': user.is_whitelisted ? '��' : '���',
+            'Admin': user.is_admin ? 'Да' : 'Нет',
+            'Blocked': user.is_blocked ? 'Да' : 'Нет',
+            'Whitelisted': user.is_whitelisted ? 'Да' : 'Нет',
             'Created': user.created_at || ''
         }));
 
@@ -289,20 +289,20 @@ const UserManagementPage: React.FC = () => {
         link.download = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
 
-        toast.success(`�������������� ${csvData.length} �������������`);
+        toast.success(`Экспортировано ${csvData.length} пользователей`);
     };
 
     // DataTable columns definition
     const columns: DataTableColumn<User>[] = [
         {
             key: 'id',
-            header: 'ID / ���',
+            header: 'ID / Имя',
             accessor: (user) => {
                 const sessionsArray = Array.isArray(sessionsData) ? sessionsData : [];
-                const hasActiveSession = sessionsArray.some(session => 
+                const hasActiveSession = sessionsArray.some(session =>
                     session.user_id === user.id && session.session_type === 'active_user'
                 );
-                
+
                 return (
                     <div className="flex items-center gap-2">
                         {user.is_guest ? (
@@ -328,7 +328,7 @@ const UserManagementPage: React.FC = () => {
         },
         {
             key: 'integrations',
-            header: '����������',
+            header: 'Платформы',
             accessor: (user) => (
                 <div className="flex flex-wrap gap-1">
                     {user.integrations?.twitch?.connected && (
@@ -359,8 +359,8 @@ const UserManagementPage: React.FC = () => {
                     return (
                         <div className="flex flex-col gap-1">
                             {user.whitelisted_platforms.map((platform) => {
-                                const channelName = user.whitelisted_channels?.[platform] || 
-                                                   (platform === 'twitch' ? user.twitch_username : user.vk_username);
+                                const channelName = user.whitelisted_channels?.[platform] ||
+                                    (platform === 'twitch' ? user.twitch_username : user.vk_username);
                                 return (
                                     <Badge key={platform} className="bg-green-900/50 text-green-200 text-xs w-fit">
                                         <CheckCircle className="w-3 h-3 mr-1" />
@@ -371,41 +371,41 @@ const UserManagementPage: React.FC = () => {
                         </div>
                     );
                 }
-                return <span className="text-xs text-slate-500">���</span>;
+                return <span className="text-xs text-slate-500">Нет</span>;
             },
         },
         {
             key: 'role',
-            header: '����',
+            header: 'Роль',
             accessor: (user) => {
                 if (user.is_admin) {
                     return (
                         <Badge className="bg-purple-900/50 text-purple-200 text-xs">
                             <Shield className="w-3 h-3 mr-1" />
-                            �����
+                            Админ
                         </Badge>
                     );
                 }
-                return <span className="text-xs text-slate-400">������������</span>;
+                return <span className="text-xs text-slate-400">Пользователь</span>;
             },
             sortable: true,
         },
         {
             key: 'status',
-            header: '������',
+            header: 'Статус',
             accessor: (user) => {
                 if (user.is_blocked) {
                     return (
                         <Badge className="bg-red-900/50 text-red-200 text-xs">
                             <Ban className="w-3 h-3 mr-1" />
-                            ����
+                            Бан
                         </Badge>
                     );
                 }
                 return (
                     <Badge className="bg-green-900/50 text-green-200 text-xs">
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        �����
+                        Актив
                     </Badge>
                 );
             },
@@ -413,7 +413,7 @@ const UserManagementPage: React.FC = () => {
         },
         {
             key: 'created_at',
-            header: '������',
+            header: 'Создан',
             accessor: (user) => (
                 <span className="text-xs text-slate-400 whitespace-nowrap">
                     {formatDate(user.created_at)}
@@ -423,7 +423,7 @@ const UserManagementPage: React.FC = () => {
         },
         {
             key: 'actions',
-            header: '��������',
+            header: 'Действия',
             accessor: (user) => (
                 <div className="flex items-center gap-1">
                     {!user.is_guest && (
@@ -436,7 +436,7 @@ const UserManagementPage: React.FC = () => {
                                     e.stopPropagation();
                                     openEditDialog(user);
                                 }}
-                                title="�������������"
+                                title="Редактировать"
                             >
                                 <Edit className="w-4 h-4" />
                             </Button>
@@ -452,7 +452,7 @@ const UserManagementPage: React.FC = () => {
                                         openBlockDialog(user);
                                     }
                                 }}
-                                title={user.is_blocked ? "��������������" : "�������������"}
+                                title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
                             >
                                 {user.is_blocked ? (
                                     <CheckCircle className="w-4 h-4 text-green-400" />
@@ -466,11 +466,11 @@ const UserManagementPage: React.FC = () => {
                                 className="h-8 w-8 p-0"
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    if (confirm('�� �������, ��� ������ ������� ����� ������������?')) {
+                                    if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
                                         deleteUserMutation.mutate(user.id);
                                     }
                                 }}
-                                title="�������"
+                                title="Удалить"
                             >
                                 <Trash2 className="w-4 h-4 text-red-500" />
                             </Button>
@@ -484,7 +484,7 @@ const UserManagementPage: React.FC = () => {
                             e.stopPropagation();
                             handleToggleWhitelist(user);
                         }}
-                        title={user.is_whitelisted ? "������� �� whitelist" : "�������� � whitelist"}
+                        title={user.is_whitelisted ? "Удалить из whitelist" : "Добавить в whitelist"}
                     >
                         {user.is_whitelisted ? (
                             <UserX className="w-4 h-4 text-red-400" />
@@ -502,21 +502,21 @@ const UserManagementPage: React.FC = () => {
     const filters: DataTableFilter[] = [
         {
             key: 'role',
-            label: '����',
+            label: 'Роль',
             options: [
-                { value: 'all', label: '���' },
-                { value: 'admin', label: '������' },
-                { value: 'user', label: '������������' },
+                { value: 'all', label: 'Все' },
+                { value: 'admin', label: 'Админ' },
+                { value: 'user', label: 'Пользователь' },
             ],
             defaultValue: 'all',
         },
         {
             key: 'status',
-            label: '������',
+            label: 'Статус',
             options: [
-                { value: 'all', label: '���' },
-                { value: 'active', label: '��������' },
-                { value: 'blocked', label: '���������������' },
+                { value: 'all', label: 'Все' },
+                { value: 'active', label: 'Активен' },
+                { value: 'blocked', label: 'Заблокирован' },
             ],
             defaultValue: 'all',
         },
@@ -524,20 +524,20 @@ const UserManagementPage: React.FC = () => {
             key: 'whitelist',
             label: 'Whitelist',
             options: [
-                { value: 'all', label: '���' },
-                { value: 'whitelisted', label: '� whitelist' },
-                { value: 'not_whitelisted', label: '�� � whitelist' },
+                { value: 'all', label: 'Все' },
+                { value: 'whitelisted', label: 'В whitelist' },
+                { value: 'not_whitelisted', label: 'Не в whitelist' },
             ],
             defaultValue: 'all',
         },
         {
             key: 'platform',
-            label: '���������',
+            label: 'Платформа',
             options: [
-                { value: 'all', label: '���' },
+                { value: 'all', label: 'Все' },
                 { value: 'twitch', label: 'Twitch' },
                 { value: 'vk', label: 'VK Live' },
-                { value: 'both', label: '��� ���������' },
+                { value: 'both', label: 'Обе платформы' },
             ],
             defaultValue: 'all',
         },
@@ -547,25 +547,25 @@ const UserManagementPage: React.FC = () => {
     const bulkActions: DataTableBulkAction[] = [
         {
             key: 'block',
-            label: '�������������',
+            label: 'Заблокировать',
             icon: <Ban className="h-4 w-4 mr-2" />,
             variant: 'destructive',
             onClick: async (ids) => {
                 for (const id of ids) {
                     try {
-                        await adminService.blockUser(Number(id), { reason: '�������� ����������' });
+                        await adminService.blockUser(Number(id), { reason: 'Массовая блокировка' });
                     } catch (error) {
                         logger.error(`Error blocking user ${id}:`, error);
                     }
                 }
                 queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-                toast.success(`������������� �������������: ${ids.length}`);
+                toast.success(`Пользователи заблокированы: ${ids.length}`);
             },
-            confirmMessage: '�� ������� ��� ������ ������������� ��������� �������������?',
+            confirmMessage: 'Вы уверены что хотите заблокировать выбранных пользователей?',
         },
         {
             key: 'unblock',
-            label: '��������������',
+            label: 'Разблокировать',
             icon: <CheckCircle className="h-4 w-4 mr-2" />,
             variant: 'outline',
             onClick: async (ids) => {
@@ -577,12 +577,12 @@ const UserManagementPage: React.FC = () => {
                     }
                 }
                 queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-                toast.success(`�������������� �������������: ${ids.length}`);
+                toast.success(`Пользователи разблокированы: ${ids.length}`);
             },
         },
         {
             key: 'delete',
-            label: '�������',
+            label: 'Удалить',
             icon: <Trash2 className="h-4 w-4 mr-2" />,
             variant: 'destructive',
             onClick: async (ids) => {
@@ -594,9 +594,9 @@ const UserManagementPage: React.FC = () => {
                     }
                 }
                 queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-                toast.success(`������� �������������: ${ids.length}`);
+                toast.success(`Удалено пользователей: ${ids.length}`);
             },
-            confirmMessage: '�� �������? ��� �������� ������ ��������!',
+            confirmMessage: 'Вы уверены? Это действие нельзя отменить!',
         },
     ];
 
@@ -605,10 +605,10 @@ const UserManagementPage: React.FC = () => {
             <div className="container mx-auto p-6">
                 <Card className="bg-slate-800/50 border-slate-700 p-6">
                     <div className="text-center text-red-400">
-                        <p>������ �������� �������������</p>
+                        <p>Ошибка загрузки пользователей</p>
                         <Button onClick={() => refetch()} className="mt-4">
                             <RefreshCw className="w-4 h-4 mr-2" />
-                            ���������
+                            Повторить
                         </Button>
                     </div>
                 </Card>
@@ -621,12 +621,12 @@ const UserManagementPage: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">���������� ��������������</h1>
+                    <h1 className="text-2xl font-bold">Управление пользователями</h1>
                     <p className="text-slate-400 text-sm">
-                        �����: {usersResponse.pagination.total || 0} �������������
+                        Всего: {usersResponse.pagination.total || 0} пользователей
                         {usersResponse.pagination.total_users !== undefined && usersResponse.pagination.total_guests !== undefined && (
                             <span className="ml-2 text-xs text-slate-500">
-                                (�������: {usersResponse.pagination.total_users}, ������: {usersResponse.pagination.total_guests})
+                                (Аккаунты: {usersResponse.pagination.total_users}, Гости: {usersResponse.pagination.total_guests})
                             </span>
                         )}
                     </p>
@@ -634,53 +634,53 @@ const UserManagementPage: React.FC = () => {
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
                         <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                        ��������
+                        Обновить
                     </Button>
                     <Button variant="outline" onClick={handleExportCSV} disabled={usersResponse.users.length === 0}>
-                        ������� CSV
+                        Экспорт CSV
                     </Button>
                     <Dialog open={whitelistDialogOpen} onOpenChange={setWhitelistDialogOpen}>
                         <DialogTrigger asChild>
                             <Button>
                                 <Plus className="w-4 h-4 mr-2" />
-                                �������� � whitelist
+                                Добавить в whitelist
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle>�������� ������ � whitelist</DialogTitle>
+                                <DialogTitle>Добавить канал в whitelist</DialogTitle>
                                 <DialogDescription>
-                                    ������� Twitch �/��� VK Live ������ ��� ���������� � whitelist
+                                    Укажите Twitch и/или VK Live канал для добавления в whitelist
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-4">
                                 <div>
-                                    <Label htmlFor="twitch_channel">Twitch �����</Label>
+                                    <Label htmlFor="twitch_channel">Twitch канал</Label>
                                     <Input
                                         id="twitch_channel"
                                         value={whitelistForm.twitch_channel}
                                         onChange={(e) => setWhitelistForm({ ...whitelistForm, twitch_channel: e.target.value })}
-                                        placeholder="������� �������� Twitch ������..."
+                                        placeholder="Введите название Twitch канала..."
                                         className="mt-1"
                                     />
                                 </div>
                                 <div>
-                                    <Label htmlFor="vk_channel">VK Live �����</Label>
+                                    <Label htmlFor="vk_channel">VK Live канал</Label>
                                     <Input
                                         id="vk_channel"
                                         value={whitelistForm.vk_channel}
                                         onChange={(e) => setWhitelistForm({ ...whitelistForm, vk_channel: e.target.value })}
-                                        placeholder="������� �������� VK Live ������..."
+                                        placeholder="Введите название VK Live канала..."
                                         className="mt-1"
                                     />
                                 </div>
                             </div>
                             <DialogFooter>
                                 <Button variant="outline" onClick={() => setWhitelistDialogOpen(false)}>
-                                    ������
+                                    Отмена
                                 </Button>
                                 <Button onClick={handleAddToWhitelist}>
-                                    ��������
+                                    Добавить
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
@@ -694,7 +694,7 @@ const UserManagementPage: React.FC = () => {
                 columns={columns}
                 getRowId={(user) => String(user.id || user.session_id)}
                 searchable
-                searchPlaceholder="����� �� ���� (Twitch, VK Live)..."
+                searchPlaceholder="Поиск по имени (Twitch, VK Live)..."
                 filterable
                 filters={filters}
                 sortable
@@ -703,16 +703,16 @@ const UserManagementPage: React.FC = () => {
                 pagination
                 pageSize={50}
                 pageSizeOptions={[10, 25, 50, 100]}
-                emptyMessage="������������ �� �������"
+                emptyMessage="Пользователи не найдены"
             />
 
             {/* Edit Dialog */}
             <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>�������������� ������������</DialogTitle>
+                        <DialogTitle>Редактирование пользователя</DialogTitle>
                         <DialogDescription>
-                            �������� ��������� ������������
+                            Изменение настроек пользователя
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -722,18 +722,18 @@ const UserManagementPage: React.FC = () => {
                                 checked={editForm.is_admin}
                                 onCheckedChange={(checked) => setEditForm({ ...editForm, is_admin: checked as boolean })}
                             />
-                            <Label htmlFor="is_admin">�������������</Label>
+                            <Label htmlFor="is_admin">Администратор</Label>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-                            ������
+                            Отмена
                         </Button>
-                        <Button 
+                        <Button
                             onClick={handleEditUser}
                             disabled={updateUserMutation.isPending}
                         >
-                            {updateUserMutation.isPending ? '����������...' : '���������'}
+                            {updateUserMutation.isPending ? 'Сохранение...' : 'Сохранить'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -743,33 +743,33 @@ const UserManagementPage: React.FC = () => {
             <Dialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>���������� ������������</DialogTitle>
+                        <DialogTitle>Блокировка пользователя</DialogTitle>
                         <DialogDescription>
-                            ������������� ������������ � ��������� �������
+                            Заблокировать пользователя и запретить доступ
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div>
-                            <Label htmlFor="reason">������� ����������</Label>
+                            <Label htmlFor="reason">Причина блокировки</Label>
                             <Textarea
                                 id="reason"
                                 value={blockForm.reason}
                                 onChange={(e) => setBlockForm({ ...blockForm, reason: e.target.value })}
-                                placeholder="������� ������� ����������..."
+                                placeholder="Укажите причину блокировки..."
                                 className="mt-1"
                             />
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>
-                            ������
+                            Отмена
                         </Button>
-                        <Button 
+                        <Button
                             onClick={handleBlockUser}
                             disabled={blockUserMutation.isPending}
                             className="bg-red-600 hover:bg-red-700"
                         >
-                            {blockUserMutation.isPending ? '����������...' : '�������������'}
+                            {blockUserMutation.isPending ? 'Блокировка...' : 'Заблокировать'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

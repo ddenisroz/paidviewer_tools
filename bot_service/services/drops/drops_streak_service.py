@@ -127,13 +127,13 @@ class DropsStreakMixin:
                     logger.info(f"[ERROR] Streak reset for {viewer_name}: skipped stream")
                     streak.current_streak = 0
                 else:
-                    logger.info(f"⏸️ Streak paused for {viewer_name}: skipped stream (reset disabled)")
+                    logger.info(f"[STREAK] Streak paused for {viewer_name}: skipped stream (reset disabled)")
             else:
                 if config.streak_reset_on_skip and streak.current_streak > 0:
                     logger.info(f"[ERROR] Streak reset for {viewer_name}: insufficient messages")
                     streak.current_streak = 0
                 else:
-                    logger.info(f"⏸️ Streak paused for {viewer_name}: insufficient messages (reset disabled)")
+                    logger.info(f"[STREAK] Streak paused for {viewer_name}: insufficient messages (reset disabled)")
 
             streak.messages_this_stream = 0
 

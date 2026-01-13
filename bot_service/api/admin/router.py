@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from api.admin import dashboard, users, channels, tickets, system, voices
+from api.admin.bot_token_api import router as bot_token_legacy_router
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -26,3 +27,4 @@ router.include_router(channels.router)
 router.include_router(tickets.router)
 router.include_router(system.router)
 router.include_router(voices.router)
+router.include_router(bot_token_legacy_router)

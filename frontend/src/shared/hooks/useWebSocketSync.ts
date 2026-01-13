@@ -15,12 +15,12 @@ interface WebSocketSyncOptions {
    * User ID for WebSocket connection
    */
   userId: string | number;
-  
+
   /**
    * Whether to show toast notifications for updates (default: false)
    */
   showNotifications?: boolean;
-  
+
   /**
    * Custom message handlers for specific event types
    */
@@ -31,131 +31,111 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
   const { userId, showNotifications = false, customHandlers = {} } = options;
   const queryClient = useQueryClient();
 
-  const handleWebSocketMessage = useCallback(
-    (message: Record<string, unknown>) => {
-      const wsMessage = message as { type?: string; data?: Record<string, unknown>; platform?: string };
-      const { type, data } = wsMessage;
+  const handleMessageByType = useCallback(
+    (type: string, data: Record<string, unknown> | undefined) => {
+      // Settings updates
+      if (type === 'settings_updated' && data) {
+        queryClient.setQueryData(queryKeys.userSettings.settings(), (old: ApiResponse | undefined) => ({
+          ...old,
+          ...data.settings as Record<string, unknown>,
+        }));
+        if (showNotifications) toast.info('Настройки обновлены');
+        return;
+      }
 
-      if (!type) return;
+      // TTS settings updates
+      if (type === 'tts_settings_updated' && data) {
+        queryClient.setQueryData(queryKeys.tts.settings(), (old: ApiResponse | undefined) => ({
+          ...old,
+          data: {
+            ...(old?.data as Record<string, unknown> || {}),
+            ...data.settings as Record<string, unknown>,
+          },
+        }));
+        if (showNotifications) toast.info('Настройки TTS обновлены');
+        return;
+      }
 
-      logger.debug('WebSocket message received:', { type, data });
+      // TTS status updates
+      if (type === 'tts_status_changed' && data) {
+        queryClient.setQueryData(queryKeys.tts.status(null), (old: ApiResponse | undefined) => ({
+          ...old,
+          data: {
+            ...(old?.data as Record<string, unknown> || {}),
+            enabled: data.enabled,
+          },
+        }));
+        return;
+      }
 
-      switch (type) {
-        // Settings updates
-        case 'settings_updated':
-          if (!data) break;
-          queryClient.setQueryData(queryKeys.userSettings.settings(), (old: ApiResponse | undefined) => {
-            const settingsData = data.settings as Record<string, unknown>;
-            return {
-              ...old,
-              ...settingsData,
-            };
-          });
-          if (showNotifications) {
-            toast.info('Настройки обновлены');
-          }
-          break;
+      // Stream info updates
+      if (type === 'stream_info_updated' && data) {
+        if (data.platform === 'twitch') {
+          queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: ApiResponse | undefined) => ({
+            ...old,
+            data: {
+              ...(old?.data as Record<string, unknown> || {}),
+              ...data.stream_info as Record<string, unknown>,
+            },
+          }));
+        } else if (data.platform === 'vk') {
+          queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: ApiResponse | undefined) => ({
+            ...old,
+            data: {
+              ...(old?.data as Record<string, unknown> || {}),
+              ...data.stream_info as Record<string, unknown>,
+            },
+          }));
+        }
+        if (showNotifications) toast.info('Информация о стриме обновлена');
+        return;
+      }
 
-        // TTS settings updates
-        case 'tts_settings_updated':
-          if (!data) break;
-          queryClient.setQueryData(queryKeys.tts.settings(), (old: ApiResponse | undefined) => {
-            const settingsData = data.settings as Record<string, unknown>;
-            return {
-              ...old,
-              data: {
-                ...(old?.data as Record<string, unknown> || {}),
-                ...settingsData,
-              },
-            };
-          });
-          if (showNotifications) {
-            toast.info('Настройки TTS обновлены');
-          }
-          break;
+      // Invalidations
+      const invalidations: Record<string, any> = {
+        'youtube_queue_updated': { queryKey: queryKeys.youtube.queue() },
+        'points_updated': { queryKey: queryKeys.points.all },
+        'drops_result': { queryKey: queryKeys.drops.all },
+        'state_reconciliation_required': { queryKey: [] }, // Special case
+      };
 
-        // TTS status updates
-        case 'tts_status_changed':
-          if (!data) break;
-          queryClient.setQueryData(queryKeys.tts.status(null), (old: ApiResponse | undefined) => {
-            return {
-              ...old,
-              data: {
-                ...(old?.data as Record<string, unknown> || {}),
-                enabled: data.enabled,
-              },
-            };
-          });
-          break;
-
-        // Stream info updates
-        case 'stream_info_updated':
-          if (!data) break;
-          if (data.platform === 'twitch') {
-            queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: ApiResponse | undefined) => {
-              const streamInfo = data.stream_info as Record<string, unknown>;
-              return {
-                ...old,
-                data: {
-                  ...(old?.data as Record<string, unknown> || {}),
-                  ...streamInfo,
-                },
-              };
-            });
-          } else if (data.platform === 'vk') {
-            queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: ApiResponse | undefined) => {
-              const streamInfo = data.stream_info as Record<string, unknown>;
-              return {
-                ...old,
-                data: {
-                  ...(old?.data as Record<string, unknown> || {}),
-                  ...streamInfo,
-                },
-              };
-            });
-          }
-          if (showNotifications) {
-            toast.info('Информация о стриме обновлена');
-          }
-          break;
-
-        // YouTube queue updates
-        case 'youtube_queue_updated':
-          queryClient.invalidateQueries({ queryKey: queryKeys.youtube.queue() });
-          break;
-
-        // Points/rewards updates
-        case 'points_updated':
-          queryClient.invalidateQueries({ queryKey: queryKeys.points.all });
-          break;
-
-        // Drops updates
-        case 'drops_result':
-          queryClient.invalidateQueries({ queryKey: queryKeys.drops.all });
-          break;
-
-        // Chat messages (handled by ChatContext)
-        case 'chat_message':
-          // Let ChatContext handle this
-          break;
-
-        // State reconciliation required
-        case 'state_reconciliation_required':
+      if (invalidations[type]) {
+        if (type === 'state_reconciliation_required') {
           logger.info('State reconciliation triggered by WebSocket');
-          // Invalidate all queries to force refetch
           queryClient.invalidateQueries();
-          break;
+        } else {
+          queryClient.invalidateQueries(invalidations[type]);
+        }
+        return;
+      }
 
-        // Custom handlers
-        default:
-          if (customHandlers[type] && data) {
-            customHandlers[type](data);
-          } else {
-            logger.debug('Unhandled WebSocket message type:', type);
-          }
+      if (type === 'chat_message') return; // Handled by ChatContext
+
+      // Custom handlers
+      if (customHandlers[type] && data) {
+        customHandlers[type](data);
+      } else {
+        logger.debug('Unhandled WebSocket message type:', type);
       }
     },
     [queryClient, showNotifications, customHandlers]
+  );
+
+  const handleWebSocketMessage = useCallback(
+    (message: Record<string, unknown>) => {
+      const { type, data, platform } = message as { type?: string; data?: Record<string, unknown>; platform?: string };
+      if (!type) return;
+
+      // Normalize data if platform is outside data object
+      const normalizedData = data || {};
+      if (platform) {
+        normalizedData.platform = platform;
+      }
+
+      logger.debug('WebSocket message received:', { type, data: normalizedData });
+      handleMessageByType(type, normalizedData);
+    },
+    [handleMessageByType]
   );
 
   useEffect(() => {

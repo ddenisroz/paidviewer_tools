@@ -63,6 +63,7 @@ const HomePage: React.FC = () => {
     });
 
     const hasAnyIntegration = useMemo<boolean>(() => {
+        // Check if user has any ENABLED integrations (matching legacy behavior)
         return integrations?.twitch?.enabled || integrations?.vk?.enabled;
     }, [integrations]);
 

@@ -26,7 +26,8 @@ class AdminStatsRepository:
         return query.count()
 
     def count_active_users_since(self, since: datetime) -> int:
-        return self.db.query(User).filter(User.last_seen >= since).count()
+        # Note: User model doesn't have last_seen, using created_at as fallback
+        return self.db.query(User).filter(User.created_at >= since).count()
 
     def count_new_users_since(self, since: datetime) -> int:
         return self.db.query(User).filter(User.created_at >= since).count()
@@ -81,8 +82,8 @@ class AdminStatsRepository:
     # === Security/Errors ===
     def count_errors_since(self, since: datetime) -> int:
         return self.db.query(SecurityLog).filter(
-            SecurityLog.timestamp >= since,
-            SecurityLog.action.in_(['error', 'critical', 'exception'])
+            SecurityLog.created_at >= since,
+            SecurityLog.event_type.in_(['error', 'critical', 'exception'])
         ).count()
 
     # === Commands ===

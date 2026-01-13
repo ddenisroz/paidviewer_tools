@@ -21,6 +21,9 @@ async def get_donationalerts_status(
 ):
     """Получить статус DonationAlerts"""
     try:
+        # Extract user_id from user dict
+        user_id = user.get('id') if user else None
+        
         if not user_id:
             return {
                 "success": True,

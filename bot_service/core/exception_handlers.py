@@ -40,6 +40,13 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
             "path": request.url.path,
             "query_params": dict(request.query_params),
             "client_host": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "content_type": request.headers.get("content-type"),
+            # Add safe headers snapshot (excluding sensitive auth)
+            "headers_snapshot": {
+                k: v for k, v in request.headers.items() 
+                if k.lower() not in ('authorization', 'cookie', 'x-api-key')
+            }
         },
         user_id=user_id,
         endpoint=request.url.path,

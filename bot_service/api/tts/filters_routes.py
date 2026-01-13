@@ -15,7 +15,7 @@ from services.tts.tts_core import AddWordRequest
 
 logger = logging.getLogger('bot_service')
 
-filters_router = APIRouter(tags=["tts-filters"])
+filters_router = APIRouter(prefix="/api/tts", tags=["tts-filters"])
 
 
 @filters_router.get("/filtered-words")

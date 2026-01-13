@@ -1,4 +1,5 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+﻿// src/pages/media/YoutubeIntegrationPage.tsx
+import React, { useCallback, useEffect, useState } from 'react';
 
 import { AlertCircle, Maximize, Minimize, Monitor, Pause, Play, RefreshCw, Settings, SkipForward, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -73,13 +74,13 @@ const YoutubeIntegrationPage: React.FC = () => {
             const url = response.data.youtube_obs_url;
             setYoutubeObsUrl(url);
 
-            toast.success('OBS URL ������������!', {
-                description: 'URL ���������� � ����� ������',
+            toast.success('OBS URL скопирован!', {
+                description: 'URL скопирован в буфер обмена',
                 action: {
-                    label: '�����������',
+                    label: 'Скопировать',
                     onClick: () => {
                         navigator.clipboard.writeText(url);
-                        toast.success('URL ����������!');
+                        toast.success('URL скопирован!');
                     }
                 }
             });
@@ -88,7 +89,7 @@ const YoutubeIntegrationPage: React.FC = () => {
             return url;
         } catch (error) {
             logger.error('Error generating YouTube OBS URL:', error);
-            toast.error('������ �������� YouTube OBS URL');
+            toast.error('Ошибка создания YouTube OBS URL');
             return null;
         }
     };
@@ -99,15 +100,15 @@ const YoutubeIntegrationPage: React.FC = () => {
             const url = response.data.youtube_obs_url;
             setYoutubeObsUrl(url);
 
-            toast.success('OBS URL ���������������!', {
-                description: '����� URL ���������� � ����� ������'
+            toast.success('OBS URL пересоздан!', {
+                description: 'Новый URL скопирован в буфер обмена'
             });
 
             navigator.clipboard.writeText(url);
             return url;
         } catch (error) {
             logger.error('Error regenerating YouTube OBS URL:', error);
-            toast.error('������ ������������� YouTube OBS URL');
+            toast.error('Ошибка пересоздания YouTube OBS URL');
             return null;
         }
     };
@@ -128,7 +129,7 @@ const YoutubeIntegrationPage: React.FC = () => {
     useEffect(() => {
         loadYoutubeSettings();
         loadExistingObsUrl();
-    }, []); // [OK] ������ ������ ������������ - ��������� ������ ���� ��� ��� ������������
+    }, []); // [OK] Пустой массив зависимостей - запускаем только один раз при монтировании
 
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent): void => {
@@ -150,17 +151,17 @@ const YoutubeIntegrationPage: React.FC = () => {
     const handleClearQueue = async (): Promise<void> => {
         try {
             await youtubeService.clearQueue();
-            toast.success("������� �������.");
+            toast.success("Очередь очищена.");
             setIsClearDialogOpen(false);
             loadQueue();
         } catch (error: unknown) {
             const axiosError = error as { response?: { status?: number }; code?: string; message?: string };
             if (axiosError.response?.status === 429) {
-                toast.error("������� ����� ��������. ���������� ����� ��������� ������.");
+                toast.error("Слишком много запросов. Пожалуйста, подождите немного.");
             } else if (axiosError.code === 'ERR_NETWORK' || axiosError.message?.includes('CORS')) {
-                toast.error("������ ����. ��������� ����������� � �������.");
+                toast.error("Ошибка сети. Проверьте подключение к серверу.");
             } else {
-                toast.error("�� ������� �������� �������.");
+                toast.error("Не удалось очистить очередь.");
             }
             logger.error("Error clearing queue:", error);
         }
@@ -179,7 +180,7 @@ const YoutubeIntegrationPage: React.FC = () => {
 
     if (!isAuthenticated) {
         return (
-            <PageWrapper title="YouTube ������">
+            <PageWrapper title="YouTube Заказы">
                 <Card className="border-gray-700">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
@@ -187,10 +188,10 @@ const YoutubeIntegrationPage: React.FC = () => {
                         </div>
                         <div className="space-y-2 max-w-md">
                             <h3 className="text-xl font-semibold text-gray-200">
-                                ��������� �����������
+                                Требуется авторизация
                             </h3>
                             <p className="text-gray-400 text-sm">
-                                ��� ������������� YouTube ������� ���������� ����� � ������� � ���������� ���� �� ���� ��������� (Twitch ��� VK Live)
+                                Для использования YouTube заказов необходимо войти в систему и привязать хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
                         <Button
@@ -198,7 +199,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                             className="gap-2"
                         >
                             <Settings className="w-4 h-4" />
-                            ����� � �������
+                            Войти в систему
                         </Button>
                     </CardContent>
                 </Card>
@@ -251,7 +252,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-muted">
-                                                    <p className="text-muted-foreground text-xs">��� ����� ��� ���������������.</p>
+                                                    <p className="text-muted-foreground text-xs">Нет видео для воспроизведения.</p>
                                                 </div>
                                             )}
                                         </div>
@@ -259,13 +260,13 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         <div className="relative bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500 aspect-video">
                                             <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
                                                 <div className="text-3xl mb-1">[VIDEO]</div>
-                                                <h3 className="text-sm font-medium text-purple-300 mb-1">����� OBS Studio</h3>
+                                                <h3 className="text-sm font-medium text-purple-300 mb-1">Режим OBS Studio</h3>
                                                 <p className="text-gray-300 text-xs">
-                                                    ����� ��������������� � OBS Studio
+                                                    Видео воспроизводится в OBS Studio
                                                 </p>
                                                 {currentVideo && (
                                                     <div className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded mt-1 max-w-full truncate">
-                                                        <strong>������:</strong> {currentVideo.title}
+                                                        <strong>Сейчас:</strong> {currentVideo.title}
                                                     </div>
                                                 )}
                                             </div>
@@ -276,14 +277,14 @@ const YoutubeIntegrationPage: React.FC = () => {
                                 <div className="flex-1 space-y-3">
                                     <div className="bg-muted/30 rounded-lg p-3">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className={BUTTON_SIZES.icon} title={isPlaying ? "�����" : "�������������"}>
+                                            <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className={BUTTON_SIZES.icon} title={isPlaying ? "Пауза" : "Воспроизвести"}>
                                                 {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                                             </Button>
-                                            <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className={BUTTON_SIZES.icon} title="����������">
+                                            <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className={BUTTON_SIZES.icon} title="Следующий">
                                                 <SkipForward className="h-5 w-5" />
                                             </Button>
                                             <div className="h-6 w-px bg-border mx-2" />
-                                            <Button variant="ghost" size="sm" onClick={toggleMute} className={BUTTON_SIZES.icon} title={isMuted ? "�������� ����" : "��������� ����"}>
+                                            <Button variant="ghost" size="sm" onClick={toggleMute} className={BUTTON_SIZES.icon} title={isMuted ? "Включить звук" : "Выключить звук"}>
                                                 {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                                             </Button>
                                             <div className="flex-1 flex items-center gap-2 mx-2">
@@ -296,26 +297,26 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     <div className="grid grid-cols-2 gap-2">
                                         <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
                                             <DialogTrigger asChild>
-                                                <Button variant="outline" className="h-12 w-full" title="�������� �������">
+                                                <Button variant="outline" className="h-12 w-full" title="Очистить очередь">
                                                     <Trash2 className="h-4 w-4 mr-2" />
-                                                    ��������
+                                                    Очистить
                                                 </Button>
                                             </DialogTrigger>
                                             <DialogContent>
                                                 <DialogHeader>
-                                                    <DialogTitle>�������������</DialogTitle>
-                                                    <DialogDescription>�� �������, ��� ������ ��������� �������� �������?</DialogDescription>
+                                                    <DialogTitle>Подтверждение</DialogTitle>
+                                                    <DialogDescription>Вы уверены, что хотите очистить очередь заказов?</DialogDescription>
                                                 </DialogHeader>
                                                 <DialogFooter>
-                                                    <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>������</Button>
-                                                    <Button variant="destructive" onClick={handleClearQueue}>��������</Button>
+                                                    <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
+                                                    <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
                                                 </DialogFooter>
                                             </DialogContent>
                                         </Dialog>
 
                                         <Popover>
                                             <PopoverTrigger asChild>
-                                                <Button variant="outline" className="h-12 w-full" title="OBS ����������">
+                                                <Button variant="outline" className="h-12 w-full" title="OBS Интеграция">
                                                     <Monitor className="h-4 w-4 mr-2" />
                                                     OBS
                                                 </Button>
@@ -330,12 +331,12 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                             className="w-full"
                                                             variant="default"
                                                         >
-                                                            ������������� URL
+                                                            Сгенерировать URL
                                                         </Button>
                                                     ) : (
                                                         <>
                                                             <div className="space-y-2">
-                                                                <p className="text-xs text-muted-foreground">URL ��� OBS:</p>
+                                                                <p className="text-xs text-muted-foreground">URL для OBS:</p>
                                                                 <div className="bg-muted rounded p-2">
                                                                     <p className="text-xs font-mono break-all">{youtubeObsUrl}</p>
                                                                 </div>
@@ -345,21 +346,21 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                                         variant="outline"
                                                                         onClick={() => {
                                                                             navigator.clipboard.writeText(youtubeObsUrl);
-                                                                            toast.success('URL ����������!');
+                                                                            toast.success('URL скопирован!');
                                                                         }}
                                                                         className="flex-1"
                                                                     >
-                                                                        ����������
+                                                                        Копировать
                                                                     </Button>
                                                                     <Button
                                                                         size="sm"
                                                                         variant="outline"
                                                                         onClick={regenerateYoutubeObsUrl}
                                                                         className="flex-1"
-                                                                        title="���������������� URL"
+                                                                        title="Пересоздать URL"
                                                                     >
                                                                         <RefreshCw className="h-3 w-3 mr-1" />
-                                                                        ��������
+                                                                        Обновить
                                                                     </Button>
                                                                 </div>
                                                             </div>
@@ -379,10 +380,10 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     detail: { event: 'theater_mode_changed', data: { isTheaterMode: newTheaterMode } }
                                                 }));
                                             }}
-                                            title="������������� �����"
+                                            title="Театральный режим"
                                         >
                                             {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
-                                            {isTheaterMode ? '����� �� ������� ������' : '������������� �����'}
+                                            {isTheaterMode ? 'Выйти из режима театра' : 'Театральный режим'}
                                         </Button>
                                     </div>
                                 </div>
@@ -392,17 +393,17 @@ const YoutubeIntegrationPage: React.FC = () => {
 
                     <Card className="flex-1 flex flex-col overflow-hidden">
                         <CardHeader className="pb-3">
-                            <CardTitle>������� ({queue.length})</CardTitle>
+                            <CardTitle>Очередь ({queue.length})</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0 flex-1 overflow-y-auto">
                             {currentVideo && (
                                 <div className="p-4 border-b bg-muted/20">
-                                    <p className="text-xs text-muted-foreground mb-2">������ ������:</p>
+                                    <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
                                     <div className="flex gap-3 p-2 rounded-lg">
                                         <img src={currentVideo.thumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded" />
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
-                                            <p className="text-xs text-muted-foreground">�� {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
+                                            <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -419,7 +420,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 <img src={video.thumbnail} alt={video.title} className="w-20 h-12 object-cover rounded" />
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
-                                                    <p className="text-xs text-muted-foreground">�������: {video.requester_name || video.user_id || 'Unknown'}</p>
+                                                    <p className="text-xs text-muted-foreground">Заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
                                                 </div>
                                             </div>
                                         );
@@ -428,9 +429,9 @@ const YoutubeIntegrationPage: React.FC = () => {
                             ) : (
                                 <div className="text-center py-8 text-muted-foreground p-4">
                                     <div className="text-4xl mb-4">[AUDIO]</div>
-                                    <p className="font-medium text-base mb-2">������� �����</p>
+                                    <p className="font-medium text-base mb-2">Очередь пуста</p>
                                     <p className="text-sm text-muted-foreground">
-                                        ������� �����. ������� ����� ��������� ����� �������� !sr
+                                        Очередь пуста. Зрители могут заказывать видео командой !sr
                                     </p>
                                 </div>
                             )}
@@ -453,7 +454,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     }}
                                 >
                                     <Minimize className="h-4 w-4 mr-2" />
-                                    ����� �� ������� ������
+                                    Выйти из режима театра
                                 </Button>
                             </div>
                             <div className="aspect-video bg-black rounded-lg overflow-hidden">
@@ -488,7 +489,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        <p className="text-muted-foreground">��� ����� ��� ���������������.</p>
+                                        <p className="text-muted-foreground">Нет видео для воспроизведения.</p>
                                     </div>
                                 )}
                             </div>
@@ -497,17 +498,17 @@ const YoutubeIntegrationPage: React.FC = () => {
                         <div className="col-span-1 h-full">
                             <Card className="flex-1 flex flex-col h-full">
                                 <CardHeader className="pb-3">
-                                    <CardTitle>������� ({queue.length})</CardTitle>
+                                    <CardTitle>Очередь ({queue.length})</CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-0 flex-1 overflow-y-auto">
                                     {currentVideo && (
                                         <div className="p-4 border-b bg-muted/20">
-                                            <p className="text-xs text-muted-foreground mb-2">������ ������:</p>
+                                            <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
                                             <div className="flex gap-3 p-2 rounded-lg">
                                                 <img src={currentVideo.thumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded" />
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
-                                                    <p className="text-xs text-muted-foreground">�� {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
+                                                    <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -524,7 +525,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                         <img src={video.thumbnail} alt={video.title} className="w-20 h-12 object-cover rounded" />
                                                         <div className="flex-1 min-w-0">
                                                             <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
-                                                            <p className="text-xs text-muted-foreground">�������: {video.requester_name || video.user_id || 'Unknown'}</p>
+                                                            <p className="text-xs text-muted-foreground">Заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
                                                         </div>
                                                     </div>
                                                 );
@@ -533,9 +534,9 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     ) : (
                                         <div className="text-center py-8 text-muted-foreground p-4">
                                             <div className="text-4xl mb-4">[AUDIO]</div>
-                                            <p className="font-medium text-base mb-2">������� �����</p>
+                                            <p className="font-medium text-base mb-2">Очередь пуста</p>
                                             <p className="text-sm text-muted-foreground">
-                                                ������� �����. ������� ����� ��������� ����� �������� !sr
+                                                Очередь пуста. Зрители могут заказывать видео командой !sr
                                             </p>
                                         </div>
                                     )}
@@ -550,4 +551,3 @@ const YoutubeIntegrationPage: React.FC = () => {
 };
 
 export default YoutubeIntegrationPage;
-

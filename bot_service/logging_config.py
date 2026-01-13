@@ -81,7 +81,7 @@ class QuietLoggingConfig:
         # 3. Консольный вывод для DEBUG и выше
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(simple_formatter)
-        console_handler.setLevel(logging.DEBUG)
+        console_handler.setLevel(logging.INFO)
         # Устанавливаем кодировку UTF-8 для консоли
         if hasattr(console_handler.stream, 'reconfigure'):
             console_handler.stream.reconfigure(encoding='utf-8')

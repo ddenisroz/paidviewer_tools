@@ -31,14 +31,14 @@ interface ComponentFile {
  */
 function findComponentFiles(dir: string, baseDir: string = dir): ComponentFile[] {
     const files: ComponentFile[] = [];
-    
+
     try {
         const entries = readdirSync(dir);
-        
+
         for (const entry of entries) {
             const fullPath = join(dir, entry);
             const stat = statSync(fullPath);
-            
+
             if (stat.isDirectory()) {
                 // Skip node_modules and test directories
                 if (entry === 'node_modules' || entry === '__tests__' || entry.endsWith('.test')) {
@@ -50,23 +50,23 @@ function findComponentFiles(dir: string, baseDir: string = dir): ComponentFile[]
                 if (entry.includes('.test.') || entry.includes('.spec.')) {
                     continue;
                 }
-                
+
                 const content = readFileSync(fullPath, 'utf-8');
                 const lines = content.split('\n');
                 const totalLines = lines.length;
-                
+
                 // Count code lines (excluding imports, comments, empty lines, and type definitions)
                 let codeLines = 0;
                 let inMultilineComment = false;
                 let inImportBlock = false;
                 let inTypeDefinition = false;
-                
+
                 for (const line of lines) {
                     const trimmed = line.trim();
-                    
+
                     // Skip empty lines
                     if (trimmed === '') continue;
-                    
+
                     // Handle multiline comments
                     if (trimmed.startsWith('/*')) {
                         inMultilineComment = true;
@@ -77,10 +77,10 @@ function findComponentFiles(dir: string, baseDir: string = dir): ComponentFile[]
                         }
                         continue;
                     }
-                    
+
                     // Skip single-line comments
                     if (trimmed.startsWith('//')) continue;
-                    
+
                     // Skip import statements
                     if (trimmed.startsWith('import ')) {
                         inImportBlock = true;
@@ -91,7 +91,7 @@ function findComponentFiles(dir: string, baseDir: string = dir): ComponentFile[]
                         continue;
                     }
                     if (inImportBlock) continue;
-                    
+
                     // Skip type/interface definitions (but count their content)
                     if (trimmed.startsWith('interface ') || trimmed.startsWith('type ')) {
                         inTypeDefinition = true;
@@ -102,11 +102,11 @@ function findComponentFiles(dir: string, baseDir: string = dir): ComponentFile[]
                         continue;
                     }
                     if (inTypeDefinition) continue;
-                    
+
                     // Count this as a code line
                     codeLines++;
                 }
-                
+
                 const relativePath = fullPath.replace(baseDir + '/', '');
                 files.push({
                     path: relativePath,
@@ -119,7 +119,7 @@ function findComponentFiles(dir: string, baseDir: string = dir): ComponentFile[]
         // Directory might not exist, skip it
         console.warn(`Warning: Could not read directory ${dir}:`, error);
     }
-    
+
     return files;
 }
 
@@ -127,59 +127,59 @@ describe('Component Size Compliance', () => {
     // Feature: frontend-typescript-linting, Property 3: Component Size Compliance
     it('should ensure all components are under 150 lines of code', () => {
         const allFiles: ComponentFile[] = [];
-        
+
         // Collect all component files from all directories
         for (const dir of COMPONENT_DIRS) {
             const fullPath = join(process.cwd(), dir);
             allFiles.push(...findComponentFiles(fullPath, fullPath));
         }
-        
+
         // Find files that exceed the limit
         const oversizedFiles = allFiles.filter(file => file.codeLines > MAX_LINES);
-        
+
         // Report oversized files
         if (oversizedFiles.length > 0) {
-            console.log('\n❌ Components exceeding 150 lines:');
+            console.log('\n[ERROR] Components exceeding 150 lines:');
             oversizedFiles.forEach(file => {
                 console.log(`  - ${file.path}: ${file.codeLines} lines (${file.lines} total)`);
             });
             console.log('');
         } else {
-            console.log('\n✅ All components are under 150 lines of code');
+            console.log('\n[OK] All components are under 150 lines of code');
         }
-        
+
         // The test passes if no files exceed the limit
         expect(oversizedFiles).toHaveLength(0);
     });
-    
+
     it('should report component size statistics', () => {
         const allFiles: ComponentFile[] = [];
-        
+
         // Collect all component files
         for (const dir of COMPONENT_DIRS) {
             const fullPath = join(process.cwd(), dir);
             allFiles.push(...findComponentFiles(fullPath, fullPath));
         }
-        
+
         if (allFiles.length === 0) {
-            console.log('\n⚠️  No component files found');
+            console.log('\n[WARNING] No component files found');
             return;
         }
-        
+
         // Calculate statistics
         const totalFiles = allFiles.length;
         const totalCodeLines = allFiles.reduce((sum, file) => sum + file.codeLines, 0);
         const averageLines = Math.round(totalCodeLines / totalFiles);
         const maxFile = allFiles.reduce((max, file) => file.codeLines > max.codeLines ? file : max);
         const minFile = allFiles.reduce((min, file) => file.codeLines < min.codeLines ? file : min);
-        
+
         console.log('\n📊 Component Size Statistics:');
         console.log(`  Total components: ${totalFiles}`);
         console.log(`  Average lines: ${averageLines}`);
         console.log(`  Largest: ${maxFile.path} (${maxFile.codeLines} lines)`);
         console.log(`  Smallest: ${minFile.path} (${minFile.codeLines} lines)`);
         console.log('');
-        
+
         // This test always passes, it's just for reporting
         expect(totalFiles).toBeGreaterThan(0);
     });

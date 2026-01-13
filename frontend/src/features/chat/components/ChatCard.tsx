@@ -225,7 +225,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
     // Load blocked users
     useEffect(() => {
         if (user?.id) loadBlockedUsers();
-    }, [user, loadBlockedUsers]);
+    }, [user?.id, loadBlockedUsers]);
 
     // Load chat history
     useEffect(() => {

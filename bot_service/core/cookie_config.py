@@ -48,7 +48,7 @@ def get_cookie_settings(
     # Логируем для отладки (только в dev)
     if not is_production:
         logger.debug(
-            f"🍪 Cookie '{key}' settings: "
+            f"[COOKIE] Cookie '{key}' settings: "
             f"secure={cookie_settings['secure']}, "
             f"httponly={httponly}, "
             f"samesite={samesite}"

@@ -11,8 +11,6 @@ interface AuthContextType {
     user: User | null;
     isAuthenticated: boolean;
     isLoading: boolean;
-    isAuthenticated: boolean;
-    isLoading: boolean;
     isCheckingAuth: boolean;
     integrationsNeedRefresh: boolean;
     loginWithTwitch: () => void;
@@ -36,8 +34,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loginWithVk,
         logout
     } = useAuthStore();
-
-
 
     // Track if we have performed the initial check
     const [initialCheckDone, setInitialCheckDone] = useState(false);

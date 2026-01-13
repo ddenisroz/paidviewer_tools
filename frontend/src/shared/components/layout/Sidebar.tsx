@@ -47,6 +47,7 @@ const getNavItems = (isYourchy: boolean): NavItem[] => {
         { to: '/dashboard', label: 'Главная', icon: Home },
         {
             label: 'TTS ИИ озвучка',
+            to: '/dashboard/tts',
             icon: Mic,
             submenu: [
                 { to: '/dashboard/tts', label: 'Основные настройки', icon: Settings },
@@ -56,6 +57,7 @@ const getNavItems = (isYourchy: boolean): NavItem[] => {
         },
         {
             label: 'Медиа запросы',
+            to: '/dashboard/youtube',
             icon: Sparkles,
             submenu: [
                 { to: '/dashboard/youtube', label: 'YouTube заказы', icon: Youtube },
@@ -113,32 +115,73 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={() => setOpenSection(null)}
             >
-                <div
-                    className={`w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${isOpen
-                        ? 'bg-primary/20 text-primary'
-                        : isParentActive
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground group-hover:bg-muted/50 group-hover:text-foreground'
-                        }`}
-                    onClick={() => setOpenSection(isOpen ? null : item.label)}
-                    onKeyDown={handleKeyDown}
-                    tabIndex={0}
-                    role="button"
-                    aria-expanded={isOpen}
-                    aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
-                >
-                    {/* Индикатор активной подстраницы */}
-                    {isParentActive && !isOpen && (
-                        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-full pointer-events-none" />
-                    )}
-                    <div className="flex items-center justify-between gap-4 pointer-events-none">
-                        <div className="flex items-center gap-4">
+                {item.to ? (
+                    <NavLink
+                        to={item.to}
+                        end
+                        onClick={() => {
+                            setOpenSection(null);
+                            onMobileMenuClose();
+                        }}
+                        className={({ isActive }) =>
+                            `w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative flex items-center justify-between group-hover:bg-muted/50 ${isOpen
+                                ? 'bg-primary/20 text-primary'
+                                : isActive
+                                    ? 'bg-primary/10 text-primary'
+                                    : 'text-muted-foreground group-hover:text-foreground'
+                            }`
+                        }
+                        onKeyDown={handleKeyDown}
+                        tabIndex={0}
+                        role="button"
+                        aria-expanded={isOpen}
+                        aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
+                        onMouseEnter={() => {
+                            // Preload route on hover
+                            if (item.to) {
+                                const preloader = routePreloaders[item.to];
+                                if (preloader) preloader();
+                            }
+                        }}
+                    >
+                        {/* Индикатор активной подстраницы или родителя */}
+                        {(isParentActive || location.pathname === item.to) && !isOpen && (
+                            <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-full pointer-events-none" />
+                        )}
+                        <div className="flex items-center gap-4 pointer-events-none">
                             <item.icon className="h-6 w-6" />
                             {item.label}
                         </div>
                         <ChevronRight className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-0 opacity-100' : 'opacity-0'}`} />
+                    </NavLink>
+                ) : (
+                    <div
+                        className={`w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${isOpen
+                            ? 'bg-primary/20 text-primary'
+                            : isParentActive
+                                ? 'bg-primary/10 text-primary'
+                                : 'text-muted-foreground group-hover:bg-muted/50 group-hover:text-foreground'
+                            }`}
+                        onClick={() => setOpenSection(isOpen ? null : item.label)}
+                        onKeyDown={handleKeyDown}
+                        tabIndex={0}
+                        role="button"
+                        aria-expanded={isOpen}
+                        aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
+                    >
+                        {/* Индикатор активной подстраницы */}
+                        {isParentActive && !isOpen && (
+                            <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-full pointer-events-none" />
+                        )}
+                        <div className="flex items-center justify-between gap-4 pointer-events-none">
+                            <div className="flex items-center gap-4">
+                                <item.icon className="h-6 w-6" />
+                                {item.label}
+                            </div>
+                            <ChevronRight className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-0 opacity-100' : 'opacity-0'}`} />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Submenu появляется СПРАВА от родителя (GitHub-style, без gap) */}
                 {isOpen && (
@@ -282,7 +325,7 @@ const Sidebar: React.FC = () => {
                     <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
                         <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
                             <span className="text-xl font-bold text-green-400 font-mono tracking-wider whitespace-nowrap">
-                                Payedviewer_tools
+                                Payedviewer
                             </span>
                         </NavLink>
                     </div>

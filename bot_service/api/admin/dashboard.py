@@ -55,25 +55,37 @@ async def get_dashboard_stats(
         dashboard_stats = stats_service.get_dashboard_stats()
         
         # === BOTS STATUS (runtime, not DB) ===
-        registry = get_bot_registry()
-        twitch_bot = registry.twitch_bot
-        vk_bot = registry.vk_bot
-        
-        twitch_online = False
-        twitch_connections = 0
-        if twitch_bot:
-            twitch_online = hasattr(twitch_bot, 'user_id') and twitch_bot.user_id is not None
-            twitch_connections = len(twitch_bot.connected_channels) if hasattr(twitch_bot, 'connected_channels') else 0
-        
-        vk_online = False
-        vk_connections = 0
-        if vk_bot:
-            vk_online = vk_bot.is_running if hasattr(vk_bot, 'is_running') else False
-            vk_connections = len(vk_bot.connected_channels) if hasattr(vk_bot, 'connected_channels') else 0
+        # === BOTS STATUS (runtime, not DB) ===
+        try:
+            registry = get_bot_registry()
+            twitch_bot = registry.twitch_bot
+            vk_bot = registry.vk_bot
+            
+            twitch_online = False
+            twitch_connections = 0
+            if twitch_bot:
+                twitch_online = hasattr(twitch_bot, 'user_id') and twitch_bot.user_id is not None
+                twitch_connections = len(twitch_bot.connected_channels) if hasattr(twitch_bot, 'connected_channels') else 0
+            
+            vk_online = False
+            vk_connections = 0
+            if vk_bot:
+                vk_online = vk_bot.is_running if hasattr(vk_bot, 'is_running') else False
+                vk_connections = len(vk_bot.connected_channels) if hasattr(vk_bot, 'connected_channels') else 0
+        except Exception as e:
+            logger.error(f"Error getting bot status for dashboard: {e}")
+            twitch_online = False
+            vk_online = False
+            twitch_connections = 0
+            vk_connections = 0
         
         # WebSocket connections
-        ws_stats = get_memory_websocket_manager().get_connection_stats()
-        total_connections = ws_stats.get('active_connections', 0)
+        try:
+            ws_stats = get_memory_websocket_manager().get_connection_stats()
+            total_connections = ws_stats.get('active_connections', 0)
+        except Exception as e:
+            logger.error(f"Error getting websocket stats for dashboard: {e}")
+            total_connections = 0
         
         return {
             "success": True,

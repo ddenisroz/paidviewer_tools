@@ -60,190 +60,52 @@ class TTSHandlerService:
         Uses repository pattern for all database access.
         """
         try:
-            # Skip commands if enabled (Check before DB to save resources)
-            if skip_if_command and text.strip().startswith('!'):
-                logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping command: {text[:50]}")
-                return {"success": False, "error": "Message is a command"}
+            # 1. Initial Checks (Connection, Commands, Blocked)
+            initial_check = self._check_initial_conditions(
+                text, username, channel_identifier, platform, connection_manager, skip_if_command
+            )
+            if initial_check:
+                return initial_check
 
-            logger.info(f"[MIC] [{platform.upper()} TTS] Processing message for TTS: '{text[:50]}...'")
-
-            # Determine if AI TTS is requested via connection manager
-            use_ai_tts_requested = False
-            if connection_manager:
-                use_ai_tts_requested = connection_manager.is_tts_enabled(channel_identifier)
-            else:
-                logger.warning(f"[WARN] [{platform.upper()} TTS] No connection_manager, will check user settings")
-
-            # Check if user is blocked from TTS (Legacy API check - pending refactor of ModerationAPI)
-            if is_user_blocked_from_tts(channel_identifier, platform, username.lower()):
-                logger.warning(f"[BLOCKED] User {username} is blocked from TTS in {platform} channel {channel_identifier}")
-                return {"success": False, "error": "User is blocked from TTS"}
-
-            # Database operations
+            # 2. Database Context
             db = SessionLocal()
             try:
-                # Initialize Repositories
-                tts_settings_repo = TTSSettingsRepository(db)
-                audio_settings_repo = AudioSettingsRepository(db)
-                local_tts_repo = LocalTTSRepository(db)
-                voice_settings_repo = UserVoiceSettingsRepository(db)
-                
-                # Initialize Services with current session
-                tts_service = TTSService(db)
-
-                # Check blocked bots cache
-                if is_bot_blocked_cached(username, db):
-                    logger.debug(f"[BOT] Bot {username} is in blocked list, skipping TTS")
-                    return {"success": False, "error": "Bot is blocked from TTS"}
-
-                # Find channel owner
-                channel_owner = self._find_channel_owner(db, platform, channel_identifier)
-                
-                if not channel_owner:
+                # 3. Load User and Settings
+                user_data = self._load_user_and_settings(db, channel_identifier, platform)
+                if not user_data:
                     logger.warning(f"[ERROR] [{platform.upper()} TTS] No user found for channel {channel_identifier}")
                     return {"success": False, "error": "Channel owner not found"}
-
-                user_id = channel_owner.id
-
-                # Check if TTS is globally enabled for the user
-                if not channel_owner.tts_enabled:
-                    logger.info(f"[INFO] [{platform.upper()} TTS] TTS is DISABLED GLOBALLY for user {user_id}")
-                    return {"success": False, "error": "TTS is disabled for this user"}
-
-                # Load settings via Repositories (Clean Architecture)
-                tts_user_settings = tts_settings_repo.get_or_create(user_id=user_id)
-                audio_settings = audio_settings_repo.get_or_create(user_id=user_id)
                 
-                # Load audio settings dict for volume
-                audio_settings_dict = audio_settings_repo.get_settings_dict(user_id)
+                if user_data.get("error"):
+                    return {"success": False, "error": user_data["error"]}
 
-                # Check TTS Mode (Channel Points vs All Messages)
-                if hasattr(tts_user_settings, 'tts_mode') and tts_user_settings.tts_mode == 'channel_points':
-                    if not self._validate_channel_points_mode(tts_user_settings, platform, reward_id):
-                         return {"success": False, "error": "Invalid channel points configuration or mismatch"}
-
-                # Determine TTS Engine
-                use_ai_tts = (tts_user_settings.engine == 'f5tts')
-                use_basic_tts = True 
-
-                if use_ai_tts and not use_ai_tts_requested:
-                    logger.info(f"[MIC] [{platform.upper()} TTS] AI TTS disabled via connection_manager for channel")
-                    use_ai_tts = False
-                    use_basic_tts = True
-
-                if not use_ai_tts and not use_basic_tts:
-                     use_basic_tts = True
-
-                # Check Local Endpoint via Repository
-                local_tts = local_tts_repo.get_by_user_id(user_id)
-                has_local_endpoint = use_ai_tts and local_tts and local_tts.use_local
-
-                # Whitelist Check for Cloud AI TTS
-                if use_ai_tts and not has_local_endpoint:
-                    from utils.whitelist_cache import is_user_whitelisted_cached
-                    if not is_user_whitelisted_cached(channel_owner, db):
-                        logger.warning(f"[WARN] [{platform.upper()} TTS] User {user_id} not in whitelist, falling back to gTTS")
-                        use_ai_tts = False
-                        use_basic_tts = True
-
-                if has_local_endpoint:
-                    logger.info(f"[LOCAL] [{platform.upper()} TTS] Using local TTS endpoint for user {user_id}: {local_tts.endpoint_url}")
-
-                # Apply Word Filters using Service
-                filtered_text = await self._apply_word_filters(tts_service, user_id, platform, text)
-
-                # Check Blocked User using Service
-                blocked_users = await tts_service.get_blocked_users(user_id)
-                if any(u['username'] == username.lower() and u['platform'] == platform for u in blocked_users):
-                     return {"success": False, "error": "User is blocked from TTS"}
-
-                # Shield Filters (Replies/Mentions)
-                if tts_user_settings.filter_replies and is_reply:
-                    logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping reply message")
-                    return {"success": False, "error": "Reply messages are filtered"}
-
-                if tts_user_settings.filter_mentions and self._has_mentions(text, mentioned_users):
-                    logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping message with mentions")
-                    return {"success": False, "error": "Messages with mentions are filtered"}
-
-                text_for_tts = filtered_text
-
-                # Prepare TTS Settings
-                tts_settings_dict = {
-                    "enable7TV": tts_user_settings.enable_7tv,
-                    "enableTwitch": tts_user_settings.enable_twitch,
-                    "enableProfanity": tts_user_settings.enable_lexicon_filter,
-                    "maxLength": tts_user_settings.max_message_length,
-                    "skipCommands": tts_user_settings.skip_commands,
-                    "voice": tts_user_settings.voice
-                }
-
-                # Volume Logic via Repository
-                base_volume_level = audio_settings_dict.get('websiteVolume', TTS_DEFAULT_VOLUME)
-                if tts_user_settings.listening_mode == 'obs':
-                    # Use repository-fetched audio_settings object
-                    if audio_settings and hasattr(audio_settings, 'obs_volume'):
-                        base_volume_level = audio_settings.obs_volume
-
-                final_volume_level = base_volume_level
+                # 4. Filter Logic (Bots, Blocked, Shield)
+                filter_result = await self._process_filters(
+                    db, text, username, platform, is_reply, mentioned_users, reward_id, user_data
+                )
+                if filter_result.get("error"):
+                    return {"success": False, "error": filter_result["error"]}
                 
-                # Voice Settings Logic via Repository
-                if use_ai_tts and tts_user_settings.voice:
-                    user_voice_config = voice_settings_repo.get_by_voice_name(
-                        user_id, tts_user_settings.voice
-                    )
+                text_for_tts = filter_result["filtered_text"]
 
-                    if user_voice_config:
-                        voice_settings_dict = {}
-                        if user_voice_config.cfg_strength is not None:
-                            voice_settings_dict["cfg_strength"] = user_voice_config.cfg_strength
-                        if user_voice_config.speed_preset is not None:
-                            voice_settings_dict["speed_preset"] = user_voice_config.speed_preset
-                        
-                        if voice_settings_dict:
-                            tts_settings_dict["voice_settings"] = voice_settings_dict
-                        
-                        if user_voice_config.volume is not None:
-                            final_volume_level = user_voice_config.volume
-
-                logger.info(f"[MIC] [{platform.upper()} TTS] Processing: {username}: {text[:50]}... (engine={tts_user_settings.engine}, volume={final_volume_level}%)")
-
-                # Send request to TTS API
-                result = await tts_api.send_tts_request(
-                    channel_name=channel_identifier,
-                    text=text_for_tts,
-                    author=username,
-                    user_id=user_id,
-                    volume_level=final_volume_level,
-                    use_ai_tts=use_ai_tts,
-                    use_basic_tts=use_basic_tts,
-                    connection_manager=connection_manager,
-                    tts_settings=tts_settings_dict
+                # 5. Determine TTS Engine & Volume
+                engine_config = self._determine_engine_and_volume(
+                    db, user_data, connection_manager, channel_identifier, platform
                 )
 
-                if result.get("success"):
-                    # Auto-accept rewards
-                    if reward_id and hasattr(tts_user_settings, 'tts_mode') and tts_user_settings.tts_mode == 'channel_points':
-                        await self._auto_accept_reward(db, user_id, platform, reward_id)
-
-                    # Broadcast Audio
-                    await notification_service.broadcast_tts_audio(
-                        audio_data={
-                            "audio_url": result.get("audio_url"),
-                            "voice": result.get("voice", "unknown"),
-                            "volume": final_volume_level,
-                            "tts_type": result.get("tts_type", "unknown"),
-                            "duration": result.get("duration", 0),
-                            "text": text,
-                            "username": username
-                        },
-                        channel_name=channel_identifier,
-                        platform=platform
-                    )
-                else:
-                    logger.error(f"[ERROR] [{platform.upper()} TTS] Synthesis FAILED: {result.get('error')}")
-
-                return result
+                # 6. Execute TTS Request
+                return await self._execute_tts_request(
+                    tts_api, 
+                    connection_manager, 
+                    channel_identifier, 
+                    text_for_tts, 
+                    username, 
+                    user_data, 
+                    engine_config,
+                    platform,
+                    db,
+                    reward_id
+                )
 
             finally:
                 db.close()
@@ -251,6 +113,194 @@ class TTSHandlerService:
         except Exception as e:
             logger.error(f"[ERROR] [{platform.upper()} TTS] Error processing TTS: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
+
+    def _check_initial_conditions(self, text, username, channel_identifier, platform, connection_manager, skip_if_command):
+        # Skip commands
+        if skip_if_command and text.strip().startswith('!'):
+            logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping command: {text[:50]}")
+            return {"success": False, "error": "Message is a command"}
+
+        logger.info(f"[MIC] [{platform.upper()} TTS] Processing message for TTS: '{text[:50]}...'")
+
+        if not connection_manager:
+            logger.warning(f"[WARN] [{platform.upper()} TTS] No connection_manager, will check user settings")
+
+        # Check legacy blocked list
+        if is_user_blocked_from_tts(channel_identifier, platform, username.lower()):
+            logger.warning(f"[BLOCKED] User {username} is blocked from TTS in {platform} channel {channel_identifier}")
+            return {"success": False, "error": "User is blocked from TTS"}
+        
+        return None
+
+    def _load_user_and_settings(self, db, channel_identifier, platform):
+        channel_owner = self._find_channel_owner(db, platform, channel_identifier)
+        if not channel_owner:
+            return None
+
+        if not channel_owner.tts_enabled:
+             logger.info(f"[INFO] [{platform.upper()} TTS] TTS is DISABLED GLOBALLY for user {channel_owner.id}")
+             return {"error": "TTS is disabled for this user"}
+
+        user_id = channel_owner.id
+        tts_settings_repo = TTSSettingsRepository(db)
+        audio_settings_repo = AudioSettingsRepository(db)
+        
+        return {
+            "user": channel_owner,
+            "user_id": user_id,
+            "tts_settings": tts_settings_repo.get_or_create(user_id=user_id),
+            "audio_settings": audio_settings_repo.get_or_create(user_id=user_id),
+            "audio_settings_dict": audio_settings_repo.get_settings_dict(user_id)
+        }
+
+    async def _process_filters(self, db, text, username, platform, is_reply, mentioned_users, reward_id, user_data):
+        user_id = user_data["user_id"]
+        tts_settings = user_data["tts_settings"]
+        
+        # Check blocked bots cache
+        if is_bot_blocked_cached(username, db):
+             logger.debug(f"[BOT] Bot {username} is in blocked list, skipping TTS")
+             return {"error": "Bot is blocked from TTS"}
+
+        # Channel Points Mode Validation
+        if hasattr(tts_settings, 'tts_mode') and tts_settings.tts_mode == 'channel_points':
+            if not self._validate_channel_points_mode(tts_settings, platform, reward_id):
+                 return {"error": "Invalid channel points configuration or mismatch"}
+
+        # Blocked Users Service Check
+        tts_service = TTSService(db)
+        blocked_users = await tts_service.get_blocked_users(user_id)
+        if any(u['username'] == username.lower() and u['platform'] == platform for u in blocked_users):
+             return {"error": "User is blocked from TTS"}
+        
+        # Shield Filters
+        if tts_settings.filter_replies and is_reply:
+            logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping reply message")
+            return {"error": "Reply messages are filtered"}
+
+        if tts_settings.filter_mentions and self._has_mentions(text, mentioned_users):
+            logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping message with mentions")
+            return {"error": "Messages with mentions are filtered"}
+
+        # Apply Word Filters
+        filtered_text = await self._apply_word_filters(tts_service, user_id, platform, text)
+        return {"filtered_text": filtered_text}
+
+    def _determine_engine_and_volume(self, db, user_data, connection_manager, channel_identifier, platform):
+        user_id = user_data["user_id"]
+        tts_settings = user_data["tts_settings"]
+        audio_settings = user_data["audio_settings"]
+        audio_settings_dict = user_data["audio_settings_dict"]
+        
+        # AI TTS requested?
+        use_ai_tts_requested = False
+        if connection_manager:
+            use_ai_tts_requested = connection_manager.is_tts_enabled(channel_identifier)
+        
+        use_ai_tts = (tts_settings.engine == 'f5tts')
+        use_basic_tts = True
+
+        if use_ai_tts and not use_ai_tts_requested:
+            logger.info(f"[MIC] [{platform.upper()} TTS] AI TTS disabled via connection_manager for channel")
+            use_ai_tts = False
+        
+        # Check Local Endpoint
+        local_tts_repo = LocalTTSRepository(db)
+        local_tts = local_tts_repo.get_by_user_id(user_id)
+        has_local_endpoint = use_ai_tts and local_tts and local_tts.use_local
+
+        # Whitelist Check
+        if use_ai_tts and not has_local_endpoint:
+            from utils.whitelist_cache import is_user_whitelisted_cached
+            if not is_user_whitelisted_cached(user_data["user"], db):
+                 logger.warning(f"[WARN] [{platform.upper()} TTS] User {user_id} not in whitelist, falling back to gTTS")
+                 use_ai_tts = False
+
+        if has_local_endpoint:
+             logger.info(f"[LOCAL] [{platform.upper()} TTS] Using local TTS endpoint for user {user_id}: {local_tts.endpoint_url}")
+
+        # Volume
+        base_volume_level = audio_settings_dict.get('websiteVolume', TTS_DEFAULT_VOLUME)
+        if tts_settings.listening_mode == 'obs':
+             if audio_settings and hasattr(audio_settings, 'obs_volume'):
+                 base_volume_level = audio_settings.obs_volume
+        
+        final_volume = base_volume_level
+        voice_settings_dict = {}
+
+        # Voice Specific Settings
+        if use_ai_tts and tts_settings.voice:
+             voice_settings_repo = UserVoiceSettingsRepository(db)
+             user_voice_config = voice_settings_repo.get_by_voice_name(user_id, tts_settings.voice)
+             
+             if user_voice_config:
+                 if user_voice_config.cfg_strength is not None:
+                     voice_settings_dict["cfg_strength"] = user_voice_config.cfg_strength
+                 if user_voice_config.speed_preset is not None:
+                     voice_settings_dict["speed_preset"] = user_voice_config.speed_preset
+                 if user_voice_config.volume is not None:
+                     final_volume = user_voice_config.volume
+
+        return {
+            "use_ai_tts": use_ai_tts,
+            "use_basic_tts": use_basic_tts,
+            "volume": final_volume,
+            "voice_settings": voice_settings_dict
+        }
+
+    async def _execute_tts_request(self, tts_api, connection_manager, channel_identifier, text, username, user_data, engine_config, platform, db, reward_id=None):
+        user_id = user_data["user_id"]
+        tts_settings = user_data["tts_settings"]
+        
+        tts_settings_dict = {
+            "enable7TV": tts_settings.enable_7tv,
+            "enableTwitch": tts_settings.enable_twitch,
+            "enableProfanity": tts_settings.enable_lexicon_filter,
+            "maxLength": tts_settings.max_message_length,
+            "skipCommands": tts_settings.skip_commands,
+            "voice": tts_settings.voice
+        }
+        
+        if engine_config["voice_settings"]:
+             tts_settings_dict["voice_settings"] = engine_config["voice_settings"]
+
+        logger.info(f"[MIC] [{platform.upper()} TTS] Processing: {username}: {text[:50]}... (engine={tts_settings.engine}, volume={engine_config['volume']}%)")
+
+        result = await tts_api.send_tts_request(
+            channel_name=channel_identifier,
+            text=text,
+            author=username,
+            user_id=user_id,
+            volume_level=engine_config["volume"],
+            use_ai_tts=engine_config["use_ai_tts"],
+            use_basic_tts=engine_config["use_basic_tts"],
+            connection_manager=connection_manager,
+            tts_settings=tts_settings_dict
+        )
+
+        if result.get("success"):
+            # Auto-accept rewards (if applicable)
+             if reward_id and hasattr(tts_settings, 'tts_mode') and tts_settings.tts_mode == 'channel_points':
+                await self._auto_accept_reward(db, user_id, platform, reward_id)
+
+             # Broadcast Audio
+             await notification_service.broadcast_tts_audio(
+                audio_data={
+                    "audio_url": result.get("audio_url"),
+                    "voice": result.get("voice", "unknown"),
+                    "volume": engine_config["volume"],
+                    "tts_type": result.get("tts_type", "unknown"),
+                    "duration": result.get("duration", 0),
+                    "text": text,
+                    "username": username
+                },
+                channel_name=channel_identifier,
+                platform=platform
+            )
+        else:
+            logger.error(f"[ERROR] [{platform.upper()} TTS] Synthesis FAILED: {result.get('error')}")
+
+        return result
 
     def _find_channel_owner(self, db: Session, platform: str, channel_identifier: str) -> Optional[User]:
         from repositories.user_repository import UserRepository

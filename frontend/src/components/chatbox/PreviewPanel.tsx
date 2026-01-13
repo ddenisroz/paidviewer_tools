@@ -38,8 +38,8 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings }) => {
                         )}
                         {settings.showBadges && msg.badges.length > 0 && (
                             <span className="mr-1">
-                                {msg.badges.includes('broadcaster') && '👑'}
-                                {msg.badges.includes('moderator') && '🛡️'}
+                                {msg.badges.includes('broadcaster') && '[STREAMER]'}
+                                {msg.badges.includes('moderator') && '[MOD]'}
                             </span>
                         )}
                         <span className="font-bold" style={{ color: '#9146FF' }}>
@@ -51,7 +51,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings }) => {
                     </div>
                 ))}
             </div>
-        </div>
+        </div >
     );
 };
 

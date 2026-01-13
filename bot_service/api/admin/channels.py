@@ -122,7 +122,7 @@ async def update_blocked_channel(
             if not channel:
                 raise HTTPException(status_code=404, detail="Blocked channel not found")
             
-            logger.info(f"✏️ Updated blocked channel: {channel.channel_name}")
+            logger.info(f"[ADMIN] Updated blocked channel: {channel.channel_name}")
         
         return {
             "success": True,

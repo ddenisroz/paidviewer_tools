@@ -132,12 +132,12 @@ class TTSService:
     # === Settings Management ===
 
     async def get_audio_settings(self, user_id: int = None, session_id: str = None) -> dict:
-        settings = self.audio_repo.get_or_create(user_id, session_id)
+        settings = self.audio_repo.get_or_create(user_id)
         return {"websiteVolume": settings.website_volume}
 
     async def save_audio_settings(self, website_volume: int, user_id: int = None, session_id: str = None) -> bool:
         try:
-            settings = self.audio_repo.get_or_create(user_id, session_id)
+            settings = self.audio_repo.get_or_create(user_id)
             self.audio_repo.update(settings, {"website_volume": website_volume})
             return True
         except Exception as e:
@@ -145,7 +145,7 @@ class TTSService:
             return False
 
     async def get_tts_settings(self, user_id: int = None, session_id: str = None) -> dict:
-        settings = self.settings_repo.get_or_create(user_id, session_id)
+        settings = self.settings_repo.get_or_create(user_id)
         return self.settings_repo.get_settings_dict(settings)
 
     async def save_tts_settings(self, **kwargs) -> dict:
@@ -154,7 +154,7 @@ class TTSService:
             user_id = kwargs.get('user_id')
             session_id = kwargs.get('session_id')
             
-            settings = self.settings_repo.get_or_create(user_id, session_id)
+            settings = self.settings_repo.get_or_create(user_id)
             
             # Version check logic if needed (can be added to repo or here)
             client_version = kwargs.get('client_version')
@@ -187,7 +187,7 @@ class TTSService:
     # === Blocked Users ===
     
     async def get_blocked_users(self, user_id: int) -> List[dict]:
-        return self.blocked_user_repo.get_blocks_list(user_id=user_id)
+        return self.blocked_user_repo.get_blocked_list(user_id=user_id)
         
     async def block_user(self, user_id: int, channel_name: str, platform: str, username: str) -> bool:
         return self.blocked_user_repo.block_user(user_id, channel_name, platform, username) is not None

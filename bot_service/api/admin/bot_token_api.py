@@ -13,10 +13,11 @@ from services.bot_token_validator import bot_token_validator
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/bot-tokens", tags=["admin", "bot-tokens"])
+
+router = APIRouter(prefix="/api/admin/bot", tags=["admin", "bot-tokens"])
 
 
-@router.get("/status")
+@router.get("/token-status")
 async def get_bot_tokens_status(
     current_user: Dict[str, Any] = Depends(require_role(AppRole.ADMIN))
 ) -> Dict[str, Any]:

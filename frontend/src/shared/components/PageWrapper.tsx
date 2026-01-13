@@ -6,24 +6,31 @@ interface PageWrapperProps {
     actions?: ReactNode;
     children: ReactNode;
     className?: string;
+    hideTitle?: boolean; // Опция для скрытия заголовка (например, на главной)
 }
 
 /**
  * Унифицированная обертка для всех страниц дашборда
  * Обеспечивает единообразное позиционирование заголовков и контента
  */
-export const PageWrapper: React.FC<PageWrapperProps> = ({ 
-    title: _title, 
-    description, 
-    actions, 
-    children, 
-    className = '' 
+export const PageWrapper: React.FC<PageWrapperProps> = ({
+    title,
+    description,
+    actions,
+    children,
+    className = '',
+    hideTitle = true
 }) => {
-    // Заголовок теперь показывается в Header, поэтому здесь не показываем title
-    // Оставляем только description и actions если они нужны
     return (
         <div className={`container mx-auto px-6 py-4 space-y-6 min-h-[600px] ${className}`} style={{ scrollbarGutter: 'stable' }}>
-            {/* Description и actions (без title, так как он в Header) */}
+            {/* Заголовок страницы */}
+            {(title && !hideTitle) && (
+                <div className="mb-6">
+                    <h1 className="text-3xl font-bold text-white">{title}</h1>
+                </div>
+            )}
+
+            {/* Description и actions */}
             {(description || actions) && (
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     {description && (

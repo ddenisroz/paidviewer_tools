@@ -1,8 +1,8 @@
 ﻿// src/components/chat/ChatControls.tsx
 import React from 'react';
 
-import { 
-    Copy, 
+import {
+    Copy,
     MessageCircle,
     MessageSquare,
     Settings,
@@ -65,11 +65,11 @@ const ChatControls: React.FC<ChatControlsProps> = ({
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <MessageSquare className="h-5 w-5" />
-                    ���������� �����
+                    Управление чатом
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-                {/* ������������� �������� */}
+                {/* Переключатели платформ */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
@@ -81,11 +81,11 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                             />
                             <div className="flex items-center space-x-2">
                                 <Twitch className="h-4 w-4 text-purple-500" />
-                                <Label htmlFor="twitchChat">Twitch ���</Label>
+                                <Label htmlFor="twitchChat">Twitch чат</Label>
                             </div>
                         </div>
                         <span className="text-sm text-gray-400">
-                            {twitchEnabled ? `@${integrations.twitch?.username}` : '�� ���������'}
+                            {twitchEnabled ? `@${integrations.twitch?.username}` : 'Не подключен'}
                         </span>
                     </div>
 
@@ -99,11 +99,11 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                             />
                             <div className="flex items-center space-x-2">
                                 <VKIcon className="h-4 w-4 text-blue-500" />
-                                <Label htmlFor="vkChat">VK Live ���</Label>
+                                <Label htmlFor="vkChat">VK Live чат</Label>
                             </div>
                         </div>
                         <span className="text-sm text-gray-400">
-                            {vkEnabled ? `@${integrations.vk?.username}` : '�� ���������'}
+                            {vkEnabled ? `@${integrations.vk?.username}` : 'Не подключен'}
                         </span>
                     </div>
 
@@ -111,10 +111,10 @@ const ChatControls: React.FC<ChatControlsProps> = ({
 
                 <Separator />
 
-                {/* �������� */}
+                {/* Действия */}
                 <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">��������</h3>
-                    
+                    <h3 className="text-lg font-semibold">Действия</h3>
+
                     <div className="grid grid-cols-2 gap-4">
                         <Button
                             variant="outline"
@@ -122,13 +122,13 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                             className="flex items-center gap-2"
                         >
                             <Settings className="h-4 w-4" />
-                            ��������� OBS
+                            Настройки OBS
                         </Button>
-                        
+
                         <Button
                             variant="outline"
                             onClick={() => {
-                                // ������ �������� ���� � ��������� ����
+                                // Логика открытия чата в отдельном окне
                                 const chatWindow = window.open(
                                     '/chat-window',
                                     'chatWindow',
@@ -141,24 +141,24 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                             className="flex items-center gap-2"
                         >
                             <MessageCircle className="h-4 w-4" />
-                            ������� � ����
+                            Открыть в окне
                         </Button>
                     </div>
                 </div>
 
                 <Separator />
 
-                {/* URL ��� OBS */}
+                {/* URL для OBS */}
                 <div className="space-y-4">
-                    <h3 className="text-lg font-semibold">URL ��� OBS</h3>
-                    
-                    {/* ������������� URL � �������������� ����������� */}
+                    <h3 className="text-lg font-semibold">URL для OBS</h3>
+
+                    {/* Универсальный URL с автоматической фильтрацией */}
                     <div className="space-y-2 p-3 border rounded-lg bg-blue-500/10">
                         <div className="flex items-center gap-2 mb-2">
                             <MessageCircle className="h-4 w-4 text-blue-500" />
-                            <span className="font-medium text-sm">������������� ���</span>
+                            <span className="font-medium text-sm">Универсальный чат</span>
                             <span className="text-xs text-muted-foreground">
-                                (������������� ��������� �� ���������� ����������)
+                                (автоматически фильтрует по включенным платформам)
                             </span>
                         </div>
                         <div className="flex gap-2">
@@ -167,22 +167,22 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                                 onClick={() => {
                                     const url = generateObsUrl();
                                     navigator.clipboard.writeText(url);
-                                    toast.success('URL ���������� � ����� ������');
+                                    toast.success('URL скопирован в буфер обмена');
                                 }}
                             >
                                 <Copy className="h-4 w-4 mr-1" />
-                                ������������� � ����������� URL
+                                Сгенерировать и скопировать URL
                             </Button>
                         </div>
                         <div className="text-xs text-muted-foreground italic">
-                            ������� ������ ���� ����� ������������� URL � �������� �����������
+                            Нажмите кнопку выше чтобы сгенерировать URL с текущими настройками
                         </div>
                         <div className="text-xs text-muted-foreground">
-                            <strong>������� ����������:</strong> {
-                                twitchChatEnabled && vkChatEnabled ? '������������ ��� (Twitch + VK Live)' :
-                                twitchChatEnabled ? '������ Twitch' :
-                                vkChatEnabled ? '������ VK Live' :
-                                '��� ���������'
+                            <strong>Текущая фильтрация:</strong> {
+                                twitchChatEnabled && vkChatEnabled ? 'Объединенный чат (Twitch + VK Live)' :
+                                    twitchChatEnabled ? 'Только Twitch' :
+                                        vkChatEnabled ? 'Только VK Live' :
+                                            'Все платформы'
                             }
                         </div>
                     </div>
@@ -193,4 +193,3 @@ const ChatControls: React.FC<ChatControlsProps> = ({
 };
 
 export default ChatControls;
-

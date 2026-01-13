@@ -25,34 +25,34 @@ router = APIRouter(tags=["websocket"])
 async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
     """
     Загружает историю чата для пользователя.
-    
-    Выполняется в отдельном потоке для избежания блокировки event loop.
     """
     def _db_query():
+        # Используем новый session context manager если он есть, или получаем session напрямую
+        # В данном проекте get_db() - это генератор
         db = next(get_db())
         try:
+            from repositories.user_repository import UserRepository
+            from repositories.chat_message_repository import ChatMessageRepository
+            
             user_repo = UserRepository(db)
             user = user_repo.get_by_id(user_id)
             if not user:
                 return []
             
-            # Определяем платформы пользователя
             platforms = []
-            if user.twitch_username:
-                platforms.append('twitch')
-            if user.vk_channel_name:
-                platforms.append('vk')
+            if user.twitch_username: platforms.append('twitch')
+            if user.vk_channel_name: platforms.append('vk')
             
-            if not platforms:
-                return []
+            if not platforms: return []
             
-            # Используем репозиторий для получения истории
-            from repositories.chat_message_repository import ChatMessageRepository
             chat_repo = ChatMessageRepository(db)
-            messages = chat_repo.get_history_by_platforms(user_id, platforms, limit=50)
-            
+            # Оптимизация: limit=20 для быстрой загрузки, клиент может запросить больше если надо
+            messages = chat_repo.get_history_by_platforms(user_id, platforms, limit=20)
             messages.sort(key=lambda x: x.timestamp)
             return messages
+        except Exception as e:
+            logger.error(f"Error querying chat history: {e}")
+            return []
         finally:
             db.close()
     
@@ -117,63 +117,86 @@ async def _send_chat_history(websocket: WebSocket, user_id: int) -> None:
 async def websocket_chat(websocket: WebSocket, user_id: str):
     """
     WebSocket endpoint для чата.
-    
-    Обрабатывает:
-    - Подключение/отключение пользователей
-    - Отправку истории чата
-    - Ping/pong heartbeat
-    - TTS disconnect scheduling
     """
-    logger.info(f"[WS] WebSocket connection for user {user_id}")
+    logger.info(f"[WS] Connection request for user {user_id}")
     
     await websocket.accept()
-    logger.info(f"[OK] WebSocket accepted for user {user_id}")
     
     user_id_int = int(user_id) if user_id.isdigit() else -1
+    if user_id_int <= 0:
+        logger.warning(f"[WS] Invalid user_id {user_id}, closing")
+        await websocket.close(code=4000)
+        return
+
+    manager = get_memory_websocket_manager()
+    conn_mgr = get_connection_manager()
+
+    # Zombie Check: Close existing chat connections for this user to prevent duplicates
+    # This is a basic implementation; for multiple tabs support, we might need a different strategy.
+    # But for stability, ensuring 1 main connection is safer.
+    # DISABLED to prevent infinite loops during stabilization
+    # active_conns = manager.get_active_connections(user_id_int)
+    # for conn in active_conns:
+    #     if conn.connection_type == 'chat':
+    #         logger.info(f"[WS] Closing stale connection {conn.connection_id} for user {user_id}")
+    #         # We can't easily close the *socket* of the other task here without access to it, 
+    #         # but we can remove it from manager so it stops receiving broadcasts.
+    #         # Ideally the client handles single-tab logic.
+    #         pass 
+
+    # Cancel TTS disconnect timer
+    conn_mgr.cancel_tts_disconnect(user_id_int)
     
-    # Отменяем отложенное отключение TTS
-    if user_id_int > 0:
-        conn_mgr = get_connection_manager()
-        conn_mgr.cancel_tts_disconnect(user_id_int)
-    
-    # Добавляем соединение в manager
-    conn_id = await get_memory_websocket_manager().add_connection(
+    # Register connection
+    conn_id = await manager.add_connection(
         websocket,
         user_id_int,
         f"user_{user_id}",
         "chat"
     )
-    logger.info(f"[OK] Connection added: {conn_id}")
+    logger.info(f"[WS] Connected: {conn_id} (User: {user_id})")
     
-    # Отправляем историю в background
-    asyncio.create_task(_send_chat_history(websocket, user_id_int))
+    # Send history asynchronously
+    history_task = asyncio.create_task(_send_chat_history(websocket, user_id_int))
     
     try:
         while True:
+            # heartbeat logic could go here if not handled by standard ping/pong
             data = await websocket.receive_text()
             
             try:
                 message = json.loads(data)
-                
                 if message.get("type") == "ping":
-                    await get_memory_websocket_manager().handle_ping(conn_id)
-                    logger.debug(f"🏓 Ping/Pong with user {user_id}")
+                    await manager.handle_ping(conn_id)
                     continue
                 
-                logger.info(f"[BROADCAST] Received from user {user_id}: {message.get('type', 'unknown')}")
-                
+                # Basic validation to avoid log spam
+                msg_type = message.get('type', 'unknown')
+                if msg_type != 'pong':
+                     logger.debug(f"[WS] User {user_id} sent: {msg_type}")
+
             except json.JSONDecodeError:
-                logger.info(f"[BROADCAST] Received from user {user_id}: {data}")
+                pass
                 
     except Exception as e:
-        logger.info(f"[WS] WebSocket disconnected for user {user_id}: {e}")
+        # Normal disconnects (1000, 1001) raise exceptions in starlette/fastapi sometimes
+        # check string to avoid scary logs for normal disconnects
+        e_str = str(e)
+        if "1000" in e_str or "1001" in e_str or "closed" in e_str.lower():
+            logger.info(f"[WS] Disconnected cleanly: {user_id}")
+        else:
+            logger.warning(f"[WS] Error user {user_id}: {e}")
+            
     finally:
-        await get_memory_websocket_manager().remove_connection(conn_id)
-        logger.info(f"[OK] Connection removed: {conn_id}")
+        await manager.remove_connection(conn_id)
         
-        # Планируем отключение TTS
-        if user_id_int > 0:
+        # Schedule TTS disconnect if no other connections remain
+        remaining = manager.get_active_connections(user_id_int)
+        if not remaining:
+            logger.info(f"[WS] No active connections for {user_id}, scheduling TTS disconnect")
             await _schedule_tts_disconnect(user_id_int)
+        else:
+             logger.debug(f"[WS] User {user_id} still has {len(remaining)} connections, skipping disconnect timer")
 
 
 async def _schedule_tts_disconnect(user_id: int) -> None:

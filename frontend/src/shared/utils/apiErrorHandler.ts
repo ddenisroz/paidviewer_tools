@@ -57,6 +57,9 @@ export interface ErrorHandlerOptions {
 /**
  * Определяет тип ошибки на основе AxiosError
  */
+/**
+ * Определяет тип ошибки на основе AxiosError
+ */
 function getErrorType(error: AxiosError): ApiErrorType {
   if (!error.response) {
     // Нет ответа от сервера
@@ -67,24 +70,18 @@ function getErrorType(error: AxiosError): ApiErrorType {
   }
 
   const status = error.response.status;
+  const statusToType: Record<number, ApiErrorType> = {
+    401: ApiErrorType.UNAUTHORIZED,
+    403: ApiErrorType.FORBIDDEN,
+    404: ApiErrorType.NOT_FOUND,
+    422: ApiErrorType.VALIDATION_ERROR,
+    500: ApiErrorType.SERVER_ERROR,
+    502: ApiErrorType.SERVER_ERROR,
+    503: ApiErrorType.SERVER_ERROR,
+    504: ApiErrorType.SERVER_ERROR,
+  };
 
-  switch (status) {
-    case 401:
-      return ApiErrorType.UNAUTHORIZED;
-    case 403:
-      return ApiErrorType.FORBIDDEN;
-    case 404:
-      return ApiErrorType.NOT_FOUND;
-    case 422:
-      return ApiErrorType.VALIDATION_ERROR;
-    case 500:
-    case 502:
-    case 503:
-    case 504:
-      return ApiErrorType.SERVER_ERROR;
-    default:
-      return ApiErrorType.UNKNOWN_ERROR;
-  }
+  return statusToType[status] || ApiErrorType.UNKNOWN_ERROR;
 }
 
 /**
@@ -96,71 +93,81 @@ function getBackendErrorCode(error: AxiosError): BackendErrorCode | undefined {
 }
 
 /**
+ * Получает сообщение для специфичного error_code
+ */
+function getMessageForErrorCode(errorCode: BackendErrorCode, data?: BackendErrorResponse): string | undefined {
+  switch (errorCode) {
+    case 'TOKEN_EXPIRED':
+    case 'SESSION_EXPIRED':
+      return 'Сессия истекла. Пожалуйста, войдите снова.';
+    case 'INVALID_TOKEN':
+      return 'Недействительный токен авторизации.';
+    case 'BOT_NOT_CONNECTED':
+      return 'Бот не подключен к каналу.';
+    case 'BOT_ALREADY_CONNECTED':
+      return 'Бот уже подключен к каналу.';
+    case 'TTS_SERVICE_UNAVAILABLE':
+      return 'TTS сервис временно недоступен.';
+    case 'TTS_VOICE_NOT_FOUND':
+      return 'Выбранный голос не найден.';
+    case 'PLATFORM_CONNECTION_ERROR':
+      return 'Ошибка подключения к платформе.';
+    case 'RATE_LIMIT_EXCEEDED': {
+      const retryAfter = data?.details?.retry_after as string | number | undefined;
+      return retryAfter
+        ? `Превышен лимит запросов. Повторите через ${retryAfter} сек.`
+        : 'Превышен лимит запросов. Попробуйте позже.';
+    }
+    case 'ALREADY_EXISTS':
+      return 'Такой ресурс уже существует.';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Получает дефолтное сообщение для типа ошибки
+ */
+function getDefaultMessageForType(type: ApiErrorType): string {
+  const defaultMessages: Record<ApiErrorType, string> = {
+    [ApiErrorType.NETWORK_ERROR]: 'Нет связи с сервером. Проверьте подключение к интернету.',
+    [ApiErrorType.TIMEOUT_ERROR]: 'Превышено время ожидания ответа от сервера.',
+    [ApiErrorType.UNAUTHORIZED]: 'Требуется авторизация. Пожалуйста, войдите в систему.',
+    [ApiErrorType.FORBIDDEN]: 'Недостаточно прав для выполнения этого действия.',
+    [ApiErrorType.NOT_FOUND]: 'Запрашиваемый ресурс не найден.',
+    [ApiErrorType.VALIDATION_ERROR]: 'Ошибка валидации данных. Проверьте введенные значения.',
+    [ApiErrorType.SERVER_ERROR]: 'Ошибка сервера. Попробуйте позже.',
+    [ApiErrorType.UNKNOWN_ERROR]: 'Произошла непредвиденная ошибка.',
+  };
+  return defaultMessages[type] || 'Произошла непредвиденная ошибка.';
+}
+
+/**
  * Получает пользовательское сообщение об ошибке
  */
 function getUserMessage(error: AxiosError, type: ApiErrorType): string {
   const data = error.response?.data as BackendErrorResponse | undefined;
 
-  // Пытаемся получить сообщение от сервера (новый формат)
+  // 1. Сообщение от сервера (новый формат)
   if (data?.message && typeof data.message === 'string') {
     return data.message;
   }
 
-  // Legacy format
+  // 2. Legacy format
   const serverMessage = data?.error || data?.detail;
   if (serverMessage && typeof serverMessage === 'string') {
     return serverMessage;
   }
 
-  // Сообщения по error_code от backend
+  // 3. Сообщение по error_code
   const errorCode = data?.error_code;
   if (errorCode) {
-    switch (errorCode) {
-      case 'TOKEN_EXPIRED':
-      case 'SESSION_EXPIRED':
-        return 'Сессия истекла. Пожалуйста, войдите снова.';
-      case 'INVALID_TOKEN':
-        return 'Недействительный токен авторизации.';
-      case 'BOT_NOT_CONNECTED':
-        return 'Бот не подключен к каналу.';
-      case 'BOT_ALREADY_CONNECTED':
-        return 'Бот уже подключен к каналу.';
-      case 'TTS_SERVICE_UNAVAILABLE':
-        return 'TTS сервис временно недоступен.';
-      case 'TTS_VOICE_NOT_FOUND':
-        return 'Выбранный голос не найден.';
-      case 'PLATFORM_CONNECTION_ERROR':
-        return 'Ошибка подключения к платформе.';
-      case 'RATE_LIMIT_EXCEEDED': {
-        const retryAfter = data?.details?.retry_after;
-        return retryAfter
-          ? `Превышен лимит запросов. Повторите через ${retryAfter} сек.`
-          : 'Превышен лимит запросов. Попробуйте позже.';
-      }
-      case 'ALREADY_EXISTS':
-        return 'Такой ресурс уже существует.';
-    }
+    const codeMessage = getMessageForErrorCode(errorCode, data);
+    if (codeMessage) return codeMessage;
   }
 
-  // Дефолтные сообщения по типу ошибки
-  switch (type) {
-    case ApiErrorType.NETWORK_ERROR:
-      return 'Нет связи с сервером. Проверьте подключение к интернету.';
-    case ApiErrorType.TIMEOUT_ERROR:
-      return 'Превышено время ожидания ответа от сервера.';
-    case ApiErrorType.UNAUTHORIZED:
-      return 'Требуется авторизация. Пожалуйста, войдите в систему.';
-    case ApiErrorType.FORBIDDEN:
-      return 'Недостаточно прав для выполнения этого действия.';
-    case ApiErrorType.NOT_FOUND:
-      return 'Запрашиваемый ресурс не найден.';
-    case ApiErrorType.VALIDATION_ERROR:
-      return 'Ошибка валидации данных. Проверьте введенные значения.';
-    case ApiErrorType.SERVER_ERROR:
-      return 'Ошибка сервера. Попробуйте позже.';
-    default:
-      return 'Произошла непредвиденная ошибка.';
-  }
+  // 4. Дефолтное сообщение по типу
+  return getDefaultMessageForType(type);
 }
 
 /**

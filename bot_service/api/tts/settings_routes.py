@@ -7,8 +7,7 @@ import httpx
 from core.database import get_db
 from auth.auth import get_current_user
 from core.config import settings
-from auth.auth import get_current_user
-from core.config import settings
+from constants import DEFAULT_ENABLED_PLATFORMS
 from services.tts.tts_service import TTSService
 from services.tts.tts_core import (
     AudioSettingsRequest,
@@ -245,6 +244,17 @@ async def get_user_voices(
 # ============================================================================
 # ADDITIONAL SETTINGS (Platform / Listening Mode)
 # ============================================================================
+
+@router.get("/platform-settings")
+async def get_platform_settings(
+    user: dict = Depends(get_current_user),
+    service: TTSService = Depends(get_tts_service)
+):
+    """Get enabled platforms for TTS."""
+    settings = await service.get_tts_settings(user_id=user['id'])
+    return {
+        "enabled_platforms": settings.get("enabled_platforms", DEFAULT_ENABLED_PLATFORMS)
+    }
 
 @router.post("/platform-settings")
 async def set_platform_settings(

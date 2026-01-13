@@ -52,7 +52,7 @@ async def toggle_mute_user(
         return MuteStatusResponse(**result)
 
     except Exception as e:
-        logger.error(f"❌ [MODERATION] Error toggling mute: {e}")
+        logger.error(f"[MODERATION] Error toggling mute: {e}")
         raise HTTPException(status_code=500, detail=f"Error toggling mute: {str(e)}")
 
 @router.get("/muted-users")

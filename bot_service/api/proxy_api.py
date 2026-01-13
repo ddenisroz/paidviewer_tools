@@ -69,7 +69,7 @@ async def proxy_7tv(path: str):
         )
 
     except httpx.TimeoutException:
-        logger.error(f"⏱️ [PROXY] Timeout proxying 7TV request: {path}")
+        logger.error(f"[PROXY] Timeout proxying 7TV request: {path}")
         raise HTTPException(status_code=504, detail="Request timeout")
     except httpx.RequestError as e:
         logger.error(f"[ERROR] [PROXY] Error proxying 7TV request: {path}, error: {e}")

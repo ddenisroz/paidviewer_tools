@@ -105,15 +105,15 @@ class ModerationService:
                                     success = await twitch_client.unban_user(broadcaster_id, broadcaster_id, target_id, token_info)
                                     platform_mute_applied = success
                                     if success:
-                                        logger.info(f"✅ [TWITCH] Timeout removed for {username}")
+                                        logger.info(f"[TWITCH] Timeout removed for {username}")
                                     else:
-                                        logger.warning(f"⚠️ [TWITCH] Failed to remove timeout for {username}")
+                                        logger.warning(f"[TWITCH] Failed to remove timeout for {username}")
                                 else:
                                     logger.error("Could not determine broadcaster ID for moderation")
                             else:
                                 logger.warning(f"Target user {username} not found on Twitch")
                     except Exception as e:
-                        logger.error(f"❌ [TWITCH] Error removing timeout: {e}")
+                        logger.error(f"[TWITCH] Error removing timeout: {e}")
 
                 return {
                     "success": True,
@@ -215,7 +215,10 @@ class ModerationService:
         db = SessionLocal()
         try:
             from repositories.blocked_user_repository import BlockedUserRepository
-            return BlockedUserRepository(db).get_blocked_users(user_id, platform)
+            blocked_users = BlockedUserRepository(db).get_by_user_id(user_id)
+            if platform:
+                return [u for u in blocked_users if u.platform == platform]
+            return blocked_users
         finally:
             db.close()
 
