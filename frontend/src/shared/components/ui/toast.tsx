@@ -1,9 +1,8 @@
-import React, { createContext, ReactNode, useCallback, useContext, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext } from 'react';
+import { toast } from 'sonner';
 
-import { AlertCircle, AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
-
-interface Toast {
-    id: number;
+interface ToastOptions {
+    id?: number | string;
     type?: 'success' | 'error' | 'warning' | 'info';
     title?: string;
     message: string;
@@ -12,8 +11,8 @@ interface Toast {
 }
 
 interface ToastContextType {
-    addToast: (toast: Omit<Toast, 'id'>) => number;
-    removeToast: (id: number) => void;
+    addToast: (toast: Omit<ToastOptions, 'id'>) => number | string;
+    removeToast: (id: number | string) => void;
     clearAllToasts: () => void;
 }
 
@@ -27,96 +26,40 @@ export const useToast = () => {
     return context;
 };
 
-interface ToastProps {
-    toast: Toast;
-    onRemove: (id: number) => void;
-}
-
-const Toast: React.FC<ToastProps> = ({ toast, onRemove }) => {
-    const [isLeaving, setIsLeaving] = useState(false);
-
-    const handleRemove = useCallback(() => {
-        setIsLeaving(true);
-        setTimeout(() => {
-            onRemove(toast.id);
-        }, 300); // Animation duration
-    }, [toast.id, onRemove]);
-
-    React.useEffect(() => {
-        if (toast.autoClose !== false) {
-            const timer = setTimeout(handleRemove, toast.duration || 4000);
-            return () => clearTimeout(timer);
-        }
-    }, [handleRemove, toast.autoClose, toast.duration]);
-
-    const getIcon = (): React.ReactNode => {
-        switch (toast.type) {
-            case 'success': return <CheckCircle className="h-5 w-5" />;
-            case 'error': return <AlertCircle className="h-5 w-5" />;
-            case 'warning': return <AlertTriangle className="h-5 w-5" />;
-            case 'info':
-            default: return <Info className="h-5 w-5" />;
-        }
-    };
-
-    const getStyling = (): string => {
-        switch (toast.type) {
-            case 'success': return 'bg-green-600 border-green-500';
-            case 'error': return 'bg-red-600 border-red-500';
-            case 'warning': return 'bg-yellow-600 border-yellow-500';
-            case 'info':
-            default: return 'bg-blue-600 border-blue-500';
-        }
-    };
-
-    return (
-        <div
-            className={`
-                relative flex items-center gap-4 max-w-sm w-full text-white rounded-lg shadow-lg p-4 mb-2
-                transform transition-all duration-300 ease-in-out border
-                ${isLeaving ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
-                ${getStyling()}
-            `}
-        >
-            <div className="flex-shrink-0">
-                {getIcon()}
-            </div>
-            <div className="flex-1">
-                {toast.title && <p className="font-bold">{toast.title}</p>}
-                <p className="text-sm">{toast.message}</p>
-            </div>
-            <button onClick={handleRemove} className="absolute top-1 right-1 p-1 rounded-full hover:bg-white/10">
-                <X className="h-4 w-4" />
-            </button>
-        </div>
-    );
-};
-
 interface ToastProviderProps {
     children: ReactNode;
 }
 
 export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
-    const [toasts, setToasts] = useState<Toast[]>([]);
 
-    const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
-        const id = Date.now() + Math.random();
-        const newToast: Toast = {
-            id,
-            type: 'info',
-            autoClose: true,
-            ...toast,
-        };
-        setToasts(prev => [...prev, newToast]);
-        return id;
+    const addToast = useCallback((options: Omit<ToastOptions, 'id'>) => {
+        const { type = 'info', message, title, duration } = options;
+
+        // Map to sonner
+        const toastFn = type === 'error' ? toast.error :
+            type === 'success' ? toast.success :
+                type === 'warning' ? toast.warning :
+                    type === 'info' ? toast.info : toast;
+
+        // Sonner signature: toast(message, data)
+        // If we have a title, we usually make it the main text and message the description, 
+        // OR we can just join them. 
+        // Best practice for sonner: `toast.success('Title', { description: 'Message' })`
+
+        const toastId = toastFn(title || message, {
+            description: title ? message : undefined,
+            duration: duration || 4000,
+        });
+
+        return toastId;
     }, []);
 
-    const removeToast = useCallback((id: number) => {
-        setToasts(prev => prev.filter(toast => toast.id !== id));
+    const removeToast = useCallback((id: number | string) => {
+        toast.dismiss(id);
     }, []);
 
     const clearAllToasts = useCallback(() => {
-        setToasts([]);
+        toast.dismiss();
     }, []);
 
     const value: ToastContextType = {
@@ -128,15 +71,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     return (
         <ToastContext.Provider value={value}>
             {children}
-            <div className="fixed top-4 right-4 z-50 space-y-2">
-                {toasts.map(toast => (
-                    <Toast
-                        key={toast.id}
-                        toast={toast}
-                        onRemove={removeToast}
-                    />
-                ))}
-            </div>
+            {/* No internal rendering of toasts, App.tsx handles the Toaster */}
         </ToastContext.Provider>
     );
 };

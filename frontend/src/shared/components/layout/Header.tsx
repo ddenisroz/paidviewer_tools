@@ -1,7 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
 import { ChevronDown, LogOut, Settings } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -16,7 +16,7 @@ import { Button } from '../ui/button';
 const Header: React.FC = () => {
     const { user, logout, isAuthenticated, refreshAuthStatus } = useAuth();
     const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
-    const _navigate = useNavigate();
+    const location = useLocation();
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
     // Заголовки страниц
@@ -35,7 +35,7 @@ const Header: React.FC = () => {
     }), []);
 
     const pageTitle = useMemo(() => {
-        const currentPath = window.location.pathname.replace(/\/$/, '') || '/';
+        const currentPath = location.pathname.replace(/\/$/, '') || '/';
 
         if (pageTitles[currentPath as keyof typeof pageTitles] !== undefined) {
             return pageTitles[currentPath as keyof typeof pageTitles];
@@ -52,7 +52,7 @@ const Header: React.FC = () => {
         }
 
         return '';
-    }, [pageTitles]);
+    }, [pageTitles, location.pathname]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

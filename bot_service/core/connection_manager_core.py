@@ -84,7 +84,7 @@ class ConnectionManagerCore:
                 # Если это была последняя сессия канала, запускаем таймер отключения TTS
                 if not sessions:  # Пустое множество
                     del self.active_sessions[channel_name]
-                    logger.info(f"⏱️ [SESSION] Last session removed for {channel_name}, checking TTS disconnect")
+                    logger.info(f"[TIMER] [SESSION] Last session removed for {channel_name}, checking TTS disconnect")
                     self._schedule_tts_disconnect_for_channel(channel_name)
 
                 return True
@@ -109,7 +109,7 @@ class ConnectionManagerCore:
                 ).first()
 
                 if user:
-                    logger.info(f"⏱️ [TTS DISCONNECT] Found user {user.id} for channel {channel_name}")
+                    logger.info(f"[TIMER] [TTS DISCONNECT] Found user {user.id} for channel {channel_name}")
                     self.schedule_tts_disconnect(user.id, channel_name)
                 else:
                     logger.warning(f"[WARN] [TTS DISCONNECT] User not found for channel {channel_name}")
@@ -357,7 +357,7 @@ class ConnectionManagerCore:
 
         task.add_done_callback(cleanup_callback)
 
-        logger.info(f"⏱️ [TTS DISCONNECT] Scheduled TTS disable for user {user_id} ({username}) in {self.reconnect_timeout}s")
+        logger.info(f"[TIMER] [TTS DISCONNECT] Scheduled TTS disable for user {user_id} ({username}) in {self.reconnect_timeout}s")
 
     def cancel_tts_disconnect(self, user_id: int):
         """Отменить запланированное отключение TTS

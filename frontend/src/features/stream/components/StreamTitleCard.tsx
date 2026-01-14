@@ -1,7 +1,7 @@
 ﻿// src/components/StreamTitleCard.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Edit3, Link, Loader, Save, Unlink } from 'lucide-react';
+import { CheckCircle, Edit3, Link, Loader, Save, Unlink } from 'lucide-react';
 
 import { useData } from '@/context/DataContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -356,16 +356,18 @@ const StreamTitleCard: React.FC<StreamTitleCardProps> = ({ onLinkStateChange }) 
                 <div className="p-3 pt-0 flex-shrink-0">
                     <Button
                         onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
-                        disabled={status.saveTitle === 'loading' || !isChanged}
+                        disabled={status.saveTitle === 'loading' || status.saveTitle === 'success' || !isChanged}
                         size="sm"
                         className="w-full flex items-center gap-2"
                     >
                         {status.saveTitle === 'loading' ? (
                             <Loader className="h-4 w-4 animate-spin" />
+                        ) : status.saveTitle === 'success' ? (
+                            <CheckCircle className="h-4 w-4" />
                         ) : (
                             <Save className="h-4 w-4" />
                         )}
-                        {status.saveTitle === 'loading' ? 'Сохранение...' : 'Сохранить'}
+                        {status.saveTitle === 'loading' ? 'Сохранение...' : status.saveTitle === 'success' ? 'Сохранено' : 'Сохранить'}
                     </Button>
                 </div>
             )}

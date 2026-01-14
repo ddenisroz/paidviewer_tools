@@ -23,7 +23,6 @@ interface IntegrationsState {
 
 interface UseChatHistoryOptions {
     isAuthenticated: boolean;
-    isAuthenticated: boolean;
     isConnected: boolean;
     integrationsLoading: boolean;
     integrations: IntegrationsState | null;
@@ -40,24 +39,39 @@ export function useChatHistory({
     onHistoryLoaded
 }: UseChatHistoryOptions): void {
     const loadingRef = useRef<boolean>(false);
+    // Track if we've already attempted to load history this session
+    const hasAttemptedLoadRef = useRef<boolean>(false);
+    // Stable ref for callback to prevent useEffect re-triggers
+    const onHistoryLoadedRef = useRef(onHistoryLoaded);
+    onHistoryLoadedRef.current = onHistoryLoaded;
+
+    // IMPORTANT: Track historyLoaded in ref to avoid stale closure in async loop
+    const historyLoadedRef = useRef(historyLoaded);
+    historyLoadedRef.current = historyLoaded;
 
     useEffect(() => {
         const loadChatHistory = async (): Promise<void> => {
             // Skip if not authenticated
             if (!isAuthenticated) return;
             if (integrationsLoading) return;
-            if (historyLoaded) {
+            if (historyLoadedRef.current) {
                 logger.debug('[CHAT] History already loaded, skipping...');
                 return;
             }
+            // Skip if already loading or already attempted
             if (loadingRef.current) return;
+            if (hasAttemptedLoadRef.current) {
+                logger.debug('[CHAT] Already attempted to load history, skipping...');
+                return;
+            }
 
             // Wait for WebSocket connection
             const maxWaitTime = 2000;
             const checkInterval = 100;
             let elapsedTime = 0;
 
-            while (elapsedTime < maxWaitTime && !historyLoaded) {
+            // Use ref to check current value (not stale closure)
+            while (elapsedTime < maxWaitTime && !historyLoadedRef.current) {
                 if (isConnected) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                     break;
@@ -66,13 +80,14 @@ export function useChatHistory({
                 elapsedTime += checkInterval;
             }
 
-            // Check again after waiting
-            if (historyLoaded) {
+            // Check again after waiting - use ref for real-time value
+            if (historyLoadedRef.current) {
                 logger.debug('[CHAT] History already loaded via WebSocket, skipping API load...');
                 return;
             }
 
             loadingRef.current = true;
+            hasAttemptedLoadRef.current = true;
 
             try {
                 logger.info('[CHAT] Loading chat history from API (WebSocket fallback)...');
@@ -88,7 +103,7 @@ export function useChatHistory({
                     };
 
                     logger.info(`[CHAT] Loaded ${data.messages.length} messages from history (API fallback)`);
-                    onHistoryLoaded(data.messages, platformFilter);
+                    onHistoryLoadedRef.current(data.messages, platformFilter);
                 } else {
                     logger.debug('[CHAT] No messages in history response');
                 }
@@ -100,5 +115,7 @@ export function useChatHistory({
         };
 
         loadChatHistory();
-    }, [isAuthenticated, integrationsLoading, isConnected, integrations, historyLoaded, onHistoryLoaded]);
+        // Removed onHistoryLoaded from deps - using ref instead to prevent re-triggers
+    }, [isAuthenticated, integrationsLoading, isConnected, integrations, historyLoaded]);
 }
+

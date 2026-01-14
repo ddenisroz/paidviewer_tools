@@ -22,9 +22,11 @@ class StreamInfoService:
         """
         Get stream info and update session tracking.
         """
+        logger.info(f"[STREAM_INFO] Getting stream info for user_id={user_id}, platform={platform_name}")
+        
         platform = platform_registry.get(platform_name)
         if not platform:
-            logger.warning(f"Platform {platform_name} not found")
+            logger.warning(f"[STREAM_INFO] Platform {platform_name} not found")
             return self._empty_info()
 
         # Get stream status from platform
@@ -38,16 +40,20 @@ class StreamInfoService:
         from repositories.user_repository import UserRepository
         user = UserRepository(self.db).get(user_id)
         if not user:
-             return self._empty_info()
+            logger.warning(f"[STREAM_INFO] User {user_id} not found in database")
+            return self._empty_info()
         
         username = None
         if platform_name == 'twitch':
             username = user.twitch_username
+            logger.info(f"[STREAM_INFO] Twitch username: {username}")
         elif platform_name == 'vk':
             username = user.vk_channel_name or user.vk_username # VKPlatform uses channel name
+            logger.info(f"[STREAM_INFO] VK username: {username}")
             
         if not username:
-             return self._empty_info()
+            logger.warning(f"[STREAM_INFO] No username found for user {user_id} on platform {platform_name}")
+            return self._empty_info()
 
         # Fetch Info
         # VKPlatform has get_stream_status_for_user(user_id) which handles tokens better.
@@ -55,53 +61,63 @@ class StreamInfoService:
         stream_info = None
         
         if hasattr(platform, 'get_stream_status_for_user'):
-             stream_info = await platform.get_stream_status_for_user(user_id)
+            stream_info = await platform.get_stream_status_for_user(user_id)
+            logger.info(f"[STREAM_INFO] get_stream_status_for_user result: {stream_info}")
         else:
-             stream_info = await platform.get_stream_status(username)
+            stream_info = await platform.get_stream_status(username)
+            logger.info(f"[STREAM_INFO] get_stream_status result: {stream_info}")
 
         is_live = stream_info is not None and (stream_info.get('is_live') or stream_info.get('online') or stream_info.get('type') == 'live')
+        logger.info(f"[STREAM_INFO] is_live: {is_live}")
         
         # Get Channel Info (title, game) if stream_info doesn't have it fully or we want offline info
         channel_info = None
         if not stream_info: # If offline, we still want title/game
-             channel_info = await platform.get_channel_info(username)
+            logger.info(f"[STREAM_INFO] Stream offline, fetching channel_info for {username}")
+            channel_info = await platform.get_channel_info(username)
+            logger.info(f"[STREAM_INFO] channel_info result: {channel_info}")
         
         # Unify Result
         result = self._empty_info()
         
         if stream_info:
-             result.update(stream_info)
-             result['is_live'] = True
-             result['viewers'] = stream_info.get('viewer_count', 0)
+            result.update(stream_info)
+            result['is_live'] = True
+            result['viewers'] = stream_info.get('viewer_count', 0)
+            logger.info(f"[STREAM_INFO] Using stream_info, title: {result.get('title')}")
         elif channel_info:
-             result.update(channel_info)
+            result.update(channel_info)
+            logger.info(f"[STREAM_INFO] Using channel_info, title: {result.get('title')}")
+        else:
+            logger.warning(f"[STREAM_INFO] No stream_info or channel_info available")
              
         # Session Tracking logic
         title = result.get('title', "")
         
         if is_live and username:
-             self.session_service.get_or_create_active_session(
+            self.session_service.get_or_create_active_session(
                 user_id=user_id,
                 session_id=session_id,
                 channel_name=username.lower(),
                 platform=platform_name,
                 title=title
-             )
+            )
         elif not is_live and username:
-             self.session_service.end_session(
+            self.session_service.end_session(
                 user_id=user_id,
                 session_id=session_id,
                 channel_name=username.lower(),
                 platform=platform_name
-             )
+            )
              
         # Normalize keys for Frontend
         # Frontend expects: is_live, title, category, viewers, etc.
         # VK returns 'category' object or 'category_id'. Twitch returns 'game_name', 'game_id'.
         
         if platform_name == 'twitch':
-             result['game'] = result.get('game_name') # Frontend expects 'game'
+            result['game'] = result.get('game_name') # Frontend expects 'game'
         
+        logger.info(f"[STREAM_INFO] Final result: title={result.get('title')}, game={result.get('game')}, is_live={result.get('is_live')}")
         return result
 
     async def update_stream(self, user_id: int, platform_name: str, title: Optional[str] = None, category_id: Optional[str] = None) -> bool:

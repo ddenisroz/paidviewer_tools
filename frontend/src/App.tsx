@@ -7,7 +7,8 @@ import AppErrorBoundary from '@/shared/components/ErrorBoundary/AppErrorBoundary
 import RouteErrorBoundary from '@/shared/components/ErrorBoundary/RouteErrorBoundary';
 import { ConnectionStatus } from '@/shared/components/layout/ConnectionStatus';
 import Layout from '@/shared/components/layout/Layout';
-import { AdminSkeleton, DashboardSkeleton, FormSkeleton, PageSkeleton } from '@/shared/components/ui/PageSkeleton';
+// Minimal loading - no skeletons, pages appear instantly
+const MinimalFallback = () => <div className="min-h-screen" />;
 import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 
 // Critical pages - загружаем сразу (только auth flow)
@@ -45,7 +46,7 @@ const App: React.FC = () => {
 
             {/* Toast Manager - top-right, legacy position */}
             <Toaster
-                position="top-right"
+                position="bottom-right"
                 richColors
                 expand={true}
                 visibleToasts={3}
@@ -129,7 +130,7 @@ const App: React.FC = () => {
                     } />
                     <Route path="/chat-window" element={
                         <RouteErrorBoundary routeName="Chat Window">
-                            <Suspense fallback={<PageSkeleton />}>
+                            <Suspense fallback={<MinimalFallback />}>
                                 <ChatWindow />
                             </Suspense>
                         </RouteErrorBoundary>
@@ -143,7 +144,7 @@ const App: React.FC = () => {
                             {/* Dashboard - main page */}
                             <Route path="dashboard" element={
                                 <RouteErrorBoundary routeName="Dashboard">
-                                    <Suspense fallback={<DashboardSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <HomePage />
                                     </Suspense>
                                 </RouteErrorBoundary>
@@ -152,21 +153,21 @@ const App: React.FC = () => {
                             {/* TTS Routes */}
                             <Route path="dashboard/tts" element={
                                 <RouteErrorBoundary routeName="TTS">
-                                    <Suspense fallback={<PageSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <TtsMainPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/tts/voices" element={
                                 <RouteErrorBoundary routeName="Voice Management">
-                                    <Suspense fallback={<PageSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <VoiceManagementPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/tts/local" element={
                                 <RouteErrorBoundary routeName="Local TTS Settings">
-                                    <Suspense fallback={<FormSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <LocalTTSSettingsPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
@@ -175,7 +176,7 @@ const App: React.FC = () => {
                             {/* Settings */}
                             <Route path="dashboard/settings" element={
                                 <RouteErrorBoundary routeName="Settings">
-                                    <Suspense fallback={<FormSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <SettingsPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
@@ -184,21 +185,21 @@ const App: React.FC = () => {
                             {/* Media Routes */}
                             <Route path="dashboard/youtube" element={
                                 <RouteErrorBoundary routeName="YouTube">
-                                    <Suspense fallback={<PageSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <YoutubeIntegrationPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/points" element={
                                 <RouteErrorBoundary routeName="Points">
-                                    <Suspense fallback={<PageSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <PointsManagementPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/drops" element={
                                 <RouteErrorBoundary routeName="Drops">
-                                    <Suspense fallback={<PageSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <DropsMainPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
@@ -207,14 +208,14 @@ const App: React.FC = () => {
                             {/* Analytics & Commands */}
                             <Route path="dashboard/chat-analysis" element={
                                 <RouteErrorBoundary routeName="Analytics">
-                                    <Suspense fallback={<PageSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AnalyticsPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/commands" element={
                                 <RouteErrorBoundary routeName="Commands">
-                                    <Suspense fallback={<PageSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <CommandsPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
@@ -223,49 +224,49 @@ const App: React.FC = () => {
                             {/* Admin Routes */}
                             <Route path="dashboard/dolbaebadmintts" element={
                                 <RouteErrorBoundary routeName="Admin">
-                                    <Suspense fallback={<AdminSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/dolbaebadmintts/sessions" element={
                                 <RouteErrorBoundary routeName="Admin Sessions">
-                                    <Suspense fallback={<AdminSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/dolbaebadmintts/users" element={
                                 <RouteErrorBoundary routeName="Admin Users">
-                                    <Suspense fallback={<AdminSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/dolbaebadmintts/bots" element={
                                 <RouteErrorBoundary routeName="Admin Bots">
-                                    <Suspense fallback={<AdminSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/dolbaebadmintts/monitoring" element={
                                 <RouteErrorBoundary routeName="Admin Monitoring">
-                                    <Suspense fallback={<AdminSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/dolbaebadmintts/blocked-channels" element={
                                 <RouteErrorBoundary routeName="Admin Blocked Channels">
-                                    <Suspense fallback={<AdminSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
                             <Route path="dashboard/dolbaebadmintts/support" element={
                                 <RouteErrorBoundary routeName="Admin Support">
-                                    <Suspense fallback={<AdminSkeleton />}>
+                                    <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>
                                 </RouteErrorBoundary>

@@ -478,15 +478,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             for (const response of responses) {
                 let categoryData: StreamCategory[] = [];
 
-                const responseData = response as { data?: { categories?: StreamCategory[] } | StreamCategory[] };
-                if (platform === 'vk' && responseData.data && typeof responseData.data === 'object' && 'categories' in responseData.data) {
-                    categoryData = Array.isArray(responseData.data.categories) ? responseData.data.categories : [];
-                } else if (platform === 'twitch' && responseData.data && typeof responseData.data === 'object' && 'categories' in responseData.data) {
-                    categoryData = Array.isArray(responseData.data.categories) ? responseData.data.categories : [];
-                } else if (responseData.data && Array.isArray(responseData.data)) {
-                    categoryData = responseData.data;
-                } else if (responseData.data && typeof responseData.data === 'object') {
-                    categoryData = Array.isArray(responseData.data) ? responseData.data : [];
+                // API returns {"categories": [...]} directly in response.data
+                // So response here is already the unwrapped data object
+                const responseObj = response as { categories?: StreamCategory[] };
+                if (responseObj.categories && Array.isArray(responseObj.categories)) {
+                    categoryData = responseObj.categories;
+                } else if (Array.isArray(response)) {
+                    categoryData = response as StreamCategory[];
                 }
 
                 categoryData.forEach(cat => {

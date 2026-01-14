@@ -325,7 +325,7 @@ const Sidebar: React.FC = () => {
                     <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
                         <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
                             <span className="text-xl font-bold text-green-400 font-mono tracking-wider whitespace-nowrap">
-                                Payedviewer
+                                Payedviewer tools
                             </span>
                         </NavLink>
                     </div>

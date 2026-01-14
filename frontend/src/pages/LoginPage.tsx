@@ -44,7 +44,7 @@ const LoginPage: React.FC = () => {
     const [subtitleText, setSubtitleText] = useState<string>('');
     const [subtitleVisible, setSubtitleVisible] = useState<boolean>(false);
     const [currentFeatureIndex, setCurrentFeatureIndex] = useState<number>(0);
-    const fullTitle = 'Payedviewer_';
+    const fullTitle = 'Payedviewer tools';
     const features = ['TTS озвучка', 'Медиа запросы', 'Анализ чата'];
 
     useEffect(() => {

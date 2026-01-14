@@ -23,14 +23,14 @@ const CookieConsent: React.FC = () => {
         <div className="fixed bottom-4 left-4 z-50 max-w-xs">
             <div className="relative bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3 shadow-2xl animate-in slide-in-from-left-4 duration-500">
                 {/* Иконка печенья */}
-                <div className="absolute -top-2 -right-2">
-                    <div className="bg-amber-500/20 rounded-full px-2 py-1 flex items-center justify-center">
-                        <span className="text-amber-400 text-xs whitespace-nowrap">COOKIE</span>
+                <div className="absolute -top-5 -right-2">
+                    <div className="bg-amber-500/20 rounded-full px-2 py-1 flex items-center justify-center border border-amber-500/30">
+                        <span className="text-amber-400 text-[10px] font-bold tracking-wider">COOKIE</span>
                     </div>
                 </div>
 
                 {/* Контент */}
-                <div>
+                <div className="pr-2 pt-1">
                     <p className="text-xs text-muted-foreground leading-relaxed mb-3">
                         Сайт использует Cookies для передачи данных об авторизации на сервер.
                     </p>

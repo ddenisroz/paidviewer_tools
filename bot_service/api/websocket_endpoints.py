@@ -191,7 +191,7 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
         await manager.remove_connection(conn_id)
         
         # Schedule TTS disconnect if no other connections remain
-        remaining = manager.get_active_connections(user_id_int)
+        remaining = manager.get_user_connections(user_id_int)
         if not remaining:
             logger.info(f"[WS] No active connections for {user_id}, scheduling TTS disconnect")
             await _schedule_tts_disconnect(user_id_int)

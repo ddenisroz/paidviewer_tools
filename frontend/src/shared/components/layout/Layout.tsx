@@ -1,5 +1,8 @@
-﻿import { Outlet } from 'react-router-dom';
+﻿import { useEffect } from 'react';
 
+import { Outlet, useNavigate } from 'react-router-dom';
+
+import { useAuth } from '@/context/AuthContext';
 import { DataProvider } from '@/context/DataContext';
 import { DonationAlertsProvider } from '@/context/DonationAlertsContext';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
@@ -23,11 +26,36 @@ const LayoutProviders = composeProviders(
 // Внутренний компонент для использования usePlayer
 const LayoutContent: React.FC = () => {
   const { isVisible, isTheaterMode } = usePlayer();
+  const { isAuthenticated, isCheckingAuth } = useAuth();
+  const navigate = useNavigate();
   const currentPath = window.location.pathname;
   const isOnYoutubePage = currentPath.includes('/dashboard/youtube');
 
+  // 🔒 Auth Guard: Redirect to login if session expired
+  useEffect(() => {
+    // Wait for auth check to complete
+    if (!isCheckingAuth && !isAuthenticated) {
+      // Session expired or user not logged in - redirect to login
+      navigate('/login', { replace: true });
+    }
+  }, [isAuthenticated, isCheckingAuth, navigate]);
+
   // Показываем отступ снизу только если плеер виден и не на странице YouTube
   const showPlayerPadding = isVisible && !isTheaterMode && !isOnYoutubePage;
+
+  // Show loading while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/40">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Don't render content if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="grid min-h-screen w-full grid-cols-1 md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">

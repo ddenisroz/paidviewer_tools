@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional
+import time
 
 from auth.auth import get_current_user, get_current_user_optional
 from core.database import get_db
@@ -18,6 +19,28 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["stream-info"])
+
+# Simple in-memory cache for stream info (30 second TTL)
+# Key: (user_id, platform) -> (data, timestamp)
+_stream_info_cache: dict[tuple[int, str], tuple[dict, float]] = {}
+STREAM_INFO_CACHE_TTL = 30  # seconds
+
+def _get_cached_stream_info(user_id: int, platform: str) -> Optional[dict]:
+    """Get cached stream info if not expired"""
+    key = (user_id, platform)
+    if key in _stream_info_cache:
+        data, timestamp = _stream_info_cache[key]
+        if time.time() - timestamp < STREAM_INFO_CACHE_TTL:
+            logger.debug(f"[STREAM_INFO] Cache HIT for user {user_id}, platform {platform}")
+            return data
+        else:
+            del _stream_info_cache[key]
+    return None
+
+def _set_cached_stream_info(user_id: int, platform: str, data: dict) -> None:
+    """Cache stream info with timestamp"""
+    _stream_info_cache[(user_id, platform)] = (data, time.time())
+    logger.debug(f"[STREAM_INFO] Cached data for user {user_id}, platform {platform}")
 
 def get_stream_service(db: Session = Depends(get_db)) -> StreamInfoService:
     return StreamInfoService(db)
@@ -40,16 +63,25 @@ async def get_twitch_stream_info(
     user: dict = Depends(get_current_user),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Получить детальную информацию о Twitch стриме"""
+    """Получить детальную информацию о Twitch стриме (cached for 30s)"""
     try:
         user_id = user.get("id")
         session_id = user.get("session_id")
         
+        # Check cache first
+        cached = _get_cached_stream_info(user_id, "twitch")
+        if cached:
+            return JSONResponse(content={"data": cached})
+        
         info = await service.get_stream_info(user_id, "twitch", session_id)
-        return JSONResponse(content=info)
+        
+        # Cache result
+        _set_cached_stream_info(user_id, "twitch", info)
+        
+        return JSONResponse(content={"data": info})
     except Exception as e:
         logger.error(f"Error getting Twitch stream info: {e}")
-        return JSONResponse(content=service._empty_info(), status_code=500)
+        return JSONResponse(content={"data": service._empty_info()}, status_code=500)
 
 @router.get("/vk/stream-info")
 async def get_vk_stream_info(
@@ -68,10 +100,10 @@ async def get_vk_stream_info(
         # StreamInfoService doesn't explicitly fetch description unless platform returns it.
         # But VK platform get_stream_info usually includes everything.
         
-        return JSONResponse(content=info)
+        return JSONResponse(content={"data": info})
     except Exception as e:
         logger.error(f"Error getting VK stream info: {e}")
-        return JSONResponse(content=service._empty_info(), status_code=500)
+        return JSONResponse(content={"data": service._empty_info()}, status_code=500)
 
 @router.post("/stream/update")
 async def update_stream(

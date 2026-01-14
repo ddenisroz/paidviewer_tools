@@ -175,7 +175,8 @@ export function useChatWebSocket({
             case 'ping':
             case 'pong':
             case 'chatbox_settings_updated':
-                // Ignore these message types
+            case 'state_reconciliation_required':
+                // Ignore these message types (handled elsewhere or not needed here)
                 break;
 
             default:
