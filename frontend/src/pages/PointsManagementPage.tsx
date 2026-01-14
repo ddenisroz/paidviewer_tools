@@ -76,11 +76,11 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
             }
 
             await pointsApi.deleteReward(platform, String(reward.id));
-            toast.success('������� �������');
+            toast.success('Награда удалена');
             onRefresh();
         } catch (err) {
             logger.error('Error deleting reward:', err);
-            const errorMessage = err instanceof Error ? err.message : '������ �������� �������';
+            const errorMessage = err instanceof Error ? err.message : 'Ошибка удаления награды';
             toast.error(errorMessage);
         } finally {
             setDeleting(false);
@@ -113,7 +113,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
                         <h3 className="text-lg font-semibold mb-1 line-clamp-2">{reward.title || reward.name}</h3>
                         {platform === 'vk' && (
                             <Badge variant={reward.is_enabled ? 'default' : 'secondary'} className="text-xs">
-                                {reward.is_enabled ? '? �������' : '0 ���������'}
+                                {reward.is_enabled ? 'ВКЛ' : 'ВЫКЛ'}
                             </Badge>
                         )}
                     </div>
@@ -137,7 +137,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
                 <div className="flex gap-2 pt-3 border-t border-border">
                     <Button variant="outline" size="sm" onClick={onEdit} className="flex-1 h-9">
                         <Edit className="w-4 h-4 mr-2" />
-                        ��������
+                        Изменить
                     </Button>
 
                     {platform === 'vk' && (
@@ -153,12 +153,12 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
                             ) : reward.is_enabled ? (
                                 <>
                                     <PowerOff className="w-4 h-4 mr-2" />
-                                    ����
+                                    Выкл
                                 </>
                             ) : (
                                 <>
                                     <Power className="w-4 h-4 mr-2" />
-                                    ���
+                                    Вкл
                                 </>
                             )}
                         </Button>
@@ -233,7 +233,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
 
     const handleSubmit = async (): Promise<void> => {
         if (!formData.title.trim()) {
-            toast.error('������� �������� �������');
+            toast.error('Введите название награды');
             return;
         }
 
@@ -273,10 +273,10 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
 
             if (reward) {
                 await pointsApi.updateReward(platform, String(reward.id), rewardData);
-                toast.success('������� ���������');
+                toast.success('Награда обновлена');
             } else {
                 await pointsApi.createReward(platform, rewardData);
-                toast.success('������� �������');
+                toast.success('Награда создана');
             }
 
             onSuccess();
@@ -291,38 +291,38 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
         <Dialog open={open} onOpenChange={onClose}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{reward ? '������������� �������' : '������� �������'}</DialogTitle>
+                    <DialogTitle>{reward ? 'Редактировать награду' : 'Создать награду'}</DialogTitle>
                     <DialogDescription>
-                        {reward ? '�������� ��������� �������' : '������� ��������� ����� �������'}
+                        {reward ? 'Измените параметры награды' : 'Заполните параметры новой награды'}
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
                     <div>
-                        <Label htmlFor="title" className="text-sm">��������</Label>
+                        <Label htmlFor="title" className="text-sm">Название</Label>
                         <Input
                             id="title"
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            placeholder="��������: �����������"
+                            placeholder="Например: Подписка"
                             className="h-9"
                         />
                     </div>
 
                     <div>
-                        <Label htmlFor="description" className="text-sm">�������� (�����������)</Label>
+                        <Label htmlFor="description" className="text-sm">Описание (опционально)</Label>
                         <Textarea
                             id="description"
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            placeholder="��� ������� ������� �� ��� �������?"
+                            placeholder="Что делает эта награда или зачем её покупать?"
                             rows={2}
                             className="text-sm resize-none"
                         />
                     </div>
 
                     <div>
-                        <Label htmlFor="cost" className="text-sm">���������</Label>
+                        <Label htmlFor="cost" className="text-sm">Стоимость</Label>
                         <Input
                             id="cost"
                             type="number"
@@ -332,14 +332,14 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                             className="h-9"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                            {platform === 'twitch' ? 'Channel Points' : '����� VK Live'}
+                            {platform === 'twitch' ? 'Channel Points' : 'Баллы VK Live'}
                         </p>
                     </div>
 
                     {platform === 'vk' && (
                         <>
                             <div>
-                                <Label htmlFor="repair_timeout" className="text-sm">������� (�������)</Label>
+                                <Label htmlFor="repair_timeout" className="text-sm">Таймаут (секунды)</Label>
                                 <Input
                                     id="repair_timeout"
                                     type="number"
@@ -347,16 +347,16 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                     value={formData.repair_timeout}
                                     onChange={(e) => setFormData({ ...formData, repair_timeout: e.target.value })}
                                     className="h-9"
-                                    placeholder="0 = ��� ��������"
+                                    placeholder="0 = без таймаута"
                                 />
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    ����� �������������� ������� (0 = ��� �����������)
+                                    Время до повторного использования награды (0 = без таймаута)
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <Label htmlFor="max_uses_count" className="text-sm">����. �������������</Label>
+                                    <Label htmlFor="max_uses_count" className="text-sm">Макс. использований</Label>
                                     <Input
                                         id="max_uses_count"
                                         type="number"
@@ -364,15 +364,15 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                         value={formData.max_uses_count}
                                         onChange={(e) => setFormData({ ...formData, max_uses_count: e.target.value })}
                                         className="h-9"
-                                        placeholder="0 = ��� ������"
+                                        placeholder="0 = без лимита"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        ����� (0 = ?)
+                                        Всего (0 = без лимита)
                                     </p>
                                 </div>
 
                                 <div>
-                                    <Label htmlFor="max_uses_count_per_user" className="text-sm">����. �� �����</Label>
+                                    <Label htmlFor="max_uses_count_per_user" className="text-sm">Макс. на зрителя</Label>
                                     <Input
                                         id="max_uses_count_per_user"
                                         type="number"
@@ -380,10 +380,10 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                         value={formData.max_uses_count_per_user}
                                         onChange={(e) => setFormData({ ...formData, max_uses_count_per_user: e.target.value })}
                                         className="h-9"
-                                        placeholder="0 = ��� ������"
+                                        placeholder="0 = без лимита"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        �� 1 �������� (0 = ?)
+                                        На 1 зрителя (0 = без лимита)
                                     </p>
                                 </div>
                             </div>
@@ -397,7 +397,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                     className="w-4 h-4 rounded border-gray-300"
                                 />
                                 <Label htmlFor="is_message_required" className="text-sm cursor-pointer">
-                                    ��������� ��������� �� �������
+                                    Требуется сообщение от пользователя
                                 </Label>
                             </div>
                         </>
@@ -406,7 +406,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                     {platform === 'twitch' && (
                         <>
                             <div>
-                                <Label htmlFor="global_cooldown_seconds" className="text-sm">���������� ������� (�������)</Label>
+                                <Label htmlFor="global_cooldown_seconds" className="text-sm">Глобальный кулдаун (сек)</Label>
                                 <Input
                                     id="global_cooldown_seconds"
                                     type="number"
@@ -414,16 +414,16 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                     value={formData.global_cooldown_seconds}
                                     onChange={(e) => setFormData({ ...formData, global_cooldown_seconds: e.target.value })}
                                     className="h-9"
-                                    placeholder="0 = ��� ��������"
+                                    placeholder="0 = без кулдауна"
                                 />
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    ����� �������� ����� ����������� (0 = ��� �����������)
+                                    Время, после которого награда снова станет доступна (0 = без кулдауна)
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <Label htmlFor="max_per_stream" className="text-sm">����. �� �����</Label>
+                                    <Label htmlFor="max_per_stream" className="text-sm">Макс. за стрим</Label>
                                     <Input
                                         id="max_per_stream"
                                         type="number"
@@ -431,15 +431,15 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                         value={formData.max_per_stream}
                                         onChange={(e) => setFormData({ ...formData, max_per_stream: e.target.value })}
                                         className="h-9"
-                                        placeholder="0 = ��� ������"
+                                        placeholder="0 = без лимита"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        ����� �� ����� (0 = ?)
+                                        Всего за стрим (0 = без лимита)
                                     </p>
                                 </div>
 
                                 <div>
-                                    <Label htmlFor="max_per_user_per_stream" className="text-sm">����. �� ����� �� �����</Label>
+                                    <Label htmlFor="max_per_user_per_stream" className="text-sm">Макс. на зрителя за стрим</Label>
                                     <Input
                                         id="max_per_user_per_stream"
                                         type="number"
@@ -447,10 +447,10 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                         value={formData.max_per_user_per_stream}
                                         onChange={(e) => setFormData({ ...formData, max_per_user_per_stream: e.target.value })}
                                         className="h-9"
-                                        placeholder="0 = ��� ������"
+                                        placeholder="0 = без лимита"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        �� 1 �������� �� ����� (0 = ?)
+                                        На 1 зрителя за стрим (0 = без лимита)
                                     </p>
                                 </div>
                             </div>
@@ -464,7 +464,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                     className="w-4 h-4 rounded border-gray-300"
                                 />
                                 <Label htmlFor="should_redemptions_skip_request_queue" className="text-sm cursor-pointer">
-                                    �������������� ���������� (��� �������)
+                                    Автоматически выполнять (без очереди)
                                 </Label>
                             </div>
                         </>
@@ -473,11 +473,11 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
 
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>
-                        ������
+                        Отмена
                     </Button>
                     <Button onClick={handleSubmit} disabled={saving}>
                         {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                        {reward ? '���������' : '�������'}
+                        {reward ? 'Сохранить' : 'Создать'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -485,7 +485,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
     );
 };
 
-// ���� ��� API �������
+// Типы для API ответов
 interface RewardsResponse {
     rewards?: PlatformReward[];
 }
@@ -546,7 +546,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             }
         } catch (err) {
             logger.error('Error loading redemptions:', err);
-            toast.error('�� ������� ��������� ������� ��������');
+            toast.error('Не удалось загрузить награды');
             setRedemptions([]);
         } finally {
             setLoading(false);
@@ -561,7 +561,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         setProcessing(prev => new Set(prev).add(redemptionId));
         try {
             await pointsApi.processVKDemands('accept', [redemptionId]);
-            toast.success('������� �������');
+            toast.success('Награда принята');
             setRedemptions(prev => prev.filter(d => d.id !== redemptionId));
             setSelectedItems(prev => {
                 const next = new Set(prev);
@@ -570,7 +570,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             });
         } catch (err: unknown) {
             logger.error('Error accepting redemption:', err);
-            toast.error('������ �������� �������');
+            toast.error('Ошибка принятия награды');
         } finally {
             setProcessing(prev => {
                 const next = new Set(prev);
@@ -584,7 +584,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         setProcessing(prev => new Set(prev).add(redemptionId));
         try {
             await pointsApi.processVKDemands('reject', [redemptionId]);
-            toast.success('������� ���������');
+            toast.success('Награда отклонена');
             setRedemptions(prev => prev.filter(d => d.id !== redemptionId));
             setSelectedItems(prev => {
                 const next = new Set(prev);
@@ -593,7 +593,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             });
         } catch (err: unknown) {
             logger.error('Error rejecting redemption:', err);
-            toast.error('������ ���������� �������');
+            toast.error('Ошибка отклонения награды');
         } finally {
             setProcessing(prev => {
                 const next = new Set(prev);
@@ -610,12 +610,12 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         setProcessing(prev => new Set([...prev, ...ids]));
         try {
             await pointsApi.processVKDemands('accept', ids);
-            toast.success(`������� ������: ${ids.length}`);
+            toast.success(`Принято наград: ${ids.length}`);
             setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
             setSelectedItems(new Set());
         } catch (err: unknown) {
             logger.error('Error bulk accepting:', err);
-            toast.error('������ ��������� ��������');
+            toast.error('Ошибка принятия наград');
         } finally {
             setProcessing(prev => {
                 const next = new Set(prev);
@@ -632,12 +632,12 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         setProcessing(prev => new Set([...prev, ...ids]));
         try {
             await pointsApi.processVKDemands('reject', ids);
-            toast.success(`��������� ������: ${ids.length}`);
+            toast.success(`Отклонено наград: ${ids.length}`);
             setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
             setSelectedItems(new Set());
         } catch (err: unknown) {
             logger.error('Error bulk rejecting:', err);
-            toast.error('������ ��������� ����������');
+            toast.error('Ошибка отклонения наград');
         } finally {
             setProcessing(prev => {
                 const next = new Set(prev);
@@ -654,9 +654,9 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         const rewardTitle = (rewardData?.name || rewardData?.title || '').toLowerCase();
 
         if (filterType === 'tts') {
-            return rewardTitle.includes('�������') || rewardTitle.includes('tts') || rewardTitle.includes('�����');
+            return rewardTitle.includes('голос') || rewardTitle.includes('tts') || rewardTitle.includes('озвучка');
         } else {
-            return !rewardTitle.includes('�������') && !rewardTitle.includes('tts') && !rewardTitle.includes('�����');
+            return !rewardTitle.includes('голос') && !rewardTitle.includes('tts') && !rewardTitle.includes('озвучка');
         }
     });
 
@@ -675,10 +675,10 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                     <CardContent className="py-12 text-center">
                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
                         <p className="text-sm text-muted-foreground">
-                            ��� ��������� ��������
+                            Нет активных запросов
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            ����� ������� ���������� �������, ��� �������� �����
+                            Когда зрители активируют награды, они появятся здесь
                         </p>
                     </CardContent>
                 </Card>
@@ -693,15 +693,15 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                         <div className="flex items-center gap-3 flex-wrap">
                             <div className="flex items-center gap-2">
-                                <Label className="text-sm font-medium whitespace-nowrap">������:</Label>
+                                <Label className="text-sm font-medium whitespace-nowrap">Фильтр:</Label>
                                 <Select value={filterType} onValueChange={(value) => setFilterType(value as 'all' | 'tts' | 'other')}>
                                     <SelectTrigger className="w-[160px] h-9">
-                                        <SelectValue placeholder="�������� ������" />
+                                        <SelectValue placeholder="Выберите фильтр" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">��� �������</SelectItem>
-                                        <SelectItem value="tts">TTS �������</SelectItem>
-                                        <SelectItem value="other">������</SelectItem>
+                                        <SelectItem value="all">Все награды</SelectItem>
+                                        <SelectItem value="tts">TTS награды</SelectItem>
+                                        <SelectItem value="other">Прочие</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -711,7 +711,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                     <div className="h-6 w-px bg-gray-700" />
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-muted-foreground whitespace-nowrap">
-                                            �������: <span className="font-semibold text-foreground">{filteredRedemptions.length}</span>
+                                            Найдено: <span className="font-semibold text-foreground">{filteredRedemptions.length}</span>
                                         </span>
                                         <Button
                                             size="sm"
@@ -726,7 +726,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                             }}
                                             className="whitespace-nowrap"
                                         >
-                                            {filteredRedemptions.every(d => selectedItems.has(d.id)) ? '����� ��' : '�������� ��'}
+                                            {filteredRedemptions.every(d => selectedItems.has(d.id)) ? 'Снять все' : 'Выбрать все'}
                                         </Button>
                                     </div>
                                 </>
@@ -736,7 +736,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         {selectedItems.size > 0 && (
                             <div className="flex items-center gap-2 flex-wrap">
                                 <div className="px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20">
-                                    <span className="text-sm font-medium text-primary">�������: {selectedItems.size}</span>
+                                    <span className="text-sm font-medium text-primary">Выбрано: {selectedItems.size}</span>
                                 </div>
                                 <Button
                                     size="sm"
@@ -746,7 +746,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                     className="whitespace-nowrap"
                                 >
                                     <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                                    ������� ({selectedItems.size})
+                                    Принять ({selectedItems.size})
                                 </Button>
                                 <Button
                                     size="sm"
@@ -756,7 +756,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                     className="whitespace-nowrap"
                                 >
                                     <XCircle className="w-4 h-4 mr-1.5" />
-                                    ��������� ({selectedItems.size})
+                                    Отклонить ({selectedItems.size})
                                 </Button>
                             </div>
                         )}
@@ -769,7 +769,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                     <CardContent className="py-12 text-center">
                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
                         <p className="text-sm text-muted-foreground">
-                            ��� �������� �� ���������� �������
+                            Нет запросов по выбранному фильтру
                         </p>
                     </CardContent>
                 </Card>
@@ -777,9 +777,9 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {filteredRedemptions.map((demand, index) => {
                         const rewardData = rewardsMap.get(demand.reward?.id || '');
-                        const rewardTitle = rewardData?.name || rewardData?.title || '����������� �������';
+                        const rewardTitle = rewardData?.name || rewardData?.title || 'Неизвестная награда';
                         const rewardCost = rewardData?.price || rewardData?.cost || 0;
-                        const isTtsReward = rewardTitle.toLowerCase().includes('�������') || rewardTitle.toLowerCase().includes('tts') || rewardTitle.toLowerCase().includes('�����');
+                        const isTtsReward = rewardTitle.toLowerCase().includes('голос') || rewardTitle.toLowerCase().includes('tts') || rewardTitle.toLowerCase().includes('озвучка');
 
                         let message = '';
                         if (Array.isArray(demand.message_parts) && demand.message_parts.length > 0) {
@@ -805,7 +805,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
 
                         const isSelected = selectedItems.has(demand.id);
                         const isProcessing = processing.has(demand.id);
-                        const userName = demand.user?.nick || demand.user?.name || '������������';
+                        const userName = demand.user?.nick || demand.user?.name || 'Пользователь';
                         const timestamp = demand.created_at ? new Date(typeof demand.created_at === 'number' ? demand.created_at * 1000 : new Date(demand.created_at).getTime()).toLocaleString('ru-RU', {
                             day: '2-digit',
                             month: '2-digit',
@@ -813,7 +813,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                             hour: '2-digit',
                             minute: '2-digit',
                             second: '2-digit'
-                        }) : '����������';
+                        }) : 'Неизвестно';
 
                         return (
                             <Card
@@ -864,7 +864,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                     {rewardTitle}
                                                 </Badge>
                                                 <Badge variant="secondary" className="text-xs font-mono bg-blue-600/20 text-blue-300 border-blue-600/30">
-                                                    {rewardCost} ������
+                                                    {rewardCost} баллов������
                                                 </Badge>
                                             </div>
 
@@ -901,7 +901,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                 ) : (
                                                     <>
                                                         <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                                                        �������
+                                                        Принять�������
                                                     </>
                                                 )}
                                             </Button>
@@ -916,7 +916,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                 className="min-w-[100px] h-9"
                                             >
                                                 <XCircle className="w-4 h-4 mr-1.5" />
-                                                ���������
+                                                Отклонить���������
                                             </Button>
                                         </div>
                                     </div>
@@ -971,14 +971,14 @@ const PointsManagementPage: React.FC = () => {
         } catch (err) {
             logger.error('Error loading rewards:', err);
             const apiError = err as { message?: string; status?: number };
-            const errorMessage = apiError.message || '����������� ������';
+            const errorMessage = apiError.message || 'Неизвестная ошибка';
 
             if (apiError.status === 404) {
-                toast.error('��������� �� ����������. ������������� ����� ���������', { duration: 5000 });
-            } else if (apiError.status === 403 || errorMessage.includes('�������� � ����������') || errorMessage.includes('partner or affiliate')) {
-                toast.error('������� Twitch �������� ������ ��� �������� � ����������', { duration: 5000 });
+                toast.error('Настройки не загружены. Попробуйте снова позднее', { duration: 5000 });
+            } else if (apiError.status === 403 || errorMessage.includes('партнёр или аффилейт') || errorMessage.includes('partner or affiliate')) {
+                toast.error('Аккаунт Twitch должен быть подключен для партнёров и аффилейтов', { duration: 5000 });
             } else {
-                toast.error(errorMessage, { duration: 5000 });
+                toast.error('Настройки не загружены. Попробуйте снова позднее', { duration: 5000 });
             }
             setRewards([]);
         } finally {
@@ -994,7 +994,7 @@ const PointsManagementPage: React.FC = () => {
         return (
             <div className="flex flex-col items-center justify-center h-64 gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">�������� ������...</p>
+                <p className="text-sm text-muted-foreground">Загрузка данных...</p>
             </div>
         );
     }
@@ -1011,7 +1011,7 @@ const PointsManagementPage: React.FC = () => {
                                 : 'border-transparent text-muted-foreground hover:text-foreground'
                                 }`}
                         >
-                            �������
+                            Награды
                         </button>
                         <button
                             onClick={() => setActiveTab('queue')}
@@ -1020,7 +1020,7 @@ const PointsManagementPage: React.FC = () => {
                                 : 'border-transparent text-muted-foreground hover:text-foreground'
                                 }`}
                         >
-                            ������� ��������
+                            Очередь запросов
                         </button>
                     </div>
 
@@ -1061,7 +1061,7 @@ const PointsManagementPage: React.FC = () => {
                     {activeTab === 'rewards' && (
                         <Button onClick={() => setShowCreateDialog(true)} className="w-full h-10" variant="outline">
                             <Plus className="w-4 h-4 mr-2" />
-                            ������� �������
+                            Создать награду
                         </Button>
                     )}
                 </div>
@@ -1073,8 +1073,8 @@ const PointsManagementPage: React.FC = () => {
                                 <Card>
                                     <CardContent className="py-12 text-center">
                                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-                                        <p className="text-sm text-muted-foreground font-medium">��� ������</p>
-                                        <p className="text-xs text-muted-foreground mt-1">�������� ������ ������� ��� ��������!</p>
+                                        <p className="text-sm text-muted-foreground font-medium">Нет наград</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Создайте первую награду для зрителей!</p>
                                     </CardContent>
                                 </Card>
                             ) : (

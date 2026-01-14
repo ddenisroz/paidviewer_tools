@@ -118,6 +118,21 @@ const TtsMainPageContent: React.FC = () => {
         version: 1,
     });
 
+    const { data: ttsStatus } = useTtsStatus();
+
+    // Синхронизация состояния TTS с бэкендом при загрузке
+    useEffect(() => {
+        if (ttsStatus?.enabled !== undefined) {
+            const isCloud = ttsStatus.engine_type === 'cloud';
+            setBasicTtsEnabled(ttsStatus.enabled && !isCloud);
+            setAiTtsEnabled(ttsStatus.enabled && isCloud);
+
+            if (ttsStatus.engine_type) {
+                setTtsEngine(ttsStatus.engine_type);
+            }
+        }
+    }, [ttsStatus]);
+
     const [_localTtsConfig, _setLocalTtsConfig] = useState<unknown>(null);
     const [isSavingMode, setIsSavingMode] = useState<boolean>(false);
     const [isRegeneratingUrl, setIsRegeneratingUrl] = useState<boolean>(false);
@@ -704,7 +719,7 @@ const TtsMainPageContent: React.FC = () => {
                                             onModeChange={handleTtsModeChange}
                                             isSaving={isSavingMode}
                                             showModeSelector={true}
-                                            showRewards={false}
+                                            showRewards={true}
                                         />
                                     </div>
 
@@ -797,140 +812,194 @@ const TtsMainPageContent: React.FC = () => {
 
                                     {/* Режим прослушивания (Website/OBS) */}
                                     <div className="flex-1 flex flex-col">
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Режим вывода звука</label>
-                                        <div className="grid grid-cols-2 gap-2 mb-3">
-                                            <button
-                                                onClick={() => handleListeningModeChange('website')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
-                                                    }`}
-                                            >
-                                                Браузер
-                                            </button>
-                                            <button
-                                                onClick={() => handleListeningModeChange('obs')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
-                                                    }`}
-                                            >
-                                                OBS
-                                            </button>
-                                        </div>
-
-                                        {/* Громкость в браузере */}
-                                        {listeningMode === 'website' && (
-                                            <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 mt-auto">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-xs font-medium text-gray-300">Громкость браузера</span>
-                                                    <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">{localVolume}%</span>
+                                        <div className="flex-col flex h-[140px] justify-between">
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-400 mb-2">Режим вывода звука</label>
+                                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                                    <button
+                                                        onClick={() => handleListeningModeChange('website')}
+                                                        className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
+                                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                            }`}
+                                                    >
+                                                        Браузер
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleListeningModeChange('obs')}
+                                                        className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
+                                                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                            }`}
+                                                    >
+                                                        OBS
+                                                    </button>
                                                 </div>
-                                                <Slider
-                                                    value={[localVolume]}
-                                                    min={0}
-                                                    max={100}
-                                                    step={1}
-                                                    onValueChange={(val) => handleVolumeChange(val[0])}
-                                                    className="w-full"
-                                                />
                                             </div>
-                                        )}
 
-                                        {/* Настроить OBS */}
-                                        {listeningMode === 'obs' && (
-                                            <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 mt-auto">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-xs font-medium text-gray-300">OBS Источник</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => setShowObsUrl(!showObsUrl)}
-                                                            className="text-[10px] text-blue-400 hover:underline"
-                                                        >
-                                                            {showObsUrl ? 'Скрыть URL' : 'Показать URL'}
-                                                        </button>
+                                            {/* Громкость в браузере */}
+                                            {listeningMode === 'website' && (
+                                                <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <span className="text-xs font-medium text-gray-300">Громкость браузера</span>
+                                                        <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">{localVolume}%</span>
+                                                    </div>
+                                                    <Slider
+                                                        value={[localVolume]}
+                                                        min={0}
+                                                        max={100}
+                                                        step={1}
+                                                        onValueChange={(val) => handleVolumeChange(val[0])}
+                                                        className="w-full"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Настроить OBS */}
+                                            {listeningMode === 'obs' && (
+                                                <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 flex flex-col gap-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs font-medium text-gray-300">OBS URL</span>
                                                         <button
                                                             onClick={handleRegenerateObsUrl}
                                                             className="text-[10px] text-red-400 hover:underline"
                                                             disabled={isRegeneratingUrl}
                                                         >
-                                                            {isRegeneratingUrl ? 'Обновление...' : 'Сбросить'}
+                                                            {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
                                                         </button>
                                                     </div>
-                                                </div>
 
-                                                {showObsUrl ? (
                                                     <div
-                                                        className="text-[10px] bg-black/50 p-2 rounded text-gray-400 font-mono break-all cursor-pointer hover:text-white transition-colors"
+                                                        className="relative group cursor-pointer"
                                                         onClick={() => {
                                                             navigator.clipboard.writeText(obsUrl);
                                                             toast.success('Скопировано');
                                                         }}
                                                     >
-                                                        {obsUrl || 'Генерация...'}
+                                                        <div className="w-full bg-black/40 border border-gray-700/50 rounded px-2 py-1.5 text-[10px] font-mono text-gray-400 truncate pr-8 select-all">
+                                                            {obsUrl || 'Генерация URL...'}
+                                                        </div>
+                                                        <div className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 bg-gray-800/80 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            Copy
+                                                        </div>
                                                     </div>
-                                                ) : (
-                                                    <div className="text-[10px] text-gray-500 italic">
-                                                        Добавьте этот URL в Browser Source в OBS
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            <div className="space-y-4">
+                            <div className="flex flex-col gap-4">
                                 {/* Платформы */}
                                 <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
                                     <CardHeader className="pb-3">
-                                        <CardTitle className="text-base font-bold text-white">Платформы</CardTitle>
+                                        <CardTitle className="text-base font-bold text-white">Источники озвучки</CardTitle>
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-2 gap-3">
-                                        {(['twitch', 'vk'] as const).map(platform => (
-                                            <div
-                                                key={platform}
-                                                onClick={() => handlePlatformToggle(platform)}
-                                                className={`
+                                        {(['twitch', 'vk'] as const).map(platform => {
+                                            const isConnected = platform === 'twitch' ? isTwitchConnected : isVkConnected;
+                                            const isActive = platformSettings.enabled_platforms?.includes(platform);
+                                            const shouldGlow = isActive && isConnected;
+
+                                            // Determine status text and color
+                                            let statusText = 'Отключено';
+                                            let statusColor = 'text-gray-500';
+
+                                            if (!isConnected) {
+                                                statusText = 'Не подключено';
+                                                statusColor = 'text-red-400';
+                                            } else if (isActive) {
+                                                statusText = 'Активно';
+                                                statusColor = 'text-green-400';
+                                            }
+
+                                            return (
+                                                <div
+                                                    key={platform}
+                                                    onClick={() => handlePlatformToggle(platform)}
+                                                    className={`
                                                     cursor-pointer relative overflow-hidden rounded-xl border transition-all duration-300
-                                                    ${platformSettings.enabled_platforms?.includes(platform)
-                                                        ? platform === 'twitch'
-                                                            ? 'bg-purple-900/40 border-purple-500/50 hover:bg-purple-900/60'
-                                                            : 'bg-blue-900/40 border-blue-500/50 hover:bg-blue-900/60'
-                                                        : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50 hover:border-gray-600/50'
-                                                    }
-                                                `}
-                                            >
-                                                <div className="p-4 flex flex-col items-center gap-3">
-                                                    <div className={`
-                                                        w-10 h-10 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110
-                                                        ${platformSettings.enabled_platforms?.includes(platform)
-                                                            ? platform === 'twitch' ? 'bg-purple-500 text-white' : 'bg-blue-500 text-white'
-                                                            : 'bg-gray-700 text-gray-400'
+                                                    ${shouldGlow
+                                                            ? platform === 'twitch'
+                                                                ? 'bg-purple-900/40 border-purple-500/50 hover:bg-purple-900/60'
+                                                                : 'bg-rose-900/40 border-rose-500/50 hover:bg-rose-900/60'
+                                                            : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50 hover:border-gray-600/50'
                                                         }
+                                                `}
+                                                >
+                                                    <div className="p-4 flex flex-col items-center gap-3">
+                                                        <div className={`
+                                                        w-10 h-10 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110
+                                                        ${shouldGlow
+                                                                ? platform === 'twitch' ? 'bg-purple-500 text-white' : 'bg-rose-500 text-white'
+                                                                : 'bg-gray-700 text-gray-400'
+                                                            }
                                                     `}>
-                                                        {platform === 'twitch' ? <TwitchIcon className="w-5 h-5" /> : <VKIcon className="w-5 h-5" />}
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <div className="text-sm font-semibold text-white capitalize">{platform}</div>
-                                                        <div className={`text-xs ${platformSettings.enabled_platforms?.includes(platform) ? 'text-green-400' : 'text-gray-500'}`}>
-                                                            {platformSettings.enabled_platforms?.includes(platform) ? 'Активно' : 'Отключено'}
+                                                            {platform === 'twitch' ? <TwitchIcon className="w-5 h-5" /> : <VKIcon className="w-5 h-5" />}
+                                                        </div>
+                                                        <div className="text-center">
+                                                            <div className="text-sm font-semibold text-white capitalize">{platform}</div>
+                                                            <div className={`text-xs ${statusColor}`}>
+                                                                {statusText}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </CardContent>
                                 </Card>
 
-                                {/* Фильтры */}
-                                <TtsFilterManager />
+                                {/* Фильтры озвучки */}
+                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex-1">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base font-bold text-white">Фильтры озвучки</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {/* 7TV Emotes */}
+                                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:bg-gray-800/60 transition-colors">
+                                            <span className="text-sm font-medium text-gray-200">7TV смайлы</span>
+                                            <Switch
+                                                checked={ttsSettings.enable7TV}
+                                                onCheckedChange={(val) => handleTtsSettingChange('enable7TV', val)}
+                                                className="data-[state=checked]:bg-blue-600"
+                                            />
+                                        </div>
+
+                                        {/* Twitch Emotes */}
+                                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:bg-gray-800/60 transition-colors">
+                                            <span className="text-sm font-medium text-gray-200">Twitch смайлы</span>
+                                            <Switch
+                                                checked={ttsSettings.enableTwitch}
+                                                onCheckedChange={(val) => handleTtsSettingChange('enableTwitch', val)}
+                                                className="data-[state=checked]:bg-purple-600"
+                                            />
+                                        </div>
+
+                                        {/* Filter Mentions */}
+                                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:bg-gray-800/60 transition-colors">
+                                            <span className="text-sm font-medium text-gray-200">Озвучивать «@»</span>
+                                            <Switch
+                                                checked={!ttsSettings.filterMentions}
+                                                onCheckedChange={(val) => handleTtsSettingChange('filterMentions', !val)}
+                                                className="data-[state=checked]:bg-purple-600"
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
+                        </div>
+
+
+                        {/* Фильтры (Moved to bottom full-width) */}
+                        <div className="w-full">
+                            <TtsFilterManager className="w-full" />
                         </div>
                     </>
                 )}
             </div>
-        </PageWrapper>
+        </PageWrapper >
     );
 };
 

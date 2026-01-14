@@ -1,20 +1,19 @@
 ﻿// src/components/tts/TtsFilterManager.tsx
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 
-import { AlertCircle, ChevronDown, Plus, UserX, X } from 'lucide-react';
+import { AlertCircle, Plus, UserX, X } from 'lucide-react';
 
-import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
-import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { toast } from '@/utils/toastManager';
 
 import { useAuth } from '../../../context/AuthContext';
 import { useIntegrations } from '../../../context/IntegrationsContext';
 import { useAddFilteredWord, useBlockedUsers, useBlockUser, useDeleteFilteredWord, useFilteredWords, useUnblockUser } from '../../../queries/tts/ttsQueries';
+import { queryKeys } from '../../../queries/queryKeys';
+import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { AxiosError } from 'axios';
 
@@ -32,11 +31,14 @@ interface FilteredWord {
     platform: string;
 }
 
-const TtsFilterManager: React.FC = React.memo(() => {
-    // Общие состояния
-    const [isExpanded, setIsExpanded] = useState(false);
-    const { integrations } = useIntegrations();
+interface TtsFilterManagerProps {
+    className?: string;
+}
+
+const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ className }) => {
     const { user } = useAuth();
+    const { integrations } = useIntegrations();
+    const queryClient = useQueryClient();
 
     // Состояния для черного списка
     const [newUsername, setNewUsername] = useState('');
@@ -45,11 +47,6 @@ const TtsFilterManager: React.FC = React.memo(() => {
     // Состояния для словаря фильтра
     const [newWord, setNewWord] = useState('');
     const [selectedWordPlatform, setSelectedWordPlatform] = useState<string>('all');
-
-    // Функция переключения спойлера
-    const toggleExpanded = useCallback(() => {
-        setIsExpanded(prev => !prev);
-    }, []);
 
     // React Query hooks для черного списка
     const { data: blockedUsersData, isLoading: loadingUsers } = useBlockedUsers({
@@ -62,6 +59,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
             setNewUsername('');
             const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
             toast.success(`Пользователь ${variables.username} заглушен на ${platformName}`);
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.blockedUsers() });
         },
         onError: (error: unknown) => {
             const err = error as AxiosError;
@@ -74,6 +72,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
     const unblockUserMutation = useUnblockUser({
         onSuccess: (response, variables) => {
             toast.success(`Пользователь ${variables.username} разблокирован`);
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.blockedUsers() });
         },
         onError: (error: AxiosError) => {
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
@@ -91,6 +90,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
     const addWordMutation = useAddFilteredWord({
         onSuccess: () => {
             setNewWord('');
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.filteredWords() });
         },
         onError: (error: AxiosError) => {
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
@@ -100,6 +100,9 @@ const TtsFilterManager: React.FC = React.memo(() => {
     });
 
     const deleteWordMutation = useDeleteFilteredWord({
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.filteredWords() });
+        },
         onError: (error: AxiosError) => {
             if (error.code !== 'ERR_NETWORK' && error.code !== 'ERR_CONNECTION_REFUSED') {
                 // Ошибка уже обработана в hook
@@ -147,7 +150,7 @@ const TtsFilterManager: React.FC = React.memo(() => {
     const getPlatformColor = (platform: string): string => {
         switch (platform) {
             case 'twitch': return 'bg-purple-600';
-            case 'vk': return 'bg-blue-600';
+            case 'vk': return 'bg-rose-600';
             case 'all': return 'bg-gray-600';
             default: return 'bg-gray-600';
         }
@@ -229,197 +232,169 @@ const TtsFilterManager: React.FC = React.memo(() => {
     const availablePlatforms = getAvailablePlatforms();
 
     return (
-        <Card className="border-gray-700 bg-gray-900/30" data-testid="tts-filter-card">
-            <CardHeader
-                className="cursor-pointer hover:bg-gray-800/20 transition-colors"
-                onClick={toggleExpanded}
-                data-testid="tts-filter-header"
-            >
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-semibold text-white">
-                        Фильтры и заблокированные
-                    </CardTitle>
-                    <ChevronDown
-                        className={`h-5 w-5 transition-transform duration-300 text-gray-400 ${isExpanded ? 'rotate-180' : ''}`}
-                    />
+        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${className || ''}`} data-testid="tts-filter-card">
+            {/* ========== ЧЕРНЫЙ СПИСОК ========== */}
+            <div className="border border-gray-700/50 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center gap-2 px-4 py-3 bg-red-500/5 border-b border-gray-700/30">
+                    <div className="w-6 h-6 rounded-full bg-red-500/10 flex items-center justify-center">
+                        <UserX className="w-3.5 h-3.5 text-red-400" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white">Черный список</h3>
+                    {blacklist.length > 0 && (
+                        <span className="ml-auto text-xs font-medium text-red-400/80 bg-red-500/10 px-2 py-0.5 rounded-full">
+                            {blacklist.length}
+                        </span>
+                    )}
                 </div>
-            </CardHeader>
-            {isExpanded && (
-                <CardContent className="space-y-6 pt-4">
-                    <Tabs defaultValue="blacklist" className="w-full">
-                        <TabsList className="grid w-full grid-cols-2 bg-gray-800/50">
-                            <TabsTrigger value="blacklist" className="data-[state=active]:bg-gray-700">
-                                <UserX className="w-4 h-4 mr-2" />
-                                Черный список
-                            </TabsTrigger>
-                            <TabsTrigger value="words" className="data-[state=active]:bg-gray-700">
-                                <AlertCircle className="w-4 h-4 mr-2" />
-                                Запрещенные слова
-                            </TabsTrigger>
-                        </TabsList>
 
-                        {/* ========== ВКЛАДКА: ЧЕРНЫЙ СПИСОК ========== */}
-                        <TabsContent value="blacklist" className="space-y-4">
-                            {/* Форма добавления пользователя */}
-                            <div className="space-y-3">
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <Input
-                                        placeholder="Введите имя пользователя"
-                                        value={newUsername}
-                                        onChange={(e) => setNewUsername(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && addToBlacklist()}
-                                        disabled={addingUser || availablePlatforms.length === 0}
-                                        className="flex-grow bg-gray-800/50 border-gray-700/50 text-white placeholder-gray-500"
-                                    />
-                                    {availablePlatforms.length > 0 && (
-                                        <Select value={selectedUserPlatform} onValueChange={setSelectedUserPlatform}>
-                                            <SelectTrigger className="w-full sm:w-36 bg-gray-800/50 border-gray-700/50 text-white">
-                                                <SelectValue placeholder="Платформа" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                                                {availablePlatforms.map(platform => (
-                                                    <SelectItem key={platform} value={platform}>
-                                                        {getPlatformIcon(platform)} {platform === 'twitch' ? 'Twitch' : 'VK Live'}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                    <Button
-                                        onClick={addToBlacklist}
-                                        disabled={addingUser || !newUsername.trim() || !selectedUserPlatform}
-                                        className="bg-red-600 hover:bg-red-700 text-white whitespace-nowrap"
-                                    >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        {addingUser ? 'Добавление...' : 'Заглушить'}
-                                    </Button>
-                                </div>
-
-                                {availablePlatforms.length === 0 && (
-                                    <p className="text-sm text-gray-400">
-                                        Подключите хотя бы одну платформу (Twitch или VK Live) чтобы заглушать пользователей
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Список заглушенных пользователей */}
-                            <div className="space-y-4">
-                                <Label>Заглушенные пользователи ({blacklist.length})</Label>
-                                {loadingUsers ? (
-                                    <div className="text-center py-4 text-gray-400">Загрузка...</div>
-                                ) : blacklist.length === 0 ? (
-                                    <div className="text-center py-4 text-gray-400">Список пуст</div>
-                                ) : (
-                                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                                        {blacklist.map((blockedUser, index) => (
-                                            <div
-                                                key={`${blockedUser.username}-${blockedUser.platform}-${index}`}
-                                                className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <span className="font-medium">{blockedUser.username}</span>
-                                                    <Badge className={`${getPlatformColor(blockedUser.platform)} text-white`}>
-                                                        {getPlatformLabel(blockedUser.platform)}
-                                                    </Badge>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => removeFromBlacklist(blockedUser)}
-                                                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
+                <div className="p-4">
+                    {/* Форма добавления */}
+                    <div className="flex gap-2 mb-4">
+                        <Input
+                            placeholder="Имя пользователя"
+                            value={newUsername}
+                            onChange={(e) => setNewUsername(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && addToBlacklist()}
+                            disabled={addingUser || availablePlatforms.length === 0}
+                            className="flex-1 bg-gray-800/60 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm focus:border-red-500/50 focus:ring-red-500/20"
+                        />
+                        {availablePlatforms.length > 0 && (
+                            <Select value={selectedUserPlatform} onValueChange={setSelectedUserPlatform}>
+                                <SelectTrigger className="w-[100px] bg-gray-800/60 border-gray-700/50 text-white h-9 text-xs">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                                    {availablePlatforms.map(platform => (
+                                        <SelectItem key={platform} value={platform}>
+                                            <div className="flex items-center gap-1.5">
+                                                {platform === 'twitch' ? <TwitchIcon className="w-3.5 h-3.5 text-purple-400" /> : <VKIcon className="w-3.5 h-3.5 text-blue-400" />}
+                                                <span className="text-xs">{platform === 'twitch' ? 'Twitch' : 'VK'}</span>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </TabsContent>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                        <Button
+                            onClick={addToBlacklist}
+                            disabled={addingUser || !newUsername.trim() || !selectedUserPlatform}
+                            size="sm"
+                            className="h-9 px-4 bg-red-600 hover:bg-red-500 text-white text-xs font-medium shadow-lg shadow-red-600/20 transition-all duration-200 hover:shadow-red-500/30"
+                        >
+                            {addingUser ? '...' : <><Plus className="h-3.5 w-3.5 mr-1" />Бан</>}
+                        </Button>
+                    </div>
 
-                        {/* ========== ВКЛАДКА: ЗАПРЕЩЕННЫЕ СЛОВА ========== */}
-                        <TabsContent value="words" className="space-y-4">
-                            {/* Форма добавления слова */}
-                            <div className="space-y-3">
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <Input
-                                        placeholder="Введите слово для фильтрации..."
-                                        value={newWord}
-                                        onChange={(e) => setNewWord(e.target.value)}
-                                        onKeyPress={(e) => e.key === 'Enter' && addWord()}
-                                        disabled={addingWord}
-                                        className="flex-grow bg-gray-800/50 border-gray-700/50 text-white placeholder-gray-500"
-                                    />
-                                    {availablePlatforms.length > 0 && (
-                                        <Select value={selectedWordPlatform} onValueChange={setSelectedWordPlatform}>
-                                            <SelectTrigger className="w-full sm:w-44 bg-gray-800/50 border-gray-700/50 text-white">
-                                                <SelectValue placeholder="Платформа" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-gray-800 border-gray-700 text-white">
-                                                <SelectItem value="all">{getPlatformIcon('all')} Все платформы</SelectItem>
-                                                {availablePlatforms.map(platform => (
-                                                    <SelectItem key={platform} value={platform}>
-                                                        {getPlatformIcon(platform)} {platform === 'twitch' ? 'Twitch' : 'VK Live'}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                    <Button
-                                        onClick={addWord}
-                                        disabled={addingWord || !newWord.trim()}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                    {/* Список */}
+                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto custom-scrollbar">
+                        {loadingUsers ? (
+                            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                                <div className="w-5 h-5 border-2 border-gray-600 border-t-red-400 rounded-full animate-spin mb-2" />
+                                <span className="text-xs">Загрузка...</span>
+                            </div>
+                        ) : blacklist.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                                <UserX className="w-8 h-8 mb-2 opacity-30" />
+                                <span className="text-xs">Нет заблокированных</span>
+                            </div>
+                        ) : (
+                            blacklist.map((blockedUser, index) => (
+                                <div
+                                    key={`${blockedUser.username}-${blockedUser.platform}-${index}`}
+                                    className="group flex items-center justify-between py-2 px-3 bg-gray-800/40 hover:bg-red-500/10 rounded-lg border border-transparent hover:border-red-500/20 transition-all duration-200"
+                                >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${blockedUser.platform === 'twitch' ? 'bg-purple-500/20' : 'bg-rose-500/20'}`}>
+                                            {blockedUser.platform === 'twitch' ? <TwitchIcon className="w-3 h-3 text-purple-400" /> : <VKIcon className="w-3 h-3 text-rose-400" />}
+                                        </div>
+                                        <span className="text-sm text-gray-200 truncate font-medium">{blockedUser.username}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => removeFromBlacklist(blockedUser)}
+                                        className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200 p-1 hover:bg-red-500/10 rounded"
                                     >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        {addingWord ? 'Добавление...' : 'Добавить'}
-                                    </Button>
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
                                 </div>
+                            ))
+                        )}
+                    </div>
+                </div>
 
-                                {availablePlatforms.length === 0 && (
-                                    <p className="text-sm text-gray-400">
-                                        Подключите хотя бы одну платформу (Twitch или VK Live) чтобы фильтровать слова
-                                    </p>
-                                )}
-                            </div>
+                {availablePlatforms.length === 0 && (
+                    <div className="px-4 pb-3 text-xs text-gray-400">Подключите платформу</div>
+                )}
+            </div>
 
-                            {/* Список запрещенных слов */}
-                            <div className="space-y-4">
-                                <Label>Заблокированные слова ({Array.isArray(words) ? words.length : 0})</Label>
-                                {loadingWords ? (
-                                    <div className="text-center py-4 text-gray-400">Загрузка...</div>
-                                ) : !Array.isArray(words) || words.length === 0 ? (
-                                    <div className="text-center py-4 text-gray-400">Слова не добавлены</div>
-                                ) : (
-                                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                                        {words.filter(word => word && (word.word || word.text)).map((word) => (
-                                            <div
-                                                key={word.id}
-                                                className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <span className="font-medium">{word.word || word.text || 'Unknown'}</span>
-                                                    <Badge className={`${getPlatformColor(word.platform || 'all')} text-white`}>
-                                                        {getPlatformLabel(word.platform || 'all')}
-                                                    </Badge>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => removeWord(word.id)}
-                                                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+            {/* ========== ЗАПРЕЩЕННЫЕ СЛОВА ========== */}
+            <div className="border border-gray-700/50 bg-gradient-to-br from-gray-900/50 to-gray-800/30 rounded-xl overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center gap-2 px-4 py-3 bg-yellow-500/5 border-b border-gray-700/30">
+                    <div className="w-6 h-6 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                        <AlertCircle className="w-3.5 h-3.5 text-yellow-400" />
+                    </div>
+                    <h3 className="text-sm font-bold text-white">Запрещенные слова</h3>
+                    {Array.isArray(words) && words.length > 0 && (
+                        <span className="ml-auto text-xs font-medium text-yellow-400/80 bg-yellow-500/10 px-2 py-0.5 rounded-full">
+                            {words.length}
+                        </span>
+                    )}
+                </div>
+
+                <div className="p-4">
+                    {/* Форма добавления */}
+                    <div className="flex gap-2 mb-4">
+                        <Input
+                            placeholder="Слово или фраза"
+                            value={newWord}
+                            onChange={(e) => setNewWord(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && addWord()}
+                            disabled={addingWord}
+                            className="flex-1 bg-gray-800/60 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm focus:border-yellow-500/50 focus:ring-yellow-500/20"
+                        />
+                        <Button
+                            onClick={addWord}
+                            disabled={addingWord || !newWord.trim()}
+                            size="sm"
+                            className="h-9 px-4 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium shadow-lg shadow-blue-600/20 transition-all duration-200 hover:shadow-blue-500/30"
+                        >
+                            {addingWord ? '...' : <><Plus className="h-3.5 w-3.5 mr-1" />Добавить</>}
+                        </Button>
+                    </div>
+
+                    {/* Список слов - тегами */}
+                    <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto custom-scrollbar content-start">
+                        {loadingWords ? (
+                            <div className="w-full flex flex-col items-center justify-center py-8 text-gray-500">
+                                <div className="w-5 h-5 border-2 border-gray-600 border-t-yellow-400 rounded-full animate-spin mb-2" />
+                                <span className="text-xs">Загрузка...</span>
                             </div>
-                        </TabsContent>
-                    </Tabs>
-                </CardContent>
-            )}
-        </Card>
+                        ) : !Array.isArray(words) || words.length === 0 ? (
+                            <div className="w-full flex flex-col items-center justify-center py-8 text-gray-500">
+                                <AlertCircle className="w-8 h-8 mb-2 opacity-30" />
+                                <span className="text-xs">Нет запрещенных слов</span>
+                            </div>
+                        ) : (
+                            words.filter(word => word && (word.word || word.text)).map((word) => (
+                                <div
+                                    key={word.id}
+                                    className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-800/70 hover:bg-yellow-500/10 border border-gray-700/50 hover:border-yellow-500/30 rounded-lg text-xs text-gray-200 transition-all duration-200"
+                                >
+                                    <span className="max-w-[100px] truncate">{word.word || word.text}</span>
+                                    <button
+                                        onClick={() => removeWord(word.id)}
+                                        className="text-gray-600 hover:text-red-400 transition-colors p-0.5 hover:bg-red-500/10 rounded"
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 });
 

@@ -35,7 +35,7 @@ const QuickActionsBar: React.FC = () => {
     if (!logic.isAuthenticated) return null;
 
     return (
-        <Card className="border-gray-700">
+        <Card className="border-gray-700/50 bg-gray-900/50">
             <div className="flex items-center justify-center gap-3 px-6 py-4">
                 <ActionButton
                     icon={logic.ttsState ? Volume2 : VolumeX}

@@ -190,10 +190,37 @@ class TTSService:
         return self.blocked_user_repo.get_blocked_list(user_id=user_id)
         
     async def block_user(self, user_id: int, channel_name: str, platform: str, username: str) -> bool:
-        return self.blocked_user_repo.block_user(user_id, channel_name, platform, username) is not None
+        # Validate user existence on platform
+        if platform.lower() == 'twitch':
+            from startup.bot_registry import get_bot_registry
+            registry = get_bot_registry()
+            if registry.is_twitch_running() and registry.twitch_bot:
+                try:
+                    # Use TwitchIO's fetch_users to validate user existence
+                    users = await registry.twitch_bot.fetch_users(names=[username])
+                    if not users:
+                        logger.warning(f"Cannot block user {username}: user not found on Twitch")
+                        return False
+                except Exception as e:
+                    logger.error(f"Error validating user {username} on Twitch: {e}")
+                    # If validation fails due to error, we might want to fail safe or allow. 
+                    # For now, let's fail safe (don't block if we can't verify)
+                    return False
+
+        return self.blocked_user_repo.block_user(
+            channel_name=channel_name, 
+            platform=platform, 
+            username=username, 
+            user_id=user_id
+        ) is not None
         
     async def unblock_user(self, user_id: int, channel_name: str, platform: str, username: str) -> bool:
-        return self.blocked_user_repo.unblock_user(user_id, channel_name, platform, username)
+        return self.blocked_user_repo.unblock_user(
+            channel_name=channel_name, 
+            platform=platform, 
+            username=username, 
+            user_id=user_id
+        )
 
     # === TTS Status ===
 

@@ -177,8 +177,8 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             # Если scope пустой, используем scopes из запроса
             if not scope_string or scope_string == "":
                 logger.warning("[VK SCOPES] VK API returned empty scope! Using requested scopes as fallback")
-                from api.vk_api import VK_OAUTH_SCOPES
-                scopes = VK_OAUTH_SCOPES
+                from constants import OAUTH_SCOPES
+                scopes = OAUTH_SCOPES["vk"].split(",")
                 logger.info(f"[VK SCOPES] Using fallback scopes: {scopes}")
             else:
                 scopes = scope_string.split(",")

@@ -83,11 +83,8 @@ export const useQuickActionsLogic = () => {
     const ttsState = useMemo(() => {
         const statusData = ttsStatusData as TtsStatusData | undefined;
         if (!statusData) return false;
-        const enabled = statusData.enabled || false;
-        const engineType = statusData.engine_type || 'gtts';
-        const basicEnabled = enabled && engineType === 'gtts';
-        const aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local');
-        return basicEnabled || aiEnabled;
+        // Просто проверяем enabled - не важно какой тип движка
+        return statusData.enabled || false;
     }, [ttsStatusData]);
 
     const { data: dropsConfigData } = useDropsConfig(channelName, {

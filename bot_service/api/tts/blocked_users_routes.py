@@ -15,7 +15,7 @@ from services.tts.tts_core import BlockUserRequest, UnblockUserRequest
 
 logger = logging.getLogger('bot_service')
 
-blocked_users_router = APIRouter(tags=["tts-blocked-users"])
+blocked_users_router = APIRouter(prefix="/api/tts", tags=["tts-blocked-users"])
 
 
 @blocked_users_router.get("/blocked-users")
@@ -31,7 +31,7 @@ async def get_blocked_users(
         tts_service = TTSService(db)
         user_identifier = UserIdentityService.get_user_identifier(current_user)
         blocked_users = await tts_service.get_blocked_users(user_identifier)
-        return {"success": True, "blocked_users": blocked_users}
+        return {"success": True, "data": blocked_users}
     except Exception as e:
         logger.error(f"Error getting blocked users: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения черного списка")

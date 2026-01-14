@@ -27,7 +27,7 @@ async def get_filtered_words(
     try:
         tts_service = TTSService(db)
         words = await tts_service.get_filtered_words(current_user['id'])
-        return {"success": True, "filtered_words": words}
+        return {"success": True, "data": words}
     except Exception as e:
         logger.error(f"Error getting filtered words: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения списка слов")
