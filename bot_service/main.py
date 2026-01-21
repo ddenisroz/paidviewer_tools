@@ -64,10 +64,12 @@ from middleware.logging_middleware import (  # noqa: E402
     PerformanceLoggingMiddleware,
     ErrorLoggingMiddleware
 )
+from middleware.rate_limit_middleware import RateLimitMiddleware  # noqa: E402
 
 app.add_middleware(ErrorLoggingMiddleware)
 app.add_middleware(PerformanceLoggingMiddleware, slow_threshold_ms=1000)
 app.add_middleware(StructuredLoggingMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # Existing middleware
 app.add_middleware(SecurityHeadersMiddleware)
@@ -104,11 +106,11 @@ from api.user_settings_api import router as user_settings_router  # noqa: E402
 from api.chatbox_api import router as chatbox_router  # noqa: E402
 from api.admin.router import router as admin_router  # noqa: E402
 from api.admin.users_management import router as admin_users_router  # noqa: E402
-from api.admin.bot_token_api import router as bot_token_router  # noqa: E402
 from api.database_health_api import router as database_health_router  # noqa: E402
 from api.active_channels_api import router as active_channels_router  # noqa: E402
 from api.stream_history_api import router as stream_history_router  # noqa: E402
 from api.donationalerts_api import router as donationalerts_router  # noqa: E402
+from api.memealerts_api import router as memealerts_router  # noqa: E402
 from api.platforms_api import router as platforms_router  # noqa: E402
 from api.system_logs_api import router as system_logs_router  # noqa: E402
 from api.proxy_api import router as proxy_router  # noqa: E402
@@ -184,7 +186,6 @@ app.include_router(da_auth_router)
 # Admin
 app.include_router(admin_router)
 app.include_router(admin_users_router)
-app.include_router(bot_token_router)
 app.include_router(database_health_router)
 app.include_router(system_logs_router)
 
@@ -193,6 +194,7 @@ app.include_router(widgets_router)
 app.include_router(active_channels_router)
 app.include_router(stream_history_router)
 app.include_router(donationalerts_router)
+app.include_router(memealerts_router)
 app.include_router(platforms_router)
 app.include_router(proxy_router)
 

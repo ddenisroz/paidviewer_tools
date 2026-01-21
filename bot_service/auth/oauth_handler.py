@@ -303,6 +303,14 @@ class OAuthHandler:
                         is_admin=False
                     )
 
+                    # SECURITY FIX: При входе с нового устройства с использованием существующего аккаунта
+                    # мы должны деактивировать токены других платформ, чтобы предотвратить
+                    # несанкционированный доступ ко всем привязанным платформам.
+                    if unified_user and not is_linking:
+                         logger.info(f"[SECURITY] Login via {platform} (User ID {unified_user.id}) - deactivating other platform tokens")
+                         self._deactivate_other_platform_tokens(unified_user.id, platform, db)
+                         db.commit()
+
             if not unified_user:
                 raise HTTPException(
                     status_code=HTTP_STATUS.INTERNAL_SERVER_ERROR,

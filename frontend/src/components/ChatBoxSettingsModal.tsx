@@ -187,89 +187,95 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6">
-                        <div className="grid grid-cols-2 gap-6 h-full">
-                            <div className="space-y-6">
-                                {/* OBS Link */}
-                                <div className="space-y-2">
-                                    <Label className="text-white font-semibold">Ссылка для OBS</Label>
-                                    <div className="flex gap-2">
-                                        <Input
-                                            value={settings.widget_url || ''}
-                                            readOnly
-                                            className="bg-gray-800 text-white border-gray-600 font-mono text-xs flex-1"
-                                        />
-                                        <Button
-                                            onClick={copyToClipboard}
-                                            variant="outline"
-                                            size="sm"
-                                            className="border-gray-600 hover:bg-gray-700"
-                                        >
-                                            {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                        </Button>
-                                        <Button
-                                            onClick={() => handleSave(true)}
-                                            variant="outline"
-                                            size="sm"
-                                            className="border-gray-600 hover:bg-gray-700"
-                                            title="Обновить токен"
-                                        >
-                                            <RefreshCw className="w-4 h-4" />
-                                        </Button>
+                    <div className="flex-1 overflow-hidden p-6 flex flex-col gap-6">
+                        {/* Preview Panel - Fixed at Top */}
+                        <div className="shrink-0 h-[280px] border border-gray-700/50 rounded-lg overflow-hidden bg-black/50">
+                            <PreviewPanel settings={settings} previewMessages={PREVIEW_MESSAGES} />
+                        </div>
+
+                        {/* Settings - Scrollable Below */}
+                        <div className="flex-1 overflow-y-auto min-h-0 pr-2">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                                <div className="space-y-6">
+                                    {/* OBS Link */}
+                                    <div className="space-y-2">
+                                        <Label className="text-white font-semibold">Ссылка для OBS</Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                value={settings.widget_url || ''}
+                                                readOnly
+                                                className="bg-gray-800 text-white border-gray-600 font-mono text-xs flex-1"
+                                            />
+                                            <Button
+                                                onClick={copyToClipboard}
+                                                variant="outline"
+                                                size="sm"
+                                                className="border-gray-600 hover:bg-gray-700"
+                                            >
+                                                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                            </Button>
+                                            <Button
+                                                onClick={() => handleSave(true)}
+                                                variant="outline"
+                                                size="sm"
+                                                className="border-gray-600 hover:bg-gray-700"
+                                                title="Обновить токен"
+                                            >
+                                                <RefreshCw className="w-4 h-4" />
+                                            </Button>
+                                        </div>
                                     </div>
+
+                                    <FontSettings
+                                        fontFamily={settings.font_family}
+                                        fontSize={settings.font_size}
+                                        textStrokeWidth={settings.text_stroke_width}
+                                        onFontFamilyChange={(value) => handleChange('font_family', value)}
+                                        onFontSizeChange={(value) => handleChange('font_size', value)}
+                                        onTextStrokeWidthChange={(value) => handleChange('text_stroke_width', value)}
+                                    />
+
+                                    <ColorSettings
+                                        backgroundColor={settings.background_color || '#000000'}
+                                        backgroundOpacity={settings.background_opacity}
+                                        textStrokeColor={settings.text_stroke_color || '#000000'}
+                                        borderRadius={settings.border_radius || 8}
+                                        onBackgroundColorChange={(value) => handleChange('background_color', value)}
+                                        onBackgroundOpacityChange={(value) => handleChange('background_opacity', value)}
+                                        onTextStrokeColorChange={(value) => handleChange('text_stroke_color', value)}
+                                        onBorderRadiusChange={(value) => handleChange('border_radius', value)}
+                                    />
                                 </div>
 
-                                <FontSettings
-                                    fontFamily={settings.font_family}
-                                    fontSize={settings.font_size}
-                                    textStrokeWidth={settings.text_stroke_width}
-                                    onFontFamilyChange={(value) => handleChange('font_family', value)}
-                                    onFontSizeChange={(value) => handleChange('font_size', value)}
-                                    onTextStrokeWidthChange={(value) => handleChange('text_stroke_width', value)}
-                                />
+                                <div className="space-y-6">
+                                    <AnimationSettings
+                                        animationType={settings.animation_type}
+                                        animationDuration={settings.animation_duration}
+                                        messageFadeSeconds={settings.message_fade_seconds}
+                                        onAnimationTypeChange={(value) => handleChange('animation_type', value)}
+                                        onAnimationDurationChange={(value) => handleChange('animation_duration', value)}
+                                        onMessageFadeSecondsChange={(value) => handleChange('message_fade_seconds', value)}
+                                    />
 
-                                <ColorSettings
-                                    backgroundColor={settings.background_color || '#000000'}
-                                    backgroundOpacity={settings.background_opacity}
-                                    textStrokeColor={settings.text_stroke_color || '#000000'}
-                                    borderRadius={settings.border_radius || 8}
-                                    onBackgroundColorChange={(value) => handleChange('background_color', value)}
-                                    onBackgroundOpacityChange={(value) => handleChange('background_opacity', value)}
-                                    onTextStrokeColorChange={(value) => handleChange('text_stroke_color', value)}
-                                    onBorderRadiusChange={(value) => handleChange('border_radius', value)}
-                                />
-
-                                <AnimationSettings
-                                    animationType={settings.animation_type}
-                                    animationDuration={settings.animation_duration}
-                                    messageFadeSeconds={settings.message_fade_seconds}
-                                    onAnimationTypeChange={(value) => handleChange('animation_type', value)}
-                                    onAnimationDurationChange={(value) => handleChange('animation_duration', value)}
-                                    onMessageFadeSecondsChange={(value) => handleChange('message_fade_seconds', value)}
-                                />
-
-                                <PlatformSettings
-                                    showPlatformIcons={settings.show_platform_icons}
-                                    showBadges={settings.show_badges}
-                                    show7tvEmotes={settings.show_7tv_emotes}
-                                    showLinks={settings.show_links}
-                                    maxMessages={settings.max_messages}
-                                    messageSpacing={settings.message_spacing}
-                                    chatDirection={settings.chat_direction}
-                                    chatWidth={settings.chat_width}
-                                    onShowPlatformIconsChange={(value) => handleChange('show_platform_icons', value)}
-                                    onShowBadgesChange={(value) => handleChange('show_badges', value)}
-                                    onShow7tvEmotesChange={(value) => handleChange('show_7tv_emotes', value)}
-                                    onShowLinksChange={(value) => handleChange('show_links', value)}
-                                    onMaxMessagesChange={(value) => handleChange('max_messages', value)}
-                                    onMessageSpacingChange={(value) => handleChange('message_spacing', value)}
-                                    onChatDirectionChange={(value) => handleChange('chat_direction', value)}
-                                    onChatWidthChange={(value) => handleChange('chat_width', value)}
-                                />
-                            </div>
-
-                            <div>
-                                <PreviewPanel settings={settings} previewMessages={PREVIEW_MESSAGES} />
+                                    <PlatformSettings
+                                        showPlatformIcons={settings.show_platform_icons}
+                                        showBadges={settings.show_badges}
+                                        show7tvEmotes={settings.show_7tv_emotes}
+                                        showLinks={settings.show_links}
+                                        maxMessages={settings.max_messages}
+                                        messageSpacing={settings.message_spacing}
+                                        chatDirection={settings.chat_direction}
+                                        chatWidth={settings.chat_width}
+                                        onShowPlatformIconsChange={(value) => handleChange('show_platform_icons', value)}
+                                        onShowBadgesChange={(value) => handleChange('show_badges', value)}
+                                        onShow7tvEmotesChange={(value) => handleChange('show_7tv_emotes', value)}
+                                        onShowLinksChange={(value) => handleChange('show_links', value)}
+                                        onMaxMessagesChange={(value) => handleChange('max_messages', value)}
+                                        onMessageSpacingChange={(value) => handleChange('message_spacing', value)}
+                                        onChatDirectionChange={(value) => handleChange('chat_direction', value)}
+                                        onChatWidthChange={(value) => handleChange('chat_width', value)}
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -89,14 +89,33 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
 
     const { data: settingsData, isLoading: isLoadingSettings, refetch: refetchSettings, error: settingsError } = useUserSettingsQuery({
         enabled: !!isAuthenticated,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        refetchOnWindowFocus: false,
     });
-    
+
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (settingsData) {
             const data = settingsData as { data?: UserSettings } | UserSettings;
-            const settings = 'data' in data && data.data ? data.data : (data as UserSettings);
-            if (settings && typeof settings === 'object' && !('data' in settings)) {
+            let settings: UserSettings | null = null;
+
+            // Check if it's an API Response { success: true, settings: {...} }
+            if ('settings' in data && (data as any).settings) {
+                settings = (data as any).settings as UserSettings;
+            } else if ('data' in data && data.data) {
+                // Check inner data for settings property
+                const innerData = data.data as any;
+                if (innerData && typeof innerData === 'object' && 'settings' in innerData) {
+                    settings = innerData.settings as UserSettings;
+                } else {
+                    settings = innerData as UserSettings;
+                }
+            } else {
+                // Fallback - assume it's the settings object directly (legacy or cached)
+                settings = data as UserSettings;
+            }
+
+            if (settings && typeof settings === 'object') {
                 setSettings(settings);
                 cacheManager.set(CACHE_CONFIG.USER_SETTINGS, settings, { userId: user?.id });
             } else {
@@ -104,7 +123,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
             }
         }
     }, [settingsData, user?.id]);
-    
+
     useEffect(() => {
         if (settingsError) {
             logger.error('[USER_SETTINGS] Error loading settings:', settingsError);
@@ -129,16 +148,48 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     }, [isAuthenticated, refetchSettings]);
 
     const saveSettingsMutation = useSaveUserSettings({
-        onSuccess: (response: unknown) => {
-            const data = response as { data?: { settings?: UserSettings } | UserSettings };
-            const savedSettings = data.data && typeof data.data === 'object' && 'settings' in data.data 
-                ? data.data.settings 
-                : data.data;
-            setSettings(savedSettings as UserSettings);
-            if (savedSettings) {
-                cacheManager.set(CACHE_CONFIG.USER_SETTINGS, savedSettings, { userId: user?.id });
+        onSuccess: async (response: unknown) => {
+            logger.info('[USER_SETTINGS] Save success response:', response);
+
+            // Try to parse the response
+            try {
+                // Determine the correct settings object from the response
+                // Response could be ApiResponse or the data object directly
+                const responseData = response as { data?: { settings?: UserSettings } | UserSettings } | UserSettings;
+
+                let savedSettings: UserSettings | null = null;
+
+                if (responseData && typeof responseData === 'object') {
+                    if ('data' in responseData && responseData.data) {
+                        // It's an API Response
+                        const innerData = responseData.data;
+                        if (innerData && typeof innerData === 'object' && 'settings' in innerData && innerData.settings) {
+                            // Backend now returns { success, message, updated_fields, settings: {...} }
+                            savedSettings = innerData.settings as UserSettings;
+                        } else if (innerData && typeof innerData === 'object' && 'settings' in innerData) {
+                            // Handle edge case where settings might be directly inside data? Unlikely with new structure but safe.
+                            savedSettings = (innerData.settings as unknown) as UserSettings;
+                        } else {
+                            savedSettings = innerData as UserSettings;
+                        }
+                    } else if (!('data' in responseData)) {
+                        // It's likely the settings object itself (if query normalized it)
+                        savedSettings = responseData as UserSettings;
+                    }
+                }
+
+                if (savedSettings) {
+                    setSettings(savedSettings);
+                    cacheManager.set(CACHE_CONFIG.USER_SETTINGS, savedSettings, { userId: user?.id });
+                    logger.info('[USER_SETTINGS] State updated with saved settings');
+                } else {
+                    logger.warn('[USER_SETTINGS] Could not parse saved settings from response, refetching...');
+                    await refetchSettings();
+                }
+            } catch (err) {
+                logger.error('[USER_SETTINGS] Error parsing save response:', err);
+                await refetchSettings();
             }
-            logger.info('[USER_SETTINGS] Saved successfully');
         },
         onError: (error) => {
             logger.error('[USER_SETTINGS] Error saving settings:', error);
@@ -151,7 +202,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
 
     const saveSettings = useCallback(async (newSettings: Partial<UserSettings>): Promise<boolean> => {
         if (!isAuthenticated) return false;
-        
+
         return new Promise((resolve) => {
             saveSettingsMutation.mutate(newSettings, {
                 onSuccess: () => resolve(true),
@@ -161,14 +212,31 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     }, [isAuthenticated, saveSettingsMutation]);
 
     const updateSetting = useCallback(async (key: keyof UserSettings, value: unknown): Promise<boolean> => {
+        // Optimistic update
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setSettings(prev => prev ? { ...prev, [key]: value as any } : null);
+
         const success = await saveSettings({ [key]: value } as Partial<UserSettings>);
+
+        if (!success) {
+            // Revert on failure (reload from server)
+            loadSettings();
+        }
         return success;
-    }, [saveSettings]);
+    }, [saveSettings, loadSettings]);
 
     const updateSettings = useCallback(async (settingsToUpdate: Partial<UserSettings>): Promise<boolean> => {
+        // Optimistic update
+        setSettings(prev => prev ? { ...prev, ...settingsToUpdate } : null);
+
         const success = await saveSettings(settingsToUpdate);
+
+        if (!success) {
+            // Revert on failure
+            loadSettings();
+        }
         return success;
-    }, [saveSettings]);
+    }, [saveSettings, loadSettings]);
 
     const getSetting = useCallback(<T = unknown,>(key: keyof UserSettings, defaultValue: T | null = null): T | null => {
         return (settings?.[key] as T) ?? defaultValue;
@@ -176,7 +244,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
 
     const getChatSettings = useCallback((): ChatSettings | null => {
         if (!settings) return null;
-        
+
         return {
             enabled: settings.chat_enabled ?? true,
             max_messages: settings.chat_max_messages ?? 50,
@@ -191,7 +259,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
 
     const getObsSettings = useCallback((): ObsSettings | null => {
         if (!settings) return null;
-        
+
         return {
             width: settings.obs_width ?? 400,
             height: settings.obs_height ?? 300,
@@ -224,7 +292,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
                 combine_categories: settings.combine_categories ?? false
             };
         }
-        
+
         const cachedSettings = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true }) as UserSettings | null;
         if (cachedSettings) {
             return {
@@ -232,7 +300,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
                 combine_categories: cachedSettings.combine_categories ?? false
             };
         }
-        
+
         return { combine_titles: false, combine_categories: false };
     }, [settings]);
 

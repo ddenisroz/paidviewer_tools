@@ -93,11 +93,13 @@ export const useAuthStore = create<AuthState>()(devtools(
 
             try {
                 const response = await authService.getAuthStatus();
-                if (response.data?.authenticated) {
-                    const userData = response.data.user;
+                const authData = response.data as any;
+
+                if (authData?.authenticated) {
+                    const userData = authData.user;
                     const userWithIntegrations = {
                         ...userData,
-                        integrations: response.data.integrations || userData.integrations
+                        integrations: authData.integrations || userData.integrations
                     };
 
                     set({
@@ -188,7 +190,16 @@ export const useAuthStore = create<AuthState>()(devtools(
 
             try {
                 await authService.logout();
-                set({ user: null, isAuthenticated: false, isLoading: false });
+            } catch (error) {
+                logger.error('[AuthStore] Logout failed (API step):', error);
+            } finally {
+                // SOFT LOGOUT: Clear state without page reload
+                set({
+                    user: null,
+                    isAuthenticated: false,
+                    isLoading: false,
+                    isCheckingAuth: false
+                });
 
                 // 🚀 ANTI-FLASH: Clear all caches
                 localStorage.removeItem('cached_user');
@@ -199,11 +210,8 @@ export const useAuthStore = create<AuthState>()(devtools(
                     logger.info('[AuthStore] Query cache cleared on logout');
                 }
 
-                // Reload page to clear all states
-                window.location.reload();
-            } catch (error) {
-                logger.error('[AuthStore] Logout failed:', error);
-                set({ isLoading: false, error: 'Logout failed' });
+                // Note: We don't need window.location.reload() or explicit navigate here
+                // because AuthGuard will automatically redirect to /login when isAuthenticated becomes false.
             }
         },
 

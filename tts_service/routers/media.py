@@ -3,7 +3,7 @@ import logging
 import os
 from pathlib import Path
 from sqlalchemy.orm import Session
-from core.database import get_db
+from tts_service.database import get_db
 from tts_service.config import config
 from tts_service.database import Voice as VoiceModel
 

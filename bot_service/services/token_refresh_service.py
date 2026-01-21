@@ -36,10 +36,9 @@ class TokenRefreshService:
             'donationalerts': self._refresh_donationalerts
         }
         
-    @classmethod
-    def _get_refresh_handler(cls, platform: str) -> Optional[RefreshHandler]:
+    def _get_refresh_handler(self, platform: str) -> Optional[RefreshHandler]:
         """Получить handler для обновления токена платформы"""
-        return cls._refresh_handlers.get(platform)
+        return self._refresh_handlers.get(platform)
 
     async def refresh_if_needed(self, user_id: int, platform: str, db: Optional[Session] = None) -> bool:
         """
@@ -154,7 +153,7 @@ class TokenRefreshService:
                 return response.json()
 
         try:
-            return await retry_async(_do_refresh, retries=3, delay=1.0)
+            return await retry_async(_do_refresh, max_attempts=3, initial_delay=1.0)
         except Exception as e:
             logger.error(f"Refresh request failed: {e}")
             return None
@@ -214,33 +213,11 @@ class TokenRefreshService:
         if not refresh_token:
             return False
             
-        # VK refresh logic specifics... assuming standard OAuth or specific endpoint
-        # The previous code used https://api.live.vkvideo.ru/oauth/server/token
-        # I should keep the logic.
-        
-        # Note: Previous logic seemed to use basic auth header?
-        # Let's try to preserve exact logic if possible.
-        # But I don't see the original _refresh_vk logic clearly in outline.
-        # Assuming standard POST for now based on context, or revisit original file.
-        # Wait, I can't guess. I must be precise.
-        # I did not perform `read_file` on `token_refresh_service.py`, only outline.
-        # Outline says:
-        # _refresh_vk(token: UserToken, db: Session)
-        
-        # I SHOULD READ THE FILE CONTENT FULLY BEFORE WRITING to preserve logic.
-        # Especially specific endpoints and params.
-    async def _refresh_vk(self, token: UserToken, db: Session) -> bool:
-        """Обновить VK Live токен"""
-        refresh_token = decrypt_token(token.refresh_token)
-        if not refresh_token:
-            return False
-            
-        # Logic from VKTokenRefreshService
         data = {
             'grant_type': 'refresh_token',
             'refresh_token': refresh_token,
-            'client_id': settings.VK_CLIENT_ID,
-            'client_secret': settings.VK_CLIENT_SECRET
+            'client_id': settings.vk_client_id,
+            'client_secret': settings.vk_client_secret
         }
         
         data = await self._make_refresh_request(

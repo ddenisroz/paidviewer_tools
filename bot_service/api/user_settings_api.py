@@ -76,7 +76,9 @@ async def get_user_settings(
     """Получить все настройки пользователя"""
     try:
         service = get_settings_service()
-        return service.get_settings(current_user, db)
+        settings_response = service.get_settings(current_user, db)
+        logger.info(f"[API] get_user_settings returning: {settings_response}")
+        return settings_response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -93,7 +95,7 @@ async def update_user_settings(
     """Обновить настройки пользователя"""
     try:
         service = get_settings_service()
-        return service.update_settings(
+        return await service.update_settings(
             user=current_user,
             update_data=settings_update.model_dump(exclude_unset=True),
             db=db

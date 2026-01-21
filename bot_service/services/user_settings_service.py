@@ -57,7 +57,7 @@ class UserSettingsService:
             "settings": self._map_to_dict(settings)
         }
 
-    def update_settings(
+    async def update_settings(
         self,
         user: Dict[str, Any],
         update_data: Dict[str, Any],
@@ -90,12 +90,13 @@ class UserSettingsService:
 
         # Send WebSocket notification
         # Import here to avoid circular dependencies
-        self._send_cache_invalidation(user)
+        await self._send_cache_invalidation(user)
 
         return {
             "success": True,
             "message": "Настройки успешно сохранены",
-            "updated_fields": list(update_data.keys())
+            "updated_fields": list(update_data.keys()),
+            "settings": self._map_to_dict(settings)
         }
 
     def get_chat_settings(self, user: Dict[str, Any], db: Session) -> Dict[str, Any]:

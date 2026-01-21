@@ -82,11 +82,12 @@ class StreamInfoService:
         
         if stream_info:
             result.update(stream_info)
-            result['is_live'] = True
+            result['is_live'] = is_live  # Use calculated is_live, not always True
             result['viewers'] = stream_info.get('viewer_count', 0)
             logger.info(f"[STREAM_INFO] Using stream_info, title: {result.get('title')}")
         elif channel_info:
             result.update(channel_info)
+            result['is_live'] = False  # Channel info means stream is offline
             logger.info(f"[STREAM_INFO] Using channel_info, title: {result.get('title')}")
         else:
             logger.warning(f"[STREAM_INFO] No stream_info or channel_info available")

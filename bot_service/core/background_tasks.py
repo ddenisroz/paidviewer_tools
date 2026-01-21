@@ -226,18 +226,25 @@ class BackgroundTasks:
         """
         from core.database import SessionLocal, UserToken
         from core.datetime_utils import utcnow_naive
-        from services.token_refresh_service import TokenRefreshService
+        from services.token_refresh_service import token_refresh_service
 
+        first_run = True
         while True:
             try:
-                await asyncio.sleep(7200)  # Проверяем каждые 2 часа (2 * 60 * 60)
+                # Первая проверка сразу при старте, затем каждые 2 часа
+                if not first_run:
+                    await asyncio.sleep(7200)  # 2 часа
+                else:
+                    first_run = False
+                    logger.info("[STARTUP] [TOKEN REFRESH] Initial token check on startup...")
 
-                logger.info("[REFRESH] [TOKEN REFRESH] Checking for expiring user OAuth tokens...")
+                logger.info("[REFRESH] [TOKEN REFRESH] Checking for expiring/expired user OAuth tokens...")
 
                 db = SessionLocal()
                 try:
-                    # Находим токены которые истекут в течение следующего часа
-                    threshold = utcnow_naive() + timedelta(hours=1)
+                    # Находим токены которые истекли ИЛИ истекут в течение следующего часа
+                    now = utcnow_naive()
+                    threshold = now + timedelta(hours=1)
 
                     expiring_tokens = db.query(UserToken).filter(
                         UserToken.expires_at.isnot(None),
@@ -254,10 +261,10 @@ class BackgroundTasks:
                         try:
                             logger.info(f"[REFRESH] [TOKEN REFRESH] Refreshing {token.platform} token for user {token.user_id}")
                             
-                            # Use TokenRefreshService internal method to refresh specific token object
+                            # Use token_refresh_service instance method to refresh specific token object
                             # We can also use refresh_if_needed, but we already have the token object.
                             # Calling protected method _refresh_token for efficiency as we are in backend service.
-                            success = await TokenRefreshService._refresh_token(token, db)
+                            success = await token_refresh_service._refresh_token(token, db)
 
                             if success:
                                 logger.info(f"[OK] [TOKEN REFRESH] Successfully refreshed {token.platform} token for user {token.user_id}")

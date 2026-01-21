@@ -10,7 +10,7 @@
  */
 
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 
 interface EngineStatus {
     loaded: boolean;
@@ -47,23 +47,32 @@ const initialState = {
 
 export const useTtsStore = create<TtsState>()(
     devtools(
-        (set) => ({
-            ...initialState,
+        persist(
+            (set) => ({
+                ...initialState,
 
-            setTtsEnabled: (enabled) => set({ ttsEnabled: enabled }),
+                setTtsEnabled: (enabled) => set({ ttsEnabled: enabled }),
 
-            setIsWhitelisted: (value) => set({ isWhitelisted: value }),
+                setIsWhitelisted: (value) => set({ isWhitelisted: value }),
 
-            setEngineStatus: (status) => set({ engineStatus: status }),
+                setEngineStatus: (status) => set({ engineStatus: status }),
 
-            setIsInitialized: (value) => set({ isInitialized: value }),
+                setIsInitialized: (value) => set({ isInitialized: value }),
 
-            setIsToggling: (value) => set({ isToggling: value }),
+                setIsToggling: (value) => set({ isToggling: value }),
 
-            setIsCheckingHealth: (value) => set({ isCheckingHealth: value }),
+                setIsCheckingHealth: (value) => set({ isCheckingHealth: value }),
 
-            reset: () => set(initialState),
-        }),
+                reset: () => set(initialState),
+            }),
+            {
+                name: 'tts-storage',
+                partialize: (state) => ({
+                    ttsEnabled: state.ttsEnabled,
+                    isWhitelisted: state.isWhitelisted,
+                }),
+            }
+        ),
         { name: 'TtsStore' }
     )
 );
@@ -73,3 +82,4 @@ export const useTtsEnabled = () => useTtsStore((state) => state.ttsEnabled);
 export const useIsWhitelisted = () => useTtsStore((state) => state.isWhitelisted);
 export const useEngineStatus = () => useTtsStore((state) => state.engineStatus);
 export const useIsToggling = () => useTtsStore((state) => state.isToggling);
+

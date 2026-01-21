@@ -4,7 +4,6 @@ import {
     AlertCircle,
     Bot,
     CheckCircle,
-    Constants,
     ExternalLink,
     Info,
     RefreshCw,
@@ -38,9 +37,51 @@ export interface TtsStatus {
     url?: string;
 }
 
+// Types for bot status from API
+interface BotStatusFromApi {
+    connected: boolean;
+    channels: number;
+    is_ready?: boolean;
+    is_running?: boolean;
+}
+
+interface BotsObjectFromApi {
+    twitch?: BotStatusFromApi;
+    vk?: BotStatusFromApi;
+}
+
 // Helper functions
-function parseBotsResponse(data: { bots?: BotData[] }): BotData[] {
-    return data?.bots || [];
+function parseBotsResponse(data: { bots?: BotData[] | BotsObjectFromApi }): BotData[] {
+    if (!data?.bots) return [];
+
+    // Если bots уже массив - вернуть его
+    if (Array.isArray(data.bots)) {
+        return data.bots;
+    }
+
+    // Если bots - объект с twitch/vk, преобразовать в массив
+    const botsObj = data.bots as BotsObjectFromApi;
+    const result: BotData[] = [];
+
+    if (botsObj.twitch) {
+        const twitch = botsObj.twitch;
+        result.push({
+            name: 'Twitch Bot',
+            status: twitch.is_ready ? 'running' : (twitch.connected ? 'stopped' : 'error'),
+            connections: twitch.channels
+        });
+    }
+
+    if (botsObj.vk) {
+        const vk = botsObj.vk;
+        result.push({
+            name: 'VK Live Bot',
+            status: vk.is_running ? 'running' : (vk.connected ? 'stopped' : 'error'),
+            connections: vk.channels
+        });
+    }
+
+    return result;
 }
 
 function parseTtsResponse(data: { status?: string; healthy?: boolean; url?: string }): TtsStatus {
@@ -198,11 +239,11 @@ const BotManagementPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
+        <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold mb-2 text-foreground flex items-center">
-                        <Bot className="w-8 h-8 mr-3 text-purple-500" />
+                    <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400 flex items-center">
+                        <Bot className="w-8 h-8 mr-3 text-purple-400" />
                         Управление ботами
                     </h1>
                     <p className="text-muted-foreground">
@@ -211,7 +252,7 @@ const BotManagementPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center space-x-4">
-                    <Button onClick={loadBotsStatus} variant="outline">
+                    <Button onClick={loadBotsStatus} variant="outline" className="hover:bg-primary/10">
                         <RefreshCw className="w-4 h-4 mr-2" />
                         Обновить
                     </Button>
@@ -220,10 +261,10 @@ const BotManagementPage: React.FC = () => {
 
             <div className="grid gap-6 md:grid-cols-2">
                 {/* 1. Bot Service Status */}
-                <Card className="bg-slate-800/50 border-slate-700">
+                <Card className="card-glass border-slate-700/50">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Bot className="w-5 h-5" />
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Bot className="w-5 h-5 text-purple-400" />
                             Bot Service
                         </CardTitle>
                     </CardHeader>
@@ -231,7 +272,7 @@ const BotManagementPage: React.FC = () => {
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-4">
                                 {currentBotStatus === 'running' ? (
-                                    <CheckCircle className="w-8 h-8 text-green-500" />
+                                    <CheckCircle className="w-8 h-8 text-green-500 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]" />
                                 ) : currentBotStatus === 'error' ? (
                                     <Square className="w-8 h-8 text-red-500" />
                                 ) : (
@@ -239,10 +280,10 @@ const BotManagementPage: React.FC = () => {
                                 )}
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <h3 className="font-semibold">Статус сервиса</h3>
+                                        <h3 className="font-semibold text-foreground">Статус сервиса</h3>
                                         {getBotServiceStatusBadge()}
                                     </div>
-                                    <p className="text-sm text-slate-400">
+                                    <p className="text-sm text-muted-foreground">
                                         {getBotServiceDescription(bots)}
                                     </p>
                                 </div>
@@ -254,8 +295,8 @@ const BotManagementPage: React.FC = () => {
                                 onClick={restartBotService}
                                 disabled={restarting['bot_service']}
                                 className={currentBotStatus === 'running'
-                                    ? "border-green-600 text-green-600 hover:bg-green-600 hover:text-white"
-                                    : "border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                                    ? "border-green-600/50 text-green-500 hover:bg-green-500/10"
+                                    : "border-red-600/50 text-red-500 hover:bg-red-500/10"
                                 }
                             >
                                 {restarting['bot_service'] ? (
@@ -270,10 +311,10 @@ const BotManagementPage: React.FC = () => {
                 </Card>
 
                 {/* 2. TTS Engine Status */}
-                <Card className="bg-slate-800/50 border-slate-700">
+                <Card className="card-glass border-slate-700/50">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Info className="w-5 h-5" />
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Info className="w-5 h-5 text-blue-400" />
                             TTS Engine
                         </CardTitle>
                     </CardHeader>
@@ -285,15 +326,15 @@ const BotManagementPage: React.FC = () => {
                                         variant="outline"
                                         className={
                                             ttsStatus?.healthy
-                                                ? "text-green-600 border-green-600"
-                                                : "text-red-600 border-red-600"
+                                                ? "text-green-400 border-green-500/50 bg-green-500/10"
+                                                : "text-red-400 border-red-500/50 bg-red-500/10"
                                         }
                                     >
                                         {ttsStatus?.healthy ? 'Активен' : 'Недоступен'}
                                     </Badge>
                                 </div>
                                 <div className="overflow-hidden">
-                                    <p className="text-sm font-medium truncate">
+                                    <p className="text-sm font-medium truncate text-foreground">
                                         {ttsStatus?.url || TTS_SERVICE_URL}
                                     </p>
                                     {ttsStatus?.error && (
@@ -308,7 +349,7 @@ const BotManagementPage: React.FC = () => {
                                     variant="outline"
                                     onClick={restartTtsEngine}
                                     disabled={restarting['tts_engine']}
-                                    className="border-red-600 text-red-600 hover:bg-red-600 hover:text-white"
+                                    className="border-red-600/50 text-red-500 hover:bg-red-500/10"
                                 >
                                     {restarting['tts_engine'] ? (
                                         <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
@@ -323,8 +364,8 @@ const BotManagementPage: React.FC = () => {
                 </Card>
             </div>
 
-            {/* 3. OAuth Авторизация (New Section) */}
-            <Card className="border-slate-700">
+            {/* 3. OAuth Авторизация */}
+            <Card className="card-glass border-slate-700/50">
                 <CardHeader>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -332,7 +373,7 @@ const BotManagementPage: React.FC = () => {
                             <CardTitle>Авторизация бота (Twitch)</CardTitle>
                         </div>
                         {tokenStatus?.configured && tokenStatus.has_refresh_token && (
-                            <Badge variant="outline" className="gap-1 border-green-500 text-green-500">
+                            <Badge variant="outline" className="gap-1 border-green-500/50 text-green-400 bg-green-500/10">
                                 <CheckCircle className="w-3 h-3" />
                                 Авторизован
                             </Badge>
@@ -351,20 +392,38 @@ const BotManagementPage: React.FC = () => {
                         <div className="flex flex-col md:flex-row gap-6">
                             <div className="flex-1 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-3 bg-muted/30 rounded-lg">
+                                    <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800/50">
                                         <span className="text-xs text-muted-foreground block mb-1">Логин бота</span>
-                                        <span className="font-mono font-medium">{tokenStatus.bot_login}</span>
+                                        <span className="font-mono font-medium text-purple-300">{tokenStatus.bot_login || 'Unknown'}</span>
                                     </div>
-                                    <div className="p-3 bg-muted/30 rounded-lg">
+                                    <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800/50">
                                         <span className="text-xs text-muted-foreground block mb-1">Статус токена</span>
                                         <div className="flex items-center gap-2">
-                                            <Badge variant={getDaysLeftColor(tokenStatus.days_left)}>
-                                                {getDaysLeftText(tokenStatus.days_left)}
-                                            </Badge>
+                                            {/* @ts-ignore - type is not fully typed in frontend yet */}
+                                            {tokenStatus.type === 'legacy' ? (
+                                                <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/50">
+                                                    Legacy Env Token
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant={getDaysLeftColor(tokenStatus.days_left)}>
+                                                    {getDaysLeftText(tokenStatus.days_left)}
+                                                </Badge>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
-                                {tokenStatus.needs_refresh && (
+
+                                {/* @ts-ignore */}
+                                {tokenStatus.type === 'legacy' ? (
+                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
+                                        <AlertCircle className="w-4 h-4 mt-0.5" />
+                                        <div className="text-sm">
+                                            <p className="font-bold mb-1">Используется устаревший метод (env)</p>
+                                            <p>Бот работает через токен из .env файла. Автообновление токена недоступно.</p>
+                                            <p className="mt-1 opacity-80">Рекомендуется авторизовать бота через кнопку справа для автоматического обновления.</p>
+                                        </div>
+                                    </div>
+                                ) : tokenStatus.needs_refresh && (
                                     <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
                                         <AlertCircle className="w-4 h-4 mt-0.5" />
                                         <p className="text-sm">Токен скоро истечет, пожалуйста обновите его вручную.</p>
@@ -377,6 +436,7 @@ const BotManagementPage: React.FC = () => {
                                     variant="outline"
                                     onClick={handleRefreshToken}
                                     disabled={refreshing}
+                                    className="hover:bg-primary/10"
                                 >
                                     {refreshing ? (
                                         <>
@@ -391,8 +451,8 @@ const BotManagementPage: React.FC = () => {
                                     )}
                                 </Button>
                                 <Button
-                                    variant="secondary"
                                     onClick={handleAuthorizeBot}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-900/20"
                                 >
                                     <ExternalLink className="w-4 h-4 mr-2" />
                                     Переавторизовать
@@ -401,14 +461,14 @@ const BotManagementPage: React.FC = () => {
                         </div>
                     ) : (
                         <div className="text-center py-6 space-y-4">
-                            <div className="bg-blue-500/10 text-blue-400 p-4 rounded-lg inline-flex items-center gap-2 mb-2">
+                            <div className="bg-blue-500/10 text-blue-400 p-4 rounded-lg inline-flex items-center gap-2 mb-2 border border-blue-500/20">
                                 <Info className="w-5 h-5" />
                                 <span>Бот не авторизован или токен истек</span>
                             </div>
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Нажмите кнопку ниже, чтобы авторизовать бота через Twitch. Это откроет новое окно.
                             </p>
-                            <Button onClick={handleAuthorizeBot} size="lg" className="bg-[#9146FF] hover:bg-[#772ce8] text-white">
+                            <Button onClick={handleAuthorizeBot} size="lg" className="bg-[#9146FF] hover:bg-[#772ce8] text-white shadow-lg shadow-purple-900/20">
                                 <Bot className="w-5 h-5 mr-2" />
                                 Авторизовать бота
                             </Button>

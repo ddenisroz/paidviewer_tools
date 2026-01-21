@@ -389,6 +389,8 @@ class TTSHandlerService:
                   
                   if count > 0:
                        logger.info(f"[OK] [TWITCH TTS] Auto-fulfilled {count} redemptions")
+                  else:
+                       logger.debug(f"[DEBUG] [TWITCH TTS] No unfulfilled redemptions found for reward {reward_id}")
 
         except Exception as e:
              logger.warning(f"[WARN] Error auto-accepting reward: {e}")

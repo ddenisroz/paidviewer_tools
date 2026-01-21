@@ -70,13 +70,13 @@ const DropsMainPage: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <PageWrapper title="Drops система">
-        <Card className="border-gray-700">
+        <Card className="card-glass">
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-              <AlertCircle className="w-10 h-10 text-gray-500" />
+            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-gray-200">
+              <h3 className="text-xl font-semibold text-white">
                 Требуется авторизация
               </h3>
               <p className="text-gray-400 text-sm">
@@ -103,13 +103,13 @@ const DropsMainPage: React.FC = () => {
   if (!hasAnyIntegration) {
     return (
       <PageWrapper title="Drops система">
-        <Card className="border-gray-700">
+        <Card className="card-glass">
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-              <AlertCircle className="w-10 h-10 text-gray-500" />
+            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-gray-200">
+              <h3 className="text-xl font-semibold text-white">
                 Нет подключенных интеграций
               </h3>
               <p className="text-gray-400 text-sm">
@@ -133,13 +133,13 @@ const DropsMainPage: React.FC = () => {
   if (!channelName || !user) {
     return (
       <PageWrapper title="Drops система">
-        <Card className="border-gray-700">
+        <Card className="card-glass">
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-              <AlertCircle className="w-10 h-10 text-gray-500" />
+            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-gray-200">
+              <h3 className="text-xl font-semibold text-white">
                 Загрузка данных...
               </h3>
               <p className="text-gray-400 text-sm">

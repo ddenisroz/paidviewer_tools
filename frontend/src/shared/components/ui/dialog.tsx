@@ -43,17 +43,17 @@ const DialogContent = React.forwardRef<
 
   // Получаем состояние открытия из Radix
   const [open, setOpen] = React.useState(false);
-  
+
   // Проверяем состояние при монтировании и изменениях
   React.useEffect(() => {
     let observer: MutationObserver | null = null;
-    
+
     const checkState = () => {
       const dialog = dialogRef.current?.closest('[data-state]') as HTMLElement | null;
       if (dialog) {
         const state = dialog.getAttribute('data-state');
         const isOpen = state === 'open';
-        
+
         setOpen(prevOpen => {
           if (prevOpen !== isOpen) {
             if (isOpen) {
@@ -74,7 +74,7 @@ const DialogContent = React.forwardRef<
     // Небольшая задержка для того, чтобы DOM обновился
     const timeoutId = setTimeout(() => {
       checkState();
-      
+
       // Подписываемся на изменения состояния
       const dialog = dialogRef.current?.closest('[data-state]') as HTMLElement | null;
       if (dialog) {
@@ -99,13 +99,13 @@ const DialogContent = React.forwardRef<
       const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
       const originalPaddingRight = document.body.style.paddingRight;
       const originalOverflow = document.body.style.overflow;
-      
+
       // Блокируем прокрутку и добавляем padding для компенсации скроллбара
       document.body.style.overflow = 'hidden';
       if (scrollbarWidth > 0) {
         document.body.style.paddingRight = `${scrollbarWidth}px`;
       }
-      
+
       return () => {
         // Восстанавливаем исходные значения
         document.body.style.overflow = originalOverflow || '';
@@ -138,18 +138,18 @@ const DialogContent = React.forwardRef<
 
   return (
     <DialogPortal>
-      <DialogOverlay 
+      <DialogOverlay
         ref={overlayRef}
         onClick={handleOverlayClick}
         className={cn(
-          "transition-opacity duration-200",
+          "transition-opacity duration-200 backdrop-blur-sm",
           isAnimating ? "opacity-0" : "opacity-100"
         )}
       />
       <DialogPrimitive.Content
         ref={dialogRef}
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 sm:rounded-lg",
+          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-white/10 bg-slate-900/95 backdrop-blur-xl p-6 shadow-2xl duration-200 sm:rounded-xl",
           "transform transition-all duration-200",
           isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100",
           className

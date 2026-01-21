@@ -60,15 +60,36 @@ export const useQuickActionsLogic = () => {
         initialData: () => getQueryCache(['tts-status']) || undefined,
     });
 
+    // Optimistic local state for immediate UI feedback
+    const [optimisticTtsState, setOptimisticTtsState] = useState<boolean | null>(null);
+
     useEffect(() => {
         if (ttsStatusResponse?.data) {
             setQueryCache(['tts-status'], ttsStatusResponse.data);
+            // Reset optimistic state when real data arrives
+            setOptimisticTtsState(null);
         }
     }, [ttsStatusResponse]);
+
+    // Sync TTS state when changed from other components (e.g., Shift+T shortcut)
+    useEffect(() => {
+        const handleExternalTtsChange = (e: Event) => {
+            const customEvent = e as CustomEvent<{ enabled: boolean }>;
+            // Set optimistic state immediately for external changes too
+            setOptimisticTtsState(customEvent.detail.enabled);
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+        };
+        window.addEventListener('tts-status-changed', handleExternalTtsChange);
+        return () => window.removeEventListener('tts-status-changed', handleExternalTtsChange);
+    }, [queryClient]);
 
     const ttsStatusData = ttsStatusResponse?.data;
 
     const toggleTtsMutation = useToggleTts({
+        onMutate: (enabled: boolean) => {
+            // Optimistic update - show new state immediately
+            setOptimisticTtsState(enabled);
+        },
         onSuccess: (response, enabled) => {
             if (response?.data) {
                 setQueryCache(['tts-status'], response.data);
@@ -78,14 +99,21 @@ export const useQuickActionsLogic = () => {
                 detail: { enabled }
             }));
         },
+        onError: () => {
+            // Revert optimistic update on error
+            setOptimisticTtsState(null);
+        },
     });
 
+    // Use optimistic state if set, otherwise use API state
     const ttsState = useMemo(() => {
+        if (optimisticTtsState !== null) {
+            return optimisticTtsState;
+        }
         const statusData = ttsStatusData as TtsStatusData | undefined;
         if (!statusData) return false;
-        // Просто проверяем enabled - не важно какой тип движка
         return statusData.enabled || false;
-    }, [ttsStatusData]);
+    }, [optimisticTtsState, ttsStatusData]);
 
     const { data: dropsConfigData } = useDropsConfig(channelName, {
         enabled: !!isAuthenticated && isDropsEnabled && !!channelName,

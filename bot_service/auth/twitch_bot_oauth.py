@@ -16,6 +16,7 @@ from core.config import settings
 from core.permissions import require_role, AppRole
 from services.twitch_bot_oauth_service import twitch_bot_oauth_service
 from core.security_modern import limiter
+from auth.auth import get_admin_user, get_session_data
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ async def login_twitch_bot(request: Request):
     """
     try:
         # Проверяем авторизацию через session_id
-        from auth.auth import get_session_data
+        # Проверяем авторизацию через session_id
         
         session_data = get_session_data(request)
         if not session_data:
@@ -189,7 +190,7 @@ async def twitch_bot_callback(
 async def refresh_bot_token(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_role(AppRole.ADMIN))
+    current_user: Dict[str, Any] = Depends(get_admin_user)
 ):
     """
     Принудительно обновить токен бота.
@@ -238,7 +239,7 @@ async def refresh_bot_token(
 async def get_bot_token_status(
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Dict[str, Any] = Depends(require_role(AppRole.ADMIN))
+    current_user: Dict[str, Any] = Depends(get_admin_user)
 ):
     """
     Получить статус токена бота.
@@ -246,34 +247,56 @@ async def get_bot_token_status(
     Требует права администратора.
     """
     try:
+        # 1. Сначала ищем в БД (приоритет)
         bot_token = await twitch_bot_oauth_service.get_bot_token(db)
         
-        if not bot_token:
+        if bot_token:
+            from core.datetime_utils import utcnow_naive
+            
+            expires_at = bot_token.get('expires_at')
+            days_left = None
+            needs_refresh = False
+            
+            if expires_at:
+                days_left = (expires_at - utcnow_naive()).days
+                needs_refresh = days_left < 7
+            
             return {
-                "success": False,
-                "configured": False,
-                "message": "Bot token not configured. Please authorize the bot."
+                "success": True,
+                "configured": True,
+                "type": "oauth",
+                "bot_login": bot_token.get('bot_login'),
+                "bot_user_id": bot_token.get('bot_user_id'),
+                "expires_at": expires_at.isoformat() if expires_at else None,
+                "days_left": days_left,
+                "needs_refresh": needs_refresh,
+                "has_refresh_token": bool(bot_token.get('refresh_token'))
             }
-        
-        from core.datetime_utils import utcnow_naive
-        
-        expires_at = bot_token.get('expires_at')
-        days_left = None
-        needs_refresh = False
-        
-        if expires_at:
-            days_left = (expires_at - utcnow_naive()).days
-            needs_refresh = days_left < 7
+
+        # 2. Если в БД нет, проверяем Legacy .env токен
+        if settings.twitch_bot_token:
+            # Валидируем токен
+            from services.bot_token_validator import bot_token_validator
+            validation = await bot_token_validator.validate_twitch_bot_token()
+            
+            if validation.get('valid'):
+                return {
+                    "success": True,
+                    "configured": True,
+                    "type": "legacy",
+                    "bot_login": validation.get('login'),
+                    "bot_user_id": validation.get('user_id'),
+                    "expires_at": None, # Неизвестно для legacy
+                    "days_left": 30, # Фейковое значение чтобы не краснело
+                    "needs_refresh": False,
+                    "has_refresh_token": False,
+                    "message": "Using legacy .env token. Auto-refresh unavailable."
+                }
         
         return {
-            "success": True,
-            "configured": True,
-            "bot_login": bot_token.get('bot_login'),
-            "bot_user_id": bot_token.get('bot_user_id'),
-            "expires_at": expires_at.isoformat() if expires_at else None,
-            "days_left": days_left,
-            "needs_refresh": needs_refresh,
-            "has_refresh_token": bool(bot_token.get('refresh_token'))
+            "success": False,
+            "configured": False,
+            "message": "Bot token not configured. Please authorize the bot."
         }
         
     except Exception as e:

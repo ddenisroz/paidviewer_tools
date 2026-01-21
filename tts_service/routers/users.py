@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session
-from core.database import get_db
+from tts_service.database import get_db
 from tts_service.database import Voice as VoiceModel
 from tts_service.config import config
 from tts_service.tts_engine import tts_engine_manager
@@ -365,7 +365,7 @@ async def update_user_voice_settings(
 
 # --- LIMITS & STATS ---
 
-from tts_service.tts_schemas import UserTTSLimitsSchema
+from tts_service.models import UserTTSLimitsSchema
 
 @router.get("/user/tts-limits/{user_id}")
 async def get_user_tts_limits(user_id: int, db: Session = Depends(get_db)):

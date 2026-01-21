@@ -7,38 +7,39 @@
 
 /* Spacing Utility Classes - Use these for consistent spacing */
 @layer utilities {
+
   /* Card spacing utilities */
   .card-padding {
     padding: var(--card-padding);
   }
-  
+
   .card-gap {
     gap: var(--card-gap);
   }
-  
+
   /* Section spacing utilities */
   .section-gap {
     gap: var(--section-gap);
   }
-  
+
   .section-spacing {
     margin-bottom: var(--section-gap);
   }
-  
+
   /* Form spacing utilities */
   .form-field-gap {
     gap: var(--form-field-gap);
   }
-  
+
   .form-spacing {
     margin-bottom: var(--form-field-gap);
   }
-  
+
   /* List spacing utilities */
   .list-gap {
     gap: var(--list-item-gap);
   }
-  
+
   /* Button spacing utilities */
   .button-padding {
     padding: var(--button-padding-y) var(--button-padding-x);
@@ -88,6 +89,7 @@ body {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -98,6 +100,7 @@ body {
     transform: scale(0.9);
     opacity: 0.8;
   }
+
   100% {
     transform: scale(1.1);
     opacity: 0;
@@ -113,78 +116,103 @@ body {
 .auth-pulse {
   animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
 }
- 
+
 @layer base {
   :root {
-    --background: 260 30% 8%; /* Darker Purple */
-    --foreground: 270 20% 95%; /* Light Lavender */
+    --background: 260 30% 8%;
+    /* Darker Purple */
+    --foreground: 270 20% 95%;
+    /* Light Lavender */
 
     --card: 260 30% 10%;
     --card-foreground: 270 20% 95%;
- 
+
     --popover: 260 30% 8%;
     --popover-foreground: 270 20% 95%;
- 
-    --primary: 266 90% 60%; /* Twitch Purple */
+
+    --primary: 266 90% 60%;
+    /* Twitch Purple */
     --primary-foreground: 270 20% 98%;
- 
+
     --secondary: 260 30% 15%;
     --secondary-foreground: 270 20% 98%;
- 
+
     --muted: 260 30% 15%;
     --muted-foreground: 270 20% 70%;
- 
+
     --accent: 260 30% 18%;
     --accent-foreground: 270 20% 98%;
- 
+
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 86% 97%;
 
     --border: 260 30% 15%;
     --input: 260 30% 18%;
     --ring: 266 90% 65%;
- 
+
     --radius: 0.5rem;
-    
+
     /* Quality colors для Drops системы - стандартизированные */
-    --quality-common: 215 16% 47%;      /* #6B7280 */
-    --quality-rare: 217 91% 60%;        /* #3B82F6 */
-    --quality-epic: 262 83% 58%;        /* #8B5CF6 */
-    --quality-legendary: 38 92% 50%;    /* #F59E0B */
-    --quality-mythical: 310 70% 55%;    /* Мифический */
-    
+    --quality-common: 215 16% 47%;
+    /* #6B7280 */
+    --quality-rare: 217 91% 60%;
+    /* #3B82F6 */
+    --quality-epic: 262 83% 58%;
+    /* #8B5CF6 */
+    --quality-legendary: 38 92% 50%;
+    /* #F59E0B */
+    --quality-mythical: 310 70% 55%;
+    /* Мифический */
+
     /* Typography - стандартизированные шрифты */
     /* Font families with consistent fallbacks to prevent layout shift */
     --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
-    
+
     /* Font rendering optimization */
     --font-smoothing: antialiased;
     --font-feature-settings: 'cv11', 'ss01';
-    
+
     /* Spacing System - 8px grid for consistent spacing across the application */
     /* Use these variables for padding, margin, gap, and other spacing properties */
-    --spacing-0: 0;           /* 0px - No spacing */
-    --spacing-1: 0.5rem;      /* 8px - Minimal spacing */
-    --spacing-2: 1rem;        /* 16px - Small spacing */
-    --spacing-3: 1.5rem;      /* 24px - Medium spacing */
-    --spacing-4: 2rem;        /* 32px - Large spacing */
-    --spacing-5: 2.5rem;      /* 40px - Extra large spacing */
-    --spacing-6: 3rem;        /* 48px - XXL spacing */
-    --spacing-8: 4rem;        /* 64px - Section spacing */
-    --spacing-10: 5rem;       /* 80px - Large section spacing */
-    --spacing-12: 6rem;       /* 96px - Page spacing */
-    
+    --spacing-0: 0;
+    /* 0px - No spacing */
+    --spacing-1: 0.5rem;
+    /* 8px - Minimal spacing */
+    --spacing-2: 1rem;
+    /* 16px - Small spacing */
+    --spacing-3: 1.5rem;
+    /* 24px - Medium spacing */
+    --spacing-4: 2rem;
+    /* 32px - Large spacing */
+    --spacing-5: 2.5rem;
+    /* 40px - Extra large spacing */
+    --spacing-6: 3rem;
+    /* 48px - XXL spacing */
+    --spacing-8: 4rem;
+    /* 64px - Section spacing */
+    --spacing-10: 5rem;
+    /* 80px - Large section spacing */
+    --spacing-12: 6rem;
+    /* 96px - Page spacing */
+
     /* Component-specific spacing presets */
-    --card-padding: var(--spacing-4);           /* 32px - Standard card padding */
-    --card-gap: var(--spacing-3);               /* 24px - Gap between card elements */
-    --section-gap: var(--spacing-6);            /* 48px - Gap between sections */
-    --form-field-gap: var(--spacing-2);         /* 16px - Gap between form fields */
-    --button-padding-x: var(--spacing-3);       /* 24px - Button horizontal padding */
-    --button-padding-y: var(--spacing-2);       /* 16px - Button vertical padding */
-    --list-item-gap: var(--spacing-2);          /* 16px - Gap between list items */
+    --card-padding: var(--spacing-4);
+    /* 32px - Standard card padding */
+    --card-gap: var(--spacing-3);
+    /* 24px - Gap between card elements */
+    --section-gap: var(--spacing-6);
+    /* 48px - Gap between sections */
+    --form-field-gap: var(--spacing-2);
+    /* 16px - Gap between form fields */
+    --button-padding-x: var(--spacing-3);
+    /* 24px - Button horizontal padding */
+    --button-padding-y: var(--spacing-2);
+    /* 16px - Button vertical padding */
+    --list-item-gap: var(--spacing-2);
+    /* 16px - Gap between list items */
   }
- 
+
   .dark {
     /* Same as root for a forced dark theme */
     --background: 260 30% 8%;
@@ -192,22 +220,22 @@ body {
 
     --card: 260 30% 10%;
     --card-foreground: 270 20% 95%;
- 
+
     --popover: 260 30% 8%;
     --popover-foreground: 270 20% 95%;
- 
+
     --primary: 266 90% 60%;
     --primary-foreground: 270 20% 98%;
- 
+
     --secondary: 260 30% 15%;
     --secondary-foreground: 270 20% 98%;
- 
+
     --muted: 260 30% 15%;
     --muted-foreground: 270 20% 70%;
- 
+
     --accent: 260 30% 18%;
     --accent-foreground: 270 20% 98%;
- 
+
     --destructive: 0 63% 31%;
     --destructive-foreground: 0 86% 97%;
 
@@ -219,13 +247,17 @@ body {
 
 /* Правильный перенос эмоджи и Unicode символов */
 @layer base {
+
   /* Улучшенная обработка переноса для эмоджи и Unicode */
-  p, span, div, textarea {
+  p,
+  span,
+  div,
+  textarea {
     word-break: break-word;
     overflow-wrap: anywhere;
     /* Для эмоджи и других Unicode символов */
   }
-  
+
   /* Специально для сообщений в тикетах и чате */
   .ticket-message,
   .chat-message,
@@ -236,15 +268,17 @@ body {
     white-space: pre-wrap;
   }
 }
- 
+
 @layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-family-base) !important;
-    font-size: 14px !important; /* Базовый размер по умолчанию */
+    font-size: 14px !important;
+    /* Базовый размер по умолчанию */
     line-height: 1.5 !important;
     -webkit-font-smoothing: var(--font-smoothing);
     -moz-osx-font-smoothing: grayscale;
@@ -253,9 +287,14 @@ body {
     text-size-adjust: 100%;
     -webkit-text-size-adjust: 100%;
   }
-  
+
   /* Устанавливаем базовые размеры для предотвращения FOUT */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-size: inherit;
     font-weight: inherit;
     line-height: inherit;
@@ -275,115 +314,18 @@ body {
 }
 
 [data-sonner-toaster][data-y-position="top"] {
-  top: 120px !important; /* Увеличено для header (64px) + отступ (56px) */
+  top: 120px !important;
+  /* Увеличено для header (64px) + отступ (56px) */
 }
 
-/* Стандартизированные стили для всех toast */
+[data-sonner-toaster][data-y-position="bottom"] {
+  bottom: 16px !important;
+}
+
+/* Стандартизированные стили для всех toast - базовые правила позиционирования и анимации */
 [data-sonner-toast] {
-  --tw-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-  --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -2px var(--tw-shadow-color);
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
-  border-radius: calc(var(--radius) + 2px);
-  font-family: inherit;
   pointer-events: auto !important;
   margin-bottom: 8px !important;
-}
-
-.toast-base {
-  background: hsl(var(--card)) !important;
-  border: 1px solid hsl(var(--border)) !important;
-  color: hsl(var(--foreground)) !important;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.toast-title {
-  font-weight: 600;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  color: hsl(var(--foreground));
-}
-
-.toast-description {
-  font-size: 0.8125rem;
-  line-height: 1.4;
-  color: hsl(var(--muted-foreground));
-  margin-top: 0.25rem;
-}
-
-/* Success toast - зеленый с акцентом */
-[data-sonner-toast][data-type="success"] {
-  background: linear-gradient(135deg, hsl(142, 76%, 36%) 0%, hsl(142, 70%, 45%) 100%) !important;
-  border-color: hsl(142, 76%, 36%) !important;
-  color: white !important;
-}
-
-[data-sonner-toast][data-type="success"] .toast-title,
-[data-sonner-toast][data-type="success"] .toast-description {
-  color: white !important;
-}
-
-/* Error toast - красный с акцентом */
-[data-sonner-toast][data-type="error"] {
-  background: linear-gradient(135deg, hsl(0, 84%, 60%) 0%, hsl(0, 72%, 51%) 100%) !important;
-  border-color: hsl(0, 84%, 60%) !important;
-  color: white !important;
-}
-
-[data-sonner-toast][data-type="error"] .toast-title,
-[data-sonner-toast][data-type="error"] .toast-description {
-  color: white !important;
-}
-
-/* Warning toast - желтый с акцентом */
-[data-sonner-toast][data-type="warning"] {
-  background: linear-gradient(135deg, hsl(38, 92%, 50%) 0%, hsl(32, 95%, 44%) 100%) !important;
-  border-color: hsl(38, 92%, 50%) !important;
-  color: white !important;
-}
-
-[data-sonner-toast][data-type="warning"] .toast-title,
-[data-sonner-toast][data-type="warning"] .toast-description {
-  color: white !important;
-}
-
-/* Info toast - синий с акцентом */
-[data-sonner-toast][data-type="info"] {
-  background: linear-gradient(135deg, hsl(217, 91%, 60%) 0%, hsl(221, 83%, 53%) 100%) !important;
-  border-color: hsl(217, 91%, 60%) !important;
-  color: white !important;
-}
-
-[data-sonner-toast][data-type="info"] .toast-title,
-[data-sonner-toast][data-type="info"] .toast-description {
-  color: white !important;
-}
-
-/* Default toast - использует тему */
-[data-sonner-toast]:not([data-type]) {
-  background: hsl(var(--card)) !important;
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Иконки и кнопки */
-[data-sonner-toast] [data-icon] {
-  color: currentColor;
-  flex-shrink: 0;
-}
-
-[data-sonner-toast] [data-close-button] {
-  color: hsl(var(--muted-foreground));
-  opacity: 0.7;
-  transition: opacity 0.2s, color 0.2s;
-}
-
-[data-sonner-toast] [data-close-button]:hover {
-  opacity: 1;
-  color: hsl(var(--foreground));
-}
-
-/* Анимации */
-[data-sonner-toast] {
   animation: toast-in 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
 }
 
@@ -400,6 +342,7 @@ body {
     transform: translateX(calc(100% + 1rem));
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
@@ -411,6 +354,7 @@ body {
     opacity: 1;
     transform: translateX(0);
   }
+
   to {
     opacity: 0;
     transform: translateX(calc(100% + 1rem));
@@ -419,38 +363,41 @@ body {
 
 /* Полностью скрываем скроллбар */
 ::-webkit-scrollbar {
-    width: 0px;
-    background: transparent;
+  width: 0px;
+  background: transparent;
 }
+
 ::-webkit-scrollbar-track {
-    background: transparent;
+  background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-    background: transparent;
+  background: transparent;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-    background: transparent;
+  background: transparent;
 }
 
 /* Для Firefox */
 html {
-    scrollbar-width: none;
+  scrollbar-width: none;
 }
 
 /* Убираем полоску скроллбара полностью */
 body {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 /* Дополнительно скрываем скроллбар */
 * {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 *::-webkit-scrollbar {
-    display: none;
+  display: none;
 }
 
 /* Body font - использует CSS переменную */
@@ -478,6 +425,7 @@ body {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -488,6 +436,7 @@ body {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -498,12 +447,10 @@ body {
 }
 
 .animate-progress-shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent);
   background-size: 200% 100%;
   animation: progress-shimmer 2s infinite;
 }
@@ -513,6 +460,7 @@ body {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -522,16 +470,20 @@ body {
   from {
     transform: rotate(360deg);
   }
+
   to {
     transform: rotate(0deg);
   }
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.1);
@@ -542,6 +494,7 @@ body {
   0% {
     transform: rotate(0deg) translateX(30px) rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg) translateX(30px) rotate(-360deg);
   }
@@ -571,23 +524,27 @@ body {
 }
 
 @keyframes gentle-glow {
-  0% { 
+  0% {
     background-position: 0% 50%;
     filter: brightness(1);
   }
+
   25% {
     background-position: 50% 0%;
     filter: brightness(1.1);
   }
-  50% { 
+
+  50% {
     background-position: 100% 50%;
     filter: brightness(1.05);
   }
+
   75% {
     background-position: 50% 100%;
     filter: brightness(1.1);
   }
-  100% { 
+
+  100% {
     background-position: 0% 50%;
     filter: brightness(1);
   }
@@ -620,24 +577,26 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 200px; /* Высота свечения */
+  height: 200px;
+  /* Высота свечения */
   background: radial-gradient(ellipse at top, rgba(167, 139, 250, 0.15), transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
 
-.login-card > * {
+.login-card>* {
   position: relative;
   z-index: 1;
 }
 
 @keyframes rotate-glow {
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Анимация курсора для заголовка */
@@ -646,11 +605,15 @@ body {
 }
 
 @keyframes blink {
-  from, to {
+
+  from,
+  to {
     color: transparent;
   }
+
   50% {
-    color: #34D399; /* Зеленый цвет курсора */
+    color: #34D399;
+    /* Зеленый цвет курсора */
   }
 }
 
@@ -660,6 +623,7 @@ body {
     transform: translate(-50%, 20px);
     opacity: 0;
   }
+
   to {
     transform: translate(-50%, 0);
     opacity: 1;
@@ -671,6 +635,7 @@ body {
     transform: translate(-50%, 0);
     opacity: 1;
   }
+
   to {
     transform: translate(-50%, 20px);
     opacity: 0;
@@ -690,6 +655,7 @@ body {
   0% {
     transform: translateX(-100%);
   }
+
   100% {
     transform: translateX(100%);
   }
@@ -705,10 +671,12 @@ body {
     opacity: 0;
     transform: scale(0.8) rotateY(180deg);
   }
+
   50% {
     opacity: 0.8;
     transform: scale(1.1) rotateY(90deg);
   }
+
   100% {
     opacity: 1;
     transform: scale(1) rotateY(0deg);
@@ -724,15 +692,19 @@ body {
   0% {
     transform: scale(1) rotateY(0deg);
   }
+
   25% {
     transform: scale(1.1) rotateY(90deg);
   }
+
   50% {
     transform: scale(1.2) rotateY(180deg);
   }
+
   75% {
     transform: scale(1.1) rotateY(270deg);
   }
+
   100% {
     transform: scale(1) rotateY(360deg);
   }
@@ -757,9 +729,12 @@ body {
 }
 
 @keyframes legendary-pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
   }
+
   50% {
     box-shadow: 0 0 40px rgba(251, 191, 36, 0.9);
   }
@@ -771,10 +746,12 @@ body {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.7;
     transform: scale(1.05);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);
@@ -791,10 +768,12 @@ body {
     opacity: 0;
     transform: scale(0) rotate(0deg);
   }
+
   50% {
     opacity: 1;
     transform: scale(1.2) rotate(180deg);
   }
+
   100% {
     opacity: 0;
     transform: scale(0) rotate(360deg);
@@ -848,15 +827,24 @@ input[placeholder] {
 }
 
 @keyframes bounce {
-  0%, 20%, 53%, 80%, 100% {
-    transform: translate3d(0,0,0);
+
+  0%,
+  20%,
+  53%,
+  80%,
+  100% {
+    transform: translate3d(0, 0, 0);
   }
-  40%, 43% {
+
+  40%,
+  43% {
     transform: translate3d(0, -8px, 0);
   }
+
   70% {
     transform: translate3d(0, -4px, 0);
   }
+
   90% {
     transform: translate3d(0, -2px, 0);
   }
@@ -868,8 +856,13 @@ input[placeholder] {
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Убираем transitions только для некоторых элементов */
@@ -903,4 +896,50 @@ input[placeholder] {
 
 .chatbox-preview-scroll::-webkit-scrollbar-thumb:hover {
   background: #6B7280;
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-right {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-left {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scale {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }

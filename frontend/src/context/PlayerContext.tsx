@@ -194,7 +194,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             }
             dispatch({
                 type: 'SET_ERROR',
-                payload: '������ �������� �������'
+                payload: 'Ошибка загрузки очереди'
             });
             dispatch({ type: 'SET_LOADING', payload: false });
         }
@@ -231,7 +231,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             logger.error('Error skipping to next video:', error);
             dispatch({
                 type: 'SET_ERROR',
-                payload: '�� ������� ������� � ���������� �����'
+                payload: 'Не удалось перейти к следующему видео'
             });
         },
     });
@@ -313,7 +313,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                     lastUpdateTimeRef.current = time;
                 }
             } catch {
-                // ���������� ������
+                // Игнорируем ошибки
             }
         }
     }, [state.playerRef]);
@@ -333,10 +333,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         if (playerState === 1) {
             dispatch({ type: 'SET_PLAYING', payload: true });
             dispatch({ type: 'SET_VISIBLE', payload: true });
-            logger.debug('?? [YOUTUBE] Playing, mini-player visible');
+            logger.debug('▶ [YOUTUBE] Playing, mini-player visible');
         } else if (playerState === 2) {
             dispatch({ type: 'SET_PLAYING', payload: false });
-            logger.debug('?? [YOUTUBE] Paused');
+            logger.debug('⏸ [YOUTUBE] Paused');
         } else if (playerState === 0) {
             logger.debug('[SKIP] [YOUTUBE] Video ended, switching to next');
             nextVideo();
@@ -344,7 +344,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             try {
                 if (player && player.playVideo) {
                     player.playVideo();
-                    logger.debug('?? [YOUTUBE] Auto-play triggered (video cued)');
+                    logger.debug('▶ [YOUTUBE] Auto-play triggered (video cued)');
                 }
             } catch (error: unknown) {
                 const err = error as { message?: string };
@@ -361,8 +361,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
         // Error codes: 2 (invalid ID), 5 (HTML5 error), 100 (not found), 101/150 (not embeddable)
         if ([2, 100, 101, 150].includes(errorCode)) {
-            toast.error('����� ����������, ������� � ����������');
-            nextVideo(); // ������������� ���������� ���������� �����
+            toast.error('Видео недоступно, переход к следующему');
+            nextVideo(); // Автоматически включаем следующее видео
         }
     };
 
@@ -442,11 +442,11 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             logger.debug(`[AUDIO] [YouTube] Audio priority change: ${action} (${reason})`);
 
             if (action === 'pause_youtube' && state.playerRef && state.isPlaying) {
-                logger.debug('?? [YouTube] Pausing for TTS');
+                logger.debug('⏸ [YouTube] Pausing for TTS');
                 state.playerRef.pauseVideo();
                 dispatch({ type: 'SET_PLAYING', payload: false });
             } else if (action === 'resume_youtube' && state.playerRef && !state.isPlaying && state.currentVideo) {
-                logger.debug('?? [YouTube] Resuming after TTS');
+                logger.debug('▶ [YouTube] Resuming after TTS');
                 state.playerRef.playVideo();
                 dispatch({ type: 'SET_PLAYING', payload: true });
             } else if (action === 'duck_youtube' && state.playerRef) {
@@ -508,4 +508,3 @@ export const usePlayer = (): PlayerContextValue => {
 };
 
 export default PlayerContext;
-

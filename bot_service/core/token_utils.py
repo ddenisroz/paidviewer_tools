@@ -128,7 +128,9 @@ async def validate_platform_token(token) -> bool:
 
         elif token.platform == 'vk':
             # VK Validation (using dev endpoint as in original code)
-            async with httpx.AsyncClient(timeout=TOKEN_VALIDATION_TIMEOUT, verify=False) as client:
+            from core.config import settings
+            ssl_verify = settings.is_production
+            async with httpx.AsyncClient(timeout=TOKEN_VALIDATION_TIMEOUT, verify=ssl_verify) as client:
                 try:
                     response = await client.get(
                         "https://apidev.live.vkvideo.ru/v1/current_user",

@@ -1,7 +1,7 @@
-// src/components/chatbox/AnimationSettings.tsx
 import React from 'react';
 
 import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
 
 interface AnimationSettingsProps {
     animationType: string;
@@ -28,55 +28,45 @@ const AnimationSettings: React.FC<AnimationSettingsProps> = ({
                 <select
                     value={animationType}
                     onChange={(e) => onAnimationTypeChange(e.target.value)}
-                    className="w-full bg-gray-800 text-white border-gray-600 rounded-lg p-2"
+                    className="w-full bg-gray-800 text-white border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 >
-                    <option value="fade">Появление</option>
-                    <option value="slide-right">← Слева</option>
-                    <option value="slide-left">Справа →</option>
-                    <option value="scale">Увеличение</option>
-                    <option value="bounce">Подпрыгивание</option>
+                    <option value="fade">Появление (Fade)</option>
+                    <option value="slide-right">← Слева (Slide Left)</option>
+                    <option value="slide-left">Справа → (Slide Right)</option>
+                    <option value="scale">Увеличение (Scale)</option>
+                    <option value="bounce">Подпрыгивание (Bounce)</option>
                 </select>
             </div>
-            
+
             {/* Animation Duration */}
-            <div className="space-y-2">
+            <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <Label className="text-white">Длительность анимации</Label>
                     <span className="text-sm text-gray-400">{animationDuration}ms</span>
                 </div>
-                <input
-                    type="range"
-                    min="100"
-                    max="1000"
-                    step="100"
-                    value={animationDuration}
-                    onChange={(e) => onAnimationDurationChange(parseInt(e.target.value) || 300)}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    style={{
-                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((animationDuration - 100) / 900) * 100}%, #374151 ${((animationDuration - 100) / 900) * 100}%, #374151 100%)`
-                    }}
+                <Slider
+                    value={[animationDuration]}
+                    min={100}
+                    max={2000}
+                    step={100}
+                    onValueChange={(val) => onAnimationDurationChange(val[0])}
                 />
             </div>
-            
+
             {/* Message Fade Duration */}
-            <div className="space-y-2">
+            <div className="space-y-3">
                 <div className="flex items-center justify-between">
                     <Label className="text-white">Исчезание сообщений</Label>
                     <span className="text-sm text-gray-400">
                         {messageFadeSeconds === 60 ? 'Никогда' : `${messageFadeSeconds}с`}
                     </span>
                 </div>
-                <input
-                    type="range"
-                    min="10"
-                    max="60"
-                    step="10"
-                    value={messageFadeSeconds}
-                    onChange={(e) => onMessageFadeSecondsChange(parseInt(e.target.value) || 60)}
-                    className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    style={{
-                        background: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((messageFadeSeconds - 10) / 50) * 100}%, #374151 ${((messageFadeSeconds - 10) / 50) * 100}%, #374151 100%)`
-                    }}
+                <Slider
+                    value={[messageFadeSeconds]}
+                    min={5}
+                    max={120}
+                    step={5}
+                    onValueChange={(val) => onMessageFadeSecondsChange(val[0])}
                 />
             </div>
         </div>

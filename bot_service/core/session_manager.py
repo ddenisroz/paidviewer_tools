@@ -530,8 +530,8 @@ class SessionManager:
     async def _notify_all_sessions_terminated_for_channel(self, channel_name: str, reason: str):
         """Вспомогательный метод для уведомлений"""
         try:
-            from core.connection_manager import ConnectionManager
-            manager = ConnectionManager()
+            from core.connection_manager import get_connection_manager
+            manager = get_connection_manager()
             await manager.notify_all_sessions_terminated_for_channel(channel_name, reason)
         except Exception as e:
             logger.error(f"Error in _notify_all_sessions_terminated_for_channel: {e}")

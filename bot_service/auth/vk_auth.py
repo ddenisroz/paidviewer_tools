@@ -191,7 +191,8 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             logger.info("Attempting to get user info with token...")
 
             user_info = None
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=False) as client:
+            ssl_verify = settings.is_production
+            async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=ssl_verify) as client:
                 # Используем dev API (только он доступен)
                 endpoint = "https://apidev.live.vkvideo.ru/v1/current_user"
                 try:

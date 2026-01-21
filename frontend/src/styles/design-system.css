@@ -83,16 +83,38 @@
 
 /* === Стандартизированные отступы === */
 /* Используем Tailwind spacing, но для консистентности добавляем утилиты */
-.spacing-xs { gap: 0.5rem; }
-.spacing-sm { gap: 0.75rem; }
-.spacing-md { gap: 1rem; }
-.spacing-lg { gap: 1.5rem; }
-.spacing-xl { gap: 2rem; }
+.spacing-xs {
+  gap: 0.5rem;
+}
+
+.spacing-sm {
+  gap: 0.75rem;
+}
+
+.spacing-md {
+  gap: 1rem;
+}
+
+.spacing-lg {
+  gap: 1.5rem;
+}
+
+.spacing-xl {
+  gap: 2rem;
+}
 
 /* === Стандартизированные радиусы скругления === */
-.radius-card { border-radius: calc(var(--radius) + 2px); }
-.radius-button { border-radius: var(--radius); }
-.radius-input { border-radius: calc(var(--radius) - 2px); }
+.radius-card {
+  border-radius: calc(var(--radius) + 2px);
+}
+
+.radius-button {
+  border-radius: var(--radius);
+}
+
+.radius-input {
+  border-radius: calc(var(--radius) - 2px);
+}
 
 /* === Стандартизированные тени === */
 .shadow-card {
@@ -133,11 +155,22 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.5;
   }
 }
 
+
+/* === Standardized Glass Card (Premium Dark) === */
+.card-glass {
+  background-color: rgba(15, 17, 23, 0.85);
+  /* Much darker, nearly opaque for rich contrast */
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}

@@ -36,18 +36,18 @@ interface ChatMessageItemProps {
     truncateWords: (text: string | undefined, maxWords: number) => string;
 }
 
-const ChatMessageItem = memo<ChatMessageItemProps>(({ 
-    msg, 
-    index, 
-    settings, 
-    lastAddedMessageId, 
-    emotes, 
+const ChatMessageItem = memo<ChatMessageItemProps>(({
+    msg,
+    index,
+    settings,
+    lastAddedMessageId,
+    emotes,
     onNicknameClick,
-    truncateWords 
+    truncateWords
 }) => {
     const messageId = msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`;
     const isNewMessage = messageId === lastAddedMessageId;
-    
+
     const messageStyle = useMemo(() => {
         const baseStyle: React.CSSProperties = {
             borderRadius: `${settings?.border_radius || 8}px`,
@@ -61,76 +61,76 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
             backgroundColor: settings.chat_direction === 'horizontal' ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
             marginTop: index > 0 && settings.chat_direction !== 'horizontal' ? `${settings?.message_spacing || 4}px` : '0'
         };
-        
+
         if (isNewMessage) {
             const animationType = settings?.animation_type || 'fade';
             const animationDuration = settings?.animation_duration || 300;
-            
-            const animationName = 
+
+            const animationName =
                 animationType === 'fade' ? 'fadeIn' :
-                animationType === 'slide-right' ? 'slideRight' :
-                animationType === 'slide-left' ? 'slideLeft' :
-                animationType === 'scale' ? 'scale' :
-                animationType === 'bounce' ? 'bounce' :
-                'fadeIn';
-            
+                    animationType === 'slide-right' ? 'slideRight' :
+                        animationType === 'slide-left' ? 'slideLeft' :
+                            animationType === 'scale' ? 'scale' :
+                                animationType === 'bounce' ? 'bounce' :
+                                    'fadeIn';
+
             return {
                 ...baseStyle,
                 animation: `${animationName} ${animationDuration}ms ease-out`
             };
         }
-        
+
         return baseStyle;
     }, [isNewMessage, settings, index]);
-    
+
     return (
-        <div 
+        <div
             key={messageId}
             style={messageStyle}
         >
             {settings?.show_platform_icons && (
                 msg.platform === 'twitch' ? (
-                    <TwitchIcon 
-                        style={{ 
+                    <TwitchIcon
+                        style={{
                             color: '#9147FF',
                             width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                             height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                             display: 'inline-block',
                             verticalAlign: 'text-bottom',
                             marginRight: '4px'
-                        }} 
+                        }}
                     />
                 ) : (
-                    <VKIcon 
-                        style={{ 
+                    <VKIcon
+                        style={{
                             color: '#EF4444',
                             width: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
                             height: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
                             display: 'inline-block',
                             verticalAlign: 'text-bottom',
                             marginRight: '4px'
-                        }} 
+                        }}
                     />
                 )
             )}
-            
+
             {settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
                 <>
                     {msg.badges.map((badge: string, idx: number) => {
                         const [badgeId, version] = badge.split('/');
                         const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
-                        
+
                         if (!badgeUrl) return null;
-                        
+
                         const badgeSize = Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1));
                         return (
-                            <img 
-                                key={idx} 
+                            <img
+                                key={idx}
                                 src={badgeUrl}
                                 alt={badgeId}
                                 title={badge}
-                                style={{ 
-                                    width: `${badgeSize}px`, 
+                                style={{
+                                    width: `${badgeSize}px`,
                                     height: `${badgeSize}px`,
                                     display: 'inline-block',
                                     verticalAlign: 'text-bottom',
@@ -144,7 +144,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                     })}
                 </>
             )}
-            
+
             {settings?.show_avatars && msg.avatar_url && (
                 <img
                     src={msg.avatar_url}
@@ -159,16 +159,16 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                     }}
                 />
             )}
-            
-            <span style={{ 
+
+            <span style={{
                 ...(settings.text_stroke_width && settings.text_stroke_width > 0 ? {
                     WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
                     paintOrder: 'stroke fill'
                 } : {})
             }}>
-                <span 
+                <span
                     onClick={(e) => onNicknameClick(e, msg.author_name || msg.author || 'Unknown', msg.platform)}
-                    style={{ 
+                    style={{
                         color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
                         fontWeight: '600',
                         cursor: 'pointer',
@@ -183,8 +183,8 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                     {settings.chat_direction === 'horizontal' ? (
                         truncateWords(msg.message || msg.content, 6)
                     ) : (
-                        <MessageContent 
-                            message={msg.message || msg.content || ''} 
+                        <MessageContent
+                            message={msg.message || msg.content || ''}
                             channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
                             globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
                             showLinks={settings?.show_links !== false}
@@ -215,7 +215,7 @@ ChatMessageItem.displayName = 'ChatMessageItem';
 const ChatOverlay: React.FC = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
-    
+
     const [settings, setSettings] = useState<ChatBoxSettings | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -224,18 +224,18 @@ const ChatOverlay: React.FC = () => {
     const [channelName, setChannelName] = useState<string | null>(null);
     const [lastAddedMessageId, setLastAddedMessageId] = useState<string | null>(null);
     const [userId, setUserId] = useState<number | null>(null);
-    
+
     const [emotes, setEmotes] = useState<Emotes>({ channelEmotes: new Map(), globalEmotes: new Map() });
-    
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const processedMessageIds = useRef<Set<string>>(new Set());
     const historyLoadedRef = useRef<boolean>(false);
-    
+
     const containerStyle = useMemo<React.CSSProperties>(() => {
         if (!settings) return {};
-        
+
         logger.log('[STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
-        
+
         return {
             width: `${settings?.chat_width || 100}vw`,
             height: '100vh',
@@ -255,7 +255,7 @@ const ChatOverlay: React.FC = () => {
             overflow: 'hidden'
         };
     }, [settings?.font_family, settings?.font_size, settings?.font_weight, settings?.text_color, settings?.background_color, settings?.background_opacity, settings?.chat_width]);
-    
+
     useEffect(() => {
         const style = document.createElement('style');
         style.innerHTML = `
@@ -283,39 +283,39 @@ const ChatOverlay: React.FC = () => {
             document.head.removeChild(style);
         };
     }, []);
-    
+
     useEffect(() => {
         if (!settings?.font_family) return;
-        
+
         const systemFonts = [
             'Arial', 'Helvetica', 'Times New Roman', 'Times', 'Courier New', 'Courier',
             'Verdana', 'Georgia', 'Palatino', 'Garamond', 'Comic Sans MS', 'Trebuchet MS',
             'Arial Black', 'Impact', 'Inter', 'sans-serif', 'serif', 'monospace'
         ];
-        
+
         const fontFamily = settings.font_family;
         const isSystemFont = systemFonts.some(sf => fontFamily.includes(sf));
-        
+
         if (isSystemFont) {
             logger.log(`[FONT] Using system font: ${fontFamily}`);
             return;
         }
-        
+
         const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/\s+/g, '+')}"]`);
         if (existingLink) {
             logger.log(`[FONT] Font already loaded: ${fontFamily}`);
             return;
         }
-        
+
         const link = document.createElement('link');
         link.rel = 'stylesheet';
         link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/\s+/g, '+')}:wght@400;500;600;700&display=swap`;
-        
+
         logger.log(`[FONT] Loading Google Font: ${fontFamily}`);
         logger.log(`[LINK] [FONT] URL: ${link.href}`);
-        
+
         document.head.appendChild(link);
-        
+
         return () => {
             if (document.head.contains(link)) {
                 document.head.removeChild(link);
@@ -323,17 +323,17 @@ const ChatOverlay: React.FC = () => {
             }
         };
     }, [settings?.font_family]);
-    
 
-    
+
+
     const loadSettings = useCallback(async (isPolling: boolean = false): Promise<void> => {
         if (!token) return;
-        
+
         try {
             const response = await chatboxService.getSettingsByToken(token);
             const responseData = response.data as ApiResponse<ChatBoxSettings>;
             const data = responseData.data || {} as ChatBoxSettings;
-            
+
             const normalizedSettings: ChatBoxSettings = {
                 ...data,
                 font_size: parseInt(String(data.font_size)) || 16,
@@ -349,22 +349,22 @@ const ChatOverlay: React.FC = () => {
                 chat_width: parseInt(String(data.chat_width)) || 100,
                 border_radius: parseInt(String(data.border_radius)) || 8
             };
-            
+
             if (!isPolling) {
                 logger.log(`[OK] [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
                 logger.log(`[OK] [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
             }
-            
+
             setSettings(normalizedSettings);
-            
+
             if (!isPolling) {
                 await twitchBadgesService.loadGlobalBadges();
-                
+
                 if (data.channel_name) {
                     setChannelName(data.channel_name);
                     await twitchBadgesService.loadChannelBadges(data.channel_name);
                     logger.log(`[OK] [BADGES] Loaded badges for channel: ${data.channel_name}`);
-                    
+
                     if (normalizedSettings.show_7tv_emotes !== false) {
                         try {
                             const emotesData = await getAllEmotesForChannel(data.channel_name);
@@ -375,7 +375,7 @@ const ChatOverlay: React.FC = () => {
                         }
                     }
                 }
-                
+
                 setUserId(normalizedSettings.user_id || null);
             }
         } catch (error: unknown) {
@@ -391,26 +391,26 @@ const ChatOverlay: React.FC = () => {
             }
         }
     }, [token]);
-    
+
     useEffect(() => {
         if (!token) {
             setError('Токен не указан в URL');
             setLoading(false);
             return;
         }
-        
+
         loadSettings();
-        
+
         const pollInterval = setInterval(() => {
             loadSettings(true);
         }, 30000);
-        
+
         return () => clearInterval(pollInterval);
     }, [token, loadSettings]);
-    
+
     useEffect(() => {
         if (!userId || !settings || historyLoadedRef.current) return;
-        
+
         const timeoutId = setTimeout(async () => {
             if (messages.length === 0 && !historyLoadedRef.current) {
                 logger.log('[CHATOVERLAY] WebSocket history not received, loading via API...');
@@ -418,12 +418,12 @@ const ChatOverlay: React.FC = () => {
                     const response = await chatService.getChatHistory({
                         limit: settings.max_messages || 50
                     });
-                    
+
                     const apiResponse = response.data as ChatHistoryApiResponse;
                     if (apiResponse.success && apiResponse.messages && apiResponse.messages.length > 0) {
                         const uniqueMessages: ChatMessage[] = [];
                         const seenIds = new Set<string>();
-                        
+
                         for (const msg of apiResponse.messages) {
                             const uniqueKey = msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`;
                             if (!seenIds.has(uniqueKey)) {
@@ -431,17 +431,17 @@ const ChatOverlay: React.FC = () => {
                                 uniqueMessages.push(msg);
                             }
                         }
-                        
+
                         setMessages(uniqueMessages);
-                        processedMessageIds.current = new Set(uniqueMessages.map(msg => 
+                        processedMessageIds.current = new Set(uniqueMessages.map(msg =>
                             msg.id || `${msg.timestamp}-${msg.author}-${msg.message || msg.content}`
                         ));
                         historyLoadedRef.current = true;
-                        
+
                         setTimeout(() => {
                             messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
                         }, 100);
-                        
+
                         logger.log(`[CHATOVERLAY] Loaded ${uniqueMessages.length} messages via API fallback`);
                     }
                 } catch (error: unknown) {
@@ -449,10 +449,10 @@ const ChatOverlay: React.FC = () => {
                 }
             }
         }, 3000);
-        
+
         return () => clearTimeout(timeoutId);
     }, [userId, settings, messages.length]);
-    
+
     const handleWebSocketMessage = useCallback((data: WebSocketMessage): void => {
         if (data.type === 'cache_invalidate') {
             logger.log('[REFRESH] [CACHE] Received cache invalidation:', data.cache_key);
@@ -462,10 +462,10 @@ const ChatOverlay: React.FC = () => {
             }
             return;
         }
-        
+
         if (data.type === 'chatbox_settings_updated') {
             logger.log('[REFRESH] [CHATBOX] Received settings update event');
-            
+
             const updateData = data.data as Partial<ChatBoxSettings> | undefined;
             setSettings(prevSettings => {
                 if (!prevSettings) return prevSettings;
@@ -484,35 +484,35 @@ const ChatOverlay: React.FC = () => {
                     chat_width: parseInt(String(updateData?.chat_width)) || prevSettings.chat_width || 100,
                     border_radius: parseInt(String(updateData?.border_radius)) || prevSettings.border_radius || 8
                 };
-                
+
                 logger.log('[REFRESH] [CHATBOX] Settings updated:', updatedSettings);
                 return updatedSettings;
             });
             return;
         }
-        
+
         if (data.type === 'message' || data.type === 'chat_message') {
             const messageId = data.id || `${data.timestamp}-${data.author || data.author_name}-${data.message}`;
-            
+
             if (processedMessageIds.current.has(messageId)) {
                 return;
             }
-            
+
             processedMessageIds.current.add(messageId);
             setLastAddedMessageId(messageId);
-            
+
             setTimeout(() => {
                 setLastAddedMessageId(null);
             }, (settings?.animation_duration || 300) + 100);
-            
+
             setMessages(prev => {
-                const isDuplicate = prev.some(msg => 
-                    msg.id === data.id || 
+                const isDuplicate = prev.some(msg =>
+                    msg.id === data.id ||
                     (msg.timestamp === String(data.timestamp) && (msg.author === data.author || msg.author_name === data.author_name) && (msg.message || msg.content) === data.message)
                 );
-                
+
                 if (isDuplicate) return prev;
-                
+
                 const newMessage: ChatMessage = {
                     id: data.id || messageId,
                     author: data.author || data.author_name || 'Unknown',
@@ -522,27 +522,27 @@ const ChatOverlay: React.FC = () => {
                     platform: data.platform || 'twitch',
                     badges: (data as WebSocketMessage & { badges?: string[] }).badges
                 };
-                
+
                 const newMessages = [...prev, newMessage];
                 const maxMessages = settings?.max_messages || 20;
                 const result = newMessages.slice(-maxMessages);
-                
+
                 if (processedMessageIds.current.size > maxMessages * 2) {
-                    const recentIds = new Set(result.map(msg => 
+                    const recentIds = new Set(result.map(msg =>
                         msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`
                     ));
                     processedMessageIds.current = recentIds;
                 }
-                
+
                 return result;
             });
-        } 
+        }
         else if (data.type === 'chat_history') {
             logger.log(`[CHAT] Loaded ${data.messages?.length || 0} messages from history`);
-            
+
             const uniqueMessages: ChatMessage[] = [];
             const seenIds = new Set<string>();
-            
+
             for (const msg of (data.messages || [])) {
                 const uniqueKey = msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`;
                 if (!seenIds.has(uniqueKey)) {
@@ -550,60 +550,60 @@ const ChatOverlay: React.FC = () => {
                     uniqueMessages.push(msg);
                 }
             }
-            
+
             setMessages(uniqueMessages);
-            processedMessageIds.current = new Set(uniqueMessages.map(msg => 
+            processedMessageIds.current = new Set(uniqueMessages.map(msg =>
                 msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`
             ));
             historyLoadedRef.current = true;
-            
+
             setTimeout(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
             }, 100);
         }
     }, [settings, loadSettings]);
-    
+
     useSharedWebSocket(userId, handleWebSocketMessage as (message: Record<string, unknown>) => void);
-    
+
     useEffect(() => {
         if (messagesEndRef.current) {
-            messagesEndRef.current.scrollIntoView({ 
+            messagesEndRef.current.scrollIntoView({
                 behavior: 'smooth',
                 block: settings?.chat_direction === 'horizontal' ? 'nearest' : 'end',
                 inline: settings?.chat_direction === 'horizontal' ? 'end' : 'nearest'
             });
         }
     }, [messages, settings?.chat_direction]);
-    
+
     useEffect(() => {
         const fadeSeconds = settings?.message_fade_seconds;
-        
+
         if (!fadeSeconds || fadeSeconds >= 60) {
             return;
         }
-        
+
         const interval = setInterval(() => {
             const now = Date.now();
-            
+
             setMessages(prev => {
                 if (prev.length === 0) return prev;
-                
+
                 const filtered = prev.filter(msg => {
                     const messageAge = (now - Number(msg.timestamp)) / 1000;
                     return messageAge < fadeSeconds;
                 });
-                
+
                 if (filtered.length < prev.length) {
                     logger.log(`[DELETE] [FADE] Removed ${prev.length - filtered.length} old messages (>${fadeSeconds}s)`);
                 }
-                
+
                 return filtered;
             });
         }, 1000);
-        
+
         return () => clearInterval(interval);
     }, [settings?.message_fade_seconds]);
-    
+
     useEffect(() => {
         const handleClickOutside = () => setContextMenu(null);
         if (contextMenu) {
@@ -611,25 +611,25 @@ const ChatOverlay: React.FC = () => {
             return () => document.removeEventListener('click', handleClickOutside);
         }
     }, [contextMenu]);
-    
+
     // Move hooks before early returns to comply with rules-of-hooks
     const truncateWords = useCallback((text: string | undefined, maxWords: number = 6): string => {
         if (!text) return '';
         const words = text.trim().split(/\s+/);
         if (words.length <= maxWords) return text;
-        return `${words.slice(0, maxWords).join(' ')  }...`;
+        return `${words.slice(0, maxWords).join(' ')}...`;
     }, []);
-    
+
     const handleNicknameClick = useCallback((e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube'): void => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         const x = e.clientX + 5;
         const y = e.clientY + 5;
-        
+
         setContextMenu({ x, y, username, platform });
     }, []);
-    
+
     if (loading) {
         return (
             <div style={{
@@ -650,7 +650,7 @@ const ChatOverlay: React.FC = () => {
             </div>
         );
     }
-    
+
     if (error) {
         return (
             <div style={{
@@ -676,7 +676,7 @@ const ChatOverlay: React.FC = () => {
             </div>
         );
     }
-    
+
     if (!settings) {
         return (
             <div style={{
@@ -699,7 +699,7 @@ const ChatOverlay: React.FC = () => {
             </div>
         );
     }
-    
+
     return (
         <>
             <style>
@@ -789,7 +789,7 @@ const ChatOverlay: React.FC = () => {
                     }
                 `}
             </style>
-            
+
             <div style={containerStyle}>
                 {messages.length === 0 ? (
                     <div style={{
@@ -811,10 +811,10 @@ const ChatOverlay: React.FC = () => {
                         </div>
                     </div>
                 ) : (
-                    <div 
+                    <div
                         className={settings.chat_direction === 'horizontal' ? 'horizontal-chat-scroll' : ''}
-                        style={{ 
-                            display: 'flex', 
+                        style={{
+                            display: 'flex',
                             flexDirection: settings.chat_direction === 'horizontal' ? 'row' : 'column',
                             minHeight: '100%',
                             height: '100%',
@@ -842,7 +842,7 @@ const ChatOverlay: React.FC = () => {
                     </div>
                 )}
             </div>
-            
+
             {contextMenu && (
                 <div
                     style={{
@@ -868,7 +868,7 @@ const ChatOverlay: React.FC = () => {
                     }}>
                         {contextMenu.username}
                     </div>
-                    
+
                     <button
                         onClick={async () => {
                             try {
@@ -879,7 +879,7 @@ const ChatOverlay: React.FC = () => {
                                 });
                                 setContextMenu(null);
                             } catch (error: unknown) {
-                                logger.error('Ошибка блокировки TTS:', error);
+                                logger.error('Ошибка переключения TTS:', error);
                             }
                         }}
                         style={{
@@ -887,7 +887,7 @@ const ChatOverlay: React.FC = () => {
                             padding: '10px 16px',
                             backgroundColor: 'transparent',
                             border: 'none',
-                            color: '#ff4444',
+                            color: '#fff',
                             cursor: 'pointer',
                             textAlign: 'left',
                             fontSize: '14px',
@@ -896,37 +896,7 @@ const ChatOverlay: React.FC = () => {
                         onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2a2a2a'}
                         onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
                     >
-                        Заглушить
-                    </button>
-                    
-                    <button
-                        onClick={async () => {
-                            try {
-                                await chatService.toggleMute({
-                                    username: contextMenu.username,
-                                    platform: contextMenu.platform,
-                                    channel_name: channelName || 'unknown'
-                                });
-                                setContextMenu(null);
-                            } catch (error: unknown) {
-                                logger.error('Ошибка разблокировки TTS:', error);
-                            }
-                        }}
-                        style={{
-                            width: '100%',
-                            padding: '10px 16px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            color: '#00c851',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            fontSize: '14px',
-                            transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2a2a2a'}
-                        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
-                    >
-                        [VOLUME] Разглушить
+                        Заглушить/Разглушить TTS
                     </button>
                 </div>
             )}

@@ -25,6 +25,11 @@ export const useWebSocketStateSync = () => {
   const isReconcilingRef = useRef(false);
   const reconcileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // ANTI-DOUBLE-FETCH: Запоминаем время монтирования компонента
+  // Если WebSocket подключается сразу после загрузки страницы, 
+  // мы не хотим делать повторный запрос данных, так как они только что были загружены
+  const mountTimeRef = useRef<number>(Date.now());
+
   useEffect(() => {
     if (!user?.id) return;
 
@@ -42,6 +47,14 @@ export const useWebSocketStateSync = () => {
         // Skip if already reconciling
         if (isReconcilingRef.current) {
           logger.debug('Skipping reconciliation - already in progress');
+          return;
+        }
+
+        // ANTI-DOUBLE-FETCH: Проверяем, сколько времени прошло с загрузки
+        const timeSinceMount = Date.now() - mountTimeRef.current;
+        if (timeSinceMount < 5000) {
+          logger.info(`[SKIP] State reconciliation skipped - app just loaded (${timeSinceMount}ms)`);
+          setSyncStatus('synced'); // Считаем что все ок
           return;
         }
 

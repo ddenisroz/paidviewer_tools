@@ -3,8 +3,6 @@ import logging
 import time
 from typing import Optional
 
-from sqlalchemy.orm import Session
-from core.database import get_db
 from tts_service.tts_engine import tts_engine_manager
 from tts_service.async_tts_engine import async_tts_engine
 from tts_service.gpu_worker_pool import gpu_worker_pool

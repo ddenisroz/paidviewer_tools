@@ -23,7 +23,7 @@ class AdvancedRateLimiter:
         self.limits = {
             "default": "60/minute",
             "login": "5/15minutes",
-            "api": "100/minute",
+            "api": "300/minute",
             "tts": "30/minute",
             "upload": "10/minute"
         }

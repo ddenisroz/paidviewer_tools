@@ -73,13 +73,17 @@ class VKLiveAPIClient:
         Args:
             base_url: Базовый URL API (из docs/vk/API.md)
         """
+        from core.config import settings
+        
         self.base_url = base_url
+        # VK Dev API uses self-signed certificate, disable verify only in development
+        ssl_verify = settings.is_production
         self.client = httpx.AsyncClient(
             base_url=base_url,
             timeout=httpx.Timeout(30.0, connect=10.0),
-            verify=False  # Dev API использует самоподписанный сертификат
+            verify=ssl_verify
         )
-        logger.info("vk_api_client_initialized", base_url=base_url)
+        logger.info("vk_api_client_initialized", base_url=base_url, ssl_verify=ssl_verify)
         
     async def __aenter__(self):
         """Async context manager entry"""

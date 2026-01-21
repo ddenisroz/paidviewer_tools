@@ -10,7 +10,6 @@ import { logger } from '@/shared/utils/prodLogger';
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 
-
 import type { ApiResponse, Command as ChatCommand } from '../../types';
 import type { AxiosError } from 'axios';
 
@@ -19,10 +18,61 @@ interface CommandsData {
   custom_commands: ChatCommand[];
 }
 
-interface CommandsApiResponse {
-  basic_commands: ChatCommand[];
-  custom_commands: ChatCommand[];
+interface ApiCommandResponse {
+  id: number;
+  command_name: string;
+  response_text: string;
+  platforms: string;
+  allowed_roles: string;
+  cooldown_seconds: number;
+  is_enabled: boolean;
+  description?: string;
+  command_type?: string;
+  parent_command_id?: number;
+  alias?: string;
+  created_at?: string;
+  updated_at?: string;
+  tags?: string[];
 }
+
+interface CommandsApiResponse {
+  basic_commands: ApiCommandResponse[];
+  custom_commands: ApiCommandResponse[];
+}
+
+/**
+ * Map API command response to frontend ChatCommand type
+ */
+const mapApiCommandToFrontend = (cmd: ApiCommandResponse): ChatCommand => {
+  // Convert platforms string to single platform value
+  const platformsLower = (cmd.platforms || 'all').toLowerCase();
+  let platform: 'twitch' | 'vk' | 'youtube' | 'all' = 'all';
+  if (platformsLower === 'twitch') platform = 'twitch';
+  else if (platformsLower === 'vk') platform = 'vk';
+  else if (platformsLower === 'youtube') platform = 'youtube';
+
+  // Convert allowed_roles to user_level
+  const rolesLower = (cmd.allowed_roles || 'all').toLowerCase();
+  let user_level: 'everyone' | 'subscriber' | 'moderator' | 'broadcaster' = 'everyone';
+  if (rolesLower.includes('broadcaster')) user_level = 'broadcaster';
+  else if (rolesLower.includes('moderator')) user_level = 'moderator';
+  else if (rolesLower.includes('vip') || rolesLower.includes('subscriber')) user_level = 'subscriber';
+
+  return {
+    id: cmd.id,
+    name: cmd.command_name,
+    description: cmd.description,
+    response: cmd.response_text || '',
+    enabled: cmd.is_enabled,
+    cooldown: cmd.cooldown_seconds || 0,
+    user_level,
+    platform,
+    created_at: cmd.created_at,
+    updated_at: cmd.updated_at,
+    tags: cmd.tags || [],
+    command_type: cmd.command_type as 'global' | 'override' | 'custom' | undefined,
+  };
+};
 
 /**
  * Получить все команды
@@ -33,14 +83,13 @@ export const useCommands = (options?: Omit<UseQueryOptions<CommandsData, AxiosEr
     queryFn: async () => {
       const response = await unwrapResponse(commandsService.getCommands());
       const data = response as unknown as CommandsApiResponse;
-      // Возвращаем данные в том же формате, что ожидают компоненты
       return {
-        basic_commands: (data?.basic_commands || []) as ChatCommand[],
-        custom_commands: (data?.custom_commands || []) as ChatCommand[],
+        basic_commands: (data?.basic_commands || []).map(mapApiCommandToFrontend),
+        custom_commands: (data?.custom_commands || []).map(mapApiCommandToFrontend),
       };
     },
-    staleTime: 30 * 1000, // 30 секунд
-    gcTime: 5 * 60 * 1000, // 5 минут
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     retry: 1,
@@ -91,8 +140,6 @@ export const useCreateCommandOverride = (options?: Omit<UseMutationOptions<ApiRe
       logger.error('Error creating command override:', error);
       if (!options?.onError) {
         const errorMessage = (error.response?.data as Record<string, unknown>)?.detail as string || (error.response?.data as Record<string, unknown>)?.message as string || 'Ошибка создания персональной настройки';
-        
-        // Специальная обработка ошибки "уже существует"
         if (error.response?.status === 400 && errorMessage.includes('уже существует')) {
           toast.error('Персональная настройка уже существует. Перезагрузите список команд.');
           queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
@@ -112,7 +159,7 @@ export const useUpdateCommand = (options?: Omit<UseMutationOptions<ApiResponse<C
   const queryClient = useQueryClient();
 
   return useMutation<ApiResponse<ChatCommand>, AxiosError, { commandId: number; command: Partial<ChatCommand> }, unknown>({
-    mutationFn: ({ commandId, command }: { commandId: number; command: Partial<ChatCommand> }) => unwrapResponse(commandsService.updateCommand(commandId, command)),
+    mutationFn: ({ commandId, command }) => unwrapResponse(commandsService.updateCommand(commandId, command)),
     onSuccess: (_response, _variables, _context) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.commands.list() });
       if (!options?.onSuccess) {
@@ -160,12 +207,12 @@ export const useToggleCommand = (options?: Omit<UseMutationOptions<ApiResponse, 
   const queryClient = useQueryClient();
 
   return useMutation<ApiResponse, AxiosError, { commandName: string; data: Record<string, unknown> }, { previousCommands?: CommandsData }>({
-    mutationFn: ({ commandName, data }: { commandName: string; data: Record<string, unknown> }) => unwrapResponse(commandsService.toggleCommand(commandName, data)),
+    mutationFn: ({ commandName, data }) => unwrapResponse(commandsService.toggleCommand(commandName, data)),
     onMutate: async (variables) => {
       const { commandName, data } = variables;
       await queryClient.cancelQueries({ queryKey: queryKeys.commands.list() });
       const previousCommands = queryClient.getQueryData<CommandsData>(queryKeys.commands.list());
-      
+
       queryClient.setQueryData(queryKeys.commands.list(), (old: CommandsData | undefined) => {
         if (!old) return old;
         return {
@@ -177,10 +224,10 @@ export const useToggleCommand = (options?: Omit<UseMutationOptions<ApiResponse, 
           ) || [],
         };
       });
-      
+
       return { previousCommands };
     },
-    onError: (err: AxiosError, variables, context: { previousCommands?: CommandsData } | undefined) => {
+    onError: (err: AxiosError, variables, context) => {
       if (context?.previousCommands) {
         queryClient.setQueryData(queryKeys.commands.list(), context.previousCommands);
       }
@@ -191,4 +238,3 @@ export const useToggleCommand = (options?: Omit<UseMutationOptions<ApiResponse, 
     ...options,
   });
 };
-

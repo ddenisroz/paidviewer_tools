@@ -603,10 +603,10 @@ const UserManagementPage: React.FC = () => {
     if (error) {
         return (
             <div className="container mx-auto p-6">
-                <Card className="bg-slate-800/50 border-slate-700 p-6">
+                <Card className="card-glass border-slate-700/50 p-6">
                     <div className="text-center text-red-400">
                         <p>Ошибка загрузки пользователей</p>
-                        <Button onClick={() => refetch()} className="mt-4">
+                        <Button onClick={() => refetch()} className="mt-4" variant="outline">
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Повторить
                         </Button>
@@ -621,9 +621,11 @@ const UserManagementPage: React.FC = () => {
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">Управление пользователями</h1>
-                    <p className="text-slate-400 text-sm">
-                        Всего: {usersResponse.pagination.total || 0} пользователей
+                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">
+                        Управление пользователями
+                    </h1>
+                    <p className="text-muted-foreground text-sm mt-1">
+                        Всего пользователей: <span className="text-foreground font-medium">{usersResponse.pagination.total || 0}</span>
                         {usersResponse.pagination.total_users !== undefined && usersResponse.pagination.total_guests !== undefined && (
                             <span className="ml-2 text-xs text-slate-500">
                                 (Аккаунты: {usersResponse.pagination.total_users}, Гости: {usersResponse.pagination.total_guests})
@@ -632,16 +634,16 @@ const UserManagementPage: React.FC = () => {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
+                    <Button variant="outline" onClick={() => refetch()} disabled={isLoading} className="hover:bg-primary/10">
                         <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                         Обновить
                     </Button>
-                    <Button variant="outline" onClick={handleExportCSV} disabled={usersResponse.users.length === 0}>
+                    <Button variant="outline" onClick={handleExportCSV} disabled={usersResponse.users.length === 0} className="hover:bg-primary/10">
                         Экспорт CSV
                     </Button>
                     <Dialog open={whitelistDialogOpen} onOpenChange={setWhitelistDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button>
+                            <Button className="font-semibold shadow-lg shadow-primary/20">
                                 <Plus className="w-4 h-4 mr-2" />
                                 Добавить в whitelist
                             </Button>

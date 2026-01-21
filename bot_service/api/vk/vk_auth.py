@@ -22,6 +22,66 @@ class VKAuth(VKBase):
     Handles token retrieval, validation, and refreshing.
     """
 
+    
+    # Cache for Service Token (Client Credentials)
+    _service_token: Optional[str] = None
+    _service_token_expires: float = 0
+
+    async def _get_service_token(self) -> Optional[str]:
+        """
+        Get Service Token (Client Credentials) for app-level requests (like search).
+        """
+        import time
+        from core.config import settings
+
+        current_time = time.time()
+        # Return cached if valid (with 60s buffer)
+        if self._service_token and current_time < (self._service_token_expires - 60):
+            return self._service_token
+
+        try:
+            client_id = settings.vk_client_id
+            client_secret = settings.vk_client_secret
+            
+            if not client_id or not client_secret:
+                logger.error("[VK AUTH] Client ID or Secret missing for Service Token")
+                return None
+
+            import base64
+            credentials = f"{client_id}:{client_secret}"
+            base64_credentials = base64.b64encode(credentials.encode()).decode()
+
+            full_url = "https://api.live.vkvideo.ru/oauth/server/token"
+            
+            headers = {
+                "Authorization": f"Basic {base64_credentials}",
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            data = {
+                "grant_type": "client_credentials"
+            }
+            
+            async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
+                # Use default SSL verification for Prod Auth
+                async with session.post(full_url, data=data, headers=headers) as response:
+                    if response.status == 200:
+                        token_data = await response.json()
+                        access_token = token_data.get("access_token")
+                        expires_in = token_data.get("expires_in", 3600)
+                        
+                        if access_token:
+                            self._service_token = access_token
+                            self._service_token_expires = current_time + expires_in
+                            logger.info(f"[VK AUTH] Generated Service Token (expires in {expires_in}s)")
+                            return access_token
+                    else:
+                        text = await response.text()
+                        logger.error(f"[VK AUTH] Failed to get Service Token: {response.status} - {text}")
+                        return None
+        except Exception as e:
+             logger.error(f"[VK AUTH] Error getting Service Token: {e}")
+             return None
+
     def _get_user_token(self, user_id: str, session_id: Optional[str] = None) -> Optional[str]:
         """
         Get VK user token via TokenManager.

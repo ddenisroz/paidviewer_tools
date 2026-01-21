@@ -16,10 +16,14 @@ interface StreamStatusProps {
         twitch?: {
             isLive?: boolean;
             viewerCount?: number;
+            gameName?: string;
+            boxArtUrl?: string;
         };
         vk?: {
             isLive?: boolean;
             viewerCount?: number;
+            gameName?: string;
+            boxArtUrl?: string;
         };
     };
     isLoading?: boolean;
@@ -33,18 +37,31 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     const twitchStream = streamData?.twitch;
     const vkStream = streamData?.vk;
 
+    // Helper to render art
+    const renderArt = (url?: string, name?: string) => {
+        if (!url) return null;
+        const processedUrl = url.replace('{width}', '52').replace('{height}', '72');
+        return (
+            <div className="w-8 h-10 rounded bg-muted/30 overflow-hidden flex-shrink-0 border border-white/5">
+                <img src={processedUrl} alt={name || 'Game'} className="w-full h-full object-cover" />
+            </div>
+        );
+    };
+
     // Если загружается, показываем пустые карточки с анимацией
     if (isLoading) {
         return (
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
-                {/* Пустая Twitch карточка - точно такой же размер как финальная */}
+                {/* Пустая Twitch карточка */}
                 <Card className="border-muted-foreground/20 bg-muted/5">
                     <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-muted-foreground/30 rounded"></div>
-                            <div className="flex-1">
-                                <div className="h-4 bg-muted-foreground/30 rounded w-16 mb-2"></div>
-                                <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-muted-foreground/30 rounded"></div>
+                                <div className="flex-1">
+                                    <div className="h-4 bg-muted-foreground/30 rounded w-16 mb-2"></div>
+                                    <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
+                                </div>
                             </div>
                             <div className="flex space-x-1">
                                 <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
@@ -55,14 +72,16 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                     </CardContent>
                 </Card>
 
-                {/* Пустая VK карточка - точно такой же размер как финальная */}
+                {/* Пустая VK карточка */}
                 <Card className="border-muted-foreground/20 bg-muted/5">
                     <CardContent className="p-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-muted-foreground/30 rounded"></div>
-                            <div className="flex-1">
-                                <div className="h-4 bg-muted-foreground/30 rounded w-16 mb-2"></div>
-                                <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-muted-foreground/30 rounded"></div>
+                                <div className="flex-1">
+                                    <div className="h-4 bg-muted-foreground/30 rounded w-16 mb-2"></div>
+                                    <div className="h-3 bg-muted-foreground/20 rounded w-12"></div>
+                                </div>
                             </div>
                             <div className="flex space-x-1">
                                 <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
@@ -79,38 +98,52 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     return (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
             {/* Twitch статус */}
-            <Card className={`${twitchEnabled ? 'border-purple-500/20 bg-purple-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
-                <CardContent className="p-4">
+            <Card className={`card-glass transition-colors duration-300 ${twitchEnabled ? 'bg-purple-500/10 border-purple-500/20' : ''}`}>
+                <CardContent className="p-3">
                     <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                            <TwitchIcon className="h-6 w-6 text-[#9146FF] flex-shrink-0" />
-                            <div className="font-medium text-sm whitespace-nowrap">Twitch</div>
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <TwitchIcon className="h-8 w-8 text-[#9146FF] flex-shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                                <div className="font-medium text-sm text-white">Twitch</div>
+                                {twitchStream?.gameName && (
+                                    <div className="text-xs text-muted-foreground truncate" title={twitchStream.gameName}>
+                                        {twitchStream.gameName}
+                                    </div>
+                                )}
+                            </div>
                         </div>
+
                         <div className="flex items-center gap-3 flex-shrink-0">
                             {twitchEnabled ? (
                                 twitchStream?.isLive ? (
                                     <>
-                                        <Wifi className="h-4 w-4 text-green-500" />
-                                        <Badge variant="secondary" className="bg-green-500/20 text-green-700 border-green-500/30">
-                                            <Users className="h-3 w-3 mr-1" />
-                                            {twitchStream.viewerCount || 0}
-                                        </Badge>
+                                        {renderArt(twitchStream?.boxArtUrl, twitchStream?.gameName)}
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
+                                                <Wifi className="h-3 w-3" />
+                                                <span>Live</span>
+                                            </Badge>
+                                            <div className="flex items-center text-xs text-muted-foreground">
+                                                <Users className="h-3 w-3 mr-1" />
+                                                {twitchStream?.viewerCount || 0}
+                                            </div>
+                                        </div>
                                     </>
                                 ) : (
                                     <>
-                                        <WifiOff className="h-4 w-4 text-gray-400" />
-                                        <Badge variant="outline" className="text-gray-500">
-                                            Offline
-                                        </Badge>
+                                        {renderArt(twitchStream?.boxArtUrl, twitchStream?.gameName)}
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
+                                                <WifiOff className="h-3 w-3" />
+                                                <span>Offline</span>
+                                            </Badge>
+                                        </div>
                                     </>
                                 )
                             ) : (
-                                <>
-                                    <WifiOff className="h-4 w-4 text-gray-400" />
-                                    <Badge variant="outline" className="text-gray-500">
-                                        Не подключено
-                                    </Badge>
-                                </>
+                                <Badge variant="outline" className="text-gray-500 border-white/10">
+                                    Не подключено
+                                </Badge>
                             )}
                         </div>
                     </div>
@@ -118,38 +151,52 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
             </Card>
 
             {/* VK Live статус */}
-            <Card className={`${vkEnabled ? 'border-red-500/20 bg-red-500/5' : 'border-muted-foreground/20 bg-muted/5'}`}>
-                <CardContent className="p-4">
+            <Card className={`card-glass transition-colors duration-300 ${vkEnabled ? 'bg-blue-500/10 border-blue-500/20' : ''}`}>
+                <CardContent className="p-3">
                     <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                            <VKIcon className="h-6 w-6 text-red-500 flex-shrink-0" />
-                            <div className="font-medium text-sm whitespace-nowrap">VK Live</div>
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <VKIcon className="h-8 w-8 text-[#0077FF] flex-shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                                <div className="font-medium text-sm text-white">VK Live</div>
+                                {vkStream?.gameName && (
+                                    <div className="text-xs text-muted-foreground truncate" title={vkStream.gameName}>
+                                        {vkStream.gameName}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
+
+                        <div className="flex items-center gap-3 flex-shrink-0 min-h-[32px]">
                             {vkEnabled ? (
                                 vkStream?.isLive ? (
                                     <>
-                                        <Wifi className="h-4 w-4 text-green-500" />
-                                        <Badge variant="secondary" className="bg-green-500/20 text-green-700 border-green-500/30">
-                                            <Users className="h-3 w-3 mr-1" />
-                                            {vkStream.viewerCount || 0}
-                                        </Badge>
+                                        {renderArt(vkStream?.boxArtUrl, vkStream?.gameName)}
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
+                                                <Wifi className="h-3 w-3" />
+                                                <span>Live</span>
+                                            </Badge>
+                                            <div className="flex items-center text-xs text-muted-foreground">
+                                                <Users className="h-3 w-3 mr-1" />
+                                                {vkStream?.viewerCount || 0}
+                                            </div>
+                                        </div>
                                     </>
                                 ) : (
                                     <>
-                                        <WifiOff className="h-4 w-4 text-gray-400" />
-                                        <Badge variant="outline" className="text-gray-500">
-                                            Offline
-                                        </Badge>
+                                        {renderArt(vkStream?.boxArtUrl, vkStream?.gameName)}
+                                        <div className="flex flex-col items-end gap-1">
+                                            <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
+                                                <WifiOff className="h-3 w-3" />
+                                                <span>Offline</span>
+                                            </Badge>
+                                        </div>
                                     </>
                                 )
                             ) : (
-                                <>
-                                    <WifiOff className="h-4 w-4 text-gray-400" />
-                                    <Badge variant="outline" className="text-gray-500">
-                                        Не подключено
-                                    </Badge>
-                                </>
+                                <Badge variant="outline" className="text-gray-500 border-white/10 self-center">
+                                    Не подключено
+                                </Badge>
                             )}
                         </div>
                     </div>
@@ -160,4 +207,3 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
 };
 
 export default StreamStatus;
-

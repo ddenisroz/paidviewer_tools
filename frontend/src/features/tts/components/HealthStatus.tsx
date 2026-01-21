@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
-import { useInterval } from '@/hooks/useInterval';
+import { useInterval } from '@/shared/hooks/useInterval';
 
 interface HealthStatusProps {
     isHealthy: boolean;

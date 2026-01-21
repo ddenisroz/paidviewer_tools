@@ -2,6 +2,7 @@
 import React from 'react';
 
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { Sword, Video } from 'lucide-react';
 
 interface ChatBoxSettings {
     font_family: string;
@@ -48,20 +49,18 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
     };
 
     return (
-        <div className="space-y-4">
-            <div className="text-white font-semibold">Предпросмотр</div>
-            <div 
-                className="border border-gray-600 rounded-lg overflow-hidden"
+        <div className="h-full flex flex-col">
+            <div className="text-white font-semibold p-3 pb-2">Предпросмотр</div>
+            <div
+                className="flex-1 border-t border-gray-600/50 overflow-hidden"
                 style={{
-                    width: '100%',
-                    height: '400px',
                     backgroundColor: hexToRgba(settings.background_color || '#000000', settings.background_opacity),
                     borderRadius: `${settings.border_radius}px`,
                     fontFamily: settings.font_family,
                     fontSize: `${settings.font_size}px`
                 }}
             >
-                <div 
+                <div
                     className="h-full overflow-y-auto p-4"
                     style={{
                         display: 'flex',
@@ -87,7 +86,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
                             )}
                             <span className="text-gray-400 text-xs mr-2">{msg.time}</span>
                             {settings.show_badges && msg.badges.length > 0 && (
-                                <span className="text-xs bg-purple-600 px-1 rounded mr-1">{msg.role}</span>
+                                <span className="mr-1 inline-flex items-center">
+                                    {msg.role === 'Broadcaster' && <Video className="w-4 h-4 text-red-500 fill-current" />}
+                                    {msg.role === 'Moderator' && <Sword className="w-4 h-4 text-green-500 fill-current" />}
+                                    {msg.role === 'Viewer' && null}
+                                </span>
                             )}
                             <span className={msg.platform === 'twitch' ? 'text-purple-400' : 'text-red-400'}>
                                 {msg.author}:

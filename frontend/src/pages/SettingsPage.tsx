@@ -74,7 +74,7 @@ const SettingsPage: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <PageWrapper title="Настройки">
-                <Card className="border-gray-700">
+                <Card className="card-glass border-gray-700">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
                             <AlertCircle className="w-10 h-10 text-gray-500" />
@@ -133,10 +133,10 @@ const SettingsPage: React.FC = () => {
                     {/* Секция Интеграций - как в Legacy, простые карточки с тогглами */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Twitch Integration */}
-                        <Card className="p-4 flex flex-col justify-between h-full">
+                        <Card className="card-glass p-4 flex flex-col justify-between h-full">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <TwitchIcon width="24" height="24" />
+                                    <TwitchIcon width="32" height="32" />
                                     <div className="flex flex-col">
                                         <Label className="text-base font-medium">Twitch</Label>
                                         <span className="text-xs text-muted-foreground">
@@ -153,10 +153,10 @@ const SettingsPage: React.FC = () => {
                         </Card>
 
                         {/* VK Integration */}
-                        <Card className="p-4 flex flex-col justify-between h-full">
+                        <Card className="card-glass p-4 flex flex-col justify-between h-full">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <VKIcon width="24" height="24" />
+                                    <VKIcon width="32" height="32" />
                                     <div className="flex flex-col">
                                         <Label className="text-base font-medium">VK Live</Label>
                                         <span className="text-xs text-muted-foreground">
@@ -173,10 +173,10 @@ const SettingsPage: React.FC = () => {
                         </Card>
 
                         {/* DonationAlerts Integration */}
-                        <Card className="p-4 flex flex-col justify-between h-full">
+                        <Card className="card-glass p-4 flex flex-col justify-between h-full">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <DonationAlertsIcon width="24" height="24" />
+                                    <DonationAlertsIcon width="32" height="32" />
                                     <div className="flex flex-col">
                                         <Label className="text-base font-medium">DonationAlerts</Label>
                                         <span className="text-xs text-muted-foreground">
@@ -195,7 +195,7 @@ const SettingsPage: React.FC = () => {
                     </div>
 
                     {/* Секция Приоритет аудио - компактный список */}
-                    <Card>
+                    <Card className="card-glass">
                         <CardHeader className="py-4">
                             <CardTitle className="text-lg font-medium flex items-center gap-2">
                                 <Settings className="h-5 w-5" />
@@ -226,7 +226,7 @@ const SettingsPage: React.FC = () => {
                     {/* User Info and Danger Zone */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* User Info */}
-                        <Card className="flex flex-col gap-2 p-4">
+                        <Card className="card-glass flex flex-col gap-2 p-4">
                             <div className="flex items-center gap-2">
                                 <span className="text-muted-foreground text-sm">ID пользователя:</span>
                             </div>
@@ -236,7 +236,7 @@ const SettingsPage: React.FC = () => {
                         </Card>
 
                         {/* Danger Zone - Delete Account */}
-                        <Card className="flex flex-col gap-3 p-4 border-red-500/30 bg-red-500/10">
+                        <Card className="card-glass flex flex-col gap-3 p-4 border-red-500/30 bg-red-500/10">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />

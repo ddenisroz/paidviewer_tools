@@ -441,6 +441,11 @@ const CommandsPage: React.FC = () => {
     const availablePlatforms = platformOptions.filter(opt => opt.enabled);
     const platformsToShow = availablePlatforms.length > 0 ? availablePlatforms : platformOptions;
 
+    const getPlatformLabel = (platforms: string): string => {
+        if (platforms === 'twitch,vk' || platforms === 'all') return 'Все платформы';
+        return platformOptions.find(opt => opt.value === platforms)?.label || platforms;
+    };
+
     const getFilteredBasicCommands = (): ChatCommand[] => {
         return basicCommands.filter((command: ChatCommand) => {
             const matchesSearch = command.name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
@@ -599,13 +604,7 @@ const CommandsPage: React.FC = () => {
 
                 <TabsContent value="basic" className="space-y-4">
                     <Card className="transition-all duration-200">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Settings className="h-5 w-5" />
-                                Базовые команды
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
+                        <CardContent className="pt-6">
                             <div className="flex items-center justify-between mb-4">
                                 {(basicSearchTerm || selectedBasicTags.length > 0 || platformFilter !== 'all') && (
                                     <Button
@@ -681,24 +680,16 @@ const CommandsPage: React.FC = () => {
                                             <div className="p-3 border-b">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <h4 className="font-medium text-sm">Фильтр по тегам</h4>
-                                                    <div className="flex gap-1">
-                                                        <Button
-                                                            variant={areAllTagsSelected ? "default" : "ghost"}
-                                                            size="sm"
-                                                            onClick={selectAllFilters}
-                                                            className="h-6 px-2 text-xs"
-                                                        >
-                                                            {areAllTagsSelected ? "Все ✓" : "Все"}
-                                                        </Button>
+                                                    {selectedBasicTags.length > 0 && (
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={clearAllFilters}
                                                             className="h-6 px-2 text-xs"
                                                         >
-                                                            Очистить
+                                                            Сбросить
                                                         </Button>
-                                                    </div>
+                                                    )}
                                                 </div>
                                                 <Input
                                                     placeholder="Поиск тегов..."

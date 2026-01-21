@@ -611,7 +611,7 @@ const VoiceManagementPageContent: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <PageWrapper title="Управление голосами">
-                <Card className="border-gray-700">
+                <Card className="card-glass">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
                             <AlertCircle className="w-10 h-10 text-gray-500" />
@@ -650,7 +650,7 @@ const VoiceManagementPageContent: React.FC = () => {
     if (!isTwitchConnected && !isVkConnected) {
         return (
             <PageWrapper title="Управление голосами">
-                <Card className="border-gray-700">
+                <Card className="card-glass">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
                             <AlertCircle className="w-10 h-10 text-gray-500" />
@@ -731,11 +731,11 @@ const VoiceManagementPageContent: React.FC = () => {
 
             {loading ? (
                 <div className="col-span-full text-center py-12">
-                    <p className="text-slate-400">Загрузка голосов...</p>
+                    <p className="text-muted-foreground">Загрузка голосов...</p>
                 </div>
             ) : whitelistStatus && whitelistStatus.can_manage_voices === false ? (
                 <div className="col-span-full">
-                    <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700">
+                    <div className="text-center py-12 card-glass rounded-lg">
                         <Lock className="h-16 w-16 mx-auto mb-4 text-orange-500" />
                         <p className="text-slate-300 text-lg mb-2 font-semibold">Вы не состоите в whitelist</p>
                         <p className="text-slate-400 text-sm mb-4">

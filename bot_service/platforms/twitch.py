@@ -13,6 +13,8 @@ from integrations.base import TokenInfo
 # [REF] Services
 from services.user_service import UserService
 from core.database import get_db
+from repositories.user_token_repository import UserTokenRepository
+from integrations.base import TokenInfo, TokenExpiredError
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,76 @@ class TwitchPlatform(StreamingPlatform):
         self.oauth = TwitchOAuth.from_settings()
         self.client = TwitchClient(self.oauth)
         self.user_service = UserService()
+
+    async def _execute_with_token(self, user_id: int, operation, default_return=False):
+        """
+        Executes an operation with automatic token handling and refresh.
+        operation: async function(token_info, broadcaster_id)
+        """
+        try:
+            db = next(get_db())
+            try:
+                token = self.user_service.get_user_token(user_id, 'twitch', db)
+                if not token:
+                    logger.warning(f"No Twitch token found for user {user_id}")
+                    return default_return
+                
+                decrypted_token = self.user_service.decrypt_access_token(token.access_token)
+                token_info = TokenInfo(
+                    access_token=decrypted_token,
+                    refresh_token=token.refresh_token,
+                    scopes=token.scopes
+                )
+                
+                broadcaster_id = token.platform_user_id
+                if not broadcaster_id:
+                     user = await self.client.get_user_from_token(token_info)
+                     if user:
+                         broadcaster_id = user['id']
+                
+                if not broadcaster_id:
+                    logger.error("Could not determine broadcaster ID")
+                    return default_return
+
+                try:
+                    return await operation(token_info, broadcaster_id)
+                except TokenExpiredError:
+                    logger.warning(f"Twitch token expired for user {user_id}, attempting refresh...")
+                    if not token.refresh_token:
+                        logger.error("No refresh token available")
+                        return default_return
+                        
+                    try:
+                        new_tokens = await self.oauth.refresh_user_token(token.refresh_token)
+                        
+                        # Update DB
+                        token_repo = UserTokenRepository(db)
+                        token_repo.upsert(
+                            user_id=user_id,
+                            platform='twitch',
+                            access_token=new_tokens.access_token,
+                            refresh_token=new_tokens.refresh_token,
+                            expires_at=None,
+                            scopes=new_tokens.scopes
+                        )
+                        
+                        # Retry with new token
+                        new_token_info = TokenInfo(
+                            access_token=new_tokens.access_token,
+                            refresh_token=new_tokens.refresh_token,
+                            scopes=new_tokens.scopes
+                        )
+                        logger.info("Retrying operation with new token")
+                        return await operation(new_token_info, broadcaster_id)
+                        
+                    except Exception as refresh_error:
+                        logger.error(f"Failed to refresh token: {refresh_error}")
+                        return default_return
+            finally:
+                db.close()
+        except Exception as e:
+            logger.error(f"Error executing Twitch operation: {e}")
+            return default_return
 
     async def authenticate(self, code: str) -> Dict[str, Any]:
         """
@@ -97,37 +169,11 @@ class TwitchPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
-        try:
-            db = next(get_db())
-            try:
-                token = self.user_service.get_user_token(user_id, 'twitch', db)
-                if not token:
-                    logger.warning(f"No Twitch token found for user {user_id}")
-                    return False
-                
-                decrypted_token = self.user_service.decrypt_access_token(token.access_token)
-                token_info = TokenInfo(
-                    access_token=decrypted_token,
-                    refresh_token=token.refresh_token,
-                    scopes=token.scopes
-                )
-                
-                broadcaster_id = token.platform_user_id
-                if not broadcaster_id:
-                     user = await self.client.get_user_from_token(token_info)
-                     if user:
-                         broadcaster_id = user['id']
-                
-                if not broadcaster_id:
-                    logger.error("Could not determine broadcaster ID")
-                    return False
-
-                return await self.client.update_channel(broadcaster_id, token_info, title=title)
-            finally:
-                db.close()
-        except Exception as e:
-            logger.error(f"Error updating Twitch stream title: {e}")
-            return False
+        async def op(token_info, broadcaster_id):
+            return await self.client.update_channel(broadcaster_id, token_info, title=title)
+            
+        result = await self._execute_with_token(user_id, op, default_return=False)
+        return bool(result)
 
     async def update_stream_category(self, user_id: int, category_id: str) -> bool:
         """
@@ -140,37 +186,11 @@ class TwitchPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
-        try:
-            db = next(get_db())
-            try:
-                token = self.user_service.get_user_token(user_id, 'twitch', db)
-                if not token:
-                    logger.warning(f"No Twitch token found for user {user_id}")
-                    return False
-                
-                decrypted_token = self.user_service.decrypt_access_token(token.access_token)
-                token_info = TokenInfo(
-                    access_token=decrypted_token,
-                    refresh_token=token.refresh_token,
-                    scopes=token.scopes
-                )
-                
-                broadcaster_id = token.platform_user_id
-                if not broadcaster_id:
-                     user = await self.client.get_user_from_token(token_info)
-                     if user:
-                         broadcaster_id = user['id']
-                
-                if not broadcaster_id:
-                    logger.error("Could not determine broadcaster ID")
-                    return False
-
-                return await self.client.update_channel(broadcaster_id, token_info, game_id=category_id)
-            finally:
-                db.close()
-        except Exception as e:
-            logger.error(f"Error updating Twitch stream category: {e}")
-            return False
+        async def op(token_info, broadcaster_id):
+            return await self.client.update_channel(broadcaster_id, token_info, game_id=category_id)
+            
+        result = await self._execute_with_token(user_id, op, default_return=False)
+        return bool(result)
 
     async def search_categories(self, query: str) -> List[Dict[str, Any]]:
         """
@@ -253,38 +273,11 @@ class TwitchPlatform(StreamingPlatform):
         Returns:
             Reward ID if successful, None otherwise
         """
-        try:
-            db = next(get_db())
-            try:
-                token = self.user_service.get_user_token(user_id, 'twitch', db)
-                if not token:
-                    logger.warning(f"No Twitch token found for user {user_id}")
-                    return None
-                
-                decrypted_token = self.user_service.decrypt_access_token(token.access_token)
-                token_info = TokenInfo(
-                    access_token=decrypted_token,
-                    refresh_token=token.refresh_token,
-                    scopes=token.scopes
-                )
-                
-                broadcaster_id = token.platform_user_id
-                if not broadcaster_id:
-                     user = await self.client.get_user_from_token(token_info)
-                     if user:
-                         broadcaster_id = user['id']
-                
-                if not broadcaster_id:
-                     logger.error("Could not determine broadcaster ID")
-                     return None
-
-                result = await self.client.create_custom_reward(broadcaster_id, token_info, reward_data)
-                return result.get("id") if result else None
-            finally:
-                db.close()
-        except Exception as e:
-            logger.error(f"Error creating Twitch reward: {e}")
-            return None
+        async def op(token_info, broadcaster_id):
+            result = await self.client.create_custom_reward(broadcaster_id, token_info, reward_data)
+            return result.get("id") if result else None
+            
+        return await self._execute_with_token(user_id, op, default_return=None)
 
     async def update_reward(self, user_id: int, reward_id: str, reward_data: Dict) -> bool:
         """
@@ -298,38 +291,12 @@ class TwitchPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
-        try:
-            db = next(get_db())
-            try:
-                token = self.user_service.get_user_token(user_id, 'twitch', db)
-                if not token:
-                    logger.warning(f"No Twitch token found for user {user_id}")
-                    return False
-                
-                decrypted_token = self.user_service.decrypt_access_token(token.access_token)
-                token_info = TokenInfo(
-                    access_token=decrypted_token,
-                    refresh_token=token.refresh_token,
-                    scopes=token.scopes
-                )
-                
-                broadcaster_id = token.platform_user_id
-                if not broadcaster_id:
-                     user = await self.client.get_user_from_token(token_info)
-                     if user:
-                         broadcaster_id = user['id']
-                
-                if not broadcaster_id:
-                     logger.error("Could not determine broadcaster ID")
-                     return False
-
-                result = await self.client.update_custom_reward(broadcaster_id, reward_id, token_info, reward_data)
-                return result is not None
-            finally:
-                db.close()
-        except Exception as e:
-            logger.error(f"Error updating Twitch reward: {e}")
-            return False
+        async def op(token_info, broadcaster_id):
+            result = await self.client.update_custom_reward(broadcaster_id, reward_id, token_info, reward_data)
+            return result is not None
+            
+        result = await self._execute_with_token(user_id, op, default_return=False)
+        return bool(result)
 
     async def delete_reward(self, user_id: int, reward_id: str) -> bool:
         """
@@ -342,37 +309,11 @@ class TwitchPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
-        try:
-            db = next(get_db())
-            try:
-                token = self.user_service.get_user_token(user_id, 'twitch', db)
-                if not token:
-                    logger.warning(f"No Twitch token found for user {user_id}")
-                    return False
-                
-                decrypted_token = self.user_service.decrypt_access_token(token.access_token)
-                token_info = TokenInfo(
-                    access_token=decrypted_token,
-                    refresh_token=token.refresh_token,
-                    scopes=token.scopes
-                )
-                
-                broadcaster_id = token.platform_user_id
-                if not broadcaster_id:
-                     user = await self.client.get_user_from_token(token_info)
-                     if user:
-                         broadcaster_id = user['id']
-                
-                if not broadcaster_id:
-                     logger.error("Could not determine broadcaster ID")
-                     return False
-
-                return await self.client.delete_custom_reward(broadcaster_id, reward_id, token_info)
-            finally:
-                db.close()
-        except Exception as e:
-            logger.error(f"Error deleting Twitch reward: {e}")
-            return False
+        async def op(token_info, broadcaster_id):
+            return await self.client.delete_custom_reward(broadcaster_id, reward_id, token_info)
+            
+        result = await self._execute_with_token(user_id, op, default_return=False)
+        return bool(result)
 
     async def get_user_roles(self, username: str, channel_name: str) -> List[str]:
         """

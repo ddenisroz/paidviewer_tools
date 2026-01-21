@@ -203,24 +203,12 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             return;
         }
 
-        if (!engineStatus.loaded) {
-            const errorMessage = engineStatus.error || "TTS движок не готов. Попробуйте обновить страницу.";
-            if (notificationCallback) {
-                notificationCallback(errorMessage);
-            }
-            return;
-        }
-
-        if (!isWhitelisted) {
-            const message = "Ваш канал не в белом списке для использования TTS.";
-            if (notificationCallback) {
-                notificationCallback(message);
-            }
-            return;
-        }
+        // Note: We no longer block on engineStatus or whitelist checks
+        // The API will handle validation and return appropriate errors
+        // This allows Shift+T shortcut to work without waiting for health checks
 
         toggleTtsMutation.mutate(!ttsEnabled);
-    }, [engineStatus.loaded, isWhitelisted, ttsEnabled, notificationCallback, isToggling, toggleTtsMutation]);
+    }, [ttsEnabled, isToggling, toggleTtsMutation]);
 
     const initializeTts = useCallback(async (): Promise<void> => {
         if (!isInitialized && user) {

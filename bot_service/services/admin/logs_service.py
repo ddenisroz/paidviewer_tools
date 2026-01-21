@@ -101,14 +101,37 @@ class LogsService:
 
             # Читаем логи
             for log_file in log_files:
+                lines = []
                 try:
-                    with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
-                        for line in f:
-                            parsed = self._parse_log_line(line)
-                            if parsed:
-                                logs.append(parsed)
+                    # Попытка 1: UTF-8 с поддержкой BOM
+                    with open(log_file, "r", encoding="utf-8-sig") as f:
+                        lines = f.readlines()
+                except UnicodeDecodeError:
+                    try:
+                        # Попытка 2: CP1251 (Windows Cyrillic) - наиболее вероятная для Windows
+                        with open(log_file, "r", encoding="cp1251") as f:
+                            lines = f.readlines()
+                    except UnicodeDecodeError:
+                        try:
+                            # Попытка 3: CP866 (DOS Cyrillic) - консольная кодировка
+                            with open(log_file, "r", encoding="cp866") as f:
+                                lines = f.readlines()
+                        except UnicodeDecodeError:
+                            try:
+                                # Попытка 4: Latin-1 (читает всё, но могут быть кракозябры)
+                                with open(log_file, "r", encoding="latin1") as f:
+                                    lines = f.readlines()
+                            except Exception as e:
+                                logger.error(f"Failed to read log file '{log_file}': {e}")
+                                continue
                 except Exception as e:
-                    logger.error(f"Error reading log file {log_file}: {e}")
+                    logger.error(f"Error opening log file '{log_file}': {e}")
+                    continue
+
+                for line in lines:
+                    parsed = self._parse_log_line(line)
+                    if parsed:
+                        logs.append(parsed)
 
             # Сортируем по времени (новые сверху)
             logs.sort(key=lambda x: x["timestamp"], reverse=True)

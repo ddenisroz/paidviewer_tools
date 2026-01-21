@@ -112,11 +112,12 @@ async def update_stream(
     service: StreamInfoService = Depends(get_stream_service)
 ):
     """Обновить информацию о стриме (title или category)"""
-    logger.info("🎬 [STREAM UPDATE] Request received")
+    logger.info("[STREAM UPDATE] Request received")
     
     try:
         user_id = user.get("id")
         results = []
+        failures = []
 
         # Update Twitch
         if request.twitch:
@@ -128,12 +129,8 @@ async def update_stream(
                 if success:
                     results.append("Twitch updated")
                 else:
+                    failures.append("Twitch")
                     logger.error(f"Failed to update Twitch for user {user_id}")
-                    # Decide if we throw error or just log. API previously threw 401/400.
-                    # We'll continue for now but mark as error if critical?
-                    # Original API raised detailed HTTPExceptions.
-                    # For simplicity, we assume Service handles logic, but if failure, we might can't easily propagate specific error details easily without Service returning result object.
-                    # But boolean is enough to know it failed.
 
         # Update VK
         if request.vk:
@@ -155,10 +152,17 @@ async def update_stream(
                 if success:
                     results.append("VK updated")
                 else:
+                    failures.append("VK")
                     logger.error(f"Failed to update VK for user {user_id}")
 
-        if not results:
-             return JSONResponse(content={"success": True, "message": "No changes or updates failed/not needed"})
+        if not results and not failures:
+             return JSONResponse(content={"success": True, "message": "No changes or updates needed"})
+
+        if failures and not results:
+             return JSONResponse(content={"success": False, "message": f"Failed to update: {', '.join(failures)}"}, status_code=500)
+        
+        if failures:
+             return JSONResponse(content={"success": True, "message": f"Updated: {', '.join(results)}. Failed: {', '.join(failures)}"})
 
         return JSONResponse(content={"success": True, "message": ", ".join(results)})
 

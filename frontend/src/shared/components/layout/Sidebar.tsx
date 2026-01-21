@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
-import { ChevronRight, Coins, Command, Headphones, Home, LucideIcon, Menu, MessageSquare, Mic, Monitor, Settings, Shield, Sparkles, X, Youtube } from 'lucide-react';
+import { ChevronRight, Coins, Command, Headphones, Home, Laugh, LucideIcon, Menu, MessageSquare, Mic, Monitor, Settings, Shield, Sparkles, X, Youtube } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
@@ -47,7 +47,6 @@ const getNavItems = (isYourchy: boolean): NavItem[] => {
         { to: '/dashboard', label: 'Главная', icon: Home },
         {
             label: 'TTS ИИ озвучка',
-            to: '/dashboard/tts',
             icon: Mic,
             submenu: [
                 { to: '/dashboard/tts', label: 'Основные настройки', icon: Settings },
@@ -57,14 +56,14 @@ const getNavItems = (isYourchy: boolean): NavItem[] => {
         },
         {
             label: 'Медиа запросы',
-            to: '/dashboard/youtube',
             icon: Sparkles,
             submenu: [
-                { to: '/dashboard/youtube', label: 'YouTube заказы', icon: Youtube },
-                { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
+                { to: '/dashboard/media', label: 'YouTube заказы', icon: Youtube },
+                { to: '/dashboard/media?tab=memealerts', label: 'MemeAlerts', icon: Laugh },
                 { to: '/dashboard/drops', label: 'Drops система', icon: Sparkles },
             ]
         },
+        { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
         { to: '/dashboard/chat-analysis', label: 'Управление чатом', icon: MessageSquare },
         { to: '/dashboard/commands', label: 'Команды', icon: Command },
         { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
@@ -115,73 +114,30 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={() => setOpenSection(null)}
             >
-                {item.to ? (
-                    <NavLink
-                        to={item.to}
-                        end
-                        onClick={() => {
-                            setOpenSection(null);
-                            onMobileMenuClose();
-                        }}
-                        className={({ isActive }) =>
-                            `w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative flex items-center justify-between group-hover:bg-muted/50 ${isOpen
-                                ? 'bg-primary/20 text-primary'
-                                : isActive
-                                    ? 'bg-primary/10 text-primary'
-                                    : 'text-muted-foreground group-hover:text-foreground'
-                            }`
-                        }
-                        onKeyDown={handleKeyDown}
-                        tabIndex={0}
-                        role="button"
-                        aria-expanded={isOpen}
-                        aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
-                        onMouseEnter={() => {
-                            // Preload route on hover
-                            if (item.to) {
-                                const preloader = routePreloaders[item.to];
-                                if (preloader) preloader();
-                            }
-                        }}
-                    >
-                        {/* Индикатор активной подстраницы или родителя */}
-                        {(isParentActive || location.pathname === item.to) && !isOpen && (
-                            <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-full pointer-events-none" />
-                        )}
-                        <div className="flex items-center gap-4 pointer-events-none">
-                            <item.icon className="h-6 w-6" />
+                <div
+                    className={`w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${isOpen
+                        ? 'bg-primary/20 text-primary'
+                        : 'text-muted-foreground group-hover:bg-muted/50 group-hover:text-foreground'
+                        }`}
+                    onClick={() => setOpenSection(isOpen ? null : item.label)}
+                    onKeyDown={handleKeyDown}
+                    tabIndex={0}
+                    role="button"
+                    aria-expanded={isOpen}
+                    aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
+                >
+                    {/* Индикатор активной подстраницы - показываем только если меню закрыто */}
+                    {isParentActive && !isOpen && (
+                        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-full pointer-events-none" />
+                    )}
+                    <div className="flex items-center justify-between gap-4 pointer-events-none">
+                        <div className="flex items-center gap-4">
+                            <item.icon className="h-5 w-5" />
                             {item.label}
                         </div>
-                        <ChevronRight className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-0 opacity-100' : 'opacity-0'}`} />
-                    </NavLink>
-                ) : (
-                    <div
-                        className={`w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${isOpen
-                            ? 'bg-primary/20 text-primary'
-                            : isParentActive
-                                ? 'bg-primary/10 text-primary'
-                                : 'text-muted-foreground group-hover:bg-muted/50 group-hover:text-foreground'
-                            }`}
-                        onClick={() => setOpenSection(isOpen ? null : item.label)}
-                        onKeyDown={handleKeyDown}
-                        tabIndex={0}
-                        role="button"
-                        aria-expanded={isOpen}
-                        aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
-                    >
-                        {/* Индикатор активной подстраницы */}
-                        {isParentActive && !isOpen && (
-                            <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-full pointer-events-none" />
-                        )}
-                        <div className="flex items-center justify-between gap-4 pointer-events-none">
-                            <div className="flex items-center gap-4">
-                                <item.icon className="h-6 w-6" />
-                                {item.label}
-                            </div>
-                            <ChevronRight className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-0 opacity-100' : 'opacity-0'}`} />
-                        </div>
+                        <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-90 opacity-100' : 'opacity-40'}`} />
                     </div>
-                )}
+                </div>
 
                 {/* Submenu появляется СПРАВА от родителя (GitHub-style, без gap) */}
                 {isOpen && (
@@ -192,34 +148,41 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                             onMouseEnter={handleMouseEnter}
                         />
                         <div
-                            className="absolute left-full top-0 w-64 bg-background border border-border rounded-lg shadow-lg z-50 py-2 animate-in fade-in slide-in-from-left-2 duration-200"
+                            className="absolute left-full top-0 w-72 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-0 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden"
                             onMouseEnter={handleMouseEnter}
                         >
-                            {item.submenu!.map((subItem) => (
-                                <NavLink
-                                    key={subItem.to}
-                                    to={subItem.to}
-                                    end
-                                    onClick={() => {
-                                        setOpenSection(null); // Закрываем submenu при клике
-                                        onMobileMenuClose();
-                                    }}
-                                    onMouseEnter={() => {
-                                        // Preload route on hover
-                                        const preloader = routePreloaders[subItem.to];
-                                        if (preloader) preloader();
-                                    }}
-                                    className={({ isActive }) =>
-                                        `flex items-center gap-3 px-4 py-2.5 text-base font-medium transition-colors ${isActive
-                                            ? 'bg-primary/10 text-primary'
-                                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                                        }`
-                                    }
-                                >
-                                    {subItem.icon && <subItem.icon className="h-5 w-5" />}
-                                    {subItem.label}
-                                </NavLink>
-                            ))}
+                            {item.submenu!.map((subItem) => {
+                                // Custom active check for query params support
+                                const isSubItemActive = location.pathname === subItem.to.split('?')[0] &&
+                                    (subItem.to.includes('?')
+                                        ? location.search === `?${subItem.to.split('?')[1]}`
+                                        : location.search === '' || location.search === '?tab=youtube'); // Handle default tab logic if needed
+
+                                return (
+                                    <NavLink
+                                        key={subItem.to}
+                                        to={subItem.to}
+                                        end
+                                        onClick={() => {
+                                            setOpenSection(null);
+                                            onMobileMenuClose();
+                                        }}
+                                        onMouseEnter={() => {
+                                            const preloader = routePreloaders[subItem.to.split('?')[0]]; // Preload base route
+                                            if (preloader) preloader();
+                                        }}
+                                        className={() =>
+                                            `flex items-center gap-3 px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-colors ${isSubItemActive
+                                                ? 'bg-primary/10 text-primary'
+                                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                                            }`
+                                        }
+                                    >
+                                        {subItem.icon && <subItem.icon className="h-4 w-4 flex-shrink-0" />}
+                                        {subItem.label}
+                                    </NavLink>
+                                );
+                            })}
                         </div>
                     </>
                 )}
@@ -246,7 +209,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 }`
             }
         >
-            <item.icon className="h-6 w-6" />
+            <item.icon className="h-5 w-5" />
             {item.label}
         </NavLink>
     );
@@ -325,7 +288,7 @@ const Sidebar: React.FC = () => {
                     <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
                         <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
                             <span className="text-xl font-bold text-green-400 font-mono tracking-wider whitespace-nowrap">
-                                Payedviewer tools
+                                Payedviewer_tools
                             </span>
                         </NavLink>
                     </div>

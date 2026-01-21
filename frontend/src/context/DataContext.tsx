@@ -295,15 +295,27 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         };
 
         if (twitchData?.data) {
-            const twitch = twitchData.data as { title?: string; game_id?: string; game?: string };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const twitch = twitchData.data as any;
             data.twitch.title = twitch.title || '';
-            data.twitch.category = twitch.game_id ? { id: twitch.game_id, name: twitch.game || '' } : null;
+            data.twitch.category = twitch.game_id ? {
+                id: twitch.game_id,
+                name: twitch.game || twitch.game_name || '',
+                box_art_url: twitch.game_box_art_url || twitch.box_art_url
+            } : null;
         }
 
         if (vkData?.data) {
-            const vk = vkData.data as { title?: string; category_id?: string; category?: string };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const vk = vkData.data as any;
             data.vk.title = vk.title || '';
-            data.vk.category = vk.category_id ? { id: vk.category_id, name: vk.category || '' } : null;
+            const cat = vk.category;
+            data.vk.category = vk.category_id ? {
+                id: vk.category_id,
+                name: vk.category?.title || vk.category || '',
+                box_art_url: cat?.box_art_url,
+                cover_url: cat?.cover_url
+            } : null;
         }
 
         return data;
@@ -314,10 +326,40 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         setLoading(prev => ({ ...prev, streamData: isLoadingStreamData }));
     }, [isLoadingStreamData]);
 
+    // Track if it's the first load to allow initial population
+    const [isFirstLoad, setIsFirstLoad] = useState(true);
+
     useEffect(() => {
         if (combinedStreamData && (combinedStreamData.twitch.title || combinedStreamData.vk.title || combinedStreamData.twitch.category || combinedStreamData.vk.category)) {
+            // Check if user has unsaved changes
+            // We compare strict equality of objects/strings to ensure we don't overwrite if user is typing
+            // Note: This simple check assumes equality works. 
+            // Better: Compare serialized or field-by-field if structure is complex.
+            // For now, we assume if initialData matches currentData, it's pristine.
+
+            const isTwitchExistent = !!initialData.twitch;
+            const isVkExistent = !!initialData.vk;
+
+            // Check if modified (simplified check)
+            let isModified = false;
+
+            if (isTwitchExistent) {
+                if (initialData.twitch.title !== currentData.twitch.title) isModified = true;
+                if (initialData.twitch.category?.id !== currentData.twitch.category?.id) isModified = true;
+            }
+            if (isVkExistent) {
+                if (initialData.vk.title !== currentData.vk.title) isModified = true;
+                if (initialData.vk.category?.id !== currentData.vk.category?.id) isModified = true;
+            }
+
+            // Only overwrite currentData if NOT modified OR it's the first load
+            if (!isModified || isFirstLoad) {
+                setCurrentData(combinedStreamData);
+                if (isFirstLoad) setIsFirstLoad(false);
+            }
+
+            // Always update initialData to the fresh server state
             setInitialData(combinedStreamData);
-            setCurrentData(combinedStreamData);
             setQueryCache(['stream-data', user?.id], combinedStreamData);
             setRefreshTrigger(prev => prev + 1);
         }

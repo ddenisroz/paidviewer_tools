@@ -74,27 +74,29 @@ const InboxPage: React.FC = () => {
     const errors: CreateFormErrors = {};
 
     if (!data.subject.trim()) {
-      errors.subject = 'пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ';
+      errors.subject = 'Поле тема обязательно';
     } else if (data.subject.length < 3) {
-      errors.subject = 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅ 3 пїЅпїЅпїЅпїЅпїЅпїЅпїЅ';
+      errors.subject = 'Минимум 3 символа';
     } else if (data.subject.length > 100) {
-      errors.subject = 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 100 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ';
+      errors.subject = 'Максимум 100 символов';
     }
 
     if (!data.message.trim()) {
-      errors.message = 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ';
+      errors.message = 'Поле сообщение обязательно';
     } else if (data.message.length < 10) {
-      errors.message = 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅ 10 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ';
+      errors.message = 'Минимум 10 символов';
     } else if (data.message.length > 5000) {
-      errors.message = 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ 5000 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ';
+      errors.message = 'Максимум 5000 символов';
     }
 
     return errors;
   };
 
-  const loadTickets = async (): Promise<void> => {
+  const loadTickets = async (showLoader: boolean = true): Promise<void> => {
     try {
-      setLoading(true);
+      if (showLoader) {
+        setLoading(true);
+      }
       const response = await supportService.getMyTickets();
       const result = response.data as ApiResponse<{ tickets?: Ticket[] }>;
       setTickets(result.data?.tickets || []);
@@ -102,11 +104,13 @@ const InboxPage: React.FC = () => {
       const err = error as { status?: number };
       logger.error('Error loading tickets:', error);
       const errorMsg = err.status === 503
-        ? 'пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ.'
-        : 'пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ-пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.';
+        ? 'Сервис временно недоступен. Попробуйте позже.'
+        : 'Не удалось загрузить данные. Попробуйте обновить страницу.';
       toast.error(errorMsg);
     } finally {
-      setLoading(false);
+      if (showLoader) {
+        setLoading(false);
+      }
     }
   };
 
@@ -117,7 +121,7 @@ const InboxPage: React.FC = () => {
       setResponses(result.data?.responses || []);
     } catch (error) {
       logger.error('Error loading responses:', error);
-      toast.error('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ');
+      toast.error('Ошибка загрузки ответов');
     }
   };
 
@@ -142,7 +146,7 @@ const InboxPage: React.FC = () => {
 
     setResponses(prev => [...prev, optimisticResponse]);
     setNewResponse('');
-    toast.success('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ');
+    toast.success('Ответ отправлен');
 
     setIsSubmitting(true);
     try {
@@ -151,11 +155,11 @@ const InboxPage: React.FC = () => {
 
       await supportService.respondToTicket(selectedTicket.id, formData);
       await loadTicketResponses(selectedTicket.id);
-      await loadTickets();
+      await loadTickets(false);
     } catch (error) {
       setResponses(prev => prev.filter(r => r.id !== optimisticResponse.id));
       logger.error('Error sending response:', error);
-      toast.error('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ');
+      toast.error('Ошибка отправки ответа');
     } finally {
       setIsSubmitting(false);
     }
@@ -165,7 +169,7 @@ const InboxPage: React.FC = () => {
     e.preventDefault();
 
     if (!createFormData.subject.trim() || !createFormData.message.trim()) {
-      toast.error('пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ');
+      toast.error('Заполните все обязательные поля');
       return;
     }
 
@@ -182,7 +186,7 @@ const InboxPage: React.FC = () => {
     setTickets(prev => [optimisticTicket, ...prev]);
     setIsCreateDialogOpen(false);
     setCreateFormData({ subject: '', message: '' });
-    toast.success('пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ');
+    toast.success('Тикет создан');
 
     setIsCreating(true);
 
@@ -193,12 +197,12 @@ const InboxPage: React.FC = () => {
 
       const response = await supportService.createTicket(formDataToSend);
       const result = response.data as ApiResponse<{ ticket_id?: number }>;
-      toast.success(`пїЅпїЅпїЅпїЅпїЅ #${result.data?.ticket_id} пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ!`);
-      await loadTickets();
+      toast.success(`Тикет #${result.data?.ticket_id} успешно создан!`);
+      await loadTickets(false);
     } catch (error) {
       setTickets(prev => prev.filter(t => t.id !== optimisticTicket.id));
       logger.error('Error creating ticket:', error);
-      toast.error('пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ');
+      toast.error('Ошибка создания тикета');
     } finally {
       setIsCreating(false);
     }
@@ -218,9 +222,9 @@ const InboxPage: React.FC = () => {
 
   const getStatusBadge = (status: Ticket['status']): React.ReactNode => {
     const statusConfig = {
-      open: { color: 'bg-blue-500', icon: Clock, text: 'пїЅпїЅпїЅпїЅпїЅпїЅ' },
-      in_progress: { color: 'bg-yellow-500', icon: AlertCircle, text: 'пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ' },
-      closed: { color: 'bg-green-500', icon: CheckCircle, text: 'пїЅпїЅпїЅпїЅпїЅпїЅ' }
+      open: { color: 'bg-blue-500', icon: Clock, text: 'Открыт' },
+      in_progress: { color: 'bg-yellow-500', icon: AlertCircle, text: 'В работе' },
+      closed: { color: 'bg-green-500', icon: CheckCircle, text: 'Закрыт' }
     };
 
     const config = statusConfig[status] || statusConfig.open;
@@ -248,7 +252,7 @@ const InboxPage: React.FC = () => {
 
   if (!isAuthenticated) {
     return (
-      <PageWrapper title="пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ">
+      <PageWrapper title="Поддержка">
         <Card className="border-gray-700">
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
             <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
@@ -256,10 +260,10 @@ const InboxPage: React.FC = () => {
             </div>
             <div className="space-y-2 max-w-md">
               <h3 className="text-xl font-semibold text-gray-200">
-                пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+                Требуется авторизация
               </h3>
               <p className="text-gray-400 text-sm">
-                пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+                Для доступа к поддержке необходимо войти в систему
               </p>
             </div>
             <Button
@@ -267,7 +271,7 @@ const InboxPage: React.FC = () => {
               className="gap-2"
             >
               <Settings className="w-4 h-4" />
-              пїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+              Войти в систему
             </Button>
           </CardContent>
         </Card>
@@ -279,12 +283,12 @@ const InboxPage: React.FC = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-6 text-foreground">пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ</h1>
+          <h1 className="text-3xl font-bold mb-6 text-foreground">Мои тикеты</h1>
           <p className="text-muted-foreground">
-            пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+            Здесь отображаются ваши запросы в техподдержку
             {totalUnread > 0 && (
               <span className="ml-2 text-primary font-semibold">
-                ({totalUnread} пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ)
+                ({totalUnread} непрочитанных)
               </span>
             )}
           </p>
@@ -295,24 +299,24 @@ const InboxPage: React.FC = () => {
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
-          пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
+          Создать тикет
         </Button>
       </div>
 
       <div className="space-y-4">
         {loading ? (
-          <PageLoader message="пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ..." />
+          <PageLoader message="Загрузка тикетов..." />
         ) : tickets.length === 0 ? (
           <Card className="border-dashed border-2">
             <CardContent className="p-12 text-center">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-xl font-semibold mb-2">пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ</h3>
+              <h3 className="text-xl font-semibold mb-2">Нет активных тикетов</h3>
               <p className="text-muted-foreground mb-6">
-                пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ! [SUCCESS] пїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+                Все хорошо! У вас пока нет обращений в поддержку.
               </p>
               <Button onClick={() => setIsCreateDialogOpen(true)} size="lg">
                 <Plus className="h-4 w-4 mr-2" />
-                пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
+                Создать первый тикет
               </Button>
             </CardContent>
           </Card>
@@ -333,14 +337,14 @@ const InboxPage: React.FC = () => {
                         {getStatusBadge(ticket.status)}
                         {ticket.unread_responses > 0 && (
                           <Badge variant="destructive">
-                            {ticket.unread_responses} пїЅпїЅпїЅпїЅпїЅ
+                            {ticket.unread_responses} новых
                           </Badge>
                         )}
                       </div>
 
                       <div className="text-sm text-muted-foreground mb-3">
-                        <p><strong>пїЅпїЅпїЅпїЅпїЅпїЅ:</strong> {formatDate(ticket.created_at)}</p>
-                        <p><strong>пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ:</strong> {formatDate(ticket.updated_at)}</p>
+                        <p><strong>Создан:</strong> {formatDate(ticket.created_at)}</p>
+                        <p><strong>Обновлен:</strong> {formatDate(ticket.updated_at)}</p>
                       </div>
 
                       <div className="bg-muted p-3 rounded-lg">
@@ -350,7 +354,7 @@ const InboxPage: React.FC = () => {
 
                     <Button variant="outline" size="sm">
                       <Eye className="h-4 w-4 mr-2" />
-                      пїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+                      Просмотр
                     </Button>
                   </div>
                 </CardContent>
@@ -364,7 +368,7 @@ const InboxPage: React.FC = () => {
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              пїЅпїЅпїЅпїЅпїЅ #{selectedTicket?.id}
+              Тикет #{selectedTicket?.id}
             </DialogTitle>
             <DialogDescription>
               {selectedTicket?.subject}
@@ -377,16 +381,16 @@ const InboxPage: React.FC = () => {
                 <div className="flex items-center gap-2 mb-2">
                   {getStatusBadge(selectedTicket.status)}
                   <span className="text-sm text-muted-foreground">
-                    пїЅпїЅпїЅпїЅпїЅпїЅ: {formatDate(selectedTicket.created_at)}
+                    Создан: {formatDate(selectedTicket.created_at)}
                   </span>
                 </div>
                 <p className="text-sm whitespace-pre-wrap break-words overflow-wrap-anywhere" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedTicket.message}</p>
               </div>
 
               <div className="space-y-3">
-                <h4 className="font-semibold">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ:</h4>
+                <h4 className="font-semibold">Ответы:</h4>
                 {responses.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">пїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ</p>
+                  <p className="text-muted-foreground text-sm">Нет ответов</p>
                 ) : (
                   responses.map((response) => (
                     <div
@@ -399,7 +403,7 @@ const InboxPage: React.FC = () => {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">
-                            {response.is_admin_response ? 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ' : 'пїЅпїЅ'}
+                            {response.is_admin_response ? 'Администратор' : 'Вы'}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {formatDate(response.created_at)}
@@ -407,7 +411,7 @@ const InboxPage: React.FC = () => {
                         </div>
                         {response.is_admin_response && !response.is_read && (
                           <Badge variant="destructive" className="text-xs">
-                            пїЅпїЅпїЅпїЅпїЅ
+                            Новый
                           </Badge>
                         )}
                       </div>
@@ -419,9 +423,9 @@ const InboxPage: React.FC = () => {
 
               {selectedTicket.status !== 'closed' && (
                 <div className="space-y-3">
-                  <h4 className="font-semibold">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ:</h4>
+                  <h4 className="font-semibold">Ваш ответ:</h4>
                   <Textarea
-                    placeholder="пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ..."
+                    placeholder="Напишите ваш ответ..."
                     value={newResponse}
                     onChange={(e) => setNewResponse(e.target.value)}
                     rows={3}
@@ -435,12 +439,12 @@ const InboxPage: React.FC = () => {
                       {isSubmitting ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                          пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ...
+                          Отправка...
                         </>
                       ) : (
                         <>
                           <Send className="h-4 w-4 mr-2" />
-                          пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+                          Отправить
                         </>
                       )}
                     </Button>
@@ -451,7 +455,7 @@ const InboxPage: React.FC = () => {
               {selectedTicket.status === 'closed' && (
                 <div className="text-center py-4 text-muted-foreground">
                   <CheckCircle className={cn(BUTTON_SIZES.iconSm, "mx-auto mb-2")} />
-                  <p>пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ.</p>
+                  <p>Этот тикет закрыт. Создайте новый для продолжения общения.</p>
                 </div>
               )}
             </div>
@@ -463,19 +467,19 @@ const InboxPage: React.FC = () => {
         <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
+              Создать тикет
             </DialogTitle>
             <DialogDescription>
-              пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ. пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ.
+              Опишите вашу проблему как можно подробнее.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCreateTicket} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="create-subject">пїЅпїЅпїЅпїЅ *</Label>
+              <Label htmlFor="create-subject">Тема *</Label>
               <Input
                 id="create-subject"
-                placeholder="пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ"
+                placeholder="Краткое описание проблемы"
                 value={createFormData.subject}
                 onChange={(e) => handleCreateInputChange('subject', e.target.value)}
                 maxLength={100}
@@ -488,10 +492,10 @@ const InboxPage: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="create-message">пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ *</Label>
+              <Label htmlFor="create-message">Сообщение *</Label>
               <Textarea
                 id="create-message"
-                placeholder="пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ..."
+                placeholder="Подробное описание проблемы, шаги воспроизведения и т.д..."
                 value={createFormData.message}
                 onChange={(e) => handleCreateInputChange('message', e.target.value)}
                 maxLength={5000}
@@ -503,7 +507,7 @@ const InboxPage: React.FC = () => {
                 <p className="text-red-500 text-sm">{createFormErrors.message}</p>
               )}
               <div className="text-sm text-muted-foreground text-right">
-                {createFormData.message.length}/5000 пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
+                {createFormData.message.length}/5000 символов
               </div>
             </div>
 
@@ -514,23 +518,23 @@ const InboxPage: React.FC = () => {
                 onClick={() => setIsCreateDialogOpen(false)}
                 disabled={isCreating}
               >
-                пїЅпїЅпїЅпїЅпїЅпїЅ
+                Отмена
               </Button>
               <Button
                 type="submit"
                 disabled={isCreating || Object.keys(createFormErrors).length > 0}
                 className="min-w-[100px]"
-                title={Object.keys(createFormErrors).length > 0 ? 'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ' : ''}
+                title={Object.keys(createFormErrors).length > 0 ? 'Исправьте ошибки перед отправкой' : ''}
               >
                 {isCreating ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ...
+                    Создание...
                   </>
                 ) : Object.keys(createFormErrors).length > 0 ? (
-                  'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ'
+                  'Исправьте ошибки'
                 ) : (
-                  'пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ'
+                  'Создать'
                 )}
               </Button>
             </div>
@@ -542,4 +546,3 @@ const InboxPage: React.FC = () => {
 };
 
 export default InboxPage;
-

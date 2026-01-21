@@ -1,0 +1,113 @@
+/* Toast Overrides - Force Dark Glassmorphism */
+
+/* Target the toast container provided by Sonner */
+[data-sonner-toaster] {
+    --normal-bg: rgba(10, 10, 10, 0.95) !important;
+    --normal-border: rgba(255, 255, 255, 0.08) !important;
+    --normal-text: #ffffff !important;
+    z-index: 9999 !important;
+}
+
+/* Force dark background on ALL toast types and remove conflicting styles */
+[data-sonner-toast] {
+    background: rgba(15, 15, 15, 0.95) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7) !important;
+    color: #ffffff !important;
+    padding: 16px !important;
+    padding-right: 48px !important;
+    /* Space for close button */
+    min-height: 56px !important;
+    align-items: center !important;
+    font-family: inherit !important;
+    transition: transform 0.2s ease, opacity 0.2s ease !important;
+}
+
+/* Prevent lifting effect on hover */
+[data-sonner-toast]:hover {
+    transform: none !important;
+}
+
+/* Consistent Even Borders for all types */
+[data-sonner-toast][data-type="success"] {
+    border: 1px solid rgba(16, 185, 129, 0.5) !important;
+    background-image: linear-gradient(to right, rgba(16, 185, 129, 0.05), transparent) !important;
+}
+
+[data-sonner-toast][data-type="error"] {
+    border: 1px solid rgba(239, 110, 110, 0.5) !important;
+    background-image: linear-gradient(to right, rgba(239, 68, 68, 0.05), transparent) !important;
+}
+
+[data-sonner-toast][data-type="warning"] {
+    border: 1px solid rgba(245, 158, 11, 0.6) !important;
+    background-image: linear-gradient(to right, rgba(245, 158, 11, 0.05), transparent) !important;
+}
+
+[data-sonner-toast][data-type="info"] {
+    border: 1px solid rgba(59, 130, 246, 0.5) !important;
+    background-image: linear-gradient(to right, rgba(59, 130, 246, 0.05), transparent) !important;
+}
+
+/* Typography Enhancements */
+[data-sonner-toast] [data-title] {
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    color: #ffffff !important;
+    margin-bottom: 4px !important;
+    line-height: 1.4 !important;
+}
+
+[data-sonner-toast] [data-description] {
+    color: #a1a1aa !important;
+    font-size: 0.8rem !important;
+    line-height: 1.4 !important;
+}
+
+/* Fix Close Button Layout */
+[data-sonner-toast] [data-close-button] {
+    position: absolute !important;
+    top: 12px !important;
+    right: 12px !important;
+    left: auto !important;
+    bottom: auto !important;
+    background: transparent !important;
+    border: none !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+    /* Much more visible */
+    width: 24px !important;
+    height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    transform: none !important;
+    /* Reset transform if sonner moves it */
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+    border-radius: 4px !important;
+}
+
+/* Icon adjustments */
+[data-sonner-toast] [data-icon] {
+    margin-right: 12px !important;
+    margin-top: 2px !important;
+    /* Align with title */
+}
+
+/* Hide cancel buttons usually, unless action needed */
+[data-sonner-toast] [data-button] {
+    background: #27272a !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    font-size: 0.75rem !important;
+    height: 28px !important;
+    padding: 0 12px !important;
+}

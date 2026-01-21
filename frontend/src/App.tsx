@@ -7,9 +7,10 @@ import AppErrorBoundary from '@/shared/components/ErrorBoundary/AppErrorBoundary
 import RouteErrorBoundary from '@/shared/components/ErrorBoundary/RouteErrorBoundary';
 import { ConnectionStatus } from '@/shared/components/layout/ConnectionStatus';
 import Layout from '@/shared/components/layout/Layout';
+import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
+
 // Minimal loading - no skeletons, pages appear instantly
 const MinimalFallback = () => <div className="min-h-screen" />;
-import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 
 // Critical pages - загружаем сразу (только auth flow)
 import AuthCallbackPage from './pages/AuthCallbackPage';
@@ -24,8 +25,10 @@ const TtsMainPage = lazy(() => import('./features/tts/pages/TtsMainPage'));
 const VoiceManagementPage = lazy(() => import('./features/tts/pages/VoiceManagementPage'));
 const LocalTTSSettingsPage = lazy(() => import('./features/tts/pages/LocalTTSSettingsPage'));
 const PointsManagementPage = lazy(() => import('./pages/PointsManagementPage'));
-const YoutubeIntegrationPage = lazy(() => import('./pages/media/YoutubeIntegrationPage'));
+
+const MediaRequestsPage = lazy(() => import('./pages/media/MediaRequestsPage'));
 const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+
 const CommandsPage = lazy(() => import('./pages/CommandsPage'));
 const ObsTtsPage = lazy(() => import('./features/tts/pages/ObsTtsPage'));
 const ObsYoutubePage = lazy(() => import('./features/tts/pages/ObsYoutubePage'));
@@ -41,40 +44,9 @@ const App: React.FC = () => {
 
     return (
         <>
-            {/* Task 6.5: Connection status indicator */}
+            {/* Task 6.5: Connection status indicator - Moved to bottom-left */}
             <ConnectionStatus />
 
-            {/* Toast Manager - top-right, legacy position */}
-            <Toaster
-                position="bottom-right"
-                richColors
-                expand={true}
-                visibleToasts={3}
-                duration={4000}
-                closeButton
-                toastOptions={{
-                    className: 'toast-notification',
-                    style: {
-                        background: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        color: 'hsl(var(--foreground))',
-                        pointerEvents: 'auto',
-                        zIndex: 99999,
-                    },
-                    classNames: {
-                        toast: 'toast-base',
-                        title: 'toast-title',
-                        description: 'toast-description',
-                        success: 'toast-success',
-                        error: 'toast-error',
-                        warning: 'toast-warning',
-                        info: 'toast-info',
-                        actionButton: 'toast-action',
-                        cancelButton: 'toast-cancel',
-                        closeButton: 'toast-close',
-                    },
-                }}
-            />
             <AppErrorBoundary>
                 <Routes>
                     {/* Public Routes */}
@@ -183,10 +155,10 @@ const App: React.FC = () => {
                             } />
 
                             {/* Media Routes */}
-                            <Route path="dashboard/youtube" element={
-                                <RouteErrorBoundary routeName="YouTube">
+                            <Route path="dashboard/media" element={
+                                <RouteErrorBoundary routeName="Media Requests">
                                     <Suspense fallback={<MinimalFallback />}>
-                                        <YoutubeIntegrationPage />
+                                        <MediaRequestsPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
@@ -275,6 +247,27 @@ const App: React.FC = () => {
                     </Route>
                 </Routes>
             </AppErrorBoundary>
+
+            {/* Toast Manager - premium aesthetic at the end of DOM */}
+            <Toaster
+                position="bottom-right"
+                expand={false}
+                visibleToasts={3}
+                duration={3000}
+                closeButton
+                theme="dark"
+                richColors={false}
+                toastOptions={{
+                    className: 'group toast-group',
+                    // Styles are now handled by toast-overrides.css
+                    classNames: {
+                        toast: 'group-[.toaster]:backdrop-blur-xl group-[.toaster]:shadow-2xl',
+                        description: 'group-[.toast]:text-muted-foreground',
+                        actionButton: 'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
+                        cancelButton: 'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
+                    },
+                }}
+            />
         </>
     );
 }

@@ -378,9 +378,9 @@ const LocalTTSSettingsPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
+        <div className="container mx-auto max-w-5xl space-y-6">
             <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-2 bg-gray-800/50">
                     <TabsTrigger value="connection" className="flex items-center gap-2">
                         <Server className="w-4 h-4" />
                         Подключение
@@ -391,8 +391,8 @@ const LocalTTSSettingsPage: React.FC = () => {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="connection" className="space-y-4 mt-0">
-                    <Card className="bg-blue-500/10 border-blue-500/30">
+                <TabsContent value="connection" className="space-y-4 mt-4">
+                    <Card className="card-glass border-blue-500/20">
                         <CardHeader>
                             <CardTitle className="text-blue-400 flex items-center gap-2">
                                 <ExternalLink className="w-5 h-5" />
@@ -457,7 +457,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card className="card-glass">
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Server className="w-5 h-5" />
@@ -557,7 +557,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                     </Card>
 
                     {healthData && (
-                        <Card>
+                        <Card className="card-glass">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Zap className="w-5 h-5" />
@@ -652,7 +652,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                     )}
 
                     {testResult?.success && (
-                        <Card>
+                        <Card className="card-glass">
                             <CardHeader>
                                 <CardTitle>Использование локального TTS</CardTitle>
                             </CardHeader>
@@ -679,8 +679,8 @@ const LocalTTSSettingsPage: React.FC = () => {
                     )}
                 </TabsContent>
 
-                <TabsContent value="voices" className="space-y-4 mt-0">
-                    <Card>
+                <TabsContent value="voices" className="space-y-4 mt-4">
+                    <Card className="card-glass">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div>

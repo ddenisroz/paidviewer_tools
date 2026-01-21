@@ -38,6 +38,8 @@ class VKBase:
     """Base class for VK API modules."""
     
     BASE_URL = "https://apidev.live.vkvideo.ru"
+
+
     
     def __init__(self) -> None:
         self.rate_limiter = RateLimiter()

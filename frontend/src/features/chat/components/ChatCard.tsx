@@ -193,7 +193,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         }
     }, [integrations?.twitch?.enabled, user?.twitch_username, badgesLoaded]);
 
-    // Disable TTS on page unload
+    // Disable TTS on page unload (only on actual page close, not tab switch)
     useEffect(() => {
         const handleBeforeUnload = async () => {
             try {
@@ -203,22 +203,10 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
             }
         };
 
-        const handleVisibilityChange = async () => {
-            if (document.hidden) {
-                try {
-                    await ttsService.savePlatformSettings({ enabled_platforms: [] });
-                } catch (error) {
-                    logger.error('[ERROR] [TTS] Error disabling TTS on visibility change:', error);
-                }
-            }
-        };
-
         window.addEventListener('beforeunload', handleBeforeUnload);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
 
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
@@ -400,8 +388,8 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
     }, [handleContextMenuAction]);
 
     return (
-        <Card>
-            <CardHeader className="pb-2">
+        <Card className="card-glass h-full flex flex-col">
+            <CardHeader className="py-2 px-4">
                 <ChatCardHeader
                     twitchChatEnabled={twitchChatEnabled}
                     vkChatEnabled={vkChatEnabled}

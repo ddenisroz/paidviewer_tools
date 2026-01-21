@@ -71,19 +71,27 @@ const TabButton: React.FC<{
   const Icon = tab.icon;
 
   return (
-    <Button
-      variant={isActive ? 'default' : 'ghost'}
+    <button
       onClick={onClick}
       className={cn(
-        'h-10 px-4 whitespace-nowrap flex-shrink-0',
-        TRANSITIONS.colors,
-        isActive ? tab.color : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+        'relative h-10 px-4 flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-colors duration-200 outline-none select-none',
+        isActive
+          ? cn("text-white", tab.color)
+          : "text-muted-foreground hover:text-white"
       )}
     >
-      <Icon className="h-4 w-4 mr-2" />
+      <Icon className={cn("h-4 w-4", isActive ? tab.color : "")} />
       <span className="hidden sm:inline">{tab.label}</span>
       <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
-    </Button>
+
+      {/* Active Indicator */}
+      {isActive && (
+        <div className={cn(
+          "absolute bottom-0 left-0 right-0 h-[2px] rounded-full",
+          tab.color.replace('text-', 'bg-') // Convert text color to bg color for the line
+        )} />
+      )}
+    </button>
   );
 };
 
@@ -139,7 +147,7 @@ const AdminPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6">
+    <div className="min-h-screen p-4 md:p-6 space-y-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Breadcrumbs */}
         <Breadcrumbs
@@ -150,8 +158,8 @@ const AdminPage: React.FC = () => {
         />
 
         {/* Навигация табов с горизонтальным скроллом */}
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-600">
-          <div className="flex gap-2 p-2 bg-slate-800/50 rounded-lg min-w-max">
+        <div className="border-b border-white/5 pb-0">
+          <div className="flex overflow-x-auto scrollbar-none gap-2">
             {TABS.map(tab => (
               <TabButton
                 key={tab.id}
@@ -165,7 +173,9 @@ const AdminPage: React.FC = () => {
 
         {/* Контент таба с Suspense */}
         <Suspense fallback={<TabSkeleton />}>
-          <TabContent activeTab={activeTab} />
+          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <TabContent activeTab={activeTab} />
+          </div>
         </Suspense>
       </div>
     </div>

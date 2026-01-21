@@ -2,8 +2,6 @@
 
 import { CheckCircle2, Clock, Edit, Gift, Loader2, MessageCircle, Plus, Power, PowerOff, Trash2, XCircle } from 'lucide-react';
 
-
-
 import { PLATFORM_COLORS } from '@/constants/uiConstants';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -61,7 +59,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
     const [toggling, setToggling] = useState<boolean>(false);
 
     const handleDelete = async (): Promise<void> => {
-        if (!confirm('�� �������, ��� ������ ������� ��� �������?')) return;
+        if (!confirm('Вы уверены, что хотите удалить эту награду?')) return;
 
         setDeleting(true);
         try {
@@ -864,7 +862,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                     {rewardTitle}
                                                 </Badge>
                                                 <Badge variant="secondary" className="text-xs font-mono bg-blue-600/20 text-blue-300 border-blue-600/30">
-                                                    {rewardCost} баллов������
+                                                    {rewardCost} баллов
                                                 </Badge>
                                             </div>
 
@@ -901,7 +899,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                 ) : (
                                                     <>
                                                         <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                                                        Принять�������
+                                                        Принять
                                                     </>
                                                 )}
                                             </Button>
@@ -916,7 +914,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                 className="min-w-[100px] h-9"
                                             >
                                                 <XCircle className="w-4 h-4 mr-1.5" />
-                                                Отклонить���������
+                                                Отклонить
                                             </Button>
                                         </div>
                                     </div>
@@ -934,7 +932,7 @@ const PointsManagementPage: React.FC = () => {
     // useAuth unused
     const { integrations } = useIntegrations();
 
-    // ��� ���� ������ ���� ������� �� ����� �������� return
+    // Если нет прав или не авторизован то сразу return
     const [selectedPlatform, setSelectedPlatform] = useState<'twitch' | 'vk'>('twitch');
     const [activeTab, setActiveTab] = useState<'rewards' | 'queue'>('rewards');
     const [rewards, setRewards] = useState<PlatformReward[]>([]);
@@ -957,9 +955,11 @@ const PointsManagementPage: React.FC = () => {
         }
     }, [twitchEnabled, vkEnabled, selectedPlatform]);
 
-    const loadRewards = async (): Promise<void> => {
+    const loadRewards = async (showLoader: boolean = true): Promise<void> => {
         try {
-            setLoading(true);
+            if (showLoader) {
+                setLoading(true);
+            }
             const data = await pointsApi.getRewards(selectedPlatform) as RewardsResponse;
 
             const sortedRewards = (data.rewards || []).sort((a: PlatformReward, b: PlatformReward) => {
@@ -982,12 +982,14 @@ const PointsManagementPage: React.FC = () => {
             }
             setRewards([]);
         } finally {
-            setLoading(false);
+            if (showLoader) {
+                setLoading(false);
+            }
         }
     };
 
     useEffect(() => {
-        loadRewards();
+        loadRewards(true);
     }, [selectedPlatform]);
 
     if (loading) {
@@ -1085,7 +1087,7 @@ const PointsManagementPage: React.FC = () => {
                                             reward={reward}
                                             platform={selectedPlatform}
                                             onEdit={() => setEditingReward(reward)}
-                                            onRefresh={loadRewards}
+                                            onRefresh={() => loadRewards(false)}
                                         />
                                     ))}
                                 </div>
@@ -1108,7 +1110,7 @@ const PointsManagementPage: React.FC = () => {
                 onSuccess={() => {
                     setShowCreateDialog(false);
                     setEditingReward(null);
-                    loadRewards();
+                    loadRewards(false);
                 }}
             />
         </div>
@@ -1116,4 +1118,3 @@ const PointsManagementPage: React.FC = () => {
 };
 
 export default PointsManagementPage;
-

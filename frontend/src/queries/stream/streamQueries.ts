@@ -67,7 +67,7 @@ export const useUpdateTwitchStreamTitle = (options?: UseMutationOptions<ApiRespo
     onMutate: async (newTitle: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.twitchInfo() });
       const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo());
-      
+
       queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo(), (old) => {
         if (!old?.data) return old;
         return {
@@ -75,7 +75,7 @@ export const useUpdateTwitchStreamTitle = (options?: UseMutationOptions<ApiRespo
           data: { ...old.data, title: newTitle }
         };
       });
-      
+
       return { previousStreamInfo };
     },
     onSuccess: () => {
@@ -107,7 +107,7 @@ export const useUpdateTwitchStreamCategory = (options?: UseMutationOptions<ApiRe
     onMutate: async (newCategoryId: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.twitchInfo() });
       const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo());
-      
+
       queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo(), (old) => {
         if (!old?.data) return old;
         return {
@@ -115,7 +115,7 @@ export const useUpdateTwitchStreamCategory = (options?: UseMutationOptions<ApiRe
           data: { ...old.data, game_id: newCategoryId }
         };
       });
-      
+
       return { previousStreamInfo };
     },
     onSuccess: () => {
@@ -147,7 +147,7 @@ export const useUpdateVkStreamTitle = (options?: UseMutationOptions<ApiResponse<
     onMutate: async (newTitle: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.vkInfo() });
       const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo());
-      
+
       queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo(), (old) => {
         if (!old?.data) return old;
         return {
@@ -155,7 +155,7 @@ export const useUpdateVkStreamTitle = (options?: UseMutationOptions<ApiResponse<
           data: { ...old.data, title: newTitle }
         };
       });
-      
+
       return { previousStreamInfo };
     },
     onSuccess: () => {
@@ -187,7 +187,7 @@ export const useUpdateVkStreamCategory = (options?: UseMutationOptions<ApiRespon
     onMutate: async (newCategoryId: string) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.vkInfo() });
       const previousStreamInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo());
-      
+
       queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo(), (old) => {
         if (!old?.data) return old;
         return {
@@ -195,7 +195,7 @@ export const useUpdateVkStreamCategory = (options?: UseMutationOptions<ApiRespon
           data: { ...old.data, category_id: newCategoryId }
         };
       });
-      
+
       return { previousStreamInfo };
     },
     onSuccess: () => {
@@ -268,10 +268,10 @@ export const useUpdateStream = (options?: UseMutationOptions<ApiResponse<StreamI
     mutationFn: (payload: Record<string, unknown>) => unwrapResponse(streamService.updateStream(payload)) as Promise<ApiResponse<StreamInfoData>>,
     onMutate: async (newData: Record<string, unknown>) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.all });
-      
+
       const previousTwitchInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo());
       const previousVkInfo = queryClient.getQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo());
-      
+
       if (newData.platform === 'twitch' || newData.platform === 'both') {
         queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.twitchInfo(), (old) => {
           if (!old?.data) return old;
@@ -287,7 +287,7 @@ export const useUpdateStream = (options?: UseMutationOptions<ApiResponse<StreamI
           };
         });
       }
-      
+
       if (newData.platform === 'vk' || newData.platform === 'both') {
         queryClient.setQueryData<ApiResponse<StreamInfoData>>(queryKeys.stream.vkInfo(), (old) => {
           if (!old?.data) return old;
@@ -303,11 +303,26 @@ export const useUpdateStream = (options?: UseMutationOptions<ApiResponse<StreamI
           };
         });
       }
-      
+
       return { previousTwitchInfo, previousVkInfo };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
+    onSuccess: (_data, variables) => {
+      // Targeted invalidation based on payload keys
+      const hasTwitchUpdates = 'twitch' in variables;
+      const hasVkUpdates = 'vk' in variables;
+
+      if (hasTwitchUpdates) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
+      }
+      if (hasVkUpdates) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
+      }
+
+      // If neither (or something else), default to all to be safe
+      if (!hasTwitchUpdates && !hasVkUpdates) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
+      }
+
       toast.success('Изменения сохранены');
     },
     onError: (error, _newData, context) => {
@@ -322,8 +337,14 @@ export const useUpdateStream = (options?: UseMutationOptions<ApiResponse<StreamI
       const errorMessage = (errorData?.detail || errorData?.message || 'Не удалось сохранить изменения') as string;
       toast.error(errorMessage);
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
+    onSettled: (_data, _error, variables) => {
+      if (variables) {
+        if ('twitch' in variables) queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
+        if ('vk' in variables) queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
+        if (!('twitch' in variables) && !('vk' in variables)) queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
+      } else {
+        queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
+      }
     },
     ...options,
   });

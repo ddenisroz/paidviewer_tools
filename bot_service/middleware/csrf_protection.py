@@ -64,9 +64,22 @@ class CSRFProtectionMiddleware(BaseHTTPMiddleware):
         return any(path.startswith(exempt) for exempt in self.exempt_paths)
 
     def _generate_csrf_token(self, request: Request) -> str:
-        """Генерирует CSRF токен"""
-        # Используем session ID + secret key для генерации токена
-        request.session.get("session_id", "")
+        """Генерирует CSRF токен, привязанный к сессии"""
+        import hmac
+        import hashlib
+        
+        # Привязываем токен к session_id через HMAC
+        session_id = request.cookies.get("session_id", "")
+        if session_id:
+            # HMAC для привязки к сессии + random для уникальности
+            session_hash = hmac.new(
+                self.secret_key.encode(),
+                session_id.encode(),
+                hashlib.sha256
+            ).hexdigest()[:32]
+            return f"{session_hash}_{secrets.token_urlsafe(16)}"
+        
+        # Fallback для пользователей без сессии
         return secrets.token_urlsafe(32)
 
     async def _validate_csrf_token(self, request: Request) -> bool:

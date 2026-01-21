@@ -7,12 +7,12 @@ import { BrowserRouter, useLocation } from 'react-router-dom'
 import App from './App'
 import './App.css'
 import './styles/design-system.css'
+import './styles/toast-overrides.css'
 
 // Initialize Sentry before React
 
 // Lazy load non-critical providers для ускорения начальной загрузки
 import { ToastProvider } from '@/shared/components/ui/toast'
-
 import { AudioPriorityProvider } from './context/AudioPriorityContext'
 import { AuthProvider } from './context/AuthContext'
 import { ChatProvider } from './context/ChatContext'

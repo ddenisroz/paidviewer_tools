@@ -89,18 +89,38 @@ const LoginPage: React.FC = () => {
         window.location.href = authUrl;
     };
 
+    // Delay showing the spinner to avoid flickering on fast connections
+    const [showSpinner, setShowSpinner] = useState(false);
+
+    useEffect(() => {
+        let timeoutId: NodeJS.Timeout;
+        if (isCheckingAuth) {
+            timeoutId = setTimeout(() => {
+                setShowSpinner(true);
+            }, 800); // Only show spinner if checking takes longer than 800ms
+        } else {
+            setShowSpinner(false);
+        }
+        return () => clearTimeout(timeoutId);
+    }, [isCheckingAuth]);
+
     if (isCheckingAuth) {
+        // If we are waiting for the delay, show only the background to prevent jerky transitions
+        if (!showSpinner) {
+            return (
+                <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative" />
+            );
+        }
+
         return (
-            <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4">
-                <Card className="login-card w-full max-w-sm shadow-2xl">
-                    <CardContent className="flex items-center justify-center py-16">
-                        <div className="flex flex-col items-center gap-3">
-                            <div className="relative w-8 h-8">
-                                <div className="absolute inset-0 rounded-full border-2 border-green-400/30"></div>
-                                <div className="absolute inset-0 rounded-full border-2 border-green-400 border-t-transparent animate-spin"></div>
-                            </div>
-                            <p className="text-slate-400 text-sm">Проверка...</p>
+            <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative">
+                <Card className="login-card w-full max-w-sm shadow-2xl h-[280px] flex items-center justify-center animate-fade-in">
+                    <CardContent className="flex flex-col items-center gap-3">
+                        <div className="relative w-8 h-8">
+                            <div className="absolute inset-0 rounded-full border-2 border-green-400/30"></div>
+                            <div className="absolute inset-0 rounded-full border-2 border-green-400 border-t-transparent animate-spin"></div>
                         </div>
+                        <p className="text-slate-400 text-sm">Проверка...</p>
                     </CardContent>
                 </Card>
             </div>

@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List
 
 from aiohttp import ClientTimeout
 
-from integrations.base import BaseIntegrationClient, TokenInfo, IntegrationError
+from integrations.base import BaseIntegrationClient, TokenInfo, IntegrationError, TokenExpiredError
 from .oauth import TwitchOAuth
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ class TwitchClient(BaseIntegrationClient):
         user_info = await client.get_user_by_login("streamer_name")
         
         # Запрос с user token
-        token = TokenInfo(access_token="user_token_here")
+        token = TokenInfo(access_token="<user_token>")
         await client.update_stream_title(broadcaster_id, "New Title", token)
     """
     
@@ -148,6 +148,8 @@ class TwitchClient(BaseIntegrationClient):
             )
             logger.info(f"[TWITCH] Channel {broadcaster_id} updated: {data}")
             return True
+        except TokenExpiredError:
+            raise
         except IntegrationError as e:
             logger.error(f"[TWITCH] Failed to update channel {broadcaster_id}: {e}")
             return False

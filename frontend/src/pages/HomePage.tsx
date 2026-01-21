@@ -1,9 +1,11 @@
 ﻿// src/pages/HomePage.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 
-import { MessageCircle, Settings } from 'lucide-react';
+import { Check, MessageCircle, Settings, Settings2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -16,19 +18,14 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { logger } from '@/shared/utils/prodLogger';
 import { getAndClearReturnUrl } from '@/utils/urlUtils';
-
-interface _StreamHistory {
-    status?: string;
-    current_viewers?: number;
-    current_vk_viewers?: number;
-}
+import { useLayoutStore } from '@/store/useLayoutStore';
+import WidgetWrapper from '@/features/home/components/WidgetWrapper';
+import { cn } from '@/lib/utils';
 
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, logout } = useAuth();
     const { integrations } = useIntegrations();
-    const [_titleLinked, setTitleLinked] = useState(false);
-    const [_categoryLinked, setCategoryLinked] = useState(false);
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -70,12 +67,16 @@ const HomePage: React.FC = () => {
     const streamData = useMemo(() => {
         const twitchData = integrations?.twitch?.enabled ? {
             isLive: (twitchStreamInfo?.data?.is_live ?? false) as boolean,
-            viewerCount: (twitchStreamInfo?.data?.viewers ?? 0) as number
+            viewerCount: (twitchStreamInfo?.data?.viewers ?? 0) as number,
+            gameName: (twitchStreamInfo?.data?.game_name ?? '') as string,
+            boxArtUrl: (twitchStreamInfo?.data?.thumbnail_url ?? twitchStreamInfo?.data?.box_art_url ?? '') as string
         } : undefined;
 
         const vkData = integrations?.vk?.enabled ? {
             isLive: (vkStreamInfo?.data?.is_live ?? false) as boolean,
-            viewerCount: (vkStreamInfo?.data?.viewers ?? 0) as number
+            viewerCount: (vkStreamInfo?.data?.viewers ?? 0) as number,
+            gameName: (vkStreamInfo?.data?.category_name ?? '') as string,
+            boxArtUrl: (vkStreamInfo?.data?.category_img_url ?? '') as string
         } : undefined;
 
         return {
@@ -84,13 +85,94 @@ const HomePage: React.FC = () => {
         };
     }, [integrations, twitchStreamInfo, vkStreamInfo]);
 
+
+    // Auto-logout if no integrations are connected (requested behavior)
+    useEffect(() => {
+        if (isAuthenticated && !hasAnyIntegration && integrations) {
+            // Check double confirmation to avoid race conditions during load
+            const timer = setTimeout(async () => {
+                const { twitch, vk } = integrations;
+                if (!twitch?.enabled && !vk?.enabled) {
+                    logger.log('[HOMEPAGE] No integrations found, logging out...');
+                    await logout();
+                    navigate('/login');
+                }
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [isAuthenticated, hasAnyIntegration, integrations, logout, navigate]);
+
+    const { widgets, isEditMode, toggleEditMode, reorderWidgets } = useLayoutStore();
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, {
+            activationConstraint: {
+                distance: 8, // Требуется сдвиг на 8px для активации drag
+            },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+            const oldIndex = widgets.findIndex(w => w.id === active.id);
+            const newIndex = widgets.findIndex(w => w.id === over.id);
+            reorderWidgets(oldIndex, newIndex);
+        }
+    };
+
+    const renderWidget = (id: string) => {
+        switch (id) {
+            case 'stream-status':
+                return (
+                    <StreamStatus
+                        integrations={integrations}
+                        streamData={streamData}
+                        isLoading={false}
+                    />
+                );
+            case 'stream-management':
+                return <StreamManagementCards />;
+            case 'chat':
+                return (
+                    <ChatCard
+                        integrations={integrations}
+                        isOnHomePage={true}
+                    />
+                );
+            case 'quick-actions':
+                return <QuickActionsBar />;
+            default:
+                return null;
+        }
+    };
+
+    const widgetTitles: Record<string, string> = {
+        'stream-status': 'Статус стрима',
+        'stream-management': 'Управление стримом',
+        'chat': 'Чат',
+        'quick-actions': 'Быстрые действия'
+    };
+
     return (
-        <div className="space-y-8 pb-20">
-            <StreamStatus
-                integrations={integrations}
-                streamData={streamData}
-                isLoading={false}
-            />
+        <div className="space-y-4 pb-20 relative">
+            {/* Layout Controls */}
+            {isAuthenticated && hasAnyIntegration && (
+                <div className="flex justify-end max-w-6xl mx-auto px-1">
+                    <Button
+                        onClick={toggleEditMode}
+                        variant={isEditMode ? "secondary" : "ghost"}
+                        size="sm"
+                        className={cn("gap-2 transition-all", isEditMode && "bg-green-500/20 text-green-400 hover:bg-green-500/30")}
+                    >
+                        {isEditMode ? <Check className="w-4 h-4" /> : <Settings2 className="w-4 h-4" />}
+                        {isEditMode ? "Сохранить макет" : "Настроить макет"}
+                    </Button>
+                </div>
+            )}
 
             <div className="space-y-6 max-w-6xl mx-auto overflow-visible">
                 {!isAuthenticated ? (
@@ -127,32 +209,34 @@ const HomePage: React.FC = () => {
                                     У вас нет подключенных интеграций
                                 </h3>
                                 <p className="text-gray-400 text-sm">
-                                    Для использования функций бота необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+                                    Автоматический выход...
                                 </p>
                             </div>
-                            <Button
-                                onClick={() => navigate('/dashboard/settings')}
-                                className="gap-2"
-                            >
-                                <Settings className="w-4 h-4" />
-                                Перейти в настройки
-                            </Button>
                         </CardContent>
                     </Card>
                 ) : (
-                    <>
-                        <StreamManagementCards
-                            onTitleLinkStateChange={setTitleLinked}
-                            onCategoryLinkStateChange={setCategoryLinked}
-                        />
-
-                        <ChatCard
-                            integrations={integrations}
-                            isOnHomePage={true}
-                        />
-
-                        <QuickActionsBar />
-                    </>
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <SortableContext
+                            items={widgets.map(w => w.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            <div className="space-y-6 transition-all">
+                                {widgets.map(w => (
+                                    <WidgetWrapper
+                                        key={w.id}
+                                        id={w.id}
+                                        title={widgetTitles[w.id]}
+                                    >
+                                        {renderWidget(w.id)}
+                                    </WidgetWrapper>
+                                ))}
+                            </div>
+                        </SortableContext>
+                    </DndContext>
                 )}
             </div>
         </div>

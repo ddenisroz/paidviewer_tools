@@ -122,13 +122,14 @@ const TtsMainPageContent: React.FC = () => {
 
     // Синхронизация состояния TTS с бэкендом при загрузке
     useEffect(() => {
-        if (ttsStatus?.enabled !== undefined) {
-            const isCloud = ttsStatus.engine_type === 'cloud';
-            setBasicTtsEnabled(ttsStatus.enabled && !isCloud);
-            setAiTtsEnabled(ttsStatus.enabled && isCloud);
+        const statusData = ttsStatus?.data;
+        if (statusData?.enabled !== undefined) {
+            const isCloud = statusData.engine_type === 'cloud';
+            setBasicTtsEnabled(statusData.enabled && !isCloud);
+            setAiTtsEnabled(statusData.enabled && isCloud);
 
-            if (ttsStatus.engine_type) {
-                setTtsEngine(ttsStatus.engine_type);
+            if (statusData.engine_type) {
+                setTtsEngine(statusData.engine_type as 'cloud' | 'local' | 'gtts');
             }
         }
     }, [ttsStatus]);
@@ -556,6 +557,12 @@ const TtsMainPageContent: React.FC = () => {
     }, [ttsSettings, saveTtsSettingsMutation]);
 
     const handlePlatformToggle = useCallback((platform: 'twitch' | 'vk'): void => {
+        const isConnected = platform === 'twitch' ? isTwitchConnected : isVkConnected;
+        if (!isConnected) {
+            toast.error(`Сначала подключите интеграцию с ${platform === 'twitch' ? 'Twitch' : 'VK Live'}`);
+            return;
+        }
+
         const currentPlatforms = platformSettings.enabled_platforms || [];
         const newEnabledPlatforms = currentPlatforms.includes(platform)
             ? currentPlatforms.filter(p => p !== platform)
@@ -664,12 +671,12 @@ const TtsMainPageContent: React.FC = () => {
         <PageWrapper title="Text to Speech">
             <div className="space-y-4 max-w-5xl mx-auto">
                 {/* Главный переключатель TTS */}
-                <div className="flex items-center justify-between p-4 rounded-xl border border-gray-700/50 bg-gradient-to-br from-gray-900/80 to-gray-800/50 backdrop-blur-sm hover:border-gray-600/50 transition-all cursor-pointer" onClick={handleGlobalTtsToggle}>
+                <div className="flex items-center justify-between p-4 rounded-xl card-glass cursor-pointer" onClick={handleGlobalTtsToggle}>
                     <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isAnyTtsEnabled ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-gray-600'}`} />
                         <div>
-                            <div className="text-sm font-bold text-white">Озвучка сообщений</div>
-                            <div className="text-xs text-gray-400">
+                            <div className="text-sm font-bold text-foreground">Озвучка сообщений</div>
+                            <div className="text-xs text-muted-foreground">
                                 {isAnyTtsEnabled ? 'Включена' : 'Выключена'}
                             </div>
                         </div>
@@ -686,10 +693,10 @@ const TtsMainPageContent: React.FC = () => {
                     <>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                             {/* Настройки голоса */}
-                            <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex flex-col">
+                            <Card className="card-glass flex flex-col">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base font-bold text-white">Движок синтеза</CardTitle>
+                                        <CardTitle className="text-base font-bold">Движок синтеза</CardTitle>
                                         <div className="flex items-center gap-2">
                                             {isChecking ? (
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-400">
@@ -892,9 +899,9 @@ const TtsMainPageContent: React.FC = () => {
 
                             <div className="flex flex-col gap-4">
                                 {/* Платформы */}
-                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm">
+                                <Card className="card-glass">
                                     <CardHeader className="pb-3">
-                                        <CardTitle className="text-base font-bold text-white">Источники озвучки</CardTitle>
+                                        <CardTitle className="text-base font-bold text-foreground">Источники озвучки</CardTitle>
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-2 gap-3">
                                         {(['twitch', 'vk'] as const).map(platform => {
@@ -952,9 +959,9 @@ const TtsMainPageContent: React.FC = () => {
                                 </Card>
 
                                 {/* Фильтры озвучки */}
-                                <Card className="border-gray-700/50 bg-gray-900/50 backdrop-blur-sm flex-1">
+                                <Card className="card-glass flex-1">
                                     <CardHeader className="pb-3">
-                                        <CardTitle className="text-base font-bold text-white">Фильтры озвучки</CardTitle>
+                                        <CardTitle className="text-base font-bold text-foreground">Фильтры озвучки</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-2">
                                         {/* 7TV Emotes */}

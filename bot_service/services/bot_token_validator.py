@@ -20,6 +20,7 @@ import httpx
 
 from core.config import settings
 from core.datetime_utils import utcnow_naive
+from services.twitch_bot_oauth_service import twitch_bot_oauth_service
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ class BotTokenValidator:
     async def validate_twitch_bot_token(self) -> Dict[str, Any]:
         """
         Валидирует Twitch bot token.
+        Приоритет: Token из БД > Token из .env
         
         Returns:
             dict: {
@@ -46,20 +48,33 @@ class BotTokenValidator:
                 'error': str (если invalid)
             }
         """
-        if not settings.twitch_bot_token:
-            logger.warning("[BOT TOKEN] TWITCH_BOT_TOKEN not configured")
-            return {
-                'valid': False,
-                'error': 'Token not configured',
-                'instructions': 'Set TWITCH_BOT_TOKEN in .env file'
-            }
+        # 1. Пытаемся получить токен из БД
+        try:
+            bot_token = await twitch_bot_oauth_service.get_bot_token()
+            token_to_check = bot_token.get('access_token') if bot_token else None
+        except Exception as e:
+            logger.error(f"[BOT TOKEN] Failed to get token from DB: {e}")
+            token_to_check = None
+
+        # 2. Если нет в БД, пробуем из .env (Legacy)
+        if not token_to_check:
+            if settings.twitch_bot_token:
+                logger.info("[BOT TOKEN] Using legacy token from .env")
+                token_to_check = settings.twitch_bot_token.replace("oauth:", "")
+            else:
+                logger.warning("[BOT TOKEN] TWITCH_BOT_TOKEN not configured in DB or .env")
+                return {
+                    'valid': False,
+                    'error': 'Token not configured',
+                    'instructions': 'Authorize bot in Admin Panel'
+                }
         
         try:
             # Twitch validate endpoint
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     'https://id.twitch.tv/oauth2/validate',
-                    headers={'Authorization': f'Bearer {settings.twitch_bot_token.replace("oauth:", "")}'}
+                    headers={'Authorization': f'Bearer {token_to_check}'}
                 )
             
             if response.status_code == 200:
@@ -67,9 +82,13 @@ class BotTokenValidator:
                 self.twitch_token_valid = True
                 self.last_twitch_check = utcnow_naive()
                 
+                # Check if it matches expected bot user if we have one in DB
+                db_login = bot_token.get('bot_login') if bot_token else None
+                if db_login and data.get('login') != db_login:
+                     logger.warning(f"[BOT TOKEN] Token valid but belongs to {data.get('login')}, expected {db_login}")
+
                 logger.info("[OK] [BOT TOKEN] Twitch bot token is VALID")
-                logger.info(f"[INFO] Bot user: {data.get('login')} (ID: {data.get('user_id')})")
-                logger.info(f"[INFO] Token expires in: {data.get('expires_in', 'unknown')} seconds")
+                # logger.info(f"[INFO] Bot user: {data.get('login')} (ID: {data.get('user_id')})")
                 
                 return {
                     'valid': True,
@@ -81,23 +100,21 @@ class BotTokenValidator:
             
             elif response.status_code == 401:
                 self.twitch_token_valid = False
-                logger.error("=" * 80)
                 logger.error("[ERROR] [BOT TOKEN] Twitch bot token is INVALID or EXPIRED!")
-                logger.error("=" * 80)
-                logger.error("[FIX] To fix this issue:")
-                logger.error("[FIX] 1. Go to: https://twitchapps.com/tmi/")
-                logger.error("[FIX] 2. Click 'Connect' and authorize")
-                logger.error("[FIX] 3. Copy the OAuth token")
-                logger.error("[FIX] 4. Update bot_service/.env:")
-                logger.error("[FIX]    TWITCH_BOT_TOKEN=oauth:your-new-token-here")
-                logger.error("[FIX] 5. Restart the bot service")
-                logger.error("=" * 80)
+                
+                # Try auto-refresh if we have a refresh token in DB
+                if bot_token and bot_token.get('refresh_token'):
+                     logger.info("[BOT TOKEN] Attempting auto-refresh...")
+                     refresh_success = await twitch_bot_oauth_service.refresh_bot_token()
+                     if refresh_success:
+                          logger.info("[BOT TOKEN] Auto-refresh successful, re-validating...")
+                          return await self.validate_twitch_bot_token() # Recursion (safe, one level usually)
                 
                 return {
                     'valid': False,
                     'error': 'Token invalid or expired',
                     'status_code': 401,
-                    'instructions': 'Generate new token at https://twitchapps.com/tmi/'
+                    'instructions': 'Please re-authorize bot in Admin Panel'
                 }
             
             else:
@@ -135,7 +152,8 @@ class BotTokenValidator:
         
         try:
             # VK Live current_user endpoint
-            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
+            ssl_verify = settings.is_production
+            async with httpx.AsyncClient(timeout=10.0, verify=ssl_verify) as client:
                 response = await client.get(
                     'https://apidev.live.vkvideo.ru/v1/current_user',
                     headers={'Authorization': f'Bearer {settings.vk_live_user_token}'}

@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { DataProvider } from '@/context/DataContext';
 import { DonationAlertsProvider } from '@/context/DonationAlertsContext';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
-import { TtsProvider } from '@/context/TtsContext';
+import { TtsProvider, useTts } from '@/context/TtsContext';
 import GlobalTtsPlayer from '@/features/tts/components/GlobalTtsPlayer';
 import CookieConsent from '@/shared/components/CookieConsent';
 import GlobalPlayer from '@/shared/components/GlobalPlayer';
@@ -28,34 +28,31 @@ const LayoutContent: React.FC = () => {
   const { isVisible, isTheaterMode } = usePlayer();
   const { isAuthenticated, isCheckingAuth } = useAuth();
   const navigate = useNavigate();
+  const { toggleTts, ttsEnabled } = useTts(); // Use TTS context
   const currentPath = window.location.pathname;
   const isOnYoutubePage = currentPath.includes('/dashboard/youtube');
 
-  // 🔒 Auth Guard: Redirect to login if session expired
+  // Global Keyboard Shortcut for TTS (Shift+T)
   useEffect(() => {
-    // Wait for auth check to complete
-    if (!isCheckingAuth && !isAuthenticated) {
-      // Session expired or user not logged in - redirect to login
-      navigate('/login', { replace: true });
-    }
-  }, [isAuthenticated, isCheckingAuth, navigate]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Shift+T, ignore if typing in inputs
+      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+
+        e.preventDefault();
+        toggleTts();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleTts]);
 
   // Показываем отступ снизу только если плеер виден и не на странице YouTube
   const showPlayerPadding = isVisible && !isTheaterMode && !isOnYoutubePage;
-
-  // Show loading while checking auth
-  if (isCheckingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/40">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  // Don't render content if not authenticated (will redirect)
-  if (!isAuthenticated) {
-    return null;
-  }
 
   return (
     <div className="grid h-screen w-full grid-cols-1 md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] overflow-hidden">

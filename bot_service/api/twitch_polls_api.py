@@ -136,7 +136,7 @@ async def make_twitch_api_request(
     url = f"https://api.twitch.tv/helix{endpoint}"
     headers = {
         "Authorization": f"Bearer {token}",
-        "Client-Id": settings.TWITCH_CLIENT_ID,
+        "Client-Id": settings.twitch_client_id,
         "Content-Type": "application/json"
     }
     

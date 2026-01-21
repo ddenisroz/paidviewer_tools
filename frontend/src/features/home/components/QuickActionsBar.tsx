@@ -15,7 +15,7 @@ const QuickActionsBar: React.FC = () => {
     const navigate = useNavigate();
     const logic = useQuickActionsLogic();
 
-    useQuickActionsHandlers({
+    const handlers = useQuickActionsHandlers({
         channelName: logic.channelName,
         platform: logic.platform,
         isToggling: logic.isToggling,
@@ -32,16 +32,25 @@ const QuickActionsBar: React.FC = () => {
         integrations: logic.integrations
     });
 
+    const handleTtsToggle = () => {
+        if (!logic.isToggling) {
+            logic.setIsToggling(true);
+            logic.toggleTtsMutation.mutate(!logic.ttsState, {
+                onSettled: () => logic.setIsToggling(false)
+            });
+        }
+    };
+
     if (!logic.isAuthenticated) return null;
 
     return (
-        <Card className="border-gray-700/50 bg-gray-900/50">
+        <Card className="card-glass transition-all duration-300">
             <div className="flex items-center justify-center gap-3 px-6 py-4">
                 <ActionButton
                     icon={logic.ttsState ? Volume2 : VolumeX}
                     label="TTS чата"
                     isActive={logic.ttsState}
-                    onClick={() => navigate('/dashboard/tts')}
+                    onClick={handleTtsToggle}
                 />
 
                 {logic.isDropsEnabled && (
@@ -49,7 +58,7 @@ const QuickActionsBar: React.FC = () => {
                         icon={Zap}
                         label="Стрик drops"
                         isActive={logic.streakEnabled}
-                        onClick={() => navigate('/dashboard/drops?tab=streak')}
+                        onClick={handlers.handleStreakToggle}
                     />
                 )}
 
@@ -58,7 +67,7 @@ const QuickActionsBar: React.FC = () => {
                         icon={DollarSign}
                         label="Donate drops"
                         isActive={logic.donationEnabled}
-                        onClick={() => navigate('/dashboard/drops?tab=donation')}
+                        onClick={handlers.handleDonationToggle}
                     />
                 )}
             </div>

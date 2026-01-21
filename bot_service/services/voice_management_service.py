@@ -148,7 +148,7 @@ class VoiceManagementService:
                         error_detail = "Failed to update custom voice settings"
                         try:
                             error_detail = response.json().get('detail', error_detail)
-                        except:
+                        except Exception:
                             pass
                         raise HTTPException(status_code=response.status_code, detail=error_detail)
             except HTTPException:
@@ -219,7 +219,7 @@ class VoiceManagementService:
                 detail = "Error uploading voice"
                 try:
                     detail = response.json().get('detail', detail)
-                except:
+                except Exception:
                     pass
                 raise HTTPException(status_code=response.status_code, detail=detail)
 

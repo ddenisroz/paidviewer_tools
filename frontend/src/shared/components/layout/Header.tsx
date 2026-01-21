@@ -37,6 +37,15 @@ const Header: React.FC = () => {
     const pageTitle = useMemo(() => {
         const currentPath = location.pathname.replace(/\/$/, '') || '/';
 
+        // Special handling for Media Requests tabs
+        if (currentPath === '/dashboard/media') {
+            const params = new URLSearchParams(location.search);
+            const tab = params.get('tab');
+            if (tab === 'memealerts') return 'MemeAlerts';
+            if (tab === 'drops') return 'Drops система';
+            return 'YouTube заказы';
+        }
+
         if (pageTitles[currentPath as keyof typeof pageTitles] !== undefined) {
             return pageTitles[currentPath as keyof typeof pageTitles];
         }
@@ -52,7 +61,7 @@ const Header: React.FC = () => {
         }
 
         return '';
-    }, [pageTitles, location.pathname]);
+    }, [pageTitles, location.pathname, location.search]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -209,10 +218,10 @@ const Header: React.FC = () => {
                         onClick={logout}
                         variant="ghost"
                         size="icon"
-                        className="h-10 w-10 sm:h-12 sm:w-12 hover:bg-red-500/20 hover:text-red-400 transition-all duration-200 group"
+                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg border border-transparent hover:border-red-500/30 hover:bg-red-500/10 transition-colors duration-200"
                         title="Выйти"
                     >
-                        <LogOut className="h-7 w-7 sm:h-9 sm:w-9 group-hover:scale-110 transition-transform duration-200" strokeWidth={2.5} />
+                        <LogOut className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 hover:text-red-400 transition-colors" />
                     </Button>
                 )}
             </div>

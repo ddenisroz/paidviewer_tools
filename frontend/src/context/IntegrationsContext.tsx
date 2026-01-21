@@ -170,7 +170,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 }
 
                 await refreshAuthStatus(true);
-                await fetchIntegrations();
+                // fetchIntegrations() will be triggered by useEffect when user updates
             } catch (error) {
                 logger.error('Error disconnecting Twitch:', error);
             } finally {
@@ -208,7 +208,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 }
 
                 await refreshAuthStatus(true);
-                await fetchIntegrations();
+                // fetchIntegrations() will be triggered by useEffect when user updates
             } catch (error) {
                 logger.error('Error disconnecting VK:', error);
             } finally {

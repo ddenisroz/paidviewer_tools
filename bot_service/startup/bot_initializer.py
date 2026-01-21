@@ -86,7 +86,9 @@ async def validate_vk_oauth_token(access_token: str) -> bool:
         True если токен валиден
     """
     try:
-        async with httpx.AsyncClient(timeout=5.0, verify=False) as client:
+        from core.config import settings
+        ssl_verify = settings.is_production
+        async with httpx.AsyncClient(timeout=5.0, verify=ssl_verify) as client:
             response = await client.get(
                 'https://apidev.live.vkvideo.ru/v1/current_user',
                 headers={'Authorization': f'Bearer {access_token}'}
@@ -105,7 +107,9 @@ async def refresh_vk_token_if_needed(user_id: int, access_token: str) -> Optiona
         Новый access_token или None
     """
     # Проверяем текущий токен
-    async with httpx.AsyncClient(timeout=5.0, verify=False) as client:
+    from core.config import settings
+    ssl_verify = settings.is_production
+    async with httpx.AsyncClient(timeout=5.0, verify=ssl_verify) as client:
         response = await client.get(
             'https://apidev.live.vkvideo.ru/v1/current_user',
             headers={'Authorization': f'Bearer {access_token}'}

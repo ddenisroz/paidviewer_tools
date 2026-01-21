@@ -12,7 +12,7 @@ class VKClient(BaseIntegrationClient):
     """
     VK Live API Client.
     """
-    BASE_URL = "https://api.live.vkvideo.ru"
+    BASE_URL = "https://apidev.live.vkvideo.ru"
     
     def __init__(self, oauth: VKOAuth):
         super().__init__(self.BASE_URL)

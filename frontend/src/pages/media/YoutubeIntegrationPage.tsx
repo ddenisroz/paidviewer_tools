@@ -1,7 +1,7 @@
 ﻿// src/pages/media/YoutubeIntegrationPage.tsx
 import React, { useCallback, useEffect, useState } from 'react';
 
-import { AlertCircle, Maximize, Minimize, Monitor, Pause, Play, RefreshCw, Settings, SkipForward, Trash2, Volume2, VolumeX } from 'lucide-react';
+import { AlertCircle, Maximize, Minimize, Monitor, Pause, Play, RefreshCw, Settings, SkipForward, Trash2, Volume2, VolumeX, Youtube } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import YouTube from 'react-youtube';
 
@@ -209,13 +209,13 @@ const YoutubeIntegrationPage: React.FC = () => {
 
     return (
         <div
-            className={`transition-all duration-300 ${isTheaterMode ? 'fixed inset-0 bg-black z-50 p-2' : 'container mx-auto px-4 py-6 max-w-6xl h-[calc(100vh-8rem)]'}`}
+            className={`transition-all duration-300 ${isTheaterMode ? 'fixed inset-0 bg-black z-50 p-2' : 'h-[calc(100vh-8rem)]'}`}
             onClick={handleBackdropClick}
             style={isTheaterMode ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 } : {}}
         >
             {!isTheaterMode ? (
                 <div className="flex flex-col gap-4 h-full">
-                    <Card>
+                    <Card className="card-glass">
                         <CardContent className="p-6">
                             <div className="flex gap-4">
                                 <div className="w-[360px] flex-shrink-0">
@@ -391,7 +391,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    <Card className="flex-1 flex flex-col overflow-hidden">
+                    <Card className="card-glass flex-1 flex flex-col overflow-hidden">
                         <CardHeader className="pb-3">
                             <CardTitle>Очередь ({queue.length})</CardTitle>
                         </CardHeader>

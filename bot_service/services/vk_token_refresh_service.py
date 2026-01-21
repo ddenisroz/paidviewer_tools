@@ -182,8 +182,8 @@ class VKTokenRefreshService:
         data = {
             'grant_type': 'refresh_token',
             'refresh_token': token.refresh_token,
-            'client_id': settings.VK_CLIENT_ID,
-            'client_secret': settings.VK_CLIENT_SECRET
+            'client_id': settings.vk_client_id,
+            'client_secret': settings.vk_client_secret
         }
         
         # Отправить запрос на обновление токена
