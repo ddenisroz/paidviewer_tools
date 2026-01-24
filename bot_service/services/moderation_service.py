@@ -61,7 +61,7 @@ class ModerationService:
 
             if existing_block:
                 # UNMUTE
-                logger.info(f"🔊 [MODERATION] Unmuting user {username} on {platform}")
+                logger.info(f"[UNMUTE] [MODERATION] Unmuting user {username} on {platform}")
                 repo.remove_block(existing_block)
 
                 if platform == 'twitch':
@@ -126,7 +126,7 @@ class ModerationService:
 
             else:
                 # MUTE
-                logger.info(f"🔇 [MODERATION] Muting user {username} on {platform}")
+                logger.info(f"[MUTE] [MODERATION] Muting user {username} on {platform}")
                 repo.add_block(
                     user_id=user_id,
                     username=username,

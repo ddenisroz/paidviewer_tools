@@ -94,10 +94,10 @@ def run_linting():
     result = subprocess.run(["ruff", "check", "."], cwd=Path(__file__).parent)
     
     if result.returncode != 0:
-        print(f"{RED}✗ Linting failed{RESET}")
+        print(f"{RED}[X] Linting failed{RESET}")
         return result.returncode
     
-    print(f"{GREEN}✓ Linting passed{RESET}")
+    print(f"{GREEN}[OK] Linting passed{RESET}")
     return 0
 
 
@@ -107,23 +107,23 @@ def print_summary(test_result: int, migration_result: int = None, lint_result: i
     
     # Tests
     if test_result == 0:
-        print(f"{GREEN}✓ Tests: PASSED{RESET}")
+        print(f"{GREEN}[OK] Tests: PASSED{RESET}")
     else:
-        print(f"{RED}✗ Tests: FAILED{RESET}")
+        print(f"{RED}[X] Tests: FAILED{RESET}")
     
     # Migrations
     if migration_result is not None:
         if migration_result == 0:
-            print(f"{GREEN}✓ Migration Tests: PASSED{RESET}")
+            print(f"{GREEN}[OK] Migration Tests: PASSED{RESET}")
         else:
-            print(f"{RED}✗ Migration Tests: FAILED{RESET}")
+            print(f"{RED}[X] Migration Tests: FAILED{RESET}")
     
     # Linting
     if lint_result is not None:
         if lint_result == 0:
-            print(f"{GREEN}✓ Linting: PASSED{RESET}")
+            print(f"{GREEN}[OK] Linting: PASSED{RESET}")
         else:
-            print(f"{RED}✗ Linting: FAILED{RESET}")
+            print(f"{RED}[X] Linting: FAILED{RESET}")
     
     # Overall
     print()

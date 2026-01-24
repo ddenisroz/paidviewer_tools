@@ -124,7 +124,7 @@ class CommandService:
             basic_commands_data = list(basic_commands_dict.values())
             
             self.logger.info(
-                f"✓ Returned {len(global_commands_data)} global + "
+                f"[OK] Returned {len(global_commands_data)} global + "
                 f"{len(override_commands_data)} overrides + "
                 f"{len(basic_commands_data)} merged basic + "
                 f"{len(custom_commands_data)} custom commands"
@@ -330,7 +330,7 @@ class CommandService:
         
         created = repo.create_command(new_override)
         
-        self.logger.info(f"✓ Created override for command '{command_name}' by user {user_id}")
+        self.logger.info(f"[OK] Created override for command '{command_name}' by user {user_id}")
         
         return {
             "success": True,

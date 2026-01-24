@@ -78,7 +78,7 @@ class StreamSessionService:
         )
         self.session_repo.add_session(new_session)
 
-        logger.info(f"🎬 [STREAM SESSION] Created new session for {channel_name} ({platform})")
+        logger.info(f"[SESSION] [STREAM SESSION] Created new session for {channel_name} ({platform})")
 
         return new_session
 

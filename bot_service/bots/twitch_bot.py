@@ -66,7 +66,7 @@ class Bot(TwitchBotCore):
                 if settings and settings.bot_last_welcome_at:
                     time_diff = utcnow_naive() - settings.bot_last_welcome_at
                     if time_diff < timedelta(minutes=5):
-                        logger.debug(f"🔇 [BOT] Welcome message sent {int(time_diff.total_seconds())}s ago, skipping")
+                        logger.debug(f"[MUTE] [BOT] Welcome message sent {int(time_diff.total_seconds())}s ago, skipping")
                         return
                 
                 # Отправляем приветствие
@@ -109,7 +109,7 @@ class Bot(TwitchBotCore):
         is_banned = any(indicator in error_str for indicator in ban_indicators)
         
         if is_banned:
-            logger.warning(f"🚫 [BOT BAN] Bot appears to be banned/timed out in channel: {channel_name}")
+            logger.warning(f"[BLOCKED] [BOT BAN] Bot appears to be banned/timed out in channel: {channel_name}")
             await self._disconnect_and_cleanup(channel_name, "ban_detected")
     
     async def _disconnect_and_cleanup(self, channel_name: str, reason: str = "ban"):
@@ -172,7 +172,7 @@ class Bot(TwitchBotCore):
                     channel = parts[3].replace('#', '').strip()
                     # Проверяем если забанен именно наш бот
                     if f':{self.nick}' in data.lower():
-                        logger.warning(f"🚫 [BOT BAN] Bot banned/timed out in channel: {channel}")
+                        logger.warning(f"[BLOCKED] [BOT BAN] Bot banned/timed out in channel: {channel}")
                         await self._disconnect_and_cleanup(channel, "ban_detected")
         except Exception as e:
             logger.error(f"Error processing raw data for ban detection: {e}")

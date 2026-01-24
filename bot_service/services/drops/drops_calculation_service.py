@@ -28,7 +28,7 @@ class DropsCalculationService:
         quality_name: str
     ) -> Optional[Dict[str, Any]]:
         """Calculate a drop result based on quality"""
-        logger.info(f"🎲 [DROPS CALC] Calculating drop for {channel_name} (quality: {quality_name})")
+        logger.info(f"[DICE] [DROPS CALC] Calculating drop for {channel_name} (quality: {quality_name})")
 
         # Get quality by name
         # Get quality by name

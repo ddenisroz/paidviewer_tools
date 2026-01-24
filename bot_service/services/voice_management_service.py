@@ -191,7 +191,7 @@ class VoiceManagementService:
             is_valid, error = validate_file_magic_number(temp_file_path, ALLOWED_AUDIO_TYPES)
             if not is_valid:
                 logger.warning(
-                    f"🚫 [SECURITY] Voice upload rejected - invalid magic number: "
+                    f"[BLOCKED] [SECURITY] Voice upload rejected - invalid magic number: "
                     f"user={user_id}, filename={filename}, error={error}"
                 )
                 raise HTTPException(

@@ -45,7 +45,7 @@ class TokenValidationCache:
 
             # Проверяем TTL
             if age > self.ttl:
-                logger.debug(f"🕐 [CACHE] Expired for user {user_id}, platform {platform} (age: {age:.1f}s)")
+                logger.debug(f" [CACHE] Expired for user {user_id}, platform {platform} (age: {age:.1f}s)")
                 del self._cache[key]
                 return None
 
@@ -108,7 +108,7 @@ class TokenValidationCache:
                 del self._cache[key]
 
             if expired_keys:
-                logger.info(f"🧹 [CACHE CLEANUP] Removed {len(expired_keys)} expired entries")
+                logger.info(f"[CLEANUP] [CACHE CLEANUP] Removed {len(expired_keys)} expired entries")
 
     def get_stats(self) -> Dict[str, int]:
         """Получить статистику кеша."""

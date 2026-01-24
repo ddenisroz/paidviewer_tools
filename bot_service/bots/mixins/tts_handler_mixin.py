@@ -37,7 +37,7 @@ class TTSHandlerMixin:
             if success:
                 voice_display = ' '.join(args) if isinstance(args, list) else args
                 await ctx.send(f"@{ctx.author.name} [MIC] Голос изменён на: {voice_display}")
-                self.logger.info(f"✓ Voice changed to {args} for {ctx.channel.name}")
+                self.logger.info(f"[OK] Voice changed to {args} for {ctx.channel.name}")
             else:
                 await ctx.send(f"@{ctx.author.name} [ERROR] Голос '{args}' не найден")
 
@@ -73,7 +73,7 @@ class TTSHandlerMixin:
                 voice_display = ' '.join(args) if isinstance(args, list) else args
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [MIC] Голос изменён на: {voice_display}")
-                self.logger.info(f"✓ Voice changed to {args} for VK {channel_name}")
+                self.logger.info(f"[OK] Voice changed to {args} for VK {channel_name}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [ERROR] Голос '{args}' не найден")
@@ -102,8 +102,8 @@ class TTSHandlerMixin:
             voice_name = await tts_service.set_random_voice(user.id, db)
 
             if voice_name:
-                await ctx.send(f"@{ctx.author.name} 🎲 Случайный голос: {voice_name}")
-                self.logger.info(f"✓ Random voice {voice_name} for {ctx.channel.name}")
+                await ctx.send(f"@{ctx.author.name} [DICE] Случайный голос: {voice_name}")
+                self.logger.info(f"[OK] Random voice {voice_name} for {ctx.channel.name}")
             else:
                 await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось выбрать случайный голос")
 
@@ -131,8 +131,8 @@ class TTSHandlerMixin:
 
             if voice_name:
                 await vk_bot.send_message(channel_name,
-                    f"@{author_name} 🎲 Случайный голос: {voice_name}")
-                self.logger.info(f"✓ Random voice {voice_name} for VK {channel_name}")
+                    f"@{author_name} [DICE] Случайный голос: {voice_name}")
+                self.logger.info(f"[OK] Random voice {voice_name} for VK {channel_name}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [ERROR] Не удалось выбрать случайный голос")
@@ -165,8 +165,8 @@ class TTSHandlerMixin:
             success = tts_service.block_user(user.id, target_username, 'twitch', db)
 
             if success:
-                await ctx.send(f"@{ctx.author.name} 🔇 TTS отключен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} muted for {ctx.channel.name}")
+                await ctx.send(f"@{ctx.author.name} [MUTE] TTS отключен для: {target_username}")
+                self.logger.info(f"[OK] User {target_username} muted for {ctx.channel.name}")
             else:
                 await ctx.send(f"@{ctx.author.name} [WARN] Пользователь уже в списке")
 
@@ -199,8 +199,8 @@ class TTSHandlerMixin:
 
             if success:
                 await vk_bot.send_message(channel_name,
-                    f"@{author_name} 🔇 TTS отключен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} muted for VK {channel_name}")
+                    f"@{author_name} [MUTE] TTS отключен для: {target_username}")
+                self.logger.info(f"[OK] User {target_username} muted for VK {channel_name}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [WARN] Пользователь уже в списке")
@@ -234,7 +234,7 @@ class TTSHandlerMixin:
 
             if success:
                 await ctx.send(f"@{ctx.author.name} [VOLUME] TTS включен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} unmuted for {ctx.channel.name}")
+                self.logger.info(f"[OK] User {target_username} unmuted for {ctx.channel.name}")
             else:
                 await ctx.send(f"@{ctx.author.name} [WARN] Пользователь не найден в списке")
 
@@ -268,7 +268,7 @@ class TTSHandlerMixin:
             if success:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [VOLUME] TTS включен для: {target_username}")
-                self.logger.info(f"✓ User {target_username} unmuted for VK {channel_name}")
+                self.logger.info(f"[OK] User {target_username} unmuted for VK {channel_name}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [WARN] Пользователь не найден в списке")
@@ -309,7 +309,7 @@ class TTSHandlerMixin:
 
             if success:
                 await ctx.send(f"@{ctx.author.name} [VOLUME] Громкость TTS: {volume}%")
-                self.logger.info(f"✓ TTS volume set to {volume}% for {ctx.channel.name}")
+                self.logger.info(f"[OK] TTS volume set to {volume}% for {ctx.channel.name}")
             else:
                 await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось изменить громкость")
 
@@ -351,7 +351,7 @@ class TTSHandlerMixin:
             if success:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [VOLUME] Громкость TTS: {volume}%")
-                self.logger.info(f"✓ TTS volume set to {volume}% for VK {channel_name}")
+                self.logger.info(f"[OK] TTS volume set to {volume}% for VK {channel_name}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [ERROR] Не удалось изменить громкость")

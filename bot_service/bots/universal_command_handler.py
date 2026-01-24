@@ -222,7 +222,7 @@ class UniversalCommandHandler(QueueHandlerMixin, StreamInfoHandlerMixin, TTSHand
             # Для команд с response_text просто отправляем ответ
             if command.response_text:
                 await ctx.send(command.response_text)
-                self.logger.info(f"✓ Executed text command: !{command.command_name}")
+                self.logger.info(f"[OK] Executed text command: !{command.command_name}")
                 return
 
             # Для специальных команд используем handlers (lookups on self which includes mixins)
@@ -253,7 +253,7 @@ class UniversalCommandHandler(QueueHandlerMixin, StreamInfoHandlerMixin, TTSHand
             # Для команд с response_text просто отправляем ответ
             if command.response_text:
                 await vk_bot.send_message(channel_name, command.response_text)
-                self.logger.info(f"✓ Executed text command: !{command.command_name}")
+                self.logger.info(f"[OK] Executed text command: !{command.command_name}")
                 return
 
             # Для специальных команд используем handlers (lookups on self which includes mixins)

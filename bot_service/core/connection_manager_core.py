@@ -228,7 +228,7 @@ class ConnectionManagerCore:
             logger.info(f"[TIMEOUT] [TTS TIMEOUT] User {user_id} ({username}) has no active connections - disabling TTS")
 
             # Импортируем здесь, чтобы избежать циклических импортов
-            from services.tts_service import TTSService
+            from services.tts.tts_service import TTSService
             from core.database import get_db
 
             db = next(get_db())

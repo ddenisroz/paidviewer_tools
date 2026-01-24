@@ -80,7 +80,7 @@ def upgrade():
                     'user_tokens',
                     ['user_id', 'platform']
                 )
-                print("  ✅ Added UNIQUE constraint: user_id + platform")
+                print("   Added UNIQUE constraint: user_id + platform")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
         
@@ -91,7 +91,7 @@ def upgrade():
                     'user_tokens',
                     "platform IN ('twitch', 'vk', 'donationalerts')"
                 )
-                print("  ✅ Added CHECK constraint: platform")
+                print("   Added CHECK constraint: platform")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
         
@@ -102,7 +102,7 @@ def upgrade():
                     'user_tokens',
                     ['platform', 'platform_user_id']
                 )
-                print("  ✅ Added INDEX: platform + platform_user_id")
+                print("   Added INDEX: platform + platform_user_id")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
     
@@ -117,7 +117,7 @@ def upgrade():
                     'chat_messages',
                     "platform IN ('twitch', 'vk')"
                 )
-                print("  ✅ Added CHECK constraint: platform")
+                print("   Added CHECK constraint: platform")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
         
@@ -128,7 +128,7 @@ def upgrade():
                     'chat_messages',
                     ['user_id', 'timestamp']
                 )
-                print("  ✅ Added INDEX: user_id + timestamp")
+                print("   Added INDEX: user_id + timestamp")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
     
@@ -143,7 +143,7 @@ def upgrade():
                     'youtube_queue',
                     "status IN ('pending', 'playing', 'played', 'skipped')"
                 )
-                print("  ✅ Added CHECK constraint: status")
+                print("   Added CHECK constraint: status")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
         
@@ -154,7 +154,7 @@ def upgrade():
                     'youtube_queue',
                     ['user_id', 'status']
                 )
-                print("  ✅ Added INDEX: user_id + status")
+                print("   Added INDEX: user_id + status")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
     
@@ -169,7 +169,7 @@ def upgrade():
                     'user_streaks',
                     ['user_id', 'platform']
                 )
-                print("  ✅ Added UNIQUE constraint: user_id + platform")
+                print("   Added UNIQUE constraint: user_id + platform")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
         
@@ -180,12 +180,12 @@ def upgrade():
                     'user_streaks',
                     "platform IN ('twitch', 'vk')"
                 )
-                print("  ✅ Added CHECK constraint: platform")
+                print("   Added CHECK constraint: platform")
             except Exception as e:
                 print(f"  ⚠️  Skipped: {e}")
     
     print("\n" + "=" * 60)
-    print("✅ Fundamental constraints and indexes added")
+    print(" Fundamental constraints and indexes added")
     print("=" * 60)
 
 
@@ -218,4 +218,4 @@ def downgrade():
         if constraint_exists(conn, 'user_tokens', 'uq_user_tokens_user_platform'):
             op.drop_constraint('uq_user_tokens_user_platform', 'user_tokens')
     
-    print("✅ Constraints and indexes removed")
+    print(" Constraints and indexes removed")

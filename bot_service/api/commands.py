@@ -114,7 +114,7 @@ async def get_commands(
         log_response("/api/commands", 200, result)
         return result
     except Exception as e:
-        commands_logger.error(f"✗ Error getting commands: {e}", exc_info=True)
+        commands_logger.error(f"[X] Error getting commands: {e}", exc_info=True)
         log_response("/api/commands", 500, {"error": str(e)})
         raise HTTPException(status_code=500, detail="Ошибка получения команд")
 

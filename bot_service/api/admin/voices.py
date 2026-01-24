@@ -219,7 +219,7 @@ async def upload_voice_proxy(
         
         if not is_valid:
             logger.warning(
-                f"🚫 [SECURITY] Admin voice upload rejected - invalid magic number: "
+                f"[BLOCKED] [SECURITY] Admin voice upload rejected - invalid magic number: "
                 f"admin={user.get('id')}, filename={file.filename}, error={error}"
             )
             raise HTTPException(

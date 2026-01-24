@@ -163,7 +163,7 @@ class Settings(BaseSettings):
 
         if environment.lower() == 'production' and v == default_key:
             raise ValueError(
-                "🚨 PRODUCTION ERROR: SECRET_KEY must be changed from default value! "
+                " PRODUCTION ERROR: SECRET_KEY must be changed from default value! "
                 "Generate with: openssl rand -hex 32"
             )
 
@@ -181,7 +181,7 @@ class Settings(BaseSettings):
 
         if environment.lower() == 'production' and v == default_key:
             raise ValueError(
-                "🚨 PRODUCTION ERROR: TOKEN_ENCRYPTION_KEY must be changed from default value! "
+                " PRODUCTION ERROR: TOKEN_ENCRYPTION_KEY must be changed from default value! "
                 "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
             )
 
@@ -247,7 +247,7 @@ def validate_settings():
 
         if missing:
             raise ValueError(
-                f"🚨 PRODUCTION ERROR: Missing or invalid required settings: {', '.join(missing)}"
+                f" PRODUCTION ERROR: Missing or invalid required settings: {', '.join(missing)}"
             )
 
     logger.info("[OK] Configuration validated successfully")

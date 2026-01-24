@@ -27,7 +27,7 @@ class GameHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             if ctx.platform == 'twitch':
@@ -37,7 +37,7 @@ class GameHandler(BaseCommandHandler):
                 
         except Exception as e:
             logger.error(f"Error in !game: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")
     
     async def _handle_twitch_game(self, ctx: PlatformContext, user, db) -> None:
         from platforms.registry import platform_registry
@@ -46,12 +46,12 @@ class GameHandler(BaseCommandHandler):
         token = UserTokenRepository(db).get_active_token(user.id, 'twitch')
         
         if not token:
-            await ctx.reply("❌ Twitch не подключен")
+            await ctx.reply("[ERROR] Twitch не подключен")
             return
         
         twitch_platform = platform_registry.get('twitch')
         if not twitch_platform:
-            await ctx.reply("❌ Twitch platform not available")
+            await ctx.reply("[ERROR] Twitch platform not available")
             return
         
         if not ctx.args:
@@ -59,9 +59,9 @@ class GameHandler(BaseCommandHandler):
             channel_info = await twitch_platform.get_channel_info(user.twitch_username)
             if channel_info:
                 game = channel_info.get('game_name', 'Not set')
-                await ctx.send(f"🎮 Игра: {game}")
+                await ctx.send(f" Игра: {game}")
             else:
-                await ctx.reply("❌ Не удалось получить информацию")
+                await ctx.reply("[ERROR] Не удалось получить информацию")
         else:
             # Set new game - search then update
             new_game = ctx.args.strip()
@@ -69,11 +69,11 @@ class GameHandler(BaseCommandHandler):
             if games:
                 result = await twitch_platform.update_stream_category(user.id, games[0].get('id'))
                 if result:
-                    await ctx.send(f"✅ Игра изменена на: {games[0].get('name', new_game)}")
+                    await ctx.send(f" Игра изменена на: {games[0].get('name', new_game)}")
                 else:
-                    await ctx.reply("❌ Не удалось изменить игру")
+                    await ctx.reply("[ERROR] Не удалось изменить игру")
             else:
-                await ctx.reply(f"❌ Игра '{new_game}' не найдена")
+                await ctx.reply(f"[ERROR] Игра '{new_game}' не найдена")
     
     async def _handle_vk_game(self, ctx: PlatformContext, user, db) -> None:
         await ctx.reply("ℹ VK не поддерживает смену категории через API")
@@ -98,7 +98,7 @@ class TitleHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             if ctx.platform == 'twitch':
@@ -108,7 +108,7 @@ class TitleHandler(BaseCommandHandler):
                 
         except Exception as e:
             logger.error(f"Error in !title: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")
     
     async def _handle_twitch_title(self, ctx: PlatformContext, user, db) -> None:
         from platforms.registry import platform_registry
@@ -117,28 +117,28 @@ class TitleHandler(BaseCommandHandler):
         token = UserTokenRepository(db).get_active_token(user.id, 'twitch')
         
         if not token:
-            await ctx.reply("❌ Twitch не подключен")
+            await ctx.reply("[ERROR] Twitch не подключен")
             return
         
         twitch_platform = platform_registry.get('twitch')
         if not twitch_platform:
-            await ctx.reply("❌ Twitch platform not available")
+            await ctx.reply("[ERROR] Twitch platform not available")
             return
         
         if not ctx.args:
             channel_info = await twitch_platform.get_channel_info(user.twitch_username)
             if channel_info:
                 title = channel_info.get('title', 'Not set')
-                await ctx.send(f"📺 Название: {title[:100]}")
+                await ctx.send(f" Название: {title[:100]}")
             else:
-                await ctx.reply("❌ Не удалось получить информацию")
+                await ctx.reply("[ERROR] Не удалось получить информацию")
         else:
             new_title = ctx.args.strip()
             result = await twitch_platform.update_stream_title(user.id, new_title)
             if result:
-                await ctx.send("✅ Название изменено")
+                await ctx.send(" Название изменено")
             else:
-                await ctx.reply("❌ Не удалось изменить название")
+                await ctx.reply("[ERROR] Не удалось изменить название")
     
     async def _handle_vk_title(self, ctx: PlatformContext, user, db) -> None:
         await ctx.reply("ℹ VK не поддерживает смену названия через API")
@@ -164,7 +164,7 @@ class UptimeHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             if ctx.platform == 'twitch':
@@ -184,10 +184,10 @@ class UptimeHandler(BaseCommandHandler):
                             await ctx.send(f"⏱ Стрим идет: {hours}ч {minutes}м")
                             return
                     
-                    await ctx.send("📴 Стрим офлайн")
+                    await ctx.send(" Стрим офлайн")
             else:
                 await ctx.reply("ℹ Команда !uptime поддерживается только на Twitch")
                 
         except Exception as e:
             logger.error(f"Error in !uptime: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")

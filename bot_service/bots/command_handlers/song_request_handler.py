@@ -25,7 +25,7 @@ class SongRequestHandler(BaseCommandHandler):
             from sqlalchemy import func
             
             if not ctx.args:
-                await ctx.reply("❌ Укажите ссылку на видео: !sr <url>")
+                await ctx.reply("[ERROR] Укажите ссылку на видео: !sr <url>")
                 return
             
             url = ctx.args.strip()
@@ -39,7 +39,7 @@ class SongRequestHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             # Add to queue
@@ -54,14 +54,14 @@ class SongRequestHandler(BaseCommandHandler):
             if result.get('success'):
                 title = result.get('title', 'Video')
                 position = result.get('position', '?')
-                await ctx.send(f"✅ {ctx.author_name}, добавлено: {title[:50]} (#{position})")
+                await ctx.send(f" {ctx.author_name}, добавлено: {title[:50]} (#{position})")
             else:
                 error = result.get('error', 'Unknown error')
-                await ctx.reply(f"❌ {error}")
+                await ctx.reply(f"[ERROR] {error}")
                 
         except Exception as e:
             logger.error(f"Error in !sr command: {e}")
-            await ctx.reply("❌ Ошибка добавления видео")
+            await ctx.reply("[ERROR] Ошибка добавления видео")
 
 
 class SkipHandler(BaseCommandHandler):
@@ -85,7 +85,7 @@ class SkipHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             result = await youtube_queue_service.skip_current(user.id)
@@ -93,11 +93,11 @@ class SkipHandler(BaseCommandHandler):
             if result.get('success'):
                 await ctx.send(f"⏭ {ctx.author_name} пропустил видео")
             else:
-                await ctx.reply(f"❌ {result.get('error', 'Ошибка')}")
+                await ctx.reply(f"[ERROR] {result.get('error', 'Ошибка')}")
                 
         except Exception as e:
             logger.error(f"Error in !skip: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")
 
 
 class QueueHandler(BaseCommandHandler):
@@ -120,13 +120,13 @@ class QueueHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             queue = await youtube_queue_service.get_queue(user.id, limit=5)
             
             if not queue:
-                await ctx.send("📋 Очередь пуста")
+                await ctx.send(" Очередь пуста")
                 return
             
             items = []
@@ -135,11 +135,11 @@ class QueueHandler(BaseCommandHandler):
                 requester = item.get('requested_by', 'Unknown')
                 items.append(f"{i}. {title} ({requester})")
             
-            await ctx.send("📋 " + " | ".join(items))
+            await ctx.send(" " + " | ".join(items))
                 
         except Exception as e:
             logger.error(f"Error in !queue: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")
 
 
 class ClearHandler(BaseCommandHandler):
@@ -163,19 +163,19 @@ class ClearHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             result = await youtube_queue_service.clear_queue(user.id)
             
             if result.get('success'):
-                await ctx.send(f"🗑 {ctx.author_name} очистил очередь")
+                await ctx.send(f" {ctx.author_name} очистил очередь")
             else:
-                await ctx.reply(f"❌ {result.get('error', 'Ошибка')}")
+                await ctx.reply(f"[ERROR] {result.get('error', 'Ошибка')}")
                 
         except Exception as e:
             logger.error(f"Error in !clear: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")
 
 
 class WrongLinkHandler(BaseCommandHandler):
@@ -198,7 +198,7 @@ class WrongLinkHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             result = await youtube_queue_service.remove_last_by_user(
@@ -208,10 +208,10 @@ class WrongLinkHandler(BaseCommandHandler):
             
             if result.get('success'):
                 title = result.get('title', 'video')
-                await ctx.send(f"✅ {ctx.author_name}, удалено: {title[:40]}")
+                await ctx.send(f" {ctx.author_name}, удалено: {title[:40]}")
             else:
-                await ctx.reply(f"❌ {result.get('error', 'Не найдено')}")
+                await ctx.reply(f"[ERROR] {result.get('error', 'Не найдено')}")
                 
         except Exception as e:
             logger.error(f"Error in !wronglink: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")

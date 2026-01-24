@@ -29,7 +29,7 @@ class VoiceHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             from repositories.tts_settings_repository import TTSSettingsRepository
@@ -39,16 +39,16 @@ class VoiceHandler(BaseCommandHandler):
             current_voice = settings.voice
             
             if not ctx.args:
-                await ctx.send(f"🎤 Текущий голос: {current_voice}")
+                await ctx.send(f" Текущий голос: {current_voice}")
             else:
                 new_voice = ctx.args.strip().lower()
                 settings_repo.update_settings(settings, {'voice': new_voice})
                 db.commit()
-                await ctx.send(f"✅ Голос изменен на: {new_voice}")
+                await ctx.send(f" Голос изменен на: {new_voice}")
                 
         except Exception as e:
             logger.error(f"Error in !voice: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")
 
 
 class RandomVoiceHandler(BaseCommandHandler):
@@ -77,7 +77,7 @@ class RandomVoiceHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             random_voice = random.choice(voices)
@@ -87,11 +87,11 @@ class RandomVoiceHandler(BaseCommandHandler):
             settings = settings_repo.get_or_create(user_id=user.id)
             settings_repo.update_settings(settings, {'voice': random_voice})
             db.commit()
-            await ctx.send(f"🎲 Случайный голос: {random_voice}")
+            await ctx.send(f"[DICE] Случайный голос: {random_voice}")
                 
         except Exception as e:
             logger.error(f"Error in !randomvoice: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")
 
 
 class TTSVolumeHandler(BaseCommandHandler):
@@ -116,7 +116,7 @@ class TTSVolumeHandler(BaseCommandHandler):
                 user = repo.get_by_vk_channel_name(ctx.channel_name)
             
             if not user:
-                await ctx.reply("❌ Канал не найден")
+                await ctx.reply("[ERROR] Канал не найден")
                 return
             
             from repositories.audio_settings_repository import AudioSettingsRepository
@@ -126,7 +126,7 @@ class TTSVolumeHandler(BaseCommandHandler):
             current_volume = settings.website_volume
             
             if not ctx.args:
-                await ctx.send(f"🔊 Громкость TTS: {current_volume}%")
+                await ctx.send(f"[UNMUTE] Громкость TTS: {current_volume}%")
                 return
             
             try:
@@ -134,12 +134,12 @@ class TTSVolumeHandler(BaseCommandHandler):
                 if not 0 <= new_volume <= 100:
                     raise ValueError("Invalid range")
             except ValueError:
-                await ctx.reply("❌ Укажите число от 0 до 100")
+                await ctx.reply("[ERROR] Укажите число от 0 до 100")
                 return
             
             audio_repo.update_volume(user.id, website_volume=new_volume)
-            await ctx.send(f"🔊 Громкость TTS: {new_volume}%")
+            await ctx.send(f"[UNMUTE] Громкость TTS: {new_volume}%")
                 
         except Exception as e:
             logger.error(f"Error in !ttsvolume: {e}")
-            await ctx.reply("❌ Ошибка")
+            await ctx.reply("[ERROR] Ошибка")

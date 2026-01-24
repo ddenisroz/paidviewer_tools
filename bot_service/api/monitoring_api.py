@@ -79,7 +79,7 @@ async def cleanup_expired_cache(user: dict = Depends(get_current_user)):
 
     token_validation_cache.cleanup_expired()
 
-    logger.info(f"🧹 Cache cleanup triggered by admin user {user.get('id')}")
+    logger.info(f"[CLEANUP] Cache cleanup triggered by admin user {user.get('id')}")
 
     return {
         "success": True,

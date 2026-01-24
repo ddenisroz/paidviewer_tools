@@ -56,7 +56,7 @@ class VKLiveBotCore:
             return
 
         self.is_running = False
-        logger.info("🛑 VK LIVE BOT STOPPED")
+        logger.info(" VK LIVE BOT STOPPED")
 
     async def connect_to_channel(self, channel_id: str) -> bool:
         """Подключиться к каналу VK Live (используя HTTP polling вместо WebSocket)"""
@@ -235,7 +235,7 @@ class VKLiveBotCore:
             elif is_moderator:
                 role = 'moderator'
 
-            logger.info(f"📩 [VK MSG] {channel_id} | {user} (owner={is_owner}, mod={is_moderator}, role={role}): {text[:50]}")
+            logger.info(f"[VK MSG] {channel_id} | {user} (owner={is_owner}, mod={is_moderator}, role={role}): {text[:50]}")
 
             # 1. Отправляем сообщение в WebSocket для отображения в chatbox
             from utils.websocket_helper import broadcast_chat_message
@@ -394,7 +394,7 @@ class VKLiveBotCore:
             # Удаляем служебное сообщение "получает награду: [название] за [стоимость]"
             reward_pattern = r'^получает награду:\s*[^\n]+?\s*за\s*\d+\s*\n*'
             cleaned_text = re.sub(reward_pattern, '', text, flags=re.MULTILINE).strip()
-            logger.info(f"🧹 [VK TTS] Cleaned text from reward message: '{cleaned_text[:50]}...'")
+            logger.info(f"[CLEANUP] [VK TTS] Cleaned text from reward message: '{cleaned_text[:50]}...'")
 
         await handle_tts_for_message(
             text=cleaned_text,
@@ -454,7 +454,7 @@ class VKLiveBotCore:
                                         for message in messages:
                                             await self._handle_message(message)
 
-                                        logger.info(f"📩 Polled {len(messages)} messages from VK Live")
+                                        logger.info(f"[VK POLL] Polled {len(messages)} messages from VK Live")
                                         break
                                     else:
                                         logger.debug(f"Polling endpoint {endpoint} returned {response.status}")

@@ -73,7 +73,7 @@ def validate_file_magic_number(
         # Проверяем что тип разрешен
         if mime not in allowed_types:
             logger.warning(
-                f"🚫 [SECURITY] Invalid file magic number detected: {mime}, "
+                f"[BLOCKED] [SECURITY] Invalid file magic number detected: {mime}, "
                 f"file: {os.path.basename(file_path)}"
             )
             return False, f"Invalid file content type: {mime}. File may be malicious."

@@ -99,7 +99,7 @@ class QueueHandlerMixin:
 
             if success:
                 await ctx.send(f"@{ctx.author.name} [SKIP] Видео пропущено: {first_video['title']}")
-                self.logger.info(f"✓ Video skipped for {ctx.channel.name}")
+                self.logger.info(f"[OK] Video skipped for {ctx.channel.name}")
             else:
                 await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось пропустить видео")
 
@@ -135,7 +135,7 @@ class QueueHandlerMixin:
             if success:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [SKIP] Видео пропущено: {first_video['title']}")
-                self.logger.info(f"✓ Video skipped for VK {channel_name}")
+                self.logger.info(f"[OK] Video skipped for VK {channel_name}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [ERROR] Не удалось пропустить видео")
@@ -166,7 +166,7 @@ class QueueHandlerMixin:
 
             if deleted_count > 0:
                 await ctx.send(f"@{ctx.author.name} [DELETE] Очередь очищена ({deleted_count} видео)")
-                self.logger.info(f"✓ Queue cleared for {ctx.channel.name}: {deleted_count} videos")
+                self.logger.info(f"[OK] Queue cleared for {ctx.channel.name}: {deleted_count} videos")
             else:
                 await ctx.send(f"@{ctx.author.name} [INFO] Очередь уже пуста")
 
@@ -197,7 +197,7 @@ class QueueHandlerMixin:
             if deleted_count > 0:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [DELETE] Очередь очищена ({deleted_count} видео)")
-                self.logger.info(f"✓ Queue cleared for VK {channel_name}: {deleted_count} videos")
+                self.logger.info(f"[OK] Queue cleared for VK {channel_name}: {deleted_count} videos")
             else:
                 await vk_bot.send_message(channel_name, f"@{author_name} [INFO] Очередь уже пуста")
 

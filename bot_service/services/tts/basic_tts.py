@@ -151,7 +151,7 @@ class BasicTTS:
 
             # Определяем язык
             language = self.detect_language(processed_text)
-            logger.info(f"🌍 Базовая TTS: язык={language}, текст='{processed_text[:50]}...'")
+            logger.info(f"[LANG] Базовая TTS: язык={language}, текст='{processed_text[:50]}...'")
 
             # Создаем уникальное имя файла
             timestamp = int(time.time() * 1000)

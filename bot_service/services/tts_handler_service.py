@@ -15,7 +15,7 @@ from repositories.local_tts_repository import LocalTTSRepository
 from repositories.user_voice_settings_repository import UserVoiceSettingsRepository
 
 # Services
-from services.tts_service import TTSService
+from services.tts.tts_service import TTSService
 from services.user_service import UserService
 from services.platform_rewards_service import PlatformRewardsService
 from services.notification_service import notification_service

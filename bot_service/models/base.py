@@ -105,7 +105,7 @@ def init_db():
     from models.drops import DropsQuality
     
     if engine is None:
-        logger.error("❌ База данных не сконфигурирована")
+        logger.error("[ERROR] База данных не сконфигурирована")
         return
 
     # Создаем все таблицы

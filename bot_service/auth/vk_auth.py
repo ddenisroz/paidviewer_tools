@@ -114,7 +114,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     VK_REDIRECT_URI = f"{BACKEND_URL}/auth/vk/callback"
 
     if not all([VK_CLIENT_ID, VK_CLIENT_SECRET]):
-        logger.error(f"VK credentials not configured. VK_CLIENT_ID: {'✓' if VK_CLIENT_ID else '✗'}, VK_CLIENT_SECRET: {'✓' if VK_CLIENT_SECRET else '✗'}")
+        logger.error(f"VK credentials not configured. VK_CLIENT_ID: {'[OK]' if VK_CLIENT_ID else '[X]'}, VK_CLIENT_SECRET: {'[OK]' if VK_CLIENT_SECRET else '[X]'}")
         raise HTTPException(status_code=500, detail="VK integration is not configured.")
 
     logger.info(f"VK credentials loaded. Client ID: {VK_CLIENT_ID[:8]}..., Redirect URI: {VK_REDIRECT_URI}")

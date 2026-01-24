@@ -89,7 +89,7 @@ async def block_channel(
             blocked_by=user.get('username')
         )
         
-        logger.info(f"🚫 Blocked channel: {channel_name} by {user.get('username')} (reason: {reason})")
+        logger.info(f"[BLOCKED] Blocked channel: {channel_name} by {user.get('username')} (reason: {reason})")
         
         return {
             "success": True,

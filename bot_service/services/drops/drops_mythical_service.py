@@ -108,12 +108,12 @@ class DropsMythicalMixin:
              da_token = token_repo.get_active_token_by_session(session_id, 'donationalerts')
 
         if not da_token:
-            logger.debug(f"🚫 [MYTHICAL] DonationAlerts not connected, cannot activate mythical drops for {channel_name}")
+            logger.debug(f"[BLOCKED] [MYTHICAL] DonationAlerts not connected, cannot activate mythical drops for {channel_name}")
             return False
 
         is_stream_online = self._check_stream_online(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not is_stream_online:
-            logger.debug(f"🚫 [MYTHICAL] Stream is offline, cannot activate mythical drops for {channel_name}")
+            logger.debug(f"[BLOCKED] [MYTHICAL] Stream is offline, cannot activate mythical drops for {channel_name}")
             return False
 
         if config.mythical_last_appeared:
@@ -179,12 +179,12 @@ class DropsMythicalMixin:
              da_token = token_repo.get_active_token_by_session(session_id, 'donationalerts')
 
         if not da_token:
-            logger.warning(f"🚫 [MYTHICAL] Cannot activate mythical drops: DonationAlerts not connected for {channel_name}")
+            logger.warning(f"[BLOCKED] [MYTHICAL] Cannot activate mythical drops: DonationAlerts not connected for {channel_name}")
             return None
 
         is_stream_online = self._check_stream_online(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not is_stream_online:
-            logger.warning(f"🚫 [MYTHICAL] Cannot activate mythical drops: stream is offline for {channel_name}")
+            logger.warning(f"[BLOCKED] [MYTHICAL] Cannot activate mythical drops: stream is offline for {channel_name}")
             return None
 
         now = utcnow_naive()

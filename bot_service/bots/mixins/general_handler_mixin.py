@@ -164,7 +164,7 @@ class GeneralHandlerMixin:
             db.commit()
 
             await ctx.send(f"@{ctx.author.name} [AUDIO] Громкость YouTube: {volume}%")
-            self.logger.info(f"✓ YouTube volume set to {volume}% for {ctx.channel.name}")
+            self.logger.info(f"[OK] YouTube volume set to {volume}% for {ctx.channel.name}")
 
         except Exception as e:
             self.logger.error(f"Error in !ytvolume handler: {e}", exc_info=True)
@@ -206,7 +206,7 @@ class GeneralHandlerMixin:
 
             await vk_bot.send_message(channel_name,
                 f"@{author_name} [AUDIO] Громкость YouTube: {volume}%")
-            self.logger.info(f"✓ YouTube volume set to {volume}% for VK {channel_name}")
+            self.logger.info(f"[OK] YouTube volume set to {volume}% for VK {channel_name}")
 
         except Exception as e:
             self.logger.error(f"Error in !ytvolume VK handler: {e}", exc_info=True)

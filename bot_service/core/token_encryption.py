@@ -17,7 +17,7 @@ if not ENCRYPTION_KEY or ENCRYPTION_KEY.startswith('your-'):
     # Генерируем новый ключ при первом запуске
     logger.warning("[WARN] TOKEN_ENCRYPTION_KEY not configured properly, generating new key")
     ENCRYPTION_KEY = Fernet.generate_key().decode()
-    logger.info(f"🔑 Generated encryption key. Add to .env: TOKEN_ENCRYPTION_KEY={ENCRYPTION_KEY}")
+    logger.info(f" Generated encryption key. Add to .env: TOKEN_ENCRYPTION_KEY={ENCRYPTION_KEY}")
 
 # Создаем объект для шифрования
 try:
@@ -27,7 +27,7 @@ except Exception as e:
     # Генерируем новый ключ в случае ошибки
     ENCRYPTION_KEY = Fernet.generate_key().decode()
     cipher_suite = Fernet(ENCRYPTION_KEY.encode())
-    logger.info(f"🔑 Generated new encryption key. Add to .env: TOKEN_ENCRYPTION_KEY={ENCRYPTION_KEY}")
+    logger.info(f" Generated new encryption key. Add to .env: TOKEN_ENCRYPTION_KEY={ENCRYPTION_KEY}")
 
 
 def encrypt_token(token: str) -> str:

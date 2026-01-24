@@ -88,7 +88,7 @@ class StreamInfoHandlerMixin:
             if results:
                 platforms_text = " и ".join(results)
                 await ctx.send(f"@{ctx.author.name} [OK] Игра изменена на: {game_name} ({platforms_text})")
-                self.logger.info(f"✓ Game changed to {game_name} for {platforms_text}")
+                self.logger.info(f"[OK] Game changed to {game_name} for {platforms_text}")
             else:
                 await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось изменить игру")
 
@@ -177,7 +177,7 @@ class StreamInfoHandlerMixin:
                 platforms_text = " и ".join(results)
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [OK] Игра изменена на: {game_name} ({platforms_text})")
-                self.logger.info(f"✓ Game changed to {game_name} for {platforms_text}")
+                self.logger.info(f"[OK] Game changed to {game_name} for {platforms_text}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [ERROR] Не удалось изменить игру")
@@ -234,7 +234,7 @@ class StreamInfoHandlerMixin:
                 display_title = args[:50] + '...' if len(args) > 50 else args
                 platforms_text = " и ".join(results)
                 await ctx.send(f"@{ctx.author.name} [OK] Название изменено на: {display_title} ({platforms_text})")
-                self.logger.info(f"✓ Title changed for {platforms_text}")
+                self.logger.info(f"[OK] Title changed for {platforms_text}")
             else:
                 await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось изменить название")
 
@@ -295,7 +295,7 @@ class StreamInfoHandlerMixin:
                 platforms_text = " и ".join(results)
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [OK] Название изменено на: {display_title} ({platforms_text})")
-                self.logger.info(f"✓ Title changed for {platforms_text}")
+                self.logger.info(f"[OK] Title changed for {platforms_text}")
             else:
                 await vk_bot.send_message(channel_name,
                     f"@{author_name} [ERROR] Не удалось изменить название")
