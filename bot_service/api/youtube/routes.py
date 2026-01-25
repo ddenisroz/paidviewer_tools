@@ -154,6 +154,8 @@ async def get_queue(
 ):
     """Получение очереди видео с текущим воспроизводящимся видео (только для авторизованных)"""
     try:
+        if not user:
+            raise HTTPException(status_code=401, detail="Authentication required")
         user_id = user.get('id')
         if not user_id or user_id <= 0:
             raise HTTPException(status_code=401, detail="Authentication required")
@@ -171,6 +173,8 @@ async def get_queue(
             "is_playing": current_video is not None
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting queue via API: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения очереди")

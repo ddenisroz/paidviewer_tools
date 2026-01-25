@@ -98,7 +98,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                                 disabled={!vkEnabled}
                             />
                             <div className="flex items-center space-x-2">
-                                <VKIcon className="h-4 w-4 text-blue-500" />
+                                <VKIcon className="h-4 w-4 text-[#FF0062]" />
                                 <Label htmlFor="vkChat">VK Live чат</Label>
                             </div>
                         </div>

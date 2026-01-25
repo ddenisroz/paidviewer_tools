@@ -116,7 +116,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             case 'twitch':
                 return <Twitch className="h-4 w-4 text-purple-500" />;
             case 'vk':
-                return <VKIcon className="h-4 w-4 text-blue-500" />;
+                return <VKIcon className="h-4 w-4 text-[#FF0062]" />;
             default:
                 return <MessageCircle className="h-4 w-4 text-gray-500" />;
         }
@@ -127,7 +127,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             case 'twitch':
                 return <Badge variant="outline" className="text-purple-400 border-purple-500">Twitch</Badge>;
             case 'vk':
-                return <Badge variant="outline" className="text-blue-400 border-blue-500">VK Live</Badge>;
+                return <Badge variant="outline" className="text-rose-400 border-rose-500">VK Live</Badge>;
             default:
                 return null;
         }
@@ -166,6 +166,29 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
+                                        {/* Render Twitch badges if present */}
+                                        {message.badges && message.badges.length > 0 && message.platform === 'twitch' && (
+                                            <span className="flex items-center gap-0.5">
+                                                {message.badges.map((badge, idx) => {
+                                                    const [badgeId, version] = badge.split('/');
+                                                    // Try to get URL from global cache (badges should be preloaded)
+                                                    const { twitchBadgesService } = require('@/services/twitchBadges');
+                                                    const url = twitchBadgesService.getBadgeUrl(badgeId, version || '1', '1x');
+                                                    if (url) {
+                                                        return (
+                                                            <img
+                                                                key={`${badgeId}-${idx}`}
+                                                                src={url}
+                                                                alt={badgeId}
+                                                                title={badgeId}
+                                                                className="h-4 w-4 inline-block"
+                                                            />
+                                                        );
+                                                    }
+                                                    return null;
+                                                })}
+                                            </span>
+                                        )}
                                         <span className="font-medium text-white truncate">
                                             {message.username || message.author || message.author_name || 'Unknown'}
                                         </span>
@@ -181,6 +204,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                         <MessageContent
                                             message={message.content || message.message || ''}
                                             channelEmotes={emotes ? new Map(Object.entries(emotes)) : new Map()}
+                                            twitchEmotes={message.emotes}
                                         />
                                     </div>
 

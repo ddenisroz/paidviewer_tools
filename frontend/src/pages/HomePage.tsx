@@ -21,11 +21,13 @@ import { getAndClearReturnUrl } from '@/utils/urlUtils';
 import { useLayoutStore } from '@/store/useLayoutStore';
 import WidgetWrapper from '@/features/home/components/WidgetWrapper';
 import { cn } from '@/lib/utils';
+import { useData } from '@/context/DataContext';
 
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated, logout } = useAuth();
     const { integrations } = useIntegrations();
+    const { currentData } = useData();
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -68,22 +70,27 @@ const HomePage: React.FC = () => {
         const twitchData = integrations?.twitch?.enabled ? {
             isLive: (twitchStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (twitchStreamInfo?.data?.viewers ?? 0) as number,
-            gameName: (twitchStreamInfo?.data?.game_name ?? '') as string,
-            boxArtUrl: (twitchStreamInfo?.data?.thumbnail_url ?? twitchStreamInfo?.data?.box_art_url ?? '') as string
+            gameName: (twitchStreamInfo?.data?.game_name ?? '') as string || (integrations.twitch?.enabled && currentData.twitch?.category?.name ? currentData.twitch.category.name : ''),
+            boxArtUrl: (twitchStreamInfo?.data?.thumbnail_url ?? twitchStreamInfo?.data?.box_art_url ?? '') as string || (integrations.twitch?.enabled && currentData.twitch?.category?.box_art_url ? currentData.twitch.category.box_art_url : '')
         } : undefined;
 
         const vkData = integrations?.vk?.enabled ? {
             isLive: (vkStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (vkStreamInfo?.data?.viewers ?? 0) as number,
-            gameName: (vkStreamInfo?.data?.category_name ?? '') as string,
-            boxArtUrl: (vkStreamInfo?.data?.category_img_url ?? '') as string
+            gameName: (vkStreamInfo?.data?.category_name ?? '') as string || (integrations.vk?.enabled && currentData.vk?.category?.name ? currentData.vk.category.name : ''),
+            boxArtUrl: (vkStreamInfo?.data?.category_img_url ?? '') as string || (integrations.vk?.enabled && currentData.vk?.category?.cover_url ? currentData.vk.category.cover_url : '')
         } : undefined;
+
+        // Ensure box art URLs are valid for display (Twitch needs replacement)
+        if (twitchData?.boxArtUrl && twitchData.boxArtUrl.includes('{width}')) {
+            twitchData.boxArtUrl = twitchData.boxArtUrl.replace('{width}', '52').replace('{height}', '72');
+        }
 
         return {
             twitch: twitchData,
             vk: vkData
         };
-    }, [integrations, twitchStreamInfo, vkStreamInfo]);
+    }, [integrations, twitchStreamInfo, vkStreamInfo, currentData]);
 
 
     // Auto-logout if no integrations are connected (requested behavior)
@@ -160,19 +167,8 @@ const HomePage: React.FC = () => {
     return (
         <div className="space-y-4 pb-20 relative">
             {/* Layout Controls */}
-            {isAuthenticated && hasAnyIntegration && (
-                <div className="flex justify-end max-w-6xl mx-auto px-1">
-                    <Button
-                        onClick={toggleEditMode}
-                        variant={isEditMode ? "secondary" : "ghost"}
-                        size="sm"
-                        className={cn("gap-2 transition-all", isEditMode && "bg-green-500/20 text-green-400 hover:bg-green-500/30")}
-                    >
-                        {isEditMode ? <Check className="w-4 h-4" /> : <Settings2 className="w-4 h-4" />}
-                        {isEditMode ? "Сохранить макет" : "Настроить макет"}
-                    </Button>
-                </div>
-            )}
+            {/* Layout Controls - Moved to Header */}
+            {/* Keeping empty space if needed, or remove completely */}
 
             <div className="space-y-6 max-w-6xl mx-auto overflow-visible">
                 {!isAuthenticated ? (

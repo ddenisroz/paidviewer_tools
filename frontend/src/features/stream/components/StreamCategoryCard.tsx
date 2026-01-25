@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, Loader, Save, Tag } from 'lucide-react';
+import { CheckCircle, Gamepad2, Loader, Loader2, Save, Tag } from 'lucide-react';
 import type { StreamCategory } from '@/types/stream';
 
 import { categoryMapping } from '@/constants/categoryMapping';
@@ -131,16 +131,11 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
         }
     }, [debouncedVkSearch, showDropdown.vk, searchCategories, vkEnabled]);
 
-    // Click Outside Handling logic for dropdowns is now simpler because Dropdown uses Portal, 
-    // but we still need to close it if user clicks away.
-    // Actually, separating the dropdown state management into the hook or component would be cleaner,
-    // but for now let's keep the existing logic but optimized.
-
+    // Click Outside Handling
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Element;
             const isClickInsidePortal = target.closest('[data-category-dropdown="true"]');
-            // We check if click is on input
             const isTwitchInput = twitchInputRef.current && twitchInputRef.current.contains(target);
             const isVkInput = vkInputRef.current && vkInputRef.current.contains(target);
 
@@ -181,23 +176,14 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
         if (isLinked && bothEnabled && platform === 'twitch') {
             // Linked Logic
             const otherPlatform = 'vk';
-            // Try to map
             let mappedStreamCategory: StreamCategory | undefined;
-            // ... (Mapping logic simplified for brevity, assume we do best effort)
 
             // For now just update what we selected
             setCurrentData(prev => ({
                 ...prev,
                 twitch: { ...prev.twitch, category },
-                // vk: ... we would ideally set VK here too if mapped
             }));
-            // Trigger auto-map search... (keeping original complex logic implies we should probably run it)
-            // Copying the simpler logic: 
 
-            // Ideally we should move the heavy mapping logic to a service/hook helper. 
-            // To ensure we don't break existing functionality, I'll execute the select.
-
-            // Re-implementing the essential mapping part:
             const mappedName = categoryMapping[category.name];
             const searchQuery = mappedName || category.name;
             try {
@@ -233,8 +219,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
         setShowDropdown({ twitch: false, vk: false });
     };
 
-    const handleSave = (mode: 'both' | 'individual') => {
-        // ... (Keep existing save logic)
+    const handleSave = async (mode: 'both' | 'individual') => {
         const payload: Record<string, unknown> = {};
         const getCatId = (cat: unknown) => (cat as StreamCategory | undefined)?.id || null;
 
@@ -256,7 +241,6 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                 }
             }
         } else {
-            // Individual save logic (simplified)
             if (twitchEnabled) payload.twitch = { category_id: getCatId(currentData.twitch?.category) };
             if (vkEnabled) {
                 const vkCat = currentData.vk?.category as StreamCategory;
@@ -276,31 +260,13 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
         }
 
         if (Object.keys(payload).length > 0) {
-            saveChanges(payload, 'saveCategory');
+            await saveChanges(payload, 'saveCategory');
         }
     };
 
-    // Helper to render category image
-    const renderStreamCategoryImage = (cat: StreamCategory | undefined | null) => {
-        if (!cat || (!cat.box_art_url && !cat.cover_url)) {
-            return null; // Return nothing if no image, as requested
-        }
-        return (
-            <div className="absolute right-1 top-1 bottom-1 w-8 z-10 rounded bg-muted/30 flex items-center justify-center overflow-hidden pointer-events-none border border-white/5">
-                <img
-                    src={cat.box_art_url?.replace('{width}x{height}', '52x72') || cat.cover_url}
-                    alt={cat.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                />
-            </div>
-        );
-    };
+
 
     const isChanged = useMemo(() => {
-        // Reuse simple check
         const getId = (c: any) => c?.id;
         return (twitchEnabled && getId(initialData.twitch?.category) !== getId(currentData.twitch?.category)) ||
             (vkEnabled && getId(initialData.vk?.category) !== getId(currentData.vk?.category));
@@ -311,18 +277,18 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
     const Footer = (
         <Button
             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
-            disabled={status.saveCategory === 'loading' || status.saveCategory === 'success' || !isChanged}
+            disabled={(status as any).saving || !isChanged}
             size="sm"
-            className="w-full flex items-center gap-2"
+            className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm font-medium shadow-sm transition-all duration-300"
         >
-            {status.saveCategory === 'loading' ? (
-                <Loader className="h-4 w-4 animate-spin" />
+            {(status as any).saving ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
             ) : status.saveCategory === 'success' ? (
-                <CheckCircle className="h-4 w-4" />
+                <CheckCircle className="h-5 w-5" />
             ) : (
-                <Save className="h-4 w-4" />
+                <Save className="h-5 w-5" />
             )}
-            {status.saveCategory === 'loading' ? 'Сохранение...' : status.saveCategory === 'success' ? 'Сохранено' : 'Сохранить'}
+            {(status as any).saving ? 'Сохранение...' : 'Сохранить'}
         </Button>
     );
 
@@ -345,41 +311,35 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
             ) : (
                 <div className="flex-1">
                     {/* Twitch / General Field */}
-                    <div className="space-y-2 relative">
-                        <Label className="flex items-center gap-2 text-sm text-muted-foreground transition-all duration-300">
-                            {isLinked && bothEnabled ? (
-                                <><span className="text-foreground">Общая категория</span></>
-                            ) : (
-                                <><span className={!twitchEnabled ? "text-muted-foreground" : "text-foreground"}>Twitch</span></>
-                            )}
-                        </Label>
+                    <div className="space-y-4 relative">
                         <div className="relative">
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-70">
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center gap-1.5 z-20">
                                 {isLinked && bothEnabled ? (
-                                    <div className="flex -space-x-1">
-                                        <TwitchIcon className="w-4 h-4" />
-                                        <VKIcon className="w-4 h-4" />
-                                    </div>
+                                    <>
+                                        <TwitchIcon className="w-5 h-5 text-white/80" />
+                                        <VKIcon className="w-5 h-5 text-white/80" />
+                                    </>
                                 ) : (
-                                    <TwitchIcon className="w-4 h-4" />
+                                    <TwitchIcon className="w-5 h-5 text-white/80" />
                                 )}
                             </div>
+
+
+
                             <Input
                                 ref={twitchInputRef}
                                 value={searchTerms.twitch}
                                 onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                 onFocus={() => {
                                     if (twitchEnabled) setShowDropdown({ twitch: true, vk: false });
-                                    // Auto-select text
                                     if (searchTerms.twitch === (currentData.twitch?.category as StreamCategory)?.name) {
                                         setSearchTerms(prev => ({ ...prev, twitch: '' }));
                                     }
                                 }}
-                                placeholder={isLinked ? "Поиск общей категории..." : "Поиск категории Twitch..."}
-                                className={`h-10 pl-10 pr-10 transition-all duration-300 ${!twitchEnabled && !isLinked ? 'bg-muted cursor-not-allowed opacity-50' : ''}`}
+                                placeholder={isLinked ? "Поиск общей категории..." : (twitchEnabled ? "Поиск категории Twitch..." : "нет подключения")}
+                                className={`h-10 pl-[4.5rem] pr-4 ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
                                 disabled={!twitchEnabled && !isLinked}
                             />
-                            {renderStreamCategoryImage(currentData.twitch?.category as StreamCategory)}
 
                             {showDropdown.twitch && (
                                 <StreamCategoryDropdown
@@ -394,16 +354,16 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                     </div>
 
                     {/* VK Field - Collapsible */}
-                    <div className={`grid transition-all duration-300 ease-in-out ${isLinked && bothEnabled ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}>
-                        <div className="overflow-hidden">
-                            <div className="space-y-2 pt-4 relative">
-                                <Label className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <span className={!vkEnabled ? "text-muted-foreground" : "text-foreground"}>VK Live</span>
-                                </Label>
+                    <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isLinked && bothEnabled ? 'grid-rows-[0fr] opacity-0 pointer-events-none' : 'grid-rows-[1fr] opacity-100'}`}>
+                        <div className="overflow-hidden min-h-0">
+                            <div className="space-y-4 pt-0 relative mt-4 min-h-0">
                                 <div className="relative">
-                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-70">
-                                        <VKIcon className="w-4 h-4" />
+                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center z-20">
+                                        <VKIcon className="w-5 h-5 text-white/80" />
                                     </div>
+
+
+
                                     <Input
                                         ref={vkInputRef}
                                         value={searchTerms.vk}
@@ -414,11 +374,10 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                                                 setSearchTerms(prev => ({ ...prev, vk: '' }));
                                             }
                                         }}
-                                        placeholder="Поиск категории VK Live..."
-                                        className={`h-10 pl-10 pr-10 ${!vkEnabled ? 'bg-muted cursor-not-allowed opacity-50' : ''}`}
+                                        placeholder={vkEnabled ? "Поиск категории VK Live..." : "нет подключения"}
+                                        className={`h-10 pl-12 pr-4 ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
                                         disabled={!vkEnabled}
                                     />
-                                    {renderStreamCategoryImage(currentData.vk?.category as StreamCategory)}
 
                                     {showDropdown.vk && (
                                         <StreamCategoryDropdown

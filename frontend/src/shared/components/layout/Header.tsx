@@ -1,7 +1,8 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
-import { ChevronDown, LogOut, Settings } from 'lucide-react';
+import { ChevronDown, Check, LogOut, Settings, Settings2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -10,6 +11,7 @@ import { integrationsService } from '@/services/api/services/integrationsService
 import { TwitchIcon, VKIcon, DonationAlertsIcon } from '@/shared/components/PlatformIcons';
 import { logger } from '@/shared/utils/prodLogger';
 import { saveReturnUrl } from '@/utils/urlUtils';
+import { useLayoutStore } from '@/store/useLayoutStore';
 
 import { Button } from '../ui/button';
 
@@ -19,25 +21,28 @@ const Header: React.FC = () => {
     const location = useLocation();
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
+    // Layout Store logic
+    const { isEditMode, toggleEditMode } = useLayoutStore();
+    const isDashboard = location.pathname === '/dashboard';
+
     // Заголовки страниц
     const pageTitles = useMemo(() => ({
         '/dashboard/tts/voices': 'Управление голосами',
         '/dashboard/tts/local': 'Локальный TTS',
-        '/dashboard/tts': 'TTS ИИ озвучка', // Match Sidebar
-        '/dashboard/youtube': 'YouTube заказы', // Match Sidebar case
-        '/dashboard/drops': 'Drops система', // Match Sidebar case
+        '/dashboard/tts': 'TTS ИИ озвучка',
+        '/dashboard/youtube': 'YouTube заказы',
+        '/dashboard/drops': 'Drops система',
         '/dashboard/commands': 'Команды',
         '/dashboard/points': 'Баллы канала',
         '/dashboard/settings': 'Настройки',
-        '/dashboard/chat-analysis': 'Управление чатом', // Match Sidebar
+        '/dashboard/chat-analysis': 'Управление чатом',
         '/dashboard/dolbaebadmintts': 'Админ панель',
-        '/dashboard': '', // Главная страница без заголовка
+        '/dashboard': '',
     }), []);
 
     const pageTitle = useMemo(() => {
         const currentPath = location.pathname.replace(/\/$/, '') || '/';
 
-        // Special handling for Media Requests tabs
         if (currentPath === '/dashboard/media') {
             const params = new URLSearchParams(location.search);
             const tab = params.get('tab');
@@ -54,7 +59,6 @@ const Header: React.FC = () => {
 
         for (const [path, title] of sortedPaths) {
             if (!title) continue;
-
             if (currentPath.startsWith(`${path}/`)) {
                 return title;
             }
@@ -137,6 +141,19 @@ const Header: React.FC = () => {
             )}
 
             <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
+                {/* Layout Config Button (Dashboard only) */}
+                {isAuthenticated && isDashboard && (
+                    <Button
+                        onClick={toggleEditMode}
+                        variant={isEditMode ? "secondary" : "ghost"}
+                        size="sm"
+                        className={cn("hidden sm:flex items-center gap-2 transition-all mr-2", isEditMode && "bg-green-500/20 text-green-400 hover:bg-green-500/30")}
+                    >
+                        {isEditMode ? <Check className="w-4 h-4" /> : <Settings2 className="w-4 h-4" />}
+                        {isEditMode ? "Сохранить макет" : "Настроить макет"}
+                    </Button>
+                )}
+
                 {isAuthenticated && (
                     <div className="relative integrations-menu">
                         <Button

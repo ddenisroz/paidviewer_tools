@@ -49,16 +49,19 @@ class TwitchBadgesService {
     this.loading = true;
     try {
       const response = await fetch('/api/twitch/badges/global');
-      
+
+      // Проверяем, что ответ - это JSON, а не HTML
       // Проверяем, что ответ - это JSON, а не HTML
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        logger.warn('[WARN] [BADGES] Backend not available (got HTML instead of JSON). Using empty badges.');
+        const text = await response.text(); // Read the body to debug
+        logger.warn('[WARN] [BADGES] Backend returned non-JSON response:', contentType);
+        logger.warn('[WARN] [BADGES] Response body preview:', text.substring(0, 200));
         this.globalBadges = {};
         this.loading = false;
         return this.globalBadges;
       }
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
@@ -112,7 +115,7 @@ class TwitchBadgesService {
     }
     try {
       const response = await fetch(`/api/twitch/badges/channel/${broadcasterId}`);
-      
+
       // Проверяем, что ответ - это JSON, а не HTML
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
@@ -120,7 +123,7 @@ class TwitchBadgesService {
         this.channelBadges[broadcasterId] = {};
         return this.channelBadges[broadcasterId];
       }
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {

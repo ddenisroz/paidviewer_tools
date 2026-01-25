@@ -41,6 +41,8 @@ const QuickActionsBar: React.FC = () => {
         }
     };
 
+    console.log('[TTS DEBUG QuickActionsBar] ttsState:', logic.ttsState);
+
     if (!logic.isAuthenticated) return null;
 
     return (

@@ -8,6 +8,7 @@ import { DonationAlertsProvider } from '@/context/DonationAlertsContext';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
 import { TtsProvider, useTts } from '@/context/TtsContext';
 import GlobalTtsPlayer from '@/features/tts/components/GlobalTtsPlayer';
+import { WidgetLayoutProvider } from '@/context/WidgetLayoutContext';
 import CookieConsent from '@/shared/components/CookieConsent';
 import GlobalPlayer from '@/shared/components/GlobalPlayer';
 import Header from '@/shared/components/layout/Header';
@@ -20,7 +21,8 @@ const LayoutProviders = composeProviders(
   TtsProvider,
   DataProvider,
   PlayerProvider,
-  DonationAlertsProvider
+  DonationAlertsProvider,
+  WidgetLayoutProvider
 );
 
 // Внутренний компонент для использования usePlayer

@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 import { useLocation } from 'react-router-dom';
 
+import { keepPreviousData } from '@tanstack/react-query';
+
 import { useGlobalVoices, useToggleTts, useTtsHealth, useTtsStatus } from '@/queries/tts/ttsQueries';
 import { useToast } from '@/shared/components/ui/toast';
 import { useButtonPosition } from '@/shared/hooks/useButtonPosition';
@@ -104,20 +106,28 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         refetchInterval: 30 * 1000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
+        placeholderData: keepPreviousData,
     });
 
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (statusData) {
             const statusResponse = (statusData?.data || statusData) as { enabled?: boolean; is_whitelisted?: boolean; has_local_setup?: boolean };
-            if (statusResponse) {
-                setTtsEnabled(statusResponse.enabled || false);
-                setIsWhitelisted(statusResponse.is_whitelisted || false);
+            // Validate that we actually have the expected fields
+            if (statusResponse && typeof statusResponse.enabled === 'boolean') {
+                setTtsEnabled(statusResponse.enabled);
+
+                if (typeof statusResponse.is_whitelisted === 'boolean') {
+                    setIsWhitelisted(statusResponse.is_whitelisted);
+                }
+
                 if (statusResponse.has_local_setup) {
                     localStorage.setItem('tts_has_local_setup', 'true');
                 } else {
                     localStorage.setItem('tts_has_local_setup', 'false');
                 }
+            } else {
+                logger.warn('[TtsContext] Invalid TTS status data received (ignoring update):', statusResponse);
             }
         }
     }, [statusData]);

@@ -139,7 +139,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
     const twitchChatEnabled = isChatEnabled(integrations, 'twitch', isOnHomePage);
     const vkChatEnabled = isChatEnabled(integrations, 'vk', isOnHomePage);
 
-    // Filter messages
+    // Filter messages - show all messages from enabled platforms (no filtering by TTS toggle)
     const filteredMessages = useMemo(() => {
         if (!isOnHomePage) return [];
 
@@ -147,11 +147,11 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
             chatMessages,
             twitchChatEnabled,
             vkChatEnabled,
-            twitchChatVisible,
-            vkChatVisible,
+            true, // Always show twitch messages if platform is enabled
+            true, // Always show vk messages if platform is enabled
             50
         );
-    }, [chatMessages, twitchChatEnabled, vkChatEnabled, twitchChatVisible, vkChatVisible, isOnHomePage]);
+    }, [chatMessages, twitchChatEnabled, vkChatEnabled, isOnHomePage]);
 
     // Load badges
     useEffect(() => {
@@ -193,22 +193,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         }
     }, [integrations?.twitch?.enabled, user?.twitch_username, badgesLoaded]);
 
-    // Disable TTS on page unload (only on actual page close, not tab switch)
-    useEffect(() => {
-        const handleBeforeUnload = async () => {
-            try {
-                await ttsService.savePlatformSettings({ enabled_platforms: [] });
-            } catch (error) {
-                logger.error('[ERROR] [TTS] Error disabling TTS on unload:', error);
-            }
-        };
 
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-        };
-    }, []);
 
     // Load blocked users
     useEffect(() => {
@@ -250,13 +235,21 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
 
     // Load emotes with delay
     useTimeout(() => {
-        if (user?.twitch_username) loadEmotes();
-    }, user?.twitch_username ? CHAT_CONSTANTS.EMOJI_LOAD_DELAY : null);
+        loadEmotes();
+    }, CHAT_CONSTANTS.EMOJI_LOAD_DELAY);
 
     const loadEmotes = async (): Promise<void> => {
         try {
-            const emotesData = await getAllEmotesForChannel(user?.twitch_username || '');
-            setEmotes(emotesData);
+            const username = user?.twitch_username;
+            if (username) {
+                const emotesData = await getAllEmotesForChannel(username);
+                setEmotes(emotesData);
+            } else {
+                // Load only global emotes if no channel context
+                const { getGlobalEmotes } = require('@/features/chat/utils/emotes');
+                const globalEmotes = await getGlobalEmotes();
+                setEmotes({ channelEmotes: new Map(), globalEmotes });
+            }
         } catch (error) {
             logger.error('Error loading emotes:', error);
         }

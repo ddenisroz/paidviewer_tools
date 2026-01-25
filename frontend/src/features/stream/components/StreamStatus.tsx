@@ -37,16 +37,7 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     const twitchStream = streamData?.twitch;
     const vkStream = streamData?.vk;
 
-    // Helper to render art
-    const renderArt = (url?: string, name?: string) => {
-        if (!url) return null;
-        const processedUrl = url.replace('{width}', '52').replace('{height}', '72');
-        return (
-            <div className="w-8 h-10 rounded bg-muted/30 overflow-hidden flex-shrink-0 border border-white/5">
-                <img src={processedUrl} alt={name || 'Game'} className="w-full h-full object-cover" />
-            </div>
-        );
-    };
+
 
     // Если загружается, показываем пустые карточки с анимацией
     if (isLoading) {
@@ -116,29 +107,23 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                         <div className="flex items-center gap-3 flex-shrink-0">
                             {twitchEnabled ? (
                                 twitchStream?.isLive ? (
-                                    <>
-                                        {renderArt(twitchStream?.boxArtUrl, twitchStream?.gameName)}
-                                        <div className="flex flex-col items-end gap-1">
-                                            <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
-                                                <Wifi className="h-3 w-3" />
-                                                <span>Live</span>
-                                            </Badge>
-                                            <div className="flex items-center text-xs text-muted-foreground">
-                                                <Users className="h-3 w-3 mr-1" />
-                                                {twitchStream?.viewerCount || 0}
-                                            </div>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
+                                            <Wifi className="h-3 w-3" />
+                                            <span>Live</span>
+                                        </Badge>
+                                        <div className="flex items-center text-xs text-muted-foreground">
+                                            <Users className="h-3 w-3 mr-1" />
+                                            {twitchStream?.viewerCount || 0}
                                         </div>
-                                    </>
+                                    </div>
                                 ) : (
-                                    <>
-                                        {renderArt(twitchStream?.boxArtUrl, twitchStream?.gameName)}
-                                        <div className="flex flex-col items-end gap-1">
-                                            <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
-                                                <WifiOff className="h-3 w-3" />
-                                                <span>Offline</span>
-                                            </Badge>
-                                        </div>
-                                    </>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
+                                            <WifiOff className="h-3 w-3" />
+                                            <span>Offline</span>
+                                        </Badge>
+                                    </div>
                                 )
                             ) : (
                                 <Badge variant="outline" className="text-gray-500 border-white/10">
@@ -151,47 +136,41 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
             </Card>
 
             {/* VK Live статус */}
-            <Card className={`card-glass transition-colors duration-300 ${vkEnabled ? 'bg-blue-500/10 border-blue-500/20' : ''}`}>
+            <Card className={`card-glass transition-colors duration-300 ${vkEnabled ? 'bg-rose-500/10 border-rose-500/20' : ''}`}>
                 <CardContent className="p-3">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <VKIcon className="h-8 w-8 text-[#0077FF] flex-shrink-0" />
+                            <VKIcon className="h-8 w-8 text-[#FF0062] flex-shrink-0" />
                             <div className="flex flex-col min-w-0">
                                 <div className="font-medium text-sm text-white">VK Live</div>
-                                {vkStream?.gameName && (
-                                    <div className="text-xs text-muted-foreground truncate" title={vkStream.gameName}>
-                                        {vkStream.gameName}
+                                {vkStream?.gameName || vkEnabled ? (
+                                    <div className="text-xs text-muted-foreground truncate" title={vkStream?.gameName || 'Нет категории'}>
+                                        {vkStream?.gameName || 'Нет категории'}
                                     </div>
-                                )}
+                                ) : null}
                             </div>
                         </div>
 
                         <div className="flex items-center gap-3 flex-shrink-0 min-h-[32px]">
                             {vkEnabled ? (
                                 vkStream?.isLive ? (
-                                    <>
-                                        {renderArt(vkStream?.boxArtUrl, vkStream?.gameName)}
-                                        <div className="flex flex-col items-end gap-1">
-                                            <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
-                                                <Wifi className="h-3 w-3" />
-                                                <span>Live</span>
-                                            </Badge>
-                                            <div className="flex items-center text-xs text-muted-foreground">
-                                                <Users className="h-3 w-3 mr-1" />
-                                                {vkStream?.viewerCount || 0}
-                                            </div>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
+                                            <Wifi className="h-3 w-3" />
+                                            <span>Live</span>
+                                        </Badge>
+                                        <div className="flex items-center text-xs text-muted-foreground">
+                                            <Users className="h-3 w-3 mr-1" />
+                                            {vkStream?.viewerCount || 0}
                                         </div>
-                                    </>
+                                    </div>
                                 ) : (
-                                    <>
-                                        {renderArt(vkStream?.boxArtUrl, vkStream?.gameName)}
-                                        <div className="flex flex-col items-end gap-1">
-                                            <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
-                                                <WifiOff className="h-3 w-3" />
-                                                <span>Offline</span>
-                                            </Badge>
-                                        </div>
-                                    </>
+                                    <div className="flex flex-col items-end gap-1">
+                                        <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
+                                            <WifiOff className="h-3 w-3" />
+                                            <span>Offline</span>
+                                        </Badge>
+                                    </div>
                                 )
                             ) : (
                                 <Badge variant="outline" className="text-gray-500 border-white/10 self-center">

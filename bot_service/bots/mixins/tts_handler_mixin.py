@@ -344,7 +344,7 @@ class TTSHandlerMixin:
 
             # Устанавливаем громкость TTS
             from services.tts.tts_service import TTSService
-            tts_service = TTSService()
+            tts_service = TTSService(db)
 
             success = await tts_service.set_volume(user.id, volume, db)
 

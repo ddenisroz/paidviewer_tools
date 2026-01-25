@@ -1,7 +1,7 @@
 ﻿// src/hooks/useQuickActionsLogic.ts
 import { useEffect, useMemo, useState } from 'react';
 
-import { useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/context/AuthContext';
 import { useDonationAlerts } from '@/context/DonationAlertsContext';
@@ -52,24 +52,45 @@ export const useQuickActionsLogic = () => {
         setOptimisticStreakState(null);
     }, [channelName]);
 
+
     const { data: ttsStatusResponse } = useTtsStatus(null, {
         enabled: !!isAuthenticated,
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
-        initialData: () => getQueryCache(['tts-status']) || undefined,
+        placeholderData: keepPreviousData,
+        initialData: () => {
+            // Validate cache structure before using
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const cached = getQueryCache(queryKeys.tts.status(null) as any) as any;
+            if (cached && typeof cached.enabled === 'boolean') {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return { success: true, data: cached } as any;
+            }
+            // Ignore corrupted cache (e.g. {success: true})
+            return undefined;
+        },
     });
 
     // Optimistic local state for immediate UI feedback
     const [optimisticTtsState, setOptimisticTtsState] = useState<boolean | null>(null);
 
+    // Track last known state to preserve during refetches
+    const [lastKnownTtsState, setLastKnownTtsState] = useState<boolean | null>(null);
+
     useEffect(() => {
         if (ttsStatusResponse?.data) {
-            setQueryCache(['tts-status'], ttsStatusResponse.data);
+            const enabled = (ttsStatusResponse.data as TtsStatusData).enabled;
+            setQueryCache(queryKeys.tts.status(null) as any, ttsStatusResponse.data);
+            // Update last known state
+            if (typeof enabled === 'boolean') {
+                setLastKnownTtsState(enabled);
+            }
             // Reset optimistic state when real data arrives
             setOptimisticTtsState(null);
         }
     }, [ttsStatusResponse]);
+
 
     // Sync TTS state when changed from other components (e.g., Shift+T shortcut)
     useEffect(() => {
@@ -90,10 +111,18 @@ export const useQuickActionsLogic = () => {
             // Optimistic update - show new state immediately
             setOptimisticTtsState(enabled);
         },
-        onSuccess: (response, enabled) => {
-            if (response?.data) {
-                setQueryCache(['tts-status'], response.data);
-            }
+        onSuccess: (_response, enabled) => {
+            // Cache the correct structure with correct key
+            const correctKey = queryKeys.tts.status(null);
+            setQueryCache(correctKey as any, { enabled, listening_mode: 'website' });
+
+            // Also update React Query cache directly to inform other components (like TtsContext)
+            queryClient.setQueryData(correctKey, (old: any) => ({
+                ...old,
+                success: true,
+                data: { ...(old?.data || {}), enabled }
+            }));
+
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
             window.dispatchEvent(new CustomEvent('tts-status-changed', {
                 detail: { enabled }
@@ -105,15 +134,21 @@ export const useQuickActionsLogic = () => {
         },
     });
 
-    // Use optimistic state if set, otherwise use API state
+    // Use optimistic state if set, otherwise use API state, fallback to last known state
     const ttsState = useMemo(() => {
         if (optimisticTtsState !== null) {
             return optimisticTtsState;
         }
         const statusData = ttsStatusData as TtsStatusData | undefined;
-        if (!statusData) return false;
-        return statusData.enabled || false;
-    }, [optimisticTtsState, ttsStatusData]);
+        if (statusData && typeof statusData.enabled === 'boolean') {
+            return statusData.enabled;
+        }
+        // Fallback to last known state during refetches
+        if (lastKnownTtsState !== null) {
+            return lastKnownTtsState;
+        }
+        return false;
+    }, [optimisticTtsState, ttsStatusData, lastKnownTtsState]);
 
     const { data: dropsConfigData } = useDropsConfig(channelName, {
         enabled: !!isAuthenticated && isDropsEnabled && !!channelName,

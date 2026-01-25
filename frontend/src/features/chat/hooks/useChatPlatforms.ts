@@ -1,5 +1,5 @@
 // src/features/chat/hooks/useChatPlatforms.ts
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ttsService } from '@/services/api/services/ttsService';
 import { logger } from '@/shared/utils/prodLogger';
@@ -25,21 +25,35 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
     const [twitchChatVisible, setTwitchChatVisible] = useState<boolean>(false);
     const [vkChatVisible, setVkChatVisible] = useState<boolean>(false);
     const [ttsSettings, setTtsSettings] = useState<TtsSettings>({
-        enabled_platforms: ['twitch', 'vk'],
-        global_enabled: true
+        enabled_platforms: [], // Start empty, load from API
+        global_enabled: false
     });
+
+    // Ref to always have latest settings for toggle handlers
+    const ttsSettingsRef = useRef<TtsSettings>(ttsSettings);
+    useEffect(() => {
+        ttsSettingsRef.current = ttsSettings;
+    }, [ttsSettings]);
 
     useEffect(() => {
         const loadTtsSettings = async (): Promise<void> => {
             try {
+                console.log('[TTS DEBUG] Loading platform settings...');
                 const response = await ttsService.getPlatformSettings();
+                console.log('[TTS DEBUG] Raw API response:', response);
+                console.log('[TTS DEBUG] response.data:', response?.data);
+                console.log('[TTS DEBUG] response.data.data:', response?.data?.data);
 
-                if (!response?.data?.data) {
+                // Handle different response structures: response.data.data or response.data
+                const rawData = response?.data?.data || response?.data;
+                console.log('[TTS DEBUG] rawData extracted:', rawData);
+
+                if (!rawData) {
                     logger.warn('[WARN] [TTS SHORTCUT] No settings data received (backend may be unavailable)');
                     return;
                 }
 
-                const settings = response.data.data as TtsSettings;
+                const settings = rawData as TtsSettings;
                 setTtsSettings(settings);
                 logger.log('[OK] [TTS SHORTCUT] Settings loaded:', settings);
 
@@ -65,39 +79,6 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
         };
 
         loadTtsSettings();
-
-        const handleTtsSettingsChanged = async (event: CustomEvent<{ enabledPlatforms: string[] }>): Promise<void> => {
-            const { enabledPlatforms } = event.detail;
-            logger.log('[REFRESH] [TTS SHORTCUT] Received settings update:', enabledPlatforms);
-
-            setTwitchChatVisible(enabledPlatforms.includes('twitch'));
-            setVkChatVisible(enabledPlatforms.includes('vk'));
-            setTtsSettings(prev => ({
-                ...prev,
-                enabled_platforms: enabledPlatforms
-            }));
-
-            try {
-                const response = await ttsService.getPlatformSettings();
-                const enabledPlatformsFromAPI = (response.data as unknown as TtsSettings).enabled_platforms || [];
-                logger.log('[REFRESH] [TTS SHORTCUT] Reloaded from API:', enabledPlatformsFromAPI);
-
-                setTwitchChatVisible(enabledPlatformsFromAPI.includes('twitch'));
-                setVkChatVisible(enabledPlatformsFromAPI.includes('vk'));
-                setTtsSettings(prev => ({
-                    ...prev,
-                    enabled_platforms: enabledPlatformsFromAPI
-                }));
-            } catch (error) {
-                logger.error('[ERROR] [TTS SHORTCUT] Error reloading settings:', error);
-            }
-        };
-
-        window.addEventListener('tts-settings-changed', handleTtsSettingsChanged as unknown as EventListener);
-
-        return () => {
-            window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged as unknown as EventListener);
-        };
     }, [userId]);
 
     const handleTwitchToggle = async (): Promise<void> => {
@@ -106,8 +87,10 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
         setTwitchChatVisible(newVisible);
 
         try {
-            const enabledPlatforms = Array.isArray(ttsSettings?.enabled_platforms)
-                ? [...ttsSettings.enabled_platforms]
+            // Use ref to get latest settings (avoid stale closure)
+            const currentSettings = ttsSettingsRef.current;
+            const enabledPlatforms = Array.isArray(currentSettings?.enabled_platforms)
+                ? [...currentSettings.enabled_platforms]
                 : [];
 
             const index = enabledPlatforms.indexOf('twitch');
@@ -123,18 +106,16 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
             });
 
             const updatedSettings: TtsSettings = {
-                ...ttsSettings,
+                ...currentSettings,
                 enabled_platforms: enabledPlatforms
             };
             setTtsSettings(updatedSettings);
 
-            window.dispatchEvent(new CustomEvent('tts-settings-changed', {
-                detail: { enabledPlatforms: enabledPlatforms }
-            }));
-
             logger.log(`[GAME] [TTS SHORTCUT] Twitch ${newVisible ? 'включен' : 'выключен'}`);
             toast.success(`Twitch озвучка ${newVisible ? 'включена' : 'выключена'}`);
         } catch (error) {
+            // Revert on error
+            setTwitchChatVisible(!newVisible);
             logger.error('[ERROR] [TTS SHORTCUT] Error saving:', error);
             toast.error('Ошибка сохранения настроек TTS');
         }
@@ -146,8 +127,10 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
         setVkChatVisible(newVisible);
 
         try {
-            const enabledPlatforms = Array.isArray(ttsSettings?.enabled_platforms)
-                ? [...ttsSettings.enabled_platforms]
+            // Use ref to get latest settings (avoid stale closure)
+            const currentSettings = ttsSettingsRef.current;
+            const enabledPlatforms = Array.isArray(currentSettings?.enabled_platforms)
+                ? [...currentSettings.enabled_platforms]
                 : [];
 
             const index = enabledPlatforms.indexOf('vk');
@@ -163,18 +146,16 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
             });
 
             const updatedSettings: TtsSettings = {
-                ...ttsSettings,
+                ...currentSettings,
                 enabled_platforms: enabledPlatforms
             };
             setTtsSettings(updatedSettings);
 
-            window.dispatchEvent(new CustomEvent('tts-settings-changed', {
-                detail: { enabledPlatforms: enabledPlatforms }
-            }));
-
             logger.log(`[TTS SHORTCUT] VK ${newVisible ? 'включен' : 'выключен'}`);
             toast.success(`VK озвучка ${newVisible ? 'включена' : 'выключена'}`);
         } catch (error) {
+            // Revert on error
+            setVkChatVisible(!newVisible);
             logger.error('[ERROR] [TTS SHORTCUT] Error saving:', error);
             toast.error('Ошибка сохранения настроек TTS');
         }

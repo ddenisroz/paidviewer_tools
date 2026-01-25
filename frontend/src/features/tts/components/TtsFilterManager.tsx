@@ -274,7 +274,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                                     {availablePlatforms.map(platform => (
                                         <SelectItem key={platform} value={platform}>
                                             <div className="flex items-center gap-1.5">
-                                                {platform === 'twitch' ? <TwitchIcon className="w-3.5 h-3.5 text-purple-400" /> : <VKIcon className="w-3.5 h-3.5 text-blue-400" />}
+                                                {platform === 'twitch' ? <TwitchIcon className="w-3.5 h-3.5 text-purple-400" /> : <VKIcon className="w-3.5 h-3.5 text-[#FF0062]" />}
                                                 <span className="text-xs">{platform === 'twitch' ? 'Twitch' : 'VK'}</span>
                                             </div>
                                         </SelectItem>
@@ -311,8 +311,8 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                                     className="group flex items-center justify-between py-2 px-3 bg-gray-800/40 hover:bg-red-500/5 rounded-lg border border-transparent hover:border-red-500/10 transition-all duration-200"
                                 >
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${blockedUser.platform === 'twitch' ? 'bg-purple-500/10' : 'bg-blue-500/10'}`}>
-                                            {blockedUser.platform === 'twitch' ? <TwitchIcon className="w-3 h-3 text-purple-400" /> : <VKIcon className="w-3 h-3 text-blue-400" />}
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${blockedUser.platform === 'twitch' ? 'bg-purple-500/10' : 'bg-rose-500/10'}`}>
+                                            {blockedUser.platform === 'twitch' ? <TwitchIcon className="w-3 h-3 text-purple-400" /> : <VKIcon className="w-3 h-3 text-[#FF0062]" />}
                                         </div>
                                         <span className="text-sm text-gray-200 truncate font-medium">{blockedUser.username}</span>
                                     </div>
