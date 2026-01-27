@@ -100,16 +100,21 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             return { ...state, queue: action.payload };
         case 'SET_PLAYER_REF':
             return { ...state, playerRef: action.payload };
-        case 'LOAD_QUEUE':
+        case 'LOAD_QUEUE': {
+            const queue = action.payload.queue || [];
+            const currentVideo = action.payload.current_video || queue[0] || null;
+            const hasQueue = queue.length > 0 || !!currentVideo;
+            const isPlaying = (action.payload as { is_playing?: boolean }).is_playing ?? false;
             return {
                 ...state,
-                queue: action.payload.queue || [],
-                currentVideo: action.payload.current_video || null,
-                isPlaying: false,
-                isVisible: false,
+                queue,
+                currentVideo,
+                isPlaying,
+                isVisible: hasQueue,
                 isLoading: false,
                 error: null
             };
+        }
         case 'NEXT_VIDEO':
             return {
                 ...state,
@@ -163,7 +168,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
     const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: _queueError } = useYoutubeQueue({
         enabled: !!isAuthenticated,
-        refetchInterval: 15000,
+        refetchInterval: 30000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
@@ -178,7 +183,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 type: 'LOAD_QUEUE',
                 payload: {
                     queue: queue.queue || [],
-                    current_video: queue.current_video || null
+                    current_video: queue.current_video || null,
+                    is_playing: queue.is_playing
                 }
             });
             dispatch({ type: 'SET_LOADING', payload: false });

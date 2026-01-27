@@ -1,4 +1,4 @@
-"""
+﻿"""
 VK Live platform implementation
 """
 import logging
@@ -54,7 +54,43 @@ class VKPlatform(StreamingPlatform):
                 refresh_token=token.refresh_token,
                 scopes=token.scopes
             )
-            return token_info, user.vk_channel_name
+
+            channel_name = user.vk_channel_name or user.vk_username
+            invalid_channel_name = bool(channel_name and (' ' in channel_name or channel_name.startswith('http')))
+            if not channel_name or invalid_channel_name:
+                try:
+                    user_info = await self.client.get_current_user(token_info)
+                    if user_info and user_info.get('is_streamer') is False:
+                        logger.warning("VK account is not a streamer; channel URL not available")
+                        if invalid_channel_name and user.vk_channel_name:
+                            try:
+                                from repositories.user_repository import UserRepository
+                                UserRepository(db).update(user, {"vk_channel_name": None})
+                            except Exception as e:
+                                logger.warning(f"Failed to clear invalid VK channel name: {e}")
+                        return None, None
+                    channel_url = None
+                    if user_info:
+                        channel_obj = user_info.get('channel') or {}
+                        channel_url = channel_obj.get('url') if isinstance(channel_obj, dict) else None
+                        channel_url = channel_url or user_info.get('channel_url')
+                    if channel_url:
+                        channel_name = channel_url.rstrip('/').split('/')[-1]
+                except Exception as e:
+                    logger.warning(f"Failed to resolve VK channel URL: {e}")
+
+            if channel_name and channel_name != user.vk_channel_name:
+                try:
+                    from repositories.user_repository import UserRepository
+                    user_repo = UserRepository(db)
+                    updates = {"vk_channel_name": channel_name}
+                    if not user.vk_username:
+                        updates["vk_username"] = channel_name
+                    user_repo.update(user, updates)
+                except Exception as e:
+                    logger.warning(f"Failed to persist VK channel name: {e}")
+
+            return token_info, channel_name
         finally:
             db.close()
 

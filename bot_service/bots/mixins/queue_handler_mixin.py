@@ -12,19 +12,46 @@ class QueueHandlerMixin:
     logger: logging.Logger
     
     async def _handle_sr(self, ctx, bot, args, platform, db):
-        """Handler для !sr (Song Request)"""
+        """Handler for !sr (Song Request)"""
         try:
             if not args:
-                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !sr <YouTube URL или ID>")
+                await ctx.send(f"@{ctx.author.name} [ERROR] Usage: !sr <YouTube URL or ID>")
                 return
 
-            # Вызываем существующий метод из commands_handler
-            if hasattr(bot, 'commands_handler'):
-                await bot.commands_handler.song_request_command(ctx, url=args)
+            video_url = args
+
+            from services.youtube.queue_service import QueueService
+            from repositories.user_repository import UserRepository
+
+            user = UserRepository(db).get_by_twitch_username(ctx.channel.name)
+            if not user:
+                await ctx.send(f"@{ctx.author.name} [ERROR] Channel not found")
+                return
+
+            queue_service = QueueService()
+            result = await queue_service.add_video_to_queue(
+                user_id=user.id,
+                video_url=video_url,
+                channel_name=ctx.channel.name,
+                platform='twitch',
+                requester_name=ctx.author.name,
+                requester_id=str(getattr(ctx.author, "id", ctx.author.name)),
+                is_paid=False,
+                db=db
+            )
+
+            if result.get("success"):
+                queue_item = result.get("queue_item", {})
+                await ctx.send(
+                    f"[OK] @{ctx.author.name} Added to queue: {queue_item.get('title', 'video')} "
+                    f"(pos {queue_item.get('position', '?')}, {queue_item.get('duration', 'Unknown')})"
+                )
+            else:
+                await ctx.send(f"[ERROR] @{ctx.author.name} {result.get('error')}")
 
         except Exception as e:
             self.logger.error(f"Error in !sr handler: {e}")
-            await ctx.send(f"@{ctx.author.name} [ERROR] Ошибка добавления видео")
+            await ctx.send(f"@{ctx.author.name} [ERROR] Failed to add video")
 
     async def _handle_sr_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
         """Handler для !sr в VK"""

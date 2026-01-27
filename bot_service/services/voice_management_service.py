@@ -19,12 +19,13 @@ class VoiceManagementService:
         self.db = db
         self.repository = UserVoiceSettingsRepository(db)
         self.tts_url = settings.tts_service_url
+        self.tts_api_base = f"{self.tts_url.rstrip('/')}/api/tts"
 
     async def get_global_voices(self) -> List[Dict[str, Any]]:
         """Get list of available global voices from external TTS service."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.tts_url}/api/voices/global")
+                response = await client.get(f"{self.tts_api_base}/voices/global")
                 
                 if response.status_code == 200:
                     return response.json()
@@ -39,9 +40,7 @@ class VoiceManagementService:
         """Get list of custom voices for a specific user."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{self.tts_url}/api/user/{user_id}/voices"
-                )
+                response = await client.get(f"{self.tts_api_base}/user/voices/{user_id}")
                 
                 if response.status_code == 200:
                     return response.json()
@@ -59,7 +58,7 @@ class VoiceManagementService:
         """Get information about a specific voice."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.tts_url}/api/voices/{voice_id}")
+                response = await client.get(f"{self.tts_api_base}/voices/{voice_id}")
                 if response.status_code == 200:
                     return response.json()
                 return None
@@ -138,7 +137,7 @@ class VoiceManagementService:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     response = await client.put(
-                        f"{self.tts_url}/api/user/voices/{voice_id}/settings",
+                        f"{self.tts_api_base}/user/voices/{voice_id}/settings",
                         json=settings_data
                     )
                     
@@ -203,11 +202,11 @@ class VoiceManagementService:
 
             # 3. External Service Upload
             files = {'file': (filename, content, content_type)}
-            data = {'name': name, 'user_id': user_id}
+            data = {'voice_name': name, 'user_id': str(user_id)}
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
-                    f"{self.tts_url}/api/user/voices/upload?user_id={user_id}",
+                    f"{self.tts_api_base}/user/voices/upload",
                     files=files,
                     data=data
                 )
@@ -235,21 +234,23 @@ class VoiceManagementService:
                     os.unlink(temp_file_path)
                 except Exception as cleanup_error:
                     logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
+
+    async def delete_custom_voice(self, user_id: int, voice_id: int) -> bool:
         """Delete a custom voice for a user."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.delete(
-                    f"{self.tts_url}/api/user/voices/{voice_id}",
+                    f"{self.tts_api_base}/user/voices/{voice_id}",
                     params={"user_id": user_id}
                 )
-                
-                if response.status_code == 200:
-                    return True
-                elif response.status_code == 404:
-                    raise HTTPException(status_code=404, detail="Voice not found")
-                else:
-                    logger.error(f"Failed to delete custom voice: {response.status_code}")
-                    return False
+
+            if response.status_code == 200:
+                return True
+            if response.status_code == 404:
+                raise HTTPException(status_code=404, detail="Voice not found")
+
+            logger.error(f"Failed to delete custom voice: {response.status_code}")
+            return False
         except HTTPException:
             raise
         except Exception as e:
@@ -261,7 +262,7 @@ class VoiceManagementService:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
-                    f"{self.tts_url}/api/admin/voices",
+                    f"{self.tts_api_base}/admin/voices",
                     params={"voice_type": "global"}
                 )
                 if response.status_code == 200:
@@ -276,7 +277,7 @@ class VoiceManagementService:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.put(
-                    f"{self.tts_url}/api/admin/voices/{voice_id}/settings",
+                    f"{self.tts_api_base}/admin/voices/{voice_id}/settings",
                     json=settings_data
                 )
                 if response.status_code == 200:
@@ -293,7 +294,7 @@ class VoiceManagementService:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.delete(
-                    f"{self.tts_url}/api/admin/voices/{voice_id}"
+                    f"{self.tts_api_base}/admin/voices/{voice_id}"
                 )
                 if response.status_code == 200:
                     return True
@@ -309,7 +310,7 @@ class VoiceManagementService:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.put(
-                    f"{self.tts_url}/api/admin/voices/{voice_id}/rename",
+                    f"{self.tts_api_base}/admin/voices/{voice_id}/rename",
                     json={"new_name": new_name}
                 )
                 if response.status_code == 200:

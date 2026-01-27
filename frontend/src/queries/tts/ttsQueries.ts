@@ -20,7 +20,14 @@ import type { AxiosError } from 'axios';
 export const useTtsStatus = (channelName: string | null = null, options?: Omit<UseQueryOptions<ApiResponse<TtsStatus>, AxiosError>, 'queryKey' | 'queryFn'>) => {
   return useQuery({
     queryKey: queryKeys.tts.status(channelName),
-    queryFn: () => unwrapResponse(ttsService.getStatus(channelName)),
+    queryFn: async () => {
+      const response = await unwrapResponse(ttsService.getStatus(channelName));
+      const data = response as ApiResponse<TtsStatus> | TtsStatus;
+      if (data && typeof (data as TtsStatus).enabled === 'boolean' && !(data as ApiResponse<TtsStatus>).success) {
+        return { success: true, data: data as TtsStatus };
+      }
+      return data as ApiResponse<TtsStatus>;
+    },
     staleTime: 30 * 1000, // 30 секунд
     gcTime: 5 * 60 * 1000, // 5 минут
     ...options,

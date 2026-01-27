@@ -6,9 +6,8 @@ import { useUserSettings } from '@/context/UserSettingsContext';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Label } from '@/shared/components/ui/label';
 import { logger } from '@/shared/utils/prodLogger';
-import { Loader2, PenLine, Save } from 'lucide-react';
+import { CheckCircle, Loader2, PenLine, Save } from 'lucide-react';
 
 import { StreamCardLayout } from './StreamCardLayout';
 
@@ -31,6 +30,9 @@ const StreamTitleCard: React.FC = () => {
     const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
 
     const isLinked = localCombine && bothEnabled;
+    const linkedInputPadding = 'pl-10';
+    const isSaving = status.saveTitle === 'loading';
+    const isSaved = status.saveTitle === 'success';
 
     const handleToggleLink = async (value: boolean) => {
         setLocalCombine(value);
@@ -41,7 +43,7 @@ const StreamTitleCard: React.FC = () => {
             return;
         }
 
-        // If enabling link, sync titles (take Twitch title as master)
+        // If enabling link, sync titles (take Twitch title as master) without auto-saving
         if (value && bothEnabled) {
             const masterTitle = currentData.twitch?.title;
             if (masterTitle) {
@@ -49,11 +51,6 @@ const StreamTitleCard: React.FC = () => {
                     ...prev,
                     vk: { ...prev.vk, title: masterTitle }
                 }));
-                // Save immediately
-                await saveChanges({
-                    twitch: { title: masterTitle },
-                    vk: { title: masterTitle }
-                }, 'saveTitle');
             }
         }
     };
@@ -126,10 +123,16 @@ const StreamTitleCard: React.FC = () => {
         <Button
             className="w-full bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm font-medium shadow-sm transition-all duration-300"
             onClick={handleSaveAll}
-            disabled={(status as any).saving || !isChanged}
+            disabled={isSaving || !isChanged}
         >
-            {(status as any).saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Сохранить
+            {isSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : isSaved ? (
+                <CheckCircle className="w-4 h-4 mr-2" />
+            ) : (
+                <Save className="w-4 h-4 mr-2" />
+            )}
+            {isSaving ? 'Сохранение...' : isSaved ? 'Сохранено' : 'Сохранить'}
         </Button>
     );
 
@@ -146,26 +149,24 @@ const StreamTitleCard: React.FC = () => {
                 {/* Twitch / Main Input */}
                 <div className="space-y-4 relative">
                     <div className="relative">
-                        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center gap-1.5 z-20">
-                            {isLinked && bothEnabled ? (
-                                <>
-                                    <TwitchIcon className="w-5 h-5 text-white/80" />
-                                    <VKIcon className="w-5 h-5 text-white/80" />
-                                </>
-                            ) : (
-                                <TwitchIcon className="w-5 h-5 text-white/80" />
-                            )}
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center gap-1 z-20">
+                            <TwitchIcon className="w-6 h-6 text-white/80" />
+                            <VKIcon
+                                className={`w-6 h-6 text-white/80 transition-opacity duration-200 ${isLinked && bothEnabled ? 'opacity-100' : 'opacity-0'}`}
+                            />
                         </div>
-                        <Input
-                            value={currentData.twitch?.title || ''}
-                            onChange={(e) => handleTitleChange('twitch', e.target.value)}
-                            onKeyPress={(e) => handleKeyPress(e, 'twitch')}
-                            onBlur={() => handleInputBlur('twitch')}
-                            onFocus={handleInputFocus}
-                            placeholder={isLinked ? "Общее название стрима..." : (twitchEnabled ? "Название на Twitch..." : "нет подключения")}
-                            className={`h-10 pl-[4.5rem] ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
-                            disabled={!twitchEnabled && !isLinked}
-                        />
+                            <Input
+                                id="stream-title-twitch"
+                                name="stream-title-twitch"
+                                value={currentData.twitch?.title || ''}
+                                onChange={(e) => handleTitleChange('twitch', e.target.value)}
+                                onKeyDown={(e) => handleKeyPress(e, 'twitch')}
+                                onBlur={() => handleInputBlur('twitch')}
+                                onFocus={handleInputFocus}
+                                placeholder={isLinked ? "Общее название стрима..." : (twitchEnabled ? "Название на Twitch..." : "нет подключения")}
+                                className={`h-10 ${linkedInputPadding} pr-4 transition-[padding] duration-300 ease-in-out ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
+                                disabled={!twitchEnabled && !isLinked}
+                            />
                     </div>
                 </div>
 
@@ -175,16 +176,18 @@ const StreamTitleCard: React.FC = () => {
                         <div className="space-y-4 pt-0 relative mt-4 min-h-0">
                             <div className="relative">
                                 <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center z-20">
-                                    <VKIcon className="w-5 h-5 text-white/80" />
+                                    <VKIcon className="w-6 h-6 text-white/80" />
                                 </div>
                                 <Input
+                                    id="stream-title-vk"
+                                    name="stream-title-vk"
                                     value={currentData.vk?.title || ''}
                                     onChange={(e) => handleTitleChange('vk', e.target.value)}
-                                    onKeyPress={(e) => handleKeyPress(e, 'vk')}
+                                    onKeyDown={(e) => handleKeyPress(e, 'vk')}
                                     onBlur={() => handleInputBlur('vk')}
                                     onFocus={handleInputFocus}
                                     placeholder={vkEnabled ? "Название на VK Live..." : "нет подключения"}
-                                    className={`h-10 pl-12 ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
+                                    className={`h-10 pl-10 pr-4 transition-[padding] duration-300 ease-in-out ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
                                     disabled={!vkEnabled}
                                 />
                             </div>

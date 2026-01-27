@@ -117,6 +117,7 @@ from api.proxy_api import router as proxy_router  # noqa: E402
 from api.auth_api import router as auth_api_router  # noqa: E402
 from api.websocket_endpoints import router as websocket_router  # noqa: E402
 from api.dashboard_api import router as dashboard_router  # noqa: E402
+from api.errors_api import router as errors_router  # noqa: E402
 
 
 # === Backward Compatibility ===
@@ -169,6 +170,7 @@ app.include_router(system_router)
 app.include_router(user_settings_router)
 app.include_router(support_router)
 app.include_router(chatbox_router)
+app.include_router(errors_router)
 
 # Auth
 app.include_router(vk_auth_router)

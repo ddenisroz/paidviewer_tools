@@ -1,4 +1,4 @@
-# bot_service/bots/universal_command_handler.py
+﻿# bot_service/bots/universal_command_handler.py
 """Универсальный обработчик команд для Twitch и VK Live"""
 import logging
 from typing import Optional, Any, Dict
@@ -32,6 +32,14 @@ class UniversalCommandHandler(QueueHandlerMixin, StreamInfoHandlerMixin, TTSHand
         # Ideally mixins should use command_service too.
         # For now, let's proxy calls to command_service.
         self.logger = logging.getLogger('commands')
+
+    def _has_fallback_permission(self, command_name: str, user_roles: list[str]) -> bool:
+        """Lightweight permission checks for core commands when DB is missing."""
+        cmd = command_name.lower()
+        if cmd in {'skip', 'clear'}:
+            return any(role in {'broadcaster', 'owner', 'moderator', 'mod'} for role in user_roles)
+        return True
+
 
     async def handle_twitch_command(self, ctx: Any, bot: Any):
         """
@@ -79,12 +87,21 @@ class UniversalCommandHandler(QueueHandlerMixin, StreamInfoHandlerMixin, TTSHand
 
                 if not command:
                     self.logger.debug(f"Command not found: !{command_name}")
+                    fallback_core_commands = {'sr', 'queue', 'wronglink', 'skip', 'clear'}
+                    if command_name in fallback_core_commands:
+                        if not self._has_fallback_permission(command_name, user_roles):
+                            await ctx.send(f"@{ctx.author.name} [ERROR] You do not have permission to use this command")
+                            return
+                        handler_name = f"_handle_{command_name}"
+                        if hasattr(self, handler_name):
+                            await getattr(self, handler_name)(ctx, bot, command_args, 'twitch', db)
+                        return
                     return
 
                 # Проверяем права
                 # Note: pass user=None as we use user_roles list for compat
                 if not self.command_service.check_permission(command, None, 'twitch', user_roles):
-                    await ctx.send(f"@{ctx.author.name} [ERROR] У вас нет прав на использование этой команды")
+                    await ctx.send(f"@{ctx.author.name} [ERROR] You do not have permission to use this command")
                     return
 
                 # Проверяем кулдаун
@@ -172,6 +189,15 @@ class UniversalCommandHandler(QueueHandlerMixin, StreamInfoHandlerMixin, TTSHand
 
                 if not command:
                     self.logger.debug(f"Command not found: !{command_name}")
+                    fallback_core_commands_vk = {'sr', 'queue', 'wronglink', 'skip', 'clear'}
+                    if command_name in fallback_core_commands_vk:
+                        if not self._has_fallback_permission(command_name, user_roles):
+                            await vk_bot.send_message(channel_name, f"@{author_data['name']} [ERROR] You do not have permission to use this command")
+                            return
+                        handler_name = f"_handle_{command_name}_vk"
+                        if hasattr(self, handler_name):
+                            await getattr(self, handler_name)(channel_name, author_data['name'], author_id, command_args, vk_bot, message_data, db)
+                        return
                     return
 
                 # Проверяем права

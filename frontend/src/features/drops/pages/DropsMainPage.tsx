@@ -166,7 +166,7 @@ const DropsMainPage: React.FC = () => {
           </TabsTrigger>
           <TabsTrigger value="points" className="gap-2">
             <Coins className="w-4 h-4" />
-            Очки
+            Баллы
           </TabsTrigger>
           <TabsTrigger value="rewards" className="gap-2">
             <Package className="w-4 h-4" />

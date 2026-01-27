@@ -85,18 +85,31 @@ async def add_video_to_queue(
     log_request("/youtube/queue/add", "POST", {"video_url": request.video_url}, user_id)
     start_time = time.time()
 
-    # [OK] VALIDATION: Проверяем YouTube URL перед обработкой
+    # [OK] VALIDATION: Проверяем YouTube URL или выполняем поиск по запросу
     from validators.youtube_validators import validate_youtube_url
 
-    is_valid, video_id, error = validate_youtube_url(request.video_url)
-    if not is_valid:
-        logger.warning(
-            f"[ERROR] [YOUTUBE] Invalid URL rejected: {request.video_url}, "
-            f"user: {user_id}, error: {error}"
-        )
-        raise HTTPException(status_code=400, detail=f"Invalid YouTube URL: {error}")
+    video_input = (request.video_url or "").strip()
+    if len(video_input) < 2:
+        raise HTTPException(status_code=400, detail="Search query is too short")
 
-    logger.debug(f"[OK] [YOUTUBE] Valid URL: {request.video_url} → video_id: {video_id}")
+    is_valid, video_id, error = validate_youtube_url(video_input)
+    if not is_valid:
+        search_results = await youtube_service.search_videos(video_input, max_results=1)
+        if not search_results:
+            logger.warning(
+                f"[ERROR] [YOUTUBE] Search returned no results: {video_input}, user: {user_id}"
+            )
+            raise HTTPException(status_code=400, detail="No videos found for this query")
+        video_input = search_results[0].get("url") or video_input
+        is_valid, video_id, error = validate_youtube_url(video_input)
+        if not is_valid:
+            logger.warning(
+                f"[ERROR] [YOUTUBE] Invalid URL after search: {video_input}, "
+                f"user: {user_id}, error: {error}"
+            )
+            raise HTTPException(status_code=400, detail=f"Invalid YouTube URL: {error}")
+
+    logger.debug(f"[OK] [YOUTUBE] Valid URL: {video_input} → video_id: {video_id}")
 
     # [OK] RATE LIMITING: Проверяем количество видео в очереди (макс 10)
     from constants import MAX_YOUTUBE_QUEUE_SIZE
@@ -118,7 +131,7 @@ async def add_video_to_queue(
         result = await queue_service.add_video_to_queue(
             user_id=user_id,
             session_id=None,
-            video_url=request.video_url,
+            video_url=video_input,
             channel_name="web_interface",  # Добавлено через веб-интерфейс
             platform="web",
             requester_name=f"User_{user_id}",

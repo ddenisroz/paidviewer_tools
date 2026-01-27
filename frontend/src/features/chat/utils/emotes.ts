@@ -74,11 +74,15 @@ function proxy7tvUrl(url: string | undefined): string | undefined {
 
 export async function getChannelEmotes(channelName: string): Promise<EmoteMap> {
   try {
-    if (emotesCache.has(channelName)) {
-      return emotesCache.get(channelName)!;
+    const normalizedChannel = (channelName || '').trim().toLowerCase();
+    if (!normalizedChannel || normalizedChannel.includes(' ')) {
+      return new Map();
+    }
+    if (emotesCache.has(normalizedChannel)) {
+      return emotesCache.get(normalizedChannel)!;
     }
 
-    logger.debug(`[DEBUG] [7TV] Searching for Twitch user: ${channelName}`);
+    logger.debug(`[DEBUG] [7TV] Searching for Twitch user: ${normalizedChannel}`);
 
     const searchQuery = `
       query SearchUser($username: String!) {
@@ -99,7 +103,7 @@ export async function getChannelEmotes(channelName: string): Promise<EmoteMap> {
     const response = await fetchWithTimeout(SEVENTV_GQL_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: searchQuery, variables: { username: channelName } }),
+      body: JSON.stringify({ query: searchQuery, variables: { username: normalizedChannel } }),
     });
 
     if (!response.ok) {
@@ -182,7 +186,7 @@ export async function getChannelEmotes(channelName: string): Promise<EmoteMap> {
       }
     });
 
-    emotesCache.set(channelName, emotesMap);
+    emotesCache.set(normalizedChannel, emotesMap);
     return emotesMap;
   } catch (error: unknown) {
     const err = error as Error;

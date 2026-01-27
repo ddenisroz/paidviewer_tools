@@ -8,6 +8,7 @@ import { chatboxService } from '@/services/api/services/chatboxService';
 import { chatService } from '@/services/api/services/chatService';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { VkRoleBadge } from '@/shared/components/RoleBadge';
 import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
 import { logger } from '@/shared/utils/prodLogger';
 
@@ -32,6 +33,7 @@ interface ChatMessageItemProps {
     settings: ChatBoxSettings;
     lastAddedMessageId: string | null;
     emotes: Emotes;
+    channelName: string | null;
     onNicknameClick: (e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube') => void;
     truncateWords: (text: string | undefined, maxWords: number) => string;
 }
@@ -42,6 +44,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
     settings,
     lastAddedMessageId,
     emotes,
+    channelName,
     onNicknameClick,
     truncateWords
 }) => {
@@ -104,8 +107,8 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                     <VKIcon
                         style={{
                             color: '#EF4444',
-                            width: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
-                            height: `${Math.round(Math.max(12, Math.min(24, settings?.font_size || 16)) * 0.85)}px`,
+                            width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
+                            height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                             display: 'inline-block',
                             verticalAlign: 'text-bottom',
                             marginRight: '4px'
@@ -114,11 +117,16 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 )
             )}
 
-            {settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+            {settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && msg.platform === 'twitch' && (
                 <>
                     {msg.badges.map((badge: string, idx: number) => {
                         const [badgeId, version] = badge.split('/');
-                        const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
+                        const badgeUrl = twitchBadgesService.getBadgeUrl(
+                            badgeId,
+                            version,
+                            '1x',
+                            msg.channel_name || msg.channel || channelName
+                        );
 
                         if (!badgeUrl) return null;
 
@@ -143,6 +151,14 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                         );
                     })}
                 </>
+            )}
+
+            {settings?.show_badges && msg.platform === 'vk' && msg.role && (
+                <VkRoleBadge
+                    role={msg.role}
+                    size={Math.max(12, Math.min(18, (settings?.font_size || 16) * 0.9))}
+                    style={{ marginRight: '4px' }}
+                />
             )}
 
             {settings?.show_avatars && msg.avatar_url && (
@@ -187,6 +203,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                             message={msg.message || msg.content || ''}
                             channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
                             globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
+                            twitchEmotes={msg.emotes}
                             showLinks={settings?.show_links !== false}
                         />
                     )}
@@ -357,27 +374,9 @@ const ChatOverlay: React.FC = () => {
 
             setSettings(normalizedSettings);
 
-            if (!isPolling) {
-                await twitchBadgesService.loadGlobalBadges();
-
-                if (data.channel_name) {
-                    setChannelName(data.channel_name);
-                    await twitchBadgesService.loadChannelBadges(data.channel_name);
-                    logger.log(`[OK] [BADGES] Loaded badges for channel: ${data.channel_name}`);
-
-                    if (normalizedSettings.show_7tv_emotes !== false) {
-                        try {
-                            const emotesData = await getAllEmotesForChannel(data.channel_name);
-                            setEmotes(emotesData);
-                            logger.log(`[OK] [7TV] Loaded emotes for channel: ${data.channel_name}`);
-                        } catch (error: unknown) {
-                            logger.error('Error loading 7TV emotes:', error);
-                        }
-                    }
-                }
-
-                setUserId(normalizedSettings.user_id || null);
-            }
+            const resolvedChannelName = data.channel_name || normalizedSettings.channel_name || null;
+            setChannelName(resolvedChannelName);
+            setUserId(normalizedSettings.user_id || null);
         } catch (error: unknown) {
             const axiosError = error as AxiosError<{ detail?: string }>;
             logger.error('[ERROR] Error loading ChatBox settings:', error);
@@ -391,6 +390,49 @@ const ChatOverlay: React.FC = () => {
             }
         }
     }, [token]);
+
+    useEffect(() => {
+        if (!settings?.show_badges) return;
+
+        twitchBadgesService.loadGlobalBadges().catch((err: unknown) => {
+            logger.warn('[WARN] [BADGES] Failed to load global badges:', err);
+        });
+    }, [settings?.show_badges]);
+
+    useEffect(() => {
+        if (!settings?.show_badges || !channelName) return;
+
+        twitchBadgesService.loadChannelBadges(channelName).then(() => {
+            logger.log(`[OK] [BADGES] Loaded badges for channel: ${channelName}`);
+        }).catch((err: unknown) => {
+            logger.warn(`[WARN] [BADGES] Failed to load channel badges for ${channelName}:`, err);
+        });
+    }, [settings?.show_badges, channelName]);
+
+    useEffect(() => {
+        const loadEmotes = async (): Promise<void> => {
+            if (settings?.show_7tv_emotes === false) {
+                setEmotes({ channelEmotes: new Map(), globalEmotes: new Map() });
+                return;
+            }
+
+            try {
+                if (channelName) {
+                    const emotesData = await getAllEmotesForChannel(channelName);
+                    setEmotes(emotesData);
+                    logger.log(`[OK] [7TV] Loaded emotes for channel: ${channelName}`);
+                } else {
+                    const { getGlobalEmotes } = await import('@/features/chat/utils/emotes');
+                    const globalEmotes = await getGlobalEmotes();
+                    setEmotes({ channelEmotes: new Map(), globalEmotes });
+                }
+            } catch (error: unknown) {
+                logger.error('Error loading 7TV emotes:', error);
+            }
+        };
+
+        loadEmotes();
+    }, [settings?.show_7tv_emotes, channelName]);
 
     useEffect(() => {
         if (!token) {
@@ -488,6 +530,13 @@ const ChatOverlay: React.FC = () => {
                 logger.log('[REFRESH] [CHATBOX] Settings updated:', updatedSettings);
                 return updatedSettings;
             });
+
+            if (updateData?.channel_name) {
+                setChannelName(updateData.channel_name);
+            }
+            if (updateData?.user_id !== undefined) {
+                setUserId(updateData.user_id || null);
+            }
             return;
         }
 
@@ -520,7 +569,11 @@ const ChatOverlay: React.FC = () => {
                     message: data.message || '',
                     timestamp: String(data.timestamp || Date.now()),
                     platform: data.platform || 'twitch',
-                    badges: (data as WebSocketMessage & { badges?: string[] }).badges
+                    badges: (data as WebSocketMessage & { badges?: string[] }).badges,
+                    emotes: (data as WebSocketMessage & { emotes?: ChatMessage['emotes'] }).emotes,
+                    role: (data as WebSocketMessage & { role?: string }).role,
+                    channel: (data as WebSocketMessage & { channel?: string }).channel,
+                    channel_name: (data as WebSocketMessage & { channel_name?: string }).channel_name
                 };
 
                 const newMessages = [...prev, newMessage];
@@ -834,6 +887,7 @@ const ChatOverlay: React.FC = () => {
                                 settings={settings}
                                 lastAddedMessageId={lastAddedMessageId}
                                 emotes={emotes}
+                                channelName={channelName}
                                 onNicknameClick={handleNicknameClick}
                                 truncateWords={truncateWords}
                             />

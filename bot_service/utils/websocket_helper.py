@@ -18,14 +18,15 @@ async def broadcast_chat_message(
     channel: str,
     message_id: Optional[str] = None,
     role: Optional[str] = None,
-    badges: Optional[list] = None
+    badges: Optional[list] = None,
+    emotes: Optional[list] = None
 ) -> bool:
     """
     Отправить сообщение чата во все WebSocket соединения.
     Delegates to NotificationService.
     """
     return await notification_service.broadcast_chat_message(
-        username, content, platform, channel, message_id, role, badges
+        username, content, platform, channel, message_id, role, badges, emotes
     )
 
 async def handle_tts_for_message(

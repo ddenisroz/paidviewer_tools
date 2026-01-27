@@ -1,4 +1,4 @@
-"""
+﻿"""
 VK Live HTTP Polling клиент для получения сообщений из чата
 Использует GET /v1/chat/messages вместо WebSocket
 """
@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 
 class VKLiveHTTPPolling:
     """HTTP polling клиент для VK Live чата (альтернатива WebSocket)"""
+    PROD_API_BASE_URL = "https://api.live.vkvideo.ru"
+    DEV_API_BASE_URL = "https://apidev.live.vkvideo.ru"
+    # Default to dev API per VK docs.
+    API_BASE_URL = DEV_API_BASE_URL
 
     def __init__(self, access_token: str, channel_url: str):
         """
@@ -28,6 +32,24 @@ class VKLiveHTTPPolling:
         self.last_message_time: int = 0  # Timestamp последнего сообщения
         self.error_count: int = 0  # Счетчик последовательных ошибок
         self.max_errors: int = 10  # Максимум ошибок перед увеличением интервала
+        # Use instance-level API base to allow safe fallback.
+        self.api_base_url = self.API_BASE_URL
+
+    def _format_channel_url(self, channel_url: str) -> str:
+        if not channel_url:
+            return channel_url
+        if channel_url.startswith('http://') or channel_url.startswith('https://'):
+            return channel_url
+        return f"https://live.vkvideo.ru/{channel_url}"
+
+    def _get_connector(self) -> aiohttp.TCPConnector:
+        if 'apidev.' in self.api_base_url:
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            return aiohttp.TCPConnector(ssl=ssl_context)
+        return aiohttp.TCPConnector()
 
     async def start(self, message_handler: Callable):
         """Запустить polling сообщений"""
@@ -92,30 +114,24 @@ class VKLiveHTTPPolling:
         except asyncio.CancelledError:
             logger.info(f"Polling loop cancelled for {self.channel_url}")
 
-    async def _fetch_and_process_messages(self):
+    async def _fetch_and_process_messages(self, retry: bool = False):
         """Получить и обработать новые сообщения"""
         try:
-            url = "https://apidev.live.vkvideo.ru/v1/chat/messages"
+            url = f"{self.api_base_url}/v1/chat/messages"
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
                 "Content-Type": "application/json"
             }
             params = {
-                "channel_url": self.channel_url,
+                "channel_url": self._format_channel_url(self.channel_url),
                 "limit": 20  # Получаем последние 20 сообщений
             }
-
-            # Создаем SSL context с отключенной верификацией для dev API
-            import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
 
             # Timeout: 10 секунд на соединение, 30 секунд на чтение
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
 
             async with aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(ssl=ssl_context),
+                connector=self._get_connector(),
                 timeout=timeout
             ) as session:
                 async with session.get(url, headers=headers, params=params) as response:
@@ -133,6 +149,17 @@ class VKLiveHTTPPolling:
                         logger.error(f"[ERROR] Forbidden: No access to channel {self.channel_url}")
                     else:
                         error_text = await response.text()
+                        # VK dev API may not support chat messages; fallback to prod once.
+                        if (
+                            response.status == 404
+                            and "unknown_api_method" in error_text
+                            and not retry
+                            and self.api_base_url != self.PROD_API_BASE_URL
+                        ):
+                            logger.warning("[VK HTTP] Chat messages not available on dev API, switching to prod.")
+                            self.api_base_url = self.PROD_API_BASE_URL
+                            await self._fetch_and_process_messages(retry=True)
+                            return
                         logger.error(f"[ERROR] Error fetching messages: {response.status} - {error_text}")
 
         except Exception as e:
@@ -224,13 +251,13 @@ class VKLiveHTTPPolling:
     async def send_message(self, text: str) -> bool:
         """Отправить сообщение в чат"""
         try:
-            url = "https://apidev.live.vkvideo.ru/v1/chat/message/send"
+            url = f"{self.api_base_url}/v1/chat/message/send"
             headers = {
                 "Authorization": f"Bearer {self.access_token}",
                 "Content-Type": "application/json"
             }
             params = {
-                "channel_url": self.channel_url
+                "channel_url": self._format_channel_url(self.channel_url)
             }
             body = {
                 "parts": [
@@ -242,13 +269,7 @@ class VKLiveHTTPPolling:
                 ]
             }
 
-            # Создаем SSL context с отключенной верификацией для dev API
-            import ssl
-            ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
-
-            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
+            async with aiohttp.ClientSession(connector=self._get_connector()) as session:
                 async with session.post(url, headers=headers, params=params, json=body) as response:
                     if response.status == 200:
                         logger.info(f"[OK] VK message sent: {text}")

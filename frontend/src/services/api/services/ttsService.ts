@@ -182,7 +182,7 @@ export const ttsService = {
    * @returns Promise с ответом API
    */
   async getUserVoices(userId: number): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
-    return ttsApiClient.get(`/api/tts/user/voices/${userId}`);
+    return apiClient.get(`/api/user/voices/${userId}`);
   },
 
   /**
@@ -192,7 +192,20 @@ export const ttsService = {
    * @returns Promise с ответом API
    */
   async uploadUserVoice(userId: number, formData: FormData): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
-    return ttsApiClient.post(`/api/tts/user/voices/upload?user_id=${userId}`, formData, {
+    const payload = new FormData();
+    formData.forEach((value, key) => {
+      payload.append(key, value);
+    });
+
+    if (!payload.get('name')) {
+      const fallbackName = payload.get('voice_name');
+      if (fallbackName) {
+        payload.append('name', fallbackName);
+      }
+    }
+
+    return apiClient.post('/api/user/voices/upload', payload, {
+      params: { user_id: userId },
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -205,7 +218,7 @@ export const ttsService = {
    * @returns Promise с ответом API
    */
   async uploadVoice(formData: FormData): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
-    return apiClient.post('/api/voices/upload', formData, {
+    return apiClient.post('/api/admin/voices/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -219,7 +232,9 @@ export const ttsService = {
    * @returns Promise с ответом API
    */
   async deleteUserVoice(voiceId: string, userId: number): Promise<AxiosResponse<ApiResponse>> {
-    return ttsApiClient.delete(`/api/tts/user/voices/${voiceId}?user_id=${userId}`);
+    return apiClient.delete(`/api/voices/user/custom/${voiceId}`, {
+      params: { user_id: userId },
+    });
   },
 
   /**
@@ -228,7 +243,7 @@ export const ttsService = {
    * @returns Promise с ответом API
    */
   async deleteVoice(voiceId: number): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.delete(`/api/voices/${voiceId}`);
+    return apiClient.delete(`/api/admin/voices/${voiceId}`);
   },
 
   /**

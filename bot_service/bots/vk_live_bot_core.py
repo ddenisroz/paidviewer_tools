@@ -1,4 +1,4 @@
-# bot_service/bots/vk_live_bot_core.py
+﻿# bot_service/bots/vk_live_bot_core.py
 """Основной класс VK Live бота"""
 import asyncio
 import logging
@@ -100,15 +100,44 @@ class VKLiveBotCore:
                 if is_token_encrypted(oauth_token):
                     oauth_token = decrypt_token(oauth_token)
 
+                # Resolve actual channel slug if stored name is invalid
+                resolved_channel = channel_id
+                vk_client = None
+                try:
+                    from integrations.vk.client import VKClient
+                    from integrations.vk.oauth import VKOAuth
+                    from integrations.base import TokenInfo
+                    vk_client = VKClient(VKOAuth())
+                    info = await vk_client.get_current_user(TokenInfo(access_token=oauth_token))
+                    if info:
+                        channel_obj = info.get("channel") or {}
+                        channel_url = channel_obj.get("url") if isinstance(channel_obj, dict) else None
+                        channel_url = channel_url or info.get("channel_url")
+                        if channel_url:
+                            resolved_channel = channel_url.rstrip('/').split('/')[-1]
+                except Exception as e:
+                    logger.warning(f"[WARN] Could not resolve VK channel URL: {e}")
+                finally:
+                    try:
+                        if vk_client:
+                            await vk_client.close()
+                    except Exception:
+                        pass
+
                 logger.info(f"[OK] Found VK OAuth token for channel: {channel_id}")
 
             finally:
                 db.close()
 
+            # Validate resolved channel slug (must be a URL slug, not display name)
+            if not resolved_channel or ' ' in resolved_channel:
+                logger.warning(f"[WARN] VK channel slug invalid for polling: '{resolved_channel}'. Skipping polling.")
+                return False
+
             # Создаем HTTP polling клиент с OAuth токеном пользователя
             self.http_polling = VKLiveHTTPPolling(
                 access_token=oauth_token,  # Используем OAuth токен пользователя!
-                channel_url=channel_id
+                channel_url=resolved_channel
             )
 
             # Запускаем polling с обработчиком сообщений

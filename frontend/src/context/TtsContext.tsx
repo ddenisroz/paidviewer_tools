@@ -59,7 +59,10 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const { addToast: _addToast } = useToast();
     const { getButtonPosition: _getButtonPosition } = useButtonPosition();
     const location = useLocation();
-    const [ttsEnabled, setTtsEnabled] = useState<boolean>(false);
+    const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        return window.localStorage.getItem('tts_enabled') === 'true';
+    });
     const [isWhitelisted, setIsWhitelisted] = useState<boolean | null>(null);
     const [voices, setVoices] = useState<TtsVoice[]>([]);
     const [engineStatus, setEngineStatus] = useState<EngineStatus>({ loaded: false, error: null });
@@ -116,6 +119,9 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             // Validate that we actually have the expected fields
             if (statusResponse && typeof statusResponse.enabled === 'boolean') {
                 setTtsEnabled(statusResponse.enabled);
+                if (typeof window !== 'undefined') {
+                    window.localStorage.setItem('tts_enabled', String(statusResponse.enabled));
+                }
 
                 if (typeof statusResponse.is_whitelisted === 'boolean') {
                     setIsWhitelisted(statusResponse.is_whitelisted);
@@ -151,6 +157,9 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const toggleTtsMutation = useToggleTts({
         onSuccess: (data: unknown, enabled: boolean) => {
             setTtsEnabled(enabled);
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem('tts_enabled', String(enabled));
+            }
             window.dispatchEvent(new CustomEvent('tts-status-changed', {
                 detail: { enabled }
             }));

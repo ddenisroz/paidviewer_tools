@@ -8,6 +8,7 @@ import { useDropsConfig } from '@/features/drops/hooks/useDropsConfig';
 import { dropsService } from '@/services/api/services/dropsService';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
@@ -223,6 +224,12 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   };
 
   const _isStreakEnabledAnywhere = formData.streak_enabled_twitch || formData.streak_enabled_vk;
+  const messagesRequired = formData.streak_messages_required[0];
+
+  const handleMessagesRequiredChange = (value: number) => {
+    const clamped = Math.max(1, Math.min(100, value));
+    setFormData({ ...formData, streak_messages_required: [clamped] });
+  };
 
   if (isLoading && isInitialLoad) {
     return (
@@ -339,17 +346,21 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-sm">Сообщений для засчета стрима</Label>
-              <span className="text-lg font-semibold">{formData.streak_messages_required[0]}</span>
+              <Input
+                type="number"
+                value={messagesRequired}
+                onChange={(e) => handleMessagesRequiredChange(parseInt(e.target.value, 10) || 1)}
+                className="w-20 h-8 text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                min={1}
+                max={100}
+              />
             </div>
             <Slider
               value={formData.streak_messages_required}
-              onValueChange={(value) => {
-                setFormData({ ...formData, streak_messages_required: value });
-                // Автосохранение уже в useEffect
-              }}
+              onValueChange={(value) => handleMessagesRequiredChange(value[0])}
               min={1}
               max={100}
-              step={1}
+              step={5}
             />
           </div>
 

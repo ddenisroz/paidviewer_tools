@@ -1,4 +1,4 @@
-:root {
+﻿:root {
     /* Настраиваемые переменные */
     --widget-width: 400px;
     --widget-height: 300px;
@@ -118,16 +118,62 @@ body {
 }
 
 .role-badge {
-    background: rgba(255, 255, 255, 0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.15);
     padding: 2px 6px;
-    border-radius: 3px;
+    border-radius: 4px;
     font-size: 10px;
     margin-right: 6px;
+    line-height: 1;
+    text-transform: uppercase;
 }
 
-.platform-indicator {
-    font-size: 12px;
-    margin-right: 4px;
+.role-badge svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+}
+
+.role-badge.role-moderator {
+    color: var(--moderator-color);
+}
+
+.role-badge.role-vip {
+    color: var(--vip-color);
+}
+
+.role-badge.role-subscriber {
+    color: var(--subscriber-color);
+}
+
+.role-badge.role-broadcaster {
+    color: #fbbf24;
+}
+
+.platform-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    vertical-align: text-bottom;
+}
+
+.platform-icon svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}
+
+.platform-icon.twitch {
+    color: #9146ff;
+}
+
+.platform-icon.vk {
+    color: #ef4444;
 }
 
 .timestamp {

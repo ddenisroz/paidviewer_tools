@@ -284,7 +284,11 @@ class ConnectionManager(ConnectionManagerCore):
                 # Используем vk_channel_name как основной идентификатор канала
                 channel_name = user.vk_channel_name or user.vk_username
                 if channel_name:
-                    vk_channels.append(channel_name)
+                    candidate = channel_name.strip().lower()
+                    if ' ' in candidate:
+                        logger.warning(f"[VK] Skipping invalid channel name with spaces: {candidate}")
+                        continue
+                    vk_channels.append(candidate)
 
             logger.info(f"Found {len(vk_channels)} VK Live channels to listen: {vk_channels}")
             return vk_channels

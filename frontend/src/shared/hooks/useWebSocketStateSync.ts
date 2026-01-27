@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/context/AuthContext';
+import { queryKeys } from '@/queries';
 import Logger from '@/shared/utils/prodLogger';
 import getSharedWebSocket from '@/shared/utils/sharedWebSocket';
 
@@ -24,6 +25,8 @@ export const useWebSocketStateSync = () => {
   // Dedupe mechanism to prevent multiple reconciliation triggers
   const isReconcilingRef = useRef(false);
   const reconcileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastReconcileAtRef = useRef<number>(0);
+  const reconcileMinIntervalMs = 10_000;
 
   // ANTI-DOUBLE-FETCH: Запоминаем время монтирования компонента
   // Если WebSocket подключается сразу после загрузки страницы, 
@@ -58,13 +61,35 @@ export const useWebSocketStateSync = () => {
           return;
         }
 
+        const now = Date.now();
+        const sinceLastReconcile = now - lastReconcileAtRef.current;
+        if (sinceLastReconcile < reconcileMinIntervalMs) {
+          logger.debug(`[SKIP] State reconciliation throttled (${sinceLastReconcile}ms since last)`);
+          return;
+        }
+
         isReconcilingRef.current = true;
-        logger.info('State reconciliation triggered - invalidating all queries');
+        lastReconcileAtRef.current = now;
+        logger.info('State reconciliation triggered - invalidating critical queries');
         setSyncStatus('syncing');
 
         try {
-          // Invalidate all queries to fetch fresh data
-          await queryClient.invalidateQueries();
+          // Invalidate only critical query groups (avoid global refetch storms)
+          const criticalKeys = [
+            queryKeys.userSettings.all,
+            queryKeys.stream.all,
+            queryKeys.youtube.all,
+            queryKeys.tts.all,
+            queryKeys.chat.status(),
+            queryKeys.drops.all,
+            queryKeys.integrations.all
+          ];
+
+          await Promise.all(
+            criticalKeys.map((queryKey) =>
+              queryClient.invalidateQueries({ queryKey })
+            )
+          );
 
           // Wait a bit for queries to refetch
           await new Promise(resolve => setTimeout(resolve, 500));

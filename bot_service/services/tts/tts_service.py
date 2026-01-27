@@ -229,9 +229,24 @@ class TTSService:
         user = self.user_repo.get_by_id(user_id)
         if not user:
             return {"enabled": False, "listening_mode": "website", "error": "User not found"}
-        
+        enabled = getattr(user, 'tts_enabled', False)
+
+        if enabled:
+            connection_manager = get_connection_manager()
+            if user.twitch_username:
+                channel_name = user.twitch_username.lower()
+                if channel_name not in connection_manager.tts_enabled_channels:
+                    connection_manager.enable_tts_for_channel(channel_name)
+
+            tokens = self.token_repo.get_all_by_user(user_id)
+            for token in tokens:
+                if token.platform == 'vk' and token.platform_user_id:
+                    vk_channel = str(token.platform_user_id)
+                    if vk_channel not in connection_manager.tts_enabled_channels:
+                        connection_manager.enable_tts_for_channel(vk_channel)
+
         return {
-            "enabled": getattr(user, 'tts_enabled', False),
+            "enabled": enabled,
             "listening_mode": getattr(user, 'tts_listening_mode', 'website')
         }
 

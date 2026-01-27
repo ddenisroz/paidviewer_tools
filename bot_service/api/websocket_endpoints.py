@@ -81,6 +81,7 @@ def _format_message(msg: ChatMessage) -> Dict[str, Any]:
         "author_name": msg.author_username,
         "message": msg.message,
         "timestamp": timestamp_ms,
+        "channel": msg.channel_name,
         "role": msg.role,
         "badges": badges_list
     }

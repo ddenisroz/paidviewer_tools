@@ -10,11 +10,16 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-    ({ className = '', error, ...props }, ref) => {
+    ({ className = '', error, id, name, ...props }, ref) => {
+        const fallbackId = React.useId();
+        const inputId = id ?? fallbackId;
+        const inputName = name ?? inputId;
         return (
             <div className="w-full">
                 <input
                     ref={ref}
+                    id={inputId}
+                    name={inputName}
                     className={`w-full px-3 py-2 bg-gray-700 border rounded-md text-white placeholder-gray-400 
             focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent
             ${error ? 'border-red-500' : 'border-gray-600'}

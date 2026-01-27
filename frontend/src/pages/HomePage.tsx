@@ -22,12 +22,15 @@ import { useLayoutStore } from '@/store/useLayoutStore';
 import WidgetWrapper from '@/features/home/components/WidgetWrapper';
 import { cn } from '@/lib/utils';
 import { useData } from '@/context/DataContext';
+import { useUserSettings } from '@/context/UserSettingsContext';
 
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated, logout } = useAuth();
     const { integrations } = useIntegrations();
-    const { currentData } = useData();
+    const { initialData } = useData();
+    const { getCombineSettings } = useUserSettings();
+    const { combine_categories: combineCategories } = getCombineSettings();
 
     useEffect(() => {
         if (!isAuthenticated) return;
@@ -67,18 +70,49 @@ const HomePage: React.FC = () => {
     }, [integrations]);
 
     const streamData = useMemo(() => {
+        const combineCategoriesEnabled = !!combineCategories && !!integrations?.twitch?.enabled && !!integrations?.vk?.enabled;
+        const fallbackTwitchCategory = twitchStreamInfo?.data?.game_name ? {
+            name: twitchStreamInfo?.data?.game_name as string,
+            box_art_url: (twitchStreamInfo?.data?.thumbnail_url ?? twitchStreamInfo?.data?.box_art_url ?? '') as string
+        } : null;
+        const fallbackVkCategory = vkStreamInfo?.data?.category_name ? {
+            name: vkStreamInfo?.data?.category_name as string,
+            cover_url: (vkStreamInfo?.data?.category_img_url ?? '') as string
+        } : null;
+        const combinedCategory = combineCategoriesEnabled
+            ? (initialData.twitch?.category || initialData.vk?.category || fallbackTwitchCategory || fallbackVkCategory)
+            : null;
+        const combinedGameName = combinedCategory?.name || combinedCategory?.title || '';
+        const combinedBoxArtUrl = combinedCategory?.box_art_url || combinedCategory?.cover_url || '';
+
+        const twitchCategoryName = initialData.twitch?.category?.name || initialData.twitch?.category?.title || (twitchStreamInfo?.data?.game_name ?? '');
+        const twitchCategoryBoxArt = initialData.twitch?.category?.box_art_url || initialData.twitch?.category?.cover_url ||
+            ((twitchStreamInfo?.data?.thumbnail_url ?? twitchStreamInfo?.data?.box_art_url ?? '') as string);
+
+        const vkCategoryName = initialData.vk?.category?.name || initialData.vk?.category?.title || (vkStreamInfo?.data?.category_name ?? '');
+        const vkCategoryBoxArt = initialData.vk?.category?.cover_url || initialData.vk?.category?.box_art_url ||
+            ((vkStreamInfo?.data?.category_img_url ?? '') as string);
+
         const twitchData = integrations?.twitch?.enabled ? {
             isLive: (twitchStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (twitchStreamInfo?.data?.viewers ?? 0) as number,
-            gameName: (twitchStreamInfo?.data?.game_name ?? '') as string || (integrations.twitch?.enabled && currentData.twitch?.category?.name ? currentData.twitch.category.name : ''),
-            boxArtUrl: (twitchStreamInfo?.data?.thumbnail_url ?? twitchStreamInfo?.data?.box_art_url ?? '') as string || (integrations.twitch?.enabled && currentData.twitch?.category?.box_art_url ? currentData.twitch.category.box_art_url : '')
+            gameName: combineCategoriesEnabled && combinedGameName
+                ? combinedGameName
+                : (twitchCategoryName || ''),
+            boxArtUrl: combineCategoriesEnabled && combinedBoxArtUrl
+                ? combinedBoxArtUrl
+                : (twitchCategoryBoxArt || '')
         } : undefined;
 
         const vkData = integrations?.vk?.enabled ? {
             isLive: (vkStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (vkStreamInfo?.data?.viewers ?? 0) as number,
-            gameName: (vkStreamInfo?.data?.category_name ?? '') as string || (integrations.vk?.enabled && currentData.vk?.category?.name ? currentData.vk.category.name : ''),
-            boxArtUrl: (vkStreamInfo?.data?.category_img_url ?? '') as string || (integrations.vk?.enabled && currentData.vk?.category?.cover_url ? currentData.vk.category.cover_url : '')
+            gameName: combineCategoriesEnabled && combinedGameName
+                ? combinedGameName
+                : (vkCategoryName || ''),
+            boxArtUrl: combineCategoriesEnabled && combinedBoxArtUrl
+                ? combinedBoxArtUrl
+                : (vkCategoryBoxArt || '')
         } : undefined;
 
         // Ensure box art URLs are valid for display (Twitch needs replacement)
@@ -90,7 +124,7 @@ const HomePage: React.FC = () => {
             twitch: twitchData,
             vk: vkData
         };
-    }, [integrations, twitchStreamInfo, vkStreamInfo, currentData]);
+    }, [integrations, twitchStreamInfo, vkStreamInfo, initialData, combineCategories]);
 
 
     // Auto-logout if no integrations are connected (requested behavior)

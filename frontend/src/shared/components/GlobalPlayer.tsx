@@ -107,8 +107,10 @@ const GlobalPlayer: React.FC = () => {
     // На YouTube странице - ничего не показываем (там свой встроенный плеер)
     const showUI = isVisible && !isTheaterMode && !isOnYoutubePage;
 
+    const displayVideo = currentVideo || queue[0] || null;
+
     // [OK] ТЕПЕРЬ проверяем если нет видео, не показываем плеер
-    if (!currentVideo) {
+    if (!displayVideo) {
         return null;
     }
 
@@ -116,10 +118,10 @@ const GlobalPlayer: React.FC = () => {
         <>
             {/* Скрытый плеер - воспроизводит только звук */}
             {/* НА СТРАНИЦЕ /dashboard/youtube используется встроенный плеер из YoutubeIntegrationPage */}
-            {currentVideo && !isOnYoutubePage && (
+            {displayVideo && !isOnYoutubePage && (
                 <div className="hidden">
                     <YouTube
-                        videoId={currentVideo.video_id}
+                        videoId={displayVideo.video_id}
                         onReady={handlePlayerReadyWithRef as (event: { target: unknown; data?: number }) => void}
                         onStateChange={handlePlayerStateChange as (event: { target: unknown; data?: number }) => void}
                         onError={handlePlayerError as (event: { target: unknown; data?: number }) => void}
@@ -127,7 +129,7 @@ const GlobalPlayer: React.FC = () => {
                             width: '1px',
                             height: '1px',
                             playerVars: {
-                                autoplay: 1,  // [OK] Включаем автоплей
+                                autoplay: isPlaying ? 1 : 0,
                                 controls: 0,
                                 disablekb: 1,
                                 enablejsapi: 1,
@@ -143,7 +145,7 @@ const GlobalPlayer: React.FC = () => {
                                 widget_referrer: window.location.origin
                             }
                         }}
-                        key={`hidden-player-${currentVideo.video_id}-${Date.now()}`}
+                        key={`hidden-player-${displayVideo.video_id}-${Date.now()}`}
                         className="hidden"
                     />
                 </div>
@@ -213,24 +215,24 @@ const GlobalPlayer: React.FC = () => {
                                 {/* Информация о треке слева */}
                                 <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className="w-10 h-10 bg-gray-800 rounded-md overflow-hidden flex-shrink-0">
-                                        {currentVideo.thumbnail && (
-                                            <img 
-                                                src={currentVideo.thumbnail} 
-                                                alt={currentVideo.title}
-                                                className="w-full h-full object-cover"
-                                                loading="eager"
-                                                decoding="async"
-                                            />
-                                        )}
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <h3 className="text-white font-medium text-sm truncate">
-                                            {currentVideo.title}
-                                        </h3>
-                                        <p className="text-gray-400 text-xs truncate">
-                                            от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}
-                                        </p>
-                                    </div>
+                                {displayVideo.thumbnail && (
+                                    <img 
+                                        src={displayVideo.thumbnail} 
+                                        alt={displayVideo.title}
+                                        className="w-full h-full object-cover"
+                                        loading="eager"
+                                        decoding="async"
+                                    />
+                                )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-white font-medium text-sm truncate">
+                                    {displayVideo.title}
+                                </h3>
+                                <p className="text-gray-400 text-xs truncate">
+                                    от {displayVideo.requester_name || displayVideo.user_id || 'Unknown'}
+                                </p>
+                            </div>
                                 </div>
 
                                 {/* Центральные кнопки управления */}

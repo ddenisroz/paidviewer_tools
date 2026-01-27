@@ -1,4 +1,4 @@
-
+﻿
 import logging
 from typing import Optional, Dict, Any, List, Union
 import aiohttp
@@ -12,7 +12,9 @@ class VKClient(BaseIntegrationClient):
     """
     VK Live API Client.
     """
-    BASE_URL = "https://apidev.live.vkvideo.ru"
+    PROD_BASE_URL = "https://api.live.vkvideo.ru"
+    DEV_BASE_URL = "https://apidev.live.vkvideo.ru"
+    BASE_URL = DEV_BASE_URL
     
     def __init__(self, oauth: VKOAuth):
         super().__init__(self.BASE_URL)
@@ -30,7 +32,58 @@ class VKClient(BaseIntegrationClient):
             "Content-Type": "application/json"
         }
 
+    async def _request_with_base(
+        self,
+        base_url: str,
+        method: str,
+        endpoint: str,
+        token: Optional[TokenInfo] = None,
+        params: Optional[Dict[str, Any]] = None,
+        json_data: Optional[Dict[str, Any]] = None,
+        data: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Выполнить запрос с временным base_url (для прод-эндпоинтов).
+        """
+        url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+        headers = await self._get_headers(token)
+        session = await self._get_session()
+
+        last_error: Optional[Exception] = None
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                async with session.request(
+                    method,
+                    url,
+                    headers=headers,
+                    params=params,
+                    json=json_data,
+                    data=data,
+                ) as response:
+                    return await self._handle_response(response)
+            except aiohttp.ClientError as e:
+                last_error = e
+                logger.warning(
+                    f"[INTEGRATION] {self.__class__.__name__} request failed "
+                    f"(attempt {attempt + 1}/{self.MAX_RETRIES}): {e}"
+                )
+                if attempt < self.MAX_RETRIES - 1:
+                    import asyncio
+                    await asyncio.sleep(2 ** attempt)
+
+        raise IntegrationError(
+            f"Request failed after {self.MAX_RETRIES} attempts",
+            original_error=last_error
+        )
+
     # ==================== User ====================
+
+    def _format_channel_url(self, channel_url: str) -> str:
+        if not channel_url:
+            return channel_url
+        if channel_url.startswith('http://') or channel_url.startswith('https://'):
+            return channel_url
+        return f"https://live.vkvideo.ru/{channel_url}"
 
     async def get_current_user(self, token: TokenInfo) -> Optional[Dict[str, Any]]:
         """Get info about current user (streamer)."""
@@ -56,7 +109,7 @@ class VKClient(BaseIntegrationClient):
         }
         
         try:
-            params = {"channel_url": channel_url}
+            params = {"channel_url": self._format_channel_url(channel_url)}
             # Using token allows seeing drafts/latency info etc.
             result = await self.get("v1/channel", token=token, params=params)
             data = result.get("data", {})
@@ -105,7 +158,7 @@ class VKClient(BaseIntegrationClient):
         try:
             # 1. Get current state
             try:
-                current_data = await self.get("v1/channel", token=token, params={"channel_url": channel_url})
+                current_data = await self.get("v1/channel", token=token, params={"channel_url": self._format_channel_url(channel_url)})
                 stream_info = current_data.get("data", {}).get("stream", {})
             except Exception:
                 stream_info = {}
@@ -116,17 +169,24 @@ class VKClient(BaseIntegrationClient):
                  current_cat_id = stream_info["category"].get("id")
 
             payload = {
-                "title": title if title is not None else stream_info.get("title", ""),
-                "category": {
-                    "id": str(category_id) if category_id else (str(current_cat_id) if current_cat_id else "")
-                }
+                "title": title if title is not None else stream_info.get("title", "")
             }
+            resolved_category_id = str(category_id) if category_id else (str(current_cat_id) if current_cat_id else None)
+            if resolved_category_id:
+                payload["category"] = {"id": resolved_category_id}
             if stream_info.get("description"):
                 payload["description"] = stream_info.get("description")
 
             # 3. Update
             body = {"stream": payload}
-            await self.post("v1/channel/stream/edit", token=token, params={"channel_url": channel_url}, json_data=body)
+            await self._request_with_base(
+                self.PROD_BASE_URL,
+                "POST",
+                "v1/channel/stream/edit",
+                token=token,
+                params={"channel_url": self._format_channel_url(channel_url)},
+                json_data=body
+            )
             logger.info(f"[VK client] Updated stream for {channel_url}")
             return True
 
@@ -137,18 +197,24 @@ class VKClient(BaseIntegrationClient):
     async def search_categories(self, query: str, token: TokenInfo) -> List[Dict[str, Any]]:
         """Search categories."""
         try:
-            params = {"query": query, "type": "game", "limit": "20"}
-            result = await self.get("v1/category/search", token=token, params=params)
-            
+            params = {"search": query, "type": "game", "limit": "20"}
+            result = await self._request_with_base(
+                self.PROD_BASE_URL,
+                "GET",
+                "v1/public_video_stream/category/",
+                token=token,
+                params=params
+            )
+
             categories = []
-            if result and "data" in result:
-                cats = result["data"].get("categories", [])
+            if isinstance(result, dict) and "data" in result:
+                cats = result.get("data", [])
                 for cat in cats:
                     if cat:
                         categories.append({
                             "id": cat.get("id"),
                             "name": cat.get("title"),
-                            "box_art_url": cat.get("cover_url")
+                            "box_art_url": cat.get("coverUrl")
                         })
             return categories
         except IntegrationError as e:
@@ -160,7 +226,7 @@ class VKClient(BaseIntegrationClient):
     async def get_custom_rewards(self, channel_url: str, token: TokenInfo) -> List[Dict[str, Any]]:
         """Get custom rewards."""
         try:
-            result = await self.get("v1/channel_point/rewards", token=token, params={"channel_url": channel_url})
+            result = await self.get("v1/channel_point/rewards", token=token, params={"channel_url": self._format_channel_url(channel_url)})
             return result.get("data", {}).get("rewards", [])
         except IntegrationError as e:
              logger.error(f"[VK client] Failed to get rewards: {e}")
@@ -171,7 +237,7 @@ class VKClient(BaseIntegrationClient):
         try:
             body = {"reward": reward_data}
             result = await self.post("v1/channel_point/reward/create", token=token, 
-                                   params={"channel_url": channel_url}, json_data=body)
+                                   params={"channel_url": self._format_channel_url(channel_url)}, json_data=body)
             return result.get("data")
         except IntegrationError as e:
             logger.error(f"[VK client] Failed to create reward: {e}")

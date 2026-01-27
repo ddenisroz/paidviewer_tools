@@ -76,6 +76,7 @@ class TwitchBotCore(commands.Bot):
             # Парсим роли и значки из Twitch tags
             role = None
             badges_list = []
+            emotes_list = []
 
             # Проверяем роль (broadcaster > moderator > vip > subscriber)
             if message.author.is_broadcaster:
@@ -99,6 +100,10 @@ class TwitchBotCore(commands.Bot):
                         logger.info(f"[BADGES PARSED] {message.author.name}: {badges_list}")
                 else:
                     logger.warning(f"[WARN] [BADGES] 'badges' not in tags for {message.author.name}")
+
+                emotes_tag = message.tags.get('emotes')
+                if emotes_tag:
+                    emotes_list = self._parse_twitch_emotes(emotes_tag, message.content)
             else:
                 logger.warning(f"[WARN] [BADGES] No tags attribute or empty tags for {message.author.name}")
 
@@ -111,7 +116,8 @@ class TwitchBotCore(commands.Bot):
                 platform='twitch',
                 channel=message.channel.name,
                 role=role,
-                badges=badges_list if badges_list else None
+                badges=badges_list if badges_list else None,
+                emotes=emotes_list if emotes_list else None
             )
 
             # [OK] НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
@@ -165,6 +171,40 @@ class TwitchBotCore(commands.Bot):
 
         # Обрабатываем команды
         await self.handle_commands(message)
+
+    @staticmethod
+    def _parse_twitch_emotes(emotes_tag: str, content: str) -> List[dict]:
+        """
+        Parse Twitch emotes tag into list of {id, name, start, end}.
+        Example tag: "25:0-4,12-16/1902:6-10"
+        """
+        if not emotes_tag or not content:
+            return []
+
+        parsed = []
+        try:
+            for emote_block in emotes_tag.split('/'):
+                if ':' not in emote_block:
+                    continue
+                emote_id, positions = emote_block.split(':', 1)
+                for position in positions.split(','):
+                    if "-" not in position:
+                        continue
+                    start_str, end_str = position.split('-', 1)
+                    start = int(start_str)
+                    end = int(end_str)
+                    name = content[start:end + 1]
+                    parsed.append({
+                        "id": emote_id,
+                        "name": name,
+                        "start": start,
+                        "end": end
+                    })
+        except Exception as exc:
+            logger.debug(f"[WARN] Failed to parse emotes tag '{emotes_tag}': {exc}")
+            return []
+
+        return parsed
 
     async def event_channel_joined(self, channel):
         """Вызывается при подключении к каналу"""

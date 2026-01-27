@@ -108,7 +108,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                 onValueChange={(val) => setFormData({ ...formData, [fieldName]: val })}
                 min={1}
                 max={365}
-                step={1}
+                step={5}
                 className="w-full"
               />
             </div>

@@ -60,12 +60,29 @@ class QueueService:
                     'error': 'Необходимо указать user_id или session_id'
                 }
 
-            # Проверяем валидность URL
-            if not self.youtube_service.is_valid_youtube_url(video_url):
+            # Проверяем валидность URL или выполняем поиск по запросу
+            video_input = (video_url or "").strip()
+            if not video_input:
                 return {
                     'success': False,
-                    'error': 'Неверная ссылка на YouTube. Используйте формат: https://youtube.com/watch?v=...'
+                    'error': 'Укажите ссылку или поисковый запрос.'
                 }
+
+            if not self.youtube_service.is_valid_youtube_url(video_input):
+                if len(video_input) < 2:
+                    return {
+                        'success': False,
+                        'error': 'Слишком короткий поисковый запрос.'
+                    }
+                search_results = await self.youtube_service.search_videos(video_input, max_results=1)
+                if not search_results:
+                    return {
+                        'success': False,
+                        'error': 'Видео не найдено. Попробуйте другой запрос или ссылку.'
+                    }
+                video_url = search_results[0].get('url') or video_input
+            else:
+                video_url = video_input
 
             # Получаем информацию о видео
             video_info = await self.youtube_service.get_video_info(video_url)

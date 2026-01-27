@@ -17,6 +17,7 @@ import type { AxiosError } from 'axios';
 interface YoutubeQueue {
   queue: unknown[];
   current_video: unknown | null;
+  is_playing?: boolean;
 }
 
 /**

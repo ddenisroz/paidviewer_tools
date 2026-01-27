@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
@@ -9,7 +9,7 @@ interface StreamCardLayoutProps {
     title: string;
     icon: React.ReactNode;
     isLinked: boolean;
-    onToggleLink: (value: boolean) => void;
+    onToggleLink: (value: boolean) => void | Promise<void>;
     bothEnabled: boolean;
     children: React.ReactNode;
     footer?: React.ReactNode;
@@ -27,24 +27,16 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
     className
 }) => {
     const [isLinking, setIsLinking] = useState(false);
-    const [countdown, setCountdown] = useState(0);
-
-    // Countdown timer effect
-    useEffect(() => {
-        if (countdown > 0) {
-            const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-            return () => clearTimeout(timer);
-        } else if (isLinking) {
-            setIsLinking(false);
-        }
-    }, [countdown, isLinking]);
 
     // Handle toggle with cooldown
-    const handleLinkToggle = (value: boolean) => {
+    const handleLinkToggle = async (value: boolean) => {
         if (isLinking) return;
         setIsLinking(true);
-        setCountdown(5);
-        onToggleLink(value);
+        try {
+            await Promise.resolve(onToggleLink(value));
+        } finally {
+            setIsLinking(false);
+        }
     };
 
     return (
@@ -77,11 +69,6 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
                             {isLinked ? 'Поля связаны' : 'Связать поля'}
                         </Label>
                         <div className="flex items-center gap-2">
-                            {countdown > 0 && (
-                                <span className="text-xs text-blue-400 font-mono tabular-nums animate-pulse">
-                                    {countdown}с
-                                </span>
-                            )}
                             <Switch
                                 id={`link-toggle-${title}`}
                                 checked={isLinked}

@@ -1,8 +1,9 @@
 ﻿// src/components/chatbox/PreviewPanel.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
+import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
-import { Sword, Video } from 'lucide-react';
+import { VkRoleBadge } from '@/shared/components/RoleBadge';
 
 interface ChatBoxSettings {
     font_family: string;
@@ -41,12 +42,22 @@ interface PreviewPanelProps {
 }
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }) => {
+    const [badgesReady, setBadgesReady] = useState(false);
+
     const hexToRgba = (hex: string, opacity: number): string => {
         const r = parseInt(hex.slice(1, 3), 16);
         const g = parseInt(hex.slice(3, 5), 16);
         const b = parseInt(hex.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     };
+
+    useEffect(() => {
+        if (!settings.show_badges) return;
+
+        twitchBadgesService.loadGlobalBadges()
+            .then(() => setBadgesReady(true))
+            .catch(() => setBadgesReady(false));
+    }, [settings.show_badges]);
 
     return (
         <div className="h-full flex flex-col">
@@ -85,12 +96,32 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
                                 )
                             )}
                             <span className="text-gray-400 text-xs mr-2">{msg.time}</span>
-                            {settings.show_badges && msg.badges.length > 0 && (
-                                <span className="mr-1 inline-flex items-center">
-                                    {msg.role === 'Broadcaster' && <Video className="w-4 h-4 text-red-500 fill-current" />}
-                                    {msg.role === 'Moderator' && <Sword className="w-4 h-4 text-green-500 fill-current" />}
-                                    {msg.role === 'Viewer' && null}
+                            {settings.show_badges && badgesReady && msg.badges.length > 0 && msg.platform === 'twitch' && (
+                                <span className="mr-1 inline-flex items-center gap-0.5">
+                                    {msg.badges.map((badge) => {
+                                        const [badgeId, version] = badge.split('/');
+                                        const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
+                                        if (!badgeUrl) return null;
+
+                                        const badgeSize = Math.max(14, Math.min(24, settings.font_size * 1.1));
+                                        return (
+                                            <img
+                                                key={`${msg.id}-${badgeId}-${version}`}
+                                                src={badgeUrl}
+                                                alt={badgeId}
+                                                title={badgeId}
+                                                style={{ width: `${badgeSize}px`, height: `${badgeSize}px` }}
+                                            />
+                                        );
+                                    })}
                                 </span>
+                            )}
+                            {settings.show_badges && msg.platform === 'vk' && msg.role && (
+                                <VkRoleBadge
+                                    role={msg.role}
+                                    size={Math.max(12, Math.min(18, settings.font_size * 0.9))}
+                                    style={{ marginRight: '4px' }}
+                                />
                             )}
                             <span className={msg.platform === 'twitch' ? 'text-purple-400' : 'text-red-400'}>
                                 {msg.author}:

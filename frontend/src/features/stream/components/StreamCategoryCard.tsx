@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle, Gamepad2, Loader, Loader2, Save, Tag } from 'lucide-react';
+import { CheckCircle, Loader2, Save, Tag } from 'lucide-react';
 import type { StreamCategory } from '@/types/stream';
 
 import { categoryMapping } from '@/constants/categoryMapping';
@@ -9,7 +9,6 @@ import { useUserSettings } from '@/context/UserSettingsContext';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { Label } from '@/shared/components/ui/label';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
@@ -31,7 +30,11 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
         setLocalCombineCategories(combineCategories);
     }, [combineCategories]);
 
-    const isLinked = useMemo(() => localCombineCategories || false, [localCombineCategories]);
+    const twitchEnabled = useMemo(() => integrations.twitch?.enabled === true, [integrations.twitch?.enabled]);
+    const vkEnabled = useMemo(() => integrations.vk?.enabled === true, [integrations.vk?.enabled]);
+    const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
+    const hasAnyIntegration = useMemo(() => twitchEnabled || vkEnabled, [twitchEnabled, vkEnabled]);
+    const isLinked = useMemo(() => localCombineCategories && bothEnabled, [localCombineCategories, bothEnabled]);
     const [searchTerms, setSearchTerms] = useState<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
     const [showDropdown, setShowDropdown] = useState<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
     const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -41,82 +44,80 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
 
     const twitchInputRef = useRef<HTMLInputElement>(null);
     const vkInputRef = useRef<HTMLInputElement>(null);
-
-    const twitchEnabled = useMemo(() => integrations.twitch?.enabled === true, [integrations.twitch?.enabled]);
-    const vkEnabled = useMemo(() => integrations.vk?.enabled === true, [integrations.vk?.enabled]);
-    const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
-    const hasAnyIntegration = useMemo(() => twitchEnabled || vkEnabled, [twitchEnabled, vkEnabled]);
+    const isEditingRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
+    const isSyncingRef = useRef(false);
 
     // Handle Toggle
-    const handleToggleChange = (value: boolean) => {
+    const handleToggleChange = async (value: boolean) => {
+        if (isSyncingRef.current) return;
+        isSyncingRef.current = true;
+        const previousValue = localCombineCategories;
         setLocalCombineCategories(value);
+        isEditingRef.current = { twitch: false, vk: false };
+        setShowDropdown({ twitch: false, vk: false });
+
+        const twitchCategoryName = (currentData.twitch?.category as StreamCategory | undefined)?.name || '';
+        const vkCategoryName = (currentData.vk?.category as StreamCategory | undefined)?.name || '';
+        if (value && bothEnabled) {
+            const combinedName = twitchCategoryName || vkCategoryName;
+            setSearchTerms({ twitch: combinedName, vk: combinedName });
+        } else {
+            setSearchTerms({ twitch: twitchCategoryName, vk: vkCategoryName });
+        }
+
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
         }
 
-        setTimeout(async () => {
-            try {
-                const success = await updateSetting('combine_categories', value);
-                if (!success) throw new Error("Failed to update setting");
-
-                if (value && bothEnabled) {
-                    const twitchStreamCategory = currentData.twitch?.category as StreamCategory;
-                    if (twitchStreamCategory) {
-                        // Logic to sync/map categories
-                        const mappedName = categoryMapping[twitchStreamCategory.name];
-                        let vkStreamCategory: StreamCategory | null = null;
-
-                        if (mappedName) {
-                            const searchResults = await searchCategories('vk', mappedName) as StreamCategory[];
-                            if (searchResults && searchResults.length > 0) vkStreamCategory = searchResults[0];
-                        }
-
-                        if (!vkStreamCategory) {
-                            const searchResults = await searchCategories('vk', twitchStreamCategory.name) as StreamCategory[];
-                            if (searchResults && searchResults.length > 0) vkStreamCategory = searchResults[0];
-                        }
-
-                        if (vkStreamCategory) {
-                            setCurrentData(prev => ({
-                                ...prev,
-                                vk: { ...prev.vk, category: { ...vkStreamCategory!, id: String(vkStreamCategory!.id) } }
-                            }));
-                            const payload = {
-                                twitch: { category_id: String(twitchStreamCategory.id) },
-                                vk: {
-                                    category: {
-                                        id: String(vkStreamCategory.id),
-                                        name: vkStreamCategory.name || vkStreamCategory.title || "",
-                                        title: vkStreamCategory.name || vkStreamCategory.title || "",
-                                        type: vkStreamCategory.type || "games",
-                                        cover_url: vkStreamCategory.cover_url
-                                    },
-                                    category_id: String(vkStreamCategory.id)
-                                }
-                            };
-                            await saveChanges(payload, 'saveCategory');
-                        }
-                    }
-                }
-            } catch (error) {
-                logger.error('[SYNC ERROR]', error);
-                setLocalCombineCategories(!value);
-                updateSetting('combine_categories', !value);
-                toast.error('Ошибка синхронизации категорий.');
+        try {
+            const success = await updateSetting('combine_categories', value);
+            if (!success) {
+                setLocalCombineCategories(previousValue);
+                return;
             }
-        }, 100);
+
+            if (value && bothEnabled) {
+                const twitchStreamCategory = currentData.twitch?.category as StreamCategory;
+                if (twitchStreamCategory) {
+                    const mappedName = categoryMapping[twitchStreamCategory.name];
+                    const preferredQuery = mappedName || twitchStreamCategory.name;
+                    setSearchTerms({ twitch: preferredQuery, vk: preferredQuery });
+                }
+            }
+        } catch (error) {
+            logger.error('[SYNC ERROR]', error);
+            setLocalCombineCategories(previousValue);
+            toast.error('Ошибка синхронизации категорий.');
+        } finally {
+            isSyncingRef.current = false;
+        }
     };
 
     // Load initial search terms
     useEffect(() => {
+        if (isSyncingRef.current) return;
         const twitchCat = currentData.twitch?.category as StreamCategory | undefined;
         const vkCat = currentData.vk?.category as StreamCategory | undefined;
-        setSearchTerms({
-            twitch: twitchCat?.name || '',
-            vk: vkCat?.name || '',
+        const nextTwitch = twitchCat?.name || '';
+        const nextVk = vkCat?.name || '';
+
+        setSearchTerms(prev => {
+            let changed = false;
+            const next = { ...prev };
+
+            if (!isEditingRef.current.twitch && !showDropdown.twitch && prev.twitch !== nextTwitch) {
+                next.twitch = nextTwitch;
+                changed = true;
+            }
+            if (!isEditingRef.current.vk && !showDropdown.vk && prev.vk !== nextVk) {
+                next.vk = nextVk;
+                changed = true;
+            }
+
+            return changed ? next : prev;
         });
-    }, [currentData.twitch?.category, currentData.vk?.category]);
+    }, [currentData.twitch?.category, currentData.vk?.category, showDropdown.twitch, showDropdown.vk]);
 
     // Trigger searches
     useEffect(() => {
@@ -172,6 +173,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
         }
+        isEditingRef.current = { twitch: false, vk: false };
 
         if (isLinked && bothEnabled && platform === 'twitch') {
             // Linked Logic
@@ -273,22 +275,25 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
     }, [initialData, currentData, twitchEnabled, vkEnabled]);
 
     const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
+    const linkedInputPadding = 'pl-10';
+    const isSaving = status.saveCategory === 'loading';
+    const isSaved = status.saveCategory === 'success';
 
     const Footer = (
         <Button
             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
-            disabled={(status as any).saving || !isChanged}
+            disabled={isSaving || !isChanged}
             size="sm"
             className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm font-medium shadow-sm transition-all duration-300"
         >
-            {(status as any).saving ? (
+            {isSaving ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
-            ) : status.saveCategory === 'success' ? (
+            ) : isSaved ? (
                 <CheckCircle className="h-5 w-5" />
             ) : (
                 <Save className="h-5 w-5" />
             )}
-            {(status as any).saving ? 'Сохранение...' : 'Сохранить'}
+            {isSaving ? 'Сохранение...' : isSaved ? 'Сохранено' : 'Сохранить'}
         </Button>
     );
 
@@ -313,31 +318,35 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                     {/* Twitch / General Field */}
                     <div className="space-y-4 relative">
                         <div className="relative">
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center gap-1.5 z-20">
-                                {isLinked && bothEnabled ? (
-                                    <>
-                                        <TwitchIcon className="w-5 h-5 text-white/80" />
-                                        <VKIcon className="w-5 h-5 text-white/80" />
-                                    </>
-                                ) : (
-                                    <TwitchIcon className="w-5 h-5 text-white/80" />
-                                )}
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center gap-1 z-20">
+                                <TwitchIcon className="w-6 h-6 text-white/80" />
+                                <VKIcon
+                                    className={`w-6 h-6 text-white/80 transition-opacity duration-200 ${isLinked && bothEnabled ? 'opacity-100' : 'opacity-0'}`}
+                                />
                             </div>
 
 
 
                             <Input
                                 ref={twitchInputRef}
+                                id="stream-category-twitch"
+                                name="stream-category-twitch"
                                 value={searchTerms.twitch}
                                 onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                 onFocus={() => {
+                                    isEditingRef.current = { twitch: true, vk: isLinked && bothEnabled };
                                     if (twitchEnabled) setShowDropdown({ twitch: true, vk: false });
                                     if (searchTerms.twitch === (currentData.twitch?.category as StreamCategory)?.name) {
                                         setSearchTerms(prev => ({ ...prev, twitch: '' }));
                                     }
                                 }}
+                                onBlur={() => {
+                                    isEditingRef.current = isLinked && bothEnabled
+                                        ? { twitch: false, vk: false }
+                                        : { ...isEditingRef.current, twitch: false };
+                                }}
                                 placeholder={isLinked ? "Поиск общей категории..." : (twitchEnabled ? "Поиск категории Twitch..." : "нет подключения")}
-                                className={`h-10 pl-[4.5rem] pr-4 ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
+                                className={`h-10 ${linkedInputPadding} pr-4 transition-[padding] duration-300 ease-in-out ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
                                 disabled={!twitchEnabled && !isLinked}
                             />
 
@@ -354,28 +363,34 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                     </div>
 
                     {/* VK Field - Collapsible */}
-                    <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isLinked && bothEnabled ? 'grid-rows-[0fr] opacity-0 pointer-events-none' : 'grid-rows-[1fr] opacity-100'}`}>
+                    <div className={`grid transition-[grid-template-rows,opacity,transform] duration-300 ease-in-out ${isLinked && bothEnabled ? 'grid-rows-[0fr] opacity-0 pointer-events-none -translate-y-1' : 'grid-rows-[1fr] opacity-100 translate-y-0'}`}>
                         <div className="overflow-hidden min-h-0">
                             <div className="space-y-4 pt-0 relative mt-4 min-h-0">
                                 <div className="relative">
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center z-20">
-                                        <VKIcon className="w-5 h-5 text-white/80" />
-                                    </div>
+                                    <VKIcon className="w-6 h-6 text-white/80" />
+                                </div>
 
 
 
                                     <Input
                                         ref={vkInputRef}
+                                        id="stream-category-vk"
+                                        name="stream-category-vk"
                                         value={searchTerms.vk}
                                         onChange={(e) => handleSearchChange('vk', e.target.value)}
                                         onFocus={() => {
+                                            isEditingRef.current = { ...isEditingRef.current, vk: true };
                                             if (vkEnabled) setShowDropdown({ twitch: false, vk: true });
                                             if (searchTerms.vk === (currentData.vk?.category as StreamCategory)?.name) {
                                                 setSearchTerms(prev => ({ ...prev, vk: '' }));
                                             }
                                         }}
+                                        onBlur={() => {
+                                            isEditingRef.current = { ...isEditingRef.current, vk: false };
+                                        }}
                                         placeholder={vkEnabled ? "Поиск категории VK Live..." : "нет подключения"}
-                                        className={`h-10 pl-12 pr-4 ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
+                                        className={`h-10 pl-11 pr-4 transition-[padding] duration-300 ease-in-out ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
                                         disabled={!vkEnabled}
                                     />
 

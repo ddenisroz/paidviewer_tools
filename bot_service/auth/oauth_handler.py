@@ -135,7 +135,12 @@ class OAuthHandler:
 
             # 1. ПРОВЕРЯЕМ: Есть ли активная сессия для этого канала?
             # Для Twitch используем username вместо ID
-            channel_name = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
+            if platform == Platform.VK:
+                channel_name = (user_data.channel_name or user_data.platform_user_id).lower()
+            elif user_data.username:
+                channel_name = user_data.username.lower()
+            else:
+                channel_name = user_data.platform_user_id.lower()
             from sqlalchemy import text
             # PostgreSQL использует оператор ->> для извлечения JSON значений
             json_query = "device_info->>'monitored_channel' = :channel"
@@ -232,12 +237,12 @@ class OAuthHandler:
                         # Обновляем username
                         if platform == "twitch" and hasattr(user_data, 'username'):
                             unified_user.twitch_username = user_data.username
-                        elif platform == "vk" and hasattr(user_data, 'username') and user_data.username:
-                            # Для VK сохраняем channel_name (ник канала для подключения бота)
-                            unified_user.vk_channel_name = user_data.username
-                            # Также сохраняем в vk_username для обратной совместимости
-                            unified_user.vk_username = user_data.username
-                            logger.info(f"Updated VK channel_name: {user_data.username}")
+                        elif platform == "vk":
+                            if user_data.channel_name:
+                                unified_user.vk_channel_name = user_data.channel_name
+                                logger.info(f"Updated VK channel_name: {user_data.channel_name}")
+                            if user_data.username:
+                                unified_user.vk_username = user_data.username
 
                         db.commit()
                         logger.info(f"Updated {platform} tokens for user {unified_user.id}")
@@ -274,12 +279,12 @@ class OAuthHandler:
                     # Обновляем username
                     if platform == "twitch" and hasattr(user_data, 'username'):
                         unified_user.twitch_username = user_data.username
-                    elif platform == "vk" and hasattr(user_data, 'username') and user_data.username:
-                        # Для VK сохраняем channel_name (ник канала для подключения бота)
-                        unified_user.vk_channel_name = user_data.username
-                        # Также сохраняем в vk_username для обратной совместимости
-                        unified_user.vk_username = user_data.username
-                        logger.info(f"Updated VK channel_name: {user_data.username}")
+                    elif platform == "vk":
+                        if user_data.channel_name:
+                            unified_user.vk_channel_name = user_data.channel_name
+                            logger.info(f"Updated VK channel_name: {user_data.channel_name}")
+                        if user_data.username:
+                            unified_user.vk_username = user_data.username
 
                     db.commit()
                     logger.info(f"Added {platform} integration to user {unified_user.id}")
@@ -335,264 +340,9 @@ class OAuthHandler:
             if platform == "twitch" and hasattr(user_data, 'username'):
                 logger.info(f"Saving Twitch username: {user_data.username}")
                 unified_user.twitch_username = user_data.username
-            elif platform == "vk" and hasattr(user_data, 'username') and user_data.username:
-                # Для VK сохраняем channel_name (ник канала для подключения бота)
-                logger.info(f"Saving VK channel_name: {user_data.username}")
-                unified_user.vk_channel_name = user_data.username
-                # Также сохраняем в vk_username для обратной совместимости
-                unified_user.vk_username = user_data.username
-
-            # IMPORTANT: Инвалидируем кеш валидации токена после сохранения
-            from core.token_validation_cache import token_validation_cache
-            token_validation_cache.invalidate(unified_user.id, platform)
-            logger.info(f"[CACHE] Token validation cache invalidated for user {unified_user.id}, platform {platform}")
-
-            db.commit()
-            logger.info(f"User {unified_user.id} updated with {platform} username: {getattr(unified_user, f'{platform}_username', 'None')}")
-
-            # Определяем нужно ли создавать новую сессию
-            # session_id уже получен из cookie в начале функции
-            is_new_session = False
-
-            if not is_linking:
-                # Для нового входа создаем сессию
-                is_new_session = True
-
-                if existing_token:
-                    # ВАЖНО: При входе с нового устройства завершаем ВСЕ старые сессии пользователя
-                    logger.info(f"[SECURITY] New login detected for user {unified_user.id}. Terminating ALL old sessions...")
-                    session_manager.terminate_user_sessions(unified_user.id, "new_device_login", db)
-                    logger.info("[OK] All old sessions terminated. Creating new session...")
-
-                    # Создаем новую сессию для существующего пользователя
-                    # Для Twitch используем username вместо ID для monitored_channel
-                    monitored_channel = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
-                    device_info = {
-                        "user_agent": request.headers.get("user-agent"),
-                        "ip": getattr(request.client, 'host', 'unknown'),
-                        "monitored_channel": monitored_channel,
-                        "platform": platform
-                    }
-                    session_id = session_manager.create_session(
-                        user_id=unified_user.id,
-                        device_info=device_info
-                    )
-                    logger.info(f"[OK] New session created: {session_id}")
-                else:
-                    # Завершаем ВСЕ предыдущие сессии пользователя (принцип одной активной сессии)
-                    logger.info(f"[SECURITY] New user login. Terminating all sessions for user {unified_user.id}...")
-                    session_manager.terminate_user_sessions(unified_user.id, "new_login", db)
-
-                    # Создаем новую сессию
-                    # Для Twitch используем username вместо ID для monitored_channel
-                    monitored_channel = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
-                    device_info = {
-                        "user_agent": request.headers.get("user-agent"),
-                        "ip": getattr(request.client, 'host', 'unknown'),
-                        "monitored_channel": monitored_channel,
-                        "platform": platform
-                    }
-                    logger.info(f"Creating session with device_info: {device_info}")
-                    session_id = session_manager.create_session(
-                        user_id=unified_user.id,
-                        device_info=device_info
-                    )
-                    logger.info(f"[OK] New session created: {session_id}")
-
-                # Уведомляем connection_manager о новой активной сессии
-                try:
-                    from core.connection_manager import get_connection_manager
-                    connection_manager = get_connection_manager()
-                    # Для Twitch используем username вместо ID
-                    channel_identifier = user_data.username if user_data.username else user_data.platform_user_id
-                    connection_manager.add_active_session(channel_identifier, session_id)
-                except Exception as e:
-                    logger.error(f"Error notifying connection_manager about new session: {e}")
-
-                # Устанавливаем channel_name в UserSettings для автоматического подключения бота
-                await self._setup_user_channel_settings(db, unified_user.id, platform, user_data)
-
-                # Автоматически подключаем бота если требуется
-                if auto_connect_bot:
-                    logger.info(f"[AUTO-CONNECT] Starting auto-connect bot for platform={platform}")
-                    # Для Twitch используем username вместо ID
-                    channel_identifier = user_data.username if user_data.username else user_data.platform_user_id
-                    logger.info(f"[AUTO-CONNECT] Channel identifier: {channel_identifier}")
-                    await self._auto_connect_bot(platform, channel_identifier)
-                    logger.info(f"[AUTO-CONNECT] Auto-connect completed for {platform}:{channel_identifier}")
-                else:
-                    logger.info(f"[INFO] Auto-connect disabled for {platform}")
-
-            # Определяем URL для редиректа
-            redirect_url = self._get_redirect_url(platform, is_linking, is_new_session)
-
-            return OAuthResult(
-                user=unified_user,
-                session_id=session_id,
-                is_new_session=is_new_session,
-                redirect_url=redirect_url
-            )
-
-        except HTTPException:
-            # Перебрасываем HTTP исключения как есть
-            raise
-        except Exception as e:
-            logger.error(f"{platform.title()} auth error: {e}", exc_info=True)
-            raise HTTPException(
-                status_code=HTTP_STATUS.INTERNAL_SERVER_ERROR,
-                detail=f"Internal server error during {platform} authentication"
-            )
-
-    def create_oauth_response(self, oauth_result: OAuthResult) -> RedirectResponse:
-        """
-        Создает RedirectResponse с правильными cookies
-        
-        Args:
-            oauth_result: Результат OAuth авторизации
-            
-        Returns:
-            RedirectResponse с установленными cookies
-        """
-        response = RedirectResponse(url=oauth_result.redirect_url)
-
-        if oauth_result.session_id:
-            # Production-ready cookie settings с автоматическим secure=True в prod
-            cookie_settings = get_session_cookie_settings(oauth_result.session_id)
-            response.set_cookie(**cookie_settings)
-
-        return response
-
-
-    def _get_redirect_url(self, platform: str, is_linking: bool, is_new_session: bool) -> str:
-        """
-        Определяет URL для редиректа на основе сценария авторизации
-        """
-        if is_linking:
-            # Привязка аккаунта - всегда редирект в дашборд с уведомлением
-            return f"{FRONTEND_REDIRECTS['dashboard']}?auth_link={platform}&success=1"
-        else:
-            # Новый вход - редирект в дашборд
-            return f"{FRONTEND_REDIRECTS['dashboard']}?auth={platform}&success=1"
-
-    async def _auto_connect_bot(self, platform: str, channel_name: str) -> None:
-        """
-        Автоматическое подключение бота к каналу после авторизации
-        
-        Args:
-            platform: Название платформы
-            channel_name: Имя канала
-        """
-        try:
-            from core.connection_manager import get_connection_manager
-            connection_manager = get_connection_manager()
-
-            logger.info(f"[BOT] Attempting auto-connect for {platform} bot to channel {channel_name}")
-
-            # Проверяем, есть ли активные сессии для этого канала
-            has_sessions = connection_manager.is_channel_active(channel_name)
-            logger.info(f"[BOT] Active sessions for {channel_name}: {has_sessions}")
-
-            # УБИРАЕМ проверку активных сессий - подключаем бота всегда после OAuth
-            # if not has_sessions:
-            #     logger.info(f"[ERROR] No active sessions for channel {channel_name}, skipping bot connection")
-            #     return
-
-            if platform == Platform.TWITCH:
-                logger.info(f"[BOT] Connecting Twitch bot to {channel_name}")
-                await self._connect_twitch_bot(channel_name)
-            elif platform == Platform.VK:
-                logger.info(f"[BOT] Connecting VK Live bot to {channel_name}")
-                await self._connect_vk_bot(channel_name)
-            else:
-                logger.warning(f"[WARN] Auto-connect not implemented for platform: {platform}")
-
-        except Exception as e:
-            logger.error(f"[ERROR] Error auto-connecting {platform} bot to {channel_name}: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            # Не прерываем авторизацию из-за ошибки бота
-
-    async def _connect_twitch_bot(self, channel_name: str) -> None:
-        """Подключение Twitch бота после OAuth авторизации"""
-        try:
-            # Получаем бота из registry
-            from startup.bot_registry import get_bot_registry
-            bot_instance = get_bot_registry().twitch_bot
-
-            if bot_instance:
-                logger.info(f"[BOT] Bot instance exists, attempting to join channel: {channel_name}")
-                success = await bot_instance.join_channel(channel_name)
-                if success:
-                    logger.info(f"[OK] Twitch bot successfully connected to {channel_name} via OAuth")
-
-                    # Отправляем приветственное сообщение (только после OAuth!)
-                    import asyncio
-                    await asyncio.sleep(2)  # Даем время боту полностью подключиться
-                    await bot_instance.send_welcome_message(channel_name)
-                else:
-                    logger.warning(f"[ERROR] Failed to connect Twitch bot to {channel_name} via OAuth")
-            else:
-                logger.error("[ERROR] Twitch bot instance not found. Bot was not created at startup.")
-
-        except Exception as e:
-            logger.error(f"[ERROR] Error connecting Twitch bot during OAuth: {e}")
-
-    async def _connect_vk_bot(self, channel_name: str) -> None:
-        """Подключение VK Live бота к каналу пользователя после OAuth"""
-        try:
-            # Импортируем глобальные переменные
-            import main
-
-            if not main.vk_live_bot_instance:
-                logger.error("[ERROR] VK Live bot instance not found! Bot should be initialized at startup.")
-                return
-
-            logger.info(f"[BOT] VK bot instance exists, attempting to connect to channel: {channel_name}")
-
-            # Подключаемся к каналу пользователя через HTTP polling
-            success = await main.vk_live_bot_instance.connect_to_channel(channel_name)
-
-            if success:
-                logger.info(f"[OK] VK Live bot successfully connected to {channel_name} via OAuth")
-            else:
-                logger.warning(f"[ERROR] Failed to connect VK Live bot to {channel_name} via OAuth")
-
-        except Exception as e:
-            logger.error(f"Error connecting VK Live bot: {e}")
-
-    async def _setup_user_channel_settings(self, db: Session, user_id: int, platform: str, user_data: OAuthUserData) -> None:
-        """Настройка channel_name в UserSettings для автоматического подключения бота"""
-        try:
-            from core.database import UserSettings
-
-            # Получаем или создаем настройки пользователя
-            settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
-            if not settings:
-                settings = UserSettings(
-                    user_id=user_id,
-                    chat_enabled=True  # Чат включен по умолчанию
-                )
-                db.add(settings)
-                db.flush()  # Получаем ID без коммита
-
-            # Устанавливаем channel_name в зависимости от платформы
-            if platform == "twitch":
-                # Для Twitch используем username (логин канала)
-                channel_name = user_data.username.lower()
-                settings.channel_name = channel_name
-                logger.info(f"[OK] Set Twitch channel_name: {channel_name}")
             elif platform == "vk":
-                # Для VK Live используем platform_user_id
-                channel_name = user_data.platform_user_id.lower()
-                settings.vk_channel_name = channel_name
-                logger.info(f"[OK] Set VK channel_name: {channel_name}")
-
-            db.commit()
-            logger.info(f"[OK] UserSettings updated for user {user_id}, platform {platform}")
-
-        except Exception as e:
-            logger.error(f"Error setting up user channel settings: {e}")
-            db.rollback()
-
-# Глобальный экземпляр OAuth handler
-oauth_handler = OAuthHandler()
+                if user_data.channel_name:
+                    unified_user.vk_channel_name = user_data.channel_name
+                    logger.info(f"Updated VK channel_name: {user_data.channel_name}")
+                if user_data.username:
+                    unified_user.vk_username = user_data.username

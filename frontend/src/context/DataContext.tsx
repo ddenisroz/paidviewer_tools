@@ -1,4 +1,4 @@
-﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { expandQueryWithAliases } from '@/constants/categoryAliases';
 import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo } from '@/queries/stream/streamQueries';
@@ -157,6 +157,16 @@ function sortCategoriesByRelevance(categories: StreamCategory[], query: string):
     });
 }
 
+function areStreamDataEqual(a: StreamData | null | undefined, b: StreamData | null | undefined): boolean {
+    if (!a || !b) return false;
+    return (
+        (a.twitch?.title || '') === (b.twitch?.title || '') &&
+        (a.vk?.title || '') === (b.vk?.title || '') &&
+        (a.twitch?.category?.id || null) === (b.twitch?.category?.id || null) &&
+        (a.vk?.category?.id || null) === (b.vk?.category?.id || null)
+    );
+}
+
 interface LoadingState {
     streamData: boolean;
     history: boolean;
@@ -218,6 +228,17 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
     const [initialData, setInitialData] = useState<StreamData>(getCachedStreamData);
     const [currentData, setCurrentData] = useState<StreamData>(getCachedStreamData);
+    const initialDataRef = useRef(initialData);
+    const currentDataRef = useRef(currentData);
+    const lastServerDataRef = useRef<StreamData | null>(null);
+
+    useEffect(() => {
+        initialDataRef.current = initialData;
+    }, [initialData]);
+
+    useEffect(() => {
+        currentDataRef.current = currentData;
+    }, [currentData]);
 
     useEffect(() => {
         const cached = getQueryCache(['stream-data', user?.id]);
@@ -331,39 +352,51 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
     useEffect(() => {
         if (combinedStreamData && (combinedStreamData.twitch.title || combinedStreamData.vk.title || combinedStreamData.twitch.category || combinedStreamData.vk.category)) {
+            const lastServerData = lastServerDataRef.current;
+            if (lastServerData && areStreamDataEqual(lastServerData, combinedStreamData)) {
+                return;
+            }
+            lastServerDataRef.current = combinedStreamData;
+
+            const latestInitialData = initialDataRef.current;
+            const latestCurrentData = currentDataRef.current;
             // Check if user has unsaved changes
             // We compare strict equality of objects/strings to ensure we don't overwrite if user is typing
             // Note: This simple check assumes equality works. 
             // Better: Compare serialized or field-by-field if structure is complex.
             // For now, we assume if initialData matches currentData, it's pristine.
 
-            const isTwitchExistent = !!initialData.twitch;
-            const isVkExistent = !!initialData.vk;
+            const isTwitchExistent = !!latestInitialData.twitch;
+            const isVkExistent = !!latestInitialData.vk;
 
             // Check if modified (simplified check)
             let isModified = false;
 
             if (isTwitchExistent) {
-                if (initialData.twitch.title !== currentData.twitch.title) isModified = true;
-                if (initialData.twitch.category?.id !== currentData.twitch.category?.id) isModified = true;
+                if (latestInitialData.twitch.title !== latestCurrentData.twitch.title) isModified = true;
+                if (latestInitialData.twitch.category?.id !== latestCurrentData.twitch.category?.id) isModified = true;
             }
             if (isVkExistent) {
-                if (initialData.vk.title !== currentData.vk.title) isModified = true;
-                if (initialData.vk.category?.id !== currentData.vk.category?.id) isModified = true;
+                if (latestInitialData.vk.title !== latestCurrentData.vk.title) isModified = true;
+                if (latestInitialData.vk.category?.id !== latestCurrentData.vk.category?.id) isModified = true;
             }
 
             // Only overwrite currentData if NOT modified OR it's the first load
             if (!isModified || isFirstLoad) {
                 setCurrentData(combinedStreamData);
-                if (isFirstLoad) setIsFirstLoad(false);
+                if (isFirstLoad) {
+                    setIsFirstLoad(false);
+                }
             }
 
             // Always update initialData to the fresh server state
             setInitialData(combinedStreamData);
             setQueryCache(['stream-data', user?.id], combinedStreamData);
-            setRefreshTrigger(prev => prev + 1);
+            if (!areStreamDataEqual(latestInitialData, combinedStreamData)) {
+                setRefreshTrigger(prev => prev + 1);
+            }
         }
-    }, [combinedStreamData, user?.id]);
+    }, [combinedStreamData, user?.id, isFirstLoad]);
 
     const loadStreamData = useCallback(async (force: boolean = false): Promise<void> => {
         if (!isAuthenticated) {

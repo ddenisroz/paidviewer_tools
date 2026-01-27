@@ -1,8 +1,12 @@
 # bot_service/api/tts/synthesis_routes.py
 import logging
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from core.project_paths import TEMP_DIR
 from core.database import get_db
 from auth.auth import get_current_user
 from services.tts.tts_service import TTSService
@@ -13,6 +17,19 @@ tts_router = APIRouter(prefix="/api/tts", tags=["tts"])
 
 def get_tts_service(db: Session = Depends(get_db)) -> TTSService:
     return TTSService(db)
+
+@tts_router.get("/audio/{filename}")
+async def get_tts_audio(filename: str) -> FileResponse:
+    """
+    Serve synthesized TTS audio files from temp storage.
+    """
+    safe_name = Path(filename).name
+    audio_path = TEMP_DIR / "tts_audio" / safe_name
+    if not audio_path.is_file():
+        raise HTTPException(status_code=404, detail="Audio not found")
+
+    media_type = "audio/mpeg" if audio_path.suffix.lower() == ".mp3" else "audio/wav"
+    return FileResponse(path=audio_path, media_type=media_type, filename=safe_name)
 
 @tts_router.post("/synthesize")
 async def synthesize_text(

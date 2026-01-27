@@ -1,4 +1,4 @@
-import * as React from "react"
+﻿import * as React from "react"
 
 import * as SliderPrimitive from "@radix-ui/react-slider"
 
@@ -10,7 +10,7 @@ const Slider = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SliderPrimitive.Root
     ref={ref}
-    className={cn("relative flex w-full touch-none select-none items-center group", className)}
+    className={cn("relative flex w-full select-none items-center group touch-pan-y cursor-pointer", className)}
     {...props}>
     <SliderPrimitive.Track
       className="relative h-2 w-full grow overflow-hidden rounded-full bg-gray-700/50 group-hover:bg-gray-700">

@@ -108,7 +108,8 @@ const processTwitchEmotes = (text: string, emotes: ChatEmote[]): string => {
 
         if (start < 0 || end > processedText.length) continue;
 
-        const emoteUrl = `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`;
+        const rawUrl = emote.url || `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`;
+        const emoteUrl = encodeURI(rawUrl);
         const emoteName = emote.name || 'emote';
         const imgTag = `<img src="${emoteUrl}" alt="${emoteName}" class="inline-block w-6 h-6 align-middle" title="${emoteName}" />`;
 

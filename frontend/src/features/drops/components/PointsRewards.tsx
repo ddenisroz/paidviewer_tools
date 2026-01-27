@@ -276,15 +276,35 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
                 {selectedPlatform ? `Награды для ${selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}` : 'Создавайте и управляйте наградами за баллы канала'}
               </CardDescription>
             </div>
-            <Button
-              onClick={() => handleOpenDialog()}
-              size="default"
-              className="gap-2"
-              disabled={partnerRequired}
-            >
-              <Plus className="w-4 h-4" />
-              Создать награду
-            </Button>
+            <div className="flex items-center gap-2">
+              {twitchAvailable && vkAvailable && (
+                <>
+                  <Button
+                    variant={selectedPlatform === 'twitch' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedPlatform('twitch')}
+                  >
+                    Twitch
+                  </Button>
+                  <Button
+                    variant={selectedPlatform === 'vk' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedPlatform('vk')}
+                  >
+                    VK Live
+                  </Button>
+                </>
+              )}
+              <Button
+                onClick={() => handleOpenDialog()}
+                size="default"
+                className="gap-2"
+                disabled={partnerRequired}
+              >
+                <Plus className="w-4 h-4" />
+                Создать награду
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

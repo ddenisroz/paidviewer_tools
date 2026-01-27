@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -20,6 +20,9 @@ export const MemeAlertsRewards: React.FC = () => {
     const [grantUserId, setGrantUserId] = useState('');
     const [grantValue, setGrantValue] = useState<number>(10);
     const [granting, setGranting] = useState(false);
+    const [manualAccessToken, setManualAccessToken] = useState('');
+    const [manualRefreshToken, setManualRefreshToken] = useState('');
+    const [manualSaving, setManualSaving] = useState(false);
 
     const popupRef = useRef<Window | null>(null);
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -34,6 +37,20 @@ export const MemeAlertsRewards: React.FC = () => {
         };
     }, []);
 
+    useEffect(() => {
+        const handleMessage = async (event: MessageEvent) => {
+            if (!event?.data || typeof event.data !== 'object') return;
+            const data = event.data as { access_token?: string; refresh_token?: string };
+            if (!data.access_token) return;
+
+            const success = await saveTokenToBackend(data.access_token, data.refresh_token);
+            if (success) cleanupPopup();
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [cleanupPopup, saveTokenToBackend]);
+
     const checkStatus = async () => {
         try {
             const response = await fetch(`${MEMEALERTS_API_BASE}/status`);
@@ -45,6 +62,21 @@ export const MemeAlertsRewards: React.FC = () => {
             setStatusLoading(false);
         }
     };
+
+    const checkStatusSilent = async (): Promise<boolean> => {
+        try {
+            const response = await fetch(`${MEMEALERTS_API_BASE}/status`);
+            const data = await response.json();
+            if (data?.connected) {
+                setIsConnected(true);
+                return true;
+            }
+        } catch {
+            // ignore
+        }
+        return false;
+    };
+
 
     const saveTokenToBackend = async (accessToken: string, refreshToken?: string) => {
         try {
@@ -125,12 +157,19 @@ export const MemeAlertsRewards: React.FC = () => {
                 // Check if popup is closed
                 if (!popupRef.current || popupRef.current.closed) {
                     cleanupPopup();
-                    toast.info("Окно авторизации закрыто");
+                    checkStatus();
+                    toast.info("Auth window closed");
+                    return;
+                }
+
+                const connected = await checkStatusSilent();
+                if (connected) {
+                    cleanupPopup();
                     return;
                 }
 
                 // Try to access popup's localStorage (only works when on same origin or after redirect)
-                // Due to CORS, we can only read localStorage when popup is on memealerts.com
+                // Due to cross-origin restrictions, this may throw until the popup is on a same-origin page
                 try {
                     const popupUrl = popupRef.current.location.href;
 
@@ -140,7 +179,6 @@ export const MemeAlertsRewards: React.FC = () => {
                         popupUrl.includes('memealerts.com/settings')) {
 
                         // Try to get token from localStorage
-                        // Note: This will throw if cross-origin, but works on same-origin
                         const accessToken = popupRef.current.localStorage.getItem('accessToken');
                         const refreshToken = popupRef.current.localStorage.getItem('refreshToken');
 
@@ -166,7 +204,7 @@ export const MemeAlertsRewards: React.FC = () => {
 
         // Set timeout to stop polling after max wait time
         timeoutRef.current = setTimeout(() => {
-            if (connecting) {
+            if (popupRef.current) {
                 cleanupPopup();
                 toast.warning("Время авторизации истекло", {
                     description: "Попробуйте снова"
@@ -174,7 +212,26 @@ export const MemeAlertsRewards: React.FC = () => {
             }
         }, POPUP_TIMEOUT);
 
-    }, [cleanupPopup, connecting]);
+    }, [cleanupPopup, checkStatus, checkStatusSilent, saveTokenToBackend]);
+
+    const handleManualSave = async () => {
+        const accessToken = manualAccessToken.trim();
+        if (!accessToken) {
+            toast.error("Вставьте access token для подключения");
+            return;
+        }
+
+        setManualSaving(true);
+        const success = await saveTokenToBackend(
+            accessToken,
+            manualRefreshToken.trim() || undefined
+        );
+        if (success) {
+            setManualAccessToken('');
+            setManualRefreshToken('');
+        }
+        setManualSaving(false);
+    };
 
     const handleDisconnect = async () => {
         try {
@@ -285,6 +342,33 @@ export const MemeAlertsRewards: React.FC = () => {
                             </p>
                         </div>
                     )}
+                    <div className="mt-4 space-y-3 rounded-lg border border-white/10 bg-black/20 p-4">
+                        <p className="text-xs text-gray-400">
+                            Если автоматическое подключение не сработало, вставьте access token вручную.
+                        </p>
+                        <div className="space-y-2">
+                            <Label>Access token</Label>
+                            <Input
+                                placeholder="accessToken"
+                                value={manualAccessToken}
+                                onChange={(e) => setManualAccessToken(e.target.value)}
+                                className="bg-black/20 border-white/10"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Refresh token (optional)</Label>
+                            <Input
+                                placeholder="refreshToken"
+                                value={manualRefreshToken}
+                                onChange={(e) => setManualRefreshToken(e.target.value)}
+                                className="bg-black/20 border-white/10"
+                            />
+                        </div>
+                        <Button onClick={handleManualSave} disabled={manualSaving}>
+                            {manualSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Сохранить токен
+                        </Button>
+                    </div>
                 </div>
             ) : (
                 <div className="space-y-6">

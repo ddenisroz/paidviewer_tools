@@ -1,4 +1,4 @@
-# bot_service/startup/lifespan.py
+﻿# bot_service/startup/lifespan.py
 """
 Lifecycle events для FastAPI приложения.
 
@@ -14,7 +14,7 @@ from typing import AsyncGenerator
 
 from fastapi import FastAPI
 
-from core.database import get_db, init_db
+from core.database import get_db, init_db, BotCommand
 from core.connection_manager import get_connection_manager
 from core.background_tasks import background_tasks
 from services.tts.memory_tts_queue import get_memory_tts_queue
@@ -30,6 +30,26 @@ async def _startup_database() -> None:
     """Инициализация базы данных."""
     init_db()
     logger.info("Database initialized")
+
+async def _startup_commands() -> None:
+    """Ensure global bot commands exist for core features like !sr."""
+    db = next(get_db())
+    try:
+        has_global = db.query(BotCommand).filter(
+            BotCommand.command_type == 'global',
+            BotCommand.user_id.is_(None)
+        ).first()
+        if not has_global:
+            logger.info("[STARTUP] Seeding global bot commands")
+            from init_global_commands import init_global_commands
+            init_global_commands()
+        else:
+            logger.info("[STARTUP] Global bot commands already exist")
+    except Exception as e:
+        logger.error(f"Failed to seed global commands: {e}")
+    finally:
+        db.close()
+
 
 
 async def _startup_services() -> None:
@@ -161,7 +181,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         # 1. База данных
         await _startup_database()
-        
+        await _startup_commands()
+
         # 2. Сервисы (TTS, WebSocket)
         await _startup_services()
         

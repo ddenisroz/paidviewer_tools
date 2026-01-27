@@ -68,8 +68,9 @@ const DEFAULT_SETTINGS: ChatBoxSettings = {
 
 const PREVIEW_MESSAGES: PreviewMessage[] = [
     { id: 1, platform: 'twitch', author: 'Streamer', message: 'Привет всем! 👋', time: '12:00', role: 'Broadcaster', badges: ['broadcaster/1'] },
-    { id: 2, platform: 'vk', author: 'Viewer1', message: 'Привет! Как дела?', time: '12:01', role: 'Viewer', badges: [] },
-    { id: 3, platform: 'twitch', author: 'Moderator', message: 'Всем привет!', time: '12:02', role: 'Moderator', badges: ['moderator/1'] }
+    { id: 2, platform: 'twitch', author: 'VIPUser', message: 'VIP тут!', time: '12:01', role: 'VIP', badges: ['vip/1'] },
+    { id: 3, platform: 'vk', author: 'Viewer1', message: 'Привет! Как дела?', time: '12:02', role: 'Viewer', badges: [] },
+    { id: 4, platform: 'twitch', author: 'Moderator', message: 'Всем привет!', time: '12:03', role: 'Moderator', badges: ['moderator/1'] }
 ];
 
 const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onClose, onSave }) => {

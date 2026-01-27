@@ -125,8 +125,11 @@ const VoiceManagementPageContent: React.FC = () => {
         queryKey: ['global-voices'],
         queryFn: async () => {
             const response = await getGlobalVoices();
-            const voiceResponse = (response as unknown) as VoiceApiResponse;
-            const data = voiceResponse?.data || response || [];
+            const voiceResponse = (response as unknown) as VoiceApiResponse | undefined;
+            const payload = voiceResponse?.data || (response as { data?: unknown })?.data || response;
+            const data = Array.isArray(payload)
+                ? payload
+                : ((payload as { voices?: TtsVoice[] })?.voices || (payload as { data?: TtsVoice[] })?.data || []);
             return Array.isArray(data) ? data : [];
         },
         enabled: !!whitelistStatus?.can_manage_voices,
@@ -147,8 +150,11 @@ const VoiceManagementPageContent: React.FC = () => {
         queryFn: async () => {
             if (!userId) return [];
             const response = await getUserVoices(userId);
-            const voiceResponse = (response as unknown) as VoiceApiResponse;
-            const data = voiceResponse?.data || response || [];
+            const voiceResponse = (response as unknown) as VoiceApiResponse | undefined;
+            const payload = voiceResponse?.data || (response as { data?: unknown })?.data || response;
+            const data = Array.isArray(payload)
+                ? payload
+                : ((payload as { voices?: TtsVoice[] })?.voices || (payload as { data?: TtsVoice[] })?.data || []);
             return Array.isArray(data) ? data : [];
         },
         enabled: !!userId,

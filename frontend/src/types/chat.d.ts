@@ -18,6 +18,7 @@ export interface ChatMessage {
   channel?: string; // Альтернативное поле для канала
   badges?: string[];
   emotes?: ChatEmote[];
+  role?: string;
   color?: string;
   author_color?: string; // Альтернативное поле для цвета
   is_action?: boolean;
@@ -122,6 +123,11 @@ export interface WebSocketMessage {
   author_name?: string;
   message?: string;
   platform?: 'twitch' | 'vk' | 'youtube';
+  channel?: string;
+  channel_name?: string;
+  badges?: string[];
+  emotes?: ChatEmote[];
+  role?: string;
   messages?: ChatMessage[];
   data?: Record<string, unknown>;
   cache_key?: string;

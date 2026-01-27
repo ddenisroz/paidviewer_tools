@@ -1,4 +1,4 @@
-# bot_service/services/youtube/youtube_service.py
+﻿# bot_service/services/youtube/youtube_service.py
 import re
 import aiohttp
 import logging
@@ -41,7 +41,12 @@ class YouTubeService:
                         'key': self.api_key
                     }
                     async with session.get(url, params=params) as response:
-                        return response
+                        status = response.status
+                        if status == 200:
+                            data = await response.json()
+                        else:
+                            data = await response.text()
+                        return status, data
 
             response = await retry_async(
                 _do_request,
@@ -54,8 +59,9 @@ class YouTubeService:
                 logger.error(f"YouTube API request failed after retries for: {video_id}")
                 return await self._get_video_info_fallback(video_id, video_url)
 
-            if response.status == 200:
-                data = await response.json()
+            status, data = response
+
+            if status == 200:
 
                 if not data.get('items'):
                     logger.error(f"Video not found: {video_id}")
@@ -64,11 +70,17 @@ class YouTubeService:
                 video_data = data['items'][0]
                 return self._parse_video_data(video_data, video_url)
             else:
-                logger.error(f"YouTube API error: {response.status}")
+                logger.error(f"YouTube API error: {status} - {data}")
                 return await self._get_video_info_fallback(video_id, video_url)
 
         except Exception as e:
             logger.error(f"Error getting video info: {e}")
+            try:
+                video_id = self._extract_video_id(video_url)
+                if video_id:
+                    return await self._get_video_info_fallback(video_id, video_url)
+            except Exception:
+                pass
             return None
 
     def _extract_video_id(self, url: str) -> Optional[str]:
@@ -97,9 +109,9 @@ class YouTubeService:
             return None
 
     async def _get_video_info_fallback(self, video_id: str, video_url: str) -> Dict[str, Any]:
-        """Fallback метод получения информации без API"""
+        """Fallback ????? ????????? ?????????? ??? API"""
         try:
-            # Пытаемся получить информацию через pytube
+            # ???????? ???????? ?????????? ????? pytube
             try:
                 from pytube import YouTube
                 yt = YouTube(video_url)
@@ -107,7 +119,7 @@ class YouTubeService:
                 return {
                     'video_id': video_id,
                     'title': yt.title or f"YouTube Video {video_id}",
-                    'duration': yt.length or 0,
+                    'duration': self._format_duration_seconds(yt.length or 0),
                     'thumbnail_url': yt.thumbnail_url or f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
                     'channel_title': yt.author or "Unknown Channel",
                     'view_count': yt.views or 0,
@@ -119,11 +131,15 @@ class YouTubeService:
             except Exception as pytube_error:
                 logger.warning(f"Pytube fallback failed: {pytube_error}")
 
-                # Если pytube не работает, используем базовую информацию
+                yt_dlp_info = await self._get_video_info_yt_dlp(video_url)
+                if yt_dlp_info:
+                    return yt_dlp_info
+
+                # ???? yt-dlp ?? ????????, ?????????? ??????? ??????????
                 return {
                     'video_id': video_id,
                     'title': f"YouTube Video {video_id}",
-                    'duration': 0,
+                    'duration': "0:00",
                     'thumbnail_url': f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
                     'channel_title': "Unknown Channel",
                     'view_count': 0,
@@ -195,6 +211,93 @@ class YouTubeService:
             logger.error(f"Error parsing duration: {e}")
             return "Unknown"
 
+    def _format_duration_seconds(self, duration: Optional[int]) -> str:
+        """Format seconds to H:MM:SS or M:SS."""
+        try:
+            total_seconds = int(duration or 0)
+            if total_seconds <= 0:
+                return "0:00"
+            hours, remainder = divmod(total_seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if hours > 0:
+                return f"{hours}:{minutes:02d}:{seconds:02d}"
+            return f"{minutes}:{seconds:02d}"
+        except Exception as e:
+            logger.error(f"Error formatting duration: {e}")
+            return "0:00"
+
+    async def _get_video_info_yt_dlp(self, video_url: str) -> Optional[Dict[str, Any]]:
+        """Fallback video info via yt-dlp without downloading."""
+        try:
+            import yt_dlp
+        except Exception as import_error:
+            logger.warning(f"yt-dlp not available: {import_error}")
+            return None
+
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'skip_download': True,
+                'extract_flat': False
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(video_url, download=False)
+            if not info:
+                return None
+            video_id = info.get('id') or self._extract_video_id(video_url) or ''
+            thumbnail = info.get('thumbnail') or f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"
+            return {
+                'video_id': video_id,
+                'title': info.get('title') or f"YouTube Video {video_id}",
+                'duration': self._format_duration_seconds(info.get('duration')),
+                'thumbnail_url': thumbnail,
+                'channel_title': info.get('uploader') or "Unknown Channel",
+                'view_count': info.get('view_count') or 0,
+                'like_count': info.get('like_count') or 0,
+                'description': (info.get('description') or "")[:500],
+                'url': video_url,
+                'is_fallback': True
+            }
+        except Exception as e:
+            logger.warning(f"yt-dlp info fallback failed: {e}")
+            return None
+
+    async def _search_videos_yt_dlp(self, query: str, max_results: int = 5) -> list:
+        """Fallback search via yt-dlp."""
+        try:
+            import yt_dlp
+        except Exception as import_error:
+            logger.warning(f"yt-dlp not available for search: {import_error}")
+            return []
+
+        try:
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'default_search': f"ytsearch{max_results}",
+                'extract_flat': True,
+                'skip_download': True,
+            }
+            results = []
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(query, download=False)
+            for entry in (info.get('entries') or [])[:max_results]:
+                video_id = entry.get('id')
+                if not video_id:
+                    continue
+                results.append({
+                    'video_id': video_id,
+                    'title': entry.get('title'),
+                    'url': f"https://www.youtube.com/watch?v={video_id}",
+                    'thumbnail_url': entry.get('thumbnail', f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg"),
+                    'channel_title': entry.get('uploader', 'Unknown')
+                })
+            return results
+        except Exception as e:
+            logger.warning(f"yt-dlp search fallback failed: {e}")
+            return []
+
     def is_valid_youtube_url(self, url: str) -> bool:
         """Проверка валидности YouTube URL"""
         try:
@@ -208,11 +311,11 @@ class YouTubeService:
         return f"https://www.youtube.com/embed/{video_id}"
 
     async def search_videos(self, query: str, max_results: int = 5) -> list:
-        """Поиск видео по запросу"""
+        """????? ????? ?? ???????"""
         try:
             if not self.api_key:
                 logger.warning("YouTube API key not configured for search")
-                return []
+                return await self._search_videos_yt_dlp(query, max_results)
 
             url = f"{self.base_url}/search"
             params = {
@@ -244,8 +347,9 @@ class YouTubeService:
                         return results
                     else:
                         logger.error(f"YouTube search API error: {response.status}")
-                        return []
+                        return await self._search_videos_yt_dlp(query, max_results)
 
         except Exception as e:
             logger.error(f"Error searching videos: {e}")
-            return []
+            return await self._search_videos_yt_dlp(query, max_results)
+

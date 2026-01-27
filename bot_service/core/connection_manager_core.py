@@ -225,25 +225,13 @@ class ConnectionManagerCore:
                 return
 
             # Если пользователь не переподключился и нет активных соединений, отключаем TTS
-            logger.info(f"[TIMEOUT] [TTS TIMEOUT] User {user_id} ({username}) has no active connections - disabling TTS")
-
-            # Импортируем здесь, чтобы избежать циклических импортов
-            from services.tts.tts_service import TTSService
-            from core.database import get_db
-
-            db = next(get_db())
-            try:
-                tts_service = TTSService(db)
-                await tts_service.disable_tts(user_id=user_id)
-                logger.info(f"[OK] [TTS TIMEOUT] TTS disabled for user {user_id}")
-            finally:
-                db.close()
-
+            logger.info(f"[TIMEOUT] [TTS TIMEOUT] User {user_id} ({username}) has no active connections - keeping TTS enabled")
+            return
         except asyncio.CancelledError:
             logger.info(f"[OK] [TTS RECONNECT] User {user_id} reconnected - keeping TTS enabled")
             raise  # Важно: пробрасываем CancelledError для корректной отмены
         except Exception as e:
-            logger.error(f"[ERROR] [TTS TIMEOUT] Error disabling TTS for user {user_id}: {e}")
+            logger.error(f"[ERROR] [TTS TIMEOUT] Error handling timeout for user {user_id}: {e}")
         finally:
             # [OK] ГАРАНТИРОВАННАЯ ОЧИСТКА: Удаляем задачу из pending в любом случае
             # Это предотвращает утечку памяти и повторное использование завершенных задач

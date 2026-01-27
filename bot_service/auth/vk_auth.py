@@ -1,4 +1,4 @@
-"""
+﻿"""
 VK Live авторизация и гостевой вход
 """
 import httpx
@@ -208,7 +208,9 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                         data = user_info_response.json()
                         if isinstance(data, dict) and "data" in data and "user" in data["data"]:
                             user_info = data["data"]["user"]
-                            user_info['channel_url'] = data["data"].get("channel", {}).get("url")
+                            channel_obj = data["data"].get("channel") or {}
+                            channel_url = channel_obj.get("url") if isinstance(channel_obj, dict) else None
+                            user_info['channel_url'] = channel_url
                             logger.info(f"Successfully got user info: user_id={user_info.get('id')}")
                     else:
                         logger.error(f"Failed to get user info, status: {user_info_response.status_code}")
@@ -227,43 +229,32 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             from constants import Platform
 
             # Создаем объект с данными пользователя
-            # Извлекаем VK username из channel URL для подключения бота
+            # Извлекаем VK channel slug из channel URL для подключения бота
             # VK Live API возвращает channel.url: "https://live.vkvideo.ru/yourchy"
-            vk_username = None
             channel_url = user_info.get('channel_url')
-
+            channel_name = None
             if channel_url:
-                # Извлекаем ник канала из URL
                 try:
-                    # URL формат: https://live.vkvideo.ru/yourchy
-                    vk_username = channel_url.rstrip('/').split('/')[-1]
-                    logger.info(f"[OK] Extracted channel name from URL: {vk_username} (from {channel_url})")
+                    candidate = channel_url.rstrip('/').split('/')[-1]
+                    if candidate and " " not in candidate:
+                        channel_name = candidate
+                        logger.info(f"[OK] Extracted channel name from URL: {channel_name} (from {channel_url})")
+                    else:
+                        logger.warning(f"[WARN] Invalid VK channel slug from URL: {channel_url}")
                 except Exception as e:
                     logger.error(f"[ERROR] Failed to extract channel name from URL {channel_url}: {e}")
 
-            # Fallback на user.nick если не удалось извлечь из URL
-            if not vk_username:
-                vk_username = (
-                    user_info.get("nick") or
-                    user_info.get("login") or
-                    user_info.get("username") or
-                    user_info.get("screen_name") or
-                    None
-                )
-                if vk_username:
-                    logger.info(f"[WARN] Using user.nick as fallback: {vk_username}")
-
-            if vk_username:
-                # Проверяем что это не ID (если вдруг API вернет ID)
-                if vk_username.isdigit():
-                    logger.warning(f"[WARN] VK username is numeric ({vk_username}), using fallback")
-                    vk_username = f"vk{platform_user_id}"
-            else:
-                # VK Live API не вернул username, используем ID как fallback
-                vk_username = f"vk{platform_user_id}"
-                logger.warning(f"[WARN] VK API returned user_info without channel URL or nick: {user_info}")
-                logger.warning(f"[WARN] Available keys: {list(user_info.keys())}")
-                logger.info(f"[OK] Using fallback VK username: {vk_username}")
+            # Display name for UI (not for channel routing).
+            vk_display_name = (
+                user_info.get("nick") or
+                user_info.get("login") or
+                user_info.get("username") or
+                user_info.get("screen_name") or
+                channel_name
+            )
+            if not vk_display_name:
+                vk_display_name = f"vk{platform_user_id}"
+                logger.warning(f"[WARN] VK API returned user_info without display name: {user_info}")
 
             oauth_user_data = OAuthUserData(
                 platform_user_id=platform_user_id,
@@ -272,7 +263,8 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 refresh_token=refresh_token,
                 expires_at=expires_at,
                 scopes=scopes,
-                username=vk_username  # Теперь передаем реальный username
+                username=vk_display_name,  # Display name for UI
+                channel_name=channel_name  # Channel slug for bot routing
             )
 
             # Используем общий OAuth handler с автоподключением бота
@@ -282,7 +274,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 platform=Platform.VK,
                 user_data=oauth_user_data,
                 current_user=current_user,
-                auto_connect_bot=True
+                auto_connect_bot=bool(channel_name)
             )
 
             # Создаем ответ с редиректом

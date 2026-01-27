@@ -378,6 +378,19 @@ class MemoryWebSocketManager:
         """
         try:
             from services.tts.memory_tts_queue import get_memory_tts_queue
+            from core.database import get_db, User
+
+            db = next(get_db())
+            try:
+                user = db.query(User).filter(User.id == user_id).first()
+                if user and getattr(user, "tts_enabled", False):
+                    logger.info(
+                        f"User {user_id} disconnected - TTS enabled in settings, keeping generation enabled"
+                    )
+                    return
+            finally:
+                db.close()
+
             await get_memory_tts_queue().disable_for_user(user_id)
             logger.info(f"User {user_id} fully disconnected - TTS generation disabled")
         except Exception as e:
