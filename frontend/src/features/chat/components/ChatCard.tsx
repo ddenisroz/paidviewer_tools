@@ -11,7 +11,7 @@ import {
     loadChatBadges,
     loadCompleteChatHistory
 } from '@/features/chat/utils/chatHistoryHelpers';
-import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
+import { clearEmotesCache, getAllEmotesForChannel } from '@/features/chat/utils/emotes';
 import { filterMessagesByPlatform } from '@/features/chat/utils/messageFilterHelpers';
 import {
     autoScrollIfAtBottom,
@@ -233,16 +233,34 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         if (shouldLoadHistory) loadChatHistory();
     }, shouldLoadHistory ? CHAT_CONSTANTS.RENDER_DELAY : null);
 
-    // Load emotes with delay
-    useTimeout(() => {
+    const lastEmotesKeyRef = useRef<string>('');
+
+    // Load emotes with delay, and refresh when user/twitch id becomes available.
+    useEffect(() => {
+        const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
+        const username = user?.twitch_username;
+        const key = `${username || ''}:${twitchUserId || ''}`;
+        if (lastEmotesKeyRef.current === key) return;
+        lastEmotesKeyRef.current = key;
+
+        clearEmotesCache();
         loadEmotes();
-    }, CHAT_CONSTANTS.EMOJI_LOAD_DELAY);
+        logger.debug(`[CHAT] Emotes reload key: ${key}`);
+
+        const timer = setTimeout(() => {
+            loadEmotes();
+        }, CHAT_CONSTANTS.EMOJI_LOAD_DELAY);
+
+        return () => clearTimeout(timer);
+    }, [user?.twitch_username, user?.integrations?.twitch]);
 
     const loadEmotes = async (): Promise<void> => {
         try {
             const username = user?.twitch_username;
+            const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
             if (username) {
-                const emotesData = await getAllEmotesForChannel(username);
+                clearEmotesCache();
+                const emotesData = await getAllEmotesForChannel(username, twitchUserId);
                 setEmotes(emotesData);
             } else {
                 // Load only global emotes if no channel context

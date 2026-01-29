@@ -176,7 +176,7 @@
 
 #### Документация
 
-- Обновлен `docs/CURRENT_STATUS.md` - добавлена секция об аудите
+- Обновлен `docs/guides/CURRENT_STATUS.md` - добавлена секция об аудите
 - Обновлен `docs/architecture/DESIGN_SYSTEM.md` - добавлены константы
 
 #### Дополнительные улучшения (Dec 18, вечер)
@@ -455,4 +455,4 @@
 
 ---
 
-Полная история: см. `docs/CURRENT_STATUS.md`
+Полная история: см. `docs/guides/CURRENT_STATUS.md`

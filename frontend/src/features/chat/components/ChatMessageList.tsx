@@ -92,12 +92,12 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                         {msg.platform === 'twitch' ? (
                                             <TwitchIcon
                                                 className="text-purple-400 inline-block align-text-bottom mr-1"
-                                                style={{ width: '18px', height: '18px' }}
+                                                style={{ width: '16px', height: '16px' }}
                                             />
                                         ) : (
                                             <VKIcon
                                                 className="text-red-400 inline-block align-text-bottom mr-1"
-                                                style={{ width: '18px', height: '18px' }}
+                                                style={{ width: '16px', height: '16px' }}
                                             />
                                         )}
 
@@ -131,7 +131,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                                             return (
                                                                 <span
                                                                     key={idx}
-                                                                    className="inline-block align-text-bottom mr-0.5 w-[18px] h-[18px] bg-gray-600 rounded"
+                                                                    className="inline-block align-text-bottom mr-0.5 w-[16px] h-[16px] bg-gray-600 rounded"
                                                                     title={badge}
                                                                 />
                                                             );
@@ -144,8 +144,8 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                                             src={badgeUrl}
                                                             alt={badgeId}
                                                             title={badge}
-                                                            className="inline-block align-text-bottom mr-0.5"
-                                                            style={{ width: '18px', height: '18px' }}
+                                                            className="inline-block align-text-bottom mr-0.5 object-contain"
+                                                            style={{ width: '16px', height: '16px' }}
                                                             onError={(e) => {
                                                                 (e.target as HTMLImageElement).style.display = 'none';
                                                             }}
@@ -178,6 +178,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                                 message={msg.content || msg.message || 'Нет содержимого'}
                                                 channelEmotes={channelEmotes}
                                                 globalEmotes={globalEmotes}
+                                                twitchEmotes={msg.emotes}
                                                 showLinks={showImages}
                                                 autoLoadImages={showImages}
                                             />

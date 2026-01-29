@@ -120,12 +120,6 @@ const SwipeableMessage = React.memo<SwipeableMessageProps>(({ children, onSwipeA
             </div>
         </div>
     );
-}, (prevProps, nextProps) => {
-    // Кастомная функция сравнения для оптимизации - ререндерим только если изменились критичные пропсы
-    return prevProps.message.id === nextProps.message.id &&
-           prevProps.message.timestamp === nextProps.message.timestamp &&
-           prevProps.message.author === nextProps.message.author &&
-           prevProps.message.message === nextProps.message.message;
 });
 
 SwipeableMessage.displayName = 'SwipeableMessage';

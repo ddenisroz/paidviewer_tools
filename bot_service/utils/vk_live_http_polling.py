@@ -7,6 +7,8 @@ import aiohttp
 import logging
 from typing import Optional, Callable, Dict, Set
 
+from utils.vk_channel_url import extract_vk_channel_slug
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +43,10 @@ class VKLiveHTTPPolling:
         if channel_url.startswith('http://') or channel_url.startswith('https://'):
             return channel_url
         return f"https://live.vkvideo.ru/{channel_url}"
+
+    def _format_chat_channel(self, channel_url: str) -> str:
+        slug = extract_vk_channel_slug(channel_url)
+        return slug or channel_url
 
     def _get_connector(self) -> aiohttp.TCPConnector:
         if 'apidev.' in self.api_base_url:
@@ -123,7 +129,7 @@ class VKLiveHTTPPolling:
                 "Content-Type": "application/json"
             }
             params = {
-                "channel_url": self._format_channel_url(self.channel_url),
+                "channel_url": self._format_chat_channel(self.channel_url),
                 "limit": 20  # Получаем последние 20 сообщений
             }
 

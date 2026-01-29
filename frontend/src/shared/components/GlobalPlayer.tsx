@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronUp, List, Pause, Play, SkipForward, Volume2, VolumeX, X } from 'lucide-react';
 import YouTube from 'react-youtube';
+import { useLocation } from 'react-router-dom';
 
 import { BUTTON_SIZES, TRANSITIONS } from '@/constants/designSystem';
 import { usePlayer } from '@/context/PlayerContext';
@@ -36,7 +37,8 @@ const GlobalPlayer: React.FC = () => {
         handlePlayerReady,
         handlePlayerStateChange,
         handlePlayerError,
-        setPlayerRef
+        setPlayerRef,
+        releasePlayerRef
     } = usePlayer();
     
     const [showQueue, setShowQueue] = useState(false);
@@ -60,8 +62,16 @@ const GlobalPlayer: React.FC = () => {
 
     // Обработчик готовности плеера с установкой ссылки
     const handlePlayerReadyWithRef = (event: YouTubeEvent) => {
-        setPlayerRef(event.target);
+        setPlayerRef(event.target, 'global');
         handlePlayerReady(event as unknown as Event);
+        if (!isPlaying) {
+            try {
+                event.target.pauseVideo();
+                event.target.mute();
+            } catch (error) {
+                // Ignore autoplay prevention errors
+            }
+        }
     };
 
     // Глобальный перехват ошибок YouTube API для браузерных расширений
@@ -92,22 +102,34 @@ const GlobalPlayer: React.FC = () => {
         };
     }, []);
 
+    useEffect(() => {
+        return () => {
+            releasePlayerRef('global');
+        };
+    }, [releasePlayerRef]);
+
     // Обработка громкости
     const handleVolumeChange = (value: number[]) => {
         const newVolume = value[0];
         setVolume(newVolume);
     };
 
-    // [OK] ВАЖНО: Вычисляем все переменные ДО условных return
-    // Проверяем текущий путь, чтобы не показывать UI на странице YouTube
-    const currentPath = window.location.pathname;
-    const isOnYoutubePage = currentPath.includes('/dashboard/youtube');
+    // [OK] IMPORTANT: compute variables before conditional return
+    // Check current route to avoid showing UI on YouTube page
+    const location = useLocation();
+    const currentPath = location.pathname;
+    const currentSearch = location.search;
+    const searchParams = new URLSearchParams(currentSearch);
+    const activeTab = searchParams.get('tab');
+    const isMediaYoutubeTab = currentPath.startsWith('/dashboard/media') && (!activeTab || activeTab === 'youtube');
+    const isOnYoutubePage = currentPath.startsWith('/dashboard/youtube') || isMediaYoutubeTab;
     
     // Плеер работает всегда, UI показываем на всех страницах КРОМЕ YouTube
     // На YouTube странице - ничего не показываем (там свой встроенный плеер)
     const showUI = isVisible && !isTheaterMode && !isOnYoutubePage;
 
     const displayVideo = currentVideo || queue[0] || null;
+    const displayThumbnail = displayVideo?.thumbnail || displayVideo?.thumbnail_url;
 
     // [OK] ТЕПЕРЬ проверяем если нет видео, не показываем плеер
     if (!displayVideo) {
@@ -145,7 +167,7 @@ const GlobalPlayer: React.FC = () => {
                                 widget_referrer: window.location.origin
                             }
                         }}
-                        key={`hidden-player-${displayVideo.video_id}-${Date.now()}`}
+                        key={`hidden-player-${displayVideo.video_id}`}
                         className="hidden"
                     />
                 </div>
@@ -153,8 +175,8 @@ const GlobalPlayer: React.FC = () => {
             
             {/* UI плеера фиксирован внизу экрана с отступом */}
             {showUI && (
-                <div className="fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
-                    <div className="w-full max-w-4xl pointer-events-auto">
+                <div className="absolute bottom-4 left-4 z-40 w-[calc(100%-2rem)] max-w-[320px] pointer-events-none">
+                    <div className="w-full pointer-events-auto">
                         {/* Queue panel - показывается над плеером */}
                         {showQueue && queue.length > 0 && (
                             <div className="bg-gray-900/95 backdrop-blur-md border border-gray-700 rounded-t-xl shadow-2xl mb-0 max-h-64 overflow-hidden">
@@ -183,9 +205,9 @@ const GlobalPlayer: React.FC = () => {
                                                     {index + 1}
                                                 </div>
                                                 <div className="w-12 h-8 bg-gray-800 rounded overflow-hidden flex-shrink-0">
-                                                    {video.thumbnail && (
+                                                    {(video.thumbnail || video.thumbnail_url) && (
                                                         <img 
-                                                            src={video.thumbnail} 
+                                                            src={video.thumbnail || video.thumbnail_url} 
                                                             alt={video.title}
                                                             className="w-full h-full object-cover"
                                                             loading="lazy"
@@ -211,13 +233,13 @@ const GlobalPlayer: React.FC = () => {
                         {/* Main player controls */}
                         <div className={`bg-gray-900/95 backdrop-blur-md border border-gray-700 shadow-2xl ${showQueue ? 'rounded-b-xl border-t-0' : 'rounded-xl'}`}>
                             {/* Основные элементы управления */}
-                            <div className="flex items-center justify-between px-4 py-4">
+                            <div className="flex flex-col gap-2 px-3 py-1.5">
                                 {/* Информация о треке слева */}
-                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                    <div className="w-10 h-10 bg-gray-800 rounded-md overflow-hidden flex-shrink-0">
-                                {displayVideo.thumbnail && (
+                                <div className="flex items-center gap-2 min-w-0 w-full">
+                                    <div className="w-8 h-8 bg-gray-800 rounded-md overflow-hidden flex-shrink-0">
+                                {displayThumbnail && (
                                     <img 
-                                        src={displayVideo.thumbnail} 
+                                        src={displayThumbnail} 
                                         alt={displayVideo.title}
                                         className="w-full h-full object-cover"
                                         loading="eager"
@@ -287,7 +309,7 @@ const GlobalPlayer: React.FC = () => {
                                 </div>
 
                                 {/* Регулятор громкости справа */}
-                                <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                                <div className="flex items-center gap-2 w-full">
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -297,7 +319,7 @@ const GlobalPlayer: React.FC = () => {
                                     >
                                         {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                                     </Button>
-                                    <div className="w-20">
+                                    <div className="flex-1">
                                         <Slider
                                             value={[isMuted ? 0 : (volume ?? 100)]}
                                             onValueChange={handleVolumeChange}

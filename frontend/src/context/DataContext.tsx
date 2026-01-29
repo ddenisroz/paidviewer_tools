@@ -5,7 +5,7 @@ import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo
 import { streamService } from '@/services/api/services/streamService';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
-import { getQueryCache, setQueryCache } from '@/shared/utils/queryPersist';
+import { getQueryCache, getQueryCacheWithMaxAge, setQueryCache } from '@/shared/utils/queryPersist';
 
 import { useAuth } from './AuthContext';
 import { useIntegrations } from './IntegrationsContext';
@@ -471,6 +471,9 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         updateStreamMutation.mutate(payload as unknown as Record<string, unknown>, {
             onSuccess: () => {
                 setStatus(prev => ({ ...prev, [statusType]: 'success' }));
+                const latest = currentDataRef.current;
+                setInitialData(latest);
+                setQueryCache(['stream-data', user?.id], latest);
                 setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
             },
             onError: (error: unknown) => {
@@ -522,6 +525,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         if (!integrations[platform]?.enabled) {
             logger.log('DataContext: Platform not enabled, skipping search');
             return [];
+        }
+
+        const cacheKey = ['stream-categories', platform, query.toLowerCase()];
+        const cachedCategories = getQueryCacheWithMaxAge<StreamCategory[]>(cacheKey, 10 * 60 * 1000);
+        if (cachedCategories && cachedCategories.length > 0) {
+            setCategories(prev => ({ ...prev, [platform]: cachedCategories }));
+            return cachedCategories;
         }
 
         setLoading(prev => ({ ...prev, categories: true }));
@@ -579,6 +589,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             });
 
             setCategories(prev => ({ ...prev, [platform]: mergedCategories }));
+            setQueryCache(cacheKey, mergedCategories);
 
             return mergedCategories;
         } catch (error: unknown) {

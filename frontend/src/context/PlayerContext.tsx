@@ -11,6 +11,13 @@ import { useChat } from './ChatContext';
 
 import type { YoutubeQueue, YoutubeVideo } from '@/types/youtube';
 
+
+declare global {
+    interface Window {
+        ytUserStarted?: boolean;
+    }
+}
+
 interface YouTubePlayer {
     pauseVideo: () => void;
     playVideo: () => void;
@@ -19,6 +26,7 @@ interface YouTubePlayer {
     unMute: () => void;
     getCurrentTime: () => number;
     getDuration: () => number;
+    destroy?: () => void;
 }
 
 interface PlayerState {
@@ -35,6 +43,8 @@ interface PlayerState {
     isLoading: boolean;
     error: string | null;
 }
+
+type PlayerSource = 'global' | 'page';
 
 type PlayerAction =
     | { type: 'SET_LOADING'; payload: boolean }
@@ -104,7 +114,9 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             const queue = action.payload.queue || [];
             const currentVideo = action.payload.current_video || queue[0] || null;
             const hasQueue = queue.length > 0 || !!currentVideo;
-            const isPlaying = (action.payload as { is_playing?: boolean }).is_playing ?? false;
+            const rawIsPlaying = (action.payload as { is_playing?: boolean }).is_playing ?? false;
+            const userInitiated = window.ytUserStarted === true;
+            const isPlaying = rawIsPlaying && userInitiated;
             return {
                 ...state,
                 queue,
@@ -145,7 +157,8 @@ interface PlayerContextValue extends PlayerState {
     togglePlayPause: () => void;
     setVolume: (volume: number) => void;
     toggleMute: () => void;
-    setPlayerRef: (ref: YouTubePlayer | null) => void;
+    setPlayerRef: (ref: YouTubePlayer | null, source?: PlayerSource) => void;
+    releasePlayerRef: (source: PlayerSource) => void;
     handlePlayerReady: (event: unknown) => void;
     handlePlayerStateChange: (event: unknown) => void;
     handlePlayerError: (event: unknown) => void;
@@ -163,6 +176,7 @@ interface PlayerProviderProps {
 export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [state, dispatch] = useReducer(playerReducer, initialState);
     const lastUpdateTimeRef = useRef<number>(0);
+    const playerSourceRef = useRef<PlayerSource | null>(null);
     const { isAuthenticated } = useAuth();
     const { lastJsonMessage } = useChat();
 
@@ -174,22 +188,34 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     });
 
     // React Query v5: onSuccess/onError moved to useEffect
+    const normalizeVideo = useCallback((video: YoutubeVideo | null | undefined): YoutubeVideo | null => {
+        if (!video) return null;
+        const normalized = { ...video };
+        normalized.thumbnail = normalized.thumbnail || normalized.thumbnail_url;
+        return normalized;
+    }, []);
+
     useEffect(() => {
         if (queueData) {
             // queueData is already typed as YoutubeQueue from the service
             const response = queueData as { data?: YoutubeQueue } | YoutubeQueue;
             const queue = 'data' in response && response.data ? response.data : (response as YoutubeQueue);
+            const rawIsPlaying = queue.is_playing ?? false;
+            const userInitiated = window.ytUserStarted === true;
+            const nextIsPlaying = state.isPlaying || (rawIsPlaying && userInitiated);
+            const normalizedQueue = (queue.queue || []).map(normalizeVideo).filter(Boolean) as YoutubeVideo[];
+            const normalizedCurrent = normalizeVideo(queue.current_video) || normalizedQueue[0] || null;
             dispatch({
                 type: 'LOAD_QUEUE',
                 payload: {
-                    queue: queue.queue || [],
-                    current_video: queue.current_video || null,
-                    is_playing: queue.is_playing
+                    queue: normalizedQueue,
+                    current_video: normalizedCurrent,
+                    is_playing: nextIsPlaying
                 }
             });
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [queueData]);
+    }, [queueData, state.isPlaying, normalizeVideo]);
 
     useEffect(() => {
         if (_queueError) {
@@ -210,13 +236,11 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         dispatch({ type: 'SET_LOADING', payload: isLoadingQueue });
     }, [isLoadingQueue]);
 
-    const loadQueue = useCallback(async (force: boolean = false): Promise<void> => {
+    const loadQueue = useCallback(async (_force: boolean = false): Promise<void> => {
         if (!isAuthenticated) {
             return;
         }
-        if (force) {
-            await refetchQueue();
-        }
+        await refetchQueue();
     }, [isAuthenticated, refetchQueue]);
 
     const skipVideoMutation = useSkipYoutubeVideo({
@@ -257,6 +281,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                     state.playerRef.pauseVideo();
                 } else {
                     state.playerRef.playVideo();
+                    window.ytUserStarted = true;
                 }
                 dispatch({ type: 'TOGGLE_PLAY_PAUSE' });
                 logger.debug('Play/pause toggled');
@@ -302,8 +327,39 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
     };
 
-    const setPlayerRef = (ref: YouTubePlayer | null): void => {
+    const setPlayerRef = (ref: YouTubePlayer | null, source: PlayerSource = 'global'): void => {
+        const currentRef = state.playerRef;
+        const currentSource = playerSourceRef.current;
+
+        if (currentRef && currentRef !== ref) {
+            try {
+                currentRef.pauseVideo();
+                currentRef.mute();
+                currentRef.destroy?.();
+            } catch (error) {
+                logger.debug('[YouTube] Previous player cleanup skipped:', error);
+            }
+        }
+
+        playerSourceRef.current = source;
         dispatch({ type: 'SET_PLAYER_REF', payload: ref });
+    };
+
+    const releasePlayerRef = (source: PlayerSource): void => {
+        if (playerSourceRef.current !== source) {
+            return;
+        }
+        if (state.playerRef) {
+            try {
+                state.playerRef.pauseVideo();
+                state.playerRef.mute();
+                state.playerRef.destroy?.();
+            } catch (error) {
+                logger.debug('[YouTube] Player release cleanup skipped:', error);
+            }
+        }
+        playerSourceRef.current = null;
+        dispatch({ type: 'SET_PLAYER_REF', payload: null });
     };
 
     const updateTime = useCallback((): void => {
@@ -327,7 +383,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const handlePlayerReady = (event: unknown): void => {
         const playerEvent = event as { target: YouTubePlayer };
         const player = playerEvent.target;
-        setPlayerRef(player);
+        if (!player) {
+            logger.debug('[WARN] [YOUTUBE] Player ready without target');
+            return;
+        }
         logger.debug('[OK] [YOUTUBE] Player ready - autoplay handled by iframe params');
     };
 
@@ -339,6 +398,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         if (playerState === 1) {
             dispatch({ type: 'SET_PLAYING', payload: true });
             dispatch({ type: 'SET_VISIBLE', payload: true });
+            window.ytUserStarted = true;
             logger.debug('▶ [YOUTUBE] Playing, mini-player visible');
         } else if (playerState === 2) {
             dispatch({ type: 'SET_PLAYING', payload: false });
@@ -348,7 +408,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             nextVideo();
         } else if (playerState === 5) {
             try {
-                if (player && player.playVideo) {
+                if (player && player.playVideo && state.isPlaying) {
                     player.playVideo();
                     logger.debug('▶ [YOUTUBE] Auto-play triggered (video cued)');
                 }
@@ -376,6 +436,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         if (state.playerRef) {
             state.playerRef.pauseVideo();
         }
+        window.ytUserStarted = false;
         dispatch({ type: 'CLOSE_PLAYER' });
     };
 
@@ -490,6 +551,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         setVolume,
         toggleMute,
         setPlayerRef,
+        releasePlayerRef,
         handlePlayerReady,
         handlePlayerStateChange,
         handlePlayerError,

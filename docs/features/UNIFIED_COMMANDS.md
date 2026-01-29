@@ -162,7 +162,7 @@ async def _handle_game(ctx, user, args):
 - **Система категорий:** `docs/CATEGORY_MAPPING_GUIDE.md`
 - **Кросс-платформенный маппинг:** `bot_service/utils/category_search.py`
 - **Команды бота:** `docs/ROLES_REFERENCE.md`
-- **Общий статус:** `docs/CURRENT_STATUS.md`
+- **Общий статус:** `docs/guides/CURRENT_STATUS.md`
 
 ---
 

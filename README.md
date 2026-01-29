@@ -1,8 +1,8 @@
 # AI Python TTS & Twitch Bot 🤖
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)
-![React](https://img.shields.io/badge/React-18.2.0-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.121.2-green.svg)
+![React](https://img.shields.io/badge/React-19.1.1-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
 Комплексное решение для Twitch-стримеров с ИИ-озвучкой (TTS), интеграцией Twitch/VK/DonationAlerts и современным веб-интерфейсом.
@@ -33,9 +33,9 @@ git clone <repo>
 cd TTS_TTV_0.02
 
 # 2. Настрой окружение (автоматическая миграция)
-./migrate.sh  # Linux/Mac
+./scripts/migrate.sh  # Linux/Mac
 # или
-migrate.ps1   # Windows
+.\scripts/migrate.ps1   # Windows
 
 # 3. Настрой .env файлы
 # bot_service/.env - OAuth credentials, database, security keys
@@ -43,14 +43,19 @@ migrate.ps1   # Windows
 # frontend/.env - API endpoints (уже настроен)
 
 # 4. Запусти сервисы
-npm run dev:frontend  # Frontend (localhost:5173)
-npm run dev:bot       # Bot Service (localhost:8000)
-npm run dev:tts       # TTS Service (localhost:8001) - опционально
+cd bot_service
+python main.py         # Bot Service (localhost:8000)
+
+cd ../frontend
+npm run dev            # Frontend (localhost:5173)
+
+cd ../tts_service
+python main.py          # TTS Service (localhost:8001) - опционально
 ```
 
-**Полный гайд:** [QUICK_START.md](QUICK_START.md)  
-**Deployment:** [DEPLOYMENT.md](docs/DEPLOYMENT.md)  
-**Design System:** [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) [NEW]
+**Полный гайд:** [docs/QUICKSTART.md](docs/QUICKSTART.md)  
+**Deployment:** [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md)  
+**Design System:** [docs/architecture/DESIGN_SYSTEM.md](docs/architecture/DESIGN_SYSTEM.md) [NEW]
 
 ---
 
@@ -60,13 +65,13 @@ npm run dev:tts       # TTS Service (localhost:8001) - опционально
 
 ```bash
 # Проверить соответствие Design System
-npm run check:design
+node scripts/migrate-to-design-system.js
 
 # Автоматически исправить проблемы
-npm run migrate:design:apply
+node scripts/migrate-to-design-system.js --apply
 ```
 
-**Документация:** [DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)  
+**Документация:** [DESIGN_SYSTEM.md](docs/architecture/DESIGN_SYSTEM.md)  
 **Примеры:** [DesignSystemExample.tsx](frontend/src/components/examples/DesignSystemExample.tsx)
 
 ---
@@ -108,30 +113,19 @@ npm run migrate:design:apply
 - **[PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)** - Полный анализ проекта, технический долг, план улучшений
 
 ### Для обычных пользователей
-- **[Быстрый старт](docs/guides/QUICK_START.md)**
-- **[Текущий статус](docs/CURRENT_STATUS.md)**
+- **[Быстрый старт](docs/QUICKSTART.md)**
+- **[Текущий статус](docs/guides/CURRENT_STATUS.md)**
 
 ### Для разработчиков
 - **[Архитектура](docs/architecture/ARCHITECTURE_GUIDE.md)**
-- **[Руководство](docs/DEVELOPER_GUIDE.md)**
+- **[Руководство](docs/guides/DEVELOPER_GUIDE.md)**
 - **[Changelog](docs/CHANGELOG.md)**
 
 ### Для AI-агентов
-- **[Правила разработки](docs/LLM_DEVELOPMENT_RULES.md)** ОБЯЗАТЕЛЬНО!
-- **[Текущий статус](docs/CURRENT_STATUS.md)**
-- **[Не трогать](docs/DO_NOT_TOUCH.md)**
+- **[Project Context](docs/PROJECT_CONTEXT.md)**
+- **[Текущий статус](docs/guides/CURRENT_STATUS.md)**
 
 **Полный индекс:** [docs/README.md](docs/README.md)
-
-### Legacy Code Archive
-
-The `legacy/` folder contains archived code from version 0.02 (pre-refactoring). This is a complete snapshot preserved for reference purposes.
-
-**See:** [legacy/LEGACY_CONTENTS.md](legacy/LEGACY_CONTENTS.md) for detailed documentation.
-
-**Note:** Legacy code is read-only and should not be used in current development.
-
----
 
 ## Структура проекта
 
@@ -168,7 +162,6 @@ The `legacy/` folder contains archived code from version 0.02 (pre-refactoring).
 │   └── ...               # Personal TTS for single user
 │
 ├── docs/                 # Документация
-├── legacy/               # Archived legacy code (v0.02 pre-refactoring)
 ├── .env.example          # Environment template
 └── migrate.sh/ps1        # Migration script
 ```
@@ -223,7 +216,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 **Scenario 3: Cloud (Google TTS)**
 - Machine 1 (Remote): All services (Bot + Frontend + TTS)
 
-**См. полный гайд:** [DEPLOYMENT.md](docs/DEPLOYMENT.md)
+**См. полный гайд:** [DEPLOYMENT.md](docs/setup/DEPLOYMENT.md)
 
 ## Безопасность
 

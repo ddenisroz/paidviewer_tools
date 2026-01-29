@@ -9,6 +9,7 @@ import aiohttp
 
 from .vk_auth import VKAuth
 from .vk_base import VK_API_TIMEOUT
+from utils.vk_channel_url import normalize_vk_channel_url
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,7 @@ class VKRewards(VKAuth):
     async def get_channel_points_balance(self, channel_url: str, access_token: str) -> Optional[Dict[str, Any]]:
         """Get channel points balance."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -47,6 +49,7 @@ class VKRewards(VKAuth):
     async def get_channel_rewards(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
         """Get list of channel rewards."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/rewards"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -71,6 +74,7 @@ class VKRewards(VKAuth):
     async def create_channel_reward(self, channel_url: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Create a new channel reward."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/create"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -98,6 +102,7 @@ class VKRewards(VKAuth):
     async def get_rewards_manage_info(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
         """Get rewards management info (for streamer)."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/rewards/manage_info"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -121,6 +126,7 @@ class VKRewards(VKAuth):
     async def get_reward_demands(self, channel_url: str, access_token: str, limit: int = 20, offset: int = 0) -> Optional[Dict[str, Any]]:
         """Get reward demands list."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/demands"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -148,6 +154,7 @@ class VKRewards(VKAuth):
     async def accept_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
         """Accept reward demands."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/demand/accept"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -172,6 +179,7 @@ class VKRewards(VKAuth):
     async def reject_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
         """Reject reward demands."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/demand/reject"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -196,6 +204,7 @@ class VKRewards(VKAuth):
     async def delete_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
         """Delete channel reward."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/delete"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -222,6 +231,7 @@ class VKRewards(VKAuth):
     async def update_channel_reward(self, channel_url: str, reward_id: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update channel reward."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/edit"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -250,6 +260,7 @@ class VKRewards(VKAuth):
     async def enable_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
         """Enable channel reward."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/enable"
             headers = {
                 "Authorization": f"Bearer {access_token}",
@@ -276,6 +287,7 @@ class VKRewards(VKAuth):
     async def disable_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
         """Disable channel reward."""
         try:
+            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/reward/disable"
             headers = {
                 "Authorization": f"Bearer {access_token}",

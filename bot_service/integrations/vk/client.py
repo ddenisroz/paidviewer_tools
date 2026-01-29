@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, List, Union
 import aiohttp
 
 from integrations.base import BaseIntegrationClient, TokenInfo, IntegrationError, RateLimitError
+from utils.vk_channel_url import get_vk_channel_candidates
 from integrations.vk.oauth import VKOAuth
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,30 @@ class VKClient(BaseIntegrationClient):
         """Get info about current user (streamer)."""
         try:
             result = await self.get("v1/current_user", token=token)
-            return result.get("data")
+            data = result.get("data")
+
+            # Dev API sometimes omits channel info; retry on prod to resolve channel URL.
+            has_channel = False
+            if isinstance(data, dict):
+                channel_obj = data.get("channel") or {}
+                channel_url = channel_obj.get("url") if isinstance(channel_obj, dict) else None
+                has_channel = bool(channel_url or data.get("channel_url"))
+
+            if not has_channel:
+                try:
+                    prod_result = await self._request_with_base(
+                        self.PROD_BASE_URL,
+                        "GET",
+                        "v1/current_user",
+                        token=token
+                    )
+                    prod_data = prod_result.get("data")
+                    if isinstance(prod_data, dict):
+                        return prod_data
+                except IntegrationError as e:
+                    logger.warning(f"[VK client] Failed to fetch user info from prod API: {e}")
+
+            return data
         except IntegrationError as e:
             logger.error(f"[VK client] Failed to get user info: {e}")
             raise
@@ -109,10 +133,26 @@ class VKClient(BaseIntegrationClient):
         }
         
         try:
-            params = {"channel_url": self._format_channel_url(channel_url)}
             # Using token allows seeing drafts/latency info etc.
-            result = await self.get("v1/channel", token=token, params=params)
-            data = result.get("data", {})
+            data = None
+            last_error: Optional[Exception] = None
+            for candidate in get_vk_channel_candidates(channel_url):
+                params = {"channel_url": candidate}
+                try:
+                    result = await self.get("v1/channel", token=token, params=params)
+                    data = result.get("data", {})
+                    if data:
+                        logger.info(f"[VK client] Resolved channel via {candidate}")
+                        break
+                except IntegrationError as e:
+                    last_error = e
+                    if "channel_not_found" in str(e):
+                        continue
+                    raise
+            if data is None:
+                if last_error:
+                    raise last_error
+                return default_offline
             
             stream = data.get("stream")
             if stream and stream.get('status') == 'started':
@@ -156,12 +196,21 @@ class VKClient(BaseIntegrationClient):
         Requires getting current state first to merge.
         """
         try:
-            # 1. Get current state
-            try:
-                current_data = await self.get("v1/channel", token=token, params={"channel_url": self._format_channel_url(channel_url)})
-                stream_info = current_data.get("data", {}).get("stream", {})
-            except Exception:
-                stream_info = {}
+            # 1. Get current state (try candidates)
+            stream_info: Dict[str, Any] = {}
+            last_error: Optional[Exception] = None
+            for candidate in get_vk_channel_candidates(channel_url):
+                try:
+                    current_data = await self.get("v1/channel", token=token, params={"channel_url": candidate})
+                    stream_info = current_data.get("data", {}).get("stream", {})
+                    break
+                except IntegrationError as e:
+                    last_error = e
+                    if e.status_code == 404 or "channel_not_found" in str(e):
+                        continue
+                    raise
+            if not stream_info and last_error:
+                logger.warning(f"[VK client] Failed to resolve stream info before update: {last_error}")
 
             # 2. Build payload
             current_cat_id = None
@@ -179,16 +228,26 @@ class VKClient(BaseIntegrationClient):
 
             # 3. Update
             body = {"stream": payload}
-            await self._request_with_base(
-                self.PROD_BASE_URL,
-                "POST",
-                "v1/channel/stream/edit",
-                token=token,
-                params={"channel_url": self._format_channel_url(channel_url)},
-                json_data=body
-            )
-            logger.info(f"[VK client] Updated stream for {channel_url}")
-            return True
+            last_error = None
+            for candidate in get_vk_channel_candidates(channel_url):
+                try:
+                    await self._request_with_base(
+                        self.PROD_BASE_URL,
+                        "POST",
+                        "v1/channel/stream/edit",
+                        token=token,
+                        params={"channel_url": candidate},
+                        json_data=body
+                    )
+                    logger.info(f"[VK client] Updated stream for {candidate}")
+                    return True
+                except IntegrationError as e:
+                    last_error = e
+                    if e.status_code == 404 or "channel_not_found" in str(e):
+                        continue
+                    raise
+            if last_error:
+                raise last_error
 
         except IntegrationError as e:
             logger.error(f"[VK client] Failed to update stream: {e}")
@@ -246,7 +305,7 @@ class VKClient(BaseIntegrationClient):
     async def delete_custom_reward(self, channel_url: str, reward_id: str, token: TokenInfo) -> bool:
         """Delete reward."""
         try:
-            params = {"channel_url": channel_url, "reward_id": reward_id}
+            params = {"channel_url": self._format_channel_url(channel_url), "reward_id": reward_id}
             await self.post("v1/channel_point/reward/delete", token=token, params=params)
             return True
         except IntegrationError as e:
@@ -256,7 +315,7 @@ class VKClient(BaseIntegrationClient):
     async def update_custom_reward(self, channel_url: str, reward_id: str, token: TokenInfo, reward_data: Dict[str, Any]) -> bool:
         """Update reward."""
         try:
-            params = {"channel_url": channel_url, "reward_id": reward_id}
+            params = {"channel_url": self._format_channel_url(channel_url), "reward_id": reward_id}
             body = {"reward": reward_data}
             await self.post("v1/channel_point/reward/edit", token=token, params=params, json_data=body)
             return True

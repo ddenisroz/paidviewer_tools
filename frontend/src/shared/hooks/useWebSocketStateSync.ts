@@ -21,6 +21,8 @@ export const useWebSocketStateSync = () => {
   const { user } = useAuth();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting' | 'failed'>('disconnected');
+  const lastLoggedStatusRef = useRef<'connected' | 'disconnected' | 'reconnecting' | 'failed' | null>(null);
+  const lastLogAtRef = useRef<number>(0);
 
   // Dedupe mechanism to prevent multiple reconciliation triggers
   const isReconcilingRef = useRef(false);
@@ -118,7 +120,16 @@ export const useWebSocketStateSync = () => {
 
     // Handle connection status changes
     const handleConnectionStatus = (status: 'connected' | 'disconnected' | 'reconnecting' | 'failed') => {
-      logger.info(`Connection status changed: ${status}`);
+      const now = Date.now();
+      const lastStatus = lastLoggedStatusRef.current;
+      const shouldLog =
+        status !== lastStatus &&
+        (now - lastLogAtRef.current > 1500 || status === 'failed' || status === 'disconnected');
+      if (shouldLog) {
+        logger.info(`Connection status changed: ${status}`);
+        lastLoggedStatusRef.current = status;
+        lastLogAtRef.current = now;
+      }
       setConnectionStatus(status);
 
       // Connection restored - trigger reconciliation (debounced)

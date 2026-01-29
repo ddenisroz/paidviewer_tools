@@ -5,7 +5,6 @@ import { Toaster } from 'sonner';
 
 import AppErrorBoundary from '@/shared/components/ErrorBoundary/AppErrorBoundary';
 import RouteErrorBoundary from '@/shared/components/ErrorBoundary/RouteErrorBoundary';
-import { ConnectionStatus } from '@/shared/components/layout/ConnectionStatus';
 import Layout from '@/shared/components/layout/Layout';
 import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 
@@ -44,9 +43,6 @@ const App: React.FC = () => {
 
     return (
         <>
-            {/* Task 6.5: Connection status indicator - Moved to bottom-left */}
-            <ConnectionStatus />
-
             <AppErrorBoundary>
                 <Routes>
                     {/* Public Routes */}

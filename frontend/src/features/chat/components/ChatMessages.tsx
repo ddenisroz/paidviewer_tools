@@ -181,7 +181,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                                 src={url}
                                                                 alt={badgeId}
                                                                 title={badgeId}
-                                                                className="h-4 w-4 inline-block"
+                                                                className="h-4 w-4 inline-block object-contain align-text-bottom"
                                                             />
                                                         );
                                                     }

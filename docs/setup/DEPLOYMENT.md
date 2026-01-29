@@ -819,10 +819,10 @@ sudo systemctl restart cloudflared
 ## Дополнительные ресурсы
 
 - **[README.md](../README.md)** - Главный README
-- **[QUICK_START.md](guides/QUICK_START.md)** - Быстрый старт
+- **[QUICKSTART.md](../QUICKSTART.md)** - Быстрый старт
 - **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - Текущий статус
 - **[ARCHITECTURE_GUIDE.md](architecture/ARCHITECTURE_GUIDE.md)** - Архитектура
-- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Руководство разработчика
+- **[DEVELOPER_GUIDE.md](../guides/DEVELOPER_GUIDE.md)** - Руководство разработчика
 
 ---
 

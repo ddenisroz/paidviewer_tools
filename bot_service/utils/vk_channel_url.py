@@ -1,0 +1,33 @@
+from typing import Optional
+
+
+def normalize_vk_channel_url(channel_url: Optional[str]) -> Optional[str]:
+    if not channel_url:
+        return channel_url
+    value = str(channel_url).strip()
+    if not value:
+        return value
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+    return f"https://live.vkvideo.ru/{value}"
+
+
+def extract_vk_channel_slug(channel_url: Optional[str]) -> Optional[str]:
+    if not channel_url:
+        return channel_url
+    value = str(channel_url).strip()
+    if not value:
+        return value
+    if value.startswith("http://") or value.startswith("https://"):
+        value = value.rstrip("/").split("/")[-1]
+    return value
+
+
+def get_vk_channel_candidates(channel_url: Optional[str]) -> list[str]:
+    full = normalize_vk_channel_url(channel_url)
+    slug = extract_vk_channel_slug(channel_url)
+    candidates = []
+    for item in [full, slug]:
+        if item and item not in candidates:
+            candidates.append(item)
+    return candidates

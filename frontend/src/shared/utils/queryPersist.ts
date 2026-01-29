@@ -20,6 +20,27 @@ export function getQueryCache<T = unknown>(queryKey: unknown[]): T | null {
   }
 }
 
+export function getQueryCacheWithMaxAge<T = unknown>(queryKey: unknown[], maxAgeMs: number): T | null {
+  try {
+    const cacheKey = `${QUERY_CACHE_PREFIX}${JSON.stringify(queryKey)}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (!cached) return null;
+    const { data, timestamp, version } = JSON.parse(cached) as { data: T; timestamp: number; version: number };
+    if (version !== CACHE_VERSION) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+    if (Date.now() - timestamp > maxAgeMs) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+    return data;
+  } catch (error) {
+    logger.error('[Query Persist] Error reading cache with age:', error);
+    return null;
+  }
+}
+
 export function setQueryCache<T = unknown>(queryKey: unknown[], data: T): void {
   try {
     const cacheKey = `${QUERY_CACHE_PREFIX}${JSON.stringify(queryKey)}`;

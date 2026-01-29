@@ -81,7 +81,8 @@ const ChatWindow: React.FC = () => {
         }
 
         if (settings.show_7tv_emotes && user?.twitch_username) {
-            getAllEmotesForChannel(user.twitch_username)
+            const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
+            getAllEmotesForChannel(user.twitch_username, twitchUserId)
                 .then(data => setEmotes(data))
                 .catch(err => logger.error('Failed to load 7TV emotes:', err));
         }
@@ -429,9 +430,10 @@ const ChatWindow: React.FC = () => {
                                                     alt={badgeId}
                                                     title={badge}
                                                     style={{
-                                                        width: '18px',
-                                                        height: '18px',
-                                                        flexShrink: 0
+                                                        width: '16px',
+                                                        height: '16px',
+                                                        flexShrink: 0,
+                                                        objectFit: 'contain'
                                                     }}
                                                     onError={(e) => {
                                                         (e.target as HTMLImageElement).style.display = 'none';
@@ -494,4 +496,3 @@ const ChatWindow: React.FC = () => {
 };
 
 export default ChatWindow;
-

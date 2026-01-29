@@ -176,7 +176,7 @@ Write-Host "2. For TTS service: Configure Cloudflare Tunnel (optional)" -Foregro
 Write-Host "3. Run: docker-compose up -d (or npm run dev for development)" -ForegroundColor White
 Write-Host ""
 Write-Host "Development commands:" -ForegroundColor Cyan
-Write-Host "  npm run dev:bot       - Start bot service" -ForegroundColor White
-Write-Host "  npm run dev:tts       - Start TTS service" -ForegroundColor White
-Write-Host "  npm run dev:frontend  - Start frontend" -ForegroundColor White
+Write-Host "  cd bot_service; python main.py   - Start bot service" -ForegroundColor White
+Write-Host "  cd tts_service; python main.py  - Start TTS service" -ForegroundColor White
+Write-Host "  cd frontend; npm run dev        - Start frontend" -ForegroundColor White
 Write-Host ""

@@ -5,6 +5,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { createPreloadHandler } from '@/shared/utils/preloadRoute';
+import GlobalPlayer from '@/shared/components/GlobalPlayer';
 
 interface NavSubItem {
     to: string;
@@ -284,7 +285,7 @@ const Sidebar: React.FC = () => {
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                 md:block
             `}>
-                <div className="flex h-full max-h-screen flex-col gap-2">
+                <div className="flex h-full max-h-screen flex-col gap-2 relative">
                     <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
                         <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
                             <span className="text-xl font-bold text-green-400 font-mono tracking-wider whitespace-nowrap">
@@ -308,6 +309,9 @@ const Sidebar: React.FC = () => {
 
                     {/* Блок для гостей в низу сайдбара */}
                     {/* Блок для гостей в низу сайдбара removed */}
+
+                    {/* Миниплеер внутри сайдбара */}
+                    <GlobalPlayer />
                 </div>
             </div>
         </>

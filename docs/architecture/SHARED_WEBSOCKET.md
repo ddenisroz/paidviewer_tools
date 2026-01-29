@@ -532,7 +532,7 @@ if (data.type === 'message' && data.id && data.author) {
 
 - [CACHING_SYSTEM.md](./CACHING_SYSTEM.md) - Система кэширования
 - [ARCHITECTURE_GUIDE.md](./ARCHITECTURE_GUIDE.md) - Общая архитектура
-- [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) - Руководство разработчика
+- [DEVELOPER_GUIDE.md](../guides/DEVELOPER_GUIDE.md) - Руководство разработчика
 
 ---
 

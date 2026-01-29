@@ -596,7 +596,7 @@ alembic upgrade head
 
 ### Основные
 - **[README.md](../README.md)** - Главный README
-- **[QUICK_START.md](guides/QUICK_START.md)** - Полная установка
+- **[QUICKSTART.md](../QUICKSTART.md)** - Полная установка
 - **[ARCHITECTURE_GUIDE.md](architecture/ARCHITECTURE_GUIDE.md)** - Архитектура
 
 ### Специализированные
@@ -606,8 +606,8 @@ alembic upgrade head
 - **[DROPS_SYSTEM.md](DROPS_SYSTEM.md)** - Drops система
 
 ### Для разработчиков
-- **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Паттерны
-- **[LLM_DEVELOPMENT_RULES.md](LLM_DEVELOPMENT_RULES.md)** - Правила для AI
+- **[DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)** - Паттерны
+- **[PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md)** - Правила для AI
 
 ---
 

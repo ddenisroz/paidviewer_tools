@@ -10,6 +10,7 @@ import aiohttp
 from core.database import SessionLocal
 from .vk_auth import VKAuth
 from .vk_base import VK_API_TIMEOUT
+from utils.vk_channel_url import normalize_vk_channel_url, get_vk_channel_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -54,58 +55,43 @@ class VKStream(VKAuth):
 
         await self.rate_limiter.wait()
         
-        # 1. Try Legacy Search (v1/category/search)
-        # Even though it likely 404s, we keep it as primary source if it comes back
-        base_url = "https://apidev.live.vkvideo.ru"
-        url = f"{base_url}/v1/category/search"
-        
+        # Production category search (per docs/api/VK/CATEGORY_SEARCH_GUIDE.md)
+        prod_url = "https://api.live.vkvideo.ru/v1/public_video_stream/category/"
         headers = {
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
-
+        categories: List[Dict[str, Any]] = []
         try:
             async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
                 for cat_type in ["game", "irl"]:
-                    try:
-                        params: Dict[str, Union[str, int]] = {
-                            "query": str(query or "a"),
-                            "type": str(cat_type),
-                            "limit": 25
-                        }
-                        
-                        async with session.get(url, params=params, headers=headers) as response:
-                            if response.status == 200:
-                                data = await response.json(content_type=None)
-                                # Parse data... (Simplified for brevity, assuming existing logic)
-                                # If valid data found, return directly
-                                pass 
-                            else:
-                                pass # Log warning
-                    except Exception:
-                        pass
-        except Exception:
-            pass
-
-        # If we are here, Legacy Search likely returned nothing or failed.
-        # 2. Fallback: Online Categories (v1/catalog/online_categories)
-        logger.info(f"[VK SEARCH] Legacy search empty/failed. Trying online_categories fallback for '{query}'")
-        
-        online_cats = await self._get_online_categories(token)
-        if not online_cats:
+                    params: Dict[str, Union[str, int]] = {
+                        "search": str(query or ""),
+                        "type": str(cat_type),
+                        "limit": 25
+                    }
+                    async with session.get(prod_url, params=params, headers=headers) as response:
+                        if response.status != 200:
+                            logger.warning(f"[VK SEARCH] Prod category search failed ({response.status}) for type={cat_type}")
+                            continue
+                        data = await response.json(content_type=None)
+                        items = data.get("data")
+                        if not isinstance(items, list):
+                            logger.warning("[VK SEARCH] Unexpected category response shape")
+                            continue
+                        for item in items:
+                            categories.append({
+                                "id": item.get("id"),
+                                "name": item.get("title") or item.get("name"),
+                                "viewers": item.get("viewers", 0),
+                                "box_art_url": item.get("coverUrl") or item.get("cover_url")
+                            })
+        except Exception as e:
+            logger.error(f"[VK SEARCH] Prod category search error: {e}")
             return []
-            
-        # Filter locally
-        filtered = []
-        q_lower = query.lower() if query else ""
-        
-        for cat in online_cats:
-            name = cat.get("name", "").lower()
-            if not q_lower or q_lower in name:
-                filtered.append(cat)
-                
-        logger.info(f"[VK SEARCH] Found {len(filtered)} categories in online_categories fallback")
-        return filtered
+
+        logger.info(f"[VK SEARCH] Found {len(categories)} categories via prod search")
+        return categories
 
     async def _get_online_categories(self, token: str) -> List[Dict[str, Any]]:
         """Fetch all categories with active streams (Fallback method)."""
@@ -174,58 +160,70 @@ class VKStream(VKAuth):
             async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
                 headers = {"Authorization": f"Bearer {token}"}
                 url = f"{self.BASE_URL}/v1/channel"
-                params = {"channel_url": channel_url}
-
-                async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
-                    if response.status != 200:
-                        logger.warning(f"Failed to get channel info for '{channel_url}'. Status: {response.status}")
-                        return default_offline
-
-                    data = await response.json()
-                    
-                    if isinstance(data, dict) and "data" in data and "stream" in data["data"]:
-                        stream = data["data"].get("stream")
-                        if stream and stream.get('status') == 'started':
-                            category = stream.get("category", {})
-                            return {
-                                "online": True,
-                                "title": stream.get("title", "Без названия"),
-                                "category": category.get("title", "Без категории") if category else "Без категории",
-                                "category_id": category.get("id") if category else None,
-                                "viewer_count": stream.get("counters", {}).get("viewers", 0),
-                                "started_at": stream.get("planned_at", ""),
-                                "stream_key": stream.get("id", ""),
-                                "description": stream.get("description", ""),
-                                "thumbnail": stream.get("preview_url", "")
-                            }
+                response_data = None
+                for candidate in get_vk_channel_candidates(channel_url):
+                    params = {"channel_url": candidate}
+                    async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
+                        if response.status == 200:
+                            response_data = await response.json()
+                            if response_data:
+                                logger.info(f"[OK] [VK API] Resolved channel via {candidate}")
+                                break
+                        elif response.status == 404:
+                            continue
                         else:
-                            # Offline processing
-                            category_id = None
-                            category_name = 'Общение'
-                            title = "Стрим оффлайн"
-                            description = ""
+                            logger.warning(f"Failed to get channel info for '{candidate}'. Status: {response.status}")
+                            return default_offline
 
-                            if stream and isinstance(stream, dict):
-                                if stream.get("category"):
-                                    category_id = stream["category"].get("id")
-                                    category_name = stream["category"].get("title", 'Общение')
-                                title = stream.get("title", "Стрим оффлайн")
-                                description = stream.get("description", "")
+                if not response_data:
+                    logger.warning(f"Failed to get channel info for '{channel_url}'. Status: 404")
+                    return default_offline
 
-                            return {
-                                'online': False,
-                                'title': title,
-                                'category': category_name,
-                                'category_id': category_id,
-                                'viewer_count': 0,
-                                'started_at': '',
-                                'stream_key': '',
-                                'description': description,
-                                'thumbnail': ''
-                            }
+                data = response_data
+                
+                if isinstance(data, dict) and "data" in data and "stream" in data["data"]:
+                    stream = data["data"].get("stream")
+                    if stream and stream.get('status') == 'started':
+                        category = stream.get("category", {})
+                        return {
+                            "online": True,
+                            "title": stream.get("title", "Без названия"),
+                            "category": category.get("title", "Без категории") if category else "Без категории",
+                            "category_id": category.get("id") if category else None,
+                            "viewer_count": stream.get("counters", {}).get("viewers", 0),
+                            "started_at": stream.get("planned_at", ""),
+                            "stream_key": stream.get("id", ""),
+                            "description": stream.get("description", ""),
+                            "thumbnail": stream.get("preview_url", ""),
+                        }
                     else:
-                        logger.warning(f"No 'stream' object in channel data for '{channel_url}'.")
-                        return default_offline
+                        # Offline processing
+                        category_id = None
+                        category_name = 'Общение'
+                        title = "Стрим оффлайн"
+                        description = ""
+                
+                        if stream and isinstance(stream, dict):
+                            if stream.get("category"):
+                                category_id = stream["category"].get("id")
+                                category_name = stream["category"].get("title", 'Общение')
+                            title = stream.get("title", "Стрим оффлайн")
+                            description = stream.get("description", "")
+                
+                        return {
+                            'online': False,
+                            'title': title,
+                            'category': category_name,
+                            'category_id': category_id,
+                            'viewer_count': 0,
+                            'started_at': '',
+                            'stream_key': '',
+                            'description': description,
+                            'thumbnail': ''
+                        }
+                else:
+                    logger.warning(f"No 'stream' object in channel data for '{channel_url}'.")
+                    return default_offline
 
         except Exception as e:
             logger.error(f"Error getting VK stream info for {user_id}: {e}")
@@ -246,27 +244,39 @@ class VKStream(VKAuth):
             if not channel_url:
                 logger.error(f"[ERROR] [VK API] Could not get channel URL for user {user_id}")
                 return False
+            channel_candidates = get_vk_channel_candidates(channel_url)
 
             async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
                 headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
                 
                 # STEP 1: Get current stream to merge data
-                get_url = f"{self.BASE_URL}/v1/channel"
-                get_params = {"channel_url": channel_url}
                 current_stream_data = {}
-
-                async with session.get(get_url, headers={"Authorization": f"Bearer {token}"}, params=get_params, ssl=self.ssl_context) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        stream_object = data.get("data", {}).get("stream")
-                        if stream_object and stream_object.get("status") == "started":
-                            current_stream_data = stream_object
-                        else:
-                            streams_array = data.get("data", {}).get("streams", [])
-                            for s in streams_array:
-                                if s.get("status") == "started":
-                                    current_stream_data = s
+                base_candidates = ["https://api.live.vkvideo.ru", self.BASE_URL]
+                for base_url in base_candidates:
+                    for candidate in channel_candidates:
+                        get_url = f"{base_url}/v1/channel"
+                        get_params = {"channel_url": candidate}
+                        async with session.get(get_url, headers={"Authorization": f"Bearer {token}"}, params=get_params, ssl=self.ssl_context) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                stream_object = data.get("data", {}).get("stream")
+                                if stream_object and stream_object.get("status") == "started":
+                                    current_stream_data = stream_object
+                                else:
+                                    streams_array = data.get("data", {}).get("streams", [])
+                                    for s in streams_array:
+                                        if s.get("status") == "started":
+                                            current_stream_data = s
+                                            break
+                                if current_stream_data:
+                                    logger.info(f"[OK] [VK API] Resolved channel for update via {candidate} @ {base_url}")
                                     break
+                            elif response.status == 404:
+                                continue
+                        if current_stream_data:
+                            break
+                    if current_stream_data:
+                        break
                 
                 if not current_stream_data:
                     # Fallback to get_stream_info logic if not found active
@@ -348,17 +358,22 @@ class VKStream(VKAuth):
 
                 # STEP 3: Send Update
                 await self.rate_limiter.wait()
-                post_url = f"{self.BASE_URL}/v1/channel/stream/edit"
-                post_params = {"channel_url": channel_url}
                 post_data = {"stream": final_payload}
+                for base_url in base_candidates:
+                    for candidate in channel_candidates:
+                        post_url = f"{base_url}/v1/channel/stream/edit"
+                        post_params = {"channel_url": candidate}
+                        async with session.post(post_url, headers=headers, json=post_data, params=post_params, ssl=self.ssl_context) as response:
+                            if response.status == 200:
+                                logger.info(f"[OK] [VK API] Successfully updated stream for user {user_id} via {candidate} @ {base_url}")
+                                return True
+                            if response.status == 404:
+                                continue
+                            logger.error(f"[ERROR] [VK API] Stream edit failed: {response.status} - {await response.text()}")
+                            return False
 
-                async with session.post(post_url, headers=headers, json=post_data, params=post_params, ssl=self.ssl_context) as response:
-                    if response.status == 200:
-                        logger.info(f"[OK] [VK API] Successfully updated stream for user {user_id}")
-                        return True
-                    else:
-                        logger.error(f"[ERROR] [VK API] Stream edit failed: {response.status} - {await response.text()}")
-                        return False
+                logger.error("[ERROR] [VK API] Stream edit failed: all channel_url candidates returned 404")
+                return False
 
         except Exception as e:
             logger.error(f"[ERROR] [VK API] Error updating stream for user {user_id}: {e}")

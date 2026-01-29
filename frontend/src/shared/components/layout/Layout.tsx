@@ -1,6 +1,6 @@
 ﻿import { useEffect } from 'react';
 
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { DataProvider } from '@/context/DataContext';
@@ -10,7 +10,6 @@ import { TtsProvider, useTts } from '@/context/TtsContext';
 import GlobalTtsPlayer from '@/features/tts/components/GlobalTtsPlayer';
 import { WidgetLayoutProvider } from '@/context/WidgetLayoutContext';
 import CookieConsent from '@/shared/components/CookieConsent';
-import GlobalPlayer from '@/shared/components/GlobalPlayer';
 import Header from '@/shared/components/layout/Header';
 import Sidebar from '@/shared/components/layout/Sidebar';
 import { composeProviders } from '@/shared/utils/composeProviders';
@@ -30,9 +29,14 @@ const LayoutContent: React.FC = () => {
   const { isVisible, isTheaterMode } = usePlayer();
   const { isAuthenticated, isCheckingAuth } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toggleTts, ttsEnabled } = useTts(); // Use TTS context
-  const currentPath = window.location.pathname;
-  const isOnYoutubePage = currentPath.includes('/dashboard/youtube');
+  const currentPath = location.pathname;
+  const currentSearch = location.search;
+  const searchParams = new URLSearchParams(currentSearch);
+  const activeTab = searchParams.get('tab');
+  const isMediaYoutubeTab = currentPath.startsWith('/dashboard/media') && (!activeTab || activeTab === 'youtube');
+  const isOnYoutubePage = currentPath.startsWith('/dashboard/youtube') || isMediaYoutubeTab;
 
   // Global Keyboard Shortcut for TTS (Shift+T)
   useEffect(() => {
@@ -68,8 +72,6 @@ const LayoutContent: React.FC = () => {
           <div className="max-w-7xl w-full mx-auto flex-1">
             <Outlet />
           </div>
-          {/* Глобальный плеер внутри main */}
-          <GlobalPlayer />
         </main>
       </div>
 

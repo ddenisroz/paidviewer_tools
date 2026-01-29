@@ -36,6 +36,6 @@ frontend/
 ## Commands
 ```bash
 ruff check .     # lint
-black .          # format
+ruff format .    # format
 npm run lint     # frontend
 ```

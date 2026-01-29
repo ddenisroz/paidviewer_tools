@@ -215,8 +215,8 @@ class SharedWebSocketManager {
       this.logger.warn(`[${this.tabId}] Not a leader, cannot connect WebSocket`);
       return;
     }
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.logger.debug?.(`[${this.tabId}] WebSocket already connected`);
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+      this.logger.debug?.(`[${this.tabId}] WebSocket already connecting/connected`);
       return;
     }
 
@@ -323,6 +323,9 @@ class SharedWebSocketManager {
   }
 
   private _updateConnectionStatus(status: 'connected' | 'disconnected' | 'reconnecting' | 'failed'): void {
+    if (this.connectionStatus === status) {
+      return;
+    }
     this.connectionStatus = status;
     this.connectionStatusHandlers.forEach((handler) => {
       try {

@@ -208,14 +208,68 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                         data = user_info_response.json()
                         if isinstance(data, dict) and "data" in data and "user" in data["data"]:
                             user_info = data["data"]["user"]
+                            channel_url = None
                             channel_obj = data["data"].get("channel") or {}
-                            channel_url = channel_obj.get("url") if isinstance(channel_obj, dict) else None
+                            if isinstance(channel_obj, dict):
+                                channel_url = channel_obj.get("url")
+                                if not channel_url:
+                                    channel_url = channel_obj.get("channel_url")
+                            if not channel_url:
+                                channels = data["data"].get("channels")
+                                if isinstance(channels, list) and channels:
+                                    first_channel = channels[0]
+                                    if isinstance(first_channel, dict):
+                                        channel_url = first_channel.get("url") or first_channel.get("channel_url")
+                            if not channel_url:
+                                user_channel = user_info.get("channel") if isinstance(user_info, dict) else None
+                                if isinstance(user_channel, dict):
+                                    channel_url = user_channel.get("url") or user_channel.get("channel_url")
+                            if not channel_url and isinstance(user_info, dict):
+                                channel_url = user_info.get("channel_url")
                             user_info['channel_url'] = channel_url
-                            logger.info(f"Successfully got user info: user_id={user_info.get('id')}")
+                            logger.info(f"Successfully got user info: user_id={user_info.get('id')}, channel_url={channel_url}")
                     else:
                         logger.error(f"Failed to get user info, status: {user_info_response.status_code}")
                 except Exception as e:
                     logger.error(f"Error getting user info: {e}", exc_info=True)
+
+            # Fallback: prod API can include channel URL even when dev API omits it.
+            if user_info and not user_info.get("channel_url"):
+                try:
+                    prod_endpoint = "https://api.live.vkvideo.ru/v1/current_user"
+                    logger.info(f"Retrying VK user info from prod API: {prod_endpoint}")
+                    async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+                        prod_response = await client.get(
+                            prod_endpoint,
+                            headers={"Authorization": f"Bearer {access_token}"}
+                        )
+                    logger.info(f"Prod user info response status: {prod_response.status_code}")
+                    if prod_response.status_code == 200:
+                        prod_data = prod_response.json()
+                        if isinstance(prod_data, dict) and "data" in prod_data:
+                            prod_channel_url = None
+                            prod_channel = prod_data["data"].get("channel") or {}
+                            if isinstance(prod_channel, dict):
+                                prod_channel_url = prod_channel.get("url") or prod_channel.get("channel_url")
+                            if not prod_channel_url:
+                                prod_channels = prod_data["data"].get("channels")
+                                if isinstance(prod_channels, list) and prod_channels:
+                                    first_channel = prod_channels[0]
+                                    if isinstance(first_channel, dict):
+                                        prod_channel_url = first_channel.get("url") or first_channel.get("channel_url")
+                            if not prod_channel_url:
+                                prod_user = prod_data["data"].get("user") if isinstance(prod_data.get("data"), dict) else None
+                                if isinstance(prod_user, dict):
+                                    prod_user_channel = prod_user.get("channel")
+                                    if isinstance(prod_user_channel, dict):
+                                        prod_channel_url = prod_user_channel.get("url") or prod_user_channel.get("channel_url")
+                                    if not prod_channel_url:
+                                        prod_channel_url = prod_user.get("channel_url")
+                            if prod_channel_url:
+                                user_info["channel_url"] = prod_channel_url
+                                logger.info(f"[OK] Extracted channel URL from prod API: {prod_channel_url}")
+                except Exception as e:
+                    logger.warning(f"[WARN] Failed to fetch prod user info: {e}")
 
             if not user_info:
                 logger.error("Could not fetch user info from VK Live API")

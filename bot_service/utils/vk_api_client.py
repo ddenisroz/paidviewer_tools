@@ -8,6 +8,7 @@ import httpx
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 from typing import Any, Dict, Optional, List
+from utils.vk_channel_url import normalize_vk_channel_url
 
 logger = structlog.get_logger(__name__)
 
@@ -139,6 +140,11 @@ class VKLiveAPIClient:
         if token:
             headers['Authorization'] = f'Bearer {token}'
             kwargs['headers'] = headers
+
+        params = kwargs.get("params")
+        if isinstance(params, dict) and "channel_url" in params:
+            params["channel_url"] = normalize_vk_channel_url(params.get("channel_url"))
+            kwargs["params"] = params
             
         try:
             logger.debug(

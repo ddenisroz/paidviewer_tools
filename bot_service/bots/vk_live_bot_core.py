@@ -5,6 +5,7 @@ import logging
 from typing import List, Dict, Any, Optional
 from core.connection_manager import ConnectionManager
 from utils.vk_live_websocket import VKLiveWebSocketClient
+from utils.vk_channel_url import normalize_vk_channel_url
 
 logger = logging.getLogger('bot_service')
 
@@ -165,7 +166,7 @@ class VKLiveBotCore:
                 "Content-Type": "application/json"
             }
             params = {
-                "channel_url": channel_url
+                "channel_url": normalize_vk_channel_url(channel_url)
             }
 
             # SSL context с отключенной верификацией для dev API

@@ -57,8 +57,11 @@ FRONTEND_URL=http://localhost:5173
 
 1. Запустите сервисы:
    ```bash
-   npm run dev:bot      # Backend
-   npm run dev:frontend # Frontend
+   cd bot_service
+   python main.py       # Backend
+
+   cd ../frontend
+   npm run dev          # Frontend
    ```
 
 2. Откройте админку: http://localhost:5173/settings
@@ -190,7 +193,7 @@ FRONTEND_URL=http://localhost:5173
 
 2. Перезапустите backend:
    ```bash
-   npm run dev:bot
+   python main.py
    ```
 
 ### "Unauthorized" или "Admin rights required"

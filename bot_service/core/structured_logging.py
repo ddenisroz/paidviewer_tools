@@ -191,6 +191,9 @@ def setup_log_rotation():
     from logging.handlers import RotatingFileHandler
     
     log_file = Path(getattr(settings, 'log_file', 'logs/bot_service.log'))
+    if not log_file.is_absolute():
+        repo_root = Path(__file__).resolve().parents[2]
+        log_file = repo_root / log_file
     log_file.parent.mkdir(parents=True, exist_ok=True)
     
     # Create rotating file handler
@@ -198,7 +201,9 @@ def setup_log_rotation():
         log_file,
         maxBytes=10 * 1024 * 1024,  # 10 MB
         backupCount=10,  # Keep 10 files
+        encoding="utf-8",
     )
+    handler.setFormatter(logging.Formatter("%(message)s"))
     
     # Add handler to root logger
     root_logger = logging.getLogger()

@@ -164,13 +164,13 @@ print(cm.is_tts_enabled("yourchy"))  # Should return True
 
 | File | Purpose |
 |------|---------|
-| README_MAIN.md | Overview + Session summaries |
-| DOCUMENTATION_INDEX.md | Navigation guide |
-| docs/ARCHITECTURE_GUIDE.md | System design |
-| docs/TECHNICAL_DOCUMENTATION.md | API details |
-| docs/QUICK_START.md | Setup guide |
-| docs/SECURITY_LOGIC.md | Auth & security |
-| docs/DEPLOYMENT.md | Production setup |
+| docs/README.md | Documentation index |
+| docs/QUICKSTART.md | Setup guide |
+| docs/ARCHITECTURE.md | System overview |
+| docs/architecture/ARCHITECTURE_GUIDE.md | Detailed architecture |
+| docs/setup/DEPLOYMENT.md | Production setup |
+| docs/guides/DEVELOPER_ONBOARDING.md | Onboarding |
+| docs/PROJECT_CONTEXT.md | AI session context |
 
 ---
 
@@ -200,8 +200,8 @@ GET  /api/tts/local-config   # Check local TTS setup
 2. **Test Manually** - Toggle TTS, write message, check logs
 3. **Debug Issues** - Use prefixes from logs to trace problems
 4. **Improve** - Drops system needs redesign, local TTS needs implementation
-5. **Deploy** - See docs/DEPLOYMENT.md
+5. **Deploy** - See docs/setup/DEPLOYMENT.md
 
 ---
 
-**Questions?** Check DOCUMENTATION_INDEX.md for more guides.
+**Questions?** See docs/README.md for the index.

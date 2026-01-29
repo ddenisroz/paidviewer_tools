@@ -42,6 +42,7 @@ const YoutubeIntegrationPage: React.FC = () => {
         handlePlayerStateChange,
         handlePlayerError,
         setPlayerRef,
+        releasePlayerRef,
         setIsTheaterMode,
         loadQueue
     } = usePlayer();
@@ -50,11 +51,19 @@ const YoutubeIntegrationPage: React.FC = () => {
     const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('browser');
     const [youtubeObsUrl, setYoutubeObsUrl] = useState<string>('');
     const { lastJsonMessage } = useChat();
+    const currentThumbnail = currentVideo?.thumbnail || currentVideo?.thumbnail_url;
 
     // Handler for the embedded player on this page
     const handlePagePlayerReady = (event: { target: YouTubePlayer }): void => {
-        setPlayerRef(event.target as YouTubePlayer);
+        setPlayerRef(event.target as YouTubePlayer, 'page');
         handlePlayerReady(event);
+        if (!isPlaying) {
+            try {
+                event.target.pauseVideo();
+            } catch (error) {
+                logger.debug('[YouTube Page] Pause on ready skipped:', error);
+            }
+        }
         logger.debug('[YouTube Page] Player ready');
     };
 
@@ -132,6 +141,12 @@ const YoutubeIntegrationPage: React.FC = () => {
     }, []); // [OK] Пустой массив зависимостей - запускаем только один раз при монтировании
 
     useEffect(() => {
+        return () => {
+            releasePlayerRef('page');
+        };
+    }, [releasePlayerRef]);
+
+    useEffect(() => {
         const handleEscKey = (event: KeyboardEvent): void => {
             if (event.key === 'Escape' && isTheaterMode) {
                 setIsTheaterMode(false);
@@ -153,7 +168,7 @@ const YoutubeIntegrationPage: React.FC = () => {
             await youtubeService.clearQueue();
             toast.success("Очередь очищена.");
             setIsClearDialogOpen(false);
-            loadQueue();
+            loadQueue(true);
         } catch (error: unknown) {
             const axiosError = error as { response?: { status?: number }; code?: string; message?: string };
             if (axiosError.response?.status === 429) {
@@ -231,7 +246,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                         width: '100%',
                                                         height: '100%',
                                                         playerVars: {
-                                                            autoplay: 1,
+                                                            autoplay: isPlaying ? 1 : 0,
                                                             controls: 1,
                                                             disablekb: 0,
                                                             enablejsapi: 1,
@@ -247,7 +262,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                             widget_referrer: window.location.origin
                                                         }
                                                     }}
-                                                    key={`page-player-${currentVideo.video_id}-${Date.now()}`}
+                                                    key={`page-player-${currentVideo.video_id}`}
                                                     className="w-full h-full"
                                                 />
                                             ) : (
@@ -400,7 +415,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                 <div className="p-4 border-b bg-muted/20">
                                     <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
                                     <div className="flex gap-3 p-2 rounded-lg">
-                                        <img src={currentVideo.thumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded" />
+                                        <img src={currentThumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded" />
                                         <div className="flex-1 min-w-0">
                                             <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
                                             <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
@@ -417,7 +432,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 <div className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium">
                                                     {index + 1}
                                                 </div>
-                                                <img src={video.thumbnail} alt={video.title} className="w-20 h-12 object-cover rounded" />
+                                                <img src={video.thumbnail || video.thumbnail_url} alt={video.title} className="w-20 h-12 object-cover rounded" />
                                                 <div className="flex-1 min-w-0">
                                                     <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
                                                     <p className="text-xs text-muted-foreground">Заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
@@ -468,7 +483,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             width: '100%',
                                             height: '100%',
                                             playerVars: {
-                                                autoplay: 1,
+                                                autoplay: isPlaying ? 1 : 0,
                                                 controls: 1,
                                                 disablekb: 0,
                                                 enablejsapi: 1,
@@ -484,7 +499,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 widget_referrer: window.location.origin
                                             }
                                         }}
-                                        key={`theater-player-${currentVideo.video_id}-${Date.now()}`}
+                                        key={`theater-player-${currentVideo.video_id}`}
                                         className="w-full h-full"
                                     />
                                 ) : (

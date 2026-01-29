@@ -440,7 +440,7 @@ console.log('Context state:', useContext(MyContext));
 
 ## Protected Systems
 
-**CRITICAL:** Read [DO_NOT_TOUCH.md](../DO_NOT_TOUCH.md) before modifying:
+**CRITICAL:** Read [PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md) before modifying:
 
 1. **TTS System** - Platform settings, synchronization, filters
 2. **Category System** - Stream category mapping
@@ -496,7 +496,7 @@ git push origin feature/my-feature
 
 ### Documentation
 - **[Architecture Guide](../architecture/ARCHITECTURE_GUIDE.md)** - System design
-- **[Developer Guide](../DEVELOPER_GUIDE.md)** - Patterns and conventions
+- **[Developer Guide](./DEVELOPER_GUIDE.md)** - Patterns and conventions
 - **[Current Status](../CURRENT_STATUS.md)** - Implementation status
 - **[API Documentation](http://localhost:8000/docs)** - Interactive API docs
 

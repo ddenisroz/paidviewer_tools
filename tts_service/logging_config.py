@@ -11,8 +11,10 @@ class LoggingConfig:
     
     def __init__(self, service_name: str = "tts_service"):
         self.service_name = service_name
-        self.logs_dir = Path("logs")
-        self.logs_dir.mkdir(exist_ok=True)
+        repo_root = Path(__file__).resolve().parents[1]
+        logs_root = os.getenv("LOG_DIR")
+        self.logs_dir = Path(logs_root) if logs_root else (repo_root / "logs")
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
         
         # Создаем подпапки для разных типов логов
         self.app_logs_dir = self.logs_dir / "app"
@@ -58,6 +60,18 @@ class LoggingConfig:
         daily_handler.setFormatter(detailed_formatter)
         daily_handler.setLevel(level)
         app_logger.addHandler(daily_handler)
+
+        # 1b. Единый лог в корневой logs/ для внешних инструментов
+        root_log_handler = logging.handlers.TimedRotatingFileHandler(
+            filename=self.logs_dir / f"{self.service_name}.log",
+            when='midnight',
+            interval=1,
+            backupCount=30,
+            encoding='utf-8'
+        )
+        root_log_handler.setFormatter(detailed_formatter)
+        root_log_handler.setLevel(level)
+        app_logger.addHandler(root_log_handler)
         
         # 2. Отдельный файл для ошибок
         error_handler = logging.handlers.TimedRotatingFileHandler(

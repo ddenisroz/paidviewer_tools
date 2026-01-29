@@ -17,6 +17,7 @@ from utils.vk_api_client import VKLiveAPIClient, VKAPIError
 from core.token_encryption import decrypt_token, is_token_encrypted
 from repositories.user_token_repository import UserTokenRepository
 from repositories.user_repository import UserRepository
+from utils.vk_channel_url import normalize_vk_channel_url
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,7 @@ def get_channel_url(user_id: int, db: Session) -> str:
             detail="VK канал не найден. Пожалуйста, подключите VK Live."
         )
         
-    return user.vk_channel_name
+    return normalize_vk_channel_url(user.vk_channel_name)
 
 
 # === API Endpoints ===

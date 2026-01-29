@@ -27,6 +27,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
     const [localCombineCategories, setLocalCombineCategories] = useState(combineCategories);
 
     useEffect(() => {
+        if (isSyncingRef.current) return;
         setLocalCombineCategories(combineCategories);
     }, [combineCategories]);
 
@@ -39,55 +40,85 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
     const [showDropdown, setShowDropdown] = useState<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
     const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const debouncedTwitchSearch = useDebounce(searchTerms.twitch, 300);
-    const debouncedVkSearch = useDebounce(searchTerms.vk, 300);
+    const debouncedTwitchSearch = useDebounce(searchTerms.twitch, 450);
+    const debouncedVkSearch = useDebounce(searchTerms.vk, 450);
 
     const twitchInputRef = useRef<HTMLInputElement>(null);
     const vkInputRef = useRef<HTMLInputElement>(null);
     const isEditingRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
     const isSyncingRef = useRef(false);
+    const skipNextSyncRef = useRef(false);
+    const suppressSyncUntilRef = useRef(0);
+    const focusRestoreRef = useRef<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
+    const clearedOnFocusRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
+
+    const getCategoryName = (category: StreamCategory | undefined | null) =>
+        category?.name || category?.title || '';
 
     // Handle Toggle
     const handleToggleChange = async (value: boolean) => {
         if (isSyncingRef.current) return;
         isSyncingRef.current = true;
+        skipNextSyncRef.current = true;
+        suppressSyncUntilRef.current = Date.now() + 600;
         const previousValue = localCombineCategories;
+        const prevSearchTerms = searchTerms;
         setLocalCombineCategories(value);
         isEditingRef.current = { twitch: false, vk: false };
         setShowDropdown({ twitch: false, vk: false });
-
-        const twitchCategoryName = (currentData.twitch?.category as StreamCategory | undefined)?.name || '';
-        const vkCategoryName = (currentData.vk?.category as StreamCategory | undefined)?.name || '';
-        if (value && bothEnabled) {
-            const combinedName = twitchCategoryName || vkCategoryName;
-            setSearchTerms({ twitch: combinedName, vk: combinedName });
-        } else {
-            setSearchTerms({ twitch: twitchCategoryName, vk: vkCategoryName });
-        }
 
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
         }
 
+        const twitchCat = currentData.twitch?.category as StreamCategory | undefined;
+        const vkCat = currentData.vk?.category as StreamCategory | undefined;
+        const twitchName = getCategoryName(twitchCat);
+        const vkName = getCategoryName(vkCat);
+
+        if (value && bothEnabled) {
+            const combinedName = twitchName || vkName;
+        setSearchTerms({ twitch: combinedName, vk: combinedName });
+            const masterCategory = twitchCat || vkCat;
+            if (masterCategory) {
+                const hasChange = masterCategory.id !== initialData.twitch?.category?.id || masterCategory.id !== initialData.vk?.category?.id;
+                setCurrentData(prev => ({
+                    ...prev,
+                    twitch: { ...prev.twitch, category: masterCategory },
+                    vk: { ...prev.vk, category: masterCategory },
+                }));
+                if (hasChange) {
+                    await saveChanges({
+                        twitch: { category_id: masterCategory.id },
+                        vk: {
+                            category: {
+                                id: masterCategory.id,
+                                name: masterCategory.name || masterCategory.title || "",
+                                title: masterCategory.name || masterCategory.title || "",
+                                type: masterCategory.type || "games",
+                                cover_url: masterCategory.box_art_url || masterCategory.cover_url || ""
+                            },
+                            category_id: masterCategory.id
+                        }
+                    }, 'saveCategory');
+                }
+            }
+        } else {
+            setSearchTerms({ twitch: twitchName, vk: vkName });
+        }
+
         try {
             const success = await updateSetting('combine_categories', value);
             if (!success) {
                 setLocalCombineCategories(previousValue);
+                setSearchTerms(prevSearchTerms);
                 return;
-            }
-
-            if (value && bothEnabled) {
-                const twitchStreamCategory = currentData.twitch?.category as StreamCategory;
-                if (twitchStreamCategory) {
-                    const mappedName = categoryMapping[twitchStreamCategory.name];
-                    const preferredQuery = mappedName || twitchStreamCategory.name;
-                    setSearchTerms({ twitch: preferredQuery, vk: preferredQuery });
-                }
             }
         } catch (error) {
             logger.error('[SYNC ERROR]', error);
             setLocalCombineCategories(previousValue);
+            setSearchTerms(prevSearchTerms);
             toast.error('Ошибка синхронизации категорий.');
         } finally {
             isSyncingRef.current = false;
@@ -96,15 +127,34 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
 
     // Load initial search terms
     useEffect(() => {
+        if (Date.now() < suppressSyncUntilRef.current) {
+            return;
+        }
+        if (skipNextSyncRef.current) {
+            skipNextSyncRef.current = false;
+            return;
+        }
         if (isSyncingRef.current) return;
         const twitchCat = currentData.twitch?.category as StreamCategory | undefined;
         const vkCat = currentData.vk?.category as StreamCategory | undefined;
-        const nextTwitch = twitchCat?.name || '';
-        const nextVk = vkCat?.name || '';
+        const nextTwitch = getCategoryName(twitchCat);
+        const nextVk = getCategoryName(vkCat);
 
         setSearchTerms(prev => {
             let changed = false;
             const next = { ...prev };
+
+            if (isLinked && bothEnabled) {
+                const combinedName = nextTwitch || nextVk;
+                if (!isEditingRef.current.twitch && !isEditingRef.current.vk && !showDropdown.twitch && !showDropdown.vk) {
+                    if (prev.twitch !== combinedName || prev.vk !== combinedName) {
+                        next.twitch = combinedName;
+                        next.vk = combinedName;
+                        changed = true;
+                    }
+                }
+                return changed ? next : prev;
+            }
 
             if (!isEditingRef.current.twitch && !showDropdown.twitch && prev.twitch !== nextTwitch) {
                 next.twitch = nextTwitch;
@@ -117,18 +167,20 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
 
             return changed ? next : prev;
         });
-    }, [currentData.twitch?.category, currentData.vk?.category, showDropdown.twitch, showDropdown.vk]);
+    }, [currentData.twitch?.category, currentData.vk?.category, showDropdown.twitch, showDropdown.vk, isLinked, bothEnabled]);
 
     // Trigger searches
     useEffect(() => {
-        if (debouncedTwitchSearch && debouncedTwitchSearch.length >= 2 && showDropdown.twitch && twitchEnabled) {
-            searchCategories('twitch', debouncedTwitchSearch);
+        const query = debouncedTwitchSearch.trim();
+        if (query.length >= 1 && showDropdown.twitch && twitchEnabled) {
+            searchCategories('twitch', query);
         }
     }, [debouncedTwitchSearch, showDropdown.twitch, searchCategories, twitchEnabled]);
 
     useEffect(() => {
-        if (debouncedVkSearch && debouncedVkSearch.length >= 2 && showDropdown.vk && vkEnabled) {
-            searchCategories('vk', debouncedVkSearch);
+        const query = debouncedVkSearch.trim();
+        if (query.length >= 1 && showDropdown.vk && vkEnabled) {
+            searchCategories('vk', query);
         }
     }, [debouncedVkSearch, showDropdown.vk, searchCategories, vkEnabled]);
 
@@ -147,8 +199,8 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                 const twitchCat = currentData.twitch?.category as StreamCategory | undefined;
                 const vkCat = currentData.vk?.category as StreamCategory | undefined;
                 setSearchTerms({
-                    twitch: twitchCat?.name || '',
-                    vk: vkCat?.name || ''
+                    twitch: getCategoryName(twitchCat),
+                    vk: getCategoryName(vkCat)
                 });
             }
         };
@@ -158,12 +210,14 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
 
 
     const handleSearchChange = (platform: string, value: string) => {
-        const trimmedValue = value;
+        const nextValue = value;
         if (isLinked && bothEnabled && platform === 'twitch') {
-            setSearchTerms({ twitch: trimmedValue, vk: trimmedValue });
-            setShowDropdown({ twitch: true, vk: true });
+            isEditingRef.current = { twitch: true, vk: true };
+            setSearchTerms({ twitch: nextValue, vk: nextValue });
+            setShowDropdown({ twitch: true, vk: false });
         } else {
-            setSearchTerms(prev => ({ ...prev, [platform]: trimmedValue }));
+            isEditingRef.current = { ...isEditingRef.current, [platform]: true } as { twitch: boolean; vk: boolean };
+            setSearchTerms(prev => ({ ...prev, [platform]: nextValue }));
             setShowDropdown({ twitch: false, vk: false, [platform]: true });
         }
     };
@@ -174,18 +228,12 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
             autoSaveTimerRef.current = null;
         }
         isEditingRef.current = { twitch: false, vk: false };
+        skipNextSyncRef.current = true;
+        suppressSyncUntilRef.current = Date.now() + 600;
+
+        let mappedStreamCategory: StreamCategory | undefined;
 
         if (isLinked && bothEnabled && platform === 'twitch') {
-            // Linked Logic
-            const otherPlatform = 'vk';
-            let mappedStreamCategory: StreamCategory | undefined;
-
-            // For now just update what we selected
-            setCurrentData(prev => ({
-                ...prev,
-                twitch: { ...prev.twitch, category },
-            }));
-
             const mappedName = categoryMapping[category.name];
             const searchQuery = mappedName || category.name;
             try {
@@ -209,7 +257,6 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                 }));
                 toast.warning(`Категория для VK не найдена.`);
             }
-
         } else {
             setCurrentData(prev => ({
                 ...prev,
@@ -217,7 +264,12 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
             }));
         }
 
-        setSearchTerms(prev => ({ ...prev, [platform]: category.name }));
+        if (isLinked && bothEnabled) {
+            const vkName = mappedStreamCategory?.name || mappedStreamCategory?.title || category.name;
+            setSearchTerms({ twitch: category.name, vk: vkName });
+        } else {
+            setSearchTerms(prev => ({ ...prev, [platform]: category.name }));
+        }
         setShowDropdown({ twitch: false, vk: false });
     };
 
@@ -269,13 +321,14 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
 
 
     const isChanged = useMemo(() => {
-        const getId = (c: any) => c?.id;
+        const getId = (c: StreamCategory | null | undefined) => (c?.id ? String(c.id) : null);
         return (twitchEnabled && getId(initialData.twitch?.category) !== getId(currentData.twitch?.category)) ||
             (vkEnabled && getId(initialData.vk?.category) !== getId(currentData.vk?.category));
     }, [initialData, currentData, twitchEnabled, vkEnabled]);
 
     const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
-    const linkedInputPadding = 'pl-10';
+    const twitchInputPadding = isLinked && bothEnabled ? 'pl-[4.5rem]' : 'pl-12';
+    const vkInputPadding = 'pl-12';
     const isSaving = status.saveCategory === 'loading';
     const isSaved = status.saveCategory === 'success';
 
@@ -284,7 +337,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
             disabled={isSaving || !isChanged}
             size="sm"
-            className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white h-9 text-sm font-medium shadow-sm transition-all duration-300"
+            className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white h-7 text-sm font-medium shadow-sm transition-all duration-300"
         >
             {isSaving ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -335,18 +388,36 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                                 onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                 onFocus={() => {
                                     isEditingRef.current = { twitch: true, vk: isLinked && bothEnabled };
-                                    if (twitchEnabled) setShowDropdown({ twitch: true, vk: false });
-                                    if (searchTerms.twitch === (currentData.twitch?.category as StreamCategory)?.name) {
+                                    const currentValue = searchTerms.twitch;
+                                    focusRestoreRef.current.twitch = currentValue;
+                                    if (currentValue.trim() !== '') {
+                                        clearedOnFocusRef.current.twitch = true;
                                         setSearchTerms(prev => ({ ...prev, twitch: '' }));
+                                    } else {
+                                        clearedOnFocusRef.current.twitch = false;
                                     }
+                                    if (twitchEnabled) setShowDropdown({ twitch: true, vk: false });
                                 }}
                                 onBlur={() => {
                                     isEditingRef.current = isLinked && bothEnabled
                                         ? { twitch: false, vk: false }
                                         : { ...isEditingRef.current, twitch: false };
+                                    if (!showDropdown.twitch) {
+                                        const twitchName = getCategoryName(currentData.twitch?.category as StreamCategory | undefined);
+                                        if (clearedOnFocusRef.current.twitch && searchTerms.twitch.trim() === '') {
+                                            setSearchTerms(prev => ({ ...prev, twitch: twitchName || focusRestoreRef.current.twitch }));
+                                            clearedOnFocusRef.current.twitch = false;
+                                            return;
+                                        }
+                                        setSearchTerms(prev => ({ ...prev, twitch: twitchName }));
+                                    }
                                 }}
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
                                 placeholder={isLinked ? "Поиск общей категории..." : (twitchEnabled ? "Поиск категории Twitch..." : "нет подключения")}
-                                className={`h-10 ${linkedInputPadding} pr-4 transition-[padding] duration-300 ease-in-out ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
+                                className={`h-10 ${twitchInputPadding} pr-4 transition-[padding] duration-300 ease-in-out ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
                                 disabled={!twitchEnabled && !isLinked}
                             />
 
@@ -381,16 +452,34 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                                         onChange={(e) => handleSearchChange('vk', e.target.value)}
                                         onFocus={() => {
                                             isEditingRef.current = { ...isEditingRef.current, vk: true };
-                                            if (vkEnabled) setShowDropdown({ twitch: false, vk: true });
-                                            if (searchTerms.vk === (currentData.vk?.category as StreamCategory)?.name) {
+                                            const currentValue = searchTerms.vk;
+                                            focusRestoreRef.current.vk = currentValue;
+                                            if (currentValue.trim() !== '') {
+                                                clearedOnFocusRef.current.vk = true;
                                                 setSearchTerms(prev => ({ ...prev, vk: '' }));
+                                            } else {
+                                                clearedOnFocusRef.current.vk = false;
                                             }
+                                            if (vkEnabled) setShowDropdown({ twitch: false, vk: true });
                                         }}
                                         onBlur={() => {
                                             isEditingRef.current = { ...isEditingRef.current, vk: false };
+                                            if (!showDropdown.vk) {
+                                                const vkName = getCategoryName(currentData.vk?.category as StreamCategory | undefined);
+                                                if (clearedOnFocusRef.current.vk && searchTerms.vk.trim() === '') {
+                                                    setSearchTerms(prev => ({ ...prev, vk: vkName || focusRestoreRef.current.vk }));
+                                                    clearedOnFocusRef.current.vk = false;
+                                                    return;
+                                                }
+                                                setSearchTerms(prev => ({ ...prev, vk: vkName }));
+                                            }
                                         }}
+                                        autoComplete="off"
+                                        autoCorrect="off"
+                                        autoCapitalize="off"
+                                        spellCheck={false}
                                         placeholder={vkEnabled ? "Поиск категории VK Live..." : "нет подключения"}
-                                        className={`h-10 pl-11 pr-4 transition-[padding] duration-300 ease-in-out ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
+                                        className={`h-10 ${vkInputPadding} pr-4 transition-[padding] duration-300 ease-in-out ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
                                         disabled={!vkEnabled}
                                     />
 
