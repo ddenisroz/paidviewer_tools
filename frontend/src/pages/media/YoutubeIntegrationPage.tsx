@@ -16,6 +16,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/shared/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
 import { Slider } from "@/shared/components/ui/slider";
+import { Switch } from "@/shared/components/ui/switch";
+import { Label } from "@/shared/components/ui/label";
+import { Input } from "@/shared/components/ui/input";
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
@@ -48,8 +51,12 @@ const YoutubeIntegrationPage: React.FC = () => {
     } = usePlayer();
 
     const [isClearDialogOpen, setIsClearDialogOpen] = useState<boolean>(false);
+    const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState<boolean>(false);
     const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('browser');
     const [youtubeObsUrl, setYoutubeObsUrl] = useState<string>('');
+    const [requestsCommandEnabled, setRequestsCommandEnabled] = useState<boolean>(true);
+    const [requestsRewardEnabled, setRequestsRewardEnabled] = useState<boolean>(false);
+    const [requestsRewardId, setRequestsRewardId] = useState<string>('');
     const { lastJsonMessage } = useChat();
     const currentThumbnail = currentVideo?.thumbnail || currentVideo?.thumbnail_url;
 
@@ -72,10 +79,28 @@ const YoutubeIntegrationPage: React.FC = () => {
             const response = await youtubeService.getSettings();
             setPlaybackMode(response.data.playback_mode || 'browser');
             setVolume(response.data.volume_level || 100);
+            setRequestsCommandEnabled(response.data.requests_command_enabled ?? true);
+            setRequestsRewardEnabled(response.data.requests_reward_enabled ?? false);
+            setRequestsRewardId(response.data.requests_reward_id || '');
         } catch (error) {
             logger.error('Error loading YouTube settings:', error);
         }
     }, [setVolume]);
+
+    const handleSaveSettings = async (): Promise<void> => {
+        try {
+            await youtubeService.saveSettings({
+                requests_command_enabled: requestsCommandEnabled,
+                requests_reward_enabled: requestsRewardEnabled,
+                requests_reward_id: requestsRewardId
+            });
+            toast.success('Настройки сохранены');
+            setIsSettingsDialogOpen(false);
+        } catch (error) {
+            logger.error('Error saving YouTube settings:', error);
+            toast.error('Ошибка сохранения настроек');
+        }
+    };
 
     const generateYoutubeObsUrl = async (): Promise<string | null> => {
         try {
@@ -287,26 +312,14 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             </div>
                                         </div>
                                     )}
+                                    )}
                                 </div>
 
                                 <div className="flex-1 space-y-3">
                                     <div className="bg-muted/30 rounded-lg p-3">
-                                        <div className="flex items-center gap-2">
-                                            <Button variant="ghost" size="sm" onClick={togglePlayPause} disabled={!currentVideo} className={BUTTON_SIZES.icon} title={isPlaying ? "Пауза" : "Воспроизвести"}>
-                                                {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-                                            </Button>
-                                            <Button variant="ghost" size="sm" onClick={nextVideo} disabled={!currentVideo} className={BUTTON_SIZES.icon} title="Следующий">
-                                                <SkipForward className="h-5 w-5" />
-                                            </Button>
-                                            <div className="h-6 w-px bg-border mx-2" />
-                                            <Button variant="ghost" size="sm" onClick={toggleMute} className={BUTTON_SIZES.icon} title={isMuted ? "Включить звук" : "Выключить звук"}>
-                                                {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                                            </Button>
-                                            <div className="flex-1 flex items-center gap-2 mx-2">
-                                                <Slider value={[volume]} onValueChange={handleVolumeChange} max={100} step={1} className="flex-1" />
-                                                <span className="text-xs text-muted-foreground w-12 text-right">{volume}%</span>
-                                            </div>
-                                        </div>
+                                        <p className="text-xs text-muted-foreground text-center">
+                                            Управление плеером доступно через встроенные элементы YouTube или мини-плеер.
+                                        </p>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2">
@@ -325,6 +338,58 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 <DialogFooter>
                                                     <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
                                                     <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+
+                                        <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" className="h-12 w-full" title="Настройки заказа">
+                                                    <Settings className="h-4 w-4 mr-2" />
+                                                    Настройки
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Настройки заказов YouTube</DialogTitle>
+                                                    <DialogDescription>Настройте способы добавления видео в очередь</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="space-y-4 py-4">
+                                                    <div className="flex items-center justify-between space-x-2">
+                                                        <Label htmlFor="cmd-enabled" className="flex-1">Заказ через команду (!sr)</Label>
+                                                        <Switch
+                                                            id="cmd-enabled"
+                                                            checked={requestsCommandEnabled}
+                                                            onCheckedChange={setRequestsCommandEnabled}
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center justify-between space-x-2">
+                                                        <Label htmlFor="reward-enabled" className="flex-1">Заказ через награду (Channel Points)</Label>
+                                                        <Switch
+                                                            id="reward-enabled"
+                                                            checked={requestsRewardEnabled}
+                                                            onCheckedChange={setRequestsRewardEnabled}
+                                                        />
+                                                    </div>
+                                                    {requestsRewardEnabled && (
+                                                        <div className="space-y-2">
+                                                            <Label htmlFor="reward-id">ID Награды Twitch</Label>
+                                                            <Input
+                                                                id="reward-id"
+                                                                value={requestsRewardId}
+                                                                onChange={(e) => setRequestsRewardId(e.target.value)}
+                                                                placeholder="Введите ID награды..."
+                                                            />
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Создайте награду на Twitch и скопируйте её ID (или просто название, если бот поддерживает поиск по названию).
+                                                                Рекомендуется использовать ID.
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)}>Отмена</Button>
+                                                    <Button onClick={handleSaveSettings}>Сохранить</Button>
                                                 </DialogFooter>
                                             </DialogContent>
                                         </Dialog>
@@ -411,18 +476,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                             <CardTitle>Очередь ({queue.length})</CardTitle>
                         </CardHeader>
                         <CardContent className="p-0 flex-1 overflow-y-auto">
-                            {currentVideo && (
-                                <div className="p-4 border-b bg-muted/20">
-                                    <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
-                                    <div className="flex gap-3 p-2 rounded-lg">
-                                        <img src={currentThumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded" />
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
-                                            <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+
 
                             {queue.length > 0 ? (
                                 <div className="p-4 space-y-3">
@@ -499,69 +553,39 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 widget_referrer: window.location.origin
                                             }
                                         }}
-                                        key={`theater-player-${currentVideo.video_id}`}
                                         className="w-full h-full"
                                     />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                                        <p className="text-muted-foreground">Нет видео для воспроизведения.</p>
+                                    <div className="w-full h-full flex items-center justify-center bg-muted/20">
+                                        <p className="text-muted-foreground">Нет видео</p>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className="col-span-1 h-full">
-                            <Card className="flex-1 flex flex-col h-full">
-                                <CardHeader className="pb-3">
-                                    <CardTitle>Очередь ({queue.length})</CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-0 flex-1 overflow-y-auto">
-                                    {currentVideo && (
-                                        <div className="p-4 border-b bg-muted/20">
-                                            <p className="text-xs text-muted-foreground mb-2">Сейчас играет:</p>
-                                            <div className="flex gap-3 p-2 rounded-lg">
-                                                <img src={currentVideo.thumbnail} alt={currentVideo.title} className="w-20 h-12 object-cover rounded" />
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium text-sm line-clamp-2">{currentVideo.title}</h4>
-                                                    <p className="text-xs text-muted-foreground">от {currentVideo.requester_name || currentVideo.user_id || 'Unknown'}</p>
-                                                </div>
-                                            </div>
+                        <div className="space-y-4 h-full flex flex-col overflow-hidden">
+                            <h3 className="font-semibold text-lg">Очередь</h3>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                                {queue.map((video: YoutubeVideo, index: number) => (
+                                    <div key={video.id} className="flex gap-2 p-2 rounded bg-muted/20 text-sm">
+                                        <div className="flex-shrink-0 w-5 h-5 bg-muted rounded-full flex items-center justify-center text-[10px] font-medium">
+                                            {index + 1}
                                         </div>
-                                    )}
-
-                                    {queue.length > 0 ? (
-                                        <div className="p-4 space-y-3">
-                                            {queue.map((video: YoutubeVideo, index: number) => {
-                                                return (
-                                                    <div key={video.id} className="flex gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                                                        <div className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium">
-                                                            {index + 1}
-                                                        </div>
-                                                        <img src={video.thumbnail} alt={video.title} className="w-20 h-12 object-cover rounded" />
-                                                        <div className="flex-1 min-w-0">
-                                                            <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
-                                                            <p className="text-xs text-muted-foreground">Заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-medium truncate">{video.title}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{video.requester_name}</p>
                                         </div>
-                                    ) : (
-                                        <div className="text-center py-8 text-muted-foreground p-4">
-                                            <div className="text-4xl mb-4">[AUDIO]</div>
-                                            <p className="font-medium text-base mb-2">Очередь пуста</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                Очередь пуста. Зрители могут заказывать видео командой !sr
-                                            </p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                    </div>
+                                ))}
+                                {queue.length === 0 && (
+                                    <p className="text-sm text-muted-foreground text-center py-4">Очередь пуста</p>
+                                )}
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
             )}
-        </div>
+        </div >
     );
 };
 

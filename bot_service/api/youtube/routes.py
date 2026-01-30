@@ -41,6 +41,7 @@ class QueueResponse(BaseModel):
     is_paid: bool
     points_cost: Optional[int]
     added_at: Optional[str]
+    played_at: Optional[str] = None
 
 class QueueManagementRequest(BaseModel):
     queue_id: int

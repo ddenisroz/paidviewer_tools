@@ -59,7 +59,7 @@ type PlayerAction =
     | { type: 'SET_DURATION'; payload: number }
     | { type: 'SET_QUEUE'; payload: YoutubeVideo[] }
     | { type: 'SET_PLAYER_REF'; payload: YouTubePlayer | null }
-    | { type: 'LOAD_QUEUE'; payload: { queue: YoutubeVideo[]; current_video: YoutubeVideo | null } }
+    | { type: 'LOAD_QUEUE'; payload: { queue: YoutubeVideo[]; current_video: YoutubeVideo | null; is_playing?: boolean } }
     | { type: 'NEXT_VIDEO'; payload: { current_video: YoutubeVideo | null } }
     | { type: 'TOGGLE_PLAY_PAUSE' }
     | { type: 'CLOSE_PLAYER' };
@@ -182,7 +182,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
     const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: _queueError } = useYoutubeQueue({
         enabled: !!isAuthenticated,
-        refetchInterval: 30000,
+        refetchInterval: 5000,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });

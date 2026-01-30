@@ -24,12 +24,18 @@ class YouTubeSettingsResponse(BaseModel):
     """Response model для настроек YouTube"""
     playback_mode: Literal['browser', 'obs'] = Field(default='browser', description="Режим воспроизведения")
     volume_level: int = Field(default=100, ge=0, le=100, description="Уровень громкости (0-100)")
+    requests_command_enabled: bool = Field(default=True, description="Разрешить заказ через команду !sr")
+    requests_reward_enabled: bool = Field(default=False, description="Разрешить заказ через награду")
+    requests_reward_id: Optional[str] = Field(None, description="ID награды для заказа")
 
 
 class YouTubeSettingsUpdate(BaseModel):
     """Request model для обновления настроек YouTube"""
     playback_mode: Optional[Literal['browser', 'obs']] = Field(None, description="Режим воспроизведения")
     volume_level: Optional[int] = Field(None, ge=0, le=100, description="Уровень громкости (0-100)")
+    requests_command_enabled: Optional[bool] = Field(None, description="Разрешить заказ через команду !sr")
+    requests_reward_enabled: Optional[bool] = Field(None, description="Разрешить заказ через награду")
+    requests_reward_id: Optional[str] = Field(None, description="ID награды для заказа")
 
 
 def _get_youtube_settings_from_tts(tts_settings) -> dict:
@@ -37,7 +43,10 @@ def _get_youtube_settings_from_tts(tts_settings) -> dict:
     youtube_settings = getattr(tts_settings, 'youtube_settings', None) or {}
     return {
         'playback_mode': youtube_settings.get('playback_mode', 'browser'),
-        'volume_level': youtube_settings.get('volume_level', 100)
+        'volume_level': youtube_settings.get('volume_level', 100),
+        'requests_command_enabled': youtube_settings.get('requests_command_enabled', True),
+        'requests_reward_enabled': youtube_settings.get('requests_reward_enabled', False),
+        'requests_reward_id': youtube_settings.get('requests_reward_id', None)
     }
 
 
@@ -52,6 +61,9 @@ async def get_youtube_settings(
     Возвращает:
     - playback_mode: 'browser' или 'obs'
     - volume_level: 0-100
+    - requests_command_enabled: bool
+    - requests_reward_enabled: bool
+    - requests_reward_id: str
     """
     try:
         user_id = user.get('id')
@@ -76,10 +88,6 @@ async def save_youtube_settings(
 ):
     """
     Сохранить настройки YouTube для текущего пользователя
-    
-    Параметры:
-    - playback_mode: 'browser' или 'obs' (опционально)
-    - volume_level: 0-100 (опционально)
     """
     try:
         user_id = user.get('id')
@@ -96,6 +104,12 @@ async def save_youtube_settings(
             youtube_settings['playback_mode'] = settings.playback_mode
         if settings.volume_level is not None:
             youtube_settings['volume_level'] = settings.volume_level
+        if settings.requests_command_enabled is not None:
+            youtube_settings['requests_command_enabled'] = settings.requests_command_enabled
+        if settings.requests_reward_enabled is not None:
+            youtube_settings['requests_reward_enabled'] = settings.requests_reward_enabled
+        if settings.requests_reward_id is not None:
+            youtube_settings['requests_reward_id'] = settings.requests_reward_id
         
         # Save back using repository
         repo.update_settings(tts_settings, {'youtube_settings': youtube_settings})
@@ -104,7 +118,10 @@ async def save_youtube_settings(
         
         return YouTubeSettingsResponse(
             playback_mode=youtube_settings.get('playback_mode', 'browser'),
-            volume_level=youtube_settings.get('volume_level', 100)
+            volume_level=youtube_settings.get('volume_level', 100),
+            requests_command_enabled=youtube_settings.get('requests_command_enabled', True),
+            requests_reward_enabled=youtube_settings.get('requests_reward_enabled', False),
+            requests_reward_id=youtube_settings.get('requests_reward_id', None)
         )
         
     except Exception as e:

@@ -560,12 +560,12 @@ class QueueService:
 
         try:
             queue_repo = YouTubeQueueRepository(db)
-            queue_item = queue_repo.get_pending_item(queue_id, user_id)
+            queue_item = queue_repo.get_item_by_id(queue_id, user_id)
 
             if not queue_item:
                 return False
 
-            queue_item.status = 'completed'
+            queue_item.status = 'played'
             queue_item.played_at = utcnow_naive()
 
             # Перестраиваем позиции

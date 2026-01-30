@@ -112,6 +112,7 @@ async def update_stream(
     service: StreamInfoService = Depends(get_stream_service)
 ):
     """Обновить информацию о стриме (title или category)"""
+    """Обновить информацию о стриме (title или category)"""
     logger.info("[STREAM UPDATE] Request received")
     
     try:

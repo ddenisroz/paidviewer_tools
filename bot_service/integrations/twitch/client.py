@@ -38,7 +38,31 @@ class TwitchClient(BaseIntegrationClient):
     def __init__(self, oauth: TwitchOAuth, timeout: Optional[ClientTimeout] = None):
         super().__init__(self.BASE_URL, timeout)
         self.oauth = oauth
-    
+    async def _request(
+        self,
+        method: str,
+        endpoint: str,
+        token: Optional[TokenInfo] = None,
+        params: Optional[Dict] = None,
+        json_data: Optional[Dict] = None,
+        data: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        """Override to handle App Token refresh."""
+        try:
+            return await super()._request(method, endpoint, token, params, json_data, data)
+        except TokenExpiredError:
+            # Если запрос был без user token (значит использовался app token)
+            if token is None:
+                logger.warning("[TWITCH] App token expired/invalid, forcing refresh...")
+                try:
+                    await self.oauth.get_app_access_token(force_refresh=True)
+                    # Retry once
+                    return await super()._request(method, endpoint, token, params, json_data, data)
+                except Exception as e:
+                    logger.error(f"[TWITCH] Failed to refresh app token during retry: {e}")
+                    raise
+            raise
+
     async def _get_headers(self, token: Optional[TokenInfo] = None) -> Dict[str, str]:
         """Формирует заголовки с Client-ID и Authorization."""
         if token:

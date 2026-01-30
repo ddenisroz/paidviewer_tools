@@ -8,6 +8,9 @@
 export interface YoutubeSettings {
   playback_mode: 'browser' | 'obs';
   volume_level: number; // 0-100
+  requests_command_enabled?: boolean;
+  requests_reward_enabled?: boolean;
+  requests_reward_id?: string | null;
 }
 
 /**
@@ -41,6 +44,7 @@ export interface YoutubeVideo {
   is_paid: boolean;
   points_cost: number | null;
   added_at: string | null;
+  played_at: string | null;
   // Deprecated aliases for backward compatibility
   thumbnail?: string;
   added_by?: string;

@@ -40,7 +40,7 @@ const GlobalPlayer: React.FC = () => {
         setPlayerRef,
         releasePlayerRef
     } = usePlayer();
-    
+
     const [showQueue, setShowQueue] = useState(false);
 
     // Типы для YouTube Player
@@ -64,6 +64,31 @@ const GlobalPlayer: React.FC = () => {
     const handlePlayerReadyWithRef = (event: YouTubeEvent) => {
         setPlayerRef(event.target, 'global');
         handlePlayerReady(event as unknown as Event);
+
+        // Sync playback time with server
+        if (currentVideo?.played_at) {
+            try {
+                const playedAt = new Date(currentVideo.played_at).getTime(); // Assumes UTC if string is ISO+Z or similar, check backend
+                // Backend sends naive UTC, but browser assumes local if no Z. 
+                // We should assume the string is UTC. 
+                // Generally adding 'Z' if missing is safer, but let's see. 
+                // Actually safer: assume the server time is roughly "now" minus duration.
+                // Let's rely on Date parsing.
+                // Note: The backend returns `utcnow_naive()`. If serialized, it might lack 'Z'.
+                // Ideally, we treat it as UTC.
+                const playedAtDate = new Date(currentVideo.played_at.endsWith('Z') ? currentVideo.played_at : currentVideo.played_at + 'Z');
+                const now = new Date();
+                // Simple diff in seconds
+                const diffSeconds = (now.getTime() - playedAtDate.getTime()) / 1000;
+
+                if (diffSeconds > 0) {
+                    event.target.seekTo(diffSeconds, true);
+                }
+            } catch (e) {
+                console.error("Error syncing time", e);
+            }
+        }
+
         if (!isPlaying) {
             try {
                 event.target.pauseVideo();
@@ -78,12 +103,12 @@ const GlobalPlayer: React.FC = () => {
     useEffect(() => {
         const originalConsoleError = console.error;
         window.originalConsoleError = originalConsoleError;
-        
+
         // Перехватываем console.error только если еще не перехватывали
         if (!window.youtubeErrorHandlerInstalled) {
             console.error = (...args: unknown[]) => {
                 const message = args[0]?.toString();
-                if (message?.includes('TIMEOUT waiting for') || 
+                if (message?.includes('TIMEOUT waiting for') ||
                     message?.includes('getYouTubeTitleNode') ||
                     message?.includes('Cannot read properties of null')) {
                     return; // Игнорируем эти ошибки от расширений
@@ -123,7 +148,7 @@ const GlobalPlayer: React.FC = () => {
     const activeTab = searchParams.get('tab');
     const isMediaYoutubeTab = currentPath.startsWith('/dashboard/media') && (!activeTab || activeTab === 'youtube');
     const isOnYoutubePage = currentPath.startsWith('/dashboard/youtube') || isMediaYoutubeTab;
-    
+
     // Плеер работает всегда, UI показываем на всех страницах КРОМЕ YouTube
     // На YouTube странице - ничего не показываем (там свой встроенный плеер)
     const showUI = isVisible && !isTheaterMode && !isOnYoutubePage;
@@ -172,7 +197,7 @@ const GlobalPlayer: React.FC = () => {
                     />
                 </div>
             )}
-            
+
             {/* UI плеера фиксирован внизу экрана с отступом */}
             {showUI && (
                 <div className="absolute bottom-4 left-4 z-40 w-[calc(100%-2rem)] max-w-[320px] pointer-events-none">
@@ -197,8 +222,8 @@ const GlobalPlayer: React.FC = () => {
                                 <div className="h-56 overflow-y-auto">
                                     <div className="p-2 space-y-1">
                                         {queue.map((video, index) => (
-                                            <div 
-                                                key={video.id} 
+                                            <div
+                                                key={video.id}
                                                 className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-800/50 transition-colors"
                                             >
                                                 <div className="flex-shrink-0 w-6 h-6 bg-gray-800 rounded-full flex items-center justify-center text-xs font-medium text-gray-400">
@@ -206,8 +231,8 @@ const GlobalPlayer: React.FC = () => {
                                                 </div>
                                                 <div className="w-12 h-8 bg-gray-800 rounded overflow-hidden flex-shrink-0">
                                                     {(video.thumbnail || video.thumbnail_url) && (
-                                                        <img 
-                                                            src={video.thumbnail || video.thumbnail_url} 
+                                                        <img
+                                                            src={video.thumbnail || video.thumbnail_url}
                                                             alt={video.title}
                                                             className="w-full h-full object-cover"
                                                             loading="lazy"
@@ -229,7 +254,7 @@ const GlobalPlayer: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        
+
                         {/* Main player controls */}
                         <div className={`bg-gray-900/95 backdrop-blur-md border border-gray-700 shadow-2xl ${showQueue ? 'rounded-b-xl border-t-0' : 'rounded-xl'}`}>
                             {/* Основные элементы управления */}
@@ -237,24 +262,24 @@ const GlobalPlayer: React.FC = () => {
                                 {/* Информация о треке слева */}
                                 <div className="flex items-center gap-2 min-w-0 w-full">
                                     <div className="w-8 h-8 bg-gray-800 rounded-md overflow-hidden flex-shrink-0">
-                                {displayThumbnail && (
-                                    <img 
-                                        src={displayThumbnail} 
-                                        alt={displayVideo.title}
-                                        className="w-full h-full object-cover"
-                                        loading="eager"
-                                        decoding="async"
-                                    />
-                                )}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <h3 className="text-white font-medium text-sm truncate">
-                                    {displayVideo.title}
-                                </h3>
-                                <p className="text-gray-400 text-xs truncate">
-                                    от {displayVideo.requester_name || displayVideo.user_id || 'Unknown'}
-                                </p>
-                            </div>
+                                        {displayThumbnail && (
+                                            <img
+                                                src={displayThumbnail}
+                                                alt={displayVideo.title}
+                                                className="w-full h-full object-cover"
+                                                loading="eager"
+                                                decoding="async"
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="text-white font-medium text-sm truncate">
+                                            {displayVideo.title}
+                                        </h3>
+                                        <p className="text-gray-400 text-xs truncate">
+                                            от {displayVideo.requester_name || displayVideo.user_id || 'Unknown'}
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {/* Центральные кнопки управления */}
@@ -274,7 +299,7 @@ const GlobalPlayer: React.FC = () => {
                                             </span>
                                         </Button>
                                     )}
-                                    
+
                                     {/* Кнопка закрытия */}
                                     <Button
                                         variant="ghost"

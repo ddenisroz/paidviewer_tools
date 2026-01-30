@@ -86,6 +86,19 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
             )
         ).first()
 
+    def get_item_by_id(
+        self,
+        queue_id: int,
+        user_id: int
+    ) -> Optional[YouTubeQueue]:
+        """Get queue item by ID (any status)."""
+        return self.db.query(YouTubeQueue).filter(
+            and_(
+                YouTubeQueue.id == queue_id,
+                YouTubeQueue.user_id == user_id
+            )
+        ).first()
+
     def get_next_pending(self, user_id: int) -> Optional[YouTubeQueue]:
         """Get next pending video (first in position order)."""
         return (

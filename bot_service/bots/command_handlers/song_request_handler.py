@@ -41,6 +41,16 @@ class SongRequestHandler(BaseCommandHandler):
             if not user:
                 await ctx.reply("[ERROR] Канал не найден")
                 return
+
+            # Check settings
+            from repositories.tts_settings_repository import TTSSettingsRepository
+            tts_repo = TTSSettingsRepository(db)
+            tts_settings = tts_repo.get_or_create(user_id=user.id)
+            youtube_settings = getattr(tts_settings, 'youtube_settings', None) or {}
+            
+            if not youtube_settings.get('requests_command_enabled', True):
+                await ctx.reply("Заказ видео через команды отключен стримером.")
+                return
             
             # Add to queue
             result = await youtube_queue_service.add_video(

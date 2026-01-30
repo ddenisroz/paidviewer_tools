@@ -189,7 +189,6 @@ class Bot(TwitchBotCore):
         if message.echo:
             return
         
-        # Проверка гостевого кода (если это 6 цифр)
         if message.content.strip().isdigit() and len(message.content.strip()) == 6:
             logger.info(f"[DEBUG] [GUEST] Detected 6-digit code: {message.content.strip()}")
             from api.guest_api import confirm_guest_code
@@ -201,6 +200,53 @@ class Bot(TwitchBotCore):
             )
             return  # Не обрабатываем TTS для кодов верификации
         
+        # Обработка заказа видео через награду (Channel Points)
+        if hasattr(message, 'tags') and message.tags and message.tags.get('custom-reward-id'):
+            try:
+                reward_id = message.tags.get('custom-reward-id')
+                from core.database import SessionLocal
+                from repositories.user_repository import UserRepository
+                from repositories.tts_settings_repository import TTSSettingsRepository
+                
+                db = SessionLocal()
+                try:
+                    user_repo = UserRepository(db)
+                    user = user_repo.get_by_twitch_username(message.channel.name)
+                    
+                    if user:
+                        tts_repo = TTSSettingsRepository(db)
+                        tts_settings = tts_repo.get_or_create(user_id=user.id)
+                        yt_settings = getattr(tts_settings, 'youtube_settings', {}) or {}
+                        
+                        if yt_settings.get('requests_reward_enabled') and yt_settings.get('requests_reward_id') == reward_id:
+                            logger.info(f"[YOUTUBE] Detected Request via Reward: {reward_id}")
+                            
+                            from services.youtube.queue_service import QueueService
+                            queue_service = QueueService()
+                            
+                            # Use message content as URL
+                            url = message.content.strip()
+                            if url:
+                                result = await queue_service.add_video(
+                                    user_id=user.id,
+                                    url=url,
+                                    requested_by=message.author.name,
+                                    requester_id=str(message.author.id),
+                                    platform='twitch',
+                                    is_paid=True
+                                )
+                                
+                                if result.get('success'):
+                                    await message.channel.send(f"@{message.author.name}, видео добавлено за баллы: {result.get('title', 'Video')[:40]}")
+                                else:
+                                    await message.channel.send(f"@{message.author.name}, ошибка добавления: {result.get('error')}")
+                                
+                                return # Stop further processing (TTS) for this message
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"[ERROR] Error processing reward request: {e}")
+
         # Проверка команды (универсальная система)
         if message.content.strip().startswith('!'):
             # Создаем ctx-совместимый объект для universal_command_handler

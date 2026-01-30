@@ -57,12 +57,12 @@ class TwitchOAuth:
             raise ValueError("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET must be set")
         return cls(settings.twitch_client_id, settings.twitch_client_secret)
     
-    async def get_app_access_token(self) -> str:
+    async def get_app_access_token(self, force_refresh: bool = False) -> str:
         """
         Получает App Access Token для server-to-server запросов.
         Кэширует токен и обновляет при необходимости.
         """
-        if self._app_token and time.time() < self._app_token_expires_at:
+        if not force_refresh and self._app_token and time.time() < self._app_token_expires_at:
             return self._app_token
         
         async with aiohttp.ClientSession(timeout=self.TIMEOUT) as session:
