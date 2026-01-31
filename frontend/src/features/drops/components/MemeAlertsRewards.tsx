@@ -37,20 +37,6 @@ export const MemeAlertsRewards: React.FC = () => {
         };
     }, []);
 
-    useEffect(() => {
-        const handleMessage = async (event: MessageEvent) => {
-            if (!event?.data || typeof event.data !== 'object') return;
-            const data = event.data as { access_token?: string; refresh_token?: string };
-            if (!data.access_token) return;
-
-            const success = await saveTokenToBackend(data.access_token, data.refresh_token);
-            if (success) cleanupPopup();
-        };
-
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, [cleanupPopup, saveTokenToBackend]);
-
     const checkStatus = async () => {
         try {
             const response = await fetch(`${MEMEALERTS_API_BASE}/status`);
@@ -76,7 +62,6 @@ export const MemeAlertsRewards: React.FC = () => {
         }
         return false;
     };
-
 
     const saveTokenToBackend = async (accessToken: string, refreshToken?: string) => {
         try {
@@ -123,6 +108,20 @@ export const MemeAlertsRewards: React.FC = () => {
         popupRef.current = null;
         setConnecting(false);
     }, []);
+
+    useEffect(() => {
+        const handleMessage = async (event: MessageEvent) => {
+            if (!event?.data || typeof event.data !== 'object') return;
+            const data = event.data as { access_token?: string; refresh_token?: string };
+            if (!data.access_token) return;
+
+            const success = await saveTokenToBackend(data.access_token, data.refresh_token);
+            if (success) cleanupPopup();
+        };
+
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, [cleanupPopup, saveTokenToBackend]);
 
     const handleConnect = useCallback(() => {
         // Open popup window

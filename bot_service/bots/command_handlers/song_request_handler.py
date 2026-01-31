@@ -75,19 +75,23 @@ class SongRequestHandler(BaseCommandHandler):
 
 
 class SkipHandler(BaseCommandHandler):
-    """Handler for !skip command"""
+    """Handler for !skip command with optional vote-based skipping"""
     
     name = "skip"
     aliases = ["next"]
     description = "Skip current video"
-    requires_permission = True
-    permission_level = "moderator"
+    requires_permission = False  # Changed: permission check is done dynamically
+    permission_level = "moderator"  # Default for single-skip mode
+    
+    # In-memory vote tracking: {channel_owner_id: {video_id: set(voter_usernames)}}
+    _skip_votes: dict = {}
     
     async def execute(self, ctx: PlatformContext, db) -> None:
         try:
             from services.youtube.queue_service import QueueService
             youtube_queue_service = QueueService()
             from repositories.user_repository import UserRepository
+            from repositories.command_repository import CommandRepository
             repo = UserRepository(db)
             if ctx.platform == 'twitch':
                 user = repo.get_by_twitch_username(ctx.channel_name)
@@ -98,12 +102,74 @@ class SkipHandler(BaseCommandHandler):
                 await ctx.reply("[ERROR] Канал не найден")
                 return
             
-            result = await youtube_queue_service.skip_current(user.id)
+            # Get skip_votes_required from command override settings
+            cmd_repo = CommandRepository(db)
+            skip_votes_required = 1  # Default: instant skip
             
-            if result.get('success'):
-                await ctx.send(f"⏭ {ctx.author_name} пропустил видео")
+            # Check for user override of skip command
+            override = cmd_repo.get_override_by_name('skip', user.id)
+            if override and override.extra_settings:
+                skip_votes_required = override.extra_settings.get('skip_votes_required', 1)
+            
+            # If skip_votes_required == 1: moderator-only instant skip (original behavior)
+            if skip_votes_required <= 1:
+                # Check moderator permission
+                is_mod = any(role in ['moderator', 'broadcaster', 'owner'] for role in (ctx.author_roles or []))
+                is_owner = ctx.author_name.lower() == ctx.channel_name.lower()
+                
+                if not is_mod and not is_owner:
+                    await ctx.reply("Только модераторы могут использовать !skip")
+                    return
+                
+                result = await youtube_queue_service.skip_current(user.id)
+                
+                if result.get('success'):
+                    await ctx.send(f"⏭ {ctx.author_name} пропустил видео")
+                else:
+                    await ctx.reply(f"[ERROR] {result.get('error', 'Ошибка')}")
+                return
+            
+            # Vote-based skip mode
+            current_video = await youtube_queue_service.get_current_video(user.id)
+            if not current_video:
+                await ctx.reply("Нет текущего видео для пропуска")
+                return
+            
+            video_id = current_video.get('id') or current_video.get('video_id', 'unknown')
+            
+            # Initialize vote tracking for this channel if needed
+            if user.id not in self._skip_votes:
+                self._skip_votes[user.id] = {}
+            
+            # Reset votes if video changed
+            if video_id not in self._skip_votes[user.id]:
+                self._skip_votes[user.id] = {video_id: set()}
+            
+            # Add voter (unique by username)
+            voter_name = ctx.author_name.lower()
+            votes_set = self._skip_votes[user.id][video_id]
+            
+            if voter_name in votes_set:
+                await ctx.reply(f"{ctx.author_name}, ты уже голосовал за скип!")
+                return
+            
+            votes_set.add(voter_name)
+            current_votes = len(votes_set)
+            
+            if current_votes >= skip_votes_required:
+                # Threshold reached - skip!
+                result = await youtube_queue_service.skip_current(user.id)
+                
+                if result.get('success'):
+                    # Clear votes for this channel
+                    self._skip_votes[user.id] = {}
+                    await ctx.send(f"⏭ Видео пропущено! ({current_votes}/{skip_votes_required} голосов)")
+                else:
+                    await ctx.reply(f"[ERROR] {result.get('error', 'Ошибка')}")
             else:
-                await ctx.reply(f"[ERROR] {result.get('error', 'Ошибка')}")
+                # Not enough votes yet
+                remaining = skip_votes_required - current_votes
+                await ctx.send(f"🗳 {ctx.author_name} голосует за скип ({current_votes}/{skip_votes_required}). Нужно ещё {remaining}!")
                 
         except Exception as e:
             logger.error(f"Error in !skip: {e}")

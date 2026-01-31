@@ -23,20 +23,20 @@ export const ChatComplexSettings: React.FC<ChatComplexSettingsProps> = ({
     return (
         <div className="space-y-4 w-72">
             <div className="space-y-2">
-                <h4 className="font-medium leading-none text-white">Настройки чата</h4>
+                <h4 className="font-medium leading-none text-foreground">Настройки чата</h4>
                 <p className="text-xs text-muted-foreground">
                     Управление отображением элементов чата
                 </p>
             </div>
 
-            <Separator className="bg-white/10" />
+            <Separator className="bg-border" />
 
             <div className="space-y-4">
                 {/* Visibility Toggle */}
                 <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                         <Label className="text-sm text-foreground flex items-center gap-2">
-                            {chatMessagesVisible ? <Eye className="w-4 h-4 text-green-400" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
+                            {chatMessagesVisible ? <Eye className="w-4 h-4 text-green-400" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
                             Сообщения
                         </Label>
                         <p className="text-xs text-muted-foreground">Показывать сообщения чата</p>
@@ -51,7 +51,7 @@ export const ChatComplexSettings: React.FC<ChatComplexSettingsProps> = ({
                 <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                         <Label className="text-sm text-foreground flex items-center gap-2">
-                            <ImageIcon className={`w-4 h-4 ${showImages ? 'text-blue-400' : 'text-gray-400'}`} />
+                            <ImageIcon className={`w-4 h-4 ${showImages ? 'text-blue-400' : 'text-muted-foreground'}`} />
                             Картинки и ссылки
                         </Label>
                         <p className="text-xs text-muted-foreground">Отображать медиа в чате</p>
@@ -63,12 +63,12 @@ export const ChatComplexSettings: React.FC<ChatComplexSettingsProps> = ({
                 </div>
             </div>
 
-            <Separator className="bg-white/10" />
+            <Separator className="bg-border" />
 
             {/* OBS Settings Link */}
             <Button
                 variant="outline"
-                className="w-full justify-start gap-2 border-white/10 hover:bg-white/5 hover:text-white"
+                className="w-full justify-start gap-2 border-border hover:bg-accent hover:text-accent-foreground"
                 onClick={onOpenOBSSettings}
             >
                 <Settings className="w-4 h-4" />

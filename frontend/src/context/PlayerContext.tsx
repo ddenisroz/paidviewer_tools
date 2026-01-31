@@ -27,6 +27,8 @@ interface YouTubePlayer {
     getCurrentTime: () => number;
     getDuration: () => number;
     destroy?: () => void;
+    loadVideoById: (videoId: string, startSeconds?: number) => void;
+    cueVideoById: (videoId: string, startSeconds?: number) => void;
 }
 
 interface PlayerState {
@@ -151,6 +153,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
     }
 };
 
+
 interface PlayerContextValue extends PlayerState {
     loadQueue: (force?: boolean) => Promise<void>;
     nextVideo: () => Promise<void>;
@@ -165,6 +168,9 @@ interface PlayerContextValue extends PlayerState {
     closePlayer: () => void;
     updateTime: () => void;
     setIsTheaterMode: (value: boolean) => void;
+    // Legacy portal support (deprecated)
+    playerContainerRef: HTMLDivElement | null;
+    setPlayerContainer: (container: HTMLDivElement | null) => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | undefined>(undefined);
@@ -177,6 +183,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [state, dispatch] = useReducer(playerReducer, initialState);
     const lastUpdateTimeRef = useRef<number>(0);
     const playerSourceRef = useRef<PlayerSource | null>(null);
+    const [playerContainerRef, setPlayerContainer] = React.useState<HTMLDivElement | null>(null);
     const { isAuthenticated } = useAuth();
     const { lastJsonMessage } = useChat();
 
@@ -331,13 +338,15 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         const currentRef = state.playerRef;
         const currentSource = playerSourceRef.current;
 
+        // НЕ уничтожаем предыдущий плеер - просто ставим на паузу и мьютим
+        // Это позволяет hidden плееру продолжать существовать для бесшовного воспроизведения
         if (currentRef && currentRef !== ref) {
             try {
                 currentRef.pauseVideo();
                 currentRef.mute();
-                currentRef.destroy?.();
+                // НЕ вызываем destroy - плеер должен остаться для бесшовного переключения
             } catch (error) {
-                logger.debug('[YouTube] Previous player cleanup skipped:', error);
+                logger.debug('[YouTube] Previous player pause/mute skipped:', error);
             }
         }
 
@@ -349,11 +358,12 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         if (playerSourceRef.current !== source) {
             return;
         }
+        // НЕ уничтожаем плеер - просто ставим на паузу и мьютим
         if (state.playerRef) {
             try {
                 state.playerRef.pauseVideo();
                 state.playerRef.mute();
-                state.playerRef.destroy?.();
+                // НЕ вызываем destroy - плеер может понадобиться для бесшовного воспроизведения
             } catch (error) {
                 logger.debug('[YouTube] Player release cleanup skipped:', error);
             }
@@ -557,7 +567,9 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         handlePlayerError,
         closePlayer,
         updateTime,
-        setIsTheaterMode
+        setIsTheaterMode,
+        playerContainerRef,
+        setPlayerContainer
     };
 
     return (

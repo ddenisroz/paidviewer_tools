@@ -1033,7 +1033,10 @@ const PointsManagementPage: React.FC = () => {
                                     variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
                                     size="sm"
                                     onClick={() => setSelectedPlatform('twitch')}
-                                    className="gap-1.5 h-8"
+                                    className={`gap-1.5 h-8 ${selectedPlatform === 'twitch'
+                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        : 'hover:bg-muted'
+                                        }`}
                                 >
                                     <TwitchIcon className="w-3.5 h-3.5" />
                                     Twitch
@@ -1045,7 +1048,7 @@ const PointsManagementPage: React.FC = () => {
                                     size="sm"
                                     onClick={() => setSelectedPlatform('vk')}
                                     className={`gap-1.5 h-8 ${selectedPlatform === 'vk'
-                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        ? 'bg-purple-600 text-white hover:bg-purple-700'
                                         : 'hover:bg-muted'
                                         }`}
                                 >

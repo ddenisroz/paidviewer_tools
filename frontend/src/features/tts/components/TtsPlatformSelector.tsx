@@ -20,7 +20,7 @@ const TtsPlatformSelector: React.FC = () => {
     refetchOnWindowFocus: true,
   });
   const platformSettingsData = platformSettingsResponse?.data;
-  
+
   const [settings, setSettings] = useState<TtsPlatformSettings>({
     enabled_platforms: [],
     global_enabled: false
@@ -51,7 +51,7 @@ const TtsPlatformSelector: React.FC = () => {
         global_enabled: settings.global_enabled
       };
       setSettings(newSettings);
-      
+
       // [REFRESH] Отправляем событие для синхронизации с нижними кнопками
       window.dispatchEvent(new CustomEvent('tts-settings-changed', {
         detail: { enabledPlatforms: vars.enabled_platforms }
@@ -90,7 +90,7 @@ const TtsPlatformSelector: React.FC = () => {
   const togglePlatform = (platform: string) => {
     const enabledPlatforms = [...settings.enabled_platforms];
     const index = enabledPlatforms.indexOf(platform);
-    
+
     if (index > -1) {
       enabledPlatforms.splice(index, 1);
     } else {
@@ -117,9 +117,9 @@ const TtsPlatformSelector: React.FC = () => {
         };
       });
     };
-    
+
     window.addEventListener('tts-settings-changed', handleTtsSettingsChanged as EventListener);
-    
+
     return () => {
       window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged as EventListener);
     };
@@ -139,7 +139,7 @@ const TtsPlatformSelector: React.FC = () => {
       id: 'vk',
       name: 'VK Live',
       icon: <VKIcon className="w-5 h-5" />,
-      color: 'blue',
+      color: 'red',
       description: 'Озвучка сообщений из VK Live чата'
     }
   ];
@@ -158,22 +158,20 @@ const TtsPlatformSelector: React.FC = () => {
               Выбор платформ для озвучки
             </p>
           </div>
-          
+
           <div className="flex items-center space-x-2">
             <span className="text-sm text-gray-600">TTS</span>
             <button
               onClick={toggleGlobalTts}
               disabled={saving}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                settings.global_enabled 
-                  ? 'bg-blue-600' 
-                  : 'bg-gray-200'
-              } ${saving ? 'opacity-50' : ''}`}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.global_enabled
+                ? 'bg-blue-600'
+                : 'bg-gray-200'
+                } ${saving ? 'opacity-50' : ''}`}
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  settings.global_enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.global_enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
               />
             </button>
           </div>
@@ -182,31 +180,27 @@ const TtsPlatformSelector: React.FC = () => {
 
       {/* Глобальный статус */}
       <div className="p-6 border-b">
-        <div className={`flex items-center p-4 rounded-lg ${
-          settings.global_enabled 
-            ? 'bg-green-50 border border-green-200' 
-            : 'bg-gray-50 border border-gray-200'
-        }`}>
-          <div className={`p-2 rounded-lg ${
-            settings.global_enabled ? 'bg-green-100' : 'bg-gray-100'
+        <div className={`flex items-center p-4 rounded-lg ${settings.global_enabled
+          ? 'bg-green-50 border border-green-200'
+          : 'bg-gray-50 border border-gray-200'
           }`}>
+          <div className={`p-2 rounded-lg ${settings.global_enabled ? 'bg-green-100' : 'bg-gray-100'
+            }`}>
             {settings.global_enabled ? (
               <Mic className="w-5 h-5 text-green-600" />
             ) : (
               <MicOff className="w-5 h-5 text-gray-500" />
             )}
           </div>
-          
+
           <div className="ml-3 flex-1">
-            <p className={`font-medium ${
-              settings.global_enabled ? 'text-green-900' : 'text-gray-700'
-            }`}>
+            <p className={`font-medium ${settings.global_enabled ? 'text-green-900' : 'text-gray-700'
+              }`}>
               {settings.global_enabled ? 'TTS включен' : 'TTS выключен'}
             </p>
-            <p className={`text-sm ${
-              settings.global_enabled ? 'text-green-700' : 'text-gray-500'
-            }`}>
-              {settings.global_enabled 
+            <p className={`text-sm ${settings.global_enabled ? 'text-green-700' : 'text-gray-500'
+              }`}>
+              {settings.global_enabled
                 ? `Активен на ${settings.enabled_platforms.length} платформе(ах)`
                 : 'Озвучка сообщений отключена'
               }
@@ -220,55 +214,51 @@ const TtsPlatformSelector: React.FC = () => {
         <h4 className="text-md font-medium text-gray-900 mb-4">
           Выбор платформ
         </h4>
-        
+
         <div className="space-y-4">
           {platforms.map(platform => {
             const isEnabled = settings.enabled_platforms.includes(platform.id);
             const isActive = settings.global_enabled && isEnabled;
-            
+
             return (
               <div key={platform.id} className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors">
                 <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-lg ${
-                    isActive 
-                      ? `bg-${platform.color}-100` 
-                      : 'bg-gray-100'
-                  }`}>
+                  <div className={`p-2 rounded-lg ${isActive
+                    ? `bg-${platform.color}-100`
+                    : 'bg-gray-100'
+                    }`}>
                     <div className={`text-${platform.color}-600`}>
                       {platform.icon}
                     </div>
                   </div>
-                  
+
                   <div>
                     <h5 className="font-medium text-gray-900">{platform.name}</h5>
                     <p className="text-sm text-gray-600">{platform.description}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center space-x-3">
                   {/* Статус */}
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    isActive 
-                      ? `bg-${platform.color}-100 text-${platform.color}-700` 
-                      : 'bg-gray-100 text-gray-600'
-                  }`}>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${isActive
+                    ? `bg-${platform.color}-100 text-${platform.color}-700`
+                    : 'bg-gray-100 text-gray-600'
+                    }`}>
                     {isActive ? 'Активен' : 'Выключен'}
                   </span>
-                  
+
                   {/* Переключатель */}
                   <button
                     onClick={() => togglePlatform(platform.id)}
                     disabled={saving || !settings.global_enabled}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      isEnabled && settings.global_enabled
-                        ? `bg-${platform.color}-600` 
-                        : 'bg-gray-200'
-                    } ${saving || !settings.global_enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isEnabled && settings.global_enabled
+                      ? `bg-${platform.color}-600`
+                      : 'bg-gray-200'
+                      } ${saving || !settings.global_enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        isEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
                     />
                   </button>
                 </div>

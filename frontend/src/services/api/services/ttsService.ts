@@ -218,7 +218,7 @@ export const ttsService = {
    * @returns Promise с ответом API
    */
   async uploadVoice(formData: FormData): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
-    return apiClient.post('/api/admin/voices/upload', formData, {
+    return apiClient.post('/api/voices/admin/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

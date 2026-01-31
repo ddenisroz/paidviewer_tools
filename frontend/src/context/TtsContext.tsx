@@ -59,10 +59,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const { addToast: _addToast } = useToast();
     const { getButtonPosition: _getButtonPosition } = useButtonPosition();
     const location = useLocation();
-    const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
-        if (typeof window === 'undefined') return false;
-        return window.localStorage.getItem('tts_enabled') === 'true';
-    });
+    const [ttsEnabled, setTtsEnabled] = useState<boolean>(false);
     const [isWhitelisted, setIsWhitelisted] = useState<boolean | null>(null);
     const [voices, setVoices] = useState<TtsVoice[]>([]);
     const [engineStatus, setEngineStatus] = useState<EngineStatus>({ loaded: false, error: null });
@@ -107,8 +104,6 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
         enabled: !!user,
         refetchInterval: 30 * 1000,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
         placeholderData: keepPreviousData,
     });
 

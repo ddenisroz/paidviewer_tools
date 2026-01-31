@@ -181,7 +181,7 @@ const Header: React.FC = () => {
                                         <button
                                             onClick={() => handleIntegrationToggle('twitch')}
                                             className={`w-12 h-6 rounded-full transition-colors ${integrations?.twitch?.enabled
-                                                ? 'bg-purple-500'
+                                                ? 'bg-[#9146FF]'
                                                 : 'bg-slate-600'
                                                 }`}
                                         >
@@ -198,7 +198,7 @@ const Header: React.FC = () => {
                                         <button
                                             onClick={() => handleIntegrationToggle('vk')}
                                             className={`w-12 h-6 rounded-full transition-colors ${integrations?.vk?.enabled
-                                                ? 'bg-red-500'
+                                                ? 'bg-[#FF4444]'
                                                 : 'bg-slate-600'
                                                 }`}
                                         >

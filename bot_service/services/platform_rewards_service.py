@@ -167,15 +167,27 @@ class PlatformRewardsService:
 
     def _map_to_vk_create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Map generic reward data to VK format."""
-        return {
+        vk_data = {
             "name": data.get("title"),
             "description": data.get("description"),
             "price": data.get("cost"),
             "is_message_required": data.get("is_message_required", data.get("is_user_input_required", False)),
-            "max_uses_count": data.get("max_uses_count", data.get("max_per_stream", 0) or 0),
-            "max_uses_count_per_user": data.get("max_uses_count_per_user", data.get("max_per_user_per_stream", 0) or 0),
-            "repair_timeout": data.get("repair_timeout", 0)
         }
+        
+        # Only add optional fields if they have a non-zero value
+        max_uses_count = data.get("max_uses_count", data.get("max_per_stream", 0) or 0)
+        if max_uses_count and max_uses_count > 0:
+            vk_data["max_uses_count"] = max_uses_count
+            
+        max_uses_count_per_user = data.get("max_uses_count_per_user", data.get("max_per_user_per_stream", 0) or 0)
+        if max_uses_count_per_user and max_uses_count_per_user > 0:
+            vk_data["max_uses_count_per_user"] = max_uses_count_per_user
+            
+        repair_timeout = data.get("repair_timeout", 0)
+        if repair_timeout and repair_timeout > 0:
+            vk_data["repair_timeout"] = repair_timeout
+            
+        return vk_data
 
     async def update_reward(self, user_id: int, platform: str, reward_id: str, reward_data: Dict[str, Any], db) -> Dict[str, Any]:
         token = self.user_service.get_user_token(user_id, platform.lower(), db)

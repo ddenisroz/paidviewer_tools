@@ -583,3 +583,64 @@ class QueueService:
         finally:
             if should_close:
                 db.close()
+
+    async def get_current_video(self, user_id: int, db: Session = None) -> Optional[Dict[str, Any]]:
+        """Получение текущего видео (первого в очереди)"""
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        else:
+            should_close = False
+
+        try:
+            queue_items = self.get_queue(user_id=user_id, db=db)
+            if queue_items and len(queue_items) > 0:
+                return queue_items[0]
+            return None
+        finally:
+            if should_close:
+                db.close()
+
+    async def skip_current(self, user_id: int, db: Session = None) -> Dict[str, Any]:
+        """Пропустить текущее видео и перейти к следующему"""
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        else:
+            should_close = False
+
+        try:
+            queue_items = self.get_queue(user_id=user_id, db=db)
+
+            if not queue_items or len(queue_items) == 0:
+                return {
+                    "success": False,
+                    "error": "Очередь пуста"
+                }
+
+            # Первое видео в очереди - это текущее, отмечаем его как проигранное
+            current_video_id = queue_items[0]['id']
+            success = self.mark_as_played(user_id, current_video_id, db)
+
+            if not success:
+                return {
+                    "success": False,
+                    "error": "Не удалось пропустить видео"
+                }
+
+            logger.info(f"Skipped video for user {user_id}: {queue_items[0].get('title', 'Unknown')}")
+
+            return {
+                "success": True,
+                "message": "Видео пропущено"
+            }
+
+        except Exception as e:
+            logger.error(f"Error skipping current video: {e}")
+            return {
+                "success": False,
+                "error": "Ошибка пропуска видео"
+            }
+        finally:
+            if should_close:
+                db.close()

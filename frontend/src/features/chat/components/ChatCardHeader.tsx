@@ -98,7 +98,7 @@ const ChatCardHeader: React.FC<ChatCardHeaderProps> = ({
                                         {twitchChatEnabled && (
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <TwitchIcon className="h-4 w-4 text-purple-400" />
+                                                    <TwitchIcon className="h-4 w-4 text-[#9146FF]" />
                                                     <span className="text-sm">Twitch</span>
                                                 </div>
                                                 <Switch
@@ -110,7 +110,7 @@ const ChatCardHeader: React.FC<ChatCardHeaderProps> = ({
                                         {vkChatEnabled && (
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2">
-                                                    <VKIcon className="h-4 w-4 text-rose-400" />
+                                                    <VKIcon className="h-4 w-4 text-[#FF4444]" />
                                                     <span className="text-sm">VK Live</span>
                                                 </div>
                                                 <Switch

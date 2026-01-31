@@ -80,7 +80,7 @@ const HomePage: React.FC = () => {
             cover_url: (vkStreamInfo?.data?.category_img_url ?? '') as string
         } : null;
         const combinedCategory = combineCategoriesEnabled
-            ? (initialData.twitch?.category || initialData.vk?.category || fallbackTwitchCategory || fallbackVkCategory)
+            ? (initialData.twitch?.category || initialData.vk?.category || fallbackTwitchCategory || fallbackVkCategory) as { name?: string; title?: string; box_art_url?: string; cover_url?: string } | null
             : null;
         const combinedGameName = combinedCategory?.name || combinedCategory?.title || '';
         const combinedBoxArtUrl = combinedCategory?.box_art_url || combinedCategory?.cover_url || '';
@@ -97,8 +97,8 @@ const HomePage: React.FC = () => {
             isLive: (twitchStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (twitchStreamInfo?.data?.viewers ?? 0) as number,
             gameName: combineCategoriesEnabled && combinedGameName
-                ? combinedGameName
-                : (twitchCategoryName || ''),
+                ? String(combinedGameName)
+                : String(twitchCategoryName || ''),
             boxArtUrl: combineCategoriesEnabled && combinedBoxArtUrl
                 ? combinedBoxArtUrl
                 : (twitchCategoryBoxArt || '')
@@ -108,8 +108,8 @@ const HomePage: React.FC = () => {
             isLive: (vkStreamInfo?.data?.is_live ?? false) as boolean,
             viewerCount: (vkStreamInfo?.data?.viewers ?? 0) as number,
             gameName: combineCategoriesEnabled && combinedGameName
-                ? combinedGameName
-                : (vkCategoryName || ''),
+                ? String(combinedGameName)
+                : String(vkCategoryName || ''),
             boxArtUrl: combineCategoriesEnabled && combinedBoxArtUrl
                 ? combinedBoxArtUrl
                 : (vkCategoryBoxArt || '')

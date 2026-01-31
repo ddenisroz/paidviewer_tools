@@ -3,7 +3,7 @@ API endpoints для получения Twitch badges
 """
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from api.twitch_badges_api import get_global_badges, get_channel_badges
+from services.twitch_badges_service import get_global_badges, get_channel_badges
 from core.config import settings
 import logging
 from cachetools import TTLCache

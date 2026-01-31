@@ -95,7 +95,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 msg.platform === 'twitch' ? (
                     <TwitchIcon
                         style={{
-                            color: '#9147FF',
+                            color: '#9146FF',
                             width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                             height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                             display: 'inline-block',
@@ -106,7 +106,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 ) : (
                     <VKIcon
                         style={{
-                            color: '#EF4444',
+                            color: '#FF4444',
                             width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                             height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                             display: 'inline-block',
@@ -185,7 +185,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 <span
                     onClick={(e) => onNicknameClick(e, msg.author_name || msg.author || 'Unknown', msg.platform)}
                     style={{
-                        color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
+                        color: msg.platform === 'twitch' ? '#9146FF' : '#FF4444',
                         fontWeight: '600',
                         cursor: 'pointer',
                         userSelect: 'none'

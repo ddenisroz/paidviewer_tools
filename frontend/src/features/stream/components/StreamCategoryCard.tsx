@@ -79,7 +79,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
 
         if (value && bothEnabled) {
             const combinedName = twitchName || vkName;
-        setSearchTerms({ twitch: combinedName, vk: combinedName });
+            setSearchTerms({ twitch: combinedName, vk: combinedName });
             const masterCategory = twitchCat || vkCat;
             if (masterCategory) {
                 const hasChange = masterCategory.id !== initialData.twitch?.category?.id || masterCategory.id !== initialData.vk?.category?.id;
@@ -247,7 +247,7 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                 setCurrentData(prev => ({
                     ...prev,
                     twitch: { ...prev.twitch, category },
-                    vk: { ...prev.vk, category: mappedStreamCategory },
+                    vk: { ...prev.vk, category: mappedStreamCategory as StreamCategory },
                 }));
                 toast.success(`Категория синхронизирована.`);
             } else {
@@ -439,8 +439,8 @@ const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
                             <div className="space-y-4 pt-0 relative mt-4 min-h-0">
                                 <div className="relative">
                                     <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center z-20">
-                                    <VKIcon className="w-6 h-6 text-white/80" />
-                                </div>
+                                        <VKIcon className="w-6 h-6 text-white/80" />
+                                    </div>
 
 
 

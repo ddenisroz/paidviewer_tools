@@ -136,11 +136,11 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
             </Card>
 
             {/* VK Live статус */}
-            <Card className={`card-glass transition-colors duration-300 ${vkEnabled ? 'bg-rose-500/10 border-rose-500/20' : ''}`}>
+            <Card className={`card-glass transition-colors duration-300 ${vkEnabled ? 'bg-red-500/10 border-red-500/20' : ''}`}>
                 <CardContent className="p-3">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <VKIcon className="h-8 w-8 text-[#FF0062] flex-shrink-0" />
+                            <VKIcon className="h-8 w-8 text-[#FF4444] flex-shrink-0" />
                             <div className="flex flex-col min-w-0">
                                 <div className="font-medium text-sm text-white">VK Live</div>
                                 {vkStream?.gameName || vkEnabled ? (

@@ -1,9 +1,7 @@
-﻿// src/pages/media/YoutubeIntegrationPage.tsx
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { AlertCircle, Maximize, Minimize, Monitor, Pause, Play, RefreshCw, Settings, SkipForward, Trash2, Volume2, VolumeX, Youtube } from 'lucide-react';
+import { AlertCircle, Maximize, Minimize, Monitor, Pause, Play, RefreshCw, Settings, SkipForward, Trash2, Volume2, VolumeX } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import YouTube from 'react-youtube';
 
 import { BUTTON_SIZES } from '@/constants/designSystem';
 import { useAuth } from '@/context/AuthContext';
@@ -23,7 +21,23 @@ import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
 
-import type { YouTubePlayer, YoutubeVideo } from '@/types/youtube';
+import type { YoutubeVideo } from '@/types/youtube';
+import QueueList from './components/QueueList';
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
 type PlaybackMode = 'browser' | 'obs';
 
@@ -41,43 +55,46 @@ const YoutubeIntegrationPage: React.FC = () => {
         setVolume,
         toggleMute,
         nextVideo,
-        handlePlayerReady,
-        handlePlayerStateChange,
-        handlePlayerError,
-        setPlayerRef,
-        releasePlayerRef,
         setIsTheaterMode,
-        loadQueue
+        loadQueue,
+        setPlayerContainer
     } = usePlayer();
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            // Note: In a real implementation you would call an API to reorder
+            // For now we just optimistically update the UI if we had a setQueue method, 
+            // but since queue comes from context/API, we might need to implement reorder API first
+            // or just let it snap back for now as a visual demo until API is ready.
+            console.log('Reorder requested:', active.id, '->', over.id);
+            toast.info('Изменение порядка пока не сохраняется на сервере');
+        }
+    };
+
+    // Container ref for YouTube portal from GlobalPlayer
+    const playerContainerRef = useRef<HTMLDivElement>(null);
+    const theaterPlayerContainerRef = useRef<HTMLDivElement>(null);
 
     const [isClearDialogOpen, setIsClearDialogOpen] = useState<boolean>(false);
     const [isSettingsDialogOpen, setIsSettingsDialogOpen] = useState<boolean>(false);
-    const [playbackMode, setPlaybackMode] = useState<PlaybackMode>('browser');
-    const [youtubeObsUrl, setYoutubeObsUrl] = useState<string>('');
     const [requestsCommandEnabled, setRequestsCommandEnabled] = useState<boolean>(true);
     const [requestsRewardEnabled, setRequestsRewardEnabled] = useState<boolean>(false);
     const [requestsRewardId, setRequestsRewardId] = useState<string>('');
     const { lastJsonMessage } = useChat();
     const currentThumbnail = currentVideo?.thumbnail || currentVideo?.thumbnail_url;
 
-    // Handler for the embedded player on this page
-    const handlePagePlayerReady = (event: { target: YouTubePlayer }): void => {
-        setPlayerRef(event.target as YouTubePlayer, 'page');
-        handlePlayerReady(event);
-        if (!isPlaying) {
-            try {
-                event.target.pauseVideo();
-            } catch (error) {
-                logger.debug('[YouTube Page] Pause on ready skipped:', error);
-            }
-        }
-        logger.debug('[YouTube Page] Player ready');
-    };
-
     const loadYoutubeSettings = useCallback(async (): Promise<void> => {
         try {
             const response = await youtubeService.getSettings();
-            setPlaybackMode(response.data.playback_mode || 'browser');
             setVolume(response.data.volume_level || 100);
             setRequestsCommandEnabled(response.data.requests_command_enabled ?? true);
             setRequestsRewardEnabled(response.data.requests_reward_enabled ?? false);
@@ -102,74 +119,24 @@ const YoutubeIntegrationPage: React.FC = () => {
         }
     };
 
-    const generateYoutubeObsUrl = async (): Promise<string | null> => {
-        try {
-            const response = await youtubeService.generateObsUrl();
-            const url = response.data.youtube_obs_url;
-            setYoutubeObsUrl(url);
 
-            toast.success('OBS URL скопирован!', {
-                description: 'URL скопирован в буфер обмена',
-                action: {
-                    label: 'Скопировать',
-                    onClick: () => {
-                        navigator.clipboard.writeText(url);
-                        toast.success('URL скопирован!');
-                    }
-                }
-            });
-
-            navigator.clipboard.writeText(url);
-            return url;
-        } catch (error) {
-            logger.error('Error generating YouTube OBS URL:', error);
-            toast.error('Ошибка создания YouTube OBS URL');
-            return null;
-        }
-    };
-
-    const regenerateYoutubeObsUrl = async (): Promise<string | null> => {
-        try {
-            const response = await youtubeService.regenerateObsUrl();
-            const url = response.data.youtube_obs_url;
-            setYoutubeObsUrl(url);
-
-            toast.success('OBS URL пересоздан!', {
-                description: 'Новый URL скопирован в буфер обмена'
-            });
-
-            navigator.clipboard.writeText(url);
-            return url;
-        } catch (error) {
-            logger.error('Error regenerating YouTube OBS URL:', error);
-            toast.error('Ошибка пересоздания YouTube OBS URL');
-            return null;
-        }
-    };
-
-    const loadExistingObsUrl = useCallback(async (): Promise<void> => {
-        try {
-            const response = await youtubeService.getObsUrl();
-            if (response.data.obs_token) {
-                const frontendUrl = import.meta.env.VITE_FRONTEND_URL || 'http://localhost:5173';
-                const url = `${frontendUrl}/youtube-obs/${response.data.obs_token}`;
-                setYoutubeObsUrl(url);
-            }
-        } catch (error) {
-            logger.error('Error loading existing OBS URL:', error);
-        }
-    }, []);
 
     useEffect(() => {
         loadYoutubeSettings();
-        loadExistingObsUrl();
     }, []); // [OK] Пустой массив зависимостей - запускаем только один раз при монтировании
 
+    // Set player container for GlobalPlayer portal - switches between normal and theater containers
     useEffect(() => {
+        const container = isTheaterMode
+            ? theaterPlayerContainerRef.current
+            : playerContainerRef.current;
+        if (container) {
+            setPlayerContainer(container);
+        }
         return () => {
-            releasePlayerRef('page');
+            setPlayerContainer(null);
         };
-    }, [releasePlayerRef]);
+    }, [setPlayerContainer, isTheaterMode]);
 
     useEffect(() => {
         const handleEscKey = (event: KeyboardEvent): void => {
@@ -259,60 +226,19 @@ const YoutubeIntegrationPage: React.FC = () => {
                         <CardContent className="p-6">
                             <div className="flex gap-4">
                                 <div className="w-[360px] flex-shrink-0">
-                                    {playbackMode === 'browser' ? (
-                                        <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                                            {currentVideo ? (
-                                                <YouTube
-                                                    videoId={currentVideo.video_id}
-                                                    onReady={handlePagePlayerReady}
-                                                    onStateChange={handlePlayerStateChange}
-                                                    onError={handlePlayerError}
-                                                    opts={{
-                                                        width: '100%',
-                                                        height: '100%',
-                                                        playerVars: {
-                                                            autoplay: isPlaying ? 1 : 0,
-                                                            controls: 1,
-                                                            disablekb: 0,
-                                                            enablejsapi: 1,
-                                                            fs: 1,
-                                                            iv_load_policy: 3,
-                                                            modestbranding: 1,
-                                                            playsinline: 1,
-                                                            rel: 0,
-                                                            showinfo: 0,
-                                                            cc_load_policy: 0,
-                                                            hl: 'ru',
-                                                            origin: window.location.origin,
-                                                            widget_referrer: window.location.origin
-                                                        }
-                                                    }}
-                                                    key={`page-player-${currentVideo.video_id}`}
-                                                    className="w-full h-full"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-muted">
-                                                    <p className="text-muted-foreground text-xs">Нет видео для воспроизведения.</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="relative bg-gray-800 rounded-lg overflow-hidden border-2 border-purple-500 aspect-video">
-                                            <div className="w-full h-full flex flex-col items-center justify-center text-center p-3">
-                                                <div className="text-3xl mb-1">[VIDEO]</div>
-                                                <h3 className="text-sm font-medium text-purple-300 mb-1">Режим OBS Studio</h3>
-                                                <p className="text-gray-300 text-xs">
-                                                    Видео воспроизводится в OBS Studio
-                                                </p>
-                                                {currentVideo && (
-                                                    <div className="text-xs text-gray-400 bg-gray-700 px-2 py-1 rounded mt-1 max-w-full truncate">
-                                                        <strong>Сейчас:</strong> {currentVideo.title}
-                                                    </div>
-                                                )}
+                                    <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                                        {currentVideo ? (
+                                            // Container for YouTube portal from GlobalPlayer
+                                            <div
+                                                ref={playerContainerRef}
+                                                className="w-full h-full"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                                                <p className="text-muted-foreground text-xs">Нет видео для воспроизведения.</p>
                                             </div>
-                                        </div>
-                                    )}
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="flex-1 space-y-3">
@@ -394,61 +320,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             </DialogContent>
                                         </Dialog>
 
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button variant="outline" className="h-12 w-full" title="OBS Интеграция">
-                                                    <Monitor className="h-4 w-4 mr-2" />
-                                                    OBS
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-96" align="end">
-                                                <div className="space-y-3">
-                                                    <h4 className="font-semibold text-sm">OBS Browser Source</h4>
 
-                                                    {!youtubeObsUrl ? (
-                                                        <Button
-                                                            onClick={generateYoutubeObsUrl}
-                                                            className="w-full"
-                                                            variant="default"
-                                                        >
-                                                            Сгенерировать URL
-                                                        </Button>
-                                                    ) : (
-                                                        <>
-                                                            <div className="space-y-2">
-                                                                <p className="text-xs text-muted-foreground">URL для OBS:</p>
-                                                                <div className="bg-muted rounded p-2">
-                                                                    <p className="text-xs font-mono break-all">{youtubeObsUrl}</p>
-                                                                </div>
-                                                                <div className="flex gap-2">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={() => {
-                                                                            navigator.clipboard.writeText(youtubeObsUrl);
-                                                                            toast.success('URL скопирован!');
-                                                                        }}
-                                                                        className="flex-1"
-                                                                    >
-                                                                        Копировать
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={regenerateYoutubeObsUrl}
-                                                                        className="flex-1"
-                                                                        title="Пересоздать URL"
-                                                                    >
-                                                                        <RefreshCw className="h-3 w-3 mr-1" />
-                                                                        Обновить
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </PopoverContent>
-                                        </Popover>
 
                                         <Button
                                             variant="outline"
@@ -475,35 +347,31 @@ const YoutubeIntegrationPage: React.FC = () => {
                         <CardHeader className="pb-3">
                             <CardTitle>Очередь ({queue.length})</CardTitle>
                         </CardHeader>
-                        <CardContent className="p-0 flex-1 overflow-y-auto">
-
-
-                            {queue.length > 0 ? (
-                                <div className="p-4 space-y-3">
-                                    {queue.map((video: YoutubeVideo, index: number) => {
-                                        return (
-                                            <div key={video.id} className="flex gap-3 p-2 border rounded-lg hover:bg-muted/50 cursor-pointer">
-                                                <div className="flex-shrink-0 w-6 h-6 bg-muted rounded-full flex items-center justify-center text-xs font-medium">
-                                                    {index + 1}
-                                                </div>
-                                                <img src={video.thumbnail || video.thumbnail_url} alt={video.title} className="w-20 h-12 object-cover rounded" />
-                                                <div className="flex-1 min-w-0">
-                                                    <h4 className="font-medium text-sm line-clamp-2">{video.title}</h4>
-                                                    <p className="text-xs text-muted-foreground">Заказал: {video.requester_name || video.user_id || 'Unknown'}</p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8 text-muted-foreground p-4">
-                                    <div className="text-4xl mb-4">[AUDIO]</div>
-                                    <p className="font-medium text-base mb-2">Очередь пуста</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        Очередь пуста. Зрители могут заказывать видео командой !sr
-                                    </p>
-                                </div>
-                            )}
+                        <CardContent className="p-0 flex-1 overflow-hidden">
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}
+                            >
+                                <QueueList
+                                    queue={queue}
+                                    currentVideo={currentVideo}
+                                    onRemove={(id) => {
+                                        // TODO: Implement remove by ID specific logic if needed, 
+                                        // currently API removes by index or ID?
+                                        // youtubeService.removeFromQueue(id);
+                                        // For now reusing the concept but we need queue_id vs video_id clarification
+                                        // Assuming 'id' in queue items is the unique queue entry id
+                                        youtubeService.removeFromQueue(id).then(() => {
+                                            toast.success('Удалено из очереди');
+                                            loadQueue();
+                                        });
+                                    }}
+                                    onPlay={(video) => {
+                                        // Optional: Play specific video
+                                    }}
+                                />
+                            </DndContext>
                         </CardContent>
                     </Card>
                 </div>
@@ -528,31 +396,9 @@ const YoutubeIntegrationPage: React.FC = () => {
                             </div>
                             <div className="aspect-video bg-black rounded-lg overflow-hidden">
                                 {currentVideo ? (
-                                    <YouTube
-                                        videoId={currentVideo.video_id}
-                                        onReady={handlePagePlayerReady}
-                                        onStateChange={handlePlayerStateChange}
-                                        onError={handlePlayerError}
-                                        opts={{
-                                            width: '100%',
-                                            height: '100%',
-                                            playerVars: {
-                                                autoplay: isPlaying ? 1 : 0,
-                                                controls: 1,
-                                                disablekb: 0,
-                                                enablejsapi: 1,
-                                                fs: 1,
-                                                iv_load_policy: 3,
-                                                modestbranding: 1,
-                                                playsinline: 1,
-                                                rel: 0,
-                                                showinfo: 0,
-                                                cc_load_policy: 0,
-                                                hl: 'ru',
-                                                origin: window.location.origin,
-                                                widget_referrer: window.location.origin
-                                            }
-                                        }}
+                                    // Container for YouTube portal from GlobalPlayer in theater mode
+                                    <div
+                                        ref={theaterPlayerContainerRef}
                                         className="w-full h-full"
                                     />
                                 ) : (

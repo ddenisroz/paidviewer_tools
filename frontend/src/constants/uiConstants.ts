@@ -14,10 +14,10 @@ export const UI_SIZES = {
 } as const;
 
 export const PLATFORM_COLORS = {
-  TWITCH: '#9147FF',
-  VK_LIVE: '#0077FF',
+  TWITCH: '#9146FF', // Purple
+  VK_LIVE: '#FF4444', // Red
   YOUTUBE: '#FF0000',
-  DEFAULT: '#9147ff',
+  DEFAULT: '#9146ff',
 } as const;
 
 export const TIMINGS = {

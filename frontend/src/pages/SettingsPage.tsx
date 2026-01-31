@@ -74,16 +74,16 @@ const SettingsPage: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <PageWrapper title="Настройки">
-                <Card className="card-glass border-gray-700">
+                <Card className="card-glass border-border">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-muted-foreground" />
                         </div>
                         <div className="space-y-2 max-w-md">
-                            <h3 className="text-xl font-semibold text-gray-200">
+                            <h3 className="text-xl font-semibold text-foreground">
                                 Требуется авторизация
                             </h3>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-muted-foreground text-sm">
                                 Для доступа к настройкам необходимо войти в систему
                             </p>
                         </div>
@@ -138,7 +138,7 @@ const SettingsPage: React.FC = () => {
                                 <div className="flex items-center gap-3">
                                     <TwitchIcon width="32" height="32" />
                                     <div className="flex flex-col">
-                                        <Label className="text-base font-medium">Twitch</Label>
+                                        <Label className="text-base font-medium text-foreground">Twitch</Label>
                                         <span className="text-xs text-muted-foreground">
                                             {integrations.twitch?.username || 'Не подключено'}
                                         </span>
@@ -158,7 +158,7 @@ const SettingsPage: React.FC = () => {
                                 <div className="flex items-center gap-3">
                                     <VKIcon width="32" height="32" />
                                     <div className="flex flex-col">
-                                        <Label className="text-base font-medium">VK Live</Label>
+                                        <Label className="text-base font-medium text-foreground">VK Live</Label>
                                         <span className="text-xs text-muted-foreground">
                                             {integrations.vk?.username || 'Не подключено'}
                                         </span>
@@ -167,7 +167,7 @@ const SettingsPage: React.FC = () => {
                                 <Switch
                                     checked={integrations.vk?.enabled || false}
                                     onCheckedChange={handleVkToggle}
-                                    className="data-[state=checked]:bg-[#0077FF]"
+                                    className="data-[state=checked]:bg-[#FF4444]"
                                 />
                             </div>
                         </Card>
@@ -178,7 +178,7 @@ const SettingsPage: React.FC = () => {
                                 <div className="flex items-center gap-3">
                                     <DonationAlertsIcon width="32" height="32" />
                                     <div className="flex flex-col">
-                                        <Label className="text-base font-medium">DonationAlerts</Label>
+                                        <Label className="text-base font-medium text-foreground">DonationAlerts</Label>
                                         <span className="text-xs text-muted-foreground">
                                             {daConnected ? 'Подключено' : 'Не подключено'}
                                         </span>

@@ -213,11 +213,12 @@ const TtsMainPageContent: React.FC = () => {
         refetchInterval: 30000,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
-        initialData: () => getQueryCache(['tts-status']) || undefined
+        initialData: () => getQueryCache(queryKeys.tts.status(null) as any) || undefined
     });
     const ttsStatusData = ttsStatusResponse?.data;
 
-    const isF5TTSDataLoading = isLoadingTtsStatus || isWhitelisted === null || isChecking;
+    // Only show loading if we don't have health data yet
+    const isF5TTSDataLoading = (isLoadingTtsStatus || isWhitelisted === null) && !engineStatus.loaded;
     const canUseF5TTS = !isF5TTSDataLoading && (hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false));
 
     const { data: ttsSettingsResponse } = useTtsSettings({
@@ -272,16 +273,15 @@ const TtsMainPageContent: React.FC = () => {
     }, [ttsStatusData]);
 
     // [OK] Обновление: слушаем событие tts-status-changed для синхронизации с QuickActionsBar
-    useEffect(() => {
-        const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
-            logger.log('[REFRESH] TtsMainPage: Received tts-status-changed event:', event.detail);
-            // Инвалидируем кэш для обновления статуса
-            queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
-        };
-
-        window.addEventListener('tts-status-changed', handleTtsStatusChange as EventListener);
-        return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange as EventListener);
-    }, [queryClient]);
+    // [REMOVED] Redundant event listener. State updates are handled by TtsContext.
+    // useEffect(() => {
+    //     const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
+    //         logger.log('[REFRESH] TtsMainPage: Received tts-status-changed event:', event.detail);
+    //         queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+    //     };
+    //     window.addEventListener('tts-status-changed', handleTtsStatusChange as EventListener);
+    //     return () => window.removeEventListener('tts-status-changed', handleTtsStatusChange as EventListener);
+    // }, [queryClient]);
 
     useEffect(() => {
         if (ttsSettingsData) {
@@ -544,12 +544,12 @@ const TtsMainPageContent: React.FC = () => {
         }
 
         settingsDebounceRef.current = setTimeout(() => {
-            // Приведение TtsSettingsState к Partial<TtsSettings>
+            // Updated to use camelCase matching backend Pydantic model
             const ttsSettingsPayload = {
-                enable_7tv: newSettings.enable7TV,
-                enable_twitch: newSettings.enableTwitch,
-                filter_replies: newSettings.filterReplies,
-                filter_mentions: newSettings.filterMentions,
+                enable7TV: newSettings.enable7TV,
+                enableTwitch: newSettings.enableTwitch,
+                filterReplies: newSettings.filterReplies,
+                filterMentions: newSettings.filterMentions,
                 version: newSettings.version
             };
             saveTtsSettingsMutation.mutate(ttsSettingsPayload);

@@ -88,28 +88,6 @@ export const youtubeService = {
     return apiClient.post('/api/tts/youtube-settings', settings);
   },
 
-  /**
-   * Получить OBS URL для YouTube
-   * @returns Promise с ответом API
-   */
-  async getObsUrl(): Promise<AxiosResponse<YoutubeObsUrlResponse>> {
-    return apiClient.get('/api/tts/obs-url');
-  },
 
-  /**
-   * Сгенерировать OBS URL для YouTube
-   * @returns Promise с ответом API
-   */
-  async generateObsUrl(): Promise<AxiosResponse<{ youtube_obs_url: string }>> {
-    return apiClient.post('/api/youtube/generate-obs-url');
-  },
-
-  /**
-   * Регенерировать OBS URL для YouTube
-   * @returns Promise с ответом API
-   */
-  async regenerateObsUrl(): Promise<AxiosResponse<{ youtube_obs_url: string }>> {
-    return apiClient.post('/api/youtube/regenerate-obs-url');
-  },
 };
 

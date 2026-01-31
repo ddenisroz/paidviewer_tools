@@ -236,62 +236,6 @@ export async function getGlobalEmotes(): Promise<EmoteMap> {
     }
 
     return new Map();
-
-    const query = `
-      query GlobalEmotes {
-        emoteSet(id: "global") {
-          emotes {
-            id
-            name
-            data {
-              animated
-              host {
-                url
-                files {
-                  name
-                  format
-                }
-              }
-            }
-          }
-        }
-      }
-    `;
-
-    const response = await fetchWithTimeout(SEVENTV_GQL_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    });
-
-    if (!response.ok) {
-      logger.debug(`[WARN] [7TV] Global emotes API returned status ${response.status}`);
-      return new Map();
-    }
-
-    const result = await response.json() as { data?: { emoteSet?: { emotes?: Emote[] } } };
-    const emotes = result?.data?.emoteSet?.emotes ?? [];
-
-    logger.debug(`[OK] [7TV] Loaded ${emotes.length} global emotes`);
-
-    const emotesMap: EmoteMap = new Map();
-    emotes.forEach((emote) => {
-      const host = emote.data?.host;
-      if (host?.url) {
-        // Используем статичную версию (1x.webp) вместо анимированной
-        const file = host.files?.find((f) => f.name === '1x.webp') ?? host.files?.[0];
-        const url = `https:${host.url}/${file?.name ?? '1x.webp'}`;
-        emotesMap.set(emote.name, {
-          id: emote.id,
-          name: emote.name,
-          url,
-          animated: false, // Всегда используем статичную версию
-        });
-      }
-    });
-
-    emotesCache.set('global', emotesMap);
-    return emotesMap;
   } catch (error: unknown) {
     const err = error as Error;
     if (err?.name === 'AbortError') {

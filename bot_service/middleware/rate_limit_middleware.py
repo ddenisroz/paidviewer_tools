@@ -23,6 +23,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         action = "default"
         if path.startswith("/api/auth/login"):
             action = "login"
+        elif path.startswith("/api/tts/status"):
+             action = "default" # Use default (higher) limit for passive status checking
         elif path.startswith("/api/tts"):
             action = "tts"
         elif path.startswith("/api/upload") or path.startswith("/upload"):

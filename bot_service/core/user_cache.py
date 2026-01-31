@@ -78,6 +78,7 @@ class UserCache:
             'vk_username': user.vk_username,
             'vk_channel_name': user.vk_channel_name,
             'donationalerts_user_id': user.donationalerts_user_id,
+            'tts_enabled': user.tts_enabled,
             # Platform roles
             'twitch_is_broadcaster': user.twitch_is_broadcaster,
             'twitch_is_moderator': user.twitch_is_moderator,

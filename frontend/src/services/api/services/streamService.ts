@@ -47,12 +47,12 @@ export const streamService = {
   },
 
   /**
-   * Обновить название стрима VK
-   * @param title - Название стрима
+   * Обновить заголовок стрима VK
+   * @param title - Новый заголовок
    * @returns Promise с ответом API
    */
   async updateVkStreamTitle(title: string): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/vk/stream/title', { title });
+    return apiClient.post('/api/vk/update-title', { title });
   },
 
   /**
@@ -61,7 +61,7 @@ export const streamService = {
    * @returns Promise с ответом API
    */
   async updateVkStreamCategory(categoryId: string): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/vk/stream/category', { category_id: categoryId });
+    return apiClient.post('/api/vk/update-category', { categoryId });
   },
 
   /**

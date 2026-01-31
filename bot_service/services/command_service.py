@@ -284,6 +284,7 @@ class CommandService:
         allowed_roles: Optional[str] = None,
         cooldown_seconds: Optional[int] = None,
         is_enabled: bool = True,
+        extra_settings: Optional[Dict[str, Any]] = None,
         db: Session = None
     ) -> Dict[str, Any]:
         """
@@ -299,13 +300,39 @@ class CommandService:
         if not global_command:
             raise ValueError(f"Глобальная команда '{command_name}' не найдена")
         
-        # Check no existing override
+        # Check for existing override - update it if exists
         existing_override = repo.get_override_by_name(command_name, user_id)
         if existing_override:
-            raise ValueError(
-                f"Override для команды '{command_name}' уже существует. "
-                "Используйте PUT для обновления."
-            )
+            # Update existing override instead of error
+            if platforms is not None:
+                existing_override.platforms = platforms
+            if allowed_roles is not None:
+                existing_override.allowed_roles = allowed_roles
+            if cooldown_seconds is not None:
+                existing_override.cooldown_seconds = cooldown_seconds
+            if is_enabled is not None:
+                existing_override.is_enabled = is_enabled
+            if extra_settings is not None:
+                existing_override.extra_settings = extra_settings
+            if alias is not None:
+                existing_override.alias = alias
+            
+            db.commit()
+            db.refresh(existing_override)
+            
+            self.logger.info(f"[OK] Updated existing override for command '{command_name}' by user {user_id}")
+            
+            return {
+                "success": True,
+                "message": f"Override для команды '{command_name}' обновлён",
+                "data": {
+                    "id": existing_override.id,
+                    "command_name": existing_override.command_name,
+                    "alias": existing_override.alias,
+                    "parent_command_id": existing_override.parent_command_id,
+                    "extra_settings": existing_override.extra_settings
+                }
+            }
         
         # Check alias not used
         if alias and repo.alias_exists(alias, user_id):
@@ -325,7 +352,8 @@ class CommandService:
             allowed_roles=allowed_roles if allowed_roles else global_command.allowed_roles,
             cooldown_seconds=cooldown_seconds if cooldown_seconds is not None else global_command.cooldown_seconds,
             tags=global_command.tags,
-            description=global_command.description
+            description=global_command.description,
+            extra_settings=extra_settings or {}
         )
         
         created = repo.create_command(new_override)
@@ -339,7 +367,8 @@ class CommandService:
                 "id": created.id,
                 "command_name": created.command_name,
                 "alias": created.alias,
-                "parent_command_id": created.parent_command_id
+                "parent_command_id": created.parent_command_id,
+                "extra_settings": created.extra_settings
             }
         }
 

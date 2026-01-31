@@ -20,7 +20,7 @@ const CookieConsent: React.FC = () => {
     if (!isVisible) return null;
 
     return (
-        <div className="fixed bottom-4 left-4 z-50 max-w-xs">
+        <div className="fixed bottom-4 right-4 z-50 max-w-xs">
             <div className="relative bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3 shadow-2xl animate-in slide-in-from-left-4 duration-500">
                 {/* Иконка печенья */}
                 <div className="absolute -top-5 -right-2">

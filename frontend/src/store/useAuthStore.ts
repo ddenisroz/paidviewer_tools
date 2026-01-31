@@ -203,6 +203,8 @@ export const useAuthStore = create<AuthState>()(devtools(
 
                 // 🚀 ANTI-FLASH: Clear all caches
                 localStorage.removeItem('cached_user');
+                localStorage.removeItem('tts_enabled');
+                localStorage.removeItem('tts_has_local_setup');
 
                 if (userId) {
                     // Clear query cache

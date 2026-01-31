@@ -452,7 +452,7 @@ const BotManagementPage: React.FC = () => {
                                 </Button>
                                 <Button
                                     onClick={handleAuthorizeBot}
-                                    className="bg-purple-600 hover:bg-purple-700 text-white shadow-lg shadow-purple-900/20"
+                                    className="bg-[#9146FF] hover:bg-[#7a3adc] text-white shadow-lg shadow-purple-900/20"
                                 >
                                     <ExternalLink className="w-4 h-4 mr-2" />
                                     Переавторизовать
@@ -468,7 +468,7 @@ const BotManagementPage: React.FC = () => {
                             <p className="text-muted-foreground max-w-md mx-auto">
                                 Нажмите кнопку ниже, чтобы авторизовать бота через Twitch. Это откроет новое окно.
                             </p>
-                            <Button onClick={handleAuthorizeBot} size="lg" className="bg-[#9146FF] hover:bg-[#772ce8] text-white shadow-lg shadow-purple-900/20">
+                            <Button onClick={handleAuthorizeBot} size="lg" className="bg-[#9146FF] hover:bg-[#7a3adc] text-white shadow-lg shadow-purple-900/20">
                                 <Bot className="w-5 h-5 mr-2" />
                                 Авторизовать бота
                             </Button>

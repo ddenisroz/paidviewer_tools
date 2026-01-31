@@ -154,7 +154,7 @@ const LoginPage: React.FC = () => {
 
                         <button
                             onClick={() => handleLogin('vk')}
-                            className="w-full bg-red-800 hover:bg-red-900 text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
+                            className="w-full bg-[#FF4444] hover:bg-[#d93a3a] text-white font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base"
                         >
                             <VKIcon className="mr-2 h-5 w-5" />
                             Войти через VK Live

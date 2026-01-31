@@ -30,7 +30,7 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 
 const CommandsPage = lazy(() => import('./pages/CommandsPage'));
 const ObsTtsPage = lazy(() => import('./features/tts/pages/ObsTtsPage'));
-const ObsYoutubePage = lazy(() => import('./features/tts/pages/ObsYoutubePage'));
+
 const ChatOverlay = lazy(() => import('./pages/ChatOverlay'));
 const ChatWindow = lazy(() => import('./pages/ChatWindow'));
 const AdminPage = lazy(() => import('./features/admin/pages/AdminPage'));
@@ -75,13 +75,7 @@ const App: React.FC = () => {
                             </Suspense>
                         </RouteErrorBoundary>
                     } />
-                    <Route path="/youtube-obs/:token" element={
-                        <RouteErrorBoundary routeName="YouTube OBS Widget">
-                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                <ObsYoutubePage />
-                            </Suspense>
-                        </RouteErrorBoundary>
-                    } />
+
                     <Route path="/drops-widget/:token" element={
                         <RouteErrorBoundary routeName="Drops Widget">
                             <Suspense fallback={<div className="min-h-screen bg-transparent" />}>

@@ -397,7 +397,7 @@ const ChatWindow: React.FC = () => {
                                     msg.platform === 'twitch' ? (
                                         <TwitchIcon
                                             style={{
-                                                color: '#9147FF',
+                                                color: '#9146FF',
                                                 width: '16px',
                                                 height: '16px',
                                                 flexShrink: 0
@@ -406,7 +406,7 @@ const ChatWindow: React.FC = () => {
                                     ) : (
                                         <VKIcon
                                             style={{
-                                                color: '#EF4444',
+                                                color: '#FF4444',
                                                 width: '14px',
                                                 height: '14px',
                                                 flexShrink: 0
@@ -458,7 +458,7 @@ const ChatWindow: React.FC = () => {
                                 )}
 
                                 <span style={{
-                                    color: msg.platform === 'twitch' ? '#9146FF' : '#FF0000',
+                                    color: msg.platform === 'twitch' ? '#9146FF' : '#FF4444',
                                     fontWeight: '600',
                                     flexShrink: 0
                                 }}>

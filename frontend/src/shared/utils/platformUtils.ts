@@ -48,7 +48,7 @@ export const PLATFORM_NAMES: Record<Platform, string> = {
 
 export const PLATFORM_COLORS: Record<Platform, string> = {
   [PLATFORMS.TWITCH]: '#9146FF',
-  [PLATFORMS.VK]: '#0077FF',
+  [PLATFORMS.VK]: '#FF4444',
   [PLATFORMS.YOUTUBE]: '#FF0000',
   [PLATFORMS.DONATION_ALERTS]: '#FFB800',
 };
@@ -155,7 +155,7 @@ export const formatPlatformError = (platform: Platform | string, error: unknown)
   logger.error(`Platform error [${platform}]:`, error);
   const platformName = getPlatformName(platform);
   const axiosError = error as AxiosError<{ detail?: string }>;
-  
+
   if (axiosError.response?.status === 401) {
     return `${platformName} authorization expired. Please login again.`;
   }

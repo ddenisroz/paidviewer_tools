@@ -480,3 +480,37 @@ async def admin_rename_global_voice(
     except Exception as e:
         logger.error(f"Error renaming global voice: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@voices_router.post("/admin/upload")
+@require_permission(Permission.MANAGE_GLOBAL_VOICES)
+async def admin_upload_voice(
+    request: Request,
+    file: UploadFile = File(...),
+    voice_name: str = Form(...),
+    current_user: dict = Depends(get_current_user),
+    service: VoiceManagementService = Depends(get_voice_service)
+):
+    """Admin: Upload a global voice"""
+    try:
+        # Read file content
+        file_content = await file.read()
+
+        # Delegate to service
+        result = await service.admin_upload_voice(
+            name=voice_name,
+            filename=file.filename,
+            content=file_content,
+            content_type=file.content_type
+        )
+        
+        return {
+            "success": True,
+            "message": "Global voice uploaded successfully",
+            "voice": result
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading global voice: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка загрузки голоса")

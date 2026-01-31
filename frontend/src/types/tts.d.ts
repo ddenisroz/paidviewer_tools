@@ -23,17 +23,26 @@ export interface TtsSettings {
   volume?: number;
   speed?: number;
   pitch?: number;
-  voice_id?: number;
-  enable_7tv?: boolean;
-  enable_twitch?: boolean;
-  filter_replies?: boolean;
-  filter_mentions?: boolean;
+  voiceId?: number;
+  enable7TV?: boolean;
+  enableTwitch?: boolean;
+  filterReplies?: boolean;
+  filterMentions?: boolean;
   version?: number;
-  platform_settings?: {
+  platformSettings?: {
     twitch?: TtsPlatformSettings;
     vk?: TtsPlatformSettings;
     youtube?: TtsPlatformSettings;
   };
+  // Backend specific fields that might match now
+  enableLexiconFilter?: boolean;
+  enableCustomLexicon?: boolean;
+  engine?: string;
+  voice?: string;
+  listeningMode?: string;
+  maxMessageLength?: number;
+  skipCommands?: boolean;
+  useLocalTTS?: boolean;
 }
 
 /**

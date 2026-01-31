@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from core.database import get_db
 from auth.auth import get_current_user, get_current_user_optional
@@ -55,6 +55,7 @@ class CommandUpdate(BaseModel):
     allowed_roles: Optional[str] = None
     cooldown_seconds: Optional[int] = None
     response_text: Optional[str] = None
+    extra_settings: Optional[Dict[str, Any]] = None
 
     @field_validator('response_text')
     @classmethod
@@ -73,6 +74,7 @@ class CommandOverrideCreate(BaseModel):
     allowed_roles: Optional[str] = None
     cooldown_seconds: Optional[int] = None
     is_enabled: Optional[bool] = True
+    extra_settings: Optional[Dict[str, Any]] = None
 
 
 class CommandResponse(BaseModel):
@@ -207,6 +209,7 @@ async def create_command_override(
             allowed_roles=override_data.allowed_roles,
             cooldown_seconds=override_data.cooldown_seconds,
             is_enabled=override_data.is_enabled,
+            extra_settings=override_data.extra_settings,
             db=db
         )
         return result

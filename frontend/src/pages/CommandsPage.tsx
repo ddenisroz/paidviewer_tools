@@ -75,6 +75,7 @@ interface EditForm {
     allowed_roles: string;
     cooldown_seconds: number;
     response_text: string;
+    extra_settings: Record<string, unknown>;
 }
 
 interface RoleOption {
@@ -372,7 +373,8 @@ const CommandsPage: React.FC = () => {
         platforms: 'twitch,vk',
         allowed_roles: 'all',
         cooldown_seconds: 0,
-        response_text: ''
+        response_text: '',
+        extra_settings: {}
     });
 
     const basicCommands = commandsData?.basic_commands || [];
@@ -530,7 +532,8 @@ const CommandsPage: React.FC = () => {
                 platforms: editForm.platforms,
                 allowed_roles: editForm.allowed_roles,
                 cooldown_seconds: editForm.cooldown_seconds,
-                alias: null
+                alias: null,
+                extra_settings: editForm.extra_settings
             }, {
                 onSuccess: () => {
                     setIsEditDialogOpen(false);
@@ -573,12 +576,15 @@ const CommandsPage: React.FC = () => {
         setEditingCommand(command);
         const platform = command.platform || 'all';
         const user_level = command.user_level || 'everyone';
+        // Get extra_settings from command if available
+        const cmdExtraSettings = (command as unknown as { extra_settings?: Record<string, unknown> }).extra_settings || {};
         setEditForm({
             is_enabled: command.enabled ?? true,
             platforms: platform === 'all' ? 'twitch,vk' : platform,
             allowed_roles: user_level,
             cooldown_seconds: command.cooldown || 0,
-            response_text: command.response || ''
+            response_text: command.response || '',
+            extra_settings: cmdExtraSettings
         });
         setIsEditDialogOpen(true);
     };
@@ -1067,6 +1073,31 @@ const CommandsPage: React.FC = () => {
                                     }))}
                                 />
                             </div>
+
+                            {/* Настройки голосования для команды skip */}
+                            {editingCommand.name === 'skip' && (
+                                <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800/50 mt-4">
+                                    <Label htmlFor="skip_votes" className="text-base font-medium">Голосов для скипа</Label>
+                                    <p className="text-xs text-muted-foreground mb-3">
+                                        1 = мгновенный скип (только модераторы), 2+ = голосование всех зрителей
+                                    </p>
+                                    <Input
+                                        id="skip_votes"
+                                        type="number"
+                                        min="1"
+                                        max="20"
+                                        value={(editForm.extra_settings?.skip_votes_required as number) || 1}
+                                        onChange={(e) => setEditForm(prev => ({
+                                            ...prev,
+                                            extra_settings: {
+                                                ...prev.extra_settings,
+                                                skip_votes_required: parseInt(e.target.value) || 1
+                                            }
+                                        }))}
+                                        className="w-24"
+                                    />
+                                </div>
+                            )}
                         </div>
                     )}
                     <DialogFooter>

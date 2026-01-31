@@ -81,8 +81,8 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
   });
 
   // Определяем доступные платформы
-  const twitchAvailable = actualIntegrations?.twitch?.enabled && user?.twitch_username;
-  const vkAvailable = actualIntegrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name);
+  const twitchAvailable = !!(actualIntegrations?.twitch?.enabled && user?.twitch_username);
+  const vkAvailable = !!(actualIntegrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name));
 
   // [OK] УПРОЩЕНИЕ: Автоматически определяем платформу (приоритет: Twitch -> VK)
   useEffect(() => {

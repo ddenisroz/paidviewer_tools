@@ -98,7 +98,7 @@ export const useQuickActionsLogic = () => {
             const customEvent = e as CustomEvent<{ enabled: boolean }>;
             // Set optimistic state immediately for external changes too
             setOptimisticTtsState(customEvent.detail.enabled);
-            queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+            // queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() }); // Redundant, handled by mutation onSuccess
         };
         window.addEventListener('tts-status-changed', handleExternalTtsChange);
         return () => window.removeEventListener('tts-status-changed', handleExternalTtsChange);

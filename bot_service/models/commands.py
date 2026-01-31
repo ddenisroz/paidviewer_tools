@@ -3,7 +3,7 @@
 Модель команд бота.
 """
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey
+    Column, Integer, String, Boolean, DateTime, ForeignKey, JSON
 )
 from core.datetime_utils import utcnow_naive
 from models.base import Base
@@ -36,5 +36,6 @@ class BotCommand(Base):
     last_used = Column(DateTime, nullable=True)
     usage_count = Column(Integer, default=0)
     tags = Column(String, nullable=True, default='')
+    extra_settings = Column(JSON, nullable=True, default=dict)
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)

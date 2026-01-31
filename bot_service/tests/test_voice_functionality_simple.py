@@ -18,42 +18,43 @@ class TestVoiceAPIStructure:
     def test_voices_api_module_exists(self):
         """Test that voices API module exists"""
         try:
-            from api import voices_api
-            assert voices_api is not None
+            from api.tts import voices_routes
+            assert voices_routes is not None
         except ImportError as e:
-            pytest.fail(f"voices_api module not found: {e}")
+            pytest.fail(f"voices_routes module not found: {e}")
     
     def test_voices_api_router_exists(self):
         """Test that voices API router is defined"""
-        from api import voices_api
-        assert hasattr(voices_api, 'router')
+        from api.tts import voices_routes
+        assert hasattr(voices_routes, 'voices_router')
+        assert hasattr(voices_routes, 'user_voices_router')
     
     def test_user_custom_voices_endpoint_defined(self):
         """Test that get_user_custom_voices endpoint is defined"""
-        from api import voices_api
+        from api.tts import voices_routes
         # Check if the function exists in the module
-        assert hasattr(voices_api, 'get_user_custom_voices') or 'get_user_custom_voices' in dir(voices_api)
+        assert hasattr(voices_routes, 'get_user_custom_voices')
     
     def test_global_voices_endpoint_defined(self):
         """Test that get_global_voices endpoint is defined"""
-        from api import voices_api
-        assert hasattr(voices_api, 'get_global_voices') or 'get_global_voices' in dir(voices_api)
+        from api.tts import voices_routes
+        assert hasattr(voices_routes, 'get_global_voices')
     
     def test_update_voice_settings_endpoint_defined(self):
         """Test that update_user_voice_settings endpoint is defined"""
-        from api import voices_api
-        assert hasattr(voices_api, 'update_user_voice_settings') or 'update_user_voice_settings' in dir(voices_api)
+        from api.tts import voices_routes
+        assert hasattr(voices_routes, 'update_user_voice_settings')
     
     def test_delete_custom_voice_endpoint_defined(self):
         """Test that delete_custom_voice endpoint is defined"""
-        from api import voices_api
-        assert hasattr(voices_api, 'delete_custom_voice') or 'delete_custom_voice' in dir(voices_api)
+        from api.tts import voices_routes
+        assert hasattr(voices_routes, 'delete_custom_voice')
     
     def test_admin_endpoints_defined(self):
         """Test that admin endpoints are defined"""
-        from api import voices_api
+        from api.tts import voices_routes
         # Check for admin endpoints
-        module_contents = dir(voices_api)
+        module_contents = dir(voices_routes)
         has_admin_endpoints = (
             'admin_get_global_voices' in module_contents or
             'admin_update_global_voice' in module_contents or
