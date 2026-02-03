@@ -7,6 +7,7 @@ import React, { memo, useMemo } from 'react';
 
 import { processEmotes } from '@/features/chat/utils/emotes';
 import { sanitizeHtml } from '@/shared/utils/sanitize';
+
 import type { ChatEmote } from '@/types/chat';
 
 interface EmoteData {
@@ -39,18 +40,7 @@ const isImageUrl = (url: string): boolean => {
     }
 };
 
-// Сокращение URL для отображения
-const shortenUrl = (url: string): string => {
-    try {
-        const urlObj = new URL(url);
-        const path = urlObj.pathname.length > 20
-            ? `${urlObj.pathname.substring(0, 20)}...`
-            : urlObj.pathname;
-        return urlObj.hostname + path;
-    } catch {
-        return '[ссылка]';
-    }
-};
+const removeUrls = (text: string): string => text.replace(URL_REGEX, '').replace(/\s{2,}/g, ' ').trim();
 
 // Компонент для изображения с fallback на ссылку
 const ChatImage: React.FC<{ src: string }> = memo(({ src }) => (
@@ -131,7 +121,7 @@ const renderPart = (
         URL_REGEX.lastIndex = 0; // Reset regex state
 
         if (!showLinks) {
-            return <span key={index}>{shortenUrl(part)}</span>;
+            return null;
         }
 
         if (autoLoadImages && isImageUrl(part)) {
@@ -177,8 +167,8 @@ const renderMessageWithEmotes = (
             URL_REGEX.lastIndex = 0;
 
             if (!showLinks) {
-                const replacedText = part.replace(URL_REGEX, shortenUrl);
-                return <span key={index} dangerouslySetInnerHTML={{ __html: sanitizeHtml(replacedText) }} />;
+                const removedText = removeUrls(part);
+                return removedText ? <span key={index} dangerouslySetInnerHTML={{ __html: sanitizeHtml(removedText) }} /> : null;
             }
 
             // Здесь сложность: мы не можем вернуть компонент ChatImage из dangerouslySetInnerHTML
@@ -198,6 +188,7 @@ const renderMessageWithEmotes = (
             return subParts.map((subPart, subIndex) => {
                 if (URL_REGEX.test(subPart)) {
                     URL_REGEX.lastIndex = 0;
+                    if (!showLinks) return null;
                     if (autoLoadImages && isImageUrl(subPart)) return <ChatImage key={`${index}-${subIndex}`} src={subPart} />;
                     return <ChatLink key={`${index}-${subIndex}`} href={subPart} />;
                 }
@@ -247,8 +238,8 @@ const MessageContent: React.FC<MessageContentProps> = memo(({
 
         // Обработка ссылок (FALLBACK для сообщений без эмодзи)
         if (!showLinks) {
-            const processed = message.replace(URL_REGEX, shortenUrl);
-            return <span className="break-words">{processed}</span>;
+            const processed = removeUrls(message);
+            return processed ? <span className="break-words">{processed}</span> : null;
         }
 
         // Разбиваем на части и рендерим

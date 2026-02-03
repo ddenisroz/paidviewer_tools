@@ -14,6 +14,8 @@ type BotStatusType = 'connected' | 'disconnected';
 interface UseBotConnectionOptions {
     isAuthenticated: boolean;
     isCheckingAuth?: boolean;
+    pollingInterval?: number | false;
+    pollingEnabled?: boolean;
 }
 
 interface UseBotConnectionReturn {
@@ -26,15 +28,21 @@ interface UseBotConnectionReturn {
 
 export function useBotConnection({
     isAuthenticated,
-    isCheckingAuth = false
+    isCheckingAuth = false,
+    pollingInterval,
+    pollingEnabled
 }: UseBotConnectionOptions): UseBotConnectionReturn {
     const { addToast } = useToast();
     const [botStatus, setBotStatus] = useState<BotStatusType>('disconnected');
 
     // React Query for bot status
+    const shouldPoll = pollingEnabled ?? true;
+    const resolvedInterval = shouldPoll ? (pollingInterval ?? 30000) : false;
+
     const { data: botStatusData, error: botStatusError, refetch: refetchBotStatus } = useBotStatus({
         enabled: !!isAuthenticated,
-        refetchInterval: 30000,
+        refetchInterval: resolvedInterval,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });

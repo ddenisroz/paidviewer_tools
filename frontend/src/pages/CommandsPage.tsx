@@ -37,7 +37,6 @@ import {
     useToggleCommand,
     useUpdateCommand,
 } from '@/queries/commands/commandsQueries';
-import { Alert, AlertDescription } from '@/shared/components/ui/alert';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
@@ -272,65 +271,6 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
 });
 
 CommandCard.displayName = 'CommandCard';
-
-interface PlatformStatusBannerProps {
-    integrations: {
-        twitch: { enabled: boolean; username: string | null };
-        vk: { enabled: boolean; username: string | null };
-    };
-}
-
-const PlatformStatusBanner: React.FC<PlatformStatusBannerProps> = ({ integrations }) => {
-    const twitchConnected = integrations?.twitch?.enabled;
-    const vkConnected = integrations?.vk?.enabled;
-    const bothConnected = twitchConnected && vkConnected;
-    const noneConnected = !twitchConnected && !vkConnected;
-
-    if (bothConnected) {
-        return (
-            <Alert className="mb-6 border-green-500/50 bg-green-500/10">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <AlertDescription className="text-sm">
-                    <div className="flex items-center gap-4">
-                        <span className="font-medium">Платформы подключены:</span>
-                        <div className="flex items-center gap-3">
-                            <Badge variant="outline" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Twitch {integrations.twitch.username && `(@${integrations.twitch.username})`}
-                            </Badge>
-                            <Badge variant="outline" className="bg-red-500/10 text-red-600 border-red-500/20">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                VK Live {integrations.vk.username && `(@${integrations.vk.username})`}
-                            </Badge>
-                        </div>
-                        <span className="text-muted-foreground">Команды доступны на всех платформах</span>
-                    </div>
-                </AlertDescription>
-            </Alert>
-        );
-    }
-
-    if (noneConnected) {
-        return (
-            <Alert className="mb-6 border-red-500/50 bg-red-500/10">
-                <XCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-sm">
-                    <div className="flex items-center justify-between">
-                        <span>Нет подключенных платформ. Подключите Twitch или VK Live для использования команд.</span>
-                        <Button variant="outline" size="sm" onClick={() => window.location.href = '/settings'}>
-                            Настройки
-                        </Button>
-                    </div>
-                </AlertDescription>
-            </Alert>
-        );
-    }
-
-    // [OK] ИСПРАВЛЕНИЕ: Убрана подсказка - она не нужна, пользователь и так видит подключенные платформы
-    return null;
-};
-
-
 
 const CommandsPage: React.FC = () => {
     const navigate = useNavigate();
@@ -601,7 +541,6 @@ const CommandsPage: React.FC = () => {
 
     return (
         <PageWrapper>
-            <PlatformStatusBanner integrations={integrations} />
             <Tabs defaultValue="basic" className="space-y-6">
                 <TabsList>
                     <TabsTrigger value="basic">Базовые команды</TabsTrigger>

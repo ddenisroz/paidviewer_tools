@@ -39,6 +39,42 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
         
         return self.db.query(YouTubeQueue).filter(and_(*filters)).first()
 
+    def get_banned_by_video_id(
+        self,
+        video_id: str,
+        user_id: int = None,
+        session_id: str = None
+    ) -> Optional[YouTubeQueue]:
+        """Check if video is banned for this user/session."""
+        filters = [
+            YouTubeQueue.video_id == video_id,
+            YouTubeQueue.status == 'banned'
+        ]
+        if user_id:
+            filters.append(YouTubeQueue.user_id == user_id)
+        if session_id:
+            filters.append(YouTubeQueue.session_id == session_id)
+
+        return self.db.query(YouTubeQueue).filter(and_(*filters)).first()
+
+    def get_pending_by_video_id_all(
+        self,
+        video_id: str,
+        user_id: int = None,
+        session_id: str = None
+    ) -> List[YouTubeQueue]:
+        """Get all pending items by video_id for user/session."""
+        filters = [
+            YouTubeQueue.video_id == video_id,
+            YouTubeQueue.status == 'pending'
+        ]
+        if user_id:
+            filters.append(YouTubeQueue.user_id == user_id)
+        if session_id:
+            filters.append(YouTubeQueue.session_id == session_id)
+
+        return self.db.query(YouTubeQueue).filter(and_(*filters)).all()
+
     def count_pending(
         self,
         user_id: int = None,

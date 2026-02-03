@@ -5,7 +5,6 @@ import { NavLink, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { createPreloadHandler } from '@/shared/utils/preloadRoute';
-import GlobalPlayer from '@/shared/components/GlobalPlayer';
 
 interface NavSubItem {
     to: string;
@@ -307,11 +306,12 @@ const Sidebar: React.FC = () => {
                         </nav>
                     </div>
 
-                    {/* Блок для гостей в низу сайдбара */}
-                    {/* Блок для гостей в низу сайдбара removed */}
+                    {/* Мини-плеер YouTube (слот для портала) */}
+                    <div
+                        id="youtube-mini-player-slot"
+                        className="mt-auto px-2 pb-4 overflow-visible"
+                    />
 
-                    {/* Миниплеер внутри сайдбара */}
-                    <GlobalPlayer />
                 </div>
             </div>
         </>

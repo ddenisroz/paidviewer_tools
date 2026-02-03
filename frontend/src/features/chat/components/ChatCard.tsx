@@ -22,7 +22,6 @@ import {
 import { ttsService } from '@/services/api/services/ttsService';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
-import { useTimeout } from '@/shared/hooks/useTimeout';
 import {
     didIntegrationsEnable,
     hasAnyIntegrations,
@@ -229,9 +228,13 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
 
     // Load chat history with delay
     const shouldLoadHistory = !historyLoadedRef.current && user?.id;
-    useTimeout(() => {
-        if (shouldLoadHistory) loadChatHistory();
-    }, shouldLoadHistory ? CHAT_CONSTANTS.RENDER_DELAY : null);
+    useEffect(() => {
+        if (!shouldLoadHistory) return;
+        const timer = setTimeout(() => {
+            loadChatHistory();
+        }, CHAT_CONSTANTS.RENDER_DELAY);
+        return () => clearTimeout(timer);
+    }, [shouldLoadHistory]);
 
     const lastEmotesKeyRef = useRef<string>('');
 
@@ -264,7 +267,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 setEmotes(emotesData);
             } else {
                 // Load only global emotes if no channel context
-                const { getGlobalEmotes } = require('@/features/chat/utils/emotes');
+                const { getGlobalEmotes } = await import('@/features/chat/utils/emotes');
                 const globalEmotes = await getGlobalEmotes();
                 setEmotes({ channelEmotes: new Map(), globalEmotes });
             }

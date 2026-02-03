@@ -1,10 +1,11 @@
-﻿import { create } from 'zustand';
+﻿import { AxiosError } from 'axios';
+import { toast } from 'sonner';
+import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { AxiosError } from 'axios';
 
 import { authService } from '@/services/api/services/authService';
-import { toast } from 'sonner';
 import { clearAllQueryCache } from '@/shared/utils/queryPersist';
+
 import { logger } from '../shared/utils/prodLogger';
 
 import type { User } from '@/types/user';

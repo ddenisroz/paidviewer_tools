@@ -1,11 +1,16 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+
+import { AlertCircle, Coins, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+
+import { logger } from '@/shared/utils/prodLogger';
+import { toast } from 'sonner';
+
+import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
+import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
-import { Loader2, AlertCircle, Coins, ExternalLink, RefreshCw } from 'lucide-react';
-import { toast } from 'sonner';
-import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
+
 
 
 const MEMEALERTS_API_BASE = '/api/memealerts';
@@ -43,7 +48,7 @@ export const MemeAlertsRewards: React.FC = () => {
             const data = await response.json();
             setIsConnected(data.connected);
         } catch (error) {
-            console.error('Status check error', error);
+            logger.error('Status check error', error);
         } finally {
             setStatusLoading(false);
         }
@@ -182,7 +187,7 @@ export const MemeAlertsRewards: React.FC = () => {
                         const refreshToken = popupRef.current.localStorage.getItem('refreshToken');
 
                         if (accessToken) {
-                            console.log('[MemeAlerts] Token captured successfully');
+                            logger.log('[MemeAlerts] Token captured successfully');
 
                             // Save to backend
                             const success = await saveTokenToBackend(accessToken, refreshToken || undefined);
@@ -242,7 +247,7 @@ export const MemeAlertsRewards: React.FC = () => {
                 toast.success("MemeAlerts отключен");
             }
         } catch (error) {
-            console.error('Disconnect error', error);
+            logger.error('Disconnect error', error);
         } finally {
             setConnecting(false);
         }

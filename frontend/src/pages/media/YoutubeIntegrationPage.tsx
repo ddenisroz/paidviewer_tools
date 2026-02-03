@@ -1,36 +1,13 @@
 ﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { AlertCircle, Maximize, Minimize, Monitor, Pause, Play, RefreshCw, Settings, SkipForward, Trash2, Volume2, VolumeX } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-
-import { BUTTON_SIZES } from '@/constants/designSystem';
-import { useAuth } from '@/context/AuthContext';
-import { useChat } from '@/context/ChatContext';
-import { usePlayer } from '@/context/PlayerContext';
-import { youtubeService } from '@/services/api/services/youtubeService';
-import PageWrapper from '@/shared/components/PageWrapper';
-import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/shared/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
-import { Slider } from "@/shared/components/ui/slider";
-import { Switch } from "@/shared/components/ui/switch";
-import { Label } from "@/shared/components/ui/label";
-import { Input } from "@/shared/components/ui/input";
-import { logger } from '@/shared/utils/prodLogger';
-import { toast } from '@/utils/toastManager';
-
-
-import type { YoutubeVideo } from '@/types/youtube';
-import QueueList from './components/QueueList';
 import {
-    DndContext,
     closestCenter,
+    DndContext,
+    DragEndEvent,
     KeyboardSensor,
     PointerSensor,
     useSensor,
-    useSensors,
-    DragEndEvent
+    useSensors
 } from '@dnd-kit/core';
 import {
     arrayMove,
@@ -38,12 +15,57 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import {
+    AlertCircle,
+    Check,
+    ChevronDown,
+    ChevronUp,
+    Clock,
+    Eye,
+    EyeOff,
+    Link,
+    Maximize,
+    Minimize,
+    Play,
+    Pause,
+    Plus,
+    Search,
+    Settings,
+    SkipForward,
+    Trash2,
+    Volume2,
+    VolumeX,
+    X
+} from 'lucide-react';
+import { pointsApi } from '@/services/pointsApi';
+import { useNavigate } from 'react-router-dom';
 
-type PlaybackMode = 'browser' | 'obs';
+import { useAuth } from '@/context/AuthContext';
+import { useChat } from '@/context/ChatContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
+import { usePlayer } from '@/context/PlayerContext';
+import { youtubeService } from '@/services/api/services/youtubeService';
+import PageWrapper from '@/shared/components/PageWrapper';
+import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
+import { Input } from "@/shared/components/ui/input";
+import { Label } from "@/shared/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/shared/components/ui/popover";
+import { Slider } from "@/shared/components/ui/slider";
+import { Switch } from "@/shared/components/ui/switch";
+import { logger } from '@/shared/utils/prodLogger';
+import { toast } from '@/utils/toastManager';
+
+
+import QueueList from './components/QueueList';
+
+import type { YoutubeVideo } from '@/types/youtube';
 
 const YoutubeIntegrationPage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
+    const { integrations } = useIntegrations();
     const {
         currentVideo,
         isPlaying,
@@ -51,6 +73,7 @@ const YoutubeIntegrationPage: React.FC = () => {
         isMuted,
         isTheaterMode,
         queue,
+        skipVotes,
         togglePlayPause,
         setVolume,
         toggleMute,
@@ -67,6 +90,52 @@ const YoutubeIntegrationPage: React.FC = () => {
         })
     );
 
+    const handleCreateReward = async () => {
+        if (!newRewardTitle) {
+            toast.error('Введите название награды');
+            return;
+        }
+
+        try {
+            const platform = requestsRewardPlatform;
+            const channelName = platform === 'vk' ? integrations.vk?.username : integrations.twitch?.username;
+
+            const payload = {
+                title: newRewardTitle,
+                description: 'Заказ YouTube видео',
+                cost: newRewardCost,
+                prompt: 'Отправьте ссылку на YouTube видео',
+                is_user_input_required: true,
+                background_color: '#FF0000',
+                platform,
+                channel_name: channelName || ''
+            };
+
+            const response = await pointsApi.createReward(platform, payload) as {
+                reward?: { id?: string; name?: string; title?: string };
+            };
+
+            if (platform === 'twitch') {
+                const rewardId = response?.reward?.id;
+                if (rewardId) {
+                    setRequestsRewardId(rewardId);
+                    setIsCreatingReward(false);
+                    toast.success('Награда создана и выбрана');
+                } else {
+                    toast.error('Не удалось получить ID награды');
+                }
+            } else {
+                const rewardTitle = response?.reward?.name || response?.reward?.title || newRewardTitle;
+                setRequestsRewardId(rewardTitle);
+                setIsCreatingReward(false);
+                toast.success('Награда создана и выбрана');
+            }
+        } catch (error) {
+            logger.error('Failed to create reward', error);
+            toast.error('Ошибка создания награды');
+        }
+    };
+
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
 
@@ -75,7 +144,7 @@ const YoutubeIntegrationPage: React.FC = () => {
             // For now we just optimistically update the UI if we had a setQueue method, 
             // but since queue comes from context/API, we might need to implement reorder API first
             // or just let it snap back for now as a visual demo until API is ready.
-            console.log('Reorder requested:', active.id, '->', over.id);
+            logger.log('Reorder requested:', active.id, '->', over.id);
             toast.info('Изменение порядка пока не сохраняется на сервере');
         }
     };
@@ -89,16 +158,37 @@ const YoutubeIntegrationPage: React.FC = () => {
     const [requestsCommandEnabled, setRequestsCommandEnabled] = useState<boolean>(true);
     const [requestsRewardEnabled, setRequestsRewardEnabled] = useState<boolean>(false);
     const [requestsRewardId, setRequestsRewardId] = useState<string>('');
+    const [requestsRewardPlatform, setRequestsRewardPlatform] = useState<'twitch' | 'vk'>('twitch');
+    const [isCreatingReward, setIsCreatingReward] = useState(false);
+    const [newRewardTitle, setNewRewardTitle] = useState('Заказ видео');
+    const [newRewardCost, setNewRewardCost] = useState(1000);
     const { lastJsonMessage } = useChat();
-    const currentThumbnail = currentVideo?.thumbnail || currentVideo?.thumbnail_url;
+    const hasVideo = Boolean(currentVideo || queue.length > 0);
+    const ordersClosed = !requestsCommandEnabled && !requestsRewardEnabled;
 
     const loadYoutubeSettings = useCallback(async (): Promise<void> => {
         try {
+            let hasLocalVolume = false;
+            if (typeof window !== 'undefined') {
+                const storedVolume = window.localStorage.getItem('yt_volume');
+                if (storedVolume !== null) {
+                    const parsedVolume = Number(storedVolume);
+                    if (!Number.isNaN(parsedVolume)) {
+                        const clamped = Math.max(0, Math.min(100, Math.round(parsedVolume)));
+                        setVolume(clamped);
+                        hasLocalVolume = true;
+                    }
+                }
+            }
             const response = await youtubeService.getSettings();
-            setVolume(response.data.volume_level || 100);
+            const volumeLevel = response.data.volume_level;
+            if (!hasLocalVolume && typeof volumeLevel === 'number') {
+                setVolume(volumeLevel);
+            }
             setRequestsCommandEnabled(response.data.requests_command_enabled ?? true);
             setRequestsRewardEnabled(response.data.requests_reward_enabled ?? false);
             setRequestsRewardId(response.data.requests_reward_id || '');
+            setRequestsRewardPlatform((response.data as { requests_reward_platform?: string }).requests_reward_platform === 'vk' ? 'vk' : 'twitch');
         } catch (error) {
             logger.error('Error loading YouTube settings:', error);
         }
@@ -109,7 +199,8 @@ const YoutubeIntegrationPage: React.FC = () => {
             await youtubeService.saveSettings({
                 requests_command_enabled: requestsCommandEnabled,
                 requests_reward_enabled: requestsRewardEnabled,
-                requests_reward_id: requestsRewardId
+                requests_reward_id: requestsRewardId,
+                requests_reward_platform: requestsRewardPlatform
             });
             toast.success('Настройки сохранены');
             setIsSettingsDialogOpen(false);
@@ -132,6 +223,8 @@ const YoutubeIntegrationPage: React.FC = () => {
             : playerContainerRef.current;
         if (container) {
             setPlayerContainer(container);
+        } else {
+            setPlayerContainer(null);
         }
         return () => {
             setPlayerContainer(null);
@@ -150,10 +243,55 @@ const YoutubeIntegrationPage: React.FC = () => {
     }, [isTheaterMode, setIsTheaterMode]);
 
     useEffect(() => {
-        if (lastJsonMessage && (lastJsonMessage as { type?: string }).type === 'youtube_queue_update') {
+        const messageType = (lastJsonMessage as { type?: string } | null)?.type;
+        if (messageType === 'youtube_queue_update' || messageType === 'youtube_queue_updated') {
             logger.log('[YouTube] Queue updated via WebSocket');
         }
     }, [lastJsonMessage]);
+
+    const markUserStarted = useCallback((): void => {
+        if (typeof window !== 'undefined') {
+            window.ytUserStarted = true;
+        }
+    }, []);
+
+    const handleNextVideo = useCallback((): void => {
+        markUserStarted();
+        void nextVideo();
+    }, [markUserStarted, nextVideo]);
+
+    const handleQueuePlay = useCallback(async (video: YoutubeVideo): Promise<void> => {
+        try {
+            markUserStarted();
+            await youtubeService.playQueueItem(video.id);
+            loadQueue(true);
+        } catch (error) {
+            logger.error('Error switching to queue item:', error);
+            toast.error('Не удалось переключить видео');
+        }
+    }, [loadQueue, markUserStarted]);
+
+    const handleQueueRemove = useCallback(async (queueId: number): Promise<void> => {
+        try {
+            await youtubeService.removeFromQueue(queueId);
+            toast.success('Удалено из очереди');
+            loadQueue(true);
+        } catch (error) {
+            logger.error('Error removing queue item:', error);
+            toast.error('Не удалось удалить из очереди');
+        }
+    }, [loadQueue]);
+
+    const handleQueueBan = useCallback(async (video: YoutubeVideo): Promise<void> => {
+        try {
+            await youtubeService.banQueueItem(video.id);
+            toast.success('Видео забанено');
+            loadQueue(true);
+        } catch (error) {
+            logger.error('Error banning queue item:', error);
+            toast.error('Не удалось забанить видео');
+        }
+    }, [loadQueue]);
 
     const handleClearQueue = async (): Promise<void> => {
         try {
@@ -184,6 +322,14 @@ const YoutubeIntegrationPage: React.FC = () => {
             setIsTheaterMode(false);
         }
     };
+
+    const handleToggleTheater = useCallback((): void => {
+        const newTheaterMode = !isTheaterMode;
+        setIsTheaterMode(newTheaterMode);
+        window.dispatchEvent(new CustomEvent('youtube_event', {
+            detail: { event: 'theater_mode_changed', data: { isTheaterMode: newTheaterMode } }
+        }));
+    }, [isTheaterMode, setIsTheaterMode]);
 
     if (!isAuthenticated) {
         return (
@@ -220,130 +366,303 @@ const YoutubeIntegrationPage: React.FC = () => {
             onClick={handleBackdropClick}
             style={isTheaterMode ? { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999 } : {}}
         >
+            <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Подтверждение</DialogTitle>
+                        <DialogDescription>Вы уверены, что хотите очистить очередь заказов?</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
+                        <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
+                <DialogContent className="sm:max-w-[425px] bg-gray-900 border-gray-700">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-semibold text-white">Способы заказа</DialogTitle>
+                        <DialogDescription className="text-gray-400">
+                            Настройте как зрители могут добавлять видео
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="py-4 space-y-6">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                            <div className="space-y-1">
+                                <Label className="text-base text-white">Приём заказов</Label>
+                                <p className="text-xs text-gray-400">Быстро закрыть или открыть все способы заказа</p>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    if (ordersClosed) {
+                                        setRequestsCommandEnabled(true);
+                                    } else {
+                                        setRequestsCommandEnabled(false);
+                                        setRequestsRewardEnabled(false);
+                                    }
+                                }}
+                                className="h-8"
+                            >
+                                {ordersClosed ? 'Открыть' : 'Закрыть'}
+                            </Button>
+                        </div>
+
+                        {/* Command Section */}
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                            <div className="space-y-1">
+                                <Label htmlFor="cmd-enabled" className="text-base text-white">Команда</Label>
+                                <p className="text-xs text-gray-400">Бесплатный заказ через чат (название задаётся в Команды)</p>
+                            </div>
+                            <Switch
+                                id="cmd-enabled"
+                                checked={requestsCommandEnabled}
+                                onCheckedChange={setRequestsCommandEnabled}
+                            />
+                        </div>
+
+                        {/* Reward Section */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                                <div className="space-y-1">
+                                    <Label htmlFor="reward-enabled" className="text-base text-white">Баллы канала</Label>
+                                    <p className="text-xs text-gray-400">
+                                        {requestsRewardPlatform === 'vk' ? 'Заказ за награду VK Live' : 'Заказ за награду Twitch'}
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="reward-enabled"
+                                    checked={requestsRewardEnabled}
+                                    onCheckedChange={setRequestsRewardEnabled}
+                                    className={requestsRewardPlatform === 'vk'
+                                        ? 'data-[state=checked]:bg-[#FF4444]'
+                                        : 'data-[state=checked]:bg-[#9146FF]'}
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 px-1">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={requestsRewardPlatform === 'twitch' ? 'default' : 'outline'}
+                                    onClick={() => setRequestsRewardPlatform('twitch')}
+                                    disabled={!integrations.twitch?.enabled}
+                                    className={requestsRewardPlatform === 'twitch'
+                                        ? 'bg-[#9146FF] hover:bg-[#7d3cff] text-white'
+                                        : 'border-gray-700/60'}
+                                >
+                                    Twitch
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={requestsRewardPlatform === 'vk' ? 'default' : 'outline'}
+                                    onClick={() => setRequestsRewardPlatform('vk')}
+                                    disabled={!integrations.vk?.enabled}
+                                    className={requestsRewardPlatform === 'vk'
+                                        ? 'bg-[#FF4444] hover:bg-[#e03a3a] text-white'
+                                        : 'border-gray-700/60'}
+                                >
+                                    VK Live
+                                </Button>
+                            </div>
+
+                            {requestsRewardEnabled && (
+                                <div className="pl-1 pt-2 animate-in fade-in slide-in-from-top-2">
+                                    {!isCreatingReward ? (
+                                        <div className="space-y-3">
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1">
+                                                    <Input
+                                                        id="reward-id"
+                                                        value={requestsRewardId}
+                                                        onChange={(e) => setRequestsRewardId(e.target.value)}
+                                                        placeholder={requestsRewardPlatform === 'vk' ? 'Название награды...' : 'ID награды...'}
+                                                        className="bg-gray-800 border-gray-600 text-white font-mono text-xs h-9"
+                                                    />
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="secondary"
+                                                    onClick={() => setIsCreatingReward(true)}
+                                                    className="h-9 px-3"
+                                                    title="Создать новую награду"
+                                                >
+                                                    <Plus className="h-4 w-4 mr-1.5" />
+                                                    Создать
+                                                </Button>
+                                            </div>
+                                            <p className="text-[10px] text-gray-500">
+                                                {requestsRewardPlatform === 'vk'
+                                                    ? 'Введите точное название награды VK Live или создайте новую'
+                                                    : 'Вставьте ID существующей награды или создайте новую автоматически'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-gray-800/80 rounded-lg p-3 border border-purple-500/30 space-y-3">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-xs font-medium text-purple-300">Новая награда</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                                                    onClick={() => setIsCreatingReward(false)}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Input
+                                                    value={newRewardTitle}
+                                                    onChange={(e) => setNewRewardTitle(e.target.value)}
+                                                    placeholder="Название"
+                                                    className="h-8 bg-gray-900/50 border-gray-600 text-xs"
+                                                />
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        type="number"
+                                                        value={newRewardCost}
+                                                        onChange={(e) => setNewRewardCost(Number(e.target.value))}
+                                                        placeholder="Цена"
+                                                        className="h-8 bg-gray-900/50 border-gray-600 text-xs flex-1"
+                                                    />
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={handleCreateReward}
+                                                        className="h-8 bg-purple-600 hover:bg-purple-700 text-xs"
+                                                    >
+                                                        OK
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="border-t border-gray-800 pt-3">
+                        <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)} className="border-gray-700 text-gray-400 hover:text-white">Отмена</Button>
+                        <Button onClick={handleSaveSettings}>Сохранить</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             {!isTheaterMode ? (
                 <div className="flex flex-col gap-4 h-full">
                     <Card className="card-glass">
-                        <CardContent className="p-6">
-                            <div className="flex gap-4">
-                                <div className="w-[360px] flex-shrink-0">
+                        <CardContent className="p-4">
+                            <div className="w-full flex flex-col xl:flex-row gap-4 items-start">
+                                <div className="w-full xl:w-[360px] space-y-3">
                                     <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-                                        {currentVideo ? (
-                                            // Container for YouTube portal from GlobalPlayer
-                                            <div
-                                                ref={playerContainerRef}
-                                                className="w-full h-full"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center bg-muted">
-                                                <p className="text-muted-foreground text-xs">Нет видео для воспроизведения.</p>
+                                        {/* Container for YouTube portal from GlobalPlayer */}
+                                        <div
+                                            ref={playerContainerRef}
+                                            data-player-container="inline"
+                                            className="w-full h-full"
+                                        />
+                                        {!hasVideo && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+                                                <p className="text-muted-foreground text-xs">{'Нет видео для воспроизведения.'}</p>
                                             </div>
                                         )}
                                     </div>
                                 </div>
 
-                                <div className="flex-1 space-y-3">
-                                    <div className="bg-muted/30 rounded-lg p-3">
-                                        <p className="text-xs text-muted-foreground text-center">
-                                            Управление плеером доступно через встроенные элементы YouTube или мини-плеер.
-                                        </p>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <Dialog open={isClearDialogOpen} onOpenChange={setIsClearDialogOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline" className="h-12 w-full" title="Очистить очередь">
-                                                    <Trash2 className="h-4 w-4 mr-2" />
-                                                    Очистить
+                                <div className="w-full xl:flex-1 space-y-3 xl:ml-0">
+                                    <div className="card-glass w-full rounded-xl p-3 space-y-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    onClick={togglePlayPause}
+                                                    disabled={!hasVideo}
+                                                    size="icon"
+                                                    title={isPlaying ? "Пауза" : "Плей"}
+                                                    aria-label={isPlaying ? "Пауза" : "Плей"}
+                                                    className="h-12 w-12 bg-purple-600 hover:bg-purple-500 text-white"
+                                                >
+                                                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                                                 </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Подтверждение</DialogTitle>
-                                                    <DialogDescription>Вы уверены, что хотите очистить очередь заказов?</DialogDescription>
-                                                </DialogHeader>
-                                                <DialogFooter>
-                                                    <Button variant="outline" onClick={() => setIsClearDialogOpen(false)}>Отмена</Button>
-                                                    <Button variant="destructive" onClick={handleClearQueue}>Очистить</Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-
-                                        <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
-                                            <DialogTrigger asChild>
-                                                <Button variant="outline" className="h-12 w-full" title="Настройки заказа">
-                                                    <Settings className="h-4 w-4 mr-2" />
-                                                    Настройки
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={handleNextVideo}
+                                                    disabled={!hasVideo}
+                                                    title="Следующее"
+                                                    aria-label="Следующее"
+                                                    className="h-12 w-12 border-gray-700/60 hover:border-purple-500/60"
+                                                >
+                                                    <SkipForward className="w-5 h-5" />
                                                 </Button>
-                                            </DialogTrigger>
-                                            <DialogContent>
-                                                <DialogHeader>
-                                                    <DialogTitle>Настройки заказов YouTube</DialogTitle>
-                                                    <DialogDescription>Настройте способы добавления видео в очередь</DialogDescription>
-                                                </DialogHeader>
-                                                <div className="space-y-4 py-4">
-                                                    <div className="flex items-center justify-between space-x-2">
-                                                        <Label htmlFor="cmd-enabled" className="flex-1">Заказ через команду (!sr)</Label>
-                                                        <Switch
-                                                            id="cmd-enabled"
-                                                            checked={requestsCommandEnabled}
-                                                            onCheckedChange={setRequestsCommandEnabled}
-                                                        />
-                                                    </div>
-                                                    <div className="flex items-center justify-between space-x-2">
-                                                        <Label htmlFor="reward-enabled" className="flex-1">Заказ через награду (Channel Points)</Label>
-                                                        <Switch
-                                                            id="reward-enabled"
-                                                            checked={requestsRewardEnabled}
-                                                            onCheckedChange={setRequestsRewardEnabled}
-                                                        />
-                                                    </div>
-                                                    {requestsRewardEnabled && (
-                                                        <div className="space-y-2">
-                                                            <Label htmlFor="reward-id">ID Награды Twitch</Label>
-                                                            <Input
-                                                                id="reward-id"
-                                                                value={requestsRewardId}
-                                                                onChange={(e) => setRequestsRewardId(e.target.value)}
-                                                                placeholder="Введите ID награды..."
-                                                            />
-                                                            <p className="text-xs text-muted-foreground">
-                                                                Создайте награду на Twitch и скопируйте её ID (или просто название, если бот поддерживает поиск по названию).
-                                                                Рекомендуется использовать ID.
-                                                            </p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <DialogFooter>
-                                                    <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)}>Отмена</Button>
-                                                    <Button onClick={handleSaveSettings}>Сохранить</Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-
-
-
-                                        <Button
-                                            variant="outline"
-                                            className="h-12 w-full col-span-2"
-                                            onClick={() => {
-                                                const newTheaterMode = !isTheaterMode;
-                                                setIsTheaterMode(newTheaterMode);
-                                                window.dispatchEvent(new CustomEvent('youtube_event', {
-                                                    detail: { event: 'theater_mode_changed', data: { isTheaterMode: newTheaterMode } }
-                                                }));
-                                            }}
-                                            title="Театральный режим"
-                                        >
-                                            {isTheaterMode ? <Minimize className="h-4 w-4 mr-2" /> : <Maximize className="h-4 w-4 mr-2" />}
-                                            {isTheaterMode ? 'Выйти из режима театра' : 'Театральный режим'}
-                                        </Button>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => setIsSettingsDialogOpen(true)}
+                                                    title="Настройки заказа"
+                                                    aria-label="Настройки заказа"
+                                                    className="h-10 w-10 border-gray-700/60"
+                                                >
+                                                    <Settings className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-10 w-10"
+                                                    onClick={handleToggleTheater}
+                                                    title={isTheaterMode ? "Выйти из режима театра" : "Театральный режим"}
+                                                    aria-label={isTheaterMode ? "Выйти из режима театра" : "Театральный режим"}
+                                                >
+                                                    {isTheaterMode ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => setIsClearDialogOpen(true)}
+                                                    disabled={!hasVideo}
+                                                    title="Очистить очередь"
+                                                    aria-label="Очистить очередь"
+                                                    className="h-10 w-10 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <Button
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={toggleMute}
+                                                disabled={!hasVideo}
+                                                title={isMuted ? "Включить звук" : "Выключить звук"}
+                                                aria-label={isMuted ? "Включить звук" : "Выключить звук"}
+                                                className="h-10 w-10 border-gray-700/60"
+                                            >
+                                                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                                            </Button>
+                                            <Slider
+                                                value={[isMuted ? 0 : (volume ?? 100)]}
+                                                onValueChange={handleVolumeChange}
+                                                max={100}
+                                                step={1}
+                                                disabled={!hasVideo}
+                                                className="flex-1 min-w-[160px]"
+                                            />
+                                            <span className="text-sm text-purple-200 bg-purple-500/10 px-2 py-1 rounded">
+                                                {isMuted ? 0 : (volume ?? 100)}%
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </CardContent>
-                    </Card>
+                    </Card >
 
-                    <Card className="card-glass flex-1 flex flex-col overflow-hidden">
+                    <Card className="card-glass flex flex-col overflow-hidden max-h-[520px]">
                         <CardHeader className="pb-3">
                             <CardTitle>Очередь ({queue.length})</CardTitle>
                         </CardHeader>
@@ -356,76 +675,137 @@ const YoutubeIntegrationPage: React.FC = () => {
                                 <QueueList
                                     queue={queue}
                                     currentVideo={currentVideo}
-                                    onRemove={(id) => {
-                                        // TODO: Implement remove by ID specific logic if needed, 
-                                        // currently API removes by index or ID?
-                                        // youtubeService.removeFromQueue(id);
-                                        // For now reusing the concept but we need queue_id vs video_id clarification
-                                        // Assuming 'id' in queue items is the unique queue entry id
-                                        youtubeService.removeFromQueue(id).then(() => {
-                                            toast.success('Удалено из очереди');
-                                            loadQueue();
-                                        });
-                                    }}
-                                    onPlay={(video) => {
-                                        // Optional: Play specific video
-                                    }}
+                                    skipVotes={skipVotes}
+                                    onRemove={handleQueueRemove}
+                                    onPlay={handleQueuePlay}
+                                    onBan={handleQueueBan}
                                 />
                             </DndContext>
                         </CardContent>
                     </Card>
-                </div>
+                </div >
             ) : (
                 <Card className="transition-all duration-300 w-full bg-black border-none h-full">
-                    <CardContent className="grid grid-cols-5 gap-6 h-full p-6">
-                        <div className="col-span-4 space-y-4">
-                            <div className="flex justify-end">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                        setIsTheaterMode(false);
-                                        window.dispatchEvent(new CustomEvent('youtube_event', {
-                                            detail: { event: 'theater_mode_changed', data: { isTheaterMode: false } }
-                                        }));
-                                    }}
-                                >
-                                    <Minimize className="h-4 w-4 mr-2" />
-                                    Выйти из режима театра
-                                </Button>
-                            </div>
-                            <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                                {currentVideo ? (
-                                    // Container for YouTube portal from GlobalPlayer in theater mode
-                                    <div
-                                        ref={theaterPlayerContainerRef}
-                                        className="w-full h-full"
-                                    />
-                                ) : (
+                    <CardContent className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-3 h-full p-3">
+                        <div className="flex flex-col h-full min-h-0 overflow-hidden">
+                            <div className="flex-1 min-h-0 bg-black rounded-lg overflow-hidden relative">
+                                {/* Container for YouTube portal from GlobalPlayer in theater mode */}
+                                <div
+                                    ref={theaterPlayerContainerRef}
+                                    data-player-container="theater"
+                                    className="w-full h-full absolute inset-0"
+                                />
+                                {!hasVideo && (
                                     <div className="w-full h-full flex items-center justify-center bg-muted/20">
-                                        <p className="text-muted-foreground">Нет видео</p>
+                                        <p className="text-muted-foreground">{'Нет видео'}</p>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className="space-y-4 h-full flex flex-col overflow-hidden">
-                            <h3 className="font-semibold text-lg">Очередь</h3>
-                            <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                                {queue.map((video: YoutubeVideo, index: number) => (
-                                    <div key={video.id} className="flex gap-2 p-2 rounded bg-muted/20 text-sm">
-                                        <div className="flex-shrink-0 w-5 h-5 bg-muted rounded-full flex items-center justify-center text-[10px] font-medium">
-                                            {index + 1}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-medium truncate">{video.title}</p>
-                                            <p className="text-xs text-muted-foreground truncate">{video.requester_name}</p>
-                                        </div>
+                        <div className="h-full min-h-0 min-w-0 flex flex-col overflow-hidden gap-3">
+                            <div className="card-glass rounded-xl p-3 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={togglePlayPause}
+                                            disabled={!hasVideo}
+                                            title={isPlaying ? "Пауза" : "Плей"}
+                                            aria-label={isPlaying ? "Пауза" : "Плей"}
+                                            className="h-11 w-11"
+                                        >
+                                            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={handleNextVideo}
+                                            disabled={!hasVideo}
+                                            title="Следующее"
+                                            aria-label="Следующее"
+                                            className="h-11 w-11"
+                                        >
+                                            <SkipForward className="w-5 h-5" />
+                                        </Button>
                                     </div>
-                                ))}
-                                {queue.length === 0 && (
-                                    <p className="text-sm text-muted-foreground text-center py-4">Очередь пуста</p>
-                                )}
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => setIsSettingsDialogOpen(true)}
+                                            title="Настройки заказа"
+                                            aria-label="Настройки заказа"
+                                            className="h-10 w-10"
+                                        >
+                                            <Settings className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => setIsClearDialogOpen(true)}
+                                            disabled={!hasVideo}
+                                            title="Очистить очередь"
+                                            aria-label="Очистить очередь"
+                                            className="h-10 w-10 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={handleToggleTheater}
+                                            title="Выйти из режима театра"
+                                            aria-label="Выйти из режима театра"
+                                            className="h-10 w-10"
+                                        >
+                                            <Minimize className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={toggleMute}
+                                        disabled={!hasVideo}
+                                        title={isMuted ? "Включить звук" : "Выключить звук"}
+                                        aria-label={isMuted ? "Включить звук" : "Выключить звук"}
+                                        className="h-10 w-10"
+                                    >
+                                        {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                                    </Button>
+                                    <Slider
+                                        value={[isMuted ? 0 : (volume ?? 100)]}
+                                        onValueChange={handleVolumeChange}
+                                        max={100}
+                                        step={1}
+                                        disabled={!hasVideo}
+                                        className="flex-1 min-w-[160px]"
+                                    />
+                                    <span className="text-sm text-purple-200 bg-purple-500/10 px-2 py-1 rounded">
+                                        {isMuted ? 0 : (volume ?? 100)}%
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 min-h-0 overflow-hidden">
+                                <DndContext
+                                    sensors={sensors}
+                                    collisionDetection={closestCenter}
+                                    onDragEnd={handleDragEnd}
+                                >
+                                    <QueueList
+                                        queue={queue}
+                                        currentVideo={currentVideo}
+                                        skipVotes={skipVotes}
+                                        compact={true}
+                                        onRemove={handleQueueRemove}
+                                        onPlay={handleQueuePlay}
+                                        onBan={handleQueueBan}
+                                    />
+                                </DndContext>
                             </div>
                         </div>
                     </CardContent>

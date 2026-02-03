@@ -1,6 +1,7 @@
 ﻿// src/components/tts/TtsFilterManager.tsx
 import React, { useState } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, UserX, X } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
@@ -11,10 +12,9 @@ import { toast } from '@/utils/toastManager';
 
 import { useAuth } from '../../../context/AuthContext';
 import { useIntegrations } from '../../../context/IntegrationsContext';
-import { useAddFilteredWord, useBlockedUsers, useBlockUser, useDeleteFilteredWord, useFilteredWords, useUnblockUser } from '../../../queries/tts/ttsQueries';
 import { queryKeys } from '../../../queries/queryKeys';
+import { useAddFilteredWord, useBlockedUsers, useBlockUser, useDeleteFilteredWord, useFilteredWords, useUnblockUser } from '../../../queries/tts/ttsQueries';
 import { TwitchIcon, VKIcon } from '../../../shared/components/PlatformIcons';
-import { useQueryClient } from '@tanstack/react-query';
 
 import type { AxiosError } from 'axios';
 

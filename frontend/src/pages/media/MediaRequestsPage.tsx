@@ -1,10 +1,12 @@
 import React from 'react';
+
 import { useSearchParams } from 'react-router-dom';
-import YoutubeIntegrationPage from '@/pages/media/YoutubeIntegrationPage';
+
 import { MemeAlertsRewards } from '@/features/drops/components/MemeAlertsRewards';
+import DropsMainPage from '@/features/drops/pages/DropsMainPage';
+import YoutubeIntegrationPage from '@/pages/media/YoutubeIntegrationPage';
 import PageWrapper from '@/shared/components/PageWrapper';
 import { Card, CardContent } from '@/shared/components/ui/card';
-import DropsMainPage from '@/features/drops/pages/DropsMainPage';
 
 const MediaRequestsPage: React.FC = () => {
     const [searchParams] = useSearchParams();

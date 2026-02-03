@@ -26,6 +26,34 @@ interface Emotes {
     globalEmotes: Map<string, unknown>;
 }
 
+const toRgba = (hex: string, opacity: number): string => {
+    if (!hex || !hex.startsWith('#')) {
+        return `rgba(0, 0, 0, ${opacity})`;
+    }
+    const normalized = hex.length === 4
+        ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+        : hex;
+    const r = parseInt(normalized.slice(1, 3), 16);
+    const g = parseInt(normalized.slice(3, 5), 16);
+    const b = parseInt(normalized.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
+const parseIntOr = (value: unknown, fallback: number): number => {
+    const parsed = Number.parseInt(String(value));
+    return Number.isNaN(parsed) ? fallback : parsed;
+};
+
+const parseFloatOr = (value: unknown, fallback: number): number => {
+    const parsed = Number.parseFloat(String(value));
+    return Number.isNaN(parsed) ? fallback : parsed;
+};
+
+const clampNumber = (value: number, min: number, max: number): number => {
+    if (Number.isNaN(value)) return min;
+    return Math.min(Math.max(value, min), max);
+};
+
 // Memoized message component to prevent unnecessary re-renders
 interface ChatMessageItemProps {
     msg: ChatMessage;
@@ -50,37 +78,67 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
 }) => {
     const messageId = msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`;
     const isNewMessage = messageId === lastAddedMessageId;
+    const metaGroupStyle: React.CSSProperties = {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        lineHeight: 1,
+        verticalAlign: 'text-bottom',
+        marginRight: '6px'
+    };
+    const showMeta = Boolean(
+        settings?.show_platform_icons ||
+        (settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0) ||
+        (settings?.show_badges && msg.platform === 'vk' && msg.role)
+    );
+    const usernameColor = settings.username_color
+        || (msg.platform === 'twitch' ? '#9146FF' : '#FF4444');
 
     const messageStyle = useMemo(() => {
+        const resolvedFontFamily = settings?.font_family
+            ? (settings.font_family.includes(',')
+                ? settings.font_family
+                : `${settings.font_family}, sans-serif`)
+            : undefined;
+        const messageBackground = (settings?.background_opacity ?? 0) > 0
+            ? toRgba(settings?.background_color || '#000000', settings?.background_opacity ?? 0.5)
+            : 'transparent';
         const baseStyle: React.CSSProperties = {
-            borderRadius: `${settings?.border_radius || 8}px`,
+            fontFamily: resolvedFontFamily,
+            borderRadius: `${settings?.border_radius ?? 8}px`,
             whiteSpace: settings.chat_direction === 'horizontal' ? 'nowrap' : 'normal',
-            wordBreak: settings.chat_direction === 'horizontal' ? 'normal' : 'keep-all',
+            wordBreak: settings.chat_direction === 'horizontal' ? 'normal' : 'break-word',
             overflowWrap: 'anywhere',
+            overflow: settings.chat_direction === 'horizontal' ? 'hidden' : 'visible',
+            textOverflow: settings.chat_direction === 'horizontal' ? 'ellipsis' : 'clip',
             flexShrink: 0,
             minWidth: settings.chat_direction === 'horizontal' ? 'fit-content' : 'auto',
             maxWidth: settings.chat_direction === 'horizontal' ? '600px' : 'auto',
-            padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '0',
-            backgroundColor: settings.chat_direction === 'horizontal' ? 'rgba(0, 0, 0, 0.3)' : 'transparent',
-            marginTop: index > 0 && settings.chat_direction !== 'horizontal' ? `${settings?.message_spacing || 4}px` : '0'
+            padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '4px 8px',
+            backgroundColor: messageBackground,
+            lineHeight: 1.35,
+            marginTop: index > 0 && settings.chat_direction !== 'horizontal' ? `${settings?.message_spacing ?? 4}px` : '0'
         };
 
         if (isNewMessage) {
             const animationType = settings?.animation_type || 'fade';
             const animationDuration = settings?.animation_duration || 300;
+            const shouldAnimate = animationType !== 'none' && animationDuration > 0;
 
             const animationName =
                 animationType === 'fade' ? 'fadeIn' :
-                    animationType === 'slide-right' ? 'slideRight' :
+                    animationType === 'slide-right' || animationType === 'slide' ? 'slideRight' :
                         animationType === 'slide-left' ? 'slideLeft' :
                             animationType === 'scale' ? 'scale' :
                                 animationType === 'bounce' ? 'bounce' :
                                     'fadeIn';
 
-            return {
-                ...baseStyle,
-                animation: `${animationName} ${animationDuration}ms ease-out`
-            };
+            if (shouldAnimate) {
+                return {
+                    ...baseStyle,
+                    animation: `${animationName} ${animationDuration}ms ease-out`
+                };
+            }
         }
 
         return baseStyle;
@@ -91,101 +149,110 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
             key={messageId}
             style={messageStyle}
         >
-            {settings?.show_platform_icons && (
-                msg.platform === 'twitch' ? (
-                    <TwitchIcon
-                        style={{
-                            color: '#9146FF',
-                            width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                            height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                            display: 'inline-block',
-                            verticalAlign: 'text-bottom',
-                            marginRight: '4px'
-                        }}
-                    />
-                ) : (
-                    <VKIcon
-                        style={{
-                            color: '#FF4444',
-                            width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                            height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
-                            display: 'inline-block',
-                            verticalAlign: 'text-bottom',
-                            marginRight: '4px'
-                        }}
-                    />
-                )
-            )}
-
-            {settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && msg.platform === 'twitch' && (
-                <>
-                    {msg.badges.map((badge: string, idx: number) => {
-                        const [badgeId, version] = badge.split('/');
-                        const badgeUrl = twitchBadgesService.getBadgeUrl(
-                            badgeId,
-                            version,
-                            '1x',
-                            msg.channel_name || msg.channel || channelName
-                        );
-
-                        if (!badgeUrl) return null;
-
-                        const badgeSize = Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1));
-                        return (
-                            <img
-                                key={idx}
-                                src={badgeUrl}
-                                alt={badgeId}
-                                title={badge}
+            {showMeta && (
+                <span style={metaGroupStyle}>
+                    {settings?.show_platform_icons && (
+                        msg.platform === 'twitch' ? (
+                            <TwitchIcon
                                 style={{
-                                    width: `${badgeSize}px`,
-                                    height: `${badgeSize}px`,
+                                    color: '#9146FF',
+                                    width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
+                                    height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
                                     display: 'inline-block',
-                                    verticalAlign: 'text-bottom',
-                                    marginRight: '2px'
-                                }}
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    verticalAlign: 'text-bottom'
                                 }}
                             />
-                        );
-                    })}
-                </>
-            )}
+                        ) : (
+                            <VKIcon
+                                style={{
+                                    color: '#FF4444',
+                                    width: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
+                                    height: `${Math.max(12, Math.min(24, settings?.font_size || 16))}px`,
+                                    display: 'inline-block',
+                                    verticalAlign: 'text-bottom'
+                                }}
+                            />
+                        )
+                    )}
 
-            {settings?.show_badges && msg.platform === 'vk' && msg.role && (
-                <VkRoleBadge
-                    role={msg.role}
-                    size={Math.max(12, Math.min(18, (settings?.font_size || 16) * 0.9))}
-                    style={{ marginRight: '4px' }}
-                />
-            )}
+                    {settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && msg.platform === 'twitch' && (
+                        <>
+                            {msg.badges.map((badge: string, idx: number) => {
+                                const [badgeId, version] = badge.split('/');
+                                const badgeUrl = twitchBadgesService.getBadgeUrl(
+                                    badgeId,
+                                    version,
+                                    '1x',
+                                    msg.channel_name || msg.channel || channelName
+                                );
 
-            {settings?.show_avatars && msg.avatar_url && (
-                <img
-                    src={msg.avatar_url}
-                    alt={msg.author_name || msg.author}
-                    style={{
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        display: 'inline-block',
-                        verticalAlign: 'text-bottom',
-                        marginRight: '6px'
-                    }}
-                />
+                                if (!badgeUrl) return null;
+
+                                const badgeSize = Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1));
+                                return (
+                                    <img
+                                        key={idx}
+                                        src={badgeUrl}
+                                        alt={badgeId}
+                                        title={badge}
+                                        style={{
+                                            width: `${badgeSize}px`,
+                                            height: `${badgeSize}px`,
+                                            display: 'inline-block',
+                                            verticalAlign: 'text-bottom'
+                                        }}
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).style.display = 'none';
+                                        }}
+                                    />
+                                );
+                            })}
+                        </>
+                    )}
+
+                    {settings?.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && msg.platform === 'vk' && (
+                        <>
+                            {msg.badges.map((badge: string, idx: number) => (
+                                <img
+                                    key={idx}
+                                    src={badge}
+                                    alt="badge"
+                                    style={{
+                                        width: `${Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1))}px`,
+                                        height: `${Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1))}px`,
+                                        display: 'inline-block',
+                                        verticalAlign: 'text-bottom'
+                                    }}
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {settings?.show_badges && msg.platform === 'vk' && msg.role && (
+                        <VkRoleBadge
+                            role={msg.role}
+                            size={Math.max(12, Math.min(18, (settings?.font_size || 16) * 0.9))}
+                            style={{ lineHeight: 1, verticalAlign: 'text-bottom' }}
+                        />
+                    )}
+
+                </span>
             )}
 
             <span style={{
                 ...(settings.text_stroke_width && settings.text_stroke_width > 0 ? {
                     WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
                     paintOrder: 'stroke fill'
-                } : {})
+                } : {}),
+                verticalAlign: 'baseline'
             }}>
                 <span
                     onClick={(e) => onNicknameClick(e, msg.author_name || msg.author || 'Unknown', msg.platform)}
                     style={{
-                        color: msg.platform === 'twitch' ? '#9146FF' : '#FF4444',
+                        color: usernameColor,
                         fontWeight: '600',
                         cursor: 'pointer',
                         userSelect: 'none'
@@ -196,17 +263,16 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 </span>
                 {': '}
                 <span style={{ color: settings.text_color }}>
-                    {settings.chat_direction === 'horizontal' ? (
-                        truncateWords(msg.message || msg.content, 6)
-                    ) : (
-                        <MessageContent
-                            message={msg.message || msg.content || ''}
-                            channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
-                            globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
-                            twitchEmotes={msg.emotes}
-                            showLinks={settings?.show_links !== false}
-                        />
-                    )}
+                    <MessageContent
+                        message={settings.chat_direction === 'horizontal'
+                            ? truncateWords(msg.message || msg.content, 6)
+                            : (msg.message || msg.content || '')}
+                        channelEmotes={settings?.show_7tv_emotes !== false ? emotes.channelEmotes : new Map()}
+                        globalEmotes={settings?.show_7tv_emotes !== false ? emotes.globalEmotes : new Map()}
+                        twitchEmotes={msg.emotes}
+                        showLinks={settings?.show_links !== false}
+                        autoLoadImages={settings?.auto_load_images !== false}
+                    />
                 </span>
             </span>
         </div>
@@ -218,12 +284,24 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
         prevProps.msg.id === nextProps.msg.id &&
         prevProps.index === nextProps.index &&
         prevProps.lastAddedMessageId === nextProps.lastAddedMessageId &&
+        prevProps.settings.font_family === nextProps.settings.font_family &&
         prevProps.settings.font_size === nextProps.settings.font_size &&
+        prevProps.settings.font_weight === nextProps.settings.font_weight &&
         prevProps.settings.animation_type === nextProps.settings.animation_type &&
+        prevProps.settings.animation_duration === nextProps.settings.animation_duration &&
         prevProps.settings.chat_direction === nextProps.settings.chat_direction &&
+        prevProps.settings.border_radius === nextProps.settings.border_radius &&
+        prevProps.settings.message_spacing === nextProps.settings.message_spacing &&
+        prevProps.settings.text_color === nextProps.settings.text_color &&
+        prevProps.settings.text_stroke_width === nextProps.settings.text_stroke_width &&
+        prevProps.settings.text_stroke_color === nextProps.settings.text_stroke_color &&
         prevProps.settings.show_platform_icons === nextProps.settings.show_platform_icons &&
         prevProps.settings.show_badges === nextProps.settings.show_badges &&
-        prevProps.settings.show_7tv_emotes === nextProps.settings.show_7tv_emotes
+        prevProps.settings.show_links === nextProps.settings.show_links &&
+        prevProps.settings.show_7tv_emotes === nextProps.settings.show_7tv_emotes &&
+        prevProps.settings.auto_load_images === nextProps.settings.auto_load_images &&
+        prevProps.emotes.channelEmotes === nextProps.emotes.channelEmotes &&
+        prevProps.emotes.globalEmotes === nextProps.emotes.globalEmotes
     );
 });
 
@@ -252,26 +330,26 @@ const ChatOverlay: React.FC = () => {
         if (!settings) return {};
 
         logger.log('[STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
+        const resolvedFontFamily = settings?.font_family
+            ? (settings.font_family.includes(',')
+                ? settings.font_family
+                : `${settings.font_family}, sans-serif`)
+            : 'Inter, sans-serif';
 
         return {
             width: `${settings?.chat_width || 100}vw`,
             height: '100vh',
             padding: '16px',
-            fontFamily: settings?.font_family || 'Inter, sans-serif',
+            fontFamily: resolvedFontFamily,
             fontSize: `${settings?.font_size || 16}px`,
             fontWeight: settings?.font_weight || 'normal',
             color: settings?.text_color || '#FFFFFF',
-            backgroundColor: (() => {
-                const hex = settings?.background_color || '#000000';
-                const opacity = settings?.background_opacity ?? 0.8;
-                const r = parseInt(hex.slice(1, 3), 16);
-                const g = parseInt(hex.slice(3, 5), 16);
-                const b = parseInt(hex.slice(5, 7), 16);
-                return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-            })(),
-            overflow: 'hidden'
+            backgroundColor: 'transparent',
+            borderRadius: `${settings?.border_radius || 0}px`,
+            overflow: 'hidden',
+            boxSizing: 'border-box'
         };
-    }, [settings?.font_family, settings?.font_size, settings?.font_weight, settings?.text_color, settings?.background_color, settings?.background_opacity, settings?.chat_width]);
+    }, [settings?.font_family, settings?.font_size, settings?.font_weight, settings?.text_color, settings?.background_color, settings?.background_opacity, settings?.chat_width, settings?.border_radius]);
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -348,23 +426,46 @@ const ChatOverlay: React.FC = () => {
 
         try {
             const response = await chatboxService.getSettingsByToken(token);
-            const responseData = response.data as ApiResponse<ChatBoxSettings>;
-            const data = responseData.data || {} as ChatBoxSettings;
+            const responseData = response.data as ApiResponse<ChatBoxSettings> | ChatBoxSettings;
+            const data = ('data' in responseData && responseData.data
+                ? responseData.data
+                : responseData) as ChatBoxSettings;
 
+            const normalizedAnimationType = (data.animation_type === 'slide'
+                ? 'slide-right'
+                : (data.animation_type || 'fade')) as ChatBoxSettings['animation_type'];
+            const normalizedChatDirection = (data.chat_direction === 'vertical-reverse'
+                ? 'vertical'
+                : (data.chat_direction || 'vertical')) as ChatBoxSettings['chat_direction'];
+
+            const parsedOpacity = Number.parseFloat(String(data.background_opacity));
+            const normalizedFontFamily = data.font_family
+                ?.split(',')[0]
+                ?.trim()
+                .replace(/^['"]|['"]$/g, '');
+            const fontSize = clampNumber(parseIntOr(data.font_size, 16), 8, 32);
+            const chatWidth = clampNumber(parseIntOr(data.chat_width, 100), 20, 100);
+            const messageSpacing = clampNumber(parseIntOr(data.message_spacing, 4), 0, 32);
+            const borderRadius = clampNumber(parseIntOr(data.border_radius, 8), 0, 32);
+            const animationDuration = clampNumber(parseIntOr(data.animation_duration, 300), 0, 2000);
+            const messageFadeSeconds = clampNumber(parseIntOr(data.message_fade_seconds, 60), 10, 60);
+            const textStrokeWidth = clampNumber(parseFloatOr(data.text_stroke_width, 0), 0, 3);
             const normalizedSettings: ChatBoxSettings = {
                 ...data,
-                font_size: parseInt(String(data.font_size)) || 16,
-                text_stroke_width: parseInt(String(data.text_stroke_width)) || 0,
+                font_family: normalizedFontFamily || data.font_family || 'Inter',
+                font_size: fontSize,
+                text_stroke_width: textStrokeWidth,
                 text_stroke_color: data.text_stroke_color || '#000000',
-                background_opacity: parseFloat(String(data.background_opacity)) ?? 0.5,
+                background_opacity: Number.isFinite(parsedOpacity) ? parsedOpacity : 0.5,
                 background_color: data.background_color || '#000000',
-                max_messages: parseInt(String(data.max_messages)) || 20,
-                message_spacing: parseInt(String(data.message_spacing)) || 4,
-                animation_type: (data.animation_type || 'fade') as 'fade' | 'slide-right' | 'slide-left' | 'scale' | 'bounce',
-                animation_duration: parseInt(String(data.animation_duration)) || 300,
-                chat_direction: (data.chat_direction || 'vertical') as 'vertical' | 'horizontal',
-                chat_width: parseInt(String(data.chat_width)) || 100,
-                border_radius: parseInt(String(data.border_radius)) || 8
+                max_messages: parseIntOr(data.max_messages, 20),
+                message_spacing: messageSpacing,
+                animation_type: normalizedAnimationType,
+                animation_duration: animationDuration,
+                chat_direction: normalizedChatDirection,
+                chat_width: chatWidth,
+                message_fade_seconds: messageFadeSeconds,
+                border_radius: borderRadius
             };
 
             if (!isPolling) {
@@ -376,7 +477,7 @@ const ChatOverlay: React.FC = () => {
 
             const resolvedChannelName = data.channel_name || normalizedSettings.channel_name || null;
             setChannelName(resolvedChannelName);
-            setUserId(normalizedSettings.user_id || null);
+            setUserId(normalizedSettings.user_id ?? null);
         } catch (error: unknown) {
             const axiosError = error as AxiosError<{ detail?: string }>;
             logger.error('[ERROR] Error loading ChatBox settings:', error);
@@ -416,11 +517,13 @@ const ChatOverlay: React.FC = () => {
                 return;
             }
 
+            const twitchUserId = settings?.twitch_user_id || null;
+
             try {
-                if (channelName) {
-                    const emotesData = await getAllEmotesForChannel(channelName);
+                if (channelName || twitchUserId) {
+                    const emotesData = await getAllEmotesForChannel(channelName || '', twitchUserId);
                     setEmotes(emotesData);
-                    logger.log(`[OK] [7TV] Loaded emotes for channel: ${channelName}`);
+                    logger.log(`[OK] [7TV] Loaded emotes for channel: ${channelName || twitchUserId}`);
                 } else {
                     const { getGlobalEmotes } = await import('@/features/chat/utils/emotes');
                     const globalEmotes = await getGlobalEmotes();
@@ -432,7 +535,7 @@ const ChatOverlay: React.FC = () => {
         };
 
         loadEmotes();
-    }, [settings?.show_7tv_emotes, channelName]);
+    }, [settings?.show_7tv_emotes, settings?.twitch_user_id, channelName]);
 
     useEffect(() => {
         if (!token) {
@@ -479,6 +582,12 @@ const ChatOverlay: React.FC = () => {
                             msg.id || `${msg.timestamp}-${msg.author}-${msg.message || msg.content}`
                         ));
                         historyLoadedRef.current = true;
+                        if (uniqueMessages.length > 0) {
+                            const inferredChannel = uniqueMessages[0].channel_name || uniqueMessages[0].channel;
+                            if (inferredChannel) {
+                                setChannelName(prev => prev || inferredChannel);
+                            }
+                        }
 
                         setTimeout(() => {
                             messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
@@ -511,20 +620,59 @@ const ChatOverlay: React.FC = () => {
             const updateData = data.data as Partial<ChatBoxSettings> | undefined;
             setSettings(prevSettings => {
                 if (!prevSettings) return prevSettings;
+                const parsedUpdateOpacity = Number.parseFloat(String(updateData?.background_opacity));
+                const fontSize = clampNumber(
+                    parseIntOr(updateData?.font_size ?? prevSettings.font_size, prevSettings.font_size || 16),
+                    8,
+                    32
+                );
+                const chatWidth = clampNumber(
+                    parseIntOr(updateData?.chat_width ?? prevSettings.chat_width, prevSettings.chat_width || 100),
+                    20,
+                    100
+                );
+                const messageSpacing = clampNumber(
+                    parseIntOr(updateData?.message_spacing ?? prevSettings.message_spacing, prevSettings.message_spacing || 4),
+                    0,
+                    32
+                );
+                const borderRadius = clampNumber(
+                    parseIntOr(updateData?.border_radius ?? prevSettings.border_radius, prevSettings.border_radius || 8),
+                    0,
+                    32
+                );
+                const animationDuration = clampNumber(
+                    parseIntOr(updateData?.animation_duration ?? prevSettings.animation_duration, prevSettings.animation_duration || 300),
+                    0,
+                    2000
+                );
+                const messageFadeSeconds = clampNumber(
+                    parseIntOr(updateData?.message_fade_seconds ?? prevSettings.message_fade_seconds, prevSettings.message_fade_seconds || 60),
+                    10,
+                    60
+                );
+                const textStrokeWidth = clampNumber(
+                    parseFloatOr(updateData?.text_stroke_width ?? prevSettings.text_stroke_width, prevSettings.text_stroke_width || 0),
+                    0,
+                    3
+                );
+
                 const updatedSettings: ChatBoxSettings = {
                     ...prevSettings,
                     ...updateData,
-                    font_size: parseInt(String(updateData?.font_size)) || prevSettings.font_size || 16,
-                    text_stroke_width: parseInt(String(updateData?.text_stroke_width)) || prevSettings.text_stroke_width || 0,
+                    font_size: fontSize,
+                    text_stroke_width: textStrokeWidth,
                     text_stroke_color: updateData?.text_stroke_color || prevSettings.text_stroke_color || '#000000',
-                    background_opacity: parseFloat(String(updateData?.background_opacity)) ?? prevSettings.background_opacity ?? 0.5,
+                    background_opacity: Number.isFinite(parsedUpdateOpacity)
+                        ? parsedUpdateOpacity
+                        : (prevSettings.background_opacity ?? 0.5),
                     background_color: updateData?.background_color || prevSettings.background_color || '#000000',
-                    max_messages: parseInt(String(updateData?.max_messages)) || prevSettings.max_messages || 20,
-                    message_spacing: parseInt(String(updateData?.message_spacing)) || prevSettings.message_spacing || 4,
-                    message_fade_seconds: parseInt(String(updateData?.message_fade_seconds)) || prevSettings.message_fade_seconds || 60,
-                    animation_duration: parseInt(String(updateData?.animation_duration)) || prevSettings.animation_duration || 300,
-                    chat_width: parseInt(String(updateData?.chat_width)) || prevSettings.chat_width || 100,
-                    border_radius: parseInt(String(updateData?.border_radius)) || prevSettings.border_radius || 8
+                    max_messages: parseIntOr(updateData?.max_messages ?? prevSettings.max_messages, prevSettings.max_messages || 20),
+                    message_spacing: messageSpacing,
+                    message_fade_seconds: messageFadeSeconds,
+                    animation_duration: animationDuration,
+                    chat_width: chatWidth,
+                    border_radius: borderRadius
                 };
 
                 logger.log('[REFRESH] [CHATBOX] Settings updated:', updatedSettings);
@@ -542,6 +690,10 @@ const ChatOverlay: React.FC = () => {
 
         if (data.type === 'message' || data.type === 'chat_message') {
             const messageId = data.id || `${data.timestamp}-${data.author || data.author_name}-${data.message}`;
+            const inferredChannel = data.channel_name || data.channel;
+            if (inferredChannel) {
+                setChannelName(prev => prev || inferredChannel);
+            }
 
             if (processedMessageIds.current.has(messageId)) {
                 return;
@@ -609,6 +761,12 @@ const ChatOverlay: React.FC = () => {
                 msg.id || `${msg.timestamp}-${msg.author || msg.author_name}-${msg.message || msg.content}`
             ));
             historyLoadedRef.current = true;
+            if (uniqueMessages.length > 0) {
+                const inferredChannel = uniqueMessages[0].channel_name || uniqueMessages[0].channel;
+                if (inferredChannel) {
+                    setChannelName(prev => prev || inferredChannel);
+                }
+            }
 
             setTimeout(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });

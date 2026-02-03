@@ -3,7 +3,6 @@
 import { CheckCircle2, Clock, Edit, Gift, Loader2, MessageCircle, Plus, Power, PowerOff, Trash2, XCircle } from 'lucide-react';
 
 import { PLATFORM_COLORS } from '@/constants/uiConstants';
-
 import { useIntegrations } from '@/context/IntegrationsContext';
 import pointsApi from '@/services/pointsApi';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
@@ -47,6 +46,7 @@ interface RewardDialogProps {
     onClose: () => void;
     reward: PlatformReward | null;
     platform: 'twitch' | 'vk';
+    channelName?: string | null;
     onSuccess: () => void;
 }
 
@@ -181,7 +181,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
     );
 };
 
-const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, platform, onSuccess }) => {
+const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, platform, channelName, onSuccess }) => {
     const [formData, setFormData] = useState<RewardFormData>({
         title: '',
         description: '',
@@ -243,7 +243,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                 cost: parseInt(String(formData.cost)),
                 is_user_input_required: formData.is_message_required,
                 platform: platform,
-                channel_name: ''
+                channel_name: channelName || ''
             };
 
             let rewardData: Record<string, unknown> = { ...baseData };
@@ -1034,7 +1034,7 @@ const PointsManagementPage: React.FC = () => {
                                     size="sm"
                                     onClick={() => setSelectedPlatform('twitch')}
                                     className={`gap-1.5 h-8 ${selectedPlatform === 'twitch'
-                                        ? 'bg-red-600 text-white hover:bg-red-700'
+                                        ? 'bg-[#9146FF] text-white hover:bg-[#7d3cff]'
                                         : 'hover:bg-muted'
                                         }`}
                                 >
@@ -1048,7 +1048,7 @@ const PointsManagementPage: React.FC = () => {
                                     size="sm"
                                     onClick={() => setSelectedPlatform('vk')}
                                     className={`gap-1.5 h-8 ${selectedPlatform === 'vk'
-                                        ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                        ? 'bg-[#FF4444] text-white hover:bg-[#e03a3a]'
                                         : 'hover:bg-muted'
                                         }`}
                                 >
@@ -1110,6 +1110,7 @@ const PointsManagementPage: React.FC = () => {
                 }}
                 reward={editingReward}
                 platform={selectedPlatform}
+                channelName={selectedPlatform === 'vk' ? integrations.vk?.username : integrations.twitch?.username}
                 onSuccess={() => {
                     setShowCreateDialog(false);
                     setEditingReward(null);

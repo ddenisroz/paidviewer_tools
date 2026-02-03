@@ -1,6 +1,8 @@
 import React from 'react';
-import ReactDOM from 'react-dom';
+
 import { Tag } from 'lucide-react';
+import ReactDOM from 'react-dom';
+
 import { logger } from '@/shared/utils/prodLogger';
 
 import type { StreamCategory } from '@/types/stream';

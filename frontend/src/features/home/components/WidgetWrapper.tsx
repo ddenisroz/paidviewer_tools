@@ -1,9 +1,11 @@
 import React from 'react';
+
+import { useSortable } from '@dnd-kit/sortable';
 import { Eye, EyeOff, GripVertical } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { useLayoutStore, WidgetId } from '@/store/useLayoutStore';
-import { cn } from '@/lib/utils';
-import { useSortable } from '@dnd-kit/sortable';
 
 interface WidgetWrapperProps {
     id: WidgetId;

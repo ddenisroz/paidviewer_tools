@@ -38,15 +38,10 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
     useEffect(() => {
         const loadTtsSettings = async (): Promise<void> => {
             try {
-                console.log('[TTS DEBUG] Loading platform settings...');
                 const response = await ttsService.getPlatformSettings();
-                console.log('[TTS DEBUG] Raw API response:', response);
-                console.log('[TTS DEBUG] response.data:', response?.data);
-                console.log('[TTS DEBUG] response.data.data:', response?.data?.data);
 
                 // Handle different response structures: response.data.data or response.data
                 const rawData = response?.data?.data || response?.data;
-                console.log('[TTS DEBUG] rawData extracted:', rawData);
 
                 if (!rawData) {
                     logger.warn('[WARN] [TTS SHORTCUT] No settings data received (backend may be unavailable)');

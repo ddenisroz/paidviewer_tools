@@ -6,6 +6,7 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 
 - `bot_service/`: FastAPI backend. Layers include `api/` (routes), `services/` (logic), `repositories/` (data access), `core/` (config/auth), and `tests/`.
 - `frontend/`: React + Vite app (`src/`) with assets in `public/`.
+- ChatBox UI: settings modal in `frontend/src/components/ChatBoxSettingsModal.tsx`, preview in `frontend/src/features/chatbox/components/PreviewPanel.tsx` (keep preview/overlay behavior aligned).
 - `tts_service/`: Advanced shared TTS service (`python main.py`).
 - `tts_service_simple/`: Personal TTS microservice (`python run.py`).
 - `deploy/`: Docker compose and deployment assets.
@@ -51,3 +52,14 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 ## Agent-Specific Instructions
 
 - Automated agents should read `docs/PROJECT_CONTEXT.md` before large changes.
+
+## Behavior Notes
+
+- ChatOverlay relies on `/api/chatbox/settings/by-token` returning `twitch_user_id` to load 7TV channel emotes. Keep this field in sync when touching chatbox settings.
+- YouTube mini-player renders into the sidebar slot `#youtube-mini-player-slot` when present (GlobalPlayer uses a portal).
+- Browser TTS playback is active only when `listening_mode` is `website`; when set to `obs`, in-app TTS playback is suppressed (mode is persisted in `tts_listening_mode`).
+- YouTube queue bans set queue items to `status='banned'` and prevent re-adding the same video via `/api/youtube/queue/ban/{queue_id}`.
+- Frontend polling intervals are adaptive (reduced outside relevant pages); background polling is disabled where supported.
+- Drops config/rewards responses are cached for 60s server-side with invalidation on updates; dashboard quick actions refresh every 120s.
+- Stream title/category changes broadcast `stream_info_updated` over WebSocket; Twitch stream info cache is kept in sync.
+- Dashboard stream-info polling runs every 120s; stream-info cache applies to both Twitch and VK.

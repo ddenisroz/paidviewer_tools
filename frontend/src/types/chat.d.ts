@@ -77,6 +77,7 @@ export interface ChatBoxSettings {
   font_family?: string;
   font_weight?: string;
   text_color?: string;
+  username_color?: string;
   text_stroke_width?: number;
   text_stroke_color?: string;
   background_color?: string;
@@ -84,7 +85,7 @@ export interface ChatBoxSettings {
   chat_width?: number;
   max_messages?: number;
   message_spacing?: number;
-  animation_type?: 'fade' | 'slide-right' | 'slide-left' | 'scale' | 'bounce';
+  animation_type?: 'fade' | 'slide' | 'slide-right' | 'slide-left' | 'scale' | 'bounce' | 'none';
   animation_duration?: number;
   chat_direction?: 'vertical' | 'horizontal';
   message_fade_seconds?: number;
@@ -94,10 +95,12 @@ export interface ChatBoxSettings {
   show_avatars?: boolean;
   show_7tv_emotes?: boolean;
   show_links?: boolean;
+  auto_load_images?: boolean;
   widget_url?: string;
   version?: number;
   channel_name?: string;
   user_id?: number;
+  twitch_user_id?: string;
   avatar_url?: string;
   [key: string]: string | number | boolean | undefined;
 }

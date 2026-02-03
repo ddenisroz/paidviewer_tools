@@ -11,6 +11,19 @@ class StreamInfoHandlerMixin:
     # Expected attributes/methods from main class
     logger: logging.Logger
 
+    async def _broadcast_stream_info_update(self, user_id: int, platform: str, db) -> None:
+        try:
+            from services.stream_info_service import StreamInfoService
+            from utils.stream_info_cache import set_cached_stream_info
+            from utils.websocket_broadcast import broadcast_stream_info_change
+
+            service = StreamInfoService(db)
+            info = await service.get_stream_info(user_id, platform)
+            set_cached_stream_info(user_id, platform, info)
+            await broadcast_stream_info_change(user_id, platform, info)
+        except Exception as e:
+            self.logger.warning(f"[STREAM_INFO] Broadcast failed for {platform}: {e}")
+
     async def _handle_game(self, ctx, bot, args, platform, db):
         """Handler для !game (Twitch)"""
         try:
@@ -63,6 +76,8 @@ class StreamInfoHandlerMixin:
             results = []
             if success_twitch:
                 results.append("Twitch")
+                await self._broadcast_stream_info_update(user.id, "twitch", db)
+                await self._broadcast_stream_info_update(user.id, "twitch", db)
 
             # Если включено объединение категорий И есть VK канал - обновляем и VK
             if combine_categories and user.vk_username:
@@ -82,6 +97,8 @@ class StreamInfoHandlerMixin:
                         success_vk = await vk_platform.update_stream_category(user.id, vk_categories[0].get('id'))
                         if success_vk:
                             results.append("VK Live")
+                            await self._broadcast_stream_info_update(user.id, "vk", db)
+                            await self._broadcast_stream_info_update(user.id, "vk", db)
                 except Exception as e:
                     self.logger.error(f"Error updating VK category: {e}")
 
@@ -149,6 +166,8 @@ class StreamInfoHandlerMixin:
             results = []
             if success_vk:
                 results.append("VK Live")
+                await self._broadcast_stream_info_update(user.id, "vk", db)
+                await self._broadcast_stream_info_update(user.id, "vk", db)
 
             # Если включено объединение категорий И есть Twitch канал - обновляем и Twitch
             if combine_categories and user.twitch_username:
@@ -170,6 +189,7 @@ class StreamInfoHandlerMixin:
                         success_twitch = await twitch_platform.update_stream_category(user.id, games[0].get('id'))
                         if success_twitch:
                             results.append("Twitch")
+                            await self._broadcast_stream_info_update(user.id, "twitch", db)
                 except Exception as e:
                     self.logger.error(f"Error updating Twitch category: {e}")
 
@@ -286,6 +306,7 @@ class StreamInfoHandlerMixin:
                     success_twitch = await twitch_platform.update_stream_title(user.id, args)
                     if success_twitch:
                         results.append("Twitch")
+                        await self._broadcast_stream_info_update(user.id, "twitch", db)
                 except Exception as e:
                     self.logger.error(f"Error updating Twitch title: {e}")
 

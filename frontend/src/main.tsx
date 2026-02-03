@@ -13,6 +13,7 @@ import './styles/toast-overrides.css'
 
 // Lazy load non-critical providers для ускорения начальной загрузки
 import { ToastProvider } from '@/shared/components/ui/toast'
+
 import { AudioPriorityProvider } from './context/AudioPriorityContext'
 import { AuthProvider } from './context/AuthContext'
 import { ChatProvider } from './context/ChatContext'

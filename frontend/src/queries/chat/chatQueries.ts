@@ -40,6 +40,7 @@ export const useBotStatus = (options?: Omit<UseQueryOptions<ApiResponse, AxiosEr
     staleTime: 10 * 1000, // 10 секунд
     gcTime: 2 * 60 * 1000, // 2 минуты
     refetchInterval: 30 * 1000, // 30 секунд
+    refetchIntervalInBackground: false,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     retry: 1,

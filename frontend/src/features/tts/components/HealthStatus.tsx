@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 
 import { RefreshCw } from 'lucide-react';
+import { useInterval } from 'react-use';
 
 import { Button } from '@/shared/components/ui/button';
-import { useInterval } from '@/shared/hooks/useInterval';
 
 interface HealthStatusProps {
     isHealthy: boolean;

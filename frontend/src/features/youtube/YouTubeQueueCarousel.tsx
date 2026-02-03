@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from 'react';
+
 import { ChevronDown, ChevronUp, Clock, GripVertical, History, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 import {
   useAddYoutubeVideo,
   useClearYoutubeQueue,
@@ -8,15 +11,14 @@ import {
   useSkipYoutubeVideo,
   useYoutubeQueue
 } from '@/queries/youtube/youtubeQueries';
+import { Button } from '@/shared/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
-import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
-import { cn } from '@/lib/utils';
 
 interface YouTubeVideo {
   id: string | number;
@@ -72,7 +74,8 @@ const YouTubeQueueCarousel: React.FC = () => {
   const [visibleItems, setVisibleItems] = useState(ITEMS_PER_PAGE);
 
   const { data: queueResponse, isLoading: loading } = useYoutubeQueue({
-    refetchInterval: 30 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchIntervalInBackground: false,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });

@@ -1,5 +1,6 @@
 ﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
+import { STORAGE_KEYS } from '@/constants';
 import { logger } from '@/shared/utils/prodLogger';
 
 import { useAudioPriority } from './AudioPriorityContext';
@@ -30,15 +31,23 @@ interface TtsPlayerProviderProps {
     children: ReactNode;
 }
 
+const getStoredListeningMode = (): 'website' | 'obs' => {
+    if (typeof window === 'undefined') return 'website';
+    const stored = window.localStorage.getItem(STORAGE_KEYS.TTS_LISTENING_MODE);
+    return stored === 'obs' ? 'obs' : 'website';
+};
+
 export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }) => {
     const [queue, setQueue] = useState<TtsQueueItem[]>([]);
     const [currentItem, setCurrentItem] = useState<TtsQueueItem | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [listeningMode, setListeningMode] = useState<'website' | 'obs'>(getStoredListeningMode);
 
     const audioContext = useRef<AudioContext | null>(null);
     const currentSource = useRef<AudioBufferSourceNode | null>(null);
     const audioElement = useRef<HTMLAudioElement | null>(null);
     const queueRef = useRef<TtsQueueItem[]>([]);
+    const listeningModeRef = useRef<'website' | 'obs'>(listeningMode);
     const retryCount = useRef<number>(0);
     const MAX_RETRIES = 3;
     const { requestAudioFocus, releaseAudioFocus } = useAudioPriority();
@@ -49,10 +58,37 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         queueRef.current = queue;
     }, [queue]);
 
+    useEffect(() => {
+        listeningModeRef.current = listeningMode;
+    }, [listeningMode]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        const handleListeningModeChange = (event: CustomEvent<{ mode?: string }>) => {
+            const mode = event.detail?.mode === 'obs' ? 'obs' : 'website';
+            setListeningMode(mode);
+        };
+
+        const handleStorageChange = (event: StorageEvent) => {
+            if (event.key !== STORAGE_KEYS.TTS_LISTENING_MODE) return;
+            const mode = event.newValue === 'obs' ? 'obs' : 'website';
+            setListeningMode(mode);
+        };
+
+        window.addEventListener('tts-listening-mode-changed', handleListeningModeChange as EventListener);
+        window.addEventListener('storage', handleStorageChange);
+
+        return () => {
+            window.removeEventListener('tts-listening-mode-changed', handleListeningModeChange as EventListener);
+            window.removeEventListener('storage', handleStorageChange);
+        };
+    }, []);
+
     // Initialize AudioContext ONLY after user is authenticated
     useEffect(() => {
         // Don't initialize audio context until user is authenticated
-        if (!isAuthenticated) {
+        if (!isAuthenticated || listeningMode !== 'website') {
             return;
         }
 
@@ -85,9 +121,17 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 audioContext.current.close();
             }
         };
-    }, [isAuthenticated]);
+    }, [isAuthenticated, listeningMode]);
 
     const playNext = useCallback(async () => {
+        if (listeningModeRef.current !== 'website') {
+            setQueue([]);
+            setCurrentItem(null);
+            setIsPlaying(false);
+            releaseAudioFocus('tts');
+            return;
+        }
+
         const currentQueue = queueRef.current;
 
         if (currentQueue.length === 0) {
@@ -124,6 +168,13 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
 
+                if (listeningModeRef.current !== 'website') {
+                    releaseAudioFocus('tts');
+                    setIsPlaying(false);
+                    setCurrentItem(null);
+                    return;
+                }
+
                 const source = audioContext.current.createBufferSource();
                 const gainNode = audioContext.current.createGain();
 
@@ -157,6 +208,13 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             logger.warn('[TTS Player] Web Audio API failed, falling back to Audio element:', errorMessage);
 
             // Fallback to HTML Audio element
+            if (listeningModeRef.current !== 'website') {
+                releaseAudioFocus('tts');
+                setIsPlaying(false);
+                setCurrentItem(null);
+                return;
+            }
+
             const audio = new Audio(nextItem.audioUrl);
             audio.volume = nextItem.volume / 100;
 
@@ -220,25 +278,6 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         }
     }, [requestAudioFocus, releaseAudioFocus]);
 
-    // Auto-play when queue has items and nothing is playing
-    useEffect(() => {
-        if (queue.length > 0 && !isPlaying && !currentItem) {
-            playNext();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [queue.length, isPlaying, currentItem]);
-
-    const addToQueue = useCallback((item: Omit<TtsQueueItem, 'id' | 'timestamp'>) => {
-        const newItem: TtsQueueItem = {
-            ...item,
-            id: `${Date.now()}-${Math.random()}`,
-            timestamp: new Date()
-        };
-
-        setQueue(prev => [...prev, newItem]);
-        logger.debug(`[LOG] [TTS Player] Added to queue: ${newItem.text.substring(0, 50)}...`);
-    }, []);
-
     const clearQueue = useCallback(() => {
         // Stop current playback
         if (currentSource.current) {
@@ -256,6 +295,36 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         releaseAudioFocus('tts');
         logger.info('[DELETE] [TTS Player] Queue cleared');
     }, [releaseAudioFocus]);
+
+    // Auto-play when queue has items and nothing is playing
+    useEffect(() => {
+        if (queue.length > 0 && !isPlaying && !currentItem) {
+            playNext();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [queue.length, isPlaying, currentItem]);
+
+    useEffect(() => {
+        if (listeningMode !== 'website') {
+            clearQueue();
+        }
+    }, [listeningMode, clearQueue]);
+
+    const addToQueue = useCallback((item: Omit<TtsQueueItem, 'id' | 'timestamp'>) => {
+        if (listeningModeRef.current !== 'website') {
+            logger.debug('[TTS Player] Skipping queue item (listening mode is OBS)');
+            return;
+        }
+
+        const newItem: TtsQueueItem = {
+            ...item,
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp: new Date()
+        };
+
+        setQueue(prev => [...prev, newItem]);
+        logger.debug(`[LOG] [TTS Player] Added to queue: ${newItem.text.substring(0, 50)}...`);
+    }, []);
 
     const skipCurrent = useCallback(() => {
         // Stop current playback

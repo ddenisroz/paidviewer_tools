@@ -1,8 +1,11 @@
 ﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef } from 'react';
 
 
+import { useInterval } from 'react-use';
+import { useLocation } from 'react-router-dom';
+
 import { useSkipYoutubeVideo, useYoutubeQueue } from '@/queries/youtube/youtubeQueries';
-import { useInterval } from '@/shared/hooks/useInterval';
+import { youtubeService } from '@/services/api/services/youtubeService';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
@@ -22,6 +25,7 @@ interface YouTubePlayer {
     pauseVideo: () => void;
     playVideo: () => void;
     setVolume: (volume: number) => void;
+    getVolume?: () => number;
     mute: () => void;
     unMute: () => void;
     getCurrentTime: () => number;
@@ -34,13 +38,16 @@ interface YouTubePlayer {
 interface PlayerState {
     currentVideo: YoutubeVideo | null;
     isPlaying: boolean;
+    userPaused: boolean;
     volume: number;
     isMuted: boolean;
     isVisible: boolean;
+    isMinimized: boolean;
     isTheaterMode: boolean;
     currentTime: number;
     duration: number;
     queue: YoutubeVideo[];
+    skipVotes: { current: number; required: number; video_id?: number | string | null } | null;
     playerRef: YouTubePlayer | null;
     isLoading: boolean;
     error: string | null;
@@ -53,6 +60,7 @@ type PlayerAction =
     | { type: 'SET_ERROR'; payload: string | null }
     | { type: 'SET_CURRENT_VIDEO'; payload: YoutubeVideo | null }
     | { type: 'SET_PLAYING'; payload: boolean }
+    | { type: 'SET_USER_PAUSED'; payload: boolean }
     | { type: 'SET_VOLUME'; payload: number }
     | { type: 'SET_MUTED'; payload: boolean }
     | { type: 'SET_VISIBLE'; payload: boolean }
@@ -61,21 +69,34 @@ type PlayerAction =
     | { type: 'SET_DURATION'; payload: number }
     | { type: 'SET_QUEUE'; payload: YoutubeVideo[] }
     | { type: 'SET_PLAYER_REF'; payload: YouTubePlayer | null }
-    | { type: 'LOAD_QUEUE'; payload: { queue: YoutubeVideo[]; current_video: YoutubeVideo | null; is_playing?: boolean } }
+    | {
+        type: 'LOAD_QUEUE';
+        payload: {
+            queue: YoutubeVideo[];
+            current_video: YoutubeVideo | null;
+            is_playing?: boolean;
+            skip_votes?: { current: number; required: number; video_id?: number | string | null } | null;
+        };
+    }
     | { type: 'NEXT_VIDEO'; payload: { current_video: YoutubeVideo | null } }
     | { type: 'TOGGLE_PLAY_PAUSE' }
-    | { type: 'CLOSE_PLAYER' };
+    | { type: 'CLOSE_PLAYER' }
+    | { type: 'MINIMIZE_PLAYER' }
+    | { type: 'MAXIMIZE_PLAYER' };
 
 const initialState: PlayerState = {
     currentVideo: null,
     isPlaying: false,
+    userPaused: false,
     volume: 100,
     isMuted: false,
     isVisible: false,
+    isMinimized: false,
     isTheaterMode: false,
     currentTime: 0,
     duration: 0,
     queue: [],
+    skipVotes: null,
     playerRef: null,
     isLoading: false,
     error: null
@@ -96,6 +117,8 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             };
         case 'SET_PLAYING':
             return { ...state, isPlaying: action.payload };
+        case 'SET_USER_PAUSED':
+            return { ...state, userPaused: action.payload };
         case 'SET_VOLUME':
             return { ...state, volume: action.payload, isMuted: action.payload === 0 };
         case 'SET_MUTED':
@@ -117,13 +140,15 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             const currentVideo = action.payload.current_video || queue[0] || null;
             const hasQueue = queue.length > 0 || !!currentVideo;
             const rawIsPlaying = (action.payload as { is_playing?: boolean }).is_playing ?? false;
-            const userInitiated = window.ytUserStarted === true;
-            const isPlaying = rawIsPlaying && userInitiated;
+            const userStarted = typeof window !== 'undefined' && window.ytUserStarted;
+            const isPlaying = state.userPaused ? false : (state.isPlaying || (Boolean(rawIsPlaying) && userStarted));
+            const skipVotes = action.payload.skip_votes ?? null;
             return {
                 ...state,
                 queue,
                 currentVideo,
                 isPlaying,
+                skipVotes,
                 isVisible: hasQueue,
                 isLoading: false,
                 error: null
@@ -133,6 +158,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             return {
                 ...state,
                 currentVideo: action.payload.current_video,
+                userPaused: false,
                 isPlaying: true,
                 isVisible: true
             };
@@ -146,7 +172,19 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             return {
                 ...state,
                 isVisible: false,
+                isPlaying: false,
+                isMinimized: false
+            };
+        case 'MINIMIZE_PLAYER':
+            return {
+                ...state,
+                isMinimized: true,
                 isPlaying: false
+            };
+        case 'MAXIMIZE_PLAYER':
+            return {
+                ...state,
+                isMinimized: false
             };
         default:
             return state;
@@ -166,6 +204,8 @@ interface PlayerContextValue extends PlayerState {
     handlePlayerStateChange: (event: unknown) => void;
     handlePlayerError: (event: unknown) => void;
     closePlayer: () => void;
+    minimizePlayer: () => void;
+    maximizePlayer: () => void;
     updateTime: () => void;
     setIsTheaterMode: (value: boolean) => void;
     // Legacy portal support (deprecated)
@@ -182,14 +222,60 @@ interface PlayerProviderProps {
 export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [state, dispatch] = useReducer(playerReducer, initialState);
     const lastUpdateTimeRef = useRef<number>(0);
+    const volumeSaveTimeoutRef = useRef<number | null>(null);
+    const lastSavedVolumeRef = useRef<number | null>(null);
     const playerSourceRef = useRef<PlayerSource | null>(null);
     const [playerContainerRef, setPlayerContainer] = React.useState<HTMLDivElement | null>(null);
     const { isAuthenticated } = useAuth();
-    const { lastJsonMessage } = useChat();
+    const { lastJsonMessage, isConnected: isChatConnected } = useChat();
+    const location = useLocation();
+
+    const currentPath = location.pathname;
+    const searchParams = new URLSearchParams(location.search);
+    const activeTab = searchParams.get('tab');
+    const isMediaYoutubeTab = currentPath.startsWith('/dashboard/media') && (!activeTab || activeTab === 'youtube');
+    const isOnYoutubePage = currentPath.startsWith('/dashboard/youtube') || isMediaYoutubeTab;
+    const shouldPollQueue = isOnYoutubePage || state.isPlaying;
+    const queueRefetchInterval = shouldPollQueue
+        ? (isChatConnected ? 30000 : 15000)
+        : (state.isVisible ? 60000 : 120000);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const storedVolume = window.localStorage.getItem('yt_volume');
+        if (storedVolume === null) {
+            return;
+        }
+        const parsedVolume = Number(storedVolume);
+        if (Number.isNaN(parsedVolume)) {
+            return;
+        }
+        const clamped = Math.max(0, Math.min(100, Math.round(parsedVolume)));
+        dispatch({ type: 'SET_VOLUME', payload: clamped });
+    }, []);
+
+    useEffect(() => {
+        if (!state.playerRef) {
+            return;
+        }
+        try {
+            state.playerRef.setVolume(state.volume);
+            if (state.volume === 0) {
+                state.playerRef.mute();
+            } else {
+                state.playerRef.unMute();
+            }
+        } catch (error) {
+            logger.debug('[YouTube] Failed to sync player volume', error);
+        }
+    }, [state.playerRef, state.volume]);
 
     const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: _queueError } = useYoutubeQueue({
         enabled: !!isAuthenticated,
-        refetchInterval: 5000,
+        refetchInterval: queueRefetchInterval,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
@@ -208,16 +294,19 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             const response = queueData as { data?: YoutubeQueue } | YoutubeQueue;
             const queue = 'data' in response && response.data ? response.data : (response as YoutubeQueue);
             const rawIsPlaying = queue.is_playing ?? false;
-            const userInitiated = window.ytUserStarted === true;
-            const nextIsPlaying = state.isPlaying || (rawIsPlaying && userInitiated);
             const normalizedQueue = (queue.queue || []).map(normalizeVideo).filter(Boolean) as YoutubeVideo[];
             const normalizedCurrent = normalizeVideo(queue.current_video) || normalizedQueue[0] || null;
+            const skipVotes = (queue as YoutubeQueue & { skip_votes?: PlayerState['skipVotes'] }).skip_votes ?? null;
+            const hasVideo = Boolean(normalizedCurrent || normalizedQueue.length > 0);
+            const userStarted = typeof window !== 'undefined' && window.ytUserStarted;
+            const nextIsPlaying = hasVideo ? (state.isPlaying || (rawIsPlaying && userStarted)) : false;
             dispatch({
                 type: 'LOAD_QUEUE',
                 payload: {
                     queue: normalizedQueue,
                     current_video: normalizedCurrent,
-                    is_playing: nextIsPlaying
+                    is_playing: nextIsPlaying,
+                    skip_votes: skipVotes
                 }
             });
             dispatch({ type: 'SET_LOADING', payload: false });
@@ -282,20 +371,24 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     }, [isAuthenticated, skipVideoMutation]);
 
     const togglePlayPause = (): void => {
-        if (state.playerRef) {
-            try {
+        const nextIsPlaying = !state.isPlaying;
+        if (nextIsPlaying) {
+            window.ytUserStarted = true;
+        }
+        dispatch({ type: 'SET_USER_PAUSED', payload: !nextIsPlaying });
+        try {
+            if (state.playerRef) {
                 if (state.isPlaying) {
                     state.playerRef.pauseVideo();
                 } else {
                     state.playerRef.playVideo();
-                    window.ytUserStarted = true;
                 }
-                dispatch({ type: 'TOGGLE_PLAY_PAUSE' });
-                logger.debug('Play/pause toggled');
-            } catch (error) {
-                logger.warn('Error toggling play/pause:', error);
             }
+        } catch (error) {
+            logger.warn('Error toggling play/pause:', error);
         }
+        dispatch({ type: 'TOGGLE_PLAY_PAUSE' });
+        logger.debug('Play/pause toggled');
     };
 
     const setVolume = (volume: number): void => {
@@ -333,6 +426,39 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             }
         }
     };
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        if (lastSavedVolumeRef.current === null) {
+            lastSavedVolumeRef.current = state.volume;
+            return;
+        }
+        if (state.volume === lastSavedVolumeRef.current) {
+            return;
+        }
+        if (volumeSaveTimeoutRef.current) {
+            window.clearTimeout(volumeSaveTimeoutRef.current);
+        }
+        volumeSaveTimeoutRef.current = window.setTimeout(async () => {
+            try {
+                window.localStorage.setItem('yt_volume', String(state.volume));
+                if (isAuthenticated) {
+                    await youtubeService.saveSettings({ volume_level: state.volume });
+                }
+                lastSavedVolumeRef.current = state.volume;
+            } catch (error) {
+                logger.debug('[YouTube] Failed to persist volume setting', error);
+            }
+        }, 500);
+
+        return () => {
+            if (volumeSaveTimeoutRef.current) {
+                window.clearTimeout(volumeSaveTimeoutRef.current);
+            }
+        };
+    }, [state.volume, isAuthenticated]);
 
     const setPlayerRef = (ref: YouTubePlayer | null, source: PlayerSource = 'global'): void => {
         const currentRef = state.playerRef;
@@ -384,11 +510,17 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 if (Math.abs(time - lastUpdateTimeRef.current) > 1) {
                     lastUpdateTimeRef.current = time;
                 }
+
+                const playerVolume = state.playerRef.getVolume?.();
+                if (typeof playerVolume === 'number' && Math.abs(playerVolume - state.volume) > 1) {
+                    const clampedVolume = Math.max(0, Math.min(100, Math.round(playerVolume)));
+                    dispatch({ type: 'SET_VOLUME', payload: clampedVolume });
+                }
             } catch {
                 // Игнорируем ошибки
             }
         }
-    }, [state.playerRef]);
+    }, [state.playerRef, state.volume]);
 
     const handlePlayerReady = (event: unknown): void => {
         const playerEvent = event as { target: YouTubePlayer };
@@ -406,7 +538,19 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         const player = playerEvent.target;
 
         if (playerState === 1) {
+            if (!window.ytUserStarted) {
+                try {
+                    player.pauseVideo();
+                } catch {
+                    // Игнорируем
+                }
+                dispatch({ type: 'SET_PLAYING', payload: false });
+                dispatch({ type: 'SET_USER_PAUSED', payload: true });
+                logger.debug('[YOUTUBE] Autoplay blocked until user starts playback');
+                return;
+            }
             dispatch({ type: 'SET_PLAYING', payload: true });
+            dispatch({ type: 'SET_USER_PAUSED', payload: false });
             dispatch({ type: 'SET_VISIBLE', payload: true });
             window.ytUserStarted = true;
             logger.debug('▶ [YOUTUBE] Playing, mini-player visible');
@@ -447,7 +591,20 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             state.playerRef.pauseVideo();
         }
         window.ytUserStarted = false;
+        dispatch({ type: 'SET_USER_PAUSED', payload: true });
         dispatch({ type: 'CLOSE_PLAYER' });
+    };
+
+    const minimizePlayer = (): void => {
+        if (state.playerRef) {
+            state.playerRef.pauseVideo();
+        }
+        dispatch({ type: 'SET_USER_PAUSED', payload: true });
+        dispatch({ type: 'MINIMIZE_PLAYER' });
+    };
+
+    const maximizePlayer = (): void => {
+        dispatch({ type: 'MAXIMIZE_PLAYER' });
     };
 
     useInterval(() => {
@@ -465,7 +622,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     }, [isAuthenticated, loadQueue]);
 
     useEffect(() => {
-        if (lastJsonMessage && (lastJsonMessage as { type?: string }).type === 'youtube_queue_update') {
+        const messageType = (lastJsonMessage as { type?: string } | null)?.type;
+        if (messageType === 'youtube_queue_update' || messageType === 'youtube_queue_updated') {
             logger.debug('[YouTube] Queue updated via WebSocket, reloading...');
             loadQueue(true);
         }
@@ -566,6 +724,8 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         handlePlayerStateChange,
         handlePlayerError,
         closePlayer,
+        minimizePlayer,
+        maximizePlayer,
         updateTime,
         setIsTheaterMode,
         playerContainerRef,

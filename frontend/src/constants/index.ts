@@ -91,6 +91,7 @@ export const WS_EVENTS = {
 export const STORAGE_KEYS = {
   USER_MODE: 'userMode',
   TTS_HEALTH_STATUS: 'tts_health_status',
+  TTS_LISTENING_MODE: 'tts_listening_mode',
   THEME: 'theme',
   LANGUAGE: 'language',
 } as const;

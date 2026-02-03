@@ -1,18 +1,17 @@
-# Docs
+# Docs Index
 
-**[QUICKSTART.md](./QUICKSTART.md)** — start here  
-**[FEATURES.md](./FEATURES.md)** — what it does  
-**[DEVELOPER.md](./DEVELOPER.md)** — dev setup  
-**[ARCHITECTURE.md](./ARCHITECTURE.md)** — how it works
+Start here:
+- `QUICKSTART.md` - local setup and first run
+- `FEATURES.md` - what the platform supports
+- `DEVELOPER.md` - dev setup and rules
+- `ARCHITECTURE.md` - system overview
 
----
+Detailed references:
+- `api/` - API docs
+- `setup/` - deployment guides
+- `architecture/` - deep dives (auth, caching, TTS, shared WS)
+- `features/` - feature-specific notes
+- `guides/` - troubleshooting and how-tos
 
-**Detailed:**
-- `api/` — API reference
-- `setup/` — deployment
-- `features/` — deep dives
-- `guides/` — troubleshooting
-
----
-
-[CHANGELOG.md](./CHANGELOG.md)
+History:
+- `CHANGELOG.md`

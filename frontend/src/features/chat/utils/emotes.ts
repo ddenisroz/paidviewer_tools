@@ -61,8 +61,8 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
 
 function proxy7tvUrl(url: string | undefined): string | undefined {
   try {
-    if (!url || url.startsWith('/api/proxy/')) {
-      return url;
+    if (!url || url.includes('/api/proxy/7tv/')) {
+        return url;
     }
     const urlObj = new URL(url);
     const proxyPath = `${urlObj.host}${urlObj.pathname}${urlObj.search}`;
@@ -166,7 +166,8 @@ async function getChannelEmotesByUsername(channelName: string): Promise<EmoteMap
 export async function getChannelEmotes(channelName: string, twitchUserId?: string | null): Promise<EmoteMap> {
   try {
     const normalizedChannel = (channelName || '').trim().toLowerCase();
-    if (!normalizedChannel || normalizedChannel.includes(' ')) {
+    const canUseChannelName = !!normalizedChannel && !normalizedChannel.includes(' ');
+    if (!twitchUserId && !canUseChannelName) {
       return new Map();
     }
     const cacheKey = twitchUserId ? `twitch:${twitchUserId}` : normalizedChannel;
@@ -180,6 +181,10 @@ export async function getChannelEmotes(channelName: string, twitchUserId?: strin
         emotesCache.set(cacheKey, emotesById);
         return emotesById;
       }
+    }
+
+    if (!canUseChannelName) {
+      return new Map();
     }
 
     logger.debug(`[DEBUG] [7TV] Fetching emotes for Twitch user: ${normalizedChannel}`);
@@ -267,7 +272,7 @@ export function processEmotes(message: string, channelEmotes: EmoteMap = new Map
     return message;
   }
 
-  const emoteRegex = new RegExp(`(^|\s)(:)?(${emoteNames})(:)?(?=\s|$|[.,!?])`, 'gi');
+  const emoteRegex = new RegExp(`(^|\\s)(:)?(${emoteNames})(:)?(?=\\s|$|[.,!?])`, 'gi');
 
   return message.replace(emoteRegex, (match, leading, _open, name) => {
     const rawName = String(name);

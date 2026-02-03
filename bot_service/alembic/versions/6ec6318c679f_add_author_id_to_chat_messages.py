@@ -1,33 +1,32 @@
-[OK]"[OK]"[OK]"[OK]a[OK]d[OK]d[OK]_[OK]a[OK]u[OK]t[OK]h[OK]o[OK]r[OK]_[OK]i[OK]d[OK]_[OK]t[OK]o[OK]_[OK]c[OK]h[OK]a[OK]t[OK]_[OK]m[OK]e[OK]s[OK]s[OK]a[OK]g[OK]e[OK]s[OK]
-[OK]
-[OK]R[OK]e[OK]v[OK]i[OK]s[OK]i[OK]o[OK]n[OK] [OK]I[OK]D[OK]:[OK] [OK]6[OK]e[OK]c[OK]6[OK]3[OK]1[OK]8[OK]c[OK]6[OK]7[OK]9[OK]f[OK]
-[OK]R[OK]e[OK]v[OK]i[OK]s[OK]e[OK]s[OK]:[OK] [OK]0[OK]2[OK]4[OK]6[OK]9[OK]7[OK]d[OK]a[OK]5[OK]4[OK]a[OK]b[OK]
-[OK]C[OK]r[OK]e[OK]a[OK]t[OK]e[OK] [OK]D[OK]a[OK]t[OK]e[OK]:[OK] [OK]2[OK]0[OK]2[OK]6[OK]-[OK]0[OK]1[OK]-[OK]2[OK]3[OK] [OK]1[OK]2[OK]:[OK]4[OK]9[OK]:[OK]1[OK]7[OK].[OK]9[OK]9[OK]0[OK]7[OK]4[OK]9[OK]
-[OK]
-[OK]"[OK]"[OK]"[OK]
-[OK]f[OK]r[OK]o[OK]m[OK] [OK]t[OK]y[OK]p[OK]i[OK]n[OK]g[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]S[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]e[OK],[OK] [OK]U[OK]n[OK]i[OK]o[OK]n[OK]
-[OK]
-[OK]f[OK]r[OK]o[OK]m[OK] [OK]a[OK]l[OK]e[OK]m[OK]b[OK]i[OK]c[OK] [OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]o[OK]p[OK]
-[OK]i[OK]m[OK]p[OK]o[OK]r[OK]t[OK] [OK]s[OK]q[OK]l[OK]a[OK]l[OK]c[OK]h[OK]e[OK]m[OK]y[OK] [OK]a[OK]s[OK] [OK]s[OK]a[OK]
-[OK]
-[OK]
-[OK]#[OK] [OK]r[OK]e[OK]v[OK]i[OK]s[OK]i[OK]o[OK]n[OK] [OK]i[OK]d[OK]e[OK]n[OK]t[OK]i[OK]f[OK]i[OK]e[OK]r[OK]s[OK],[OK] [OK]u[OK]s[OK]e[OK]d[OK] [OK]b[OK]y[OK] [OK]A[OK]l[OK]e[OK]m[OK]b[OK]i[OK]c[OK].[OK]
-[OK]r[OK]e[OK]v[OK]i[OK]s[OK]i[OK]o[OK]n[OK]:[OK] [OK]s[OK]t[OK]r[OK] [OK]=[OK] [OK]'[OK]6[OK]e[OK]c[OK]6[OK]3[OK]1[OK]8[OK]c[OK]6[OK]7[OK]9[OK]f[OK]'[OK]
-[OK]d[OK]o[OK]w[OK]n[OK]_[OK]r[OK]e[OK]v[OK]i[OK]s[OK]i[OK]o[OK]n[OK]:[OK] [OK]U[OK]n[OK]i[OK]o[OK]n[OK][[OK]s[OK]t[OK]r[OK],[OK] [OK]N[OK]o[OK]n[OK]e[OK]][OK] [OK]=[OK] [OK]'[OK]0[OK]2[OK]4[OK]6[OK]9[OK]7[OK]d[OK]a[OK]5[OK]4[OK]a[OK]b[OK]'[OK]
-[OK]b[OK]r[OK]a[OK]n[OK]c[OK]h[OK]_[OK]l[OK]a[OK]b[OK]e[OK]l[OK]s[OK]:[OK] [OK]U[OK]n[OK]i[OK]o[OK]n[OK][[OK]s[OK]t[OK]r[OK],[OK] [OK]S[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]e[OK][[OK]s[OK]t[OK]r[OK]][OK],[OK] [OK]N[OK]o[OK]n[OK]e[OK]][OK] [OK]=[OK] [OK]N[OK]o[OK]n[OK]e[OK]
-[OK]d[OK]e[OK]p[OK]e[OK]n[OK]d[OK]s[OK]_[OK]o[OK]n[OK]:[OK] [OK]U[OK]n[OK]i[OK]o[OK]n[OK][[OK]s[OK]t[OK]r[OK],[OK] [OK]S[OK]e[OK]q[OK]u[OK]e[OK]n[OK]c[OK]e[OK][[OK]s[OK]t[OK]r[OK]][OK],[OK] [OK]N[OK]o[OK]n[OK]e[OK]][OK] [OK]=[OK] [OK]N[OK]o[OK]n[OK]e[OK]
-[OK]
-[OK]
-[OK]d[OK]e[OK]f[OK] [OK]u[OK]p[OK]g[OK]r[OK]a[OK]d[OK]e[OK]([OK])[OK] [OK]-[OK]>[OK] [OK]N[OK]o[OK]n[OK]e[OK]:[OK]
-[OK] [OK] [OK] [OK] [OK]#[OK] [OK]#[OK]#[OK]#[OK] [OK]c[OK]o[OK]m[OK]m[OK]a[OK]n[OK]d[OK]s[OK] [OK]a[OK]u[OK]t[OK]o[OK] [OK]g[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]e[OK]d[OK] [OK]b[OK]y[OK] [OK]A[OK]l[OK]e[OK]m[OK]b[OK]i[OK]c[OK] [OK]-[OK] [OK]p[OK]l[OK]e[OK]a[OK]s[OK]e[OK] [OK]a[OK]d[OK]j[OK]u[OK]s[OK]t[OK]![OK] [OK]#[OK]#[OK]#[OK]
-[OK] [OK] [OK] [OK] [OK]o[OK]p[OK].[OK]a[OK]d[OK]d[OK]_[OK]c[OK]o[OK]l[OK]u[OK]m[OK]n[OK]([OK]'[OK]c[OK]h[OK]a[OK]t[OK]_[OK]m[OK]e[OK]s[OK]s[OK]a[OK]g[OK]e[OK]s[OK]'[OK],[OK] [OK]s[OK]a[OK].[OK]C[OK]o[OK]l[OK]u[OK]m[OK]n[OK]([OK]'[OK]a[OK]u[OK]t[OK]h[OK]o[OK]r[OK]_[OK]i[OK]d[OK]'[OK],[OK] [OK]s[OK]a[OK].[OK]S[OK]t[OK]r[OK]i[OK]n[OK]g[OK]([OK])[OK],[OK] [OK]n[OK]u[OK]l[OK]l[OK]a[OK]b[OK]l[OK]e[OK]=[OK]T[OK]r[OK]u[OK]e[OK])[OK])[OK]
-[OK] [OK] [OK] [OK] [OK]o[OK]p[OK].[OK]c[OK]r[OK]e[OK]a[OK]t[OK]e[OK]_[OK]i[OK]n[OK]d[OK]e[OK]x[OK]([OK]o[OK]p[OK].[OK]f[OK]([OK]'[OK]i[OK]x[OK]_[OK]c[OK]h[OK]a[OK]t[OK]_[OK]m[OK]e[OK]s[OK]s[OK]a[OK]g[OK]e[OK]s[OK]_[OK]a[OK]u[OK]t[OK]h[OK]o[OK]r[OK]_[OK]i[OK]d[OK]'[OK])[OK],[OK] [OK]'[OK]c[OK]h[OK]a[OK]t[OK]_[OK]m[OK]e[OK]s[OK]s[OK]a[OK]g[OK]e[OK]s[OK]'[OK],[OK] [OK][[OK]'[OK]a[OK]u[OK]t[OK]h[OK]o[OK]r[OK]_[OK]i[OK]d[OK]'[OK]][OK],[OK] [OK]u[OK]n[OK]i[OK]q[OK]u[OK]e[OK]=[OK]F[OK]a[OK]l[OK]s[OK]e[OK])[OK]
-[OK] [OK] [OK] [OK] [OK]#[OK] [OK]#[OK]#[OK]#[OK] [OK]e[OK]n[OK]d[OK] [OK]A[OK]l[OK]e[OK]m[OK]b[OK]i[OK]c[OK] [OK]c[OK]o[OK]m[OK]m[OK]a[OK]n[OK]d[OK]s[OK] [OK]#[OK]#[OK]#[OK]
-[OK]
-[OK]
-[OK]d[OK]e[OK]f[OK] [OK]d[OK]o[OK]w[OK]n[OK]g[OK]r[OK]a[OK]d[OK]e[OK]([OK])[OK] [OK]-[OK]>[OK] [OK]N[OK]o[OK]n[OK]e[OK]:[OK]
-[OK] [OK] [OK] [OK] [OK]#[OK] [OK]#[OK]#[OK]#[OK] [OK]c[OK]o[OK]m[OK]m[OK]a[OK]n[OK]d[OK]s[OK] [OK]a[OK]u[OK]t[OK]o[OK] [OK]g[OK]e[OK]n[OK]e[OK]r[OK]a[OK]t[OK]e[OK]d[OK] [OK]b[OK]y[OK] [OK]A[OK]l[OK]e[OK]m[OK]b[OK]i[OK]c[OK] [OK]-[OK] [OK]p[OK]l[OK]e[OK]a[OK]s[OK]e[OK] [OK]a[OK]d[OK]j[OK]u[OK]s[OK]t[OK]![OK] [OK]#[OK]#[OK]#[OK]
-[OK] [OK] [OK] [OK] [OK]o[OK]p[OK].[OK]d[OK]r[OK]o[OK]p[OK]_[OK]i[OK]n[OK]d[OK]e[OK]x[OK]([OK]o[OK]p[OK].[OK]f[OK]([OK]'[OK]i[OK]x[OK]_[OK]c[OK]h[OK]a[OK]t[OK]_[OK]m[OK]e[OK]s[OK]s[OK]a[OK]g[OK]e[OK]s[OK]_[OK]a[OK]u[OK]t[OK]h[OK]o[OK]r[OK]_[OK]i[OK]d[OK]'[OK])[OK],[OK] [OK]t[OK]a[OK]b[OK]l[OK]e[OK]_[OK]n[OK]a[OK]m[OK]e[OK]=[OK]'[OK]c[OK]h[OK]a[OK]t[OK]_[OK]m[OK]e[OK]s[OK]s[OK]a[OK]g[OK]e[OK]s[OK]'[OK])[OK]
-[OK] [OK] [OK] [OK] [OK]o[OK]p[OK].[OK]d[OK]r[OK]o[OK]p[OK]_[OK]c[OK]o[OK]l[OK]u[OK]m[OK]n[OK]([OK]'[OK]c[OK]h[OK]a[OK]t[OK]_[OK]m[OK]e[OK]s[OK]s[OK]a[OK]g[OK]e[OK]s[OK]'[OK],[OK] [OK]'[OK]a[OK]u[OK]t[OK]h[OK]o[OK]r[OK]_[OK]i[OK]d[OK]'[OK])[OK]
-[OK] [OK] [OK] [OK] [OK]#[OK] [OK]#[OK]#[OK]#[OK] [OK]e[OK]n[OK]d[OK] [OK]A[OK]l[OK]e[OK]m[OK]b[OK]i[OK]c[OK] [OK]c[OK]o[OK]m[OK]m[OK]a[OK]n[OK]d[OK]s[OK] [OK]#[OK]#[OK]#[OK]
-[OK]
+"""add_author_id_to_chat_messages
+
+Revision ID: 6ec6318c679f
+Revises: 024697da54ab
+Create Date: 2026-01-23 12:49:17.990749
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '6ec6318c679f'
+down_revision: Union[str, None] = '024697da54ab'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.add_column('chat_messages', sa.Column('author_id', sa.String(), nullable=True))
+    op.create_index(op.f('ix_chat_messages_author_id'), 'chat_messages', ['author_id'], unique=False)
+    # ### end Alembic commands ###
+
+
+def downgrade() -> None:
+    # ### commands auto generated by Alembic - please adjust! ###
+    op.drop_index(op.f('ix_chat_messages_author_id'), table_name='chat_messages')
+    op.drop_column('chat_messages', 'author_id')
+    # ### end Alembic commands ###

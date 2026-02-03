@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional
-import time
 
 from auth.auth import get_current_user, get_current_user_optional
 from core.database import get_db
@@ -13,6 +12,8 @@ from schemas.stream import PlatformUpdate # Helper import if needed, but not use
 
 # Services
 from services.stream_info_service import StreamInfoService
+from utils.websocket_broadcast import broadcast_stream_info_change
+from utils.stream_info_cache import get_cached_stream_info, set_cached_stream_info
 
 import logging
 
@@ -20,27 +21,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["stream-info"])
 
-# Simple in-memory cache for stream info (30 second TTL)
-# Key: (user_id, platform) -> (data, timestamp)
-_stream_info_cache: dict[tuple[int, str], tuple[dict, float]] = {}
-STREAM_INFO_CACHE_TTL = 30  # seconds
-
-def _get_cached_stream_info(user_id: int, platform: str) -> Optional[dict]:
-    """Get cached stream info if not expired"""
-    key = (user_id, platform)
-    if key in _stream_info_cache:
-        data, timestamp = _stream_info_cache[key]
-        if time.time() - timestamp < STREAM_INFO_CACHE_TTL:
-            logger.debug(f"[STREAM_INFO] Cache HIT for user {user_id}, platform {platform}")
-            return data
-        else:
-            del _stream_info_cache[key]
-    return None
-
-def _set_cached_stream_info(user_id: int, platform: str, data: dict) -> None:
-    """Cache stream info with timestamp"""
-    _stream_info_cache[(user_id, platform)] = (data, time.time())
-    logger.debug(f"[STREAM_INFO] Cached data for user {user_id}, platform {platform}")
+# Simple in-memory cache for stream info (60 second TTL)
 
 def get_stream_service(db: Session = Depends(get_db)) -> StreamInfoService:
     return StreamInfoService(db)
@@ -69,14 +50,14 @@ async def get_twitch_stream_info(
         session_id = user.get("session_id")
         
         # Check cache first
-        cached = _get_cached_stream_info(user_id, "twitch")
+        cached = get_cached_stream_info(user_id, "twitch")
         if cached:
             return JSONResponse(content={"data": cached})
         
         info = await service.get_stream_info(user_id, "twitch", session_id)
         
         # Cache result
-        _set_cached_stream_info(user_id, "twitch", info)
+        set_cached_stream_info(user_id, "twitch", info)
         
         return JSONResponse(content={"data": info})
     except Exception as e:
@@ -88,18 +69,23 @@ async def get_vk_stream_info(
     user: dict = Depends(get_current_user),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Получить информацию о VK Live стриме"""
+    """???????? ?????????? ? VK Live ??????"""
     try:
         user_id = user.get("id")
         session_id = user.get("session_id")
-        
+
+        cached = get_cached_stream_info(user_id, "vk")
+        if cached:
+            return JSONResponse(content={"data": cached})
+
         info = await service.get_stream_info(user_id, "vk", session_id)
-        
+        set_cached_stream_info(user_id, "vk", info)
+
         # Adaptation for VK specific response format if needed
         # Service returns unified dict. Frontend might expect 'description' for VK?
         # StreamInfoService doesn't explicitly fetch description unless platform returns it.
         # But VK platform get_stream_info usually includes everything.
-        
+
         return JSONResponse(content={"data": info})
     except Exception as e:
         logger.error(f"Error getting VK stream info: {e}")
@@ -117,8 +103,17 @@ async def update_stream(
     
     try:
         user_id = user.get("id")
+        session_id = user.get("session_id")
         results = []
         failures = []
+
+        async def _broadcast_stream_info(platform_name: str) -> None:
+            try:
+                info = await service.get_stream_info(user_id, platform_name, session_id)
+                set_cached_stream_info(user_id, platform_name, info)
+                await broadcast_stream_info_change(user_id, platform_name, info)
+            except Exception as broadcast_error:
+                logger.warning(f"[STREAM_INFO] Broadcast failed for {platform_name}: {broadcast_error}")
 
         # Update Twitch
         if request.twitch:
@@ -129,6 +124,7 @@ async def update_stream(
                 success = await service.update_stream(user_id, "twitch", title, category_id)
                 if success:
                     results.append("Twitch updated")
+                    await _broadcast_stream_info("twitch")
                 else:
                     failures.append("Twitch")
                     logger.error(f"Failed to update Twitch for user {user_id}")
@@ -152,6 +148,7 @@ async def update_stream(
                 success = await service.update_stream(user_id, "vk", title, category_id)
                 if success:
                     results.append("VK updated")
+                    await _broadcast_stream_info("vk")
                 else:
                     failures.append("VK")
                     logger.error(f"Failed to update VK for user {user_id}")
@@ -204,9 +201,16 @@ async def update_platform_stream(
 ):
     """Generic endpoint to update stream info for any platform"""
     user_id = user.get("id")
+    session_id = user.get("session_id")
     success = await service.update_stream(user_id, platform_name, title, category_id)
     
     if success:
+        try:
+            info = await service.get_stream_info(user_id, platform_name, session_id)
+            set_cached_stream_info(user_id, platform_name, info)
+            await broadcast_stream_info_change(user_id, platform_name, info)
+        except Exception as broadcast_error:
+            logger.warning(f"[STREAM_INFO] Broadcast failed for {platform_name}: {broadcast_error}")
         return JSONResponse(content={"success": True, "message": f"{platform_name} updated"})
     else:
         return JSONResponse(content={"success": False, "error": f"Failed to update {platform_name}"}, status_code=400)

@@ -1,28 +1,29 @@
 ﻿// src/pages/HomePage.tsx
+// touched to force rebuild
 import React, { useEffect, useMemo } from 'react';
 
+import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Check, MessageCircle, Settings, Settings2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 import { useAuth } from '@/context/AuthContext';
+import { useData } from '@/context/DataContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
+import { useUserSettings } from '@/context/UserSettingsContext';
 import ChatCard from '@/features/chat/components/ChatCard';
 import QuickActionsBar from '@/features/home/components/QuickActionsBar';
+import WidgetWrapper from '@/features/home/components/WidgetWrapper';
 import StreamManagementCards from '@/features/stream/components/StreamManagementCards';
 import StreamStatus from '@/features/stream/components/StreamStatus';
+import { cn } from '@/lib/utils';
 import { useTwitchStreamInfo, useVkStreamInfo } from '@/queries/stream/streamQueries';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { logger } from '@/shared/utils/prodLogger';
-import { getAndClearReturnUrl } from '@/utils/urlUtils';
 import { useLayoutStore } from '@/store/useLayoutStore';
-import WidgetWrapper from '@/features/home/components/WidgetWrapper';
-import { cn } from '@/lib/utils';
-import { useData } from '@/context/DataContext';
-import { useUserSettings } from '@/context/UserSettingsContext';
+import { getAndClearReturnUrl } from '@/utils/urlUtils';
 
 const HomePage: React.FC = () => {
     const navigate = useNavigate();
@@ -46,9 +47,10 @@ const HomePage: React.FC = () => {
 
     const { data: twitchStreamInfo } = useTwitchStreamInfo({
         enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
-        staleTime: 60 * 1000,
+        staleTime: 120 * 1000,
         gcTime: 5 * 60 * 1000,
-        refetchInterval: 60 * 1000,
+        refetchInterval: 120 * 1000,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         retry: 1,
@@ -56,9 +58,10 @@ const HomePage: React.FC = () => {
 
     const { data: vkStreamInfo } = useVkStreamInfo({
         enabled: !!isAuthenticated && !!integrations?.vk?.enabled,
-        staleTime: 60 * 1000,
+        staleTime: 120 * 1000,
         gcTime: 5 * 60 * 1000,
-        refetchInterval: 60 * 1000,
+        refetchInterval: 120 * 1000,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
         retry: 1,

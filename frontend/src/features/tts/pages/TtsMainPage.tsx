@@ -9,6 +9,7 @@ import { useIntegrations } from '@/context/IntegrationsContext';
 import { useTts } from '@/context/TtsContext';
 import TtsChannelPointsMode from '@/features/tts/components/TtsChannelPointsMode';
 import TtsFilterManager from '@/features/tts/components/TtsFilterManager';
+import { STORAGE_KEYS } from '@/constants';
 import { queryKeys } from '@/queries/queryKeys';
 import {
     useRegenerateTtsObsUrl,
@@ -211,6 +212,7 @@ const TtsMainPageContent: React.FC = () => {
     const { data: ttsStatusResponse, isLoading: isLoadingTtsStatus } = useTtsStatus(null, {
         enabled: !!isAuthenticated,
         refetchInterval: 30000,
+        refetchIntervalInBackground: false,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
         initialData: () => getQueryCache(queryKeys.tts.status(null) as any) || undefined
@@ -332,6 +334,18 @@ const TtsMainPageContent: React.FC = () => {
             setTtsTriggerMode(prev => prev !== modeData.tts_mode ? modeData.tts_mode! : prev);
         }
     }, [modeSettingsData]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const normalizedMode = listeningMode === 'obs' ? 'obs' : 'website';
+        const currentMode = window.localStorage.getItem(STORAGE_KEYS.TTS_LISTENING_MODE);
+        if (currentMode !== normalizedMode) {
+            window.localStorage.setItem(STORAGE_KEYS.TTS_LISTENING_MODE, normalizedMode);
+            window.dispatchEvent(new CustomEvent('tts-listening-mode-changed', {
+                detail: { mode: normalizedMode }
+            }));
+        }
+    }, [listeningMode]);
 
     useEffect(() => {
         if (listeningMode === 'obs' && isAuthenticated && user?.id) {

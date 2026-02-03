@@ -19,4 +19,5 @@ async def report_frontend_error(request: Request) -> Dict[str, Any]:
         payload = {"raw": await request.body()}
 
     logger.error("[FRONTEND ERROR] %s", payload)
+    print(f"\n[FRONTEND ERROR REPORT]: {payload}\n", flush=True)  # FORCE PRINT TO CONSOLE
     return {"success": True}

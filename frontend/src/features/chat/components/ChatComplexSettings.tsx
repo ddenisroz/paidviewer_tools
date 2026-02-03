@@ -1,9 +1,11 @@
 import React from 'react';
-import { Settings, Image as ImageIcon, Eye, EyeOff, MessageSquare } from 'lucide-react';
-import { Label } from '@/shared/components/ui/label';
-import { Switch } from '@/shared/components/ui/switch';
+
+import { Eye, EyeOff, Image as ImageIcon, MessageSquare, Settings } from 'lucide-react';
+
 import { Button } from '@/shared/components/ui/button';
+import { Label } from '@/shared/components/ui/label';
 import { Separator } from '@/shared/components/ui/separator';
+import { Switch } from '@/shared/components/ui/switch';
 
 interface ChatComplexSettingsProps {
     showImages: boolean;

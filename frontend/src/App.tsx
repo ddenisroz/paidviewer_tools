@@ -8,14 +8,14 @@ import RouteErrorBoundary from '@/shared/components/ErrorBoundary/RouteErrorBoun
 import Layout from '@/shared/components/layout/Layout';
 import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 
-// Minimal loading - no skeletons, pages appear instantly
-const MinimalFallback = () => <div className="min-h-screen" />;
-
 // Critical pages - загружаем сразу (только auth flow)
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DonationAlertsCallback from './pages/DonationAlertsCallback';
 import LoginPage from './pages/LoginPage';
 import AuthGuard from './shared/components/AuthGuard';
+
+// Minimal loading - no skeletons, pages appear instantly
+const MinimalFallback = () => <div className="min-h-screen" />;
 
 // All other pages - lazy loading for better initial load performance
 const HomePage = lazy(() => import('./pages/HomePage'));

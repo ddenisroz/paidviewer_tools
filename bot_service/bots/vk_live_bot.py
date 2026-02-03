@@ -57,23 +57,77 @@ class VKLiveBot(VKLiveBotCore):
         return success
 
     async def send_message(self, channel_id: str, message: str) -> bool:
-        """Отправить сообщение в канал VK Live"""
+        """Отправить сообщение в канал VK Live (используя HTTP Bot Token)"""
         try:
             if not self.is_connected_to_channel(channel_id):
                 logger.error(f"Not connected to channel {channel_id}")
                 return False
 
-            # Отправляем сообщение через WebSocket
-            if self.ws_client:
-                await self.ws_client.send_message(message)
-                logger.info(f"VK Live message sent to {channel_id}: {message}")
-                return True
-            else:
-                logger.error("WebSocket client not available")
-                return False
+            # Прямая отправка через HTTP API используя токен БОТА (self.user_access_token)
+            import aiohttp
+            from utils.vk_channel_url import extract_vk_channel_slug
+            
+            # channel_id usually comes as slug (e.g. "yourchy"), but we ensure it
+            slug = extract_vk_channel_slug(channel_id) or channel_id
+            
+            url = "https://apidev.live.vkvideo.ru/v1/chat/message/send"
+            # Fallback to prod if dev fails? usually dev is safer for testing
+            # But let's check which one we should use. 
+            # VKLiveHTTPPolling uses instance var. Here we check config or try both?
+            # Let's start with proper URL construction similar to HTTP Polling
+            
+            headers = {
+                "Authorization": f"Bearer {self.user_access_token}",
+                "Content-Type": "application/json"
+            }
+            
+            # Use query param for channel_url
+            params = {
+                "channel_url": f"https://live.vkvideo.ru/{slug}"
+            }
+            
+            json_body = {
+                "parts": [
+                    {
+                        "text": {
+                            "content": message
+                        }
+                    }
+                ]
+            }
+
+            # SSL workaround for dev environment
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+
+            async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
+                async with session.post(url, headers=headers, params=params, json=json_body) as response:
+                    if response.status == 200:
+                        logger.info(f"[VK BOT] Message sent to {slug}: {message}")
+                        return True
+                    else:
+                        text = await response.text()
+                        logger.error(f"[VK BOT] Failed to send message: {response.status} - {text}")
+                        
+                        # Fallback to PROD API if DEV failed (common issue)
+                        if response.status == 404:
+                            prod_url = "https://api.live.vkvideo.ru/v1/chat/message/send"
+                            async with session.post(prod_url, headers=headers, params=params, json=json_body) as prod_resp:
+                                if prod_resp.status == 200:
+                                    logger.info(f"[VK BOT] Message sent to {slug} (PROD API): {message}")
+                                    return True
+                                else:
+                                    prod_text = await prod_resp.text()
+                                    logger.error(f"[VK BOT] PROD API Failed too: {prod_resp.status} - {prod_text}")
+                                    return False
+                        return False
 
         except Exception as e:
             logger.error(f"Error sending VK Live message: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
 
     async def shutdown(self):

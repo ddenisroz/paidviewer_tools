@@ -13,13 +13,11 @@ import { useIntegrations } from '@/context/IntegrationsContext';
 // BotManagementCard removed as per requirements (moved to Admin)
 import DeleteAccountModal from '@/shared/components/DeleteAccountModal';
 import PageWrapper from '@/shared/components/PageWrapper';
-import { TwitchIcon, VKIcon, DonationAlertsIcon } from '@/shared/components/PlatformIcons';
+import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 
 import InboxPage from './InboxPage';
 
@@ -194,7 +192,7 @@ const SettingsPage: React.FC = () => {
                         </Card>
                     </div>
 
-                    {/* Секция Приоритет аудио - компактный список */}
+                    {/* Секция Приоритет аудио */}
                     <Card className="card-glass">
                         <CardHeader className="py-4">
                             <CardTitle className="text-lg font-medium flex items-center gap-2">
@@ -203,21 +201,41 @@ const SettingsPage: React.FC = () => {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pb-4">
-                            <div className="flex flex-col md:flex-row items-center gap-4 justify-between">
-                                <div className="text-sm text-muted-foreground max-w-lg">
+                            <div className="flex flex-col gap-4">
+                                <div className="text-sm text-muted-foreground max-w-2xl">
                                     Выберите, как вести себя плееру YouTube во время воспроизведения TTS сообщений.
                                 </div>
-                                <div className="w-full md:w-64">
-                                    <Select value={ttsPreference} onValueChange={(val: any) => setTtsPreference(val)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Выберите режим" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="pause">Пауза (YouTube)</SelectItem>
-                                            <SelectItem value="duck">Приглушение (20%)</SelectItem>
-                                            <SelectItem value="none">Без изменений</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setTtsPreference('pause')}
+                                        className={`rounded-xl border px-4 py-3 text-left transition-all ${ttsPreference === 'pause'
+                                            ? 'border-purple-500/40 bg-purple-500/10 text-white shadow-[0_0_0_1px_rgba(168,85,247,0.25)]'
+                                            : 'border-gray-700/60 bg-gray-900/40 text-gray-300 hover:border-purple-500/40'}`}
+                                    >
+                                        <div className="text-sm font-semibold">Пауза YouTube</div>
+                                        <div className="text-xs text-muted-foreground">Полная остановка во время TTS</div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTtsPreference('duck')}
+                                        className={`rounded-xl border px-4 py-3 text-left transition-all ${ttsPreference === 'duck'
+                                            ? 'border-purple-500/40 bg-purple-500/10 text-white shadow-[0_0_0_1px_rgba(168,85,247,0.25)]'
+                                            : 'border-gray-700/60 bg-gray-900/40 text-gray-300 hover:border-purple-500/40'}`}
+                                    >
+                                        <div className="text-sm font-semibold">Приглушение</div>
+                                        <div className="text-xs text-muted-foreground">Снижение громкости до 20%</div>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setTtsPreference('none')}
+                                        className={`rounded-xl border px-4 py-3 text-left transition-all ${ttsPreference === 'none'
+                                            ? 'border-purple-500/40 bg-purple-500/10 text-white shadow-[0_0_0_1px_rgba(168,85,247,0.25)]'
+                                            : 'border-gray-700/60 bg-gray-900/40 text-gray-300 hover:border-purple-500/40'}`}
+                                    >
+                                        <div className="text-sm font-semibold">Без изменений</div>
+                                        <div className="text-xs text-muted-foreground">YouTube продолжает играть</div>
+                                    </button>
                                 </div>
                             </div>
                         </CardContent>

@@ -14,10 +14,12 @@ from pydantic import BaseModel, Field
 from core.database import get_db
 from auth.auth import get_current_user, get_current_user_optional
 from repositories.drops_reward_repository import DropsRewardRepository
+from utils.cache import get_cached, invalidate_cache
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/drops", tags=["drops"])
+DROPS_REWARDS_CACHE_TTL = 60
 
 
 # === PYDANTIC MODELS ===
@@ -107,22 +109,31 @@ async def get_drops_rewards(
         else:
             raise HTTPException(status_code=401, detail="Authentication required")
 
-        # Get quality ID if filtering by name
-        quality_id = None
-        if quality:
-            quality_obj = repo.get_quality_by_name(quality)
-            if quality_obj:
-                quality_id = quality_obj.id
+        cache_key = f"drops_rewards:{user_id}:{channel_name}:{quality or 'all'}"
+        if widget_token:
+            cache_key = f"{cache_key}:token:{widget_token}"
 
-        rewards = repo.get_by_user_and_channel(user_id, channel_name, quality_id)
+        def _load_rewards():
+            # Get quality ID if filtering by name
+            quality_id = None
+            if quality:
+                quality_obj = repo.get_quality_by_name(quality)
+                if quality_obj:
+                    quality_id = quality_obj.id
 
-        # Batch fetch qualities
-        quality_ids = {reward.quality_id for reward in rewards if reward.quality_id}
-        qualities = repo.get_qualities_by_ids(list(quality_ids))
+            rewards = repo.get_by_user_and_channel(user_id, channel_name, quality_id)
+
+            # Batch fetch qualities
+            quality_ids = {reward.quality_id for reward in rewards if reward.quality_id}
+            qualities = repo.get_qualities_by_ids(list(quality_ids))
+
+            return [_reward_to_dict(r, qualities.get(r.quality_id, {})) for r in rewards]
+
+        rewards = get_cached(cache_key, _load_rewards, ttl=DROPS_REWARDS_CACHE_TTL)
 
         return {
             "success": True,
-            "data": [_reward_to_dict(r, qualities.get(r.quality_id, {})) for r in rewards]
+            "data": rewards
         }
 
     except HTTPException:
@@ -168,6 +179,8 @@ async def create_drops_reward(
             sound_volume=reward_data.sound_volume,
             is_active=reward_data.is_active
         )
+
+        invalidate_cache(f"drops_rewards:{current_user['id']}:{channel_name}:")
 
         # WebSocket notification
         try:
@@ -226,6 +239,8 @@ async def update_drops_reward(
 
         reward = repo.update(reward, update_data)
 
+        invalidate_cache(f"drops_rewards:{current_user['id']}:{reward.channel_name}:")
+
         # WebSocket notification
         try:
             from services.memory_websocket_manager import get_memory_websocket_manager
@@ -272,6 +287,8 @@ async def delete_drops_reward(
             raise HTTPException(status_code=404, detail="Награда не найдена")
 
         channel_name = repo.delete(reward)
+
+        invalidate_cache(f"drops_rewards:{current_user['id']}:{channel_name}:")
 
         # WebSocket notification
         try:
@@ -332,6 +349,7 @@ async def upload_reward_image(
 
         image_url = f"/static/uploads/drops/{current_user['id']}/images/{filename}"
         repo.update_image(reward, image_url)
+        invalidate_cache(f"drops_rewards:{current_user['id']}:{reward.channel_name}:")
 
         return {
             "success": True,
@@ -380,6 +398,7 @@ async def upload_reward_sound(
             buffer.write(content)
 
         repo.update_sound(reward, file_path)
+        invalidate_cache(f"drops_rewards:{current_user['id']}:{reward.channel_name}:")
 
         return {
             "success": True,

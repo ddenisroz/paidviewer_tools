@@ -55,7 +55,9 @@ export const useQuickActionsLogic = () => {
 
     const { data: ttsStatusResponse } = useTtsStatus(null, {
         enabled: !!isAuthenticated,
-        refetchInterval: 30000,
+        refetchInterval: 60000,
+        refetchIntervalInBackground: false,
+        refetchOnWindowFocus: false,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
         placeholderData: keepPreviousData,
@@ -152,16 +154,20 @@ export const useQuickActionsLogic = () => {
 
     const { data: dropsConfigData } = useDropsConfig(channelName, {
         enabled: !!isAuthenticated && isDropsEnabled && !!channelName,
-        refetchInterval: 30000,
-        staleTime: 60000,
+        refetchInterval: 120000,
+        refetchIntervalInBackground: false,
+        refetchOnWindowFocus: false,
+        staleTime: 120000,
         gcTime: 5 * 60 * 1000,
         initialData: () => getQueryCache(['drops-config', channelName]),
     });
 
     const { data: rewardsData } = useDropsRewards(channelName, {
         enabled: !!isAuthenticated && isDropsEnabled && !!channelName,
-        refetchInterval: 30000,
-        staleTime: 60000,
+        refetchInterval: 120000,
+        refetchIntervalInBackground: false,
+        refetchOnWindowFocus: false,
+        staleTime: 120000,
         gcTime: 5 * 60 * 1000,
         initialData: () => getQueryCache(['drops-rewards', channelName]) || undefined,
     });

@@ -167,23 +167,40 @@ class PlatformRewardsService:
 
     def _map_to_vk_create(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Map generic reward data to VK format."""
+        price = data.get("cost")
+        try:
+            price = int(price) if price is not None else None
+        except (TypeError, ValueError):
+            price = None
         vk_data = {
             "name": data.get("title"),
             "description": data.get("description"),
-            "price": data.get("cost"),
+            "price": price,
             "is_message_required": data.get("is_message_required", data.get("is_user_input_required", False)),
         }
         
         # Only add optional fields if they have a non-zero value
         max_uses_count = data.get("max_uses_count", data.get("max_per_stream", 0) or 0)
+        try:
+            max_uses_count = int(max_uses_count) if max_uses_count is not None else 0
+        except (TypeError, ValueError):
+            max_uses_count = 0
         if max_uses_count and max_uses_count > 0:
             vk_data["max_uses_count"] = max_uses_count
             
         max_uses_count_per_user = data.get("max_uses_count_per_user", data.get("max_per_user_per_stream", 0) or 0)
+        try:
+            max_uses_count_per_user = int(max_uses_count_per_user) if max_uses_count_per_user is not None else 0
+        except (TypeError, ValueError):
+            max_uses_count_per_user = 0
         if max_uses_count_per_user and max_uses_count_per_user > 0:
             vk_data["max_uses_count_per_user"] = max_uses_count_per_user
             
         repair_timeout = data.get("repair_timeout", 0)
+        try:
+            repair_timeout = int(repair_timeout) if repair_timeout is not None else 0
+        except (TypeError, ValueError):
+            repair_timeout = 0
         if repair_timeout and repair_timeout > 0:
             vk_data["repair_timeout"] = repair_timeout
             

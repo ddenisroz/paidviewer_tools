@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_extra_settings_cmd'
-down_revision = '20251218_add_fundamental_constraints'
+down_revision = '20251218_fundamental'
 branch_labels = None
 depends_on = None
 

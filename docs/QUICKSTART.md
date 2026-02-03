@@ -1,115 +1,70 @@
-# TTS_TTV Quickstart 🚀
+# Quickstart
 
-**Время на запуск: 5-10 минут**
+## Requirements
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL (SQLite can be used for quick dev testing)
+- GPU optional for F5-TTS
 
----
-
-## Что это?
-
-Сервис для стримеров: TTS-озвучка чата, YouTube-очередь, система баллов, интеграции с Twitch/VK.
-
----
-
-## 1. Требования
-
-- **Python 3.10+**
-- **Node.js 18+**
-- **PostgreSQL** (или SQLite для тестов)
-- **GPU** (опционально, для F5-TTS)
-
----
-
-## 2. Быстрый запуск
-
+## 1) Bootstrap
 ```powershell
-# Клонируй проект
 git clone <repo>
 cd TTS_TTV_0.02
 
-# Запусти скрипт миграции (создаёт venv, устанавливает зависимости)
-.\scripts\migrate.ps1   # Windows
-# или
-./scripts/migrate.sh    # Linux/Mac
+# Windows
+.\scripts\migrate.ps1
+
+# Linux/Mac
+./scripts/migrate.sh
 ```
 
----
+## 2) Configure env
+Copy the examples and fill in required keys:
+```powershell
+cp bot_service/.env.example bot_service/.env
+cp frontend/.env.example frontend/.env
+cp tts_service/.env.example tts_service/.env
+cp tts_service_simple/.env.example tts_service_simple/.env
+```
 
-## 3. Настройка .env
+Required backend fields (minimum):
+- `DATABASE_URL`
+- `SECRET_KEY`
+- `TWITCH_CLIENT_ID`
+- `TWITCH_CLIENT_SECRET`
 
-Скопируй примеры и заполни:
+## 3) Migrate database
+```powershell
+cd bot_service
+alembic upgrade head
+```
 
+## 4) Start services
 ```powershell
 # Backend
-cp bot_service/.env.example bot_service/.env
-
-# Frontend (обычно не требует изменений)
-cp frontend/.env.example frontend/.env
-```
-
-**Обязательные поля в `bot_service/.env`:**
-
-| Переменная | Описание |
-|------------|----------|
-| `DATABASE_URL` | PostgreSQL строка подключения |
-| `SECRET_KEY` | Сгенерируй: `openssl rand -hex 32` |
-| `TWITCH_CLIENT_ID` | Из [Twitch Developer Console](https://dev.twitch.tv/) |
-| `TWITCH_CLIENT_SECRET` | Там же |
-
----
-
-## 4. Запуск сервисов
-
-### Вариант A: Development (раздельно)
-
-```powershell
-# Terminal 1 — Backend
 cd bot_service
-.\.venv\Scripts\activate
 python main.py
-# → http://localhost:8000
 
-# Terminal 2 — Frontend
+# Frontend
 cd frontend
+npm install
 npm run dev
-# → http://localhost:5173
+
+# TTS (choose one)
+cd tts_service
+python main.py
+
+# or
+cd tts_service_simple
+python run.py
 ```
 
-### Вариант B: Docker (production-ready)
+## 5) First run
+1. Open `http://localhost:5173`
+2. Sign in with Twitch
+3. Enable TTS in settings
 
-```bash
-docker-compose up -d
-# → http://localhost:5173
-```
-
----
-
-## 5. Первый запуск
-
-1. Открой http://localhost:5173
-2. Нажми **"Войти через Twitch"**
-3. Дай права боту
-4. Готово! Включи TTS в настройках
-
----
-
-## Частые проблемы
-
-| Проблема | Решение |
-|----------|---------|
-| `ModuleNotFoundError` | Активируй venv: `.\.venv\Scripts\activate` |
-| `Connection refused` | Проверь что PostgreSQL запущен |
-| TTS не работает | Проверь `TTS_SERVICE_URL` в .env |
-| OAuth redirect error | Проверь `REDIRECT_URI` в Twitch Console |
-
----
-
-## Полезные ссылки
-
-- **Документация:** [docs/README.md](./README.md)
-- **API Reference:** [docs/api/](./api/)
-- **Архитектура:** [docs/ARCHITECTURE.md](./ARCHITECTURE.md)
-- **Деплой:** [docs/setup/DEPLOYMENT.md](./setup/DEPLOYMENT.md)
-
----
-
-**Нужна помощь?** Создай Issue в репозитории или загляни в [TTS_TROUBLESHOOTING.md](./guides/TTS_TROUBLESHOOTING.md)
+## Troubleshooting
+- `ModuleNotFoundError`: activate venv `.\.venv\Scripts\Activate.ps1`
+- `Connection refused`: check PostgreSQL is running
+- OAuth redirect errors: confirm `REDIRECT_URI` in Twitch console

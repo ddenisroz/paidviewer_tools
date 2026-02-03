@@ -27,9 +27,12 @@ class UserService:
         """Get VK channel name for the user."""
         repo = self._get_repository(db)
         user = repo.get_by_id(user_id) # Using get_by_id from BaseRepository interface if available, or just get
-        if not user or not user.vk_channel_name:
+        if not user:
              raise HTTPException(status_code=404, detail="VK канал не настроен")
-        return user.vk_channel_name
+        channel_name = user.vk_channel_name or user.vk_username
+        if not channel_name:
+             raise HTTPException(status_code=404, detail="VK канал не настроен")
+        return channel_name
 
     def decrypt_access_token(self, encrypted_token: str) -> str:
         """Decrypt access token."""

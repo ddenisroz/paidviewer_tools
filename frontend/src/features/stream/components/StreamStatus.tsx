@@ -2,7 +2,7 @@
 
 import { Twitch, Users, Wifi, WifiOff } from 'lucide-react';
 
-import { VKIcon, TwitchIcon } from '@/shared/components/PlatformIcons';
+import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent } from '@/shared/components/ui/card';
 

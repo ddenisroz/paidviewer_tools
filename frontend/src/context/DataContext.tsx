@@ -1,5 +1,7 @@
 ﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useLocation } from 'react-router-dom';
+
 import { expandQueryWithAliases } from '@/constants/categoryAliases';
 import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo } from '@/queries/stream/streamQueries';
 import { streamService } from '@/services/api/services/streamService';
@@ -214,6 +216,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     const { user, isAuthenticated } = useAuth();
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { addToast } = useToast();
+    const location = useLocation();
+    const isDashboardHome = location.pathname === '/dashboard';
 
     const getCachedStreamData = useCallback((): StreamData => {
         const cached = getQueryCache(['stream-data', user?.id]);
@@ -275,8 +279,9 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     });
 
     const { data: historyData, isLoading: isLoadingHistory, refetch: _refetchHistory } = useStreamHistory({
-        enabled: !!isAuthenticated,
-        refetchInterval: 30000,
+        enabled: !!isAuthenticated && isDashboardHome,
+        refetchInterval: isDashboardHome ? 60000 : false,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
@@ -296,15 +301,17 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
 
     const { data: twitchData, isLoading: isLoadingTwitch, refetch: refetchTwitch } = useTwitchStreamInfo({
-        enabled: !!isAuthenticated && !!integrations.twitch?.enabled,
-        refetchInterval: 60000,
+        enabled: !!isAuthenticated && isDashboardHome && !!integrations.twitch?.enabled,
+        refetchInterval: false,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
 
     const { data: vkData, isLoading: isLoadingVk, refetch: refetchVk } = useVkStreamInfo({
-        enabled: !!isAuthenticated && !!integrations.vk?.enabled,
-        refetchInterval: 60000,
+        enabled: !!isAuthenticated && isDashboardHome && !!integrations.vk?.enabled,
+        refetchInterval: false,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });

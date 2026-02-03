@@ -44,6 +44,16 @@ export const youtubeService = {
   },
 
   /**
+   * Забанить видео и удалить его из очереди
+   * @param queueId - ID видео в очереди
+   * @returns Promise с ответом API
+   */
+  async banQueueItem(queueId: number): Promise<AxiosResponse<ApiResponse>> {
+    // Backend endpoint: POST /api/youtube/queue/ban/{queue_id}
+    return apiClient.post(`/api/youtube/queue/ban/${queueId}`);
+  },
+
+  /**
    * Очистить очередь
    * @returns Promise с ответом API
    */
@@ -59,6 +69,16 @@ export const youtubeService = {
   async nextVideo(): Promise<AxiosResponse<ApiResponse<{ current_video: YoutubeVideo | null }>>> {
     // Backend endpoint: POST /api/youtube/player/next
     return apiClient.post('/api/youtube/player/next');
+  },
+
+  /**
+   * Перейти к выбранному видео в очереди
+   * @param queueId - ID видео в очереди
+   * @returns Promise с ответом API
+   */
+  async playQueueItem(queueId: number): Promise<AxiosResponse<ApiResponse<{ current_video: YoutubeVideo | null }>>> {
+    // Backend endpoint: POST /api/youtube/queue/play/{queue_id}
+    return apiClient.post(`/api/youtube/queue/play/${queueId}`);
   },
 
   /**

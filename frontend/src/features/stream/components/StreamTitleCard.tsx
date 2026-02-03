@@ -1,5 +1,7 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 
+import { CheckCircle, Loader2, PenLine, Save } from 'lucide-react';
+
 import { useData } from '@/context/DataContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { useUserSettings } from '@/context/UserSettingsContext';
@@ -7,7 +9,6 @@ import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { logger } from '@/shared/utils/prodLogger';
-import { CheckCircle, Loader2, PenLine, Save } from 'lucide-react';
 
 import { StreamCardLayout } from './StreamCardLayout';
 

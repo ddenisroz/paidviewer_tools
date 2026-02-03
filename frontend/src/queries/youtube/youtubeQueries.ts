@@ -18,6 +18,11 @@ interface YoutubeQueue {
   queue: unknown[];
   current_video: unknown | null;
   is_playing?: boolean;
+  skip_votes?: {
+    current: number;
+    required: number;
+    video_id?: number | string | null;
+  };
 }
 
 /**
@@ -33,6 +38,7 @@ export const useYoutubeQueue = (options?: Omit<UseQueryOptions<YoutubeQueue, Axi
     staleTime: 15 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchInterval: 15 * 1000,
+    refetchIntervalInBackground: false,
     ...options,
   });
 };

@@ -1,49 +1,48 @@
-# TTS & Twitch Bot
+# TTS_TTV
 
-A comprehensive solution for Twitch streamers featuring AI text-to-speech (TTS), integrations with Twitch/VK/DonationAlerts, and a web-based dashboard.
+Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, and multi-platform integrations.
 
-## Architecture
+## Key Features
+- AI TTS with multiple providers and per-user filters.
+- YouTube media requests and queue management via chat commands.
+- Chat overlay and moderation utilities.
+- Points, rewards, and drops systems.
+- Integrations for Twitch, VK Live, and DonationAlerts.
+- Optional chat analysis command via DeepSeek (requires env setup).
 
-Refactored to follow **Clean Architecture** principles:
-*   **Core**: Domain-driven design with distinct API, Service, and Repository layers.
-*   **VoiceManagementService**: Centralized control for TTS providers (Google, F5-TTS).
-*   **Integrations**: Modular services for Twitch, VK, and DonationAlerts.
-*   **Frontend**: TypeScript/React-based UI with strict typing and feature-based structure.
+## Project Layout
+- `bot_service/` FastAPI backend (API, services, repositories, bots).
+- `frontend/` React + Vite dashboard.
+- `tts_service/` Advanced shared TTS service.
+- `tts_service_simple/` Lightweight personal TTS service.
+- `deploy/` Docker compose and deployment assets.
+- `docs/` Architecture, setup, and feature docs.
+- `scripts/` Project tooling and migrations.
 
-## Deployment
+## Quick Start (Local)
+1. Configure env files:
+   - `bot_service/.env`
+   - `tts_service/.env`
+   - `tts_service_simple/.env`
+   - `frontend/.env`
+2. Run migration/bootstrap:
+   - Windows: `.\scripts\migrate.ps1`
+   - Linux/Mac: `./scripts/migrate.sh`
+3. Start services:
+   - Backend: `cd bot_service; python main.py`
+   - Frontend: `cd frontend; npm install; npm run dev`
+   - TTS: `cd tts_service; python main.py` (or `tts_service_simple`)
 
-### Quick Start
+## Common Commands
+- Backend: `ruff check .`, `ruff format .`, `pytest`
+- Frontend: `npm run lint`, `npm run format`, `npm run type-check`, `npm run test`
 
-1.  Clone the repository:
-    ```bash
-    git clone <repo>
-    cd TTS_TTV_0.02
-    ```
-
-2.  Run migration script to setup environment:
-    *   Windows: `.\scripts\migrate.ps1`
-    *   Linux/Mac: `./scripts/migrate.sh`
-
-3.  Configure `.env` files in `bot_service/`, `tts_service/`, and `frontend/`.
-
-4.  Start services:
-    *   **Backend**: `cd bot_service && python main.py`
-    *   **Frontend**: `cd frontend && npm run dev`
-    *   **TTS Service**: `cd tts_service && python main.py`
-
-### detailed Documentation
-*   [Quick Start Guide](docs/QUICKSTART.md)
-*   [Deployment Guide](docs/setup/DEPLOYMENT.md)
-*   [Architecture Overview](docs/architecture/ARCHITECTURE_GUIDE.md)
-
-## Tech Stack
-
-*   **Backend**: Python 3.10+, FastAPI, SQLAlchemy, PostgreSQL.
-*   **Frontend**: React 19, Vite, Tailwind CSS, TypeScript.
-*   **TTS**: Google Cloud TTS, F5-TTS (Local/GPU).
-*   **Integrations**: TwitchIO, VK Live API, DonationAlerts.
-*   **Security**: OAuth2, JWT, Rate Limiting.
+## Documentation
+- `docs/README.md`
+- `docs/QUICKSTART.md`
+- `docs/FEATURES.md`
+- `docs/setup/DEPLOYMENT.md`
+- `docs/architecture/ARCHITECTURE_GUIDE.md`
 
 ## License
-
 MIT License

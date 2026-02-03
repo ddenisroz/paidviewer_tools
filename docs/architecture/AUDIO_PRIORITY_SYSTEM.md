@@ -2,7 +2,7 @@
 
 ## Overview
 
-The audio priority system manages conflicts between TTS (Text-to-Speech) and YouTube audio playback. When TTS plays, the system can automatically pause, duck (reduce volume), or ignore YouTube playback based on user preference.
+The audio priority system manages conflicts between TTS (Text-to-Speech) and YouTube audio playback. When TTS plays, the system can automatically pause, duck (reduce volume), or ignore YouTube playback based on user preference. Audio priority applies only when TTS output is set to `website`. If TTS output is `obs`, browser playback is suppressed and audio priority events are not triggered.
 
 ## Features
 

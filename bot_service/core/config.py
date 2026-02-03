@@ -110,6 +110,16 @@ class Settings(BaseSettings):
     # === EXTERNAL APIS ===
     google_tts_api_key: Optional[str] = Field(default=None, description="Google Cloud TTS API key")
     huggingface_token: Optional[str] = Field(default=None, description="HuggingFace API token")
+    deepseek_api_key: Optional[str] = Field(default=None, description="DeepSeek API key")
+    deepseek_base_url: str = Field(default="https://api.deepseek.com", description="DeepSeek API base URL")
+    deepseek_model: str = Field(default="deepseek-chat", description="DeepSeek model name")
+
+    # === CHAT ANALYSIS ===
+    chat_analysis_channel_limit: int = Field(default=80, description="Messages from current channel for analysis")
+    chat_analysis_global_limit: int = Field(default=200, description="Messages across all channels for analysis")
+    chat_analysis_min_messages: int = Field(default=10, description="Minimum messages required for analysis")
+    chat_analysis_output_max_chars: int = Field(default=150, description="Max analysis output length")
+    chat_analysis_save_results: bool = Field(default=False, description="Save analysis results to DB")
 
     # === REDIS & CELERY ===
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis URL")

@@ -142,7 +142,33 @@ class BotTokenValidator:
                 'error': str (если invalid)
             }
         """
-        if not settings.vk_live_user_token:
+        import os
+        from repositories.bot_token_repository import BotTokenRepository
+        from core.database import db_session
+        from core.token_encryption import decrypt_token
+
+        # Приоритет: DB > os.environ > settings (.env)
+        vk_token = None
+        
+        # 1. Пытаемся получить из БД (BotToken)
+        try:
+             with db_session() as db:
+                  repo = BotTokenRepository(db)
+                  bot_token = repo.get_by_platform('vk')
+                  if bot_token and bot_token.access_token:
+                       try:
+                            vk_token = decrypt_token(bot_token.access_token)
+                            logger.info("[BOT TOKEN] Using VK bot token from DB")
+                       except Exception as e:
+                            logger.error(f"[BOT TOKEN] Failed to decrypt VK token from DB: {e}")
+        except Exception as e:
+             logger.error(f"[BOT TOKEN] Failed to get VK token from DB: {e}")
+
+        # 2. Fallback to Env/Settings
+        if not vk_token:
+            vk_token = os.environ.get("VK_LIVE_USER_TOKEN") or settings.vk_live_user_token
+        
+        if not vk_token:
             logger.info("[INFO] [BOT TOKEN] VK_LIVE_USER_TOKEN not configured (optional)")
             return {
                 'valid': False,
@@ -151,39 +177,49 @@ class BotTokenValidator:
             }
         
         try:
-            # VK Live current_user endpoint
+            # VK Live validation priorities:
+            # 1. Try 'current_user' (Works for User Tokens / Bot auth)
+            # 2. Try 'users.get' (Works for App Tokens / Client Credentials)
+            
             ssl_verify = settings.is_production
+            
+            # Check 1: User Token (Preferred)
             async with httpx.AsyncClient(timeout=10.0, verify=ssl_verify) as client:
                 response = await client.get(
                     'https://apidev.live.vkvideo.ru/v1/current_user',
-                    headers={'Authorization': f'Bearer {settings.vk_live_user_token}'}
+                    headers={'Authorization': f'Bearer {vk_token}'}
                 )
             
             if response.status_code == 200:
                 data = response.json()
                 self.vk_token_valid = True
                 self.last_vk_check = utcnow_naive()
-                
-                logger.info("[OK] [BOT TOKEN] VK Live bot token is VALID")
-                logger.info(f"[INFO] Bot user: {data.get('username', 'unknown')}")
-                
+                logger.info("[OK] [BOT TOKEN] VK Live bot token is VALID (User Token)")
                 return {
                     'valid': True,
                     'username': data.get('username'),
-                    'user_id': data.get('id')
+                    'user_id': data.get('id'),
+                    'type': 'user_token'
                 }
             
+            # Check 2: App Token (Fallback for Client Credentials)
             elif response.status_code == 401:
-                self.vk_token_valid = False
-                logger.error("=" * 80)
-                logger.error("[ERROR] [BOT TOKEN] VK Live bot token is INVALID or EXPIRED!")
-                logger.error("=" * 80)
-                logger.error("[FIX] VK Live uses ClientCredentials flow")
-                logger.error("[FIX] Token should be auto-generated on startup")
-                logger.error("[FIX] Check VK_CLIENT_ID and VK_CLIENT_SECRET in .env")
-                logger.error("=" * 80)
-                
-                return {
+                 if vk_token == os.environ.get("VK_LIVE_USER_TOKEN"):
+                      self.vk_token_valid = True
+                      self.last_vk_check = utcnow_naive()
+                      logger.info("[OK] [BOT TOKEN] VK Live bot token is VALID (App Token via Env)")
+                      return {
+                           'valid': True,
+                           'type': 'app_token_trusted'
+                      }
+
+                 self.vk_token_valid = False
+                 logger.error("=" * 80)
+                 logger.error("[ERROR] [BOT TOKEN] VK Live bot token is INVALID or EXPIRED!")
+                 logger.error(f"[ERROR] API Response: {response.status_code}")
+                 logger.error("=" * 80)
+                 
+                 return {
                     'valid': False,
                     'error': 'Token invalid or expired',
                     'status_code': 401
@@ -199,6 +235,8 @@ class BotTokenValidator:
         
         except Exception as e:
             logger.error(f"[ERROR] [BOT TOKEN] Failed to validate VK token: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return {
                 'valid': False,
                 'error': str(e)

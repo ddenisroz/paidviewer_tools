@@ -7,9 +7,10 @@ import { DataProvider } from '@/context/DataContext';
 import { DonationAlertsProvider } from '@/context/DonationAlertsContext';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
 import { TtsProvider, useTts } from '@/context/TtsContext';
-import GlobalTtsPlayer from '@/features/tts/components/GlobalTtsPlayer';
 import { WidgetLayoutProvider } from '@/context/WidgetLayoutContext';
+import GlobalTtsPlayer from '@/features/tts/components/GlobalTtsPlayer';
 import CookieConsent from '@/shared/components/CookieConsent';
+import GlobalPlayer from '@/shared/components/GlobalPlayer';
 import Header from '@/shared/components/layout/Header';
 import Sidebar from '@/shared/components/layout/Sidebar';
 import { composeProviders } from '@/shared/utils/composeProviders';
@@ -80,6 +81,9 @@ const LayoutContent: React.FC = () => {
 
       {/* Уведомление о cookies рендерим один раз здесь */}
       <CookieConsent />
+
+      {/* Глобальный YouTube плеер (мини-плеер/портал) */}
+      <GlobalPlayer />
     </div>
   );
 };

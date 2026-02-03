@@ -1,24 +1,30 @@
 # Features
 
 ## TTS
-Озвучка чата. Google/F5-TTS/Silero. Скорость, питч, фильтры — всё в настройках.
-
-## Points
-Баллы за активность. Тратятся на награды и заказы.
-
-## Drops
-Лутбоксы. Рандомные награды за сообщения/время/донаты.
+- Multiple providers (Google, F5-TTS, Silero).
+- Per-user filters, pitch/speed controls, and moderation options.
 
 ## YouTube Queue
-Заказ видео через чат или панель. !sr <url>
+- Requests via chat command `!sr <url-or-query>` or dashboard.
+- Queue management: play now, skip, remove, ban.
+- Rewards orders via Twitch or VK.
+
+## Chat and Overlay
+- Chat overlay with roles, badges, and platform markers.
+- Moderation tools and chat history.
+
+## Points and Rewards
+- Channel points style rewards and redemption tracking.
+- Admin controls to manage rewards.
+
+## Drops
+- Lootbox style rewards triggered by chat activity or time.
 
 ## Integrations
-- **Twitch** — OAuth, чат, Channel Points, EventSub
-- **VK Live** — чат, баллы
-- **DonationAlerts** — озвучка донатов
+- Twitch: OAuth, chat, channel points, EventSub.
+- VK Live: chat and rewards.
+- DonationAlerts: donation playback.
 
 ## Commands
-`!tts`, `!sr`, `!points`, `!skip` + кастомные через админку.
-
-## Admin
-Блокировка, вайтлист, фильтры, управление голосами.
+- `!tts`, `!sr`, `!points`, `!skip` and custom commands.
+- `!analyze <username>` optional DeepSeek profile summary with ratings.

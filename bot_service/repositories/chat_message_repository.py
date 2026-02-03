@@ -65,6 +65,42 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
             ChatMessage.user_id == user_id,
             ChatMessage.platform.in_(platforms)
         ).order_by(ChatMessage.timestamp.desc()).limit(limit).all()
+
+    def get_recent_by_author(
+        self,
+        author_username: str,
+        platform: Optional[str] = None,
+        limit: int = 200
+    ) -> List[ChatMessage]:
+        """Get recent messages by author across all channels."""
+        if not author_username:
+            return []
+        query = self.db.query(ChatMessage).filter(
+            ChatMessage.is_deleted.is_(False),
+            func.lower(ChatMessage.author_username) == author_username.lower(),
+        )
+        if platform:
+            query = query.filter(ChatMessage.platform == platform)
+        return query.order_by(ChatMessage.timestamp.desc()).limit(limit).all()
+
+    def get_recent_by_author_in_channel(
+        self,
+        author_username: str,
+        channel_name: str,
+        platform: Optional[str] = None,
+        limit: int = 80
+    ) -> List[ChatMessage]:
+        """Get recent messages by author in a specific channel."""
+        if not author_username or not channel_name:
+            return []
+        query = self.db.query(ChatMessage).filter(
+            ChatMessage.is_deleted.is_(False),
+            func.lower(ChatMessage.author_username) == author_username.lower(),
+            func.lower(ChatMessage.channel_name) == channel_name.lower(),
+        )
+        if platform:
+            query = query.filter(ChatMessage.platform == platform)
+        return query.order_by(ChatMessage.timestamp.desc()).limit(limit).all()
     
     def create(
         self,

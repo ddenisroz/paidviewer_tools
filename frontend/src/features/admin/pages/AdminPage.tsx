@@ -10,8 +10,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import Breadcrumbs from '@/components/admin/Breadcrumbs';
-import { ADMIN_SECTION_COLORS, TRANSITIONS } from '@/constants/designSystem';
+import { ADMIN_SECTION_COLORS } from '@/constants/designSystem';
 import { useAuth } from '@/context/AuthContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/ui/button';
@@ -149,14 +148,6 @@ const AdminPage: React.FC = () => {
   return (
     <div className="min-h-screen p-4 md:p-6 space-y-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Breadcrumbs */}
-        <Breadcrumbs
-          items={[
-            { label: 'Админ панель', path: '/dashboard/dolbaebadmintts' },
-            { label: TABS.find(t => t.id === activeTab)?.label || 'Обзор' }
-          ]}
-        />
-
         {/* Навигация табов с горизонтальным скроллом */}
         <div className="border-b border-white/5 pb-0">
           <div className="flex overflow-x-auto scrollbar-none gap-2">

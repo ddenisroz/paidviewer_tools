@@ -5,10 +5,10 @@ import {
   Filter, Loader, RefreshCw, Target, User, XCircle
 } from 'lucide-react';
 
+import { adminService } from '@/services/api/services/adminService';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { adminService } from '@/services/api/services/adminService';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 

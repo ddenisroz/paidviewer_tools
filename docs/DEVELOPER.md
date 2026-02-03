@@ -1,9 +1,10 @@
-# Dev Setup
+# Developer Setup
 
 ```bash
 # Backend
 cd bot_service
-python -m venv .venv && .venv\Scripts\activate
+python -m venv .venv
+.venv\\Scripts\\activate
 pip install -r requirements.txt
 cp .env.example .env
 alembic upgrade head
@@ -11,31 +12,32 @@ python main.py
 
 # Frontend
 cd frontend
-npm install && npm run dev
+npm install
+npm run dev
 ```
 
-## Structure
+## Structure (high level)
 ```
 bot_service/
-├── api/           # FastAPI routes
-├── services/      # Business logic
-├── repositories/  # DB access
-└── integrations/  # Twitch, VK, TTS
+  api/           FastAPI routes
+  services/      Business logic
+  repositories/  DB access
+  integrations/  Twitch, VK, TTS
 
 frontend/
-├── features/      # Feature modules
-├── stores/        # Zustand
-└── queries/       # TanStack Query
+  features/      Feature modules
+  store/         Zustand state
+  queries/       TanStack Query hooks
 ```
 
 ## Rules
-1. Services don't touch DB directly — use repos
-2. API routes don't contain logic — delegate to services
-3. Components don't fetch — use queries
+1. Services do not access the DB directly - use repositories.
+2. API routes contain no business logic - delegate to services.
+3. Components do not fetch data - use query hooks.
 
 ## Commands
 ```bash
-ruff check .     # lint
-ruff format .    # format
-npm run lint     # frontend
+ruff check .
+ruff format .
+npm run lint
 ```

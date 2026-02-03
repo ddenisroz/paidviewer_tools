@@ -215,18 +215,80 @@ class GeneralHandlerMixin:
                 f"@{author_name} [ERROR] Ошибка изменения громкости")
 
     async def _handle_analyze(self, ctx, bot, args, platform, db):
-        """Handler для !analyze (Twitch) - заглушка"""
+        """Handler для !analyze (Twitch)"""
         try:
-            await ctx.send(f"@{ctx.author.name} [BOT] Функция анализа чата в разработке")
-            self.logger.info(f"!analyze called by {ctx.author.name} on {ctx.channel.name}")
+            if not args:
+                await ctx.send(f"@{ctx.author.name} [ERROR] Использование: !analyze <username>")
+                return
+
+            target_username = args.strip().split()[0].lstrip('@')
+            if not target_username:
+                await ctx.send(f"@{ctx.author.name} [ERROR] Укажите пользователя для анализа")
+                return
+
+            from repositories.user_repository import UserRepository
+            user = UserRepository(db).get_by_twitch_username(ctx.channel.name)
+
+            if not user:
+                await ctx.send(f"@{ctx.author.name} [ERROR] Канал не найден")
+                return
+
+            from services.psychology_service import PsychologyService
+            service = PsychologyService(db)
+            result = await service.analyze_user_psychology(
+                target_username=target_username,
+                platform=platform,
+                analyzed_by_user_id=user.id,
+                analyzed_by_username=ctx.author.name,
+                channel_name=ctx.channel.name
+            )
+
+            if result:
+                await ctx.send(result)
+            else:
+                await ctx.send(f"@{ctx.author.name} [ERROR] Не удалось выполнить анализ")
+
+            self.logger.info(f"!analyze completed for {target_username} on {ctx.channel.name}")
         except Exception as e:
             self.logger.error(f"Error in !analyze handler: {e}", exc_info=True)
 
     async def _handle_analyze_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler для !analyze (VK) - заглушка"""
+        """Handler для !analyze (VK)"""
         try:
-            await vk_bot.send_message(channel_name,
-                f"@{author_name} [BOT] Функция анализа чата в разработке")
-            self.logger.info(f"!analyze called by {author_name} on VK {channel_name}")
+            if not args:
+                await vk_bot.send_message(channel_name,
+                    f"@{author_name} [ERROR] Использование: !analyze <username>")
+                return
+
+            target_username = args.strip().split()[0].lstrip('@')
+            if not target_username:
+                await vk_bot.send_message(channel_name,
+                    f"@{author_name} [ERROR] Укажите пользователя для анализа")
+                return
+
+            from repositories.user_repository import UserRepository
+            user = UserRepository(db).get_by_vk_username(channel_name)
+
+            if not user:
+                await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Канал не найден")
+                return
+
+            from services.psychology_service import PsychologyService
+            service = PsychologyService(db)
+            result = await service.analyze_user_psychology(
+                target_username=target_username,
+                platform='vk',
+                analyzed_by_user_id=user.id,
+                analyzed_by_username=author_name,
+                channel_name=channel_name
+            )
+
+            if result:
+                await vk_bot.send_message(channel_name, result)
+            else:
+                await vk_bot.send_message(channel_name,
+                    f"@{author_name} [ERROR] Не удалось выполнить анализ")
+
+            self.logger.info(f"!analyze completed for {target_username} on VK {channel_name}")
         except Exception as e:
             self.logger.error(f"Error in !analyze VK handler: {e}", exc_info=True)

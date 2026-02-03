@@ -8,6 +8,20 @@ from bots.command_handlers import BaseCommandHandler, PlatformContext
 logger = logging.getLogger('bot_service.commands.stream')
 
 
+async def _broadcast_stream_info_update(user_id: int, platform: str, db) -> None:
+    try:
+        from services.stream_info_service import StreamInfoService
+        from utils.stream_info_cache import set_cached_stream_info
+        from utils.websocket_broadcast import broadcast_stream_info_change
+
+        service = StreamInfoService(db)
+        info = await service.get_stream_info(user_id, platform)
+        set_cached_stream_info(user_id, platform, info)
+        await broadcast_stream_info_change(user_id, platform, info)
+    except Exception as e:
+        logger.warning(f"[STREAM_INFO] Broadcast failed for {platform}: {e}")
+
+
 class GameHandler(BaseCommandHandler):
     """Handler for !game command - show/change stream game"""
     
@@ -69,6 +83,7 @@ class GameHandler(BaseCommandHandler):
             if games:
                 result = await twitch_platform.update_stream_category(user.id, games[0].get('id'))
                 if result:
+                    await _broadcast_stream_info_update(user.id, "twitch", db)
                     await ctx.send(f" Игра изменена на: {games[0].get('name', new_game)}")
                 else:
                     await ctx.reply("[ERROR] Не удалось изменить игру")
@@ -136,6 +151,7 @@ class TitleHandler(BaseCommandHandler):
             new_title = ctx.args.strip()
             result = await twitch_platform.update_stream_title(user.id, new_title)
             if result:
+                await _broadcast_stream_info_update(user.id, "twitch", db)
                 await ctx.send(" Название изменено")
             else:
                 await ctx.reply("[ERROR] Не удалось изменить название")

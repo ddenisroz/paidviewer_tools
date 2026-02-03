@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from core.database import get_db
 from auth.auth import get_current_user
 from repositories.chatbox_repository import ChatBoxRepository
+from repositories.user_token_repository import UserTokenRepository
 
 logger = logging.getLogger(__name__)
 
@@ -216,10 +217,13 @@ async def get_settings_by_token(
     logger.info(f"[CHATBOX] Settings found for user {settings.user_id}")
     
     channel_name = repo.get_user_channel_name(settings.user_id)
+    twitch_token = UserTokenRepository(db).get_active_token(settings.user_id, "twitch")
+    twitch_user_id = twitch_token.platform_user_id if twitch_token else None
 
     return {
         "user_id": settings.user_id,
         "channel_name": channel_name,
+        "twitch_user_id": twitch_user_id,
         "font_family": settings.font_family,
         "font_size": settings.font_size,
         "font_weight": settings.font_weight,

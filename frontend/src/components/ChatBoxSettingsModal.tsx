@@ -1,15 +1,10 @@
 ﻿// src/components/ChatBoxSettingsModal.tsx
 import React, { useEffect, useState } from 'react';
 
-import { Check, Copy, RefreshCw, X } from 'lucide-react';
+import { Check, Copy, Palette, RefreshCw, Settings2, Sparkles, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
-
-
-import AnimationSettings from '@/features/chatbox/components/AnimationSettings';
-import ColorSettings from '@/features/chatbox/components/ColorSettings';
-import FontSettings from '@/features/chatbox/components/FontSettings';
-import PlatformSettings from '@/features/chatbox/components/PlatformSettings';
+import ColorInput from '@/features/chatbox/components/ColorInput';
 import PreviewPanel from '@/features/chatbox/components/PreviewPanel';
 import {
     extractSettingsFromResponse,
@@ -20,6 +15,10 @@ import { chatboxService } from '@/services/api/services/chatboxService';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { SliderWithInput } from '@/shared/components/ui/slider-with-input';
+import { Switch } from '@/shared/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/shared/utils/toastManager';
 
@@ -41,11 +40,15 @@ interface PreviewMessage {
     time: string;
     role: string;
     badges: string[];
+    avatar_url?: string;
 }
 
 const DEFAULT_SETTINGS: ChatBoxSettings = {
     font_family: 'Inter',
     font_size: 16,
+    font_weight: 'normal',
+    text_color: '#FFFFFF',
+    username_color: '#9147FF',
     text_stroke_width: 0,
     text_stroke_color: '#000000',
     background_opacity: 0.5,
@@ -59,22 +62,45 @@ const DEFAULT_SETTINGS: ChatBoxSettings = {
     chat_width: 100,
     border_radius: 8,
     show_platform_icons: true,
+    show_roles: false,
     show_badges: true,
+    show_avatars: false,
     show_7tv_emotes: true,
     show_links: true,
+    auto_load_images: true,
     widget_url: '',
     version: 1
 };
 
 const PREVIEW_MESSAGES: PreviewMessage[] = [
-    { id: 1, platform: 'twitch', author: 'Streamer', message: 'Привет всем! 👋', time: '12:00', role: 'Broadcaster', badges: ['broadcaster/1'] },
-    { id: 2, platform: 'twitch', author: 'VIPUser', message: 'VIP тут!', time: '12:01', role: 'VIP', badges: ['vip/1'] },
-    { id: 3, platform: 'vk', author: 'Viewer1', message: 'Привет! Как дела?', time: '12:02', role: 'Viewer', badges: [] },
-    { id: 4, platform: 'twitch', author: 'Moderator', message: 'Всем привет!', time: '12:03', role: 'Moderator', badges: ['moderator/1'] }
+    { id: 1, platform: 'twitch', author: 'Streamer', message: 'Привет всем! ??', time: '12:00', role: 'Broadcaster', badges: ['broadcaster/1'], avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=S' },
+    { id: 2, platform: 'twitch', author: 'VIPUser', message: 'Смотрите клип: https://example.com', time: '12:01', role: 'VIP', badges: ['vip/1'], avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=V' },
+    { id: 3, platform: 'vk', author: 'Viewer1', message: 'Это было :hype:!', time: '12:02', role: 'Moderator', badges: [], avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=VK' },
+    { id: 4, platform: 'twitch', author: 'Moderator', message: 'Всем привет!', time: '12:03', role: 'Moderator', badges: ['moderator/1'], avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=M' }
+];
+
+const FONT_OPTIONS = [
+    'Inter', 'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Oswald',
+    'Raleway', 'Poppins', 'Ubuntu', 'Nunito', 'Rubik', 'Fira Sans'
+];
+
+const ANIMATION_OPTIONS = [
+    { value: 'fade', label: 'Плавное появление' },
+    { value: 'slide-right', label: 'Слайд слева' },
+    { value: 'slide-left', label: 'Слайд справа' },
+    { value: 'scale', label: 'Масштаб' },
+    { value: 'bounce', label: 'Пружина' },
+    { value: 'none', label: 'Без анимации' }
+];
+
+const CHAT_DIRECTION_OPTIONS = [
+    { value: 'vertical', label: 'Вертикально (снизу вверх)' },
+    { value: 'horizontal', label: 'Горизонтально (бегущая строка)' }
 ];
 
 const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onClose, onSave }) => {
     const [settings, setSettings] = useState<ChatBoxSettings>(DEFAULT_SETTINGS);
+    const [initialSettings, setInitialSettings] = useState<ChatBoxSettings | null>(null);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -86,12 +112,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         } else {
             document.body.style.overflow = '';
             setSettings(DEFAULT_SETTINGS);
+            setInitialSettings(null);
             setLoading(false);
         }
-
-        return () => {
-            document.body.style.overflow = '';
-        };
+        return () => { document.body.style.overflow = ''; };
     }, [isOpen]);
 
     useEffect(() => {
@@ -102,11 +126,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
     useEffect(() => {
         if (!isOpen) return undefined;
-
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
-
         document.addEventListener('keydown', handleEscape);
         return () => document.removeEventListener('keydown', handleEscape);
     }, [isOpen, onClose]);
@@ -116,8 +138,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             setLoading(true);
             const response = await chatboxService.getSettings() as AxiosResponse<ApiResponse<ChatBoxSettings>>;
             const data = extractSettingsFromResponse(response);
-            const normalizedSettings = normalizeChatBoxSettings(data);
-            setSettings(normalizedSettings);
+            const normalized = normalizeChatBoxSettings(data);
+            setSettings(normalized);
+            setInitialSettings(normalized);
         } catch (error) {
             logger.error('Ошибка загрузки настроек ChatBox:', error);
         } finally {
@@ -133,8 +156,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                 regenerateToken
             ) as AxiosResponse<ApiResponse<ChatBoxSettings>>;
             const updatedSettings = extractSettingsFromResponse(response);
-
-            setSettings(prev => ({ ...prev, ...updatedSettings }));
+            const normalized = normalizeChatBoxSettings(updatedSettings);
+            setSettings(normalized);
+            setInitialSettings(normalized);
             toast.success('Настройки сохранены');
             if (onSave) onSave(updatedSettings);
         } catch (error) {
@@ -149,6 +173,18 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         setSettings(prev => ({ ...prev, [key]: value }));
     };
 
+    const resetToDefaults = () => {
+        setSettings(prev => ({
+            ...DEFAULT_SETTINGS,
+            widget_url: prev.widget_url,
+            version: prev.version || DEFAULT_SETTINGS.version
+        }));
+    };
+
+    const hasUnsavedChanges = initialSettings
+        ? JSON.stringify(settings) !== JSON.stringify(initialSettings)
+        : false;
+
     const copyToClipboard = () => {
         navigator.clipboard.writeText(settings.widget_url);
         setCopied(true);
@@ -161,9 +197,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     if (loading) {
         const loadingContent = (
             <>
-                <div className="fixed inset-0 bg-black/80 z-[9999]" />
+                <div className="fixed inset-0 bg-black/90 z-[9999]" />
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-                    <div className="bg-gray-900 p-8 rounded-lg shadow-2xl">
+                <div className="bg-[#020308] p-8 rounded-lg shadow-2xl border border-[#0b1422]">
                         <div className="text-white">Загрузка...</div>
                     </div>
                 </div>
@@ -174,120 +210,349 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
     const modalContent = (
         <>
-            <div className="fixed inset-0 bg-black/80 z-[9999]" onClick={onClose} />
+            <div className="fixed inset-0 bg-black/90 z-[9999]" onClick={onClose} />
 
-            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
                 <div
-                    className="bg-gray-900 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto border border-gray-700"
+                    className="bg-[#020308] font-base rounded-xl max-w-5xl w-full h-[92vh] max-h-[92vh] overflow-hidden flex flex-col pointer-events-auto border border-[#0b1422] shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="border-b border-gray-700 p-4 flex items-center justify-between">
-                        <h2 className="text-xl font-bold text-white">Настройки ChatBox для OBS</h2>
-                        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+                    {/* Header */}
+                    <div className="border-b border-[#0b1422] px-5 py-3 flex items-center justify-between bg-[#05070f]">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-lg font-semibold text-white">Настройки ChatBox</h2>
+                            {hasUnsavedChanges && (
+                                <span className="text-[11px] text-amber-300 bg-amber-400/10 border border-amber-400/30 rounded-full px-2 py-0.5">
+                                    Изменения не сохранены
+                                </span>
+                            )}
+                        </div>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1 rounded hover:bg-white/10">
                             <X className="w-5 h-5" />
                         </button>
                     </div>
 
-                    <div className="flex-1 overflow-hidden p-6 flex flex-col gap-6">
-                        {/* Preview Panel - Fixed at Top */}
-                        <div className="shrink-0 h-[280px] border border-gray-700/50 rounded-lg overflow-hidden bg-black/50">
-                            <PreviewPanel settings={settings} previewMessages={PREVIEW_MESSAGES} />
-                        </div>
+                    {/* Content */}
+                    <div className="flex-1 overflow-auto p-5 flex flex-col lg:flex-row gap-6 min-h-0 bg-[#020308]">
+                        {/* Left: Preview */}
+                        <div className="lg:w-80 w-full flex-shrink-0 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
+                            <div className="flex-1 border border-[#0b1422] rounded-lg overflow-hidden bg-[#020308] min-h-[240px]">
+                                <PreviewPanel settings={settings} previewMessages={PREVIEW_MESSAGES} />
+                            </div>
 
-                        {/* Settings - Scrollable Below */}
-                        <div className="flex-1 overflow-y-auto min-h-0 pr-2">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
-                                <div className="space-y-6">
-                                    {/* OBS Link */}
-                                    <div className="space-y-2">
-                                        <Label className="text-white font-semibold">Ссылка для OBS</Label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                value={settings.widget_url || ''}
-                                                readOnly
-                                                className="bg-gray-800 text-white border-gray-600 font-mono text-xs flex-1"
-                                            />
-                                            <Button
-                                                onClick={copyToClipboard}
-                                                variant="outline"
-                                                size="sm"
-                                                className="border-gray-600 hover:bg-gray-700"
-                                            >
-                                                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                            </Button>
-                                            <Button
-                                                onClick={() => handleSave(true)}
-                                                variant="outline"
-                                                size="sm"
-                                                className="border-gray-600 hover:bg-gray-700"
-                                                title="Обновить токен"
-                                            >
-                                                <RefreshCw className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <FontSettings
-                                        fontFamily={settings.font_family}
-                                        fontSize={settings.font_size}
-                                        textStrokeWidth={settings.text_stroke_width}
-                                        onFontFamilyChange={(value) => handleChange('font_family', value)}
-                                        onFontSizeChange={(value) => handleChange('font_size', value)}
-                                        onTextStrokeWidthChange={(value) => handleChange('text_stroke_width', value)}
+                            {/* OBS URL */}
+                            <div className="space-y-2">
+                                <Label className="text-xs text-muted-foreground">Ссылка для OBS</Label>
+                                <div className="flex gap-1.5">
+                                    <Input
+                                        value={settings.widget_url || ''}
+                                        readOnly
+                                        className="bg-[#080d18] text-white border-[#111a2a] h-8 flex-1 truncate text-sm font-normal font-base"
                                     />
-
-                                    <ColorSettings
-                                        backgroundColor={settings.background_color || '#000000'}
-                                        backgroundOpacity={settings.background_opacity}
-                                        textStrokeColor={settings.text_stroke_color || '#000000'}
-                                        borderRadius={settings.border_radius || 8}
-                                        onBackgroundColorChange={(value) => handleChange('background_color', value)}
-                                        onBackgroundOpacityChange={(value) => handleChange('background_opacity', value)}
-                                        onTextStrokeColorChange={(value) => handleChange('text_stroke_color', value)}
-                                        onBorderRadiusChange={(value) => handleChange('border_radius', value)}
-                                    />
-                                </div>
-
-                                <div className="space-y-6">
-                                    <AnimationSettings
-                                        animationType={settings.animation_type}
-                                        animationDuration={settings.animation_duration}
-                                        messageFadeSeconds={settings.message_fade_seconds}
-                                        onAnimationTypeChange={(value) => handleChange('animation_type', value)}
-                                        onAnimationDurationChange={(value) => handleChange('animation_duration', value)}
-                                        onMessageFadeSecondsChange={(value) => handleChange('message_fade_seconds', value)}
-                                    />
-
-                                    <PlatformSettings
-                                        showPlatformIcons={settings.show_platform_icons}
-                                        showBadges={settings.show_badges}
-                                        show7tvEmotes={settings.show_7tv_emotes}
-                                        showLinks={settings.show_links}
-                                        maxMessages={settings.max_messages}
-                                        messageSpacing={settings.message_spacing}
-                                        chatDirection={settings.chat_direction}
-                                        chatWidth={settings.chat_width}
-                                        onShowPlatformIconsChange={(value) => handleChange('show_platform_icons', value)}
-                                        onShowBadgesChange={(value) => handleChange('show_badges', value)}
-                                        onShow7tvEmotesChange={(value) => handleChange('show_7tv_emotes', value)}
-                                        onShowLinksChange={(value) => handleChange('show_links', value)}
-                                        onMaxMessagesChange={(value) => handleChange('max_messages', value)}
-                                        onMessageSpacingChange={(value) => handleChange('message_spacing', value)}
-                                        onChatDirectionChange={(value) => handleChange('chat_direction', value)}
-                                        onChatWidthChange={(value) => handleChange('chat_width', value)}
-                                    />
+                                    <Button onClick={copyToClipboard} variant="outline" size="sm" className="border-slate-700 h-8 w-8 p-0">
+                                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                                    </Button>
+                                    <Button onClick={() => handleSave(true)} variant="outline" size="sm" className="border-slate-700 h-8 w-8 p-0" title="Обновить токен">
+                                        <RefreshCw className="w-3 h-3" />
+                                    </Button>
                                 </div>
                             </div>
                         </div>
+
+                        {/* Right: Settings Tabs */}
+                        <div className="flex-1 min-w-0 min-h-0">
+                            <Tabs defaultValue="appearance" className="h-full flex flex-col overflow-hidden min-h-0">
+                                <TabsList className="grid grid-cols-3 gap-1 p-1 rounded-lg border border-[#0b1422] bg-[#05070f] mb-4 font-base">
+                                    <TabsTrigger value="appearance" className="text-xs gap-1.5 rounded-md text-slate-300 data-[state=active]:bg-[#0b1220] data-[state=active]:text-white data-[state=active]:shadow-sm">
+                                        <Palette className="w-3 h-3" /> Внешний вид
+                                    </TabsTrigger>
+                                    <TabsTrigger value="animation" className="text-xs gap-1.5 rounded-md text-slate-300 data-[state=active]:bg-[#0b1220] data-[state=active]:text-white data-[state=active]:shadow-sm">
+                                        <Sparkles className="w-3 h-3" /> Анимация
+                                    </TabsTrigger>
+                                    <TabsTrigger value="display" className="text-xs gap-1.5 rounded-md text-slate-300 data-[state=active]:bg-[#0b1220] data-[state=active]:text-white data-[state=active]:shadow-sm">
+                                        <Settings2 className="w-3 h-3" /> Отображение
+                                    </TabsTrigger>
+                                </TabsList>
+
+                                {/* Appearance Tab */}
+                                <TabsContent value="appearance" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
+                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                        <div className="text-[11px] uppercase tracking-wider text-slate-400">Типографика</div>
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Шрифт</Label>
+                                                <Select
+                                                    value={settings.font_family}
+                                                    onValueChange={(v) => handleChange('font_family', v)}
+                                                >
+                                                    <SelectTrigger className="h-9 bg-[#080d18] border-[#111a2a] text-sm font-normal font-base">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-[#05080f] border-[#0b1422] z-[11000] font-base">
+                                                        {FONT_OPTIONS.map(font => (
+                                                            <SelectItem key={font} value={font} style={{ fontFamily: font }}>
+                                                                {font}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Размер</Label>
+                                                <SliderWithInput
+                                                    value={settings.font_size}
+                                                    onChange={(v) => handleChange('font_size', v)}
+                                                    min={8}
+                                                    max={32}
+                                                    step={1}
+                                                    unit="px"
+                                                    inputWidth={56}
+                                                    inputClassName="text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                        <div className="text-[11px] uppercase tracking-wider text-slate-400">Цвета</div>
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Цвет фона</Label>
+                                                <ColorInput
+                                                    value={settings.background_color || '#000000'}
+                                                    onChange={(v) => handleChange('background_color', v)}
+                                                />
+                                                <div className="space-y-1.5">
+                                                    <span className="text-[11px] text-muted-foreground">Прозрачность</span>
+                                                    <SliderWithInput
+                                                        value={Math.round(settings.background_opacity * 100)}
+                                                        onChange={(v) => handleChange('background_opacity', v / 100)}
+                                                        min={0}
+                                                        max={100}
+                                                        step={5}
+                                                        unit="%"
+                                                        inputWidth={56}
+                                                        inputClassName="text-sm"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Цвет текста</Label>
+                                                <ColorInput
+                                                    value={settings.text_color || '#FFFFFF'}
+                                                    onChange={(v) => handleChange('text_color', v)}
+                                                />
+                                                <div className="space-y-2">
+                                                    <Label className="text-xs text-muted-foreground">Цвет никнейма</Label>
+                                                    <ColorInput
+                                                        value={settings.username_color || '#9147FF'}
+                                                        onChange={(v) => handleChange('username_color', v)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">Обводка текста</Label>
+                                            <ColorInput
+                                                value={settings.text_stroke_color || '#000000'}
+                                                onChange={(v) => handleChange('text_stroke_color', v)}
+                                            />
+                                            <div className="space-y-1.5">
+                                                <span className="text-[11px] text-muted-foreground">Толщина</span>
+                                                <SliderWithInput
+                                                    value={settings.text_stroke_width}
+                                                    onChange={(v) => handleChange('text_stroke_width', v)}
+                                                    min={0}
+                                                    max={3}
+                                                    step={0.5}
+                                                    unit="px"
+                                                    inputWidth={56}
+                                                    inputClassName="text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-3">
+                                        <div className="text-[11px] uppercase tracking-wider text-slate-400">Скругление</div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">Скругление углов</Label>
+                                            <SliderWithInput
+                                                value={settings.border_radius ?? 8}
+                                                onChange={(v) => handleChange('border_radius', v)}
+                                                min={0}
+                                                max={32}
+                                                step={1}
+                                                unit="px"
+                                                inputWidth={56}
+                                                inputClassName="text-sm"
+                                            />
+                                        </div>
+                                    </div>
+                                </TabsContent>
+
+                                {/* Animation Tab */}
+                                <TabsContent value="animation" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
+                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                        <div className="text-[11px] uppercase tracking-wider text-slate-400">Анимация</div>
+                                        <div className="space-y-2">
+                                            <Label className="text-xs text-muted-foreground">Тип анимации</Label>
+                                            <Select
+                                                value={settings.animation_type}
+                                                onValueChange={(v) => handleChange('animation_type', v)}
+                                            >
+                                                <SelectTrigger className="h-9 bg-[#080d18] border-[#111a2a] text-sm font-normal font-base">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-[#05080f] border-[#0b1422] z-[11000] font-base">
+                                                    {ANIMATION_OPTIONS.map(option => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Длительность</Label>
+                                                <SliderWithInput
+                                                    value={settings.animation_duration}
+                                                    onChange={(v) => handleChange('animation_duration', v)}
+                                                    min={0}
+                                                    max={2000}
+                                                    step={50}
+                                                    unit="ms"
+                                                    inputWidth={56}
+                                                    inputClassName="text-sm"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Исчезание</Label>
+                                                <SliderWithInput
+                                                    value={settings.message_fade_seconds}
+                                                    onChange={(v) => handleChange('message_fade_seconds', v)}
+                                                    min={10}
+                                                    max={60}
+                                                    step={5}
+                                                    unit="с"
+                                                    inputWidth={56}
+                                                    inputClassName="text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </TabsContent>
+
+                                {/* Display Tab */}
+                                <TabsContent value="display" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
+                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-3">
+                                        <div className="text-[11px] uppercase tracking-wider text-slate-400">Отображение</div>
+                                        <div className="grid gap-3 sm:grid-cols-2">
+                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                                <Label className="text-sm text-slate-200">Иконки платформ</Label>
+                                                <Switch checked={settings.show_platform_icons} onCheckedChange={(v) => handleChange('show_platform_icons', v)} />
+                                            </div>
+                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                                <Label className="text-sm text-slate-200">Значки (badges)</Label>
+                                                <Switch checked={settings.show_badges} onCheckedChange={(v) => handleChange('show_badges', v)} />
+                                            </div>
+                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                                <Label className="text-sm text-slate-200">7TV Эмодзи</Label>
+                                                <Switch checked={settings.show_7tv_emotes} onCheckedChange={(v) => handleChange('show_7tv_emotes', v)} />
+                                            </div>
+                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                                <Label className="text-sm text-slate-200">Ссылки</Label>
+                                                <Switch checked={settings.show_links} onCheckedChange={(v) => handleChange('show_links', v)} />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                        <div className="text-[11px] uppercase tracking-wider text-slate-400">Разметка</div>
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Ширина</Label>
+                                                <SliderWithInput
+                                                    value={settings.chat_width}
+                                                    onChange={(v) => handleChange('chat_width', v)}
+                                                    min={20}
+                                                    max={100}
+                                                    step={1}
+                                                    unit="%"
+                                                    inputWidth={56}
+                                                    inputClassName="text-sm"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Направление</Label>
+                                            <Select
+                                                value={settings.chat_direction}
+                                                onValueChange={(v) => handleChange('chat_direction', v)}
+                                            >
+                                                <SelectTrigger className="h-9 bg-[#080d18] border-[#111a2a] text-sm font-normal font-base">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-[#05080f] border-[#0b1422] z-[11000] font-base">
+                                                    {CHAT_DIRECTION_OPTIONS.map(option => (
+                                                        <SelectItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        </div>
+
+                                        <div className="grid gap-4 md:grid-cols-2">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Макс. сообщений</Label>
+                                                <SliderWithInput
+                                                    value={settings.max_messages}
+                                                    onChange={(v) => handleChange('max_messages', v)}
+                                                    min={1}
+                                                    max={50}
+                                                    step={1}
+                                                    inputWidth={56}
+                                                    inputClassName="text-sm"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Отступ</Label>
+                                                <SliderWithInput
+                                                    value={settings.message_spacing}
+                                                    onChange={(v) => handleChange('message_spacing', v)}
+                                                    min={0}
+                                                    max={32}
+                                                    step={1}
+                                                    unit="px"
+                                                    inputWidth={56}
+                                                    inputClassName="text-sm"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+                        </div>
                     </div>
 
-                    <div className="border-t border-gray-700 p-4 flex justify-end gap-2">
-                        <Button variant="outline" onClick={onClose} className="border-gray-600">
-                            Отмена
-                        </Button>
-                        <Button onClick={() => handleSave(false)} disabled={saving}>
-                            {saving ? 'Сохранение...' : 'Сохранить'}
-                        </Button>
+                    {/* Footer */}
+                    <div className="border-t border-[#0b1422] px-5 py-3 flex items-center justify-between gap-2 bg-[#05070f]">
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={resetToDefaults} className="border-slate-700">
+                                Сбросить
+                            </Button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" onClick={onClose} className="border-slate-700">
+                                Отмена
+                            </Button>
+                            <Button onClick={() => handleSave(false)} disabled={saving}>
+                                {saving ? 'Сохранение...' : 'Сохранить'}
+                            </Button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -298,3 +563,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 };
 
 export default ChatBoxSettingsModal;
+
+
+
+

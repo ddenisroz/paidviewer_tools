@@ -1,0 +1,337 @@
+# bot_service/services/vk_bot_oauth_service.py
+"""
+Сервис для управления OAuth токеном VK Live бота с автообновлением.
+"""
+
+import logging
+import httpx
+import base64
+from datetime import timedelta
+from typing import Optional, Dict, Any
+from sqlalchemy.orm import Session
+
+from core.config import settings
+from core.database import db_session
+from models.bot_token import BotToken
+from core.token_encryption import encrypt_token, decrypt_token
+from core.datetime_utils import utcnow_naive
+from repositories.bot_token_repository import BotTokenRepository
+
+logger = logging.getLogger(__name__)
+
+
+class VkBotOAuthService:
+    """Сервис для OAuth авторизации VK Live бота с refresh token"""
+    
+    # Scopes для бота
+    BOT_SCOPES = [
+        'offline'
+    ]
+    
+    @staticmethod
+    def get_authorization_url(state: str) -> str:
+        """
+        Получить URL для OAuth авторизации бота.
+        """
+        import urllib.parse
+        
+        scopes = ' '.join(VkBotOAuthService.BOT_SCOPES)
+        redirect_uri = f"{settings.backend_url}/auth/vk/bot/callback"
+        
+        params = {
+            "client_id": settings.vk_client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": scopes,
+            "state": state
+        }
+        
+        query_string = urllib.parse.urlencode(params)
+        
+        auth_url = f"https://auth.live.vkvideo.ru/app/oauth2/authorize?{query_string}"
+        
+        return auth_url
+    
+    @staticmethod
+    async def exchange_code_for_token(code: str) -> Dict[str, Any]:
+        """
+        Обменять authorization code на access token и refresh token.
+        """
+        if not all([settings.vk_client_id, settings.vk_client_secret]):
+            raise ValueError("VK credentials not configured")
+        
+        redirect_uri = f"{settings.backend_url}/auth/vk/bot/callback"
+        
+        # Basic Auth
+        credentials = f"{settings.vk_client_id}:{settings.vk_client_secret}"
+        base64_credentials = base64.b64encode(credentials.encode()).decode()
+
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": f"Basic {base64_credentials}"
+        }
+
+        async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
+            response = await client.post(
+                "https://api.live.vkvideo.ru/oauth/server/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": redirect_uri
+                },
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                error_body = response.text
+                logger.error(f"Failed to exchange code for token: {error_body}")
+                raise Exception(f"Token exchange failed: {error_body}")
+            
+            data = response.json()
+            
+            logger.info("[OK] [VK BOT OAUTH] Successfully exchanged code for tokens")
+            logger.info(f"[INFO] Token expires in: {data.get('expires_in')} seconds")
+            
+            return data
+    
+    @staticmethod
+    async def get_bot_user_info(access_token: str) -> Dict[str, Any]:
+        """
+        Получить информацию о боте через API.
+        """
+        ssl_verify = settings.is_production
+        # Check dev API first, then prod
+        async with httpx.AsyncClient(timeout=10.0, verify=ssl_verify) as client:
+            # Try Dev API
+            try:
+                 response = await client.get(
+                      "https://apidev.live.vkvideo.ru/v1/current_user",
+                      headers={"Authorization": f"Bearer {access_token}"}
+                 )
+                 if response.status_code == 200:
+                      data = response.json()
+                      user = data.get("data", {}).get("user", {})
+                      return {
+                           'id': str(user.get('id')),
+                           'login': user.get('nick'),
+                           'display_name': user.get('nick')
+                      }
+            except Exception as e:
+                 logger.warning(f"Dev API check failed: {e}")
+
+            # Try Prod API fallback
+            try:
+                 response = await client.get(
+                      "https://api.live.vkvideo.ru/v1/current_user",
+                      headers={"Authorization": f"Bearer {access_token}"}
+                 )
+                 if response.status_code == 200:
+                      data = response.json()
+                      user = data.get("data", {}).get("user", {})
+                      return {
+                           'id': str(user.get('id')),
+                           'login': user.get('nick'),
+                           'display_name': user.get('nick')
+                      }
+            except Exception as e:
+                 logger.warning(f"Prod API check failed: {e}")
+
+            raise Exception("Failed to get VK user info")
+    
+    @staticmethod
+    async def save_bot_token(
+        access_token: str,
+        refresh_token: str,
+        expires_in: int,
+        scopes: list,
+        bot_user_id: str,
+        bot_login: str,
+        db: Optional[Session] = None
+    ) -> bool:
+        """
+        Сохранить токен бота в базу данных.
+        """
+        def _save(session_db: Session) -> bool:
+            try:
+                repo = BotTokenRepository(session_db)
+                # Ищем существующий токен бота для VK
+                bot_token = repo.get_by_platform('vk')
+                
+                expires_at = utcnow_naive() + timedelta(seconds=expires_in)
+                
+                if bot_token:
+                    # Обновляем существующий
+                    bot_token.access_token = encrypt_token(access_token)
+                    if refresh_token:
+                        bot_token.refresh_token = encrypt_token(refresh_token)
+                    bot_token.expires_at = expires_at
+                    bot_token.scopes = scopes
+                    bot_token.bot_user_id = bot_user_id
+                    bot_token.bot_login = bot_login
+                    bot_token.updated_at = utcnow_naive()
+                    logger.info(f"[UPDATE] Updated VK bot token for {bot_login}")
+                else:
+                    # Создаем новый
+                    bot_token = BotToken(
+                        platform='vk',
+                        access_token=encrypt_token(access_token),
+                        refresh_token=encrypt_token(refresh_token) if refresh_token else None,
+                        expires_at=expires_at,
+                        scopes=scopes,
+                        bot_user_id=bot_user_id,
+                        bot_login=bot_login
+                    )
+                    logger.info(f"[CREATE] Created VK bot token for {bot_login}")
+                
+                repo.save(bot_token)
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error saving VK bot token: {e}")
+                session_db.rollback()
+                return False
+        
+        if db is not None:
+            return _save(db)
+        
+        with db_session() as new_db:
+            return _save(new_db)
+    
+    @staticmethod
+    async def get_bot_token(db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
+        """
+        Получить токен бота из базы данных.
+        """
+        def _get(session_db: Session) -> Optional[Dict[str, Any]]:
+            repo = BotTokenRepository(session_db)
+            bot_token = repo.get_by_platform('vk')
+            
+            if not bot_token:
+                return None
+            
+            return {
+                'access_token': decrypt_token(bot_token.access_token),
+                'refresh_token': decrypt_token(bot_token.refresh_token) if bot_token.refresh_token else None,
+                'expires_at': bot_token.expires_at,
+                'bot_login': bot_token.bot_login,
+                'bot_user_id': bot_token.bot_user_id
+            }
+        
+        if db is not None:
+            return _get(db)
+        
+        with db_session() as new_db:
+            return _get(new_db)
+    
+    @staticmethod
+    async def refresh_bot_token(db: Optional[Session] = None) -> bool:
+        """
+        Обновить токен бота используя refresh_token.
+        """
+        def _refresh(session_db: Session) -> bool:
+            try:
+                repo = BotTokenRepository(session_db)
+                bot_token = repo.get_by_platform('vk')
+                
+                if not bot_token or not bot_token.refresh_token:
+                    logger.error("[ERROR] No VK bot token or refresh token found")
+                    return False
+                
+                refresh_token = decrypt_token(bot_token.refresh_token)
+                
+                logger.info("[REFRESH] Refreshing VK bot token...")
+                
+                # Basic Auth for Refresh
+                credentials = f"{settings.vk_client_id}:{settings.vk_client_secret}"
+                base64_credentials = base64.b64encode(credentials.encode()).decode()
+
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Authorization": f"Basic {base64_credentials}"
+                }
+
+                # Выполняем refresh запрос
+                async def _do_refresh():
+                    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+                        return await client.post(
+                            "https://api.live.vkvideo.ru/oauth/server/token",
+                            data={
+                                "grant_type": "refresh_token",
+                                "refresh_token": refresh_token
+                            },
+                            headers=headers
+                        )
+                
+                import asyncio
+                response = asyncio.run(_do_refresh())
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Обновляем токен в БД
+                    bot_token.access_token = encrypt_token(data["access_token"])
+                    if data.get("refresh_token"):
+                        bot_token.refresh_token = encrypt_token(data["refresh_token"])
+                    bot_token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
+                    bot_token.updated_at = utcnow_naive()
+                    
+                    repo.save(bot_token)
+                    
+                    logger.info(f"[OK] VK bot token refreshed for {bot_token.bot_login}")
+                    return True
+                
+                else:
+                    logger.error(f"[ERROR] Failed to refresh VK bot token: {response.status_code} - {response.text}")
+                    return False
+                
+            except Exception as e:
+                logger.error(f"Error refreshing VK bot token: {e}")
+                session_db.rollback()
+                return False
+        
+        if db is not None:
+            return _refresh(db)
+        
+        with db_session() as new_db:
+            return _refresh(new_db)
+    
+    @staticmethod
+    async def refresh_if_needed(db: Optional[Session] = None) -> bool:
+        """
+        Проверить и обновить токен если истекает в течение 7 дней.
+        """
+        def _check_and_refresh(session_db: Session) -> bool:
+            repo = BotTokenRepository(session_db)
+            bot_token = repo.get_by_platform('vk')
+            
+            if not bot_token:
+                logger.warning("[WARN] No VK bot token found in database")
+                return False
+            
+            if not bot_token.expires_at:
+                logger.debug("[INFO] Bot token has no expiration date")
+                return True
+            
+            days_left = (bot_token.expires_at - utcnow_naive()).days
+            
+            if days_left >= 7:
+                logger.debug(f"[INFO] VK Bot token valid for {days_left} more days")
+                return True
+            
+            logger.info(f"[REFRESH] VK Bot token expires in {days_left} days, refreshing...")
+            return VkBotOAuthService.refresh_bot_token(session_db)
+        
+        try:
+            if db is not None:
+                return _check_and_refresh(db)
+            
+            with db_session() as new_db:
+                return _check_and_refresh(new_db)
+                
+        except Exception as e:
+            logger.error(f"Error checking bot token expiration: {e}")
+            return False
+
+
+# Глобальный экземпляр
+vk_bot_oauth_service = VkBotOAuthService()

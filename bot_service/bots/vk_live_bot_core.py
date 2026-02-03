@@ -402,6 +402,36 @@ class VKLiveBotCore:
                                 if stored_reward_id:
                                     reward_id = stored_reward_id
                                     logger.info(f"[OK] [VK MSG] Matched TTS reward_id: {reward_id}")
+
+                            # Обработка награды для заказа YouTube
+                            youtube_settings = getattr(tts_settings, 'youtube_settings', None) or {}
+                            if youtube_settings.get('requests_reward_enabled') and youtube_settings.get('requests_reward_platform', 'twitch') == 'vk':
+                                configured_reward = (youtube_settings.get('requests_reward_id') or '').strip()
+                                if configured_reward and configured_reward.lower() == reward_title.lower():
+                                    import re
+                                    from services.youtube.queue_service import QueueService
+
+                                    reward_pattern = r'^.*?получает награду:\s*[^\n]+?\s*за\s*\d+\s*\n*'
+                                    cleaned_text = re.sub(reward_pattern, '', text, flags=re.MULTILINE).strip()
+                                    viewer_name = text.split('получает награду')[0].strip() if 'получает награду' in text else 'viewer'
+
+                                    if cleaned_text:
+                                        queue_service = QueueService()
+                                        result = await queue_service.add_video_to_queue(
+                                            user_id=channel_owner.id,
+                                            video_url=cleaned_text,
+                                            channel_name=channel_id,
+                                            platform='vk',
+                                            requester_name=viewer_name,
+                                            requester_id=viewer_name,
+                                            is_paid=True,
+                                            db=db
+                                        )
+                                        if result.get('success'):
+                                            await self.send_message(channel_id, f"@{viewer_name} видео добавлено: {result.get('video_info', {}).get('title', 'Video')[:40]}")
+                                        else:
+                                            await self.send_message(channel_id, f"@{viewer_name} ошибка добавления: {result.get('error')}")
+                                        return
                     finally:
                         db.close()
 

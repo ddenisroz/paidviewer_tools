@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Edit, Globe, Lock, Settings, TestTube2, Trash2, Upload, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { TTS_SERVICE_URL } from '@/constants';
+import { API_BASE_URL, TTS_SERVICE_URL } from '@/constants';
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { useTts } from '@/context/TtsContext';
@@ -534,7 +534,9 @@ const VoiceManagementPageContent: React.FC = () => {
                 try {
                     let fullAudioUrl = audioUrl;
                     if (!audioUrl.startsWith('http')) {
-                        fullAudioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
+                        // Use API_BASE_URL because the test request is sent to the Main API (Bot Service)
+                        // and it returns a path relative to itself (or served via its static files)
+                        fullAudioUrl = `${API_BASE_URL}${audioUrl}`;
                     }
 
                     logger.log('Playing test audio:', fullAudioUrl);

@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+
 import { CheckCircle, Loader2, Save, Tag } from 'lucide-react';
-import type { StreamCategory } from '@/types/stream';
+
 
 import { categoryMapping } from '@/constants/categoryMapping';
 import { useData } from '@/context/DataContext';
@@ -12,8 +13,11 @@ import { Input } from '@/shared/components/ui/input';
 import { useDebounce } from '@/shared/hooks/useDebounce';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
+
 import { StreamCardLayout } from './StreamCardLayout';
 import { StreamCategoryDropdown } from './StreamCategoryDropdown';
+
+import type { StreamCategory } from '@/types/stream';
 
 interface StreamCategoryCardProps {
 }

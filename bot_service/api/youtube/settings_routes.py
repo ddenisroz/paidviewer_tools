@@ -27,6 +27,7 @@ class YouTubeSettingsResponse(BaseModel):
     requests_command_enabled: bool = Field(default=True, description="Разрешить заказ через команду !sr")
     requests_reward_enabled: bool = Field(default=False, description="Разрешить заказ через награду")
     requests_reward_id: Optional[str] = Field(None, description="ID награды для заказа")
+    requests_reward_platform: Literal['twitch', 'vk'] = Field(default='twitch', description="Платформа награды для заказа")
 
 
 class YouTubeSettingsUpdate(BaseModel):
@@ -36,6 +37,7 @@ class YouTubeSettingsUpdate(BaseModel):
     requests_command_enabled: Optional[bool] = Field(None, description="Разрешить заказ через команду !sr")
     requests_reward_enabled: Optional[bool] = Field(None, description="Разрешить заказ через награду")
     requests_reward_id: Optional[str] = Field(None, description="ID награды для заказа")
+    requests_reward_platform: Optional[Literal['twitch', 'vk']] = Field(None, description="Платформа награды для заказа")
 
 
 def _get_youtube_settings_from_tts(tts_settings) -> dict:
@@ -46,7 +48,8 @@ def _get_youtube_settings_from_tts(tts_settings) -> dict:
         'volume_level': youtube_settings.get('volume_level', 100),
         'requests_command_enabled': youtube_settings.get('requests_command_enabled', True),
         'requests_reward_enabled': youtube_settings.get('requests_reward_enabled', False),
-        'requests_reward_id': youtube_settings.get('requests_reward_id', None)
+        'requests_reward_id': youtube_settings.get('requests_reward_id', None),
+        'requests_reward_platform': youtube_settings.get('requests_reward_platform', 'twitch')
     }
 
 
@@ -110,6 +113,8 @@ async def save_youtube_settings(
             youtube_settings['requests_reward_enabled'] = settings.requests_reward_enabled
         if settings.requests_reward_id is not None:
             youtube_settings['requests_reward_id'] = settings.requests_reward_id
+        if settings.requests_reward_platform is not None:
+            youtube_settings['requests_reward_platform'] = settings.requests_reward_platform
         
         # Save back using repository
         repo.update_settings(tts_settings, {'youtube_settings': youtube_settings})
@@ -121,7 +126,8 @@ async def save_youtube_settings(
             volume_level=youtube_settings.get('volume_level', 100),
             requests_command_enabled=youtube_settings.get('requests_command_enabled', True),
             requests_reward_enabled=youtube_settings.get('requests_reward_enabled', False),
-            requests_reward_id=youtube_settings.get('requests_reward_id', None)
+            requests_reward_id=youtube_settings.get('requests_reward_id', None),
+            requests_reward_platform=youtube_settings.get('requests_reward_platform', 'twitch')
         )
         
     except Exception as e:

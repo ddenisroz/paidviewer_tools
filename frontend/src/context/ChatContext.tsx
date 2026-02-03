@@ -21,6 +21,8 @@ import { useAudioUnlock } from '@/shared/hooks/useAudioUnlock';
 import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
 import { logger } from '@/shared/utils/prodLogger';
 
+import { useLocation } from 'react-router-dom';
+
 import { useAuth } from './AuthContext';
 import { useIntegrations } from './IntegrationsContext';
 
@@ -64,6 +66,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const { user, isAuthenticated, isCheckingAuth } = useAuth();
     const { integrations, isLoading: integrationsLoading } = useIntegrations();
     const { addToast: _addToast } = useToast();
+    const location = useLocation();
+
+    const isBotStatusPage =
+        location.pathname.startsWith('/dashboard/chat-analysis') ||
+        location.pathname.startsWith('/dashboard/dolbaebadmintts');
+    const botStatusPollInterval = isBotStatusPage ? 30000 : 120000;
 
     // State
     const [error, setError] = useState<string | null>(null);
@@ -91,7 +99,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         getBotConnectionStatus
     } = useBotConnection({
         isAuthenticated: !!isAuthenticated,
-        isCheckingAuth: isCheckingAuth ?? false
+        isCheckingAuth: isCheckingAuth ?? false,
+        pollingInterval: botStatusPollInterval
     });
 
     // WebSocket message handler hook

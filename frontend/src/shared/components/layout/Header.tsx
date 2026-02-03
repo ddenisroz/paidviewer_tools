@@ -1,17 +1,18 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
-import { ChevronDown, Check, LogOut, Settings, Settings2 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { cn } from '@/lib/utils';
+import { Check, ChevronDown, LogOut, Settings, Settings2 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
+import { cn } from '@/lib/utils';
 import { authService } from '@/services/api/services/authService';
 import { integrationsService } from '@/services/api/services/integrationsService';
-import { TwitchIcon, VKIcon, DonationAlertsIcon } from '@/shared/components/PlatformIcons';
+import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { logger } from '@/shared/utils/prodLogger';
-import { saveReturnUrl } from '@/utils/urlUtils';
 import { useLayoutStore } from '@/store/useLayoutStore';
+import { saveReturnUrl } from '@/utils/urlUtils';
 
 import { Button } from '../ui/button';
 

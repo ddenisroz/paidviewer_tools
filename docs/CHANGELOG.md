@@ -4,6 +4,48 @@
 
 ---
 
+## [0.05-hotfix-3] - 2026-02-03
+
+- Reduced background polling intervals for YouTube queue, TTS status, bot status, and stream info.
+- Stream info/history polling now scales down outside the dashboard home.
+- Drops config/rewards use short server-side cache, and dashboard quick actions refresh less frequently.
+- Stream title/category changes now broadcast to clients via WebSocket for immediate UI sync.
+- Dashboard stream info polling increased to 120s; VK stream info now uses the same 60s server cache.
+
+## [0.05-hotfix-2] - 2026-02-02
+
+- ChatOverlay: message bubbles use settings background/opacity; avatars show initials fallback when URL missing.
+- ChatOverlay: 7TV channel emotes now load via `twitch_user_id` from chatbox widget settings.
+
+### YouTube Player
+- GlobalPlayer moved out of Sidebar to avoid transform-contained fixed positioning (mini-player visible on all dashboard tabs).
+- YouTube page now re-registers the player container when a video appears (fixes missing player after queue loads).
+- ReactPlayer wrapper now calls internal YouTube methods (fixes mute/volume recursion and restores controls).
+- Mini-player controls layout refreshed to avoid overlap and improve click targets.
+- Mini-player now renders into a sidebar slot when available (keeps it inside the nav panel).
+- Disabled PiP auto-request to avoid InvalidStateError on mount.
+- ReactPlayer v3 uses `src` prop (not `url`), fixing YouTube player rendering.
+
+### ChatBox UI & Emotes
+- ChatBox settings: обновлён выбор цвета (кнопка-свотч + hex), улучшен фокус и читаемость.
+- ChatBox settings: добавлены цвета текста/никнейма, корректно применяются значения 0 для скруглений/отступов.
+- UI: обновлён стиль слайдеров (более компактный ползунок, без визуального наложения).
+- 7TV: исправлено распознавание эмотов, отображение работает в предпросмотре и чате.
+- ChatBox: отображение аватаров отключено и удалено из UI.
+- Типы: добавлен `auto_load_images` в ChatBoxSettings (frontend).
+- Типы: добавлен `twitch_user_id` в ChatBoxSettings (frontend).
+
+## [0.05-hotfix] - 2026-02-01
+
+### ChatBox & TTS UI Fixes
+- ChatBox settings: живой предпросмотр для ссылок/эмоций/ширины, стабильный layout модалки, кнопка сброса.
+- ChatBox settings: синхронизация направлений/анимаций с реальным виджетом + корректные диапазоны слайдеров.
+- ChatBox settings: исправлен выбор цветов, выровнены шрифты/лейаут инпутов, улучшен предпросмотр.
+- ChatBox settings: скрытие ссылок при выключении, тёмная палитра модалки, 7TV эмоты в предпросмотре.
+- TTS: восстановлен export `useSetTtsListeningMode` для страницы TTS.
+- ChatOverlay: fixed settings parsing so history/WebSocket can initialize when token response isn't wrapped in data.
+- ChatBox settings: refreshed layout + darker palette, fixed dropdown layering and color picker usability.
+
 ## [0.05-final] - 2026-01-09
 
 ### Code Quality & ESLint Fixes

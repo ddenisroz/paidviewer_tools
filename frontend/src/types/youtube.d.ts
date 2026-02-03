@@ -11,6 +11,7 @@ export interface YoutubeSettings {
   requests_command_enabled?: boolean;
   requests_reward_enabled?: boolean;
   requests_reward_id?: string | null;
+  requests_reward_platform?: 'twitch' | 'vk';
 }
 
 /**
@@ -60,6 +61,11 @@ export interface YoutubeQueue {
   queue: YoutubeVideo[];
   current_video?: YoutubeVideo;
   is_playing: boolean;
+  skip_votes?: {
+    current: number;
+    required: number;
+    video_id?: number | string | null;
+  };
 }
 
 /**

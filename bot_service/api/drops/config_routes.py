@@ -8,10 +8,54 @@ from pydantic import BaseModel, Field
 
 from core.database import get_db
 from auth.auth import get_current_user_optional
+from utils.cache import get_cached, invalidate_cache
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/drops", tags=["drops"])
+DROP_CONFIG_CACHE_TTL = 60
+
+
+def _build_config_response(config) -> dict:
+    streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)
+    widget_token_val = getattr(config, 'widget_token', None)
+    streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
+    streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
+
+    return {
+        "success": True,
+        "data": {
+            "id": config.id,
+            "channel_name": config.channel_name,
+            "platform": config.platform,
+            "streak_days_common": config.streak_days_common,
+            "streak_days_rare": config.streak_days_rare,
+            "streak_days_epic": config.streak_days_epic,
+            "streak_days_legendary": config.streak_days_legendary,
+            "streak_messages_required": config.streak_messages_required,
+            "streak_reset_on_skip": streak_reset_on_skip,
+            "streak_enabled_twitch": streak_enabled_twitch,
+            "streak_enabled_vk": streak_enabled_vk,
+            "donation_enabled": config.donation_enabled,
+            "donation_amount_common": config.donation_amount_common,
+            "donation_amount_rare": config.donation_amount_rare,
+            "donation_amount_epic": config.donation_amount_epic,
+            "donation_amount_legendary": config.donation_amount_legendary,
+            "mythical_enabled": config.mythical_enabled,
+            "mythical_min_interval_hours": config.mythical_min_interval_hours,
+            "mythical_max_interval_hours": config.mythical_max_interval_hours,
+            "mythical_window_duration_minutes": config.mythical_window_duration_minutes,
+            "mythical_donation_amount": config.mythical_donation_amount,
+            "mythical_last_appeared": config.mythical_last_appeared,
+            "widget_spinning_duration_ms": config.widget_spinning_duration_ms,
+            "widget_opening_duration_ms": config.widget_opening_duration_ms,
+            "widget_result_duration_ms": config.widget_result_duration_ms,
+            "widget_closing_duration_ms": config.widget_closing_duration_ms,
+            "widget_token": widget_token_val,
+            "created_at": config.created_at,
+            "updated_at": config.updated_at
+        }
+    }
 
 
 # === PYDANTIC MODELS ===
@@ -128,62 +172,30 @@ async def get_drops_config(
         from services.drops.drops_service import DropsService
         drops_service = DropsService(db)
 
-        config = drops_service.get_config(
-            user_id=user_id,
-            session_id=session_id,
-            channel_name=channel_name,
-            platform=platform
-        )
+        cache_key = f"drops_config:{user_id}:{channel_name}:{platform or 'global'}"
+        if widget_token:
+            cache_key = f"{cache_key}:token:{widget_token}"
 
-        if not config:
-            config = drops_service.create_or_update_config(
+        def _load_config():
+            config = drops_service.get_config(
                 user_id=user_id,
                 session_id=session_id,
                 channel_name=channel_name,
-                platform=platform,
-                config_data={}
+                platform=platform
             )
 
-        # Безопасное получение полей
-        streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)
-        widget_token_val = getattr(config, 'widget_token', None)
-        streak_enabled_twitch = getattr(config, 'streak_enabled_twitch', False)
-        streak_enabled_vk = getattr(config, 'streak_enabled_vk', False)
+            if not config:
+                config = drops_service.create_or_update_config(
+                    user_id=user_id,
+                    session_id=session_id,
+                    channel_name=channel_name,
+                    platform=platform,
+                    config_data={}
+                )
 
-        return {
-            "success": True,
-            "data": {
-                "id": config.id,
-                "channel_name": config.channel_name,
-                "platform": config.platform,
-                "streak_days_common": config.streak_days_common,
-                "streak_days_rare": config.streak_days_rare,
-                "streak_days_epic": config.streak_days_epic,
-                "streak_days_legendary": config.streak_days_legendary,
-                "streak_messages_required": config.streak_messages_required,
-                "streak_reset_on_skip": streak_reset_on_skip,
-                "streak_enabled_twitch": streak_enabled_twitch,
-                "streak_enabled_vk": streak_enabled_vk,
-                "donation_enabled": config.donation_enabled,
-                "donation_amount_common": config.donation_amount_common,
-                "donation_amount_rare": config.donation_amount_rare,
-                "donation_amount_epic": config.donation_amount_epic,
-                "donation_amount_legendary": config.donation_amount_legendary,
-                "mythical_enabled": config.mythical_enabled,
-                "mythical_min_interval_hours": config.mythical_min_interval_hours,
-                "mythical_max_interval_hours": config.mythical_max_interval_hours,
-                "mythical_window_duration_minutes": config.mythical_window_duration_minutes,
-                "mythical_donation_amount": config.mythical_donation_amount,
-                "mythical_last_appeared": config.mythical_last_appeared,
-                "widget_spinning_duration_ms": config.widget_spinning_duration_ms,
-                "widget_opening_duration_ms": config.widget_opening_duration_ms,
-                "widget_result_duration_ms": config.widget_result_duration_ms,
-                "widget_closing_duration_ms": config.widget_closing_duration_ms,
-                "widget_token": widget_token_val,
-                "created_at": config.created_at,
-                "updated_at": config.updated_at
-            }
-        }
+            return _build_config_response(config)
+
+        return get_cached(cache_key, _load_config, ttl=DROP_CONFIG_CACHE_TTL)
 
     except HTTPException:
         raise
@@ -255,6 +267,8 @@ async def update_drops_config(
                 logger.debug(f"[REFRESH] [DROPS CONFIG] Sent cache invalidation to user {user_id}")
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket notification for drops config: {ws_error}")
+
+        invalidate_cache(f"drops_config:{user_id}:{channel_name}:")
 
         # Безопасное получение полей
         streak_reset_on_skip = getattr(config, 'streak_reset_on_skip', True)

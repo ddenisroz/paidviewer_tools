@@ -1,9 +1,9 @@
 import React from 'react';
 
 import { Label } from '@/shared/components/ui/label';
-import { Switch } from '@/shared/components/ui/switch';
-import { Slider } from '@/shared/components/ui/slider';
 import { Separator } from '@/shared/components/ui/separator';
+import { Slider } from '@/shared/components/ui/slider';
+import { Switch } from '@/shared/components/ui/switch';
 
 interface PlatformSettingsProps {
     showPlatformIcons: boolean;

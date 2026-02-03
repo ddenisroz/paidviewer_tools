@@ -1,4 +1,7 @@
-﻿import { logger } from '@/shared/utils/prodLogger';
+﻿import { formatDistanceToNow } from 'date-fns';
+import { ru } from 'date-fns/locale';
+
+import { logger } from '@/shared/utils/prodLogger';
 
 export const formatDate = (date: string | Date, locale: string = 'ru-RU'): string => {
   if (!date) return 'Не указано';
@@ -14,13 +17,8 @@ export const formatDate = (date: string | Date, locale: string = 'ru-RU'): strin
 export const formatRelativeTime = (date: string | Date): string => {
   if (!date) return 'Нет данных';
   try {
-    const now = new Date();
     const targetDate = typeof date === 'string' ? new Date(date) : date;
-    const diffMinutes = Math.round((Number(now) - Number(targetDate)) / (1000 * 60));
-    if (diffMinutes < 1) return 'Только что';
-    if (diffMinutes < 60) return `${diffMinutes} мин. назад`;
-    if (diffMinutes < 24 * 60) return `${Math.round(diffMinutes / 60)} ч. назад`;
-    return `${Math.round(diffMinutes / (24 * 60))} дн. назад`;
+    return formatDistanceToNow(targetDate, { addSuffix: true, locale: ru });
   } catch (error) {
     logger.error('Error formatting relative time:', error);
     return 'Неверная дата';
@@ -32,7 +30,7 @@ export const formatFileSize = (bytes: number): string => {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))  } ${  sizes[i]}`;
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 };
 
 export const formatNumber = (num: number, locale: string = 'ru-RU'): string => {

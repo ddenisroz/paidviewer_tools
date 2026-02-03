@@ -2,11 +2,12 @@
 import logging
 import aiohttp
 from datetime import timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from core.database import ChatMessage # kept for type hint only
 from core.datetime_utils import utcnow_naive
 
+from core.config import settings
 
 from repositories.psychology_repository import PsychologyRepository
 from repositories.chat_message_repository import ChatMessageRepository
@@ -17,13 +18,20 @@ logger = logging.getLogger(__name__)
 class PsychologyService:
     """Сервис для психологического анализа пользователей на основе их сообщений"""
 
+    _analysis_in_progress = False
+    _last_analysis_time: dict = {}
+
     def __init__(self, db: Session):
         self.db = db
-        self.analysis_in_progress = False  # Флаг для предотвращения множественных запросов
-        self.last_analysis_time = {}  # Кулдаун по пользователям
 
-    async def analyze_user_psychology(self, target_username: str, platform: str,
-                                    analyzed_by_user_id: int, analyzed_by_username: str) -> Optional[str]:
+    async def analyze_user_psychology(
+        self,
+        target_username: str,
+        platform: str,
+        analyzed_by_user_id: int,
+        analyzed_by_username: str,
+        channel_name: str
+    ) -> Optional[str]:
         """
         Анализирует психологический портрет пользователя на основе его сообщений
         
@@ -39,101 +47,119 @@ class PsychologyService:
         try:
             # Проверяем кулдаун (30 секунд между анализами)
             current_time = utcnow_naive()
-            if analyzed_by_user_id in self.last_analysis_time:
-                time_diff = current_time - self.last_analysis_time[analyzed_by_user_id]
+            if analyzed_by_user_id in self.__class__._last_analysis_time:
+                time_diff = current_time - self.__class__._last_analysis_time[analyzed_by_user_id]
                 if time_diff.total_seconds() < 30:
                     remaining = 30 - int(time_diff.total_seconds())
                     return f"[TIMEOUT] Подождите {remaining} секунд перед следующим анализом"
 
             # Проверяем, не идет ли уже анализ
-            if self.analysis_in_progress:
+            if self.__class__._analysis_in_progress:
                 return "[REFRESH] Анализ уже выполняется, подождите..."
 
             # Проверяем здоровье базы данных
             if not self._check_database_health():
                 return "[WARN] База данных перегружена, анализ временно недоступен"
 
-            self.analysis_in_progress = True
-            self.last_analysis_time[analyzed_by_user_id] = current_time
+            self.__class__._analysis_in_progress = True
+            self.__class__._last_analysis_time[analyzed_by_user_id] = current_time
 
-            # Получаем сообщения пользователя за последние 30 дней
-            messages = self._get_user_messages(target_username, platform, days=30)
+            target_username = (target_username or "").strip().lstrip('@')
+            if not target_username:
+                self.__class__._analysis_in_progress = False
+                return "[ERROR] Укажите пользователя для анализа"
 
-            if not messages:
-                self.analysis_in_progress = False
-                # If target_username is numeric ID, it might be clearer.
+            channel_limit = settings.chat_analysis_channel_limit
+            global_limit = settings.chat_analysis_global_limit
+            min_messages = settings.chat_analysis_min_messages
+
+            channel_messages, global_messages = self._get_user_messages(
+                target_username,
+                platform,
+                channel_name=channel_name,
+                channel_limit=channel_limit,
+                global_limit=global_limit
+            )
+
+            if not global_messages:
+                self.__class__._analysis_in_progress = False
                 return f"[ERROR] Не найдено сообщений от пользователя {target_username}"
 
-            if len(messages) < 5:
-                self.analysis_in_progress = False
-                return f"[ERROR] Недостаточно сообщений для анализа (найдено: {len(messages)}, нужно минимум 5)"
+            channel_text, channel_count = self._prepare_messages_for_analysis(channel_messages)
+            global_text, global_count = self._prepare_messages_for_analysis(global_messages)
 
-            # Ограничиваем количество сообщений для анализа (последние 50)
-            messages = messages[:50]
+            if global_count < min_messages:
+                self.__class__._analysis_in_progress = False
+                return f"[ERROR] Недостаточно сообщений для анализа (найдено: {global_count}, нужно минимум {min_messages})"
 
-            # Формируем текст для анализа
-            analysis_text = self._prepare_messages_for_analysis(messages)
+            if not channel_text and not global_text:
+                self.__class__._analysis_in_progress = False
+                return "[ERROR] Не удалось подготовить сообщения для анализа"
 
-            # Отправляем запрос к нейросети
-            analysis_result = await self._request_ai_analysis(analysis_text)
+            analysis_result = await self._request_ai_analysis(
+                target_username=target_username,
+                platform=platform,
+                channel_name=channel_name,
+                channel_text=channel_text,
+                channel_count=channel_count,
+                global_text=global_text,
+                global_count=global_count
+            )
 
             if analysis_result:
-                # Сохраняем результат
-                self._save_analysis_result(
-                   target_username, platform, analyzed_by_user_id, 
-                   analyzed_by_username, analysis_result, len(messages)
-                )
+                if analysis_result.startswith("[ERROR]"):
+                    self.__class__._analysis_in_progress = False
+                    return analysis_result
 
-                # НЕ сохраняем результат в базу данных - анализы временные
-                # (Comment says not saved, but code has _save_analysis_result call just above? 
-                # Original code had _save_analysis_result defined but commented out usage or explicit comment saying not saved.
-                # Actually original code had:
-                # if analysis_result:
-                #    # НЕ сохраняем результат в базу данных - анализы временные
-                #    logger.info(...)
-                # But it also had a _save_analysis_result method defined which was seemingly unused?
-                # Ah, _save_analysis_result was defined but NOT CALLED in original analyze_user_psychology.
-                # Use your best judgement. I will replicate original behavior -> do NOT save if it was not saving.
-                # Wait, looking at original code:
-                # if analysis_result:
-                #    # НЕ сохраняем...
-                #    logger.info(...)
-                #    return analysis_result
-                # So it does NOT save.
-                # But _save_analysis_result method existed. I will keep the method but not call it, or maybe just remove it if unused?
-                # The user might want to save it in future. I will keep logic but not call it.
-                
-                logger.info(f"Psychology analysis completed for {target_username} (not saved to DB)")
+                if settings.chat_analysis_save_results:
+                    self._save_analysis_result(
+                        target_username, platform, analyzed_by_user_id,
+                        analyzed_by_username, analysis_result, global_count
+                    )
+                    logger.info(f"Psychology analysis saved for {target_username}")
+                else:
+                    logger.info(f"Psychology analysis completed for {target_username} (not saved to DB)")
 
-                self.analysis_in_progress = False
+                self.__class__._analysis_in_progress = False
                 return analysis_result
+
             else:
-                self.analysis_in_progress = False
+                self.__class__._analysis_in_progress = False
                 return "[ERROR] Ошибка при анализе. Попробуйте позже."
 
         except Exception as e:
             logger.error(f"Error in analyze_user_psychology: {e}")
-            self.analysis_in_progress = False
+            self.__class__._analysis_in_progress = False
             return "[ERROR] Произошла ошибка при анализе"
 
-    def _get_user_messages(self, username: str, platform: str, days: int = 30) -> List[ChatMessage]:
-        """Получает сообщения пользователя за указанный период."""
+    def _get_user_messages(
+        self,
+        username: str,
+        platform: str,
+        channel_name: str,
+        channel_limit: int,
+        global_limit: int
+    ) -> Tuple[List[ChatMessage], List[ChatMessage]]:
+        """Получает сообщения пользователя по каналу и глобально по всем каналам."""
         try:
-            cutoff_date = utcnow_naive() - timedelta(days=days)
-            
-            # Username here is likely user_id as string based on original logic: filter(User.id == int(username))
-            try:
-                user_id = int(username)
-            except ValueError:
-                logger.warning(f"PsychologyService: expected numeric user_id, got {username}")
-                return []
-
             repo = ChatMessageRepository(self.db)
-            return repo.get_messages_for_analysis(user_id, platform, cutoff_date, limit=100)
+            channel_messages = repo.get_recent_by_author_in_channel(
+                username,
+                channel_name,
+                platform=platform,
+                limit=channel_limit
+            )
+            global_messages = repo.get_recent_by_author(
+                username,
+                platform=platform,
+                limit=global_limit
+            )
+
+            return channel_messages, global_messages
 
         except Exception as e:
             logger.error(f"Error getting user messages: {e}")
-            return []
+            return [], []
 
     def _check_database_health(self) -> bool:
         """Проверяет здоровье базы данных."""
@@ -163,76 +189,124 @@ class PsychologyService:
             logger.error(f"Error checking database health: {e}")
             return True
 
-    def _prepare_messages_for_analysis(self, messages: List[ChatMessage]) -> str:
+    def _prepare_messages_for_analysis(self, messages: List[ChatMessage], max_chars: int = 2000) -> Tuple[str, int]:
         """Подготавливает сообщения для отправки в нейросеть."""
         try:
             message_texts = []
             for msg in messages:
-                text = msg.message.strip()
-                if not text.startswith('!'):
-                    message_texts.append(text)
+                text = (msg.message or "").strip()
+                if not text or text.startswith('!'):
+                    continue
+                text = " ".join(text.split())
+                if len(text) > 200:
+                    text = text[:200] + "…"
+                message_texts.append(text)
 
-            combined_text = " ".join(message_texts)
+            combined_text = " | ".join(message_texts)
 
-            if len(combined_text) > 2000:
-                combined_text = combined_text[:2000] + "..."
+            if len(combined_text) > max_chars:
+                combined_text = combined_text[:max_chars] + "…"
 
-            return combined_text
+            return combined_text, len(message_texts)
 
         except Exception as e:
             logger.error(f"Error preparing messages: {e}")
-            return ""
+            return "", 0
 
-    async def _request_ai_analysis(self, messages_text: str) -> Optional[str]:
+    async def _call_deepseek(self, system_prompt: str, user_prompt: str, max_tokens: int) -> Optional[str]:
+        """Send request to DeepSeek chat completions."""
+        if not settings.deepseek_api_key:
+            return None
+
+        url = f"{settings.deepseek_base_url.rstrip('/')}/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {settings.deepseek_api_key}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": settings.deepseek_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": 0.3,
+            "max_tokens": max_tokens,
+            "stream": False
+        }
+
+        timeout = aiohttp.ClientTimeout(total=25)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, headers=headers, json=payload) as response:
+                if response.status != 200:
+                    error_text = await response.text()
+                    logger.error(f"DeepSeek API error: {response.status} - {error_text}")
+                    return None
+                data = await response.json()
+        try:
+            return (data.get("choices") or [{}])[0].get("message", {}).get("content")
+        except Exception:
+            return None
+
+    def _normalize_analysis_output(self, text: str) -> str:
+        """Normalize analysis output."""
+        if not text:
+            return ""
+        cleaned = " ".join(text.split())
+        return cleaned
+
+    def _has_required_labels(self, text: str) -> bool:
+        lower = text.lower()
+        required = ["агрессивность", "димплинг", "чувство юмора", "вниманиеблядство"]
+        return all(label in lower for label in required)
+
+    async def _request_ai_analysis(
+        self,
+        target_username: str,
+        platform: str,
+        channel_name: str,
+        channel_text: str,
+        channel_count: int,
+        global_text: str,
+        global_count: int
+    ) -> Optional[str]:
         """Отправляет запрос к ИИ для анализа личности."""
         try:
-            url = "https://api-inference.huggingface.co/models/cardiffnlp/twitter-roberta-base-emotion"
-            analysis_text = messages_text[:500]
+            if not settings.deepseek_api_key:
+                return "[ERROR] DeepSeek API key не настроен"
 
-            from core.config import settings
-            headers = {
-                "Authorization": f"Bearer {settings.huggingface_token or 'hf_your_token_here'}",
-                "Content-Type": "application/json"
-            }
+            system_prompt = (
+                "Ты анализируешь стиль общения пользователя по сообщениям чата. "
+                "Дай краткий психологический портрет без медицинских диагнозов и без оскорблений. "
+                "Ответ строго одной строкой, 100-150 символов. "
+                "Сначала короткий портрет (20-40 символов), затем оценки. "
+                "В конце обязательно оценки по критериям: агрессивность, димплинг, чувство юмора, вниманиеблядство. "
+                "Формат оценок: 'агрессивность 3/10, димплинг 2/10, чувство юмора 7/10, вниманиеблядство 4/10'. "
+                "Не добавляй ничего кроме этого."
+            )
 
-            data = {
-                "inputs": analysis_text
-            }
+            user_prompt = (
+                f"Пользователь: {target_username}\n"
+                f"Платформа: {platform}\n"
+                f"Канал: {channel_name} (сообщений: {channel_count})\n"
+                f"CHANNEL_MESSAGES: {channel_text or 'нет'}\n"
+                f"GLOBAL_MESSAGES (все каналы, сообщений: {global_count}): {global_text or 'нет'}\n"
+                "CHANNEL_MESSAGES важнее, но учитывай оба блока."
+            )
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, headers=headers, json=data, timeout=30) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        if isinstance(result, list) and len(result) > 0:
-                            emotions = result[0]
-                            dominant_emotion = max(emotions, key=lambda x: x['score'])
-                            
-                            emotion_translation = {
-                                'joy': 'радостный',
-                                'sadness': 'грустный',
-                                'anger': 'злой',
-                                'fear': 'тревожный',
-                                'surprise': 'удивленный',
-                                'disgust': 'раздраженный'
-                            }
+            max_chars = settings.chat_analysis_output_max_chars
+            analysis = await self._call_deepseek(system_prompt, user_prompt, max_tokens=120)
+            analysis = self._normalize_analysis_output(analysis or "")
 
-                            emotion_ru = emotion_translation.get(dominant_emotion['label'], dominant_emotion['label'])
-                            confidence = int(dominant_emotion['score'] * 100)
+            if analysis and (len(analysis) > max_chars or not self._has_required_labels(analysis)):
+                short_prompt = system_prompt + " Ответ должен быть еще короче и строго по формату."
+                analysis = await self._call_deepseek(short_prompt, user_prompt, max_tokens=80)
+                analysis = self._normalize_analysis_output(analysis or "")
 
-                            analysis = f"Эмоциональный профиль: {emotion_ru} ({confidence}%). "
+            if analysis and len(analysis) > max_chars:
+                analysis = analysis[:max_chars].rstrip()
 
-                            if len(messages_text) > 200:
-                                analysis += "Разговорчивый человек."
-                            elif len(messages_text) < 50:
-                                analysis += "Лаконичный в общении."
+            return analysis or None
 
-                            if '?' in messages_text:
-                                analysis += " Любознательный."
-
-                            return analysis[:150]
-                    else:
-                        logger.error(f"HuggingFace API error: {response.status}")
-                        return None
         except Exception as e:
             logger.error(f"Error requesting AI analysis: {e}")
             return None
@@ -242,17 +316,14 @@ class PsychologyService:
                             analysis_text: str, messages_count: int):
         """Сохраняет результат анализа в базу данных."""
         try:
-            # Although target_username here is likely ID, we should try to find user
             user_repo = UserRepository(self.db)
-            try:
-                target_user_id = int(target_username)
-                target_user = user_repo.get(target_user_id)
-            except ValueError:
-                logger.error(f"Target username {target_username} is not a valid ID")
-                return
+            if platform == 'vk':
+                target_user = user_repo.get_by_vk_username(target_username)
+            else:
+                target_user = user_repo.get_by_twitch_username(target_username)
 
             if not target_user:
-                logger.error(f"Target user {target_username} not found")
+                logger.error(f"Target user {target_username} not found for platform {platform}")
                 return
 
             repo = PsychologyRepository(self.db)

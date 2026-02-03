@@ -3,6 +3,9 @@
 export interface ChatBoxSettings {
     font_family: string;
     font_size: number;
+    font_weight?: string;
+    text_color?: string;
+    username_color?: string;
     text_stroke_width: number;
     background_opacity: number;
     max_messages: number;
@@ -13,12 +16,16 @@ export interface ChatBoxSettings {
     chat_direction: string;
     chat_width: number;
     show_platform_icons: boolean;
+    show_roles?: boolean;
     show_badges: boolean;
+    show_avatars?: boolean;
     show_7tv_emotes: boolean;
     show_links: boolean;
+    auto_load_images?: boolean;
     widget_url: string;
     version: number;
     background_color?: string;
     text_stroke_color?: string;
     border_radius?: number;
+    twitch_user_id?: string;
 }

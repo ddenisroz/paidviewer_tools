@@ -1,9 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { keepPreviousData } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 
-import { keepPreviousData } from '@tanstack/react-query';
 
+import { STORAGE_KEYS } from '@/constants';
 import { useGlobalVoices, useToggleTts, useTtsHealth, useTtsStatus } from '@/queries/tts/ttsQueries';
 import { useToast } from '@/shared/components/ui/toast';
 import { useButtonPosition } from '@/shared/hooks/useButtonPosition';
@@ -71,12 +72,14 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
 
     const ttsRelatedPaths = ['/dashboard/tts', '/tts'];
     const isTtsPage = ttsRelatedPaths.some(path => location.pathname.startsWith(path));
+    const ttsStatusInterval = isTtsPage ? 30 * 1000 : 120 * 1000;
 
     const channelName = null;
 
     const { data: healthData, isLoading: isCheckingHealth, error: healthError } = useTtsHealth({
         enabled: !!user && isTtsPage,
         refetchInterval: 30 * 1000,
+        refetchIntervalInBackground: false,
         refetchOnMount: false,
         refetchOnWindowFocus: false,
     });
@@ -103,14 +106,23 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
 
     const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
         enabled: !!user,
-        refetchInterval: 30 * 1000,
+        refetchInterval: ttsStatusInterval,
+        refetchIntervalInBackground: false,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
         placeholderData: keepPreviousData,
     });
 
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (statusData) {
-            const statusResponse = (statusData?.data || statusData) as { enabled?: boolean; is_whitelisted?: boolean; has_local_setup?: boolean };
+            const statusResponse = (statusData?.data || statusData) as {
+                enabled?: boolean;
+                is_whitelisted?: boolean;
+                has_local_setup?: boolean;
+                listening_mode?: 'website' | 'obs';
+                listeningMode?: 'website' | 'obs';
+            };
             // Validate that we actually have the expected fields
             if (statusResponse && typeof statusResponse.enabled === 'boolean') {
                 setTtsEnabled(statusResponse.enabled);
@@ -126,6 +138,18 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
                     localStorage.setItem('tts_has_local_setup', 'true');
                 } else {
                     localStorage.setItem('tts_has_local_setup', 'false');
+                }
+
+                const listeningModeRaw = statusResponse.listening_mode ?? statusResponse.listeningMode;
+                if (typeof window !== 'undefined' && listeningModeRaw) {
+                    const normalizedMode = listeningModeRaw === 'obs' ? 'obs' : 'website';
+                    const currentMode = window.localStorage.getItem(STORAGE_KEYS.TTS_LISTENING_MODE);
+                    if (currentMode !== normalizedMode) {
+                        window.localStorage.setItem(STORAGE_KEYS.TTS_LISTENING_MODE, normalizedMode);
+                        window.dispatchEvent(new CustomEvent('tts-listening-mode-changed', {
+                            detail: { mode: normalizedMode }
+                        }));
+                    }
                 }
             } else {
                 logger.warn('[TtsContext] Invalid TTS status data received (ignoring update):', statusResponse);
