@@ -1,6 +1,7 @@
 ﻿import Logger from '@/shared/utils/prodLogger';
 
 const logger = new Logger('CACHE');
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 export interface CacheType {
   key: string;

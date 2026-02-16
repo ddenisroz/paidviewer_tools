@@ -4,7 +4,7 @@ import React, { useEffect, useMemo } from 'react';
 
 import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { Check, MessageCircle, Settings, Settings2 } from 'lucide-react';
+import { MessageCircle, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 
@@ -17,7 +17,6 @@ import QuickActionsBar from '@/features/home/components/QuickActionsBar';
 import WidgetWrapper from '@/features/home/components/WidgetWrapper';
 import StreamManagementCards from '@/features/stream/components/StreamManagementCards';
 import StreamStatus from '@/features/stream/components/StreamStatus';
-import { cn } from '@/lib/utils';
 import { useTwitchStreamInfo, useVkStreamInfo } from '@/queries/stream/streamQueries';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
@@ -146,7 +145,8 @@ const HomePage: React.FC = () => {
         }
     }, [isAuthenticated, hasAnyIntegration, integrations, logout, navigate]);
 
-    const { widgets, isEditMode, toggleEditMode, reorderWidgets } = useLayoutStore();
+    const { widgets, draftWidgets, isEditMode, reorderWidgets } = useLayoutStore();
+    const activeWidgets = isEditMode && draftWidgets ? draftWidgets : widgets;
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -162,8 +162,8 @@ const HomePage: React.FC = () => {
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (over && active.id !== over.id) {
-            const oldIndex = widgets.findIndex(w => w.id === active.id);
-            const newIndex = widgets.findIndex(w => w.id === over.id);
+            const oldIndex = activeWidgets.findIndex(w => w.id === active.id);
+            const newIndex = activeWidgets.findIndex(w => w.id === over.id);
             reorderWidgets(oldIndex, newIndex);
         }
     };
@@ -254,11 +254,11 @@ const HomePage: React.FC = () => {
                         onDragEnd={handleDragEnd}
                     >
                         <SortableContext
-                            items={widgets.map(w => w.id)}
+                            items={activeWidgets.map(w => w.id)}
                             strategy={verticalListSortingStrategy}
                         >
                             <div className="space-y-6 transition-all">
-                                {widgets.map(w => (
+                                {activeWidgets.map(w => (
                                     <WidgetWrapper
                                         key={w.id}
                                         id={w.id}

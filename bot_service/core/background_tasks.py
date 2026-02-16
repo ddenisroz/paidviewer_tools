@@ -67,10 +67,10 @@ class BackgroundTasks:
             try:
                 db = next(get_db())
 
-                # Удаляем сессии старше 24 часов
-                expired_time = utcnow_naive() - timedelta(hours=24)
+                # Удаляем сессии неактивные более 30 дней
+                expired_time = utcnow_naive() - timedelta(days=30)
                 expired_sessions = db.query(UserSession).filter(
-                    UserSession.created_at < expired_time
+                    UserSession.last_activity < expired_time
                 ).all()
 
                 for session in expired_sessions:

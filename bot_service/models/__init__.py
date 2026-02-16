@@ -11,12 +11,14 @@ from models.base import (
     Base,
     engine,
     SessionLocal,
-    get_db,
     db_session,
     init_db,
     DATABASE_URL,
     IS_POSTGRESQL,
 )
+
+# Import get_db from dependencies to avoid circular imports and keep single source of truth
+from core.dependencies import get_db
 
 # Пользователи и сессии
 from models.user import (

@@ -29,7 +29,8 @@ def get_vk_channel_candidates(channel_url: Optional[str]) -> list[str]:
     full = normalize_vk_channel_url(channel_url)
     slug = extract_vk_channel_slug(channel_url)
     candidates = []
-    for item in [full, slug]:
+    # Prefer slug first: for many VK API methods this is the most reliable/fast format.
+    for item in [slug, full]:
         if item and item not in candidates:
             candidates.append(item)
     return candidates

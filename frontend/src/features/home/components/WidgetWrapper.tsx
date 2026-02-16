@@ -1,10 +1,9 @@
 import React from 'react';
 
 import { useSortable } from '@dnd-kit/sortable';
-import { Eye, EyeOff, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/shared/components/ui/button';
 import { useLayoutStore, WidgetId } from '@/store/useLayoutStore';
 
 interface WidgetWrapperProps {
@@ -15,8 +14,9 @@ interface WidgetWrapperProps {
 }
 
 const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ id, title, children, className }) => {
-    const { isEditMode, toggleWidgetVisibility, widgets } = useLayoutStore();
-    const widgetState = widgets.find(w => w.id === id);
+    const { isEditMode, widgets, draftWidgets } = useLayoutStore();
+    const activeWidgets = isEditMode && draftWidgets ? draftWidgets : widgets;
+    const widgetState = activeWidgets.find(w => w.id === id);
 
     const {
         attributes,
@@ -62,15 +62,6 @@ const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ id, title, children, clas
                     </div>
                     <div className="h-4 w-px bg-gray-700 mx-1" />
                     <div className="px-2 text-xs font-bold text-gray-400 uppercase tracking-wider">{title || id}</div>
-                    <div className="h-4 w-px bg-gray-700 mx-1" />
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn("h-7 w-7 p-0 hover:bg-gray-800", !widgetState.isVisible && "text-red-400")}
-                        onClick={() => toggleWidgetVisibility(id)}
-                    >
-                        {widgetState.isVisible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                    </Button>
                 </div>
             )}
 

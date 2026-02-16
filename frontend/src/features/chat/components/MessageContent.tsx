@@ -5,6 +5,7 @@
  */
 import React, { memo, useMemo } from 'react';
 
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { processEmotes } from '@/features/chat/utils/emotes';
 import { sanitizeHtml } from '@/shared/utils/sanitize';
 

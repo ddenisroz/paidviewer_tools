@@ -23,19 +23,6 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Настройка шифрования для OAuth токенов
-def _get_encryption_key() -> bytes:
-    """Получить ключ шифрования для OAuth токенов из конфигурации"""
-    # Используем TOKEN_ENCRYPTION_KEY из .env файла
-    encryption_key = settings.token_encryption_key
-    if not encryption_key or encryption_key.startswith('your-'):
-        # Fallback на SECRET_KEY если TOKEN_ENCRYPTION_KEY не задан
-        key = settings.secret_key.encode()[:32]
-        encryption_key = base64.urlsafe_b64encode(key.ljust(32, b'0')[:32]).decode()
-
-    return encryption_key.encode()
-
-_fernet = Fernet(_get_encryption_key())
 
 # Настройка rate limiting
 limiter = Limiter(key_func=get_remote_address)
@@ -53,37 +40,6 @@ class ModernSecurityManager:
 
         logger.info("[AUTH] Modern Security Manager initialized with professional libraries")
 
-    def encrypt_oauth_token(self, token: str) -> str:
-        """
-        Шифрование OAuth токена для безопасного хранения в БД
-        """
-        try:
-            encrypted_token = _fernet.encrypt(token.encode())
-            return base64.urlsafe_b64encode(encrypted_token).decode()
-        except Exception as e:
-            logger.error(f"Error encrypting OAuth token: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to encrypt OAuth token"
-            )
-
-    def decrypt_oauth_token(self, encrypted_token: str) -> str:
-        """
-        Расшифровка OAuth токена из БД.
-        Поддерживает незашифрованные токены для обратной совместимости.
-        """
-        if not encrypted_token:
-            return encrypted_token
-
-        try:
-            # Пытаемся расшифровать токен
-            encrypted_data = base64.urlsafe_b64decode(encrypted_token.encode())
-            decrypted_token = _fernet.decrypt(encrypted_data)
-            return decrypted_token.decode()
-        except Exception:
-            # Если не получилось расшифровать - возможно токен не зашифрован (старый формат)
-            logger.debug("Token appears to be unencrypted (legacy format), returning as-is")
-            return encrypted_token
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """
@@ -179,4 +135,4 @@ def rate_limit_handler(request: Request, exc: RateLimitExceeded):
         content={"detail": f"Rate limit exceeded: {exc.detail}"}
     )
 
-logger.info("[AUTH] Modern Security Manager initialized with OAuth encryption and JWT")
+logger.info("[AUTH] Modern Security Manager initialized with JWT")

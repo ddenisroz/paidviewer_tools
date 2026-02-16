@@ -1,6 +1,7 @@
 ﻿// src/context/DonationAlertsContext.tsx
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
+/* eslint-disable react-refresh/only-export-components */
 import { API_BASE_URL } from '@/constants';
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
 import { logger } from '@/shared/utils/prodLogger';
@@ -36,7 +37,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const checkStatus = async (): Promise<void> => {
+    const checkStatus = useCallback(async (): Promise<void> => {
         if (!user) {
             setIsConnected(false);
             return;
@@ -66,7 +67,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [user]);
 
     const connect = async (): Promise<boolean> => {
         if (!user) {
@@ -141,7 +142,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
 
     useEffect(() => {
         checkStatus();
-    }, [user]);
+    }, [checkStatus]);
 
     useEffect(() => {
         const handleDonationAlertsConnected = (event: CustomEvent): void => {
@@ -157,7 +158,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
         return () => {
             window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected as EventListener);
         };
-    }, []);
+    }, [checkStatus]);
 
     const value: DonationAlertsContextValue = {
         isConnected,

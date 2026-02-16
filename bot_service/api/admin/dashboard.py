@@ -146,13 +146,13 @@ async def get_bots_status(
         
         twitch_status = {
             "connected": bot_instance is not None,
-            "channels": len(bot_instance.connected_channels) if bot_instance else 0,
+            "channels": len(getattr(bot_instance, 'connected_channels', [])) if bot_instance else 0,
             "is_ready": twitch_is_ready
         }
         
         vk_status = {
             "connected": vk_live_bot_instance is not None,
-            "channels": len(vk_live_bot_instance.connected_channels) if vk_live_bot_instance else 0,
+            "channels": len(getattr(vk_live_bot_instance, 'connected_channels', [])) if vk_live_bot_instance else 0,
             "is_running": vk_live_bot_instance.is_running if vk_live_bot_instance else False
         }
         
@@ -270,7 +270,7 @@ async def get_analytics(
         
         # Add system metrics (runtime)
         try:
-            cpu_usage = psutil.cpu_percent(interval=1)
+            cpu_usage = psutil.cpu_percent(interval=0)  # non-blocking, returns cached value
             memory_info = psutil.virtual_memory()
             memory_usage = memory_info.percent
             current_process = psutil.Process(os.getpid())

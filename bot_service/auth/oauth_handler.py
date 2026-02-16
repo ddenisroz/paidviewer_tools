@@ -10,10 +10,11 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from core.database import User, UserSession, UserToken
 from core.session_manager import session_manager
+from core.token_encryption import encrypt_token
 from constants import (
-    Platform, ErrorMessages, FRONTEND_REDIRECTS,
-    HTTP_STATUS
+    Platform, ErrorMessages, FRONTEND_REDIRECTS
 )
+from starlette import status
 from core.cookie_config import get_session_cookie_settings
 from dataclasses import dataclass
 
@@ -138,17 +139,9 @@ class OAuthHandler:
             platform_fingerprint = f"{platform}:{user_data.platform_user_id}"
             logger.info(f"Checking platform fingerprint: {platform_fingerprint}")
 
-            # Ищем существующие токены этой платформы
-            db.query(UserToken).filter(
-                UserToken.platform == platform,
-                UserToken.platform_user_id == user_data.platform_user_id
-            ).all()
-
             # Инициализируем переменные
             existing_token = None
-            current_user.get('id') if current_user else None
             # session_id уже получен из cookie
-            # Если создается новая сессия, он будет переопределен
 
             # === СТРОГАЯ ЛОГИКА ЗАМЕЩЕНИЯ СЕССИЙ БЕЗ ДУБЛИРОВАНИЯ ===
 
@@ -172,100 +165,100 @@ class OAuthHandler:
             if active_session:
                 logger.info(f"Found active session {active_session.session_id} for channel {channel_name}")
                 # Активная сессия принадлежит авторизованному пользователю
-                if True:
-                    existing_user = db.query(User).filter(User.id == active_session.user_id).first()
+                existing_user = db.query(User).filter(User.id == active_session.user_id).first()
 
-                    if is_linking and current_user and existing_user.id != current_user['id']:
-                        # Сценарий: пользователь пытается привязать платформу, которая уже обслуживает канал
-                        logger.warning(f"Channel {channel_name} already served by user {existing_user.id}, replacing session")
+                if is_linking and current_user and existing_user.id != current_user['id']:
+                    # Сценарий: пользователь пытается привязать платформу, которая уже обслуживает канал
+                    logger.warning(f"Channel {channel_name} already served by user {existing_user.id}, replacing session")
 
-                        # Завершаем старую сессию
-                        active_session.is_active = False
-                        active_session.ended_at = utcnow_naive()
+                    # Завершаем старую сессию
+                    active_session.is_active = False
+                    active_session.ended_at = utcnow_naive()
 
-                        # Создаем новую сессию для текущего пользователя
-                        device_info = {
-                            "user_agent": request.headers.get("user-agent"),
-                            "ip": getattr(request.client, 'host', 'unknown'),
-                            "monitored_channel": channel_name,
-                            "platform": platform,
-                            "replaced_session": active_session.session_id
-                        }
+                    # Создаем новую сессию для текущего пользователя
+                    device_info = {
+                        "user_agent": request.headers.get("user-agent"),
+                        "ip": getattr(request.client, 'host', 'unknown'),
+                        "monitored_channel": channel_name,
+                        "platform": platform,
+                        "replaced_session": active_session.session_id
+                    }
 
-                        session_id = session_manager.create_session(
-                            user_id=current_user['id'],
-                            device_info=device_info
-                        )
-                        logger.info(f"[OK] Created replacement session: {session_id}")
+                    session_id = session_manager.create_session(
+                        user_id=current_user['id'],
+                        device_info=device_info
+                    )
+                    logger.info(f"[OK] Created replacement session: {session_id}")
 
-                        # Объединяем аккаунты если нужно
-                        if existing_user.id != current_user['id']:
-                            session_manager._merge_user_accounts(existing_user.id, current_user['id'], db)
-                            db.delete(existing_user)
+                    # Объединяем аккаунты если нужно
+                    if existing_user.id != current_user['id']:
+                        session_manager._merge_user_accounts(existing_user.id, current_user['id'], db)
+                        db.delete(existing_user)
 
-                        unified_user = db.query(User).filter(User.id == current_user['id']).first()
-                        logger.info(f"Replaced session for channel {channel_name}")
+                    unified_user = db.query(User).filter(User.id == current_user['id']).first()
+                    logger.info(f"Replaced session for channel {channel_name}")
 
+                else:
+                    # Обновляем токены существующего пользователя
+                    logger.info(f"Updating tokens for existing user {existing_user.id}")
+                    unified_user = existing_user
+
+                    # SECURITY: Деактивируем все другие токены ТОЛЬКО при новом логине
+                    # НЕ деактивируем при добавлении интеграции (is_linking=True)
+                    if not is_linking:
+                        logger.info("[SECURITY] New login detected - deactivating other platform tokens")
+                        self._deactivate_other_platform_tokens(existing_user.id, platform, db)
                     else:
-                        # Обновляем токены существующего пользователя
-                        logger.info(f"Updating tokens for existing user {existing_user.id}")
-                        unified_user = existing_user
+                        logger.info("[LINK] Linking integration - keeping other tokens active")
 
-                        # SECURITY: Деактивируем все другие токены ТОЛЬКО при новом логине
-                        # НЕ деактивируем при добавлении интеграции (is_linking=True)
-                        if not is_linking:
-                            logger.info("[SECURITY] New login detected - deactivating other platform tokens")
-                            self._deactivate_other_platform_tokens(existing_user.id, platform, db)
-                        else:
-                            logger.info("[LINK] Linking integration - keeping other tokens active")
+                    # Обновляем токены
+                    existing_token = db.query(UserToken).filter(
+                        UserToken.user_id == existing_user.id,
+                        UserToken.platform == platform
+                    ).first()
 
-                        # Обновляем токены
-                        existing_token = db.query(UserToken).filter(
-                            UserToken.user_id == existing_user.id,
-                            UserToken.platform == platform
-                        ).first()
+                    if existing_token:
+                        existing_token.access_token = encrypt_token(user_data.access_token)
+                        existing_token.refresh_token = encrypt_token(user_data.refresh_token) if user_data.refresh_token else existing_token.refresh_token
+                        existing_token.expires_at = user_data.expires_at
+                        existing_token.scopes = user_data.scopes
+                        existing_token.avatar_url = user_data.avatar_url
+                        existing_token.is_active = True  # Активируем токен при повторной авторизации
+                        logger.info(f"[OK] Token updated for platform {platform}")
+                    else:
+                        # Создаем новый токен
+                        session_manager.save_user_tokens(
+                            user_id=existing_user.id,
+                            platform=platform,
+                            platform_user_id=user_data.platform_user_id,
+                            avatar_url=user_data.avatar_url,
+                            access_token=user_data.access_token,
+                            refresh_token=user_data.refresh_token,
+                            expires_at=user_data.expires_at,
+                            scopes=user_data.scopes
+                        )
+                        logger.info(f"[OK] New token created for platform {platform}")
 
-                        if existing_token:
-                            existing_token.access_token = user_data.access_token
-                            existing_token.refresh_token = user_data.refresh_token
-                            existing_token.expires_at = user_data.expires_at
-                            existing_token.scopes = user_data.scopes
-                            existing_token.avatar_url = user_data.avatar_url
-                            existing_token.is_active = True  # Активируем токен при повторной авторизации
-                            logger.info(f"[OK] Token updated for platform {platform}")
-                        else:
-                            # Создаем новый токен
-                            session_manager.save_user_tokens(
-                                user_id=existing_user.id,
-                                platform=platform,
-                                platform_user_id=user_data.platform_user_id,
-                                avatar_url=user_data.avatar_url,
-                                access_token=user_data.access_token,
-                                refresh_token=user_data.refresh_token,
-                                expires_at=user_data.expires_at,
-                                scopes=user_data.scopes
-                            )
-                            logger.info(f"[OK] New token created for platform {platform}")
+                    # IMPORTANT: Инвалидируем кеш валидации токена после OAuth
+                    from core.token_validation_cache import token_validation_cache
+                    token_validation_cache.invalidate(existing_user.id, platform)
+                    logger.info(f"[CACHE] Token validation cache invalidated for user {existing_user.id}, platform {platform}")
 
-                        # IMPORTANT: Инвалидируем кеш валидации токена после OAuth
-                        from core.token_validation_cache import token_validation_cache
-                        token_validation_cache.invalidate(existing_user.id, platform)
-                        logger.info(f"[CACHE] Token validation cache invalidated for user {existing_user.id}, platform {platform}")
+                    # Обновляем username
+                    if platform == "twitch" and hasattr(user_data, 'username'):
+                        unified_user.twitch_username = user_data.username
+                    elif platform == "vk":
+                        vk_channel = self._resolve_vk_channel_name(user_data)
+                        vk_display = user_data.username or vk_channel
+                        if vk_channel:
+                            unified_user.vk_channel_name = vk_channel
+                            logger.info(f"Updated VK channel_name: {vk_channel}")
+                        if vk_display:
+                            unified_user.vk_username = vk_display
 
-                        # Обновляем username
-                        if platform == "twitch" and hasattr(user_data, 'username'):
-                            unified_user.twitch_username = user_data.username
-                        elif platform == "vk":
-                            vk_channel = self._resolve_vk_channel_name(user_data)
-                            vk_display = user_data.username or vk_channel
-                            if vk_channel:
-                                unified_user.vk_channel_name = vk_channel
-                                logger.info(f"Updated VK channel_name: {vk_channel}")
-                            if vk_display:
-                                unified_user.vk_username = vk_display
+                    db.commit()
+                    logger.info(f"Updated {platform} tokens for user {unified_user.id}")
 
-                        db.commit()
-                        logger.info(f"Updated {platform} tokens for user {unified_user.id}")
 
             # 2. НЕТ АКТИВНОЙ СЕССИИ - создаем новую
             else:
@@ -276,7 +269,7 @@ class OAuthHandler:
 
                     if not unified_user:
                         raise HTTPException(
-                            status_code=HTTP_STATUS.BAD_REQUEST,
+                            status_code=status.HTTP_400_BAD_REQUEST,
                             detail=ErrorMessages.USER_NOT_FOUND
                         )
 
@@ -340,36 +333,13 @@ class OAuthHandler:
 
             if not unified_user:
                 raise HTTPException(
-                    status_code=HTTP_STATUS.INTERNAL_SERVER_ERROR,
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=ErrorMessages.USER_CREATION_FAILED
                 )
 
-            # Сохраняем токены пользователя (save_user_tokens автоматически обновляет существующие или создаёт новые)
-            logger.info(f"[SAVE] Saving OAuth tokens for user {unified_user.id}, platform {platform}")
-            session_manager.save_user_tokens(
-                user_id=unified_user.id,
-                platform=platform,
-                platform_user_id=user_data.platform_user_id,
-                avatar_url=user_data.avatar_url,
-                access_token=user_data.access_token,
-                refresh_token=user_data.refresh_token,
-                expires_at=user_data.expires_at,
-                scopes=user_data.scopes
-            )
-            logger.info(f"[OK] OAuth tokens saved for user {unified_user.id}, platform {platform}")
-
-            # Сохраняем username в соответствующее поле пользователя
-            if platform == "twitch" and hasattr(user_data, 'username'):
-                logger.info(f"Saving Twitch username: {user_data.username}")
-                unified_user.twitch_username = user_data.username
-            elif platform == "vk":
-                vk_channel = self._resolve_vk_channel_name(user_data)
-                vk_display = user_data.username or vk_channel
-                if vk_channel:
-                    logger.info(f"Saving VK channel_name: {vk_channel}")
-                    unified_user.vk_channel_name = vk_channel
-                if vk_display:
-                    unified_user.vk_username = vk_display
+            # NOTE: Token save and username update are already handled in each branch above
+            # (active session update, linking, or new user creation).
+            # We only need to invalidate cache and commit here.
 
             # IMPORTANT: Инвалидируем кеш валидации токена после сохранения
             from core.token_validation_cache import token_validation_cache
@@ -452,19 +422,23 @@ class OAuthHandler:
                 # Устанавливаем channel_name в UserSettings для автоматического подключения бота
                 await self._setup_user_channel_settings(db, unified_user.id, platform, user_data)
 
-                # Автоматически подключаем бота если требуется
-                if auto_connect_bot:
-                    logger.info(f"[AUTO-CONNECT] Starting auto-connect bot for platform={platform}")
-                    # Для Twitch используем username вместо ID
-                    if platform == "vk":
-                        channel_identifier = self._resolve_vk_channel_name(user_data) or user_data.platform_user_id
-                    else:
-                        channel_identifier = user_data.username if user_data.username else user_data.platform_user_id
-                    logger.info(f"[AUTO-CONNECT] Channel identifier: {channel_identifier}")
-                    await self._auto_connect_bot(platform, channel_identifier)
-                    logger.info(f"[AUTO-CONNECT] Auto-connect completed for {platform}:{channel_identifier}")
+            # Устанавливаем channel_name и подключаем бота для linking тоже
+            if is_linking:
+                await self._setup_user_channel_settings(db, unified_user.id, platform, user_data)
+
+            # Автоматически подключаем бота если требуется (и для нового входа, и для linking)
+            if auto_connect_bot:
+                logger.info(f"[AUTO-CONNECT] Starting auto-connect bot for platform={platform}")
+                # Для Twitch используем username вместо ID
+                if platform == "vk":
+                    channel_identifier = self._resolve_vk_channel_name(user_data) or user_data.platform_user_id
                 else:
-                    logger.info(f"[INFO] Auto-connect disabled for {platform}")
+                    channel_identifier = user_data.username if user_data.username else user_data.platform_user_id
+                logger.info(f"[AUTO-CONNECT] Channel identifier: {channel_identifier}")
+                await self._auto_connect_bot(platform, channel_identifier)
+                logger.info(f"[AUTO-CONNECT] Auto-connect completed for {platform}:{channel_identifier}")
+            else:
+                logger.info(f"[INFO] Auto-connect disabled for {platform}")
 
             # Определяем URL для редиректа
             redirect_url = self._get_redirect_url(platform, is_linking, is_new_session)
@@ -482,7 +456,7 @@ class OAuthHandler:
         except Exception as e:
             logger.error(f"{platform.title()} auth error: {e}", exc_info=True)
             raise HTTPException(
-                status_code=HTTP_STATUS.INTERNAL_SERVER_ERROR,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Internal server error during {platform} authentication"
             )
 
@@ -583,17 +557,34 @@ class OAuthHandler:
     async def _connect_vk_bot(self, channel_name: str) -> None:
         """Подключение VK Live бота к каналу пользователя после OAuth"""
         try:
-            # Импортируем глобальные переменные
-            import main
+            from core.connection_manager import get_connection_manager
+            from core.database import get_db
+            from startup.bot_initializer import initialize_vk_bot
+            from startup.bot_registry import get_bot_registry
 
-            if not main.vk_live_bot_instance:
-                logger.error("[ERROR] VK Live bot instance not found! Bot should be initialized at startup.")
-                return
+            registry = get_bot_registry()
+            bot_instance = registry.vk_bot
+
+            if not bot_instance:
+                db = next(get_db())
+                try:
+                    connection_manager = get_connection_manager()
+                    vk_channels = await connection_manager.get_vk_channels_for_bot(db)
+                finally:
+                    db.close()
+
+                started = await initialize_vk_bot(vk_channels)
+                if not started:
+                    logger.error("[ERROR] VK Live bot is not started (bot OAuth token is likely missing)")
+                    return
+
+                bot_instance = get_bot_registry().vk_bot
+                if not bot_instance:
+                    logger.error("[ERROR] VK Live bot instance still missing after initialization")
+                    return
 
             logger.info(f"[BOT] VK bot instance exists, attempting to connect to channel: {channel_name}")
-
-            # Подключаемся к каналу пользователя через HTTP polling
-            success = await main.vk_live_bot_instance.connect_to_channel(channel_name)
+            success = await bot_instance.connect_to_channel(channel_name)
 
             if success:
                 logger.info(f"[OK] VK Live bot successfully connected to {channel_name} via OAuth")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -7,8 +7,7 @@ from auth.auth import get_current_user, get_current_user_optional
 from core.database import get_db
 
 # Schemas
-from schemas.stream import StreamUpdateRequest
-from schemas.stream import PlatformUpdate # Helper import if needed, but not used directly in signature
+from schemas.stream import PlatformUpdate, StreamUpdateRequest
 
 # Services
 from services.stream_info_service import StreamInfoService
@@ -20,6 +19,35 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["stream-info"])
+
+
+def _sanitize_category_id(raw_value: Optional[str]) -> Optional[str]:
+    """Normalize category identifiers from mixed payloads."""
+    if raw_value is None:
+        return None
+
+    normalized = str(raw_value).strip()
+    if not normalized:
+        return None
+    if normalized.lower() in {"none", "null", "undefined"}:
+        return None
+    return normalized
+
+
+def _extract_category_id(update: Optional[PlatformUpdate]) -> Optional[str]:
+    """Read category id from `category_id` or nested `category.id`."""
+    if not update:
+        return None
+
+    direct_id = _sanitize_category_id(update.category_id)
+    if direct_id:
+        return direct_id
+
+    category_obj = update.category
+    if category_obj and category_obj.id:
+        return _sanitize_category_id(category_obj.id)
+
+    return None
 
 # Simple in-memory cache for stream info (60 second TTL)
 
@@ -118,8 +146,8 @@ async def update_stream(
         # Update Twitch
         if request.twitch:
             title = request.twitch.title
-            category_id = request.twitch.category_id
-            
+            category_id = _extract_category_id(request.twitch)
+
             if title is not None or category_id is not None:
                 success = await service.update_stream(user_id, "twitch", title, category_id)
                 if success:
@@ -132,18 +160,8 @@ async def update_stream(
         # Update VK
         if request.vk:
             title = request.vk.title
-            category_id = request.vk.category_id
-            
-            # Handle complexity of VK category object vs ID
-            # Frontend sends 'category' object sometimes.
-            # Schema PlatformUpdate handles `category: Optional[CategoryObject]`.
-            # We should prefer ID from object if ID is missing?
-            if request.vk.category and not category_id:
-                category_id = request.vk.category.id
-            
-            # If still using 'category_id' field:
-            # request.vk.category_id is primary.
-            
+            category_id = _extract_category_id(request.vk)
+
             if title is not None or category_id is not None:
                 success = await service.update_stream(user_id, "vk", title, category_id)
                 if success:
@@ -154,15 +172,33 @@ async def update_stream(
                     logger.error(f"Failed to update VK for user {user_id}")
 
         if not results and not failures:
-             return JSONResponse(content={"success": True, "message": "No changes or updates needed"})
+            return JSONResponse(content={"success": True, "message": "No changes or updates needed"})
 
-        if failures and not results:
-             return JSONResponse(content={"success": False, "message": f"Failed to update: {', '.join(failures)}"}, status_code=500)
-        
         if failures:
-             return JSONResponse(content={"success": True, "message": f"Updated: {', '.join(results)}. Failed: {', '.join(failures)}"})
+            # Use conflict status for platform-level update failures instead of generic 500.
+            status_code = 409
+            return JSONResponse(
+                content={
+                    "success": False,
+                    "message": (
+                        f"Updated: {', '.join(results)}. Failed: {', '.join(failures)}"
+                        if results
+                        else f"Failed to update: {', '.join(failures)}"
+                    ),
+                    "updated_platforms": [item.replace(" updated", "").lower() for item in results],
+                    "failed_platforms": [item.lower() for item in failures],
+                },
+                status_code=status_code,
+            )
 
-        return JSONResponse(content={"success": True, "message": ", ".join(results)})
+        return JSONResponse(
+            content={
+                "success": True,
+                "message": ", ".join(results),
+                "updated_platforms": [item.replace(" updated", "").lower() for item in results],
+                "failed_platforms": [],
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error in stream update: {e}")

@@ -96,7 +96,6 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                                 checked={vkChatEnabled}
                                 onCheckedChange={handleVkToggle}
                                 disabled={!vkEnabled}
-                                className="data-[state=checked]:bg-none data-[state=checked]:bg-[#FF4444] data-[state=checked]:border-[#FF4444] data-[state=checked]:from-transparent data-[state=checked]:to-transparent"
                             />
                             <div className="flex items-center space-x-2">
                                 <VKIcon className="h-4 w-4 text-[#FF4444]" />

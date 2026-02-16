@@ -92,7 +92,7 @@ export const useWebSocketSync = (options: WebSocketSyncOptions) => {
       }
 
       // Invalidations
-      const invalidations: Record<string, any> = {
+      const invalidations: Record<string, { queryKey: readonly unknown[] }> = {
         'youtube_queue_updated': { queryKey: queryKeys.youtube.queue() },
         'points_updated': { queryKey: queryKeys.points.all },
         'drops_result': { queryKey: queryKeys.drops.all },

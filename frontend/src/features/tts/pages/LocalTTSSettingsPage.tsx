@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 
+/* eslint-disable no-alert */
 import { useQueryClient } from '@tanstack/react-query';
 import {
     AlertCircle,
@@ -102,7 +103,7 @@ interface NewVoice {
 
 const LocalTTSSettingsPage: React.FC = () => {
     const navigate = useNavigate();
-    const { isAuthenticated, user } = useAuth();
+    const { isAuthenticated } = useAuth();
     const { integrations } = useIntegrations();
 
     const isTwitchConnected = integrations.twitch?.enabled;

@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { ChevronRight, Coins, Command, Headphones, Home, Laugh, LucideIcon, Menu, MessageSquare, Mic, Monitor, Settings, Shield, Sparkles, X, Youtube } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
@@ -64,7 +65,7 @@ const getNavItems = (isYourchy: boolean): NavItem[] => {
             ]
         },
         { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
-        { to: '/dashboard/chat-analysis', label: 'Управление чатом', icon: MessageSquare },
+        { to: '/dashboard/chat-analysis', label: 'Аналитика чата', icon: MessageSquare },
         { to: '/dashboard/commands', label: 'Команды', icon: Command },
         { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
     ];
@@ -308,7 +309,6 @@ const Sidebar: React.FC = () => {
 
                     {/* Мини-плееры (слоты для портала) */}
                     <div className="mt-auto px-2 pb-4 overflow-visible space-y-3">
-                        <div id="tts-mini-player-slot" className="overflow-visible" />
                         <div id="youtube-mini-player-slot" className="overflow-visible" />
                     </div>
 

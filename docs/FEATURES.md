@@ -5,6 +5,16 @@
 - Per-user filters, pitch/speed controls, and moderation options.
 - Frontend playback respects global TTS status and enabled platforms.
 - Google Cloud TTS supports per-user voice pools with preview and random voice selection.
+- If at least one Gemini voice is selected, runtime uses only Gemini voices for playback; otherwise it falls back to the broader premium pool.
+- Google Cloud preview response exposes fallback diagnostics (`fallback_used`, `requested_model`) so UI can show when Gemini request fell back to a non-Gemini voice.
+- Google Cloud TTS voice list is quality-sorted (Gemini/Chirp/Neural2 first), defaults to premium voices on first setup, and includes Gemini aliases with safe fallback to Chirp3-HD when Gemini profile is unavailable.
+- Google Cloud Gemini requests now also resolve plain speaker names (for example `Kore`/`Aoede`) as Gemini voices instead of falling back to default Standard voice.
+- Google Cloud voice picker now exposes only Gemini and Chirp3-HD voices (legacy families like Standard/WaveNet/Neural2 are hidden and ignored for runtime selection).
+- Default Gemini model for requests is `gemini-2.5-flash-tts` (unless explicitly overridden for preview diagnostics/tests).
+- Google Cloud mood presets (`neutral`, `sad`, `happy`) are stored per user and mapped to system prompts on backend; free-form prompt input is not exposed in UI.
+- Website-mode synthesis is enabled only when an active `/tts-player` tab is present; OBS-mode synthesis requires an active OBS socket sink.
+- When all playback sinks disappear, pending in-memory TTS tasks are dropped instead of continuing synthesis with nowhere to deliver audio.
+- `/tts-player` now attempts automatic audio-context initialization/resume on tab open (manual user interaction remains fallback if blocked by browser autoplay policy).
 
 ## YouTube Queue
 - Requests via chat command `!sr <url-or-query>` or dashboard.
@@ -23,13 +33,15 @@
 
 ## Drops
 - Lootbox style rewards triggered by chat activity or time.
+- Streak and widget settings include quick presets to reduce fine-grained slider tuning.
 
 ## Integrations
 - Twitch: OAuth, chat, channel points, EventSub.
 - VK Live: chat and rewards.
 - DonationAlerts: donation playback.
 - MemeAlerts: meme coin grants via dashboard and chat commands.
-- Bot accounts (Twitch/VK) use OAuth tokens stored in DB with automatic refresh (configure via /auth/{platform}/bot/login).
+- Bot accounts (Twitch/VK) use OAuth tokens stored in DB with automatic refresh (configure via Admin Bot Connect tab or `/auth/{platform}/bot/login`).
+- VK bot chat polling uses dedicated bot OAuth token (no fallback to streamer user token), with `401` handling (dev->prod fallback, then OAuth refresh with cooldown) and manual refresh via `/api/admin/bot/vk/refresh-token`.
 
 ## Commands
 - `!tts`, `!sr`, `!points`, `!skip` and custom commands.

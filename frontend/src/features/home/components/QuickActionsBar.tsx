@@ -2,7 +2,6 @@
 import React from 'react';
 
 import { DollarSign, Volume2, VolumeX, Zap } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 import { useQuickActionsLogic } from '@/features/home/hooks/useQuickActionsLogic';
 import { Card } from '@/shared/components/ui/card';
@@ -12,7 +11,6 @@ import ActionButton from './quickactions/ActionButton';
 import { useQuickActionsHandlers } from './quickactions/useQuickActionsHandlers';
 
 const QuickActionsBar: React.FC = () => {
-    const navigate = useNavigate();
     const logic = useQuickActionsLogic();
 
     const handlers = useQuickActionsHandlers({

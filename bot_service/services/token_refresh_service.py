@@ -41,61 +41,6 @@ class TokenRefreshService:
         return self._refresh_handlers.get(platform)
 
     async def refresh_if_needed(self, user_id: int, platform: str, db: Optional[Session] = None) -> bool:
-        """
-        Проверить и обновить токен если истекает в течение 7 дней.
-        
-        Returns:
-            bool: True если токен валиден или успешно обновлен
-        """
-        def _check_and_refresh(session_db: Session) -> bool:
-            repo = UserTokenRepository(session_db)
-            token = repo.get_by_user_and_platform(user_id, platform)
-            
-            if not token:
-                return False
-            
-            # Если токен не истекает скоро - все ок
-            if token.expires_at and token.expires_at > utcnow_naive() + timedelta(days=7):
-                return True
-                
-            return self._refresh_token(token, session_db)
-
-        if db:
-            result = _check_and_refresh(db)
-            if asyncio.iscoroutine(result): # Should not happen with synchronous repo calls but careful mixed async
-                # Wait, _refresh_token is async? Nope, it calls self._refresh_token which IS async?
-                # Ah, _refresh_token calls handler which is Awaitable.
-                # My wrapper logic here is a bit flawed for async inside sync wrapper if not careful.
-                pass
-            return await result if asyncio.iscoroutine(result) else result 
-            # Wait, _check_and_refresh calls self._refresh_token. 
-            # self._refresh_token is NOT async defined below? 
-            # See outline: _refresh_token(token, db).
-            # It returns await handler(token, db). So it IS coroutine.
-            
-        import asyncio
-        if db:
-            return await _check_and_refresh(db) # This works if check_and_refresh matches async
-        
-        # If no DB provided, create new session
-        # But _check_and_refresh returns Awaitable.
-        # So we can't easily use 'def' wrapper for session management around async.
-        # We need explicit async with.
-        
-        async with get_db_async_context() as new_db: # We don't have get_db_async_context
-             # We have to use sync session and run async code?
-             # Or just use the standard pattern
-             pass
-             
-        # Standard pattern in this project seems to be 'with db_session() as db'.
-        # But for async methods we need something compatible.
-        # We'll just assume DB is passed or use sync get_db context and await inside.
-        
-        # Let's clean this up.
-        pass
-
-    # Better implementation avoiding the complex inner function issue
-    async def refresh_if_needed(self, user_id: int, platform: str, db: Optional[Session] = None) -> bool:
         if db:
              repo = UserTokenRepository(db)
              token = repo.get_by_user_and_platform(user_id, platform)

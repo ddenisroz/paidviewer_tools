@@ -45,6 +45,7 @@ class TTSSettingsUpdateRequest(BaseModel):
     enabled_platforms: Optional[list] = None
     tts_mode: Optional[str] = None
     gcloud_voices: Optional[list] = None
+    gcloud_mood: Optional[str] = None
 
 
 class AudioSettingsUpdateRequest(BaseModel):
@@ -165,6 +166,8 @@ async def update_my_tts_settings(
         }
         if request.gcloud_voices is not None:
             save_payload["gcloud_voices"] = request.gcloud_voices
+        if request.gcloud_mood is not None:
+            save_payload["gcloud_mood"] = request.gcloud_mood
 
         result = await tts_service.save_tts_settings(**save_payload)
         

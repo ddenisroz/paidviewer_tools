@@ -24,6 +24,7 @@ import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/shared/utils/toastManager';
 
 import type { ApiResponse } from '@/types/api';
+import type { ChatEmote } from '@/types/chat';
 import type { ChatBoxSettings } from '@/types/chatbox';
 import type { AxiosResponse } from 'axios';
 
@@ -41,6 +42,8 @@ interface PreviewMessage {
     time: string;
     role: string;
     badges: string[];
+    emotes?: ChatEmote[];
+    vk_role_icon_url?: string;
     avatar_url?: string;
 }
 
@@ -74,10 +77,56 @@ const DEFAULT_SETTINGS: ChatBoxSettings = {
 };
 
 const PREVIEW_MESSAGES: PreviewMessage[] = [
-    { id: 1, platform: 'twitch', author: 'Streamer', message: 'Привет всем! :hype:', time: '12:00', role: 'Broadcaster', badges: ['broadcaster/1'], avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=S' },
-    { id: 2, platform: 'twitch', author: 'VIPUser', message: 'Смотрите клип: https://example.com', time: '12:01', role: 'VIP', badges: ['vip/1'], avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=V' },
-    { id: 3, platform: 'vk', author: 'Viewer1', message: 'Это было :hype:! Вот мем: https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif', time: '12:02', role: 'Moderator', badges: [], avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=VK' },
-    { id: 4, platform: 'twitch', author: 'Moderator', message: 'Всем привет!', time: '12:03', role: 'Moderator', badges: ['moderator/1'], avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=M' }
+    {
+        id: 1,
+        platform: 'twitch',
+        author: 'Streamer',
+        message: 'Привет всем Kappa',
+        time: '12:00',
+        role: 'Broadcaster',
+        badges: ['broadcaster/1'],
+        emotes: [
+            { id: '25', name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0', start: 12, end: 16 }
+        ],
+        avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=S'
+    },
+    {
+        id: 2,
+        platform: 'twitch',
+        author: 'VIPUser',
+        message: 'Nice clutch PogChamp',
+        time: '12:01',
+        role: 'VIP',
+        badges: ['vip/1'],
+        emotes: [
+            { id: '88', name: 'PogChamp', url: 'https://static-cdn.jtvnw.net/emoticons/v2/88/default/dark/1.0', start: 12, end: 19 }
+        ],
+        avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=V'
+    },
+    {
+        id: 3,
+        platform: 'vk',
+        author: 'Viewer1',
+        message: 'Это огонь :smile_32: и :smile_451:',
+        time: '12:02',
+        role: 'Moderator',
+        badges: ['https://images.live.vkvideo.ru/smile/102/icon/size/small'],
+        emotes: [
+            { id: '32', name: 'smile_32', url: 'https://images.live.vkvideo.ru/smile/32/icon/size/small', start: 10, end: 19 },
+            { id: '451', name: 'smile_451', url: 'https://images.live.vkvideo.ru/smile/451/icon/size/small', start: 23, end: 33 }
+        ],
+        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=VK'
+    },
+    {
+        id: 4,
+        platform: 'twitch',
+        author: 'Moderator',
+        message: 'Го в катку JustAnotherDay',
+        time: '12:03',
+        role: 'Moderator',
+        badges: ['moderator/1'],
+        avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=M'
+    }
 ];
 
 const FONT_OPTIONS = [
@@ -199,9 +248,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     if (loading) {
         const loadingContent = (
             <>
-                <div className="fixed inset-0 bg-black/90 z-[9999]" />
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999]" />
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-                <div className="bg-[#020308] p-8 rounded-lg shadow-2xl border border-[#0b1422]">
+                <div className="bg-slate-900/95 p-8 rounded-lg shadow-2xl border border-slate-700/60">
                         <div className="text-white">Загрузка...</div>
                     </div>
                 </div>
@@ -212,15 +261,15 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
     const modalContent = (
         <>
-            <div className="fixed inset-0 bg-black/90 z-[9999]" onClick={onClose} />
+            <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[9999]" onClick={onClose} />
 
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
                 <div
-                    className="bg-[#020308] font-base rounded-xl max-w-5xl w-full h-[92vh] max-h-[92vh] overflow-hidden flex flex-col pointer-events-auto border border-[#0b1422] shadow-2xl"
+                    className="bg-slate-900/95 font-base rounded-xl max-w-5xl w-full h-[92vh] max-h-[92vh] overflow-hidden flex flex-col pointer-events-auto border border-slate-700/60 shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
-                    <div className="border-b border-[#0b1422] px-5 py-3 flex items-center justify-between bg-[#05070f]">
+                    <div className="border-b border-slate-700/60 px-5 py-3 flex items-center justify-between bg-slate-800/80">
                         <div className="flex items-center gap-3">
                             <h2 className="text-lg font-semibold text-white">Настройки ChatBox</h2>
                             {hasUnsavedChanges && (
@@ -235,10 +284,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 overflow-auto p-5 flex flex-col lg:flex-row gap-6 min-h-0 bg-[#020308]">
+                    <div className="flex-1 overflow-auto p-5 flex flex-col lg:flex-row gap-6 min-h-0 bg-slate-900/70">
                         {/* Left: Preview */}
                         <div className="lg:w-80 w-full flex-shrink-0 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
-                            <div className="flex-1 border border-[#0b1422] rounded-lg overflow-hidden bg-[#020308] min-h-[240px]">
+                            <div className="flex-1 border border-slate-700/60 rounded-lg overflow-hidden bg-slate-900/70 min-h-[240px]">
                                 <PreviewPanel
                                     settings={settings}
                                     previewMessages={PREVIEW_MESSAGES}
@@ -253,7 +302,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                     <Input
                                         value={settings.widget_url || ''}
                                         readOnly
-                                        className="bg-[#080d18] text-white border-[#111a2a] h-8 flex-1 truncate text-sm font-normal font-base"
+                                        className="bg-slate-800/80 text-white border-slate-600/70 h-8 flex-1 truncate text-sm font-normal font-base"
                                     />
                                     <Button onClick={copyToClipboard} variant="outline" size="sm" className="border-slate-700 h-8 w-8 p-0">
                                         {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -268,7 +317,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         {/* Right: Settings Tabs */}
                         <div className="flex-1 min-w-0 min-h-0">
                             <Tabs defaultValue="appearance" className="h-full flex flex-col overflow-hidden min-h-0">
-                                <TabsList className="grid grid-cols-3 gap-1 p-1 rounded-lg border border-[#0b1422] bg-[#05070f] mb-4 font-base">
+                                <TabsList className="grid grid-cols-3 gap-1 p-1 rounded-lg border border-[#1a2a3f] bg-[#0f1a2b] mb-4 font-base">
                                     <TabsTrigger value="appearance" className="text-xs gap-1.5 rounded-md text-slate-300 data-[state=active]:bg-[#0b1220] data-[state=active]:text-white data-[state=active]:shadow-sm">
                                         <Palette className="w-3 h-3" /> Внешний вид
                                     </TabsTrigger>
@@ -282,7 +331,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
                                 {/* Appearance Tab */}
                                 <TabsContent value="appearance" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
-                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                    <div className="rounded-lg border border-[#1a2a3f] bg-[#101d31] p-4 space-y-4">
                                         <div className="text-[11px] uppercase tracking-wider text-slate-400">Типографика</div>
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="space-y-2">
@@ -291,10 +340,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     value={settings.font_family}
                                                     onValueChange={(v) => handleChange('font_family', v)}
                                                 >
-                                                    <SelectTrigger className="h-9 bg-[#080d18] border-[#111a2a] text-sm font-normal font-base">
+                                                    <SelectTrigger className="h-9 bg-[#14233a] border-[#22324a] text-sm font-normal font-base">
                                                         <SelectValue />
                                                     </SelectTrigger>
-                                                    <SelectContent className="bg-[#05080f] border-[#0b1422] z-[11000] font-base">
+                                                    <SelectContent className="bg-[#101d31] border-[#1a2a3f] z-[11000] font-base">
                                                         {FONT_OPTIONS.map(font => (
                                                             <SelectItem key={font} value={font} style={{ fontFamily: font }}>
                                                                 {font}
@@ -319,7 +368,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                         </div>
                                     </div>
 
-                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                    <div className="rounded-lg border border-[#1a2a3f] bg-[#101d31] p-4 space-y-4">
                                         <div className="text-[11px] uppercase tracking-wider text-slate-400">Цвета</div>
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="space-y-2">
@@ -379,7 +428,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                         </div>
                                     </div>
 
-                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-3">
+                                    <div className="rounded-lg border border-[#1a2a3f] bg-[#101d31] p-4 space-y-3">
                                         <div className="text-[11px] uppercase tracking-wider text-slate-400">Скругление</div>
                                         <div className="space-y-2">
                                             <Label className="text-xs text-muted-foreground">Скругление углов</Label>
@@ -399,7 +448,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
                                 {/* Animation Tab */}
                                 <TabsContent value="animation" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
-                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                    <div className="rounded-lg border border-[#1a2a3f] bg-[#101d31] p-4 space-y-4">
                                         <div className="text-[11px] uppercase tracking-wider text-slate-400">Анимация</div>
                                         <div className="space-y-2">
                                             <Label className="text-xs text-muted-foreground">Тип анимации</Label>
@@ -407,10 +456,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                 value={settings.animation_type}
                                                 onValueChange={(v) => handleChange('animation_type', v)}
                                             >
-                                                <SelectTrigger className="h-9 bg-[#080d18] border-[#111a2a] text-sm font-normal font-base">
+                                                <SelectTrigger className="h-9 bg-[#14233a] border-[#22324a] text-sm font-normal font-base">
                                                     <SelectValue />
                                                 </SelectTrigger>
-                                                <SelectContent className="bg-[#05080f] border-[#0b1422] z-[11000] font-base">
+                                                <SelectContent className="bg-[#101d31] border-[#1a2a3f] z-[11000] font-base">
                                                     {ANIMATION_OPTIONS.map(option => (
                                                         <SelectItem key={option.value} value={option.value}>
                                                             {option.label}
@@ -453,29 +502,29 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
                                 {/* Display Tab */}
                                 <TabsContent value="display" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
-                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-3">
+                                    <div className="rounded-lg border border-[#1a2a3f] bg-[#101d31] p-4 space-y-3">
                                         <div className="text-[11px] uppercase tracking-wider text-slate-400">Отображение</div>
                                         <div className="grid gap-3 sm:grid-cols-2">
-                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                            <div className="flex items-center justify-between rounded-md border border-[#22324a] bg-[#14233a] px-3 py-2">
                                                 <Label className="text-sm text-slate-200">Иконки платформ</Label>
                                                 <Switch checked={settings.show_platform_icons} onCheckedChange={(v) => handleChange('show_platform_icons', v)} />
                                             </div>
-                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                            <div className="flex items-center justify-between rounded-md border border-[#22324a] bg-[#14233a] px-3 py-2">
                                                 <Label className="text-sm text-slate-200">Значки (badges)</Label>
                                                 <Switch checked={settings.show_badges} onCheckedChange={(v) => handleChange('show_badges', v)} />
                                             </div>
-                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                            <div className="flex items-center justify-between rounded-md border border-[#22324a] bg-[#14233a] px-3 py-2">
                                                 <Label className="text-sm text-slate-200">7TV Эмодзи</Label>
                                                 <Switch checked={settings.show_7tv_emotes} onCheckedChange={(v) => handleChange('show_7tv_emotes', v)} />
                                             </div>
-                                            <div className="flex items-center justify-between rounded-md border border-[#111a2a] bg-[#080d18] px-3 py-2">
+                                            <div className="flex items-center justify-between rounded-md border border-[#22324a] bg-[#14233a] px-3 py-2">
                                                 <Label className="text-sm text-slate-200">Ссылки</Label>
                                                 <Switch checked={settings.show_links} onCheckedChange={(v) => handleChange('show_links', v)} />
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="rounded-lg border border-[#0b1422] bg-[#05080f] p-4 space-y-4">
+                                    <div className="rounded-lg border border-[#1a2a3f] bg-[#101d31] p-4 space-y-4">
                                         <div className="text-[11px] uppercase tracking-wider text-slate-400">Разметка</div>
                                         <div className="grid gap-4 md:grid-cols-2">
                                             <div className="space-y-2">
@@ -497,10 +546,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                 value={settings.chat_direction}
                                                 onValueChange={(v) => handleChange('chat_direction', v)}
                                             >
-                                                <SelectTrigger className="h-9 bg-[#080d18] border-[#111a2a] text-sm font-normal font-base">
+                                                <SelectTrigger className="h-9 bg-[#14233a] border-[#22324a] text-sm font-normal font-base">
                                                     <SelectValue />
                                                 </SelectTrigger>
-                                                <SelectContent className="bg-[#05080f] border-[#0b1422] z-[11000] font-base">
+                                                <SelectContent className="bg-[#101d31] border-[#1a2a3f] z-[11000] font-base">
                                                     {CHAT_DIRECTION_OPTIONS.map(option => (
                                                         <SelectItem key={option.value} value={option.value}>
                                                             {option.label}
@@ -545,7 +594,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                     </div>
 
                     {/* Footer */}
-                    <div className="border-t border-[#0b1422] px-5 py-3 flex items-center justify-between gap-2 bg-[#05070f]">
+                    <div className="border-t border-[#1a2a3f] px-5 py-3 flex items-center justify-between gap-2 bg-[#0f1a2b]">
                         <div className="flex items-center gap-2">
                             <Button variant="outline" onClick={resetToDefaults} className="border-slate-700">
                                 Сбросить
@@ -569,6 +618,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 };
 
 export default ChatBoxSettingsModal;
+
 
 
 

@@ -11,8 +11,8 @@ import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 // Critical pages - загружаем сразу (только auth flow)
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DonationAlertsCallback from './pages/DonationAlertsCallback';
-import MemeAlertsCallback from './pages/MemeAlertsCallback';
 import LoginPage from './pages/LoginPage';
+
 import AuthGuard from './shared/components/AuthGuard';
 
 // Minimal loading - no skeletons, pages appear instantly
@@ -31,6 +31,7 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 
 const CommandsPage = lazy(() => import('./pages/CommandsPage'));
 const ObsTtsPage = lazy(() => import('./features/tts/pages/ObsTtsPage'));
+const TtsPlayerPage = lazy(() => import('./features/tts/pages/TtsPlayerPage'));
 
 const ChatOverlay = lazy(() => import('./pages/ChatOverlay'));
 const ChatWindow = lazy(() => import('./pages/ChatWindow'));
@@ -67,11 +68,7 @@ const App: React.FC = () => {
                             <DonationAlertsCallback />
                         </RouteErrorBoundary>
                     } />
-                    <Route path="/memealerts/callback" element={
-                        <RouteErrorBoundary routeName="MemeAlerts Callback">
-                            <MemeAlertsCallback />
-                        </RouteErrorBoundary>
-                    } />
+
 
                     {/* OBS Widgets - minimal loading */}
                     <Route path="/tts-obs/:token" element={
@@ -106,6 +103,14 @@ const App: React.FC = () => {
 
                     {/* Protected Routes with Layout */}
                     <Route path="/" element={<AuthGuard />}>
+                        <Route path="tts-player" element={
+                            <RouteErrorBoundary routeName="TTS Player">
+                                <Suspense fallback={<MinimalFallback />}>
+                                    <TtsPlayerPage />
+                                </Suspense>
+                            </RouteErrorBoundary>
+                        } />
+
                         <Route element={<Layout />}>
                             <Route index element={<Navigate to="/dashboard" replace />} />
 
@@ -197,13 +202,6 @@ const App: React.FC = () => {
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
-                            <Route path="dashboard/dolbaebadmintts/sessions" element={
-                                <RouteErrorBoundary routeName="Admin Sessions">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
                             <Route path="dashboard/dolbaebadmintts/users" element={
                                 <RouteErrorBoundary routeName="Admin Users">
                                     <Suspense fallback={<MinimalFallback />}>
@@ -218,22 +216,15 @@ const App: React.FC = () => {
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
+                            <Route path="dashboard/dolbaebadmintts/voices" element={
+                                <RouteErrorBoundary routeName="Admin Voices">
+                                    <Suspense fallback={<MinimalFallback />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
                             <Route path="dashboard/dolbaebadmintts/monitoring" element={
                                 <RouteErrorBoundary routeName="Admin Monitoring">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/blocked-channels" element={
-                                <RouteErrorBoundary routeName="Admin Blocked Channels">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/support" element={
-                                <RouteErrorBoundary routeName="Admin Support">
                                     <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>

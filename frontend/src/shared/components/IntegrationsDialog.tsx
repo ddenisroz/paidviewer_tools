@@ -103,7 +103,6 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                             checked={integrations.twitch?.enabled || false}
                             onCheckedChange={handleTwitchToggle}
                             disabled={isLoading || integrations.twitch?.enabled === null}
-                            className="data-[state=checked]:from-[#9146FF] data-[state=checked]:to-[#7d3cff] data-[state=checked]:border-[#9146FF]"
                         />
                     </div>
 
@@ -117,7 +116,6 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                             checked={integrations.vk?.enabled || false}
                             onCheckedChange={handleVkToggle}
                             disabled={isLoading || integrations.vk?.enabled === null}
-                            className="data-[state=checked]:bg-none data-[state=checked]:bg-[#FF4444] data-[state=checked]:border-[#FF4444] data-[state=checked]:from-transparent data-[state=checked]:to-transparent"
                         />
                     </div>
 

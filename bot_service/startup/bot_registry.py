@@ -99,8 +99,7 @@ class BotRegistry:
         """Проверить, запущен ли VK Live бот."""
         return (
             self._vk_bot is not None 
-            and self._vk_task is not None 
-            and not self._vk_task.done()
+            and self._vk_bot.is_running
         )
     
     # === Cleanup ===
@@ -119,6 +118,11 @@ class BotRegistry:
     
     async def stop_vk_bot(self) -> None:
         """Остановить VK Live бота."""
+        if self._vk_bot:
+            try:
+                await self._vk_bot.stop_bot()
+            except Exception as e:
+                logger.error(f"[ERROR] Error stopping VK bot: {e}")
         if self._vk_task:
             self._vk_task.cancel()
             try:

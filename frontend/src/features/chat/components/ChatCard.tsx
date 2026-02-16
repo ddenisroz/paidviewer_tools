@@ -19,7 +19,6 @@ import {
     scrollToBottom,
     scrollToBottomInitial
 } from '@/features/chat/utils/scrollHelpers';
-import { ttsService } from '@/services/api/services/ttsService';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
 import {
@@ -224,22 +223,59 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         if (!historyLoadedRef.current && user?.id) {
             historyLoadedRef.current = true;
         }
-    }, [user?.id, integrations?.twitch?.enabled, integrations?.vk?.enabled, setMessages]);
+    }, [user?.id, integrations, setMessages]);
 
     // Load chat history with delay
     const shouldLoadHistory = !historyLoadedRef.current && user?.id;
     useEffect(() => {
         if (!shouldLoadHistory) return;
         const timer = setTimeout(() => {
-            loadChatHistory();
+            const runLoadChatHistory = async (): Promise<void> => {
+                try {
+                    await loadChatBadges(integrations, user || {});
+                    setBadgesLoaded(true);
+
+                    const historyMessages = await loadCompleteChatHistory(
+                        integrations,
+                        user || {},
+                        CHAT_CONSTANTS.MESSAGE_LIMIT
+                    );
+
+                    if (historyMessages.length > 0) {
+                        setMessages(historyMessages);
+                    }
+                } catch (error) {
+                    logger.error('[ERROR] Error loading chat history:', error);
+                }
+            };
+
+            void runLoadChatHistory();
         }, CHAT_CONSTANTS.RENDER_DELAY);
         return () => clearTimeout(timer);
-    }, [shouldLoadHistory]);
+    }, [shouldLoadHistory, integrations, user, setMessages]);
 
     const lastEmotesKeyRef = useRef<string>('');
 
     // Load emotes with delay, and refresh when user/twitch id becomes available.
     useEffect(() => {
+        const loadEmotes = async (): Promise<void> => {
+            try {
+                const username = user?.twitch_username;
+                const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
+                if (username) {
+                    clearEmotesCache();
+                    const emotesData = await getAllEmotesForChannel(username, twitchUserId);
+                    setEmotes(emotesData);
+                } else {
+                    const { getGlobalEmotes } = await import('@/features/chat/utils/emotes');
+                    const globalEmotes = await getGlobalEmotes();
+                    setEmotes({ channelEmotes: new Map(), globalEmotes });
+                }
+            } catch (error) {
+                logger.error('Error loading emotes:', error);
+            }
+        };
+
         const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
         const username = user?.twitch_username;
         const key = `${username || ''}:${twitchUserId || ''}`;
@@ -247,53 +283,15 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         lastEmotesKeyRef.current = key;
 
         clearEmotesCache();
-        loadEmotes();
+        void loadEmotes();
         logger.debug(`[CHAT] Emotes reload key: ${key}`);
 
         const timer = setTimeout(() => {
-            loadEmotes();
+            void loadEmotes();
         }, CHAT_CONSTANTS.EMOJI_LOAD_DELAY);
 
         return () => clearTimeout(timer);
     }, [user?.twitch_username, user?.integrations?.twitch]);
-
-    const loadEmotes = async (): Promise<void> => {
-        try {
-            const username = user?.twitch_username;
-            const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
-            if (username) {
-                clearEmotesCache();
-                const emotesData = await getAllEmotesForChannel(username, twitchUserId);
-                setEmotes(emotesData);
-            } else {
-                // Load only global emotes if no channel context
-                const { getGlobalEmotes } = await import('@/features/chat/utils/emotes');
-                const globalEmotes = await getGlobalEmotes();
-                setEmotes({ channelEmotes: new Map(), globalEmotes });
-            }
-        } catch (error) {
-            logger.error('Error loading emotes:', error);
-        }
-    };
-
-    const loadChatHistory = async (): Promise<void> => {
-        try {
-            await loadChatBadges(integrations, user || {});
-            setBadgesLoaded(true);
-
-            const historyMessages = await loadCompleteChatHistory(
-                integrations,
-                user || {},
-                CHAT_CONSTANTS.MESSAGE_LIMIT
-            );
-
-            if (historyMessages.length > 0) {
-                setMessages(historyMessages);
-            }
-        } catch (error) {
-            logger.error('[ERROR] Error loading chat history:', error);
-        }
-    };
 
     // Scroll management
     const setMessagesContainerRef = (node: HTMLDivElement | null): void => {
@@ -375,9 +373,9 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         });
     };
 
-    const handleContextMenuAction = async (action: string, msg: ChatMessage): Promise<void> => {
+    const handleContextMenuAction = React.useCallback(async (action: string, msg: ChatMessage): Promise<void> => {
         await handleContextMenuActionFromHook(action, msg, user);
-    };
+    }, [handleContextMenuActionFromHook, user]);
 
     // Open chat window
     const handleOpenChatWindow = (): void => {

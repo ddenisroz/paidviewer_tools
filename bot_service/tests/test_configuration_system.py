@@ -30,6 +30,7 @@ class TestConfigurationLoading:
             'VK_CLIENT_ID': 'test-vk-id',
             'VK_CLIENT_SECRET': 'test-vk-secret',
             'VK_REDIRECT_URI': 'http://localhost:8000/auth/vk/callback',
+            'ENV_FILE': '.env.test.nonexistent',  # Force ignore local .env
         }
         
         with patch.dict(os.environ, test_env, clear=True):
@@ -86,6 +87,7 @@ class TestConfigurationLoading:
             'VK_CLIENT_ID': 'test-vk-id',
             'VK_CLIENT_SECRET': 'test-vk-secret',
             'VK_REDIRECT_URI': 'http://localhost:8000/auth/vk/callback',
+            'ENV_FILE': '.env.test.nonexistent',  # Force ignore local .env
         }
         
         with patch.dict(os.environ, test_env, clear=True):

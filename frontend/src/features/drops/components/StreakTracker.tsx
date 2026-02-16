@@ -19,12 +19,13 @@ interface StreakTrackerProps {
   channelName: string;
 }
 
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+
 const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
   const [streaks, setStreaks] = useState<Streak[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [hasMore, setHasMore] = useState(true);
-  const [offset, setOffset] = useState(0);
   const limit = 50;
 
   // Check if streak is enabled (общий конфиг, без platform)
@@ -33,18 +34,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
   // Проверяем, включен ли стрик хотя бы на одной платформе
   const streakEnabled = (config?.streak_enabled_twitch || config?.streak_enabled_vk) ?? false;
 
-  useEffect(() => {
-    // Load streaks always if we have required data (общая статистика для всех платформ)
-    if (user && channelName) {
-      loadStreaks(true);
-    } else {
-      // Clear streaks if missing required data
-      setStreaks([]);
-      setHasMore(false);
-    }
-  }, [user, channelName, streakEnabled]);
-
-  const loadStreaks = async (reset = false) => {
+  const loadStreaks = React.useCallback(async (reset = false, targetOffset = 0) => {
     // Do not load if missing required data
     if (!user || !channelName) {
       setStreaks([]);
@@ -52,7 +42,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
       return;
     }
 
-    const currentOffset = reset ? 0 : offset;
+    const currentOffset = reset ? 0 : targetOffset;
 
     try {
       setLoading(true);
@@ -68,10 +58,9 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
           setStreaks([]);
           setHasMore(false);
         } else {
-          setStreaks(reset ? newStreaks : [...streaks, ...newStreaks]);
+          setStreaks(prev => (reset ? newStreaks : [...prev, ...newStreaks]));
           setHasMore(newStreaks.length === limit);
         }
-        if (reset) setOffset(0);
       }
     } catch (error) {
       logger.error('Error loading streaks:', error);
@@ -81,12 +70,22 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, channelName, limit]);
+
+  useEffect(() => {
+    // Load streaks always if we have required data (общая статистика для всех платформ)
+    if (user && channelName) {
+      void loadStreaks(true, 0);
+    } else {
+      // Clear streaks if missing required data
+      setStreaks([]);
+      setHasMore(false);
+    }
+  }, [user, channelName, streakEnabled, loadStreaks]);
 
   const handleLoadMore = () => {
     if (!loading && hasMore) {
-      setOffset(prev => prev + limit);
-      loadStreaks(false);
+      void loadStreaks(false, streaks.length);
     }
   };
 
@@ -124,7 +123,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
 
 
   return (
-    <Card>
+    <Card className={SURFACE_CARD_CLASS}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5" />
@@ -144,17 +143,17 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
         </div>
 
         {/* Таблица стриков */}
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/60">
           {filteredStreaks.length === 0 && !loading ? (
             <div className="text-center py-12 text-muted-foreground">
               <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>Нет активных стриков</p>
-              <p className="text-xs mt-1">Стрики появятся когда зрители начнут активно участвовать</p>
+              <p className="text-xs mt-1">Появятся после первых активностей в чате</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-muted">
+                <thead className="bg-slate-900/80">
                   <tr>
                     <th className="text-left p-3 font-medium text-sm">#</th>
                     <th className="text-left p-3 font-medium text-sm">Зритель</th>
@@ -170,7 +169,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
                     const colorClass = getStreakColor(streak.current_streak);
 
                     return (
-                      <tr key={`${streak.viewer_name}-${streak.current_streak}`} className="hover:bg-muted/50 transition-colors">
+                        <tr key={`${streak.viewer_name}-${streak.current_streak}`} className="hover:bg-slate-900/80 transition-colors">
                         <td className="p-3 text-sm text-muted-foreground">
                           {index + 1}
                         </td>

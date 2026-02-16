@@ -4,7 +4,6 @@
 """
 
 import sys
-import os
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -16,7 +15,7 @@ sys.path.insert(0, str(BOT_SERVICE_ROOT))
 env_path = BOT_SERVICE_ROOT / '.env'
 load_dotenv(dotenv_path=env_path, override=True)
 
-from core.database import SessionLocal, User
+from core.database import SessionLocal, User  # noqa: E402
 
 
 def check_admin():
@@ -24,14 +23,15 @@ def check_admin():
     db = SessionLocal()
     try:
         # РС‰РµРј admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
-        admin = db.query(User).filter(User.is_admin == True).first()
+        admin = db.query(User).filter((User.role == 'admin') | (User.is_admin.is_(True))).first()
         
         if admin:
             print(" Admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅР°Р№РґРµРЅ:")
             print(f"   ID: {admin.id}")
             print(f"   Twitch: {admin.twitch_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
             print(f"   VK: {admin.vk_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
-            print(f"   Admin: {admin.is_admin}")
+            print(f"   Role: {admin.role}")
+            print(f"   Admin: {admin.role == 'admin' or admin.is_admin}")
             return True
         else:
             print("[ERROR] Admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РќР• РЅР°Р№РґРµРЅ")
@@ -39,7 +39,7 @@ def check_admin():
             print("\nР’Р°СЂРёР°РЅС‚С‹:")
             print("1. Р’РѕР№РґРёС‚Рµ С‡РµСЂРµР· OAuth (Twitch РёР»Рё VK)")
             print("2. РЎРґРµР»Р°Р№С‚Рµ РІР°С€РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р°РґРјРёРЅРѕРј:")
-            print("   UPDATE users SET is_admin = true WHERE id = YOUR_USER_ID;")
+            print("   UPDATE users SET role = 'admin', is_admin = true WHERE id = YOUR_USER_ID;")
             return False
             
     finally:

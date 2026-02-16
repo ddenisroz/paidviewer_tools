@@ -27,6 +27,7 @@ const QUALITY_CONFIGS: QualityConfig[] = [
   { id: 'epic', label: 'Эпический', color: '#8B5CF6', image: EpicClosed },
   { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed }
 ];
+const DONATION_PRESETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
 interface DonationGridFormData {
     donation_amount_common: number[];
@@ -73,7 +74,7 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
           const maxValue = getMaxAmount(quality.id);
           
           return (
-            <div key={quality.id} className="space-y-3">
+            <div key={quality.id} className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <img 
@@ -86,12 +87,13 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                     <p className="text-xs text-muted-foreground">От {value}₽</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 border rounded-lg">
+                <div className="flex items-center gap-1 border border-slate-700 bg-slate-900/80 rounded-lg">
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => handleAmountChange(quality.id, -50)}
+                    className="h-7 w-7 p-0 hover:bg-slate-800"
+                    onClick={() => handleAmountChange(quality.id, -25)}
                   >
                     <Minus className="w-3 h-3" />
                   </Button>
@@ -99,26 +101,45 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                     type="number"
                     value={value}
                     onChange={(e) => handleInputChange(quality.id, e.target.value)}
-                    className="w-20 h-7 border-0 text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-20 h-7 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     min="0"
                     max={maxValue}
                   />
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => handleAmountChange(quality.id, 50)}
+                    className="h-7 w-7 p-0 hover:bg-slate-800"
+                    onClick={() => handleAmountChange(quality.id, 25)}
                   >
                     <Plus className="w-3 h-3" />
                   </Button>
                 </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {DONATION_PRESETS.filter((preset) => preset <= maxValue).map((preset) => (
+                  <Button
+                    key={`${quality.id}-${preset}`}
+                    type="button"
+                    variant={value === preset ? 'secondary' : 'outline'}
+                    size="sm"
+                    className={`h-7 px-2 text-xs ${
+                      value === preset
+                        ? 'bg-slate-700 text-slate-100 border-slate-600'
+                        : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                    }`}
+                    onClick={() => setFormData({ ...formData, [fieldName]: [preset] })}
+                  >
+                    {preset}₽
+                  </Button>
+                ))}
               </div>
               <Slider
                 value={formData[fieldName]}
                 onValueChange={(val) => setFormData({ ...formData, [fieldName]: val })}
                 min={0}
                 max={maxValue}
-                step={50}
+                step={25}
                 className="w-full"
               />
             </div>

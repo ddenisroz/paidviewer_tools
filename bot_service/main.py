@@ -12,18 +12,14 @@
 
 import sys
 import logging
-import urllib3
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Подавляем предупреждение о небезопасных HTTPS для dev API VK
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 # === Path Setup ===
-BOT_SERVICE_ROOT = Path(__file__).parent
-if str(BOT_SERVICE_ROOT) not in sys.path:
-    sys.path.insert(0, str(BOT_SERVICE_ROOT))
+_bot_service_root = Path(__file__).parent
+if str(_bot_service_root) not in sys.path:
+    sys.path.insert(0, str(_bot_service_root))
 
 from core.project_paths import BOT_SERVICE_ROOT  # noqa: E402
 env_path = BOT_SERVICE_ROOT / '.env'
@@ -84,17 +80,6 @@ app.add_middleware(RequestLoggingMiddleware)
 from startup.router_registry import register_all_routers  # noqa: E402
 register_all_routers(app)
 
-# === Backward Compatibility ===
-# Для обратной совместимости с кодом, который импортирует из main
-# NOTE: bot_instance and vk_live_bot_instance are now managed by BotRegistry
-# Code that does "from main import bot_instance" will get None
-# Use get_bot_registry().twitch_bot instead for actual bot access
-
-# These are kept as None for backward compatibility
-# Real bot instances are in BotRegistry
-bot_instance = None
-vk_live_bot_instance = None
-
 
 # === Health Check ===
 
@@ -112,4 +97,11 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     is_dev = settings.is_development
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=is_dev)
+    uvicorn.run(
+        "main:app",
+        host="127.0.0.1",
+        port=8000,
+        reload=is_dev,
+        access_log=False,  # Request logging is already handled by middleware.
+        log_config=None,   # Keep a single app-level logging format.
+    )

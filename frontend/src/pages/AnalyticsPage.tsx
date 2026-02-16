@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
-import { AlertCircle, Settings } from 'lucide-react';
+import { AlertCircle, MessageSquare, Settings, Terminal } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { useCommands, useCreateCommandOverride } from '@/queries/commands/commandsQueries';
+import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Switch } from '@/shared/components/ui/switch';
 
 import PageWrapper from '../shared/components/PageWrapper';
+
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
 
 const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -23,38 +26,18 @@ const AnalyticsPage: React.FC = () => {
 
   const [isSaving, setIsSaving] = useState(false);
 
-  if (!isAuthenticated) {
-    return (
-      <PageWrapper title="?????????? ?????">
-        <Card className="card-glass border-border">
-          <CardContent className="pt-12 pb-12 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
-              <AlertCircle className="w-10 h-10 text-muted-foreground" />
-            </div>
-            <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-foreground">????? ???????????</h3>
-              <p className="text-muted-foreground text-sm">
-                ?????? ???????? ?????? ??? ???????????? ?????????? (Twitch ??? VK Live).
-              </p>
-            </div>
-            <Button onClick={() => navigate('/login')} className="gap-2">
-              <Settings className="w-4 h-4" />
-              ??????? ? ?????
-            </Button>
-          </CardContent>
-        </Card>
-      </PageWrapper>
-    );
-  }
-
   const basicCommands = commandsData?.basic_commands || [];
-  const analyzeCommand = basicCommands.find((cmd) => cmd.name === 'analyze');
+  const analyzeCommand = basicCommands.find(cmd => cmd.name === 'analyze');
   const hasPlatforms = !!(integrations?.twitch?.enabled || integrations?.vk?.enabled);
+  const hasAnalyzeCommand = Boolean(analyzeCommand);
+  const effectiveCommandName = useMemo(() => {
+    const alias = analyzeCommand?.alias?.trim();
+    return alias || 'analyze';
+  }, [analyzeCommand?.alias]);
 
-  const currentAlias = analyzeCommand?.alias || '';
   const isEnabled = analyzeCommand?.enabled ?? false;
 
-  const handleToggle = async (enabled: boolean) => {
+  const handleToggle = async (enabled: boolean): Promise<void> => {
     if (!analyzeCommand) return;
     setIsSaving(true);
     try {
@@ -67,47 +50,86 @@ const AnalyticsPage: React.FC = () => {
     }
   };
 
-  const effectiveCommandName = currentAlias.trim() || 'analyze';
+  if (!isAuthenticated) {
+    return (
+      <PageWrapper title="Аналитика чата">
+        <Card className={SURFACE_CARD_CLASS}>
+          <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <div className="space-y-2 max-w-md">
+              <h3 className="text-xl font-semibold text-foreground">Нужна авторизация</h3>
+              <p className="text-muted-foreground text-sm">
+                Войдите в аккаунт, чтобы управлять функциями анализа сообщений.
+              </p>
+            </div>
+            <Button onClick={() => navigate('/login')} variant="outline" className="gap-2 border-border/70">
+              <Settings className="w-4 h-4" />
+              Войти в аккаунт
+            </Button>
+          </CardContent>
+        </Card>
+      </PageWrapper>
+    );
+  }
 
   return (
-    <PageWrapper title="?????????? ?????">
-      <div className="container mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-foreground">??????? ????</h2>
-            <p className="text-sm text-muted-foreground">
-              ???????????, ??????? ???????? ????? ??????? ? ????. ?????? ????? ???????????.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="card-glass lg:col-span-2">
-            <CardHeader className="pb-2">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle className="text-base">?????? ???????????? ?? ??????????</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    ???????? ??????????????? ??????? ?? ??????? ?????????.
-                  </p>
+    <PageWrapper title="Аналитика чата">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Card className={`h-full ${SURFACE_CARD_CLASS}`}>
+            <CardHeader className="pb-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Terminal className="h-3 w-3 text-primary" />
+                  <code className="text-sm font-bold font-mono bg-muted px-2 py-1 rounded text-foreground">
+                    !{effectiveCommandName}
+                  </code>
                 </div>
-                <Switch
-                  checked={isEnabled}
-                  disabled={!analyzeCommand || !hasPlatforms || isSaving}
-                  onCheckedChange={handleToggle}
-                />
+                <div className="flex items-center gap-2">
+                  <Badge variant={isEnabled ? "default" : "secondary"}>
+                    {isEnabled ? 'Включена' : 'Отключена'}
+                  </Badge>
+                  <Switch
+                    checked={isEnabled}
+                    disabled={!hasAnalyzeCommand || !hasPlatforms || isSaving}
+                    onCheckedChange={handleToggle}
+                  />
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-0">
-              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                <div>
-                  ???????:{' '}
-                  <span className="text-foreground font-mono">!{effectiveCommandName}</span>
-                </div>
-                <div>
-                  ?????????:{' '}
-                  <span className="text-foreground font-mono">!{effectiveCommandName} &lt;???&gt;</span>
-                </div>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                Команда показывает краткий разбор активности пользователя по его сообщениям.
+              </p>
+
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <Badge variant="outline" className="text-xs px-1.5 py-0 bg-blue-500/10 text-blue-600 border-blue-500/20">
+                  <MessageSquare className="h-3 w-3 mr-1" /> Аналитика
+                </Badge>
+                {!hasPlatforms && (
+                  <Badge variant="outline" className="border-border/70 text-muted-foreground">
+                    Нет подключенных платформ
+                  </Badge>
+                )}
+                {!hasAnalyzeCommand && (
+                  <Badge variant="outline" className="border-border/70 text-muted-foreground">
+                    Команда не найдена
+                  </Badge>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-border/30">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/dashboard/commands')}
+                  className="flex-1 h-8 text-xs"
+                >
+                  <Settings className="h-3 w-3 mr-1" />
+                  Настроить имя команды
+                </Button>
               </div>
             </CardContent>
           </Card>

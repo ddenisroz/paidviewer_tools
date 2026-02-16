@@ -65,6 +65,11 @@ class ConnectionManager(ConnectionManagerCore):
                 if payload and 'user_id' in payload:
                     user_id = payload['user_id']
                     self.cancel_tts_disconnect(user_id)
+                    try:
+                        from services.memory_websocket_manager import get_memory_websocket_manager
+                        await get_memory_websocket_manager().sync_user_tts_generation(user_id)
+                    except Exception as sync_error:
+                        logger.warning(f"Failed to sync TTS generation after OBS connect: {sync_error}")
                     logger.info(f"[OK] [OBS CONNECT] Cancelled TTS disconnect for user {user_id} (OBS connected)")
             except Exception as e:
                 logger.debug(f"Could not extract user_id from OBS token: {e}")
@@ -98,6 +103,11 @@ class ConnectionManager(ConnectionManagerCore):
                                 # Планируем отключение TTS только если нет других активных соединений
                                 # Это будет проверено в _delayed_tts_disable
                                 self.schedule_tts_disconnect(user_id, username)
+                                try:
+                                    from services.memory_websocket_manager import get_memory_websocket_manager
+                                    await get_memory_websocket_manager().sync_user_tts_generation(user_id)
+                                except Exception as sync_error:
+                                    logger.warning(f"Failed to sync TTS generation after OBS disconnect: {sync_error}")
                                 logger.info(f"⏱️ [OBS DISCONNECT] Scheduled TTS disconnect for user {user_id} (OBS disconnected)")
                         finally:
                             db.close()
@@ -291,7 +301,7 @@ class ConnectionManager(ConnectionManagerCore):
                         user.vk_username,
                     )
                 if channel_name:
-                    candidate = channel_name.strip().lower()
+                    candidate = channel_name.strip()
                     if ' ' in candidate:
                         logger.warning(f"[VK] Skipping invalid channel name with spaces: {candidate}")
                         continue

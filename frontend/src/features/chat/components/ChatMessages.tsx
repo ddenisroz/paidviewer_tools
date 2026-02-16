@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 
 import { MessageCircle, MessageSquare, Twitch } from 'lucide-react';
 
+import { twitchBadgesService } from '@/services/twitchBadges';
 import { VKIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
@@ -172,7 +173,6 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                 {message.badges.map((badge, idx) => {
                                                     const [badgeId, version] = badge.split('/');
                                                     // Try to get URL from global cache (badges should be preloaded)
-                                                    const { twitchBadgesService } = require('@/services/twitchBadges');
                                                     const url = twitchBadgesService.getBadgeUrl(badgeId, version || '1', '1x');
                                                     if (url) {
                                                         return (

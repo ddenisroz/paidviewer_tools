@@ -91,8 +91,8 @@ const DropsWidget: React.FC = () => {
   const [status, setStatus] = useState<string>('Подключение...');
   const [isPreviewMode, setIsPreviewMode] = useState<boolean>(false);
   const [roulettePosition, setRoulettePosition] = useState<number>(0);
-  const [channelName, setChannelName] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<string | null>(null);
+  const channelNameRef = useRef<string | null>(null);
+  const platformRef = useRef<string | null>(null);
   const [mythicalSession, setMythicalSession] = useState<MythicalSession | null>(null);
   const [mythicalTimer, setMythicalTimer] = useState<number | null>(null);
   const mythicalTimerInterval = useRef<NodeJS.Timeout | null>(null);
@@ -102,178 +102,7 @@ const DropsWidget: React.FC = () => {
     result_duration: 5500
   });
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const preview = urlParams.get('preview');
-    if (preview === 'true') {
-      setIsPreviewMode(true);
-      setStatus('Режим предпросмотра - нажмите кнопку для тестирования анимации');
-      if (token) {
-        dropsService.getUserFromToken(token)
-          .then(res => {
-            const data = res.data as DropsApiResponse<UserTokenResponse>;
-            if (data.data?.channel_name && data.data?.platform) {
-              setChannelName(data.data.channel_name);
-              setPlatform(data.data.platform);
-              return dropsService.getConfigWithToken(data.data.channel_name, {
-                platform: data.data.platform,
-                widget_token: token
-              });
-            }
-            return undefined;
-          })
-          .then(res => {
-            if (!res) return;
-            const configData = res.data as DropsApiResponse<WidgetConfigData>;
-            if (configData?.success && configData.data) {
-              widgetConfig.current = {
-                spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
-                opening_duration: configData.data.widget_opening_duration_ms || 1000,
-                result_duration: configData.data.widget_result_duration_ms || 5505
-              };
-            }
-          })
-          .catch(err => logger.error('Error loading preview config:', err));
-      }
-      return;
-    }
-
-    if (!token) {
-      logger.error('No token provided');
-      setStatus('Ошибка: Отсутствует токен');
-      return;
-    }
-
-    const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
-    const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
-    
-    if (!wsBaseUrl || !apiUrl) {
-      logger.error('Missing environment variables');
-      setStatus('Ошибка: WebSocket URL не настроен');
-      return;
-    }
-
-    const fetchUserId = async (): Promise<void> => {
-      try {
-        const response = await dropsService.getUserFromToken(token);
-        const apiData = response.data as DropsApiResponse<UserTokenResponse>;
-        const data = apiData.data || apiData as unknown as UserTokenResponse;
-        const userId = (data as UserTokenResponse & { user_id?: number }).user_id;
-        setChannelName(data.channel_name || null);
-        setPlatform(data.platform || null);
-        
-        if (userId && data.channel_name && data.platform) {
-          try {
-            const configResponse = await dropsService.getConfigWithToken(data.channel_name, {
-              platform: data.platform,
-              widget_token: token
-            });
-            const configData = configResponse.data as DropsApiResponse<WidgetConfigData>;
-            if (configData.success && configData.data) {
-              widgetConfig.current = {
-                spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
-                opening_duration: configData.data.widget_opening_duration_ms || 1000,
-                result_duration: configData.data.widget_result_duration_ms || 5500
-              };
-            }
-          } catch (configError) {
-            logger.error('Error loading widget config:', configError);
-          }
-        }
-        
-        loadMythicalSession(data.channel_name || null);
-        
-        const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
-        const websocket = new WebSocket(wsUrl);
-
-        websocket.onopen = (): void => {
-          logger.log('Connected to drops WebSocket');
-          ws.current = websocket;
-          setStatus('Ожидание наград...');
-        };
-
-        websocket.onmessage = (event: MessageEvent): void => {
-          try {
-            const data = JSON.parse(event.data) as WebSocketMessage;
-            if (data.type === 'drops' && data.event === 'reward_received' && data.data) {
-              showReward(data.data);
-            } else if (data.type === 'drops' && data.event === 'mythical_session_started') {
-              loadMythicalSession();
-            } else if (data.type === 'drops' && data.event === 'mythical_session_ended') {
-              setMythicalSession(null);
-              setMythicalTimer(null);
-            }
-          } catch (error) {
-            logger.error('Error parsing WebSocket message:', error);
-          }
-        };
-
-        websocket.onclose = (): void => {
-          logger.log('Drops WebSocket disconnected');
-          ws.current = null;
-          setStatus('Переподключение...');
-          setTimeout(() => {
-            const reconnectWs = new WebSocket(wsUrl);
-            reconnectWs.onopen = websocket.onopen;
-            reconnectWs.onmessage = websocket.onmessage;
-            reconnectWs.onclose = websocket.onclose;
-            reconnectWs.onerror = websocket.onerror;
-            ws.current = reconnectWs;
-          }, 3000);
-        };
-
-        websocket.onerror = (): void => {
-          logger.error('Drops WebSocket error');
-        };
-
-        ws.current = websocket;
-      } catch (error) {
-        logger.error('Error fetching user ID:', error);
-        setStatus('Ошибка: Не удалось подключиться');
-      }
-    };
-
-    fetchUserId();
-
-    const mythicalCheckInterval = setInterval(() => {
-      if (channelName) {
-        loadMythicalSession(channelName);
-      }
-    }, 10000);
-
-    return () => {
-      if (ws.current) {
-        ws.current.close();
-      }
-      if (mythicalTimerInterval.current) {
-        clearInterval(mythicalTimerInterval.current);
-      }
-      clearInterval(mythicalCheckInterval);
-    };
-  }, [token, channelName]);
-
-  const loadMythicalSession = async (channel: string | null = channelName): Promise<void> => {
-    if (!channel || !token) return;
-    
-    try {
-      const response = await dropsService.getMythicalSession(channel, token);
-      const data = response.data as DropsApiResponse<MythicalSession>;
-      if (data.success && data.data) {
-        setMythicalSession(data.data);
-        startMythicalTimer(data.data.time_remaining_seconds);
-      } else {
-        setMythicalSession(null);
-        setMythicalTimer(null);
-        if (mythicalTimerInterval.current) {
-          clearInterval(mythicalTimerInterval.current);
-        }
-      }
-    } catch (error) {
-      logger.error('Error loading mythical session:', error);
-    }
-  };
-
-  const startMythicalTimer = (initialSeconds: number): void => {
+  const startMythicalTimer = React.useCallback((initialSeconds: number): void => {
     if (mythicalTimerInterval.current) {
       clearInterval(mythicalTimerInterval.current);
     }
@@ -293,7 +122,29 @@ const DropsWidget: React.FC = () => {
         setMythicalTimer(remaining);
       }
     }, 1000);
-  };
+  }, []);
+
+  const loadMythicalSession = React.useCallback(async (channel?: string | null): Promise<void> => {
+    const targetChannel = channel ?? channelNameRef.current;
+    if (!targetChannel || !token) return;
+
+    try {
+      const response = await dropsService.getMythicalSession(targetChannel, token);
+      const data = response.data as DropsApiResponse<MythicalSession>;
+      if (data.success && data.data) {
+        setMythicalSession(data.data);
+        startMythicalTimer(data.data.time_remaining_seconds);
+      } else {
+        setMythicalSession(null);
+        setMythicalTimer(null);
+        if (mythicalTimerInterval.current) {
+          clearInterval(mythicalTimerInterval.current);
+        }
+      }
+    } catch (error) {
+      logger.error('Error loading mythical session:', error);
+    }
+  }, [token, startMythicalTimer]);
 
   const formatTimer = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -301,7 +152,7 @@ const DropsWidget: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const loadRewardsForQuality = async (quality: string, channelName: string, platform: string): Promise<Reward[]> => {
+  const loadRewardsForQuality = React.useCallback(async (quality: string, channelName: string, platform: string): Promise<Reward[]> => {
     try {
       const response = await dropsService.getRewardsForWidget(channelName, {
         platform,
@@ -315,11 +166,15 @@ const DropsWidget: React.FC = () => {
       logger.error('Error loading rewards:', error);
     }
     return [];
-  };
+  }, [token]);
 
-  const showReward = async (rewardData: RewardData): Promise<void> => {
+  const showReward = React.useCallback(async (rewardData: RewardData): Promise<void> => {
     const quality = rewardData.quality?.toLowerCase() || rewardData.quality || 'common';
-    const rewards = await loadRewardsForQuality(quality, channelName || '', platform || '');
+    const rewards = await loadRewardsForQuality(
+      quality,
+      channelNameRef.current || '',
+      platformRef.current || ''
+    );
     
     const duplicatedRewards = [...rewards, ...rewards, ...rewards];
     setAllRewards(duplicatedRewards);
@@ -382,7 +237,158 @@ const DropsWidget: React.FC = () => {
       setAnimationPhase('idle');
       setRoulettePosition(0);
     }, widgetConfig.current.opening_duration + widgetConfig.current.spinning_duration + widgetConfig.current.result_duration);
-  };
+  }, [loadRewardsForQuality]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const preview = urlParams.get('preview');
+    if (preview === 'true') {
+      setIsPreviewMode(true);
+      setStatus('Режим предпросмотра - нажмите кнопку для тестирования анимации');
+      if (token) {
+        dropsService.getUserFromToken(token)
+          .then(res => {
+            const data = res.data as DropsApiResponse<UserTokenResponse>;
+            if (data.data?.channel_name && data.data?.platform) {
+              channelNameRef.current = data.data.channel_name;
+              platformRef.current = data.data.platform;
+              return dropsService.getConfigWithToken(data.data.channel_name, {
+                platform: data.data.platform,
+                widget_token: token
+              });
+            }
+            return undefined;
+          })
+          .then(res => {
+            if (!res) return;
+            const configData = res.data as DropsApiResponse<WidgetConfigData>;
+            if (configData?.success && configData.data) {
+              widgetConfig.current = {
+                spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
+                opening_duration: configData.data.widget_opening_duration_ms || 1000,
+                result_duration: configData.data.widget_result_duration_ms || 5505
+              };
+            }
+          })
+          .catch(err => logger.error('Error loading preview config:', err));
+      }
+      return;
+    }
+
+    if (!token) {
+      logger.error('No token provided');
+      setStatus('Ошибка: Отсутствует токен');
+      return;
+    }
+
+    const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
+    const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
+
+    if (!wsBaseUrl || !apiUrl) {
+      logger.error('Missing environment variables');
+      setStatus('Ошибка: WebSocket URL не настроен');
+      return;
+    }
+
+    const fetchUserId = async (): Promise<void> => {
+      try {
+        const response = await dropsService.getUserFromToken(token);
+        const apiData = response.data as DropsApiResponse<UserTokenResponse>;
+        const data = apiData.data || apiData as unknown as UserTokenResponse;
+        const userId = (data as UserTokenResponse & { user_id?: number }).user_id;
+        channelNameRef.current = data.channel_name || null;
+        platformRef.current = data.platform || null;
+
+        if (userId && data.channel_name && data.platform) {
+          try {
+            const configResponse = await dropsService.getConfigWithToken(data.channel_name, {
+              platform: data.platform,
+              widget_token: token
+            });
+            const configData = configResponse.data as DropsApiResponse<WidgetConfigData>;
+            if (configData.success && configData.data) {
+              widgetConfig.current = {
+                spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
+                opening_duration: configData.data.widget_opening_duration_ms || 1000,
+                result_duration: configData.data.widget_result_duration_ms || 5500
+              };
+            }
+          } catch (configError) {
+            logger.error('Error loading widget config:', configError);
+          }
+        }
+
+        void loadMythicalSession(data.channel_name || null);
+
+        const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
+        const websocket = new WebSocket(wsUrl);
+
+        websocket.onopen = (): void => {
+          logger.log('Connected to drops WebSocket');
+          ws.current = websocket;
+          setStatus('Ожидание наград...');
+        };
+
+        websocket.onmessage = (event: MessageEvent): void => {
+          try {
+            const data = JSON.parse(event.data) as WebSocketMessage;
+            if (data.type === 'drops' && data.event === 'reward_received' && data.data) {
+              void showReward(data.data);
+            } else if (data.type === 'drops' && data.event === 'mythical_session_started') {
+              void loadMythicalSession();
+            } else if (data.type === 'drops' && data.event === 'mythical_session_ended') {
+              setMythicalSession(null);
+              setMythicalTimer(null);
+            }
+          } catch (error) {
+            logger.error('Error parsing WebSocket message:', error);
+          }
+        };
+
+        websocket.onclose = (): void => {
+          logger.log('Drops WebSocket disconnected');
+          ws.current = null;
+          setStatus('Переподключение...');
+          setTimeout(() => {
+            const reconnectWs = new WebSocket(wsUrl);
+            reconnectWs.onopen = websocket.onopen;
+            reconnectWs.onmessage = websocket.onmessage;
+            reconnectWs.onclose = websocket.onclose;
+            reconnectWs.onerror = websocket.onerror;
+            ws.current = reconnectWs;
+          }, 3000);
+        };
+
+        websocket.onerror = (): void => {
+          logger.error('Drops WebSocket error');
+        };
+
+        ws.current = websocket;
+      } catch (error) {
+        logger.error('Error fetching user ID:', error);
+        setStatus('Ошибка: Не удалось подключиться');
+      }
+    };
+
+    void fetchUserId();
+
+    const mythicalCheckInterval = setInterval(() => {
+      const currentChannel = channelNameRef.current;
+      if (currentChannel) {
+        void loadMythicalSession(currentChannel);
+      }
+    }, 10000);
+
+    return () => {
+      if (ws.current) {
+        ws.current.close();
+      }
+      if (mythicalTimerInterval.current) {
+        clearInterval(mythicalTimerInterval.current);
+      }
+      clearInterval(mythicalCheckInterval);
+    };
+  }, [token, loadMythicalSession, showReward]);
 
   const getQualityImage = (quality: string): string => {
     const qualityLower = quality?.toLowerCase();

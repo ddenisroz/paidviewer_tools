@@ -1,5 +1,6 @@
 ﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+/* eslint-disable react-refresh/only-export-components */
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { ttsService } from '@/services/api/services/ttsService';
@@ -70,7 +71,6 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
 
     const [integrations, setIntegrations] = useState<IntegrationsState>(getInitialIntegrations);
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [initialLoad, setInitialLoad] = useState<boolean>(!user?.integrations);
 
     const fetchIntegrations = useCallback(async (): Promise<void> => {
         if (isAuthenticated === false) {
@@ -80,7 +80,6 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 donationalerts: { enabled: false, username: null }
             });
             setIsLoading(false);
-            setInitialLoad(false);
             return;
         }
 
@@ -109,10 +108,9 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 return hasChanged ? newIntegrations : prev;
             });
             setIsLoading(false);
-            setInitialLoad(false);
             return;
         }
-    }, [isAuthenticated, user?.integrations, initialLoad]);
+    }, [isAuthenticated, user?.integrations]);
 
     useEffect(() => {
         fetchIntegrations();
@@ -177,7 +175,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 setIsLoading(false);
             }
         }
-    }, [refreshAuthStatus, fetchIntegrations]);
+    }, [refreshAuthStatus]);
 
     const updateVkIntegration = useCallback(async (enabled: boolean, onClose: (() => void) | null = null): Promise<void> => {
         if (enabled) {
@@ -215,7 +213,7 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
                 setIsLoading(false);
             }
         }
-    }, [refreshAuthStatus, fetchIntegrations]);
+    }, [refreshAuthStatus]);
 
     const value = useMemo<IntegrationsContextValue>(() => ({
         integrations,

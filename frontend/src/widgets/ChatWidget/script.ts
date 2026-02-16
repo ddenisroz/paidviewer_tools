@@ -212,8 +212,8 @@ class ChatWidget {
     };
 
     const labels: Record<string, string> = {
-      broadcaster: '???????',
-      moderator: '???',
+      broadcaster: 'Стример',
+      moderator: 'Мод',
       vip: 'VIP',
       subscriber: 'SUB'
     };

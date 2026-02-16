@@ -4,9 +4,10 @@ Repository for UserSettings CRUD operations.
 Handles settings for both authenticated users and guests.
 """
 from typing import Optional, Dict, Any, List
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models.user import UserSettings
+from models.user import User, UserSettings
 from repositories.base_repository import BaseRepository
 
 
@@ -28,6 +29,27 @@ class UserSettingsRepository(BaseRepository[UserSettings]):
     def get_by_user_id(self, user_id: int) -> Optional[UserSettings]:
         """Get settings by user ID."""
         return self.db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
+
+    def get_by_channel_name(self, channel_name: str) -> Optional[UserSettings]:
+        """
+        Get settings by Twitch channel name.
+        First tries user_settings.channel_name, then falls back to users.twitch_username.
+        """
+        normalized = (channel_name or "").strip().lower()
+        if not normalized:
+            return None
+
+        by_settings_channel = self.db.query(UserSettings).filter(
+            func.lower(UserSettings.channel_name) == normalized
+        ).first()
+        if by_settings_channel:
+            return by_settings_channel
+
+        return self.db.query(UserSettings).join(
+            User, User.id == UserSettings.user_id
+        ).filter(
+            func.lower(User.twitch_username) == normalized
+        ).first()
 
     def get_by_session_id(self, session_id: str) -> Optional[UserSettings]:
         """Get settings by session ID (for guests)."""

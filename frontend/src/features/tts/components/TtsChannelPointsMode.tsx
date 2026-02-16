@@ -1,5 +1,6 @@
 ﻿import React, { useState } from 'react';
 
+/* eslint-disable no-alert */
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Trash2 } from 'lucide-react';
 

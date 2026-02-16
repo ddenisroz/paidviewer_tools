@@ -9,9 +9,15 @@ export interface YoutubeSettings {
   playback_mode: 'browser' | 'obs';
   volume_level: number; // 0-100
   requests_command_enabled?: boolean;
+  // Legacy single-platform reward settings
   requests_reward_enabled?: boolean;
   requests_reward_id?: string | null;
   requests_reward_platform?: 'twitch' | 'vk';
+  // Per-platform reward settings
+  requests_reward_twitch_enabled?: boolean;
+  requests_reward_twitch_id?: string | null;
+  requests_reward_vk_enabled?: boolean;
+  requests_reward_vk_id?: string | null;
 }
 
 /**

@@ -1,5 +1,6 @@
 ﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
+/* eslint-disable no-alert */
 import {
   Edit,
   Loader2,
@@ -136,6 +137,11 @@ interface RewardsManagerProps {
   };
 }
 
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const CONTROL_TRIGGER_CLASS = 'h-9 border-slate-700 bg-slate-900/80 shadow-none';
+const CONTROL_CONTENT_CLASS = 'border-slate-700 bg-slate-950/95 backdrop-blur-sm';
+const MAX_REWARD_WEIGHT = 2000;
+
 const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channelName, onRewardsCountChange, integrations }) => {
   const [rewardDialogOpen, setRewardDialogOpen] = useState(false);
   const [editingReward, setEditingReward] = useState<Reward | null>(null);
@@ -187,14 +193,13 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
   const deleteRewardMutation = useDeleteDropsReward(channelName);
   const toggleRewardMutation = useToggleDropsReward(channelName);
 
-  const allRewards: Reward[] = (Array.isArray(allRewardsData) ? allRewardsData : []) as Reward[];
-
   // Фильтруем награды по выбранной платформе
   const rewards = React.useMemo(() => {
+    const allRewards = (Array.isArray(allRewardsData) ? allRewardsData : []) as Reward[];
     if (!allRewards) return [];
     if (platformFilter === 'all') return allRewards;
     return allRewards.filter(r => (r.platform || 'twitch') === platformFilter);
-  }, [allRewards, platformFilter]);
+  }, [allRewardsData, platformFilter]);
 
   // Уведомляем родителя об изменении количества наград
   useEffect(() => {
@@ -303,8 +308,9 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
       <div className="flex justify-end mb-6 mt-4">
         <Button
           onClick={() => handleOpenRewardDialog(null)}
+          variant="outline"
           size="default"
-          className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-medium gap-2"
+          className="border-slate-700 bg-slate-900/70 hover:bg-slate-800 font-medium gap-2"
         >
           <Plus className="w-4 h-4" />
           Создать награду
@@ -318,7 +324,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
         const qualityData = Array.isArray(qualitiesData) ? (qualitiesData as unknown as QualityConfig[]).find((q) => q.name === name) : null;
 
         return (
-          <Card key={id}>
+          <Card key={id} className={SURFACE_CARD_CLASS}>
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
                 <img
@@ -328,7 +334,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                 />
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2">
-                    <span style={{ color: qualityData?.color || qualityColor }}>
+                    <span className="whitespace-nowrap" style={{ color: qualityData?.color || qualityColor }}>
                       {label}
                     </span>
                     <Badge
@@ -345,9 +351,8 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
             <CardContent>
               {qualityRewards.length === 0 ? (
                 <div className="text-center py-6 border-2 border-dashed border-orange-500/30 bg-orange-500/5 rounded-lg">
-                  <p className="text-sm font-medium text-orange-400">⚠️ Награды не настроены</p>
-                  <p className="text-xs mt-2 text-muted-foreground">Добавьте награды в этот лутбокс, чтобы зрители могли их получить</p>
-                  <p className="text-xs mt-1 text-yellow-500">Без наград система Drops не будет работать</p>
+                  <p className="text-sm font-medium text-orange-400">Наград пока нет</p>
+                  <p className="text-xs mt-2 text-muted-foreground">Добавьте минимум 1 награду для этого сундука</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -355,7 +360,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                     return (
                       <div
                         key={reward.id}
-                        className="relative flex flex-col p-2.5 border rounded-lg hover:bg-muted/50 transition-colors group"
+                        className="relative flex flex-col p-2.5 border border-slate-800 bg-slate-900/60 rounded-lg hover:bg-slate-900/90 transition-colors group"
                       >
                         {/* Шанс */}
                         <div className="absolute top-2 right-2 z-10">
@@ -366,7 +371,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
 
                         {/* Изображение */}
                         {reward.image_url && (
-                          <div className="w-full aspect-square border rounded overflow-hidden mb-1.5 bg-muted">
+                          <div className="w-full aspect-square border border-slate-800 rounded overflow-hidden mb-1.5 bg-slate-950/80">
                             <img
                               src={reward.image_url}
                               alt={reward.name}
@@ -398,7 +403,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                         </div>
 
                         {/* Кнопки действий */}
-                        <div className="flex gap-1 justify-end w-full pt-1.5 border-t opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1 justify-end w-full pt-1.5 border-t border-slate-800 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -441,7 +446,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
 
       {/* Диалог создания/редактирования */}
       <Dialog open={rewardDialogOpen} onOpenChange={setRewardDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 border-slate-800 bg-slate-950/95 backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle>
               {editingReward ? 'Редактировать награду' : 'Создать награду'}
@@ -482,10 +487,10 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                 value={rewardForm.quality_id?.toString() || ''}
                 onValueChange={(value) => setRewardForm({ ...rewardForm, quality_id: parseInt(value) })}
               >
-                <SelectTrigger id="reward_quality">
+                <SelectTrigger id="reward_quality" className={CONTROL_TRIGGER_CLASS}>
                   <SelectValue placeholder="Выберите качество" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className={CONTROL_CONTENT_CLASS}>
                   {/* Используем данные из БД если есть, иначе fallback на статические */}
                   {qualitiesData.length > 0 ? (
                     (qualitiesData as unknown as QualityConfig[]).map((q) => {
@@ -546,16 +551,16 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
 
               {/* Кастомный вес */}
               <div className="space-y-2">
-                <Label htmlFor="reward_weight_custom">Или укажите свой вес (1-10000)</Label>
+                <Label htmlFor="reward_weight_custom">Или укажите свой вес (1-2000)</Label>
                 <Input
                   id="reward_weight_custom"
                   type="number"
                   min="1"
-                  max="10000"
+                  max={String(MAX_REWARD_WEIGHT)}
                   value={rewardForm.weight[0]}
                   onChange={(e) => {
                     const value = parseInt(e.target.value) || 1;
-                    setRewardForm({ ...rewardForm, weight: [Math.max(1, Math.min(10000, value))] });
+                    setRewardForm({ ...rewardForm, weight: [Math.max(1, Math.min(MAX_REWARD_WEIGHT, value))] });
                   }}
                   className="w-full"
                   placeholder="Введите вес награды"
@@ -565,13 +570,13 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-4 border-t">
-            <Button variant="outline" onClick={() => setRewardDialogOpen(false)} className="w-full sm:w-auto order-2 sm:order-1">
+            <Button variant="outline" onClick={() => setRewardDialogOpen(false)} className="w-full sm:w-auto order-2 sm:order-1 border-slate-700 bg-slate-900/70 hover:bg-slate-800">
               Отмена
             </Button>
             <Button
               onClick={handleSaveReward}
               disabled={createRewardMutation.isPending || updateRewardMutation.isPending || deleteRewardMutation.isPending}
-              className="gap-2 w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-semibold order-1 sm:order-2"
+              className="gap-2 w-full sm:w-auto bg-none bg-primary hover:bg-primary/90 text-primary-foreground shadow-none font-semibold order-1 sm:order-2"
             >
               {(createRewardMutation.isPending || updateRewardMutation.isPending) ? (
                 <>

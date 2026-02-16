@@ -18,6 +18,7 @@ Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, an
 - `deploy/` Docker compose and deployment assets.
 - `docs/` Architecture, setup, and feature docs.
 - `scripts/` Project tooling and migrations.
+- `scripts/dev/` One-off debug/diagnostic utilities.
 
 ## Quick Start (Local)
 1. Configure env files:
@@ -39,12 +40,24 @@ Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, an
 - Backend: `ruff check .`, `ruff format .`, `pytest`
 - Frontend: `npm run lint`, `npm run format`, `npm run type-check`, `npm run test`
 
+## Repository Hygiene
+- Keep the repo free from local artifacts before commits:
+  - remove dev-only browser traces (`.playwright-cli/`, `.playwright/`, `playwright-report/`)
+  - do not commit cache/build/runtime outputs (`__pycache__/`, `.ruff_cache/`, `logs/`, `frontend/dist/`)
+  - keep large one-off debug artifacts out of git (for example `*.har`)
+- Fast cleanup helper: `.\scripts\cleanup-dev-artifacts.ps1`
+  - optional flags: `-RemoveHarFiles -RemoveOutput -RemovePycache -RemoveTempAudio`
+- Before pushing:
+  - `ruff check bot_service`
+  - `cd frontend; npm run type-check`
+
 ## Documentation
 - `docs/README.md`
 - `docs/QUICKSTART.md`
 - `docs/FEATURES.md`
 - `docs/setup/DEPLOYMENT.md`
 - `docs/architecture/ARCHITECTURE_GUIDE.md`
+- `bot_service/scripts/README_MAINTENANCE.md`
 
 ## License
 MIT License

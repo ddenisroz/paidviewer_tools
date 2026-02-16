@@ -267,7 +267,18 @@ export const useUpdateStream = (options?: UseMutationOptions<ApiResponse<StreamI
   const queryClient = useQueryClient();
 
   return useMutation<ApiResponse<StreamInfoData>, AxiosError, Record<string, unknown>, { previousTwitchInfo?: ApiResponse<StreamInfoData>; previousVkInfo?: ApiResponse<StreamInfoData> }>({
-    mutationFn: (payload: Record<string, unknown>) => unwrapResponse(streamService.updateStream(payload)) as Promise<ApiResponse<StreamInfoData>>,
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const response = await (unwrapResponse(streamService.updateStream(payload)) as Promise<ApiResponse<StreamInfoData>>);
+      if (response?.success === false) {
+        const error = new Error(response.message || response.error || 'Не удалось сохранить изменения') as AxiosError;
+        (error as unknown as { response?: { status?: number; data?: ApiResponse<StreamInfoData> } }).response = {
+          status: 409,
+          data: response,
+        };
+        throw error;
+      }
+      return response;
+    },
     onMutate: async (newData: Record<string, unknown>) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.stream.all });
 

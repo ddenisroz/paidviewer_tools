@@ -10,6 +10,7 @@
 
 import React, { useState } from 'react';
 
+/* eslint-disable no-alert */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Ban, CheckCircle, Edit, MessageCircle, Plus, RefreshCw, Shield,
@@ -43,6 +44,11 @@ interface UsersApiResponse {
         total_guests?: number;
     };
 }
+
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
+const ACTION_BUTTON_CLASS = 'h-9 border-border/70 hover:bg-muted/60 shadow-none';
+const TABLE_ICON_BUTTON_CLASS =
+    'h-8 w-8 p-0 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground';
 
 const UserManagementPage: React.FC = () => {
     const queryClient = useQueryClient();
@@ -292,77 +298,130 @@ const UserManagementPage: React.FC = () => {
         toast.success(`Экспортировано ${csvData.length} пользователей`);
     };
 
+    const getTwitchName = (user: User): string => {
+        return user.integrations?.twitch?.username || user.integrations?.twitch?.channel_name || user.twitch_username || '';
+    };
+
+    const getVkName = (user: User): string => {
+        return user.integrations?.vk?.username || user.integrations?.vk?.channel_name || user.vk_username || user.vk_channel_name || '';
+    };
+
+    const hasTwitchIntegration = (user: User): boolean => {
+        return Boolean(user.integrations?.twitch?.connected || getTwitchName(user));
+    };
+
+    const hasVkIntegration = (user: User): boolean => {
+        return Boolean(user.integrations?.vk?.connected || getVkName(user));
+    };
+
+    const getPlatformFilterValue = (user: User): string => {
+        const hasTwitch = hasTwitchIntegration(user);
+        const hasVk = hasVkIntegration(user);
+        if (hasTwitch && hasVk) return 'both';
+        if (hasTwitch) return 'twitch';
+        if (hasVk) return 'vk';
+        return 'none';
+    };
+
     // DataTable columns definition
     const columns: DataTableColumn<User>[] = [
         {
             key: 'id',
-            header: 'ID / Имя',
+            header: 'ID / Аккаунт',
+            width: '220px',
+            align: 'center',
             accessor: (user) => {
                 const sessionsArray = Array.isArray(sessionsData) ? sessionsData : [];
                 const hasActiveSession = sessionsArray.some(session =>
                     session.user_id === user.id && session.session_type === 'active_user'
                 );
+                const displayName = user.username || getTwitchName(user) || getVkName(user) || 'Без имени';
 
                 return (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-center justify-center gap-1">
                         {user.is_guest ? (
                             <>
-                                <Badge variant="outline" className="text-xs bg-orange-900/40 text-orange-300 border-orange-600">
+                                <Badge variant="outline" className="text-xs border-amber-500/40 bg-amber-500/10 text-amber-200">
                                     [GUEST]
                                 </Badge>
-                                <span className="font-mono text-xs text-slate-500">
+                                <span className="font-mono text-xs text-muted-foreground">
                                     {user.session_id?.substring(0, 8) || 'N/A'}
                                 </span>
                             </>
                         ) : (
-                            <Badge variant="outline" className="text-xs bg-green-900/40 text-green-300 border-green-600">
+                            <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-200">
                                 [KEY] #{user.id}
                             </Badge>
                         )}
-                        {hasActiveSession && <Wifi className="w-3 h-3 text-blue-400" />}
+                        {!user.is_guest && <span className="text-xs text-muted-foreground">{displayName}</span>}
+                        {hasActiveSession && <Wifi className="w-3 h-3 text-sky-300" />}
                     </div>
                 );
             },
+            searchable: true,
+            searchValue: (user) => [
+                user.id,
+                user.username || '',
+                user.twitch_username || '',
+                user.vk_username || '',
+                user.vk_channel_name || '',
+                user.session_id || '',
+            ].join(' ').toLowerCase(),
+            sortValue: (user) => Number(user.id || 0),
             sortable: true,
-            searchable: false,
         },
         {
             key: 'integrations',
             header: 'Платформы',
-            accessor: (user) => (
-                <div className="flex flex-wrap gap-1">
-                    {user.integrations?.twitch?.connected && (
-                        <Badge className="bg-purple-900/50 text-purple-200 text-xs">
-                            <Twitch className="w-2.5 h-2.5 mr-1" />
-                            {user.integrations.twitch.username || 'N/A'}
-                        </Badge>
-                    )}
-                    {user.integrations?.vk?.connected && (
-                        <Badge className="bg-blue-900/50 text-blue-200 text-xs">
-                            <MessageCircle className="w-2.5 h-2.5 mr-1" />
-                            {user.integrations.vk.username || 'N/A'}
-                        </Badge>
-                    )}
-                    {user.total_integrations === 0 && (
-                        <span className="text-xs text-slate-500">-</span>
-                    )}
-                </div>
-            ),
-            sortable: true,
+            width: '290px',
+            align: 'center',
+            accessor: (user) => {
+                const twitchName = getTwitchName(user);
+                const vkName = getVkName(user);
+                const hasTwitch = hasTwitchIntegration(user);
+                const hasVk = hasVkIntegration(user);
+
+                if (!hasTwitch && !hasVk) {
+                    return <span className="text-xs text-muted-foreground">Не подключено</span>;
+                }
+
+                return (
+                    <div className="flex flex-wrap justify-center gap-1">
+                        {hasTwitch && (
+                            <Badge className="border-violet-500/40 bg-violet-500/10 text-xs text-violet-200">
+                                <Twitch className="w-2.5 h-2.5 mr-1" />
+                                {twitchName || 'Twitch'}
+                            </Badge>
+                        )}
+                        {hasVk && (
+                            <Badge className="border-sky-500/40 bg-sky-500/10 text-xs text-sky-200">
+                                <MessageCircle className="w-2.5 h-2.5 mr-1" />
+                                {vkName || 'VK Live'}
+                            </Badge>
+                        )}
+                    </div>
+                );
+            },
             searchable: true,
+            searchValue: (user) => [getTwitchName(user), getVkName(user)].join(' ').toLowerCase(),
+            sortValue: (user) => getPlatformFilterValue(user),
+            filterValue: (user) => getPlatformFilterValue(user),
+            sortable: true,
         },
         {
             key: 'whitelist',
             header: 'Whitelist',
+            width: '180px',
+            align: 'center',
             accessor: (user) => {
                 if (user.is_whitelisted && user.whitelisted_platforms && user.whitelisted_platforms.length > 0) {
                     return (
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col items-center gap-1">
                             {user.whitelisted_platforms.map((platform) => {
                                 const channelName = user.whitelisted_channels?.[platform] ||
                                     (platform === 'twitch' ? user.twitch_username : user.vk_username);
                                 return (
-                                    <Badge key={platform} className="bg-green-900/50 text-green-200 text-xs w-fit">
+                                    <Badge key={platform} className="w-fit border-emerald-500/40 bg-emerald-500/10 text-xs text-emerald-200">
                                         <CheckCircle className="w-3 h-3 mr-1" />
                                         {platform === 'twitch' ? 'Twitch' : 'VK'}: {channelName}
                                     </Badge>
@@ -371,67 +430,91 @@ const UserManagementPage: React.FC = () => {
                         </div>
                     );
                 }
-                return <span className="text-xs text-slate-500">Нет</span>;
+                return <span className="text-xs text-muted-foreground">Нет</span>;
             },
+            filterValue: (user) => user.is_whitelisted ? 'whitelisted' : 'not_whitelisted',
+            sortValue: (user) => user.is_whitelisted ? 1 : 0,
+            searchable: true,
+            searchValue: (user) => user.is_whitelisted ? 'whitelisted' : 'not_whitelisted',
+            sortable: true,
         },
         {
             key: 'role',
             header: 'Роль',
+            width: '150px',
+            align: 'center',
             accessor: (user) => {
                 if (user.is_admin) {
                     return (
-                        <Badge className="bg-purple-900/50 text-purple-200 text-xs">
+                        <Badge className="border-violet-500/40 bg-violet-500/10 text-xs text-violet-200">
                             <Shield className="w-3 h-3 mr-1" />
                             Админ
                         </Badge>
                     );
                 }
-                return <span className="text-xs text-slate-400">Пользователь</span>;
+                return <span className="text-xs text-muted-foreground">Пользователь</span>;
             },
+            filterValue: (user) => user.is_admin ? 'admin' : 'user',
+            sortValue: (user) => user.is_admin ? 1 : 0,
+            searchable: true,
+            searchValue: (user) => user.is_admin ? 'admin' : 'user',
             sortable: true,
         },
         {
             key: 'status',
             header: 'Статус',
+            width: '150px',
+            align: 'center',
             accessor: (user) => {
                 if (user.is_blocked) {
                     return (
-                        <Badge className="bg-red-900/50 text-red-200 text-xs">
+                        <Badge className="border-destructive/40 bg-destructive/10 text-xs text-destructive">
                             <Ban className="w-3 h-3 mr-1" />
                             Бан
                         </Badge>
                     );
                 }
                 return (
-                    <Badge className="bg-green-900/50 text-green-200 text-xs">
+                    <Badge className="border-emerald-500/40 bg-emerald-500/10 text-xs text-emerald-200">
                         <CheckCircle className="w-3 h-3 mr-1" />
                         Актив
                     </Badge>
                 );
             },
+            filterValue: (user) => user.is_blocked ? 'blocked' : 'active',
+            sortValue: (user) => user.is_blocked ? 0 : 1,
+            searchable: true,
+            searchValue: (user) => user.is_blocked ? 'blocked' : 'active',
             sortable: true,
         },
         {
             key: 'created_at',
             header: 'Создан',
+            width: '180px',
+            align: 'center',
             accessor: (user) => (
-                <span className="text-xs text-slate-400 whitespace-nowrap">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
                     {formatDate(user.created_at)}
                 </span>
             ),
+            sortValue: (user) => Date.parse(user.created_at || '') || 0,
+            searchable: true,
+            searchValue: (user) => user.created_at || '',
             sortable: true,
         },
         {
             key: 'actions',
             header: 'Действия',
+            width: '170px',
+            align: 'center',
             accessor: (user) => (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center justify-center gap-1 rounded-md border border-border/60 bg-card/50 p-1">
                     {!user.is_guest && (
                         <>
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 p-0"
+                                className={TABLE_ICON_BUTTON_CLASS}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     openEditDialog(user);
@@ -443,7 +526,7 @@ const UserManagementPage: React.FC = () => {
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 p-0"
+                                className={TABLE_ICON_BUTTON_CLASS}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (user.is_blocked) {
@@ -455,15 +538,15 @@ const UserManagementPage: React.FC = () => {
                                 title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
                             >
                                 {user.is_blocked ? (
-                                    <CheckCircle className="w-4 h-4 text-green-400" />
+                                    <CheckCircle className="w-4 h-4 text-emerald-400" />
                                 ) : (
-                                    <Ban className="w-4 h-4 text-red-400" />
+                                    <Ban className="w-4 h-4 text-destructive" />
                                 )}
                             </Button>
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-8 w-8 p-0"
+                                className={TABLE_ICON_BUTTON_CLASS}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
@@ -472,14 +555,14 @@ const UserManagementPage: React.FC = () => {
                                 }}
                                 title="Удалить"
                             >
-                                <Trash2 className="w-4 h-4 text-red-500" />
+                                <Trash2 className="w-4 h-4 text-destructive" />
                             </Button>
                         </>
                     )}
                     <Button
                         size="sm"
                         variant="ghost"
-                        className="h-8 w-8 p-0"
+                        className={TABLE_ICON_BUTTON_CLASS}
                         onClick={(e) => {
                             e.stopPropagation();
                             handleToggleWhitelist(user);
@@ -487,14 +570,13 @@ const UserManagementPage: React.FC = () => {
                         title={user.is_whitelisted ? "Удалить из whitelist" : "Добавить в whitelist"}
                     >
                         {user.is_whitelisted ? (
-                            <UserX className="w-4 h-4 text-red-400" />
+                            <UserX className="w-4 h-4 text-destructive" />
                         ) : (
-                            <UserCheck className="w-4 h-4 text-green-400" />
+                            <UserCheck className="w-4 h-4 text-emerald-400" />
                         )}
                     </Button>
                 </div>
             ),
-            align: 'right',
         },
     ];
 
@@ -531,13 +613,14 @@ const UserManagementPage: React.FC = () => {
             defaultValue: 'all',
         },
         {
-            key: 'platform',
+            key: 'integrations',
             label: 'Платформа',
             options: [
                 { value: 'all', label: 'Все' },
                 { value: 'twitch', label: 'Twitch' },
                 { value: 'vk', label: 'VK Live' },
                 { value: 'both', label: 'Обе платформы' },
+                { value: 'none', label: 'Без платформ' },
             ],
             defaultValue: 'all',
         },
@@ -603,10 +686,10 @@ const UserManagementPage: React.FC = () => {
     if (error) {
         return (
             <div className="container mx-auto p-6">
-                <Card className="card-glass border-slate-700/50 p-6">
-                    <div className="text-center text-red-400">
+                <Card className={`${SURFACE_CARD_CLASS} p-6`}>
+                    <div className="text-center text-destructive">
                         <p>Ошибка загрузки пользователей</p>
-                        <Button onClick={() => refetch()} className="mt-4" variant="outline">
+                        <Button onClick={() => refetch()} className={`mt-4 ${ACTION_BUTTON_CLASS}`} variant="outline">
                             <RefreshCw className="w-4 h-4 mr-2" />
                             Повторить
                         </Button>
@@ -619,31 +702,41 @@ const UserManagementPage: React.FC = () => {
     return (
         <div className="container mx-auto p-6 space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-2xl font-semibold text-foreground">
                         Управление пользователями
                     </h1>
                     <p className="text-muted-foreground text-sm mt-1">
                         Всего пользователей: <span className="text-foreground font-medium">{usersResponse.pagination.total || 0}</span>
                         {usersResponse.pagination.total_users !== undefined && usersResponse.pagination.total_guests !== undefined && (
-                            <span className="ml-2 text-xs text-slate-500">
+                            <span className="ml-2 text-sm text-muted-foreground">
                                 (Аккаунты: {usersResponse.pagination.total_users}, Гости: {usersResponse.pagination.total_guests})
                             </span>
                         )}
                     </p>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => refetch()} disabled={isLoading} className="hover:bg-primary/10">
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={() => refetch()}
+                        disabled={isLoading}
+                        className={ACTION_BUTTON_CLASS}
+                    >
                         <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
                         Обновить
                     </Button>
-                    <Button variant="outline" onClick={handleExportCSV} disabled={usersResponse.users.length === 0} className="hover:bg-primary/10">
+                    <Button
+                        variant="outline"
+                        onClick={handleExportCSV}
+                        disabled={usersResponse.users.length === 0}
+                        className={ACTION_BUTTON_CLASS}
+                    >
                         Экспорт CSV
                     </Button>
                     <Dialog open={whitelistDialogOpen} onOpenChange={setWhitelistDialogOpen}>
                         <DialogTrigger asChild>
-                            <Button className="font-semibold shadow-lg shadow-primary/20">
+                            <Button className="h-9">
                                 <Plus className="w-4 h-4 mr-2" />
                                 Добавить в whitelist
                             </Button>
@@ -678,10 +771,14 @@ const UserManagementPage: React.FC = () => {
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button variant="outline" onClick={() => setWhitelistDialogOpen(false)}>
+                                <Button
+                                    variant="outline"
+                                    className={ACTION_BUTTON_CLASS}
+                                    onClick={() => setWhitelistDialogOpen(false)}
+                                >
                                     Отмена
                                 </Button>
-                                <Button onClick={handleAddToWhitelist}>
+                                <Button className="h-9" onClick={handleAddToWhitelist}>
                                     Добавить
                                 </Button>
                             </DialogFooter>
@@ -728,12 +825,17 @@ const UserManagementPage: React.FC = () => {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                        <Button
+                            variant="outline"
+                            className={ACTION_BUTTON_CLASS}
+                            onClick={() => setEditDialogOpen(false)}
+                        >
                             Отмена
                         </Button>
                         <Button
                             onClick={handleEditUser}
                             disabled={updateUserMutation.isPending}
+                            className="h-9"
                         >
                             {updateUserMutation.isPending ? 'Сохранение...' : 'Сохранить'}
                         </Button>
@@ -763,13 +865,17 @@ const UserManagementPage: React.FC = () => {
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setBlockDialogOpen(false)}>
+                        <Button
+                            variant="outline"
+                            className={ACTION_BUTTON_CLASS}
+                            onClick={() => setBlockDialogOpen(false)}
+                        >
                             Отмена
                         </Button>
                         <Button
                             onClick={handleBlockUser}
                             disabled={blockUserMutation.isPending}
-                            className="bg-red-600 hover:bg-red-700"
+                            className="h-9 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                             {blockUserMutation.isPending ? 'Блокировка...' : 'Заблокировать'}
                         </Button>
@@ -781,3 +887,4 @@ const UserManagementPage: React.FC = () => {
 };
 
 export default UserManagementPage;
+

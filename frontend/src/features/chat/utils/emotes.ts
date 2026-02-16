@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { API_BASE_URL } from '@/constants';
 import { logger } from '@/shared/utils/prodLogger';
 
@@ -31,18 +32,6 @@ interface Emote {
   id: string;
   name: string;
   data: EmoteDataField;
-}
-
-interface Connection {
-  platform: string;
-  username: string;
-  emote_set_id: string;
-}
-
-interface User {
-  id: string;
-  username: string;
-  connections: Connection[];
 }
 
 type EmoteMap = Map<string, EmoteData>;

@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 
+/* eslint-disable no-alert */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Edit, Globe, Loader2, Mic, RefreshCw, Settings, TestTube2, Trash2, Upload, User as UserIcon, Users, Volume2, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
@@ -14,7 +15,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { PageLoader } from '@/shared/components/ui/loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
-import { Slider } from "@/shared/components/ui/slider";
+import { Slider } from '@/shared/components/ui/slider';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
@@ -51,6 +52,13 @@ interface TranscribeResponse {
         reference_text: string;
     };
 }
+
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/75';
+const VOICE_CARD_CLASS = 'border-border/70 bg-card/80 flex h-full flex-col transition-colors';
+const MODAL_OVERLAY_CLASS = 'fixed inset-0 z-[9999] bg-black/65 backdrop-blur-[1px]';
+const MODAL_PANEL_CLASS = 'pointer-events-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border/70 bg-background/95 shadow-2xl shadow-black/35';
+const DIALOG_FOOTER_CLASS = 'flex justify-center gap-4 border-t border-border/70 p-4';
+const INFO_BOX_CLASS = 'mt-1 rounded-md border border-border/60 bg-muted/35 p-2.5 text-xs text-muted-foreground';
 
 const VoiceManagement: React.FC = () => {
     const { addToast } = useToast();
@@ -529,14 +537,14 @@ const VoiceManagement: React.FC = () => {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <h2 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
                         <Mic className="h-6 w-6 text-muted-foreground" />
                         Управление голосами
                     </h2>
                     <p className="text-muted-foreground mt-1">Загрузка и управление всеми голосовыми сэмплами</p>
                 </div>
                 <Button
-                    className="bg-gray-600 hover:bg-gray-700"
+                    className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={() => setUploadDialogOpen(true)}
                 >
                     <Upload className="h-4 w-4 mr-2" />
@@ -544,10 +552,10 @@ const VoiceManagement: React.FC = () => {
                 </Button>
             </div>
 
-            <Card className="bg-muted/50 border-border">
+            <Card className={SURFACE_CARD_CLASS}>
                 <CardHeader className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <CardTitle className="text-xl font-bold">Список голосов</CardTitle>
+                        <CardTitle className="text-xl font-semibold text-foreground">Список голосов</CardTitle>
                         <Badge variant="outline" className="text-sm">
                             Всего: {voices.length}
                         </Badge>
@@ -563,13 +571,13 @@ const VoiceManagement: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                     {ttsServiceWarning && (
-                        <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-600/50 rounded-lg">
+                        <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
                             <div className="flex items-start gap-3">
-                                <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-300" />
                                 <div className="flex-1">
-                                    <p className="text-yellow-300 font-semibold mb-1">[WARN] TTS Сервис недоступен</p>
-                                    <p className="text-yellow-400/80 text-sm">{ttsServiceWarning}</p>
-                                    <p className="text-yellow-400/60 text-xs mt-2">
+                                    <p className="mb-1 font-semibold text-amber-200">TTS сервис недоступен</p>
+                                    <p className="text-sm text-amber-100/90">{ttsServiceWarning}</p>
+                                    <p className="mt-2 text-xs text-amber-100/70">
                                         Убедитесь, что TTS сервис запущен и доступен по адресу указанному в переменной окружения TTS_SERVICE_URL.
                                     </p>
                                 </div>
@@ -577,7 +585,7 @@ const VoiceManagement: React.FC = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-voices'] })}
-                                    className="text-yellow-300 hover:text-yellow-200"
+                                    className="text-amber-200 hover:bg-amber-500/15 hover:text-amber-100"
                                 >
                                     <RefreshCw className="h-4 w-4" />
                                 </Button>
@@ -591,10 +599,10 @@ const VoiceManagement: React.FC = () => {
                             <>
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                            <Users className="h-5 w-5 text-green-400" />
+                                        <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                                            <Users className="h-5 w-5 text-emerald-300" />
                                             Пользовательские голоса
-                                            <Badge variant="outline" className="ml-2 text-green-400 border-green-400">
+                                            <Badge variant="outline" className="ml-2 border-emerald-500/40 text-emerald-200">
                                                 {voices.filter(v => v.voice_type === 'user').length}
                                             </Badge>
                                         </h3>
@@ -621,7 +629,7 @@ const VoiceManagement: React.FC = () => {
                                             (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
                                         );
                                         return userVoices.length === 0 ? (
-                                            <div className="text-center py-12 bg-muted/30 rounded-lg border border-border border-dashed">
+                                            <div className="rounded-lg border border-border/60 border-dashed bg-muted/25 py-12 text-center">
                                                 <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                                                 <p className="text-muted-foreground text-lg mb-2">
                                                     {selectedUserFilter !== 'all' ? 'У выбранного пользователя нет голосов' : 'Пользовательских голосов пока нет'}
@@ -630,11 +638,11 @@ const VoiceManagement: React.FC = () => {
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                                 {userVoices.map((voice) => (
-                                                    <Card key={voice.id} className="bg-slate-800 border-slate-700 flex flex-col h-full transition-all hover:border-slate-600 hover:shadow-lg">
+                                                    <Card key={voice.id} className={`${VOICE_CARD_CLASS} hover:border-emerald-500/35`}>
                                                         <CardHeader className="pb-3">
                                                             <div className="flex items-center justify-between">
-                                                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                                    <Users className="h-4 w-4 text-green-400 flex-shrink-0" />
+                                                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                                                    <Users className="h-4 w-4 flex-shrink-0 text-emerald-300" />
                                                                     <span className="truncate">{voice.name}</span>
                                                                 </CardTitle>
                                                             </div>
@@ -656,7 +664,7 @@ const VoiceManagement: React.FC = () => {
                                                             <div className="flex gap-2">
                                                                 <Button
                                                                     onClick={() => handleEdit(voice)}
-                                                                    className="flex-1"
+                                                                    className="h-8 flex-1 border-border/70 bg-background/60 text-foreground hover:bg-accent/70"
                                                                     variant="outline"
                                                                     size="sm"
                                                                 >
@@ -679,20 +687,20 @@ const VoiceManagement: React.FC = () => {
                                     })()}
                                 </div>
 
-                                <div className="border-t border-border"></div>
+                                <div className="border-t border-border/70"></div>
 
                                 <div>
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                            <Globe className="h-5 w-5 text-blue-400" />
+                                        <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                                            <Globe className="h-5 w-5 text-sky-300" />
                                             Глобальные голоса
-                                            <Badge variant="outline" className="ml-2 text-blue-400 border-blue-400">
+                                            <Badge variant="outline" className="ml-2 border-sky-500/40 text-sky-200">
                                                 {voices.filter(v => v.voice_type === 'global').length}
                                             </Badge>
                                         </h3>
                                     </div>
-                                    <div className="mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                                        <p className="text-blue-200 text-sm">
+                                    <div className="mb-4 rounded-lg border border-sky-500/35 bg-sky-500/10 p-3">
+                                        <p className="text-sm text-sky-100/95">
                                             <strong>Глобальные голоса</strong> доступны всем пользователям платформы.
                                             Пользователи могут настраивать личные параметры (скорость, громкость, CFG) для каждого глобального голоса,
                                             но не могут изменять сам голос или удалять его.
@@ -704,7 +712,7 @@ const VoiceManagement: React.FC = () => {
                                             (searchQuery === '' || v.name.toLowerCase().includes(searchQuery.toLowerCase()))
                                         );
                                         return globalVoices.length === 0 ? (
-                                            <div className="text-center py-12 bg-muted/30 rounded-lg border border-border border-dashed">
+                                            <div className="rounded-lg border border-border/60 border-dashed bg-muted/25 py-12 text-center">
                                                 <Globe className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                                                 <p className="text-muted-foreground text-lg mb-2">Глобальных голосов пока нет</p>
                                                 <p className="text-muted-foreground text-sm mb-4">Загрузите первый глобальный голос через кнопку "Загрузить голос" вверху страницы и выберите тип "Глобальный голос"</p>
@@ -712,14 +720,14 @@ const VoiceManagement: React.FC = () => {
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                                                 {globalVoices.map((voice) => (
-                                                    <Card key={voice.id} className="bg-slate-800 border-blue-500/30 flex flex-col h-full transition-all hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/20">
+                                                    <Card key={voice.id} className={`${VOICE_CARD_CLASS} hover:border-sky-500/40`}>
                                                         <CardHeader className="pb-3">
                                                             <div className="flex items-center justify-between">
-                                                                <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
-                                                                    <Globe className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                                                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                                                    <Globe className="h-4 w-4 flex-shrink-0 text-sky-300" />
                                                                     <span className="truncate">{voice.name}</span>
                                                                 </CardTitle>
-                                                                <Badge variant="outline" className="text-xs text-blue-400 border-blue-400">
+                                                                <Badge variant="outline" className="border-sky-500/40 text-xs text-sky-200">
                                                                     Глобальный
                                                                 </Badge>
                                                             </div>
@@ -731,7 +739,7 @@ const VoiceManagement: React.FC = () => {
                                                             <div className="flex gap-2">
                                                                 <Button
                                                                     onClick={() => handleEdit(voice)}
-                                                                    className="flex-1"
+                                                                    className="h-8 flex-1 border-border/70 bg-background/60 text-foreground hover:bg-accent/70"
                                                                     variant="outline"
                                                                     size="sm"
                                                                 >
@@ -763,23 +771,23 @@ const VoiceManagement: React.FC = () => {
             {uploadDialogOpen && ReactDOM.createPortal(
                 <>
                     <div
-                        className="fixed inset-0 bg-black/80 z-[9999]"
+                        className={MODAL_OVERLAY_CLASS}
                         onClick={() => setUploadDialogOpen(false)}
                     />
 
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
                         <div
-                            className="bg-background rounded-lg max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
+                            className={`${MODAL_PANEL_CLASS} max-w-md`}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="border-b border-border p-4 flex items-center justify-between">
+                            <div className="flex items-center justify-between border-b border-border/70 p-4">
                                 <div>
-                                    <h2 className="text-xl font-bold text-white">Загрузка нового голоса</h2>
+                                    <h2 className="text-xl font-semibold text-foreground">Загрузка нового голоса</h2>
                                     <p className="text-sm text-muted-foreground mt-1">Загрузите аудио файл для создания нового голоса. Поддерживаются все популярные форматы.</p>
                                 </div>
                                 <button
                                     onClick={() => setUploadDialogOpen(false)}
-                                    className="text-muted-foreground hover:text-white transition-colors"
+                                    className="text-muted-foreground transition-colors hover:text-foreground"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -795,7 +803,7 @@ const VoiceManagement: React.FC = () => {
                                                 type="file"
                                                 accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
                                                 onChange={handleFileUpload}
-                                                className="file:bg-gray-600 file:text-white file:border-0 file:rounded-md file:px-1.5 file:py-0.5 file:mr-1 file:cursor-pointer hover:file:bg-gray-700 file:text-xs cursor-pointer text-xs"
+                                                className="cursor-pointer text-xs file:mr-2 file:rounded-md file:border file:border-border/70 file:bg-muted/60 file:px-2 file:py-1 file:text-xs file:text-foreground hover:file:bg-accent/70"
                                             />
                                         </div>
                                     </div>
@@ -875,18 +883,18 @@ const VoiceManagement: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="border-t border-border p-4 flex justify-center gap-4">
+                            <div className={DIALOG_FOOTER_CLASS}>
                                 <Button
                                     onClick={() => setUploadDialogOpen(false)}
                                     variant="outline"
-                                    className="w-28"
+                                    className="h-9 w-28 border-border/70 bg-background/60 text-foreground hover:bg-accent/70"
                                 >
                                     Отмена
                                 </Button>
                                 <Button
                                     onClick={(e) => handleUpload(e)}
                                     disabled={isUploading || !uploadFile || !voiceName.trim() || (ownerId === 'user' && !selectedUserId)}
-                                    className="w-36 bg-green-600 hover:bg-green-700"
+                                    className="h-9 w-36 bg-primary text-primary-foreground hover:bg-primary/90"
                                 >
                                     {isUploading ? (
                                         <span className="flex items-center gap-2">
@@ -905,20 +913,20 @@ const VoiceManagement: React.FC = () => {
             {editDialogOpen && currentVoice && ReactDOM.createPortal(
                 <>
                     <div
-                        className="fixed inset-0 bg-black/80 z-[9999]"
+                        className={MODAL_OVERLAY_CLASS}
                         onClick={() => setEditDialogOpen(false)}
                     />
 
                     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pointer-events-none">
                         <div
-                            className="bg-background rounded-lg max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col pointer-events-auto shadow-2xl"
+                            className={MODAL_PANEL_CLASS}
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="border-b border-border p-4 flex items-center justify-between">
-                                <h2 className="text-xl font-bold text-white">Настройки голоса "{currentVoice?.name}"</h2>
+                            <div className="flex items-center justify-between border-b border-border/70 p-4">
+                                <h2 className="text-xl font-semibold text-foreground">Настройки голоса "{currentVoice?.name}"</h2>
                                 <button
                                     onClick={() => setEditDialogOpen(false)}
-                                    className="text-muted-foreground hover:text-white transition-colors"
+                                    className="text-muted-foreground transition-colors hover:text-foreground"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
@@ -976,7 +984,7 @@ const VoiceManagement: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-4">
-                                        <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
+                                        <h4 className="text-sm font-medium text-foreground">Настройки генерации</h4>
 
                                         <div>
                                             <Label htmlFor="cfg-strength">Стабильность синтеза: {testCfgStrength}</Label>
@@ -992,8 +1000,8 @@ const VoiceManagement: React.FC = () => {
                                                 }}
                                                 className="mt-2"
                                             />
-                                            <div className="text-xs text-muted-foreground bg-muted p-2 rounded mt-1">
-                                                [INFO] <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи.
+                                            <div className={INFO_BOX_CLASS}>
+                                                <strong>Стабильность:</strong> Влияет на стабильность и консистентность речи.
                                                 Рекомендуемое значение 2.5. Слишком высокое значение может сделать речь роботизированной.
                                             </div>
                                         </div>
@@ -1033,8 +1041,8 @@ const VoiceManagement: React.FC = () => {
                                                 <span>Быстрый</span>
                                                 <span>Очень быстрый</span>
                                             </div>
-                                            <div className="text-xs text-muted-foreground bg-muted p-2 rounded mt-1">
-                                                [INFO] <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы.
+                                            <div className={INFO_BOX_CLASS}>
+                                                <strong>Скорость:</strong> Подберите подходящий пресет. Сильно быстрый может обрывать конец фразы.
                                                 Слишком медленный может тормозить речь. Начните с "Нормальный" и корректируйте по результату.
                                             </div>
                                         </div>
@@ -1042,12 +1050,12 @@ const VoiceManagement: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="border-t border-border p-4 flex justify-center gap-4">
+                            <div className={DIALOG_FOOTER_CLASS}>
                                 <Button
                                     onClick={handleTestVoice}
                                     variant="outline"
                                     disabled={isTestingVoice}
-                                    className="w-32 whitespace-nowrap overflow-hidden text-ellipsis"
+                                    className="h-9 w-32 overflow-hidden text-ellipsis whitespace-nowrap border-border/70 bg-background/60 text-foreground hover:bg-accent/70"
                                 >
                                     {isTestingVoice ? (
                                         <>
@@ -1069,14 +1077,14 @@ const VoiceManagement: React.FC = () => {
                                 <Button
                                     onClick={handleRenameVoice}
                                     variant="outline"
-                                    className="w-32 whitespace-nowrap overflow-hidden text-ellipsis text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white"
+                                    className="h-9 w-32 overflow-hidden text-ellipsis whitespace-nowrap border-amber-500/50 text-amber-200 hover:bg-amber-500/15 hover:text-amber-100"
                                 >
                                     <Edit className="h-4 w-4 mr-2 flex-shrink-0" />
                                     <span className="truncate">Переименовать</span>
                                 </Button>
                                 <Button
                                     onClick={handleSaveSettings}
-                                    className="w-32 whitespace-nowrap overflow-hidden text-ellipsis bg-green-600 hover:bg-green-700"
+                                    className="h-9 w-32 overflow-hidden text-ellipsis whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
                                 >
                                     <Settings className="h-4 w-4 mr-2 flex-shrink-0" />
                                     <span className="truncate">Сохранить</span>

@@ -1,8 +1,6 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 
 import { AlertCircle, Coins, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
-
-import { logger } from '@/shared/utils/prodLogger';
 import { toast } from 'sonner';
 
 import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
@@ -10,11 +8,20 @@ import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { logger } from '@/shared/utils/prodLogger';
 
 
 
 const MEMEALERTS_API_BASE = '/api/memealerts';
-const MEMEALERTS_LOGIN_URL = 'https://memealerts.com';
+
+type MemeAlertsHistoryItem = {
+    id?: string | number;
+    user_name?: string;
+    user_id?: string | number;
+    created_at?: string;
+    amount?: number;
+    type?: string;
+};
 
 export const MemeAlertsRewards: React.FC = () => {
     const [statusLoading, setStatusLoading] = useState(true);
@@ -23,11 +30,12 @@ export const MemeAlertsRewards: React.FC = () => {
     const [grantTarget, setGrantTarget] = useState('');
     const [grantValue, setGrantValue] = useState<number>(10);
     const [granting, setGranting] = useState(false);
-    const [manualAccessToken, setManualAccessToken] = useState('');
-    const [manualRefreshToken, setManualRefreshToken] = useState('');
-    const [manualSaving, setManualSaving] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [history, setHistory] = useState<{ grants: any[]; purchases: any[]; unknown: any[] }>({
+    const [history, setHistory] = useState<{
+        grants: MemeAlertsHistoryItem[];
+        purchases: MemeAlertsHistoryItem[];
+        unknown: MemeAlertsHistoryItem[];
+    }>({
         grants: [],
         purchases: [],
         unknown: []
@@ -66,7 +74,7 @@ export const MemeAlertsRewards: React.FC = () => {
         }
     };
 
-    const saveTokenToBackend = async (accessToken: string, refreshToken?: string) => {
+    const saveTokenToBackend = useCallback(async (accessToken: string, refreshToken?: string) => {
         try {
             const response = await fetch(`${MEMEALERTS_API_BASE}/connect`, {
                 method: 'POST',
@@ -90,20 +98,35 @@ export const MemeAlertsRewards: React.FC = () => {
                 });
                 return false;
             }
-        } catch (error) {
+        } catch {
             toast.error("Ошибка сети при сохранении токена");
             return false;
         }
-    };
+    }, []);
 
+    // Listen for postMessage from the proxy popup with the extracted token.
     useEffect(() => {
         const handleMessage = async (event: MessageEvent) => {
             if (!event?.data || typeof event.data !== 'object') return;
-            const data = event.data as { access_token?: string; refresh_token?: string };
-            if (!data.access_token) return;
 
-            const success = await saveTokenToBackend(data.access_token, data.refresh_token);
-            if (success) setConnecting(false);
+            // Accept both old format and new typed format from the proxy script.
+            const data = event.data as {
+                type?: string;
+                access_token?: string;
+                refresh_token?: string;
+            };
+
+            if (data.type === 'memealerts_token' && data.access_token) {
+                setConnecting(true);
+                const success = await saveTokenToBackend(data.access_token, data.refresh_token);
+                if (success) {
+                    setConnecting(false);
+                }
+            } else if (data.access_token && !data.type) {
+                // Legacy format — keep backward compat.
+                const success = await saveTokenToBackend(data.access_token, data.refresh_token);
+                if (success) setConnecting(false);
+            }
         };
 
         window.addEventListener('message', handleMessage);
@@ -116,62 +139,21 @@ export const MemeAlertsRewards: React.FC = () => {
         }
     }, [isConnected]);
 
-    const callbackUrl = useMemo(() => `${window.location.origin}/memealerts/callback`, []);
-    const bookmarkletCode = useMemo(() => (
-        `javascript:(()=>{const t=localStorage.getItem('accessToken')||localStorage.getItem('access_token');` +
-        `const r=localStorage.getItem('refreshToken')||localStorage.getItem('refresh_token');` +
-        `if(!t){alert('MemeAlerts token not found. Make sure you are logged in.');return;}` +
-        `window.location.href='${callbackUrl}#access_token='+encodeURIComponent(t)+'&refresh_token='+(r?encodeURIComponent(r):'');})();`
-    ), [callbackUrl]);
-
     const handleConnect = useCallback(() => {
-        const popup = window.open(MEMEALERTS_LOGIN_URL, '_blank', 'width=500,height=700,scrollbars=yes');
+        // Open MemeAlerts through our reverse-proxy so the token stays on our origin.
+        const proxyUrl = `${window.location.origin}/api/memealerts/proxy/`;
+        const popup = window.open(proxyUrl, '_blank', 'width=500,height=700,scrollbars=yes');
         if (!popup) {
-            toast.error("Не удалось открыть MemeAlerts", {
-                description: "Разрешите всплывающие окна или откройте сайт вручную"
+            toast.error("Не удалось открыть окно", {
+                description: "Разрешите всплывающие окна в настройках браузера"
             });
             return;
         }
         setConnecting(true);
         toast.info("Авторизуйтесь в MemeAlerts", {
-            description: "После входа используйте закладку (код ниже) для передачи токена"
+            description: "После входа токен сохранится автоматически"
         });
-        setTimeout(() => {
-            setConnecting(false);
-            checkStatus();
-        }, 5000);
     }, []);
-
-    const handleCopyBookmarklet = async () => {
-        try {
-            await navigator.clipboard.writeText(bookmarkletCode);
-            toast.success("Код закладки скопирован", {
-                description: "Вставьте в новую закладку и нажмите ее на MemeAlerts"
-            });
-        } catch (error) {
-            logger.error('Clipboard error', error);
-            toast.error("Не удалось скопировать код. Скопируйте вручную.");
-        }
-    };
-
-    const handleManualSave = async () => {
-        const accessToken = manualAccessToken.trim();
-        if (!accessToken) {
-            toast.error("Вставьте access token для подключения");
-            return;
-        }
-
-        setManualSaving(true);
-        const success = await saveTokenToBackend(
-            accessToken,
-            manualRefreshToken.trim() || undefined
-        );
-        if (success) {
-            setManualAccessToken('');
-            setManualRefreshToken('');
-        }
-        setManualSaving(false);
-    };
 
     const handleDisconnect = async () => {
         try {
@@ -217,7 +199,7 @@ export const MemeAlertsRewards: React.FC = () => {
                     description: "Ошибка"
                 });
             }
-        } catch (error) {
+        } catch {
             toast.error("Ошибка связи с сервером");
         } finally {
             setGranting(false);
@@ -248,36 +230,6 @@ export const MemeAlertsRewards: React.FC = () => {
                 </div>
             </div>
 
-            <div className="rounded-xl border border-border/60 bg-background/50 p-4">
-                <div className="flex flex-col gap-3">
-                    <div>
-                        <h4 className="font-semibold text-white">Быстрое подключение MemeAlerts</h4>
-                        <p className="text-sm text-muted-foreground">
-                            Из другого окна нельзя прочитать токен из-за политики браузера. Самый удобный способ —
-                            закладка, которая переносит токен на нашу страницу подтверждения.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" onClick={handleConnect} disabled={connecting}>
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Открыть MemeAlerts
-                        </Button>
-                        <Button variant="outline" onClick={handleCopyBookmarklet}>
-                            <RefreshCw className="w-4 h-4 mr-2" />
-                            Скопировать код закладки
-                        </Button>
-                    </div>
-                    <div className="rounded-lg bg-slate-900/40 border border-slate-800/50 p-3 text-xs text-muted-foreground font-mono break-all">
-                        {bookmarkletCode}
-                    </div>
-                    <ol className="text-sm text-muted-foreground list-decimal pl-5 space-y-1">
-                        <li>Создайте новую закладку и вставьте код выше.</li>
-                        <li>Откройте MemeAlerts, авторизуйтесь и нажмите эту закладку.</li>
-                        <li>Вы попадете на страницу подтверждения, токен сохранится.</li>
-                    </ol>
-                </div>
-            </div>
-
             {!isConnected ? (
                 <div className="rounded-xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 p-6 space-y-5">
                     <div className="flex items-start gap-4">
@@ -285,10 +237,10 @@ export const MemeAlertsRewards: React.FC = () => {
                             <AlertCircle className="h-5 w-5 text-purple-400" />
                         </div>
                         <div className="space-y-1.5">
-                            <h4 className="font-semibold text-white">Авторизация через MemeAlerts</h4>
+                            <h4 className="font-semibold text-white">Подключение MemeAlerts</h4>
                             <p className="text-sm text-gray-400 leading-relaxed">
-                                Подключите MemeAlerts для выдачи мемкоинов вашим зрителям.
-                                После авторизации используйте закладку выше или вставьте токен вручную.
+                                Нажмите кнопку ниже — откроется окно MemeAlerts.
+                                Авторизуйтесь, и токен сохранится автоматически.
                             </p>
                         </div>
                     </div>
@@ -316,39 +268,10 @@ export const MemeAlertsRewards: React.FC = () => {
                         <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                             <RefreshCw className="h-4 w-4 animate-spin text-blue-400 flex-shrink-0" />
                             <p className="text-xs text-blue-300">
-                                Авторизуйтесь в MemeAlerts и нажмите созданную закладку.
+                                Авторизуйтесь в открытом окне. После входа токен будет передан автоматически.
                             </p>
                         </div>
                     )}
-                    <div className="mt-4 space-y-3 rounded-lg border border-white/10 bg-black/20 p-4">
-                        <p className="text-xs text-gray-400">
-                            Если подключение не произошло, можно вставить токен вручную.
-                            Откройте DevTools в MemeAlerts → Application → Local Storage → memealerts.com и скопируйте
-                            accessToken (и refreshToken при наличии).
-                        </p>
-                        <div className="space-y-2">
-                            <Label>Access token</Label>
-                            <Input
-                                placeholder="accessToken"
-                                value={manualAccessToken}
-                                onChange={(e) => setManualAccessToken(e.target.value)}
-                                className="bg-black/20 border-white/10"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Refresh token (optional)</Label>
-                            <Input
-                                placeholder="refreshToken"
-                                value={manualRefreshToken}
-                                onChange={(e) => setManualRefreshToken(e.target.value)}
-                                className="bg-black/20 border-white/10"
-                            />
-                        </div>
-                        <Button onClick={handleManualSave} disabled={manualSaving}>
-                            {manualSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Сохранить токен
-                        </Button>
-                    </div>
                 </div>
             ) : (
                 <div className="space-y-6">

@@ -66,8 +66,35 @@ class ConnectionManagerCore:
                 ).first()
 
                 if user:
-                    logger.info(f"[OK] [TTS RECONNECT] Bot reconnected to {channel_name}, cancelling TTS disconnect for user {user.id}")
-                    self.cancel_tts_disconnect(user.id)
+                    # Bot reconnect should cancel pending TTS disconnect only when
+                    # there is an actual listener (website websocket or OBS sink).
+                    has_site_listener = False
+                    has_obs_listener = False
+
+                    try:
+                        from services.memory_websocket_manager import get_memory_websocket_manager
+                        user_connections = get_memory_websocket_manager().get_user_connections(user.id)
+                        has_site_listener = any(conn.get("is_active", True) for conn in user_connections)
+                    except Exception as ws_err:
+                        logger.debug(
+                            f"[DEBUG] [TTS RECONNECT] Failed to check site listeners for user {user.id}: {ws_err}"
+                        )
+
+                    obs_token = getattr(user, "obs_token", None)
+                    if obs_token and obs_token in self.obs_connections:
+                        has_obs_listener = True
+
+                    if has_site_listener or has_obs_listener:
+                        logger.info(
+                            f"[OK] [TTS RECONNECT] Bot reconnected to {channel_name}, "
+                            f"active listener detected, cancelling TTS disconnect for user {user.id}"
+                        )
+                        self.cancel_tts_disconnect(user.id)
+                    else:
+                        logger.info(
+                            f"[SKIP] [TTS RECONNECT] Bot reconnected to {channel_name}, "
+                            f"no active listeners for user {user.id}; keeping pending TTS disconnect"
+                        )
             finally:
                 db.close()
         except Exception as e:
@@ -154,10 +181,7 @@ class ConnectionManagerCore:
     def is_tts_enabled(self, channel_name: str) -> bool:
         """Проверить включен ли TTS для канала"""
         is_enabled = channel_name in self.tts_enabled_channels
-        logger.warning(f"[DEBUG] [TTS CHECK] is_tts_enabled('{channel_name}') = {is_enabled}")
-        logger.warning(f"[DEBUG] [TTS CHECK] Current tts_enabled_channels: {self.tts_enabled_channels}")
-        logger.warning(f"[DEBUG] [TTS CHECK] Current tts_enabled_twitch: {self.tts_enabled_twitch}")
-        logger.warning(f"[DEBUG] [TTS CHECK] Current tts_enabled_vk: {self.tts_enabled_vk}")
+        logger.debug(f"[TTS CHECK] is_tts_enabled('{channel_name}') = {is_enabled}")
         return is_enabled
 
     def get_tts_type(self, channel_name: str) -> str:
@@ -224,9 +248,23 @@ class ConnectionManagerCore:
                 logger.info(f"[OK] [TTS TIMEOUT] User {user_id} ({username}) has active connections - keeping TTS enabled")
                 return
 
-            # Если пользователь не переподключился и нет активных соединений, отключаем TTS
-            logger.info(f"[TIMEOUT] [TTS TIMEOUT] User {user_id} ({username}) has no active connections - keeping TTS enabled")
-            return
+            # Пользователь не переподключился — отключаем TTS
+            logger.info(f"[TIMEOUT] [TTS TIMEOUT] User {user_id} ({username}) timeout expired, disabling TTS")
+            self.disable_tts_for_channel(username)
+
+            # Отключаем в БД через TTSService
+            try:
+                from core.database import SessionLocal
+                from services.tts.tts_service import TTSService
+                db = SessionLocal()
+                try:
+                    tts_service = TTSService(db)
+                    await tts_service.disable_tts(user_id=user_id)
+                    logger.info(f"[OK] [TTS TIMEOUT] TTS disabled for user {user_id} ({username})")
+                finally:
+                    db.close()
+            except Exception as disable_err:
+                logger.error(f"[ERROR] [TTS TIMEOUT] Failed to disable TTS in DB for user {user_id}: {disable_err}")
         except asyncio.CancelledError:
             logger.info(f"[OK] [TTS RECONNECT] User {user_id} reconnected - keeping TTS enabled")
             raise  # Важно: пробрасываем CancelledError для корректной отмены

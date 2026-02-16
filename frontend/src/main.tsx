@@ -1,9 +1,11 @@
+/* eslint-disable import/order */
 import React from 'react'
 
 import { QueryClientProvider } from '@tanstack/react-query'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, useLocation } from 'react-router-dom'
 
+import { ToastProvider } from '@/shared/components/ui/toast'
 import App from './App'
 import './App.css'
 import './styles/design-system.css'
@@ -12,9 +14,6 @@ import './styles/toast-overrides.css'
 // Initialize Sentry before React
 
 // Lazy load non-critical providers для ускорения начальной загрузки
-import { ToastProvider } from '@/shared/components/ui/toast'
-
-import { AudioPriorityProvider } from './context/AudioPriorityContext'
 import { AuthProvider } from './context/AuthContext'
 import { ChatProvider } from './context/ChatContext'
 import { IntegrationsProvider } from './context/IntegrationsContext'
@@ -31,14 +30,12 @@ cleanupQueryCache()
 // [TARGET] Core провайдеры - только самые критичные для начального рендера
 // Toast - обязательно сразу (для уведомлений)
 // Auth - обязательно сразу (проверка авторизации)
-// AudioPriorityProvider - нужен для TtsPlayerProvider
 // TtsPlayerProvider - нужен для ChatProvider
 // Остальные - загружаются после первого рендера если нужно
 const CoreProviders = composeProviders(
   ToastProvider,
   AuthProvider,
   IntegrationsProvider,
-  AudioPriorityProvider,
   TtsPlayerProvider,
   ChatProvider,
   UserSettingsProvider
@@ -49,6 +46,7 @@ interface ConditionalContextWrapperProps {
   children: React.ReactNode;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 const ConditionalContextWrapper: React.FC<ConditionalContextWrapperProps> = ({ children }) => {
   const location = useLocation();
 

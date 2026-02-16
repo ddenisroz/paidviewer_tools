@@ -58,7 +58,17 @@ async def login_twitch(request: Request):
 
         logger.info("Twitch OAuth login URL generated")
         from fastapi.responses import RedirectResponse
-        return RedirectResponse(url=auth_url)
+        response = RedirectResponse(url=auth_url)
+        # Сохраняем state в cookie для CSRF проверки в callback
+        response.set_cookie(
+            key="oauth_state",
+            value=state,
+            max_age=600,  # 10 минут
+            httponly=True,
+            samesite="lax",
+            secure=settings.is_production
+        )
+        return response
 
     except Exception as e:
         logger.error(f"Error generating Twitch login URL: {e}")
@@ -89,6 +99,12 @@ async def twitch_callback(
     if not code:
         logger.error("No authorization code received from Twitch")
         raise HTTPException(status_code=400, detail="No authorization code received from Twitch")
+
+    # CSRF: валидация state
+    expected_state = request.cookies.get("oauth_state")
+    if not state or state != expected_state:
+        logger.warning(f"Twitch OAuth CSRF state mismatch: got {state}, expected {expected_state}")
+        raise HTTPException(status_code=400, detail="Invalid OAuth state (CSRF protection)")
 
     if not all([TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET]):
         logger.error("Twitch credentials not configured")

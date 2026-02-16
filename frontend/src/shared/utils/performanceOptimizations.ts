@@ -5,7 +5,7 @@
  * following the requirements from task 7.2
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Debounce hook for expensive operations
@@ -85,7 +85,20 @@ export function useMemoizedValue<T>(
   factory: () => T,
   deps: React.DependencyList
 ): T {
-  return useMemo(factory, deps);
+  const valueRef = useRef<T | undefined>(undefined);
+  const depsRef = useRef<React.DependencyList | null>(null);
+  const currentDeps = depsRef.current;
+  const hasChanged =
+    currentDeps == null ||
+    deps.length !== currentDeps.length ||
+    deps.some((dep, index) => !Object.is(dep, currentDeps[index]));
+
+  if (hasChanged) {
+    depsRef.current = [...deps];
+    valueRef.current = factory();
+  }
+
+  return valueRef.current as T;
 }
 
 /**
@@ -98,9 +111,17 @@ export function useMemoizedValue<T>(
  */
 export function useStableCallback<T extends (...args: unknown[]) => unknown>(
   callback: T,
-  deps: React.DependencyList
+  _deps: React.DependencyList
 ): T {
-  return useCallback(callback, deps) as T;
+  const callbackRef = useRef(callback);
+  callbackRef.current = callback;
+
+  const stableCallbackRef = useRef<T | null>(null);
+  if (!stableCallbackRef.current) {
+    stableCallbackRef.current = ((...args: Parameters<T>) => callbackRef.current(...args)) as T;
+  }
+
+  return stableCallbackRef.current;
 }
 
 /**
@@ -206,14 +227,12 @@ export function useBatchedUpdates<T extends Record<string, unknown>>(
  */
 export function useDeepMemo<T>(value: T): T {
   const ref = useRef<T>(value);
-  const signalRef = useRef<number>(0);
 
   if (!deepEqual(ref.current, value)) {
     ref.current = value;
-    signalRef.current += 1;
   }
 
-  return useMemo(() => ref.current, [signalRef.current]);
+  return ref.current;
 }
 
 /**

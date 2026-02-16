@@ -1,5 +1,6 @@
 import React from 'react';
 
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { Tag } from 'lucide-react';
 import ReactDOM from 'react-dom';
 

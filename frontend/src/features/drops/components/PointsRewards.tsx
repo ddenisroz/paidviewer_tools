@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 
+/* eslint-disable no-alert */
 import { Coins, Edit, Loader2, Plus, Power, PowerOff, Trash2 } from 'lucide-react';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -56,6 +57,8 @@ interface FormData {
   max_uses_count_per_user: number;
   is_message_required: boolean;
 }
+
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
 
 const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelName, integrations }) => {
   const { integrations: integrationsContext } = useIntegrations();
@@ -249,12 +252,12 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
 
   if (!hasAnyIntegration) {
     return (
-      <Card>
+      <Card className={SURFACE_CARD_CLASS}>
         <CardContent className="p-8">
           <div className="text-center py-8 text-muted-foreground">
             <h3 className="text-lg font-semibold mb-2">Интеграция не подключена</h3>
-            <p className="text-sm">
-              Для создания наград через API необходимо подключить интеграцию Twitch или VK в настройках
+            <p className="text-sm break-words">
+              Подключите Twitch или VK в настройках, чтобы создавать награды.
             </p>
           </div>
         </CardContent>
@@ -264,7 +267,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className={SURFACE_CARD_CLASS}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
@@ -283,6 +286,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
                     variant={selectedPlatform === 'twitch' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedPlatform('twitch')}
+                    className={selectedPlatform === 'twitch' ? '' : 'border-slate-700 bg-slate-900/70 hover:bg-slate-800'}
                   >
                     Twitch
                   </Button>
@@ -290,17 +294,19 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
                     variant={selectedPlatform === 'vk' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setSelectedPlatform('vk')}
+                    className={selectedPlatform === 'vk' ? '' : 'border-slate-700 bg-slate-900/70 hover:bg-slate-800'}
                   >
                     VK Live
                   </Button>
                 </>
               )}
-              <Button
-                onClick={() => handleOpenDialog()}
-                size="default"
-                className="gap-2"
-                disabled={partnerRequired}
-              >
+                <Button
+                  onClick={() => handleOpenDialog()}
+                  size="default"
+                  variant="outline"
+                  className="gap-2 border-slate-700 bg-slate-900/70 hover:bg-slate-800"
+                  disabled={partnerRequired}
+                >
                 <Plus className="w-4 h-4" />
                 Создать награду
               </Button>
@@ -314,13 +320,13 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
               <p className="text-sm text-muted-foreground">Загрузка наград...</p>
             </div>
           ) : partnerRequired ? (
-            <div className="text-center py-8 border-2 border-dashed rounded-lg bg-muted/30">
+            <div className="text-center py-8 border-2 border-dashed border-slate-800 rounded-lg bg-slate-950/50">
               <p className="text-sm font-medium mb-2 text-amber-600 dark:text-amber-400">
                 {selectedPlatform === 'twitch' ? 'Требуется статус партнёра или аффилиата' : 'Награды недоступны'}
               </p>
-              <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto">
+              <p className="text-xs text-muted-foreground mb-4 max-w-md mx-auto break-words">
                 {errorMessage || (selectedPlatform === 'twitch'
-                  ? 'Награды за баллы канала Twitch доступны только для партнёров и аффилейтов. Получите статус партнёра или аффилиата на Twitch, чтобы использовать эту функцию.'
+                  ? 'Награды Twitch доступны только партнёрам и аффилиатам.'
                   : 'Награды недоступны для этой платформы.')}
               </p>
               {selectedPlatform === 'twitch' && (
@@ -337,15 +343,15 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
               )}
             </div>
           ) : errorMessage && !partnerRequired ? (
-            <div className="text-center py-8 border-2 border-dashed rounded-lg">
+            <div className="text-center py-8 border-2 border-dashed border-slate-800 rounded-lg bg-slate-950/50">
               <p className="text-sm font-medium text-destructive mb-2">Ошибка загрузки</p>
-              <p className="text-xs text-muted-foreground mb-4">{errorMessage}</p>
+              <p className="text-xs text-muted-foreground mb-4 break-words">{errorMessage}</p>
               <Button onClick={() => refetch()} size="sm" variant="outline">
                 Повторить попытку
               </Button>
             </div>
           ) : rewards.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed rounded-lg">
+            <div className="text-center py-8 border-2 border-dashed border-slate-800 rounded-lg bg-slate-950/50">
               <p className="text-sm font-medium text-muted-foreground mb-2">Награды не созданы</p>
               <p className="text-xs text-muted-foreground mb-4">
                 Создайте награды за баллы, которые зрители смогут приобретать на {selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}
@@ -360,11 +366,11 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
               {rewards.map((reward) => (
                 <div
                   key={reward.id}
-                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-3 p-3 border border-slate-800 rounded-lg bg-slate-950/60 hover:bg-slate-900/80 transition-colors"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-medium">{reward.title}</h4>
+                      <h4 className="text-sm font-medium break-words">{reward.title}</h4>
                       {!reward.is_enabled && (
                         <Badge variant="outline" className="text-xs">Отключено</Badge>
                       )}
@@ -373,7 +379,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
                       </Badge>
                     </div>
                     {reward.description && (
-                      <p className="text-xs text-muted-foreground mt-1">{reward.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2 break-words">{reward.description}</p>
                     )}
                   </div>
                   <div className="flex gap-2">
@@ -412,7 +418,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
 
       {/* Диалог создания/редактирования */}
       <Dialog open={showDialog} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto border-slate-800 bg-slate-950/95 backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle>
               {editingReward ? 'Редактировать награду' : 'Создать награду'}
@@ -456,7 +462,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
             </div>
 
             {/* Требуется ввод от пользователя */}
-            <div className="flex items-center justify-between p-3 border rounded-lg">
+            <div className="flex items-center justify-between p-3 border border-slate-800 bg-slate-950/50 rounded-lg">
               <div>
                 <Label>Требуется ввод от пользователя</Label>
                 <p className="text-xs text-muted-foreground">
@@ -504,7 +510,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
                   />
                 </div>
 
-                <div className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center justify-between p-3 border border-slate-800 bg-slate-950/50 rounded-lg">
                   <div>
                     <Label>Автоматически выполнять (пропустить очередь)</Label>
                     <p className="text-xs text-muted-foreground">

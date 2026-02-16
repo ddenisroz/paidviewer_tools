@@ -393,6 +393,10 @@ tts_service/.env.*
 temp/
 tmp/
 cache/
+output/
+.playwright/
+.playwright-cli/
+playwright-report/
 bot_service/temp/
 bot_service/cache/
 tts_service/temp/
@@ -462,3 +466,8 @@ desktop.ini
 *.crt
 ssl/
 certs/
+
+# User dumps and large logs
+users_*.md
+collection_errors.txt
+lint_output.txt

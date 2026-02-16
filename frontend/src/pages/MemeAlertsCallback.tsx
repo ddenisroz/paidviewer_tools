@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { API_BASE_URL } from '@/constants';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Loader } from '@/shared/components/ui/loader';
 
 const MemeAlertsCallback = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState<string>('Подключаем MemeAlerts...');
+  const [message, setMessage] = useState<string>('РџРѕРґРєР»СЋС‡Р°РµРј MemeAlerts...');
 
   const params = useMemo(() => {
     const hash = window.location.hash?.replace(/^#/, '') || '';
@@ -20,7 +20,7 @@ const MemeAlertsCallback = () => {
 
     if (!accessToken) {
       setStatus('error');
-      setMessage('Токен не найден. Запустите закладку на странице MemeAlerts.');
+      setMessage('РўРѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ. РџРѕРІС‚РѕСЂРёС‚Рµ РїРѕРґРєР»СЋС‡РµРЅРёРµ РёР· СЂР°Р·РґРµР»Р° MemeAlerts.');
       return;
     }
 
@@ -38,18 +38,18 @@ const MemeAlertsCallback = () => {
 
         const data = await response.json();
         if (!response.ok || !data?.success) {
-          throw new Error(data?.error || 'Не удалось подключить MemeAlerts');
+          throw new Error(data?.error || 'РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРєР»СЋС‡РёС‚СЊ MemeAlerts');
         }
 
         setStatus('success');
-        setMessage('MemeAlerts подключен. Можно возвращаться в панель.');
+        setMessage('MemeAlerts РїРѕРґРєР»СЋС‡С‘РЅ. РњРѕР¶РЅРѕ РІРѕР·РІСЂР°С‰Р°С‚СЊСЃСЏ РІ РїР°РЅРµР»СЊ.');
 
         const newUrl = `${window.location.origin}${window.location.pathname}`;
         window.history.replaceState({}, '', newUrl);
       } catch (error) {
         const err = error as Error;
         setStatus('error');
-        setMessage(err.message || 'Ошибка подключения MemeAlerts');
+        setMessage(err.message || 'РћС€РёР±РєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ MemeAlerts');
       }
     };
 
@@ -75,7 +75,7 @@ const MemeAlertsCallback = () => {
             variant="outline"
             onClick={() => (window.location.href = '/dashboard/media?tab=memealerts')}
           >
-            Вернуться в панель
+            Р’РµСЂРЅСѓС‚СЊСЃСЏ РІ РїР°РЅРµР»СЊ
           </Button>
         </CardContent>
       </Card>

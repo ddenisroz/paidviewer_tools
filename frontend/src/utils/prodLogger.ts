@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 // src/utils/prodLogger.ts
 /**
  * Production-safe logger that only logs in development mode.

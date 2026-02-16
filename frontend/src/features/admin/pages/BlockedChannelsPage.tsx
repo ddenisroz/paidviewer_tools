@@ -10,7 +10,6 @@ import { Input } from '@/shared/components/ui/input';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
-
 import type { ApiResponse } from '../../../types';
 
 interface BlockedChannel {
@@ -20,6 +19,9 @@ interface BlockedChannel {
   reason?: string;
   blocked_at?: string;
 }
+
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
+const ACTION_BUTTON_CLASS = 'h-9 border-border/70 hover:bg-muted/60 shadow-none';
 
 const BlockedChannelsPage: React.FC = () => {
   const [blockedChannels, setBlockedChannels] = useState<BlockedChannel[]>([]);
@@ -36,7 +38,7 @@ const BlockedChannelsPage: React.FC = () => {
       setBlockedChannels(data.data?.blocked_channels || []);
     } catch (error) {
       logger.error('Error loading blocked channels:', error);
-      toast.error('������ �������� ��������������� �������');
+      toast.error('Ошибка загрузки заблокированных каналов');
     } finally {
       setLoading(false);
     }
@@ -44,7 +46,7 @@ const BlockedChannelsPage: React.FC = () => {
 
   const addBlockedChannel = async (): Promise<void> => {
     if (!newChannel.trim()) {
-      toast.error('������� �������� ������');
+      toast.error('Введите название канала');
       return;
     }
 
@@ -52,15 +54,15 @@ const BlockedChannelsPage: React.FC = () => {
       setAddingChannel(true);
       await adminService.blockChannel({
         channel_name: newChannel.trim(),
-        reason: '������������� ���������������'
+        reason: 'Ручная блокировка'
       });
-      
-      toast.success('����� ������������');
+
+      toast.success('Канал заблокирован');
       setNewChannel('');
       await loadBlockedChannels();
     } catch (error) {
       logger.error('Error adding blocked channel:', error);
-      toast.error('������ ���������� ������');
+      toast.error('Ошибка добавления канала');
     } finally {
       setAddingChannel(false);
     }
@@ -69,11 +71,11 @@ const BlockedChannelsPage: React.FC = () => {
   const removeBlockedChannel = async (channelId: number): Promise<void> => {
     try {
       await adminService.unblockChannel(channelId);
-      toast.success('����� �������������');
+      toast.success('Канал разблокирован');
       await loadBlockedChannels();
     } catch (error) {
       logger.error('Error removing blocked channel:', error);
-      toast.error('������ ������������� ������');
+      toast.error('Ошибка разблокировки канала');
     }
   };
 
@@ -85,10 +87,10 @@ const BlockedChannelsPage: React.FC = () => {
     return (
       <div className="container mx-auto p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+          <div className="h-8 w-1/3 rounded bg-muted/60" />
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+              <div key={i} className="h-16 rounded bg-muted/50" />
             ))}
           </div>
         </div>
@@ -97,64 +99,73 @@ const BlockedChannelsPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2 text-foreground flex items-center">
-            <Shield className="w-8 h-8 mr-3 text-red-500" />
-            ��������������� ������
+    <div className="container mx-auto space-y-6 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="mb-2 flex items-center text-2xl font-semibold text-foreground">
+            <Shield className="mr-2 h-6 w-6 text-primary" />
+            Блокировка каналов
           </h1>
-          <div className="text-muted-foreground mt-2 space-y-1">
-            <p>[PIN] <strong>����������:</strong> ���������� ���� �� �������, ��� �� ������� ��� �� �����</p>
-            <p>[WARN] ��� ������������� ������� ��������������� ����� � ������ �� �����������</p>
+          <div className="mt-1 space-y-1 text-sm text-muted-foreground">
+            <p>Подсказка: блокируйте канал, если он нарушает правила платформы.</p>
+            <p>После блокировки канал не сможет использовать интеграцию в системе.</p>
           </div>
         </div>
-        
-        <Badge variant="secondary" className="text-lg px-4 py-2">
-          {blockedChannels.length} �������������
+
+        <Badge variant="secondary" className="px-3 py-1.5 text-sm">
+          {blockedChannels.length} заблокировано
         </Badge>
       </div>
 
-      <Card>
+      <Card className={SURFACE_CARD_CLASS}>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>������ ��������������� �������</CardTitle>
-            <Button onClick={() => setShowAddForm(!showAddForm)} variant="outline" size="sm">
-              {showAddForm ? <AlertCircle className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-              {showAddForm ? '������' : '�������� �����'}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>Список заблокированных каналов</CardTitle>
+            <Button
+              onClick={() => setShowAddForm(!showAddForm)}
+              variant="outline"
+              size="sm"
+              className={ACTION_BUTTON_CLASS}
+            >
+              {showAddForm ? <AlertCircle className="mr-2 h-4 w-4" /> : <Plus className="mr-2 h-4 w-4" />}
+              {showAddForm ? 'Скрыть' : 'Добавить канал'}
             </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {showAddForm && (
-            <div className="p-4 border rounded-lg bg-muted/30">
-              <div className="flex gap-2">
+            <div className="rounded-lg border border-border/70 bg-card/60 p-4">
+              <div className="flex flex-wrap gap-2">
                 <Input
-                  placeholder="�������� ������ (��������: username)"
+                  placeholder="Введите канал (например: username)"
                   value={newChannel}
                   onChange={(e) => setNewChannel(e.target.value)}
-                  onKeyPress={(e) => {
+                  className="h-9 min-w-[220px] flex-1 border-border/70 bg-card/60"
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
-                      addBlockedChannel();
+                      void addBlockedChannel();
                     }
                   }}
                 />
-                <Button onClick={addBlockedChannel} disabled={addingChannel || !newChannel.trim()}>
-                  {addingChannel ? '����������...' : '��������'}
+                <Button className="h-9" onClick={() => void addBlockedChannel()} disabled={addingChannel || !newChannel.trim()}>
+                  {addingChannel ? 'Добавляем...' : 'Добавить'}
                 </Button>
               </div>
             </div>
           )}
 
           {blockedChannels.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>��� ��������������� �������</p>
+            <div className="py-8 text-center text-muted-foreground">
+              <Shield className="mx-auto mb-4 h-12 w-12 opacity-50" />
+              <p>Нет заблокированных каналов</p>
             </div>
           ) : (
             <div className="space-y-2">
               {blockedChannels.map((channel) => (
-                <div key={channel.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/30">
+                <div
+                  key={channel.id}
+                  className="flex items-center justify-between rounded-lg border border-border/70 bg-card/60 p-4 transition-colors hover:bg-card/80"
+                >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{channel.channel_name}</span>
@@ -163,21 +174,21 @@ const BlockedChannelsPage: React.FC = () => {
                       )}
                     </div>
                     {channel.reason && (
-                      <p className="text-sm text-muted-foreground mt-1">{channel.reason}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{channel.reason}</p>
                     )}
                     {channel.blocked_at && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        ������������: {new Date(channel.blocked_at).toLocaleString()}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Заблокирован: {new Date(channel.blocked_at).toLocaleString()}
                       </p>
                     )}
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeBlockedChannel(channel.id)}
-                    className="text-red-500 hover:text-red-600"
+                    onClick={() => void removeBlockedChannel(channel.id)}
+                    className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
@@ -190,6 +201,3 @@ const BlockedChannelsPage: React.FC = () => {
 };
 
 export default BlockedChannelsPage;
-
-
-

@@ -5,6 +5,7 @@ VK Live HTTP Polling клиент для получения сообщений �
 import asyncio
 import aiohttp
 import logging
+import time
 from typing import Optional, Callable, Dict, Set
 
 from utils.vk_channel_url import extract_vk_channel_slug
@@ -20,15 +21,24 @@ class VKLiveHTTPPolling:
     # Default to dev API per VK docs.
     API_BASE_URL = DEV_API_BASE_URL
 
-    def __init__(self, access_token: str, channel_url: str, user_id: Optional[int] = None):
+    def __init__(
+        self,
+        access_token: str,
+        channel_url: str,
+        user_id: Optional[int] = None,
+        token_refresh_mode: str = "user",
+    ):
         """
         Args:
-            access_token: OAuth токен пользователя VK Live
+            access_token: VK Live access token
             channel_url: URL канала (например, "yourchy")
+            user_id: owner user id for user-token refresh mode
+            token_refresh_mode: "user" (default) or "bot"
         """
         self.access_token = access_token
         self.channel_url = channel_url
         self.user_id = user_id
+        self.token_refresh_mode = token_refresh_mode
         self.is_running = False
         self.poll_task = None
         self.message_handler: Optional[Callable] = None
@@ -38,6 +48,9 @@ class VKLiveHTTPPolling:
         self.max_errors: int = 10  # Максимум ошибок перед увеличением интервала
         # Use instance-level API base to allow safe fallback.
         self.api_base_url = self.API_BASE_URL
+        self.refresh_cooldown_seconds: int = 15
+        self._last_refresh_attempt_monotonic: float = 0.0
+        self._last_chat_404_notice_monotonic: float = 0.0
 
     def _format_channel_url(self, channel_url: str) -> str:
         if not channel_url:
@@ -130,10 +143,15 @@ class VKLiveHTTPPolling:
                 "Authorization": f"Bearer {self.access_token}",
                 "Content-Type": "application/json"
             }
-            params = {
-                "channel_url": self._format_chat_channel(self.channel_url),
-                "limit": 20  # Получаем последние 20 сообщений
-            }
+
+            # VK API может требовать либо slug, либо полный URL канала.
+            channel_candidates = []
+            for candidate in [
+                self._format_chat_channel(self.channel_url),
+                self._format_channel_url(self.channel_url),
+            ]:
+                if candidate and candidate not in channel_candidates:
+                    channel_candidates.append(candidate)
 
             # Timeout: 10 секунд на соединение, 30 секунд на чтение
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
@@ -142,36 +160,86 @@ class VKLiveHTTPPolling:
                 connector=self._get_connector(),
                 timeout=timeout
             ) as session:
-                async with session.get(url, headers=headers, params=params) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        messages = data.get("data", {}).get("chat_messages", [])
+                last_404_error = None
 
-                        # Обрабатываем сообщения в обратном порядке (от старых к новым)
-                        for message in reversed(messages):
-                            await self._process_message(message)
+                for channel_candidate in channel_candidates:
+                    params = {
+                        "channel_url": channel_candidate,
+                        "limit": 20  # Получаем последние 20 сообщений
+                    }
 
-                    elif response.status == 401:
-                        logger.warning("[REFRESH] VK Live OAuth token expired, attempting refresh")
-                        if await self._refresh_access_token():
-                            await self._fetch_and_process_messages(retry=True)
+                    async with session.get(url, headers=headers, params=params) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            messages = data.get("data", {}).get("chat_messages", [])
+
+                            # Обрабатываем сообщения в обратном порядке (от старых к новым)
+                            for message in reversed(messages):
+                                await self._process_message(message)
                             return
-                    elif response.status == 403:
-                        logger.error(f"[ERROR] Forbidden: No access to channel {self.channel_url}")
-                    else:
+
+                        if response.status == 401:
+                            error_text = await response.text()
+                            if not retry and self.api_base_url != self.PROD_API_BASE_URL:
+                                logger.warning(
+                                    "[VK HTTP] Unauthorized on dev API for %s, switching to prod before refresh. error=%s",
+                                    self.channel_url,
+                                    error_text,
+                                )
+                                self.api_base_url = self.PROD_API_BASE_URL
+                                await self._fetch_and_process_messages(retry=True)
+                                return
+
+                            logger.warning(
+                                "[REFRESH] VK Live access token rejected (401), attempting refresh. channel=%s error=%s",
+                                self.channel_url,
+                                error_text,
+                            )
+                            if await self._refresh_access_token():
+                                await self._fetch_and_process_messages(retry=True)
+                                return
+                            raise RuntimeError("VK Live OAuth token refresh failed after 401")
+
+                        if response.status == 403:
+                            raise RuntimeError(f"Forbidden: no access to VK channel {self.channel_url}")
+
                         error_text = await response.text()
-                        # VK dev API may not support chat messages; fallback to prod once.
-                        if (
-                            response.status == 404
-                            and "unknown_api_method" in error_text
-                            and not retry
-                            and self.api_base_url != self.PROD_API_BASE_URL
-                        ):
-                            logger.warning("[VK HTTP] Chat messages not available on dev API, switching to prod.")
-                            self.api_base_url = self.PROD_API_BASE_URL
-                            await self._fetch_and_process_messages(retry=True)
-                            return
-                        logger.error(f"[ERROR] Error fetching messages: {response.status} - {error_text}")
+                        if response.status == 404:
+                            # Попробуем следующий формат channel_url.
+                            last_404_error = (
+                                f"VK messages request failed: status=404 channel={self.channel_url} "
+                                f"candidate={channel_candidate} error={error_text}"
+                            )
+                            continue
+
+                        raise RuntimeError(
+                            f"VK messages request failed: status={response.status} channel={self.channel_url} "
+                            f"candidate={channel_candidate} error={error_text}"
+                        )
+
+                # Все candidates отдали 404 на dev API -> fallback на prod (один раз).
+                if not retry and self.api_base_url != self.PROD_API_BASE_URL and last_404_error:
+                    logger.warning(
+                        "[VK HTTP] Chat messages returned 404 on dev API for %s, switching to prod.",
+                        self.channel_url,
+                    )
+                    self.api_base_url = self.PROD_API_BASE_URL
+                    await self._fetch_and_process_messages(retry=True)
+                    return
+
+                if last_404_error:
+                    # For chat polling, VK may return 404 when chat endpoint is temporarily unavailable
+                    # (e.g. stream is offline or chat not initialized yet). Do not break the polling loop.
+                    now_monotonic = time.monotonic()
+                    if now_monotonic - self._last_chat_404_notice_monotonic >= 60:
+                        logger.warning(
+                            "[VK HTTP] Chat messages unavailable (404) for %s. "
+                            "Polling will continue with backoff.",
+                            self.channel_url,
+                        )
+                        self._last_chat_404_notice_monotonic = now_monotonic
+                    return
+                raise RuntimeError(f"VK messages request failed: no valid channel candidates for {self.channel_url}")
 
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             if not retry and self.api_base_url != self.PROD_API_BASE_URL:
@@ -179,14 +247,39 @@ class VKLiveHTTPPolling:
                 self.api_base_url = self.PROD_API_BASE_URL
                 await self._fetch_and_process_messages(retry=True)
                 return
-            logger.error(f"Error fetching VK Live messages: {e}")
-        except Exception as e:
-            logger.error(f"Error fetching VK Live messages: {e}")
+            raise
 
     async def _refresh_access_token(self) -> bool:
-        if not self.user_id:
-            return False
         try:
+            now_monotonic = time.monotonic()
+            if now_monotonic - self._last_refresh_attempt_monotonic < self.refresh_cooldown_seconds:
+                logger.warning(
+                    "[REFRESH] VK token refresh skipped by cooldown (%ss)",
+                    self.refresh_cooldown_seconds,
+                )
+                return False
+
+            self._last_refresh_attempt_monotonic = now_monotonic
+
+            if self.token_refresh_mode == "bot":
+                from services.vk_bot_oauth_service import vk_bot_oauth_service
+
+                refreshed = await vk_bot_oauth_service.refresh_bot_token()
+                if not refreshed:
+                    return False
+
+                latest_token = await vk_bot_oauth_service.get_bot_token()
+                latest_access_token = latest_token.get("access_token") if latest_token else None
+                if not latest_access_token:
+                    return False
+
+                self.access_token = latest_access_token
+                logger.info("[REFRESH] VK bot OAuth token refreshed for polling")
+                return True
+
+            if self.token_refresh_mode != "user" or not self.user_id:
+                return False
+
             from services.token_refresh_service import token_refresh_service
             from repositories.user_token_repository import UserTokenRepository
             from core.database import get_db
@@ -196,7 +289,8 @@ class VKLiveHTTPPolling:
             if not refreshed:
                 return False
 
-            for db in get_db():
+            db = next(get_db())
+            try:
                 repo = UserTokenRepository(db)
                 token = repo.get_by_user_and_platform(self.user_id, 'vk')
                 if not token or not token.access_token:
@@ -206,7 +300,8 @@ class VKLiveHTTPPolling:
                     access_token = decrypt_token(access_token)
                 self.access_token = access_token
                 return True
-            return False
+            finally:
+                db.close()
         except Exception as e:
             logger.error(f"[REFRESH] Failed to refresh VK token: {e}")
             return False

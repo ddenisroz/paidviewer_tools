@@ -19,10 +19,7 @@ import { StreamCategoryDropdown } from './StreamCategoryDropdown';
 
 import type { StreamCategory } from '@/types/stream';
 
-interface StreamCategoryCardProps {
-}
-
-const StreamCategoryCard: React.FC<StreamCategoryCardProps> = () => {
+const StreamCategoryCard: React.FC = () => {
     const { integrations } = useIntegrations();
     const { initialData, currentData, setCurrentData, saveChanges, status, categories, searchCategories } = useData();
     const { getCombineSettings, updateSetting } = useUserSettings();

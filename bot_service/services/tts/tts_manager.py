@@ -10,6 +10,7 @@ TTS Manager РґР»СЏ bot_service
 import logging
 import aiohttp
 import asyncio
+import re
 from typing import Optional, Dict
 from pathlib import Path
 import time
@@ -24,9 +25,35 @@ from constants import (
 )
 
 from services.tts.basic_tts import get_basic_tts
-from services.tts.google_cloud_tts import get_google_cloud_tts
+from services.tts.google_cloud_tts import (
+    get_google_cloud_tts,
+    is_gemini_or_chirp_voice,
+    normalize_gcloud_mood,
+)
 
 logger = logging.getLogger(__name__)
+_GEMINI_SPEAKER_PATTERN = re.compile(r"^[A-Z][A-Za-z0-9_]{1,63}$")
+
+
+def _gcloud_voice_quality_rank(voice_name: Optional[str]) -> int:
+    key = (voice_name or "").lower()
+    if _GEMINI_SPEAKER_PATTERN.match(voice_name or ""):
+        return 0
+    if "gemini" in key:
+        return 0
+    if "chirp3-hd" in key:
+        return 1
+    if "neural2" in key:
+        return 2
+    if "wavenet" in key:
+        return 3
+    if "studio" in key:
+        return 4
+    if "journey" in key:
+        return 5
+    if "standard" in key:
+        return 9
+    return 6
 
 
 class TTSManager:
@@ -442,16 +469,54 @@ class TTSManager:
             voice_pool = []
             if tts_settings:
                 voice_pool = tts_settings.get("gcloud_voices") or tts_settings.get("gcloudVoices") or []
-            voice_name = random.choice(voice_pool) if voice_pool else (tts_settings.get("voice") if tts_settings else None)
+            cleaned_voice_pool = [
+                str(voice).strip()
+                for voice in voice_pool
+                if isinstance(voice, str) and str(voice).strip()
+            ]
+            filtered_voice_pool = [
+                voice
+                for voice in cleaned_voice_pool
+                if is_gemini_or_chirp_voice(voice)
+            ]
+
+            if cleaned_voice_pool and not filtered_voice_pool:
+                logger.warning(
+                    "[WARN] All saved Google voices are legacy/non-premium. Keeping only Gemini/Chirp is now required."
+                )
+
+            gemini_voice_pool = [
+                voice for voice in filtered_voice_pool if _gcloud_voice_quality_rank(voice) == 0
+            ]
+            # Prefer pure Gemini output whenever at least one Gemini voice is selected.
+            random_pool = gemini_voice_pool or filtered_voice_pool
+            fallback_voice = (tts_settings.get("voice") if tts_settings else None)
+            if fallback_voice and not is_gemini_or_chirp_voice(fallback_voice):
+                fallback_voice = None
+
+            voice_name = random.choice(random_pool) if random_pool else fallback_voice
+            gcloud_mood = normalize_gcloud_mood(
+                (tts_settings or {}).get("gcloud_mood")
+                or (tts_settings or {}).get("gcloudMood")
+            )
+
             result = await self.google_cloud_tts.synthesize_speech(
                 text=text,
                 volume_level=volume_level,
                 speed=1.0,
-                voice_name=voice_name
+                voice_name=voice_name,
+                mood=gcloud_mood,
             )
 
             if not result.get("success"):
                 return result
+
+            if result.get("fallback_used"):
+                logger.warning(
+                    "[WARN] Google Cloud runtime fallback: requested_model=%s resolved_voice=%s",
+                    result.get("requested_model") or "-",
+                    result.get("voice") or "-",
+                )
 
             audio_path = result.get("audio_path")
             if not audio_path:
@@ -466,7 +531,10 @@ class TTSManager:
                 "volume": volume_level,
                 "tts_type": "google_cloud",
                 "audio_url": audio_url,
-                "audio_path": audio_path
+                "audio_path": audio_path,
+                "auth_mode": result.get("auth_mode"),
+                "requested_model": result.get("requested_model"),
+                "fallback_used": bool(result.get("fallback_used")),
             }
 
         except Exception as e:

@@ -1,4 +1,5 @@
 ﻿// src/components/tts/TtsFilterManager.tsx
+/* eslint-disable no-alert */
 import React, { useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -47,7 +48,6 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
 
     // Состояния для словаря фильтра
     const [newWord, setNewWord] = useState('');
-    const [selectedWordPlatform, setSelectedWordPlatform] = useState<string>('all');
 
     // React Query hooks для черного списка
     const { data: blockedUsersData, isLoading: loadingUsers } = useBlockedUsers({
@@ -137,34 +137,6 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
         if (platform === 'twitch') return user?.twitch_username || '';
         if (platform === 'vk') return user?.vk_username || user?.vk_channel_name || '';
         return '';
-    };
-
-    // Получаем иконку для платформы
-    const getPlatformIcon = (platform: string): string => {
-        if (platform === 'twitch') return '[TW]';
-        if (platform === 'vk') return '[VK]';
-        if (platform === 'all') return '[WEB]';
-        return '';
-    };
-
-    // Получение цвета для платформы
-    const getPlatformColor = (platform: string): string => {
-        switch (platform) {
-            case 'twitch': return 'bg-purple-600';
-            case 'vk': return 'bg-rose-600';
-            case 'all': return 'bg-gray-600';
-            default: return 'bg-gray-600';
-        }
-    };
-
-    // Получение лейбла для платформы
-    const getPlatformLabel = (platform: string): string => {
-        switch (platform) {
-            case 'twitch': return 'Twitch';
-            case 'vk': return 'VK Live';
-            case 'all': return 'Все';
-            default: return 'Неизвестно';
-        }
     };
 
     // ========== ЧЕРНЫЙ СПИСОК ==========

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { Eye, EyeOff, Image as ImageIcon, MessageSquare, Settings } from 'lucide-react';
+import { Eye, EyeOff, Image as ImageIcon, Settings } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';

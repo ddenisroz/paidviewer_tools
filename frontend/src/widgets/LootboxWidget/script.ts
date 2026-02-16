@@ -1,6 +1,7 @@
 ﻿import { logger } from '@/shared/utils/prodLogger';
 
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | string;
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 
 interface LootboxConfig {
   width: number;

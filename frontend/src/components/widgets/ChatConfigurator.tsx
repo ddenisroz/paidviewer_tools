@@ -1,4 +1,5 @@
 ﻿// src/components/widgets/ChatConfigurator.tsx
+/* eslint-disable no-alert */
 import React, { useState } from 'react';
 
 import { chatboxService } from '@/services/api/services/chatboxService';
@@ -311,7 +312,6 @@ const ChatConfigurator: React.FC = () => {
                                                             id="platform-vk"
                                                             checked={config.platforms.vk}
                                                             onCheckedChange={(checked) => updateNestedConfig('platforms', 'vk', checked)}
-                                                            className="data-[state=checked]:bg-none data-[state=checked]:bg-[#FF4444] data-[state=checked]:border-[#FF4444] data-[state=checked]:from-transparent data-[state=checked]:to-transparent"
                                                         />
                                                         <Label htmlFor="platform-vk">VK Live</Label>
                                                     </div>

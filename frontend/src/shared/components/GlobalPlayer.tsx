@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shar
 import { toast } from '@/utils/toastManager';
 
 import { MiniPlayerUI, useGlobalPlayer } from './player';
+
 import type { DisplayVideo } from './player';
 
 /**
@@ -26,7 +27,6 @@ const GlobalPlayer: React.FC = () => {
     const {
         currentVideo,
         isPlaying,
-        userPaused,
         volume,
         isMuted,
         isVisible,
@@ -48,7 +48,6 @@ const GlobalPlayer: React.FC = () => {
     } = usePlayer();
 
     const [showQueue, setShowQueue] = useState(false);
-    const [playerReady, setPlayerReady] = useState(false);
     const [miniPlayerContainer, setMiniPlayerContainer] = useState<HTMLElement | null>(null);
     const [playerRoot] = useState<HTMLDivElement | null>(() => {
         if (typeof document === 'undefined') return null;
@@ -133,7 +132,7 @@ const GlobalPlayer: React.FC = () => {
             await youtubeService.clearQueue();
             toast.success('Очередь очищена');
             loadQueue(true);
-        } catch (error) {
+        } catch {
             toast.error('Не удалось очистить очередь');
         }
     };
@@ -147,8 +146,14 @@ const GlobalPlayer: React.FC = () => {
             await youtubeService.playQueueItem(Number(video.id));
             loadQueue(true);
             setShowQueue(false);
-        } catch (error) {
-            toast.error('\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0432\u0438\u0434\u0435\u043e');
+        } catch {
+            toast.error('Не удалось переключить видео');
+        }
+    };
+
+    const handlePlayerSurfaceInteract = (): void => {
+        if (typeof window !== 'undefined') {
+            window.ytUserStarted = true;
         }
     };
 
@@ -164,10 +169,12 @@ const GlobalPlayer: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ReactPlayerAny = ReactPlayer as any;
 
-    const shouldInterceptClicks = isOnYoutubePage && playerReady && !isPlaying;
-
     const reactPlayerComponent = hasVideo ? (
-        <div className="relative w-full h-full">
+        <div
+            className="relative w-full h-full"
+            data-player-container="overlay"
+            onPointerDownCapture={handlePlayerSurfaceInteract}
+        >
             <ReactPlayerAny
                 ref={playerRef}
                 src={youtubeUrl}
@@ -180,43 +187,25 @@ const GlobalPlayer: React.FC = () => {
                 pip={false}
                 stopOnUnmount={false}
                 onReady={() => {
-                    setPlayerReady(true);
                     handleReady();
                 }}
                 onPlay={handlePlay}
+                onPlaying={handlePlay}
                 onPause={handlePause}
                 onEnded={handleEnded}
                 onError={handleError}
                 config={{
                     youtube: {
-                        playerVars: {
-                            autoplay: 0,
-                            modestbranding: 1,
-                            rel: 0,
-                            iv_load_policy: 3,
-                            cc_load_policy: 0,
-                            hl: 'ru',
-                            origin: window.location.origin
-                        }
+                        enablejsapi: 1,
+                        rel: 0,
+                        iv_load_policy: 3,
+                        cc_load_policy: 0,
+                        hl: 'ru',
+                        origin: window.location.origin
                     }
                 }}
             />
-            {shouldInterceptClicks && (
-                <>
-                    <button
-                        type="button"
-                        aria-label={isPlaying ? "Пауза" : "Плей"}
-                        onClick={togglePlayPause}
-                        className="absolute left-0 right-0 top-0 bottom-[clamp(40px,8%,64px)] cursor-pointer z-10"
-                        style={{ background: 'transparent' }}
-                    />
-                    {userPaused && !isPlaying && (
-                        <div className="absolute top-2 left-2 z-10 pointer-events-none rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/90">
-                            Пауза
-                        </div>
-                    )}
-                </>
-            )}
+            
         </div>
     ) : null;
 
@@ -254,7 +243,7 @@ const GlobalPlayer: React.FC = () => {
             playerRoot.style.height = `${rect.height}px`;
             playerRoot.style.borderRadius = isTheaterMode ? '0px' : (computed.borderRadius || '0px');
             playerRoot.style.overflow = 'hidden';
-            playerRoot.style.pointerEvents = isOnYoutubePage ? 'auto' : 'none';
+            playerRoot.style.pointerEvents = 'auto';
             playerRoot.style.zIndex = isTheaterMode ? '10000' : '40';
             playerRoot.style.opacity = '1';
             playerRoot.style.backgroundColor = isTheaterMode ? 'black' : 'transparent';
@@ -281,9 +270,11 @@ const GlobalPlayer: React.FC = () => {
         };
     }, [playerRoot]);
 
-    if (!hasVideo) {
+    if (!hasVideo || !displayVideo) {
         return null;
     }
+
+    const activeDisplayVideo = displayVideo;
 
     return (
         <>
@@ -294,7 +285,7 @@ const GlobalPlayer: React.FC = () => {
             {showMiniUI && (miniPlayerContainer
                 ? createPortal(
                     <MiniPlayerUI
-                        displayVideo={displayVideo}
+                        displayVideo={activeDisplayVideo}
                         displayThumbnail={displayThumbnail}
                         isPlaying={isPlaying}
                         isMuted={isMuted}
@@ -315,7 +306,7 @@ const GlobalPlayer: React.FC = () => {
                 )
                 : (
                     <MiniPlayerUI
-                        displayVideo={displayVideo}
+                        displayVideo={activeDisplayVideo}
                         displayThumbnail={displayThumbnail}
                         isPlaying={isPlaying}
                         isMuted={isMuted}
@@ -353,7 +344,7 @@ const GlobalPlayer: React.FC = () => {
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent side="right">
-                                <p className="text-xs max-w-[200px] truncate">{displayVideo.title}</p>
+                                <p className="text-xs max-w-[200px] truncate">{activeDisplayVideo.title}</p>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>
@@ -364,4 +355,3 @@ const GlobalPlayer: React.FC = () => {
 };
 
 export default GlobalPlayer;
-

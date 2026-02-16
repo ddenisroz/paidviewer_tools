@@ -69,11 +69,14 @@ interface LogItemProps {
   getStatusBg: (status: string) => string;
 }
 
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
+const ACTION_BUTTON_CLASS = 'h-9 border-border/70 hover:bg-muted/60 shadow-none';
+
 const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getStatusBg }) => {
   const [expanded, setExpanded] = useState<boolean>(false);
 
   return (
-    <div className="border border-slate-700 rounded-lg p-4 hover:bg-slate-700/30 transition-all">
+    <div className="rounded-lg border border-border/70 bg-card/60 p-4 transition-colors hover:bg-card/80">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           <div className="mt-1 flex-shrink-0">{getStatusIcon(log.status)}</div>
@@ -82,12 +85,12 @@ const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getSt
               <Badge variant="outline" className="text-xs">
                 {log.action_type?.replace(/_/g, ' ') || 'Неизвестно'}
               </Badge>
-              <span className="font-semibold text-white text-sm">
+              <span className="text-sm font-semibold text-foreground">
                 {log.description || 'Операция'}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-400">
+            <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground md:grid-cols-2">
               <div className="flex items-center gap-1">
                 <User className="w-3 h-3" />
                 <span className="truncate">Админ: {log.admin_name || 'Неизвестно'}</span>
@@ -110,39 +113,39 @@ const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getSt
                   variant="ghost"
                   size="sm"
                   onClick={() => setExpanded(!expanded)}
-                  className="h-6 px-2 text-xs text-slate-400 hover:text-slate-200"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                 >
                   {expanded ? 'Скрыть детали' : 'Показать детали'} {expanded ? '▲' : '▼'}
                 </Button>
                 {expanded && (
-                  <div className="mt-2 p-3 bg-slate-900/50 rounded text-xs space-y-2 border border-slate-700">
+                  <div className="mt-2 space-y-2 rounded border border-border/70 bg-card/75 p-3 text-xs">
                     {log.error_message && (
-                      <div className="text-red-400">
+                      <div className="text-destructive">
                         <span className="font-semibold">Ошибка:</span> {log.error_message}
                       </div>
                     )}
                     {log.user_agent && (
-                      <div className="text-slate-400 truncate">
+                      <div className="truncate text-muted-foreground">
                         <span className="font-semibold">User-Agent:</span> {log.user_agent}
                       </div>
                     )}
                     {log.target_resource && (
-                      <div className="text-slate-300">
+                      <div className="text-foreground/85">
                         <span className="font-semibold">Ресурс:</span> {log.target_resource}
                       </div>
                     )}
                     {log.old_value && (
                       <div>
-                        <span className="font-semibold text-yellow-400">Было:</span>
-                        <pre className="mt-1 p-2 bg-slate-800 rounded text-xs overflow-x-auto">
+                        <span className="font-semibold text-amber-300">Было:</span>
+                        <pre className="mt-1 overflow-x-auto rounded border border-border/60 bg-card/80 p-2 text-xs">
                           {JSON.stringify(log.old_value, null, 2)}
                         </pre>
                       </div>
                     )}
                     {log.new_value && (
                       <div>
-                        <span className="font-semibold text-green-400">Стало:</span>
-                        <pre className="mt-1 p-2 bg-slate-800 rounded text-xs overflow-x-auto">
+                        <span className="font-semibold text-emerald-300">Стало:</span>
+                        <pre className="mt-1 overflow-x-auto rounded border border-border/60 bg-card/80 p-2 text-xs">
                           {JSON.stringify(log.new_value, null, 2)}
                         </pre>
                       </div>
@@ -150,7 +153,7 @@ const LogItem: React.FC<LogItemProps> = ({ log, formatTime, getStatusIcon, getSt
                     {log.details && (
                       <div>
                         <span className="font-semibold">Дополнительно:</span>
-                        <pre className="mt-1 p-2 bg-slate-800 rounded text-xs overflow-x-auto">
+                        <pre className="mt-1 overflow-x-auto rounded border border-border/60 bg-card/80 p-2 text-xs">
                           {JSON.stringify(log.details, null, 2)}
                         </pre>
                       </div>
@@ -185,7 +188,7 @@ const SystemLogsPage: React.FC = () => {
   const [pagination, setPagination] = useState<Pagination>({ limit: 50, offset: 0, pages: 0, total: 0 });
   const [daysRange, setDaysRange] = useState<number>(30);
 
-  const loadLogs = async (actionType: string | null = null, status: string | null = null): Promise<void> => {
+  const loadLogs = React.useCallback(async (actionType: string | null = null, status: string | null = null): Promise<void> => {
     try {
       setLoading(true);
       const response = await adminService.getAdminLogs({
@@ -208,9 +211,9 @@ const SystemLogsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.limit, pagination.offset, daysRange]);
 
-  const loadStats = async (): Promise<void> => {
+  const loadStats = React.useCallback(async (): Promise<void> => {
     try {
       const response = await adminService.getLogsStats(daysRange);
       const apiData = response.data as StatsApiResponse;
@@ -220,9 +223,9 @@ const SystemLogsPage: React.FC = () => {
     } catch (error) {
       logger.error('Error loading stats:', error);
     }
-  };
+  }, [daysRange]);
 
-  const loadAvailableActions = async (): Promise<void> => {
+  const loadAvailableActions = React.useCallback(async (): Promise<void> => {
     try {
       const response = await adminService.getLogsActions();
       const apiData = response.data as ActionsApiResponse;
@@ -232,16 +235,16 @@ const SystemLogsPage: React.FC = () => {
     } catch (error) {
       logger.error('Error loading actions:', error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadAvailableActions();
-  }, []);
+  }, [loadAvailableActions]);
 
   useEffect(() => {
     loadLogs(selectedActionType, selectedStatus);
     loadStats();
-  }, [daysRange, pagination.offset, selectedActionType, selectedStatus]);
+  }, [selectedActionType, selectedStatus, loadLogs, loadStats]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -250,31 +253,31 @@ const SystemLogsPage: React.FC = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [selectedActionType, selectedStatus]);
+  }, [selectedActionType, selectedStatus, loadLogs, loadStats]);
 
   const getStatusIcon = (status: string): React.ReactNode => {
     switch (status) {
       case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-emerald-400" />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-destructive" />;
       case 'warning':
-        return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+        return <AlertCircle className="h-4 w-4 text-amber-400" />;
       default:
-        return <Clock className="w-4 h-4 text-slate-400" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getStatusBg = (status: string): string => {
     switch (status) {
       case 'success':
-        return 'bg-green-500/10 text-green-400';
+        return 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
       case 'failed':
-        return 'bg-red-500/10 text-red-400';
+        return 'bg-destructive/10 text-destructive border border-destructive/30';
       case 'warning':
-        return 'bg-yellow-500/10 text-yellow-400';
+        return 'bg-amber-500/10 text-amber-300 border border-amber-500/30';
       default:
-        return 'bg-slate-500/10 text-slate-400';
+        return 'bg-muted/40 text-muted-foreground border border-border/60';
     }
   };
 
@@ -288,38 +291,38 @@ const SystemLogsPage: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">[LIST] История действий</h1>
-        <p className="text-slate-400 mt-2">Логирование всех действий администраторов системы</p>
+        <p className="mt-2 text-sm text-muted-foreground">Логирование действий администраторов системы</p>
       </div>
 
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className={SURFACE_CARD_CLASS}>
             <CardContent className="pt-0">
-              <div className="text-sm text-slate-400">Всего действий</div>
+              <div className="text-sm text-muted-foreground">Всего действий</div>
               <div className="text-2xl font-bold mt-2">{stats.total_logs}</div>
-              <div className="text-xs text-slate-500 mt-1">за последние {stats.days} дней</div>
+              <div className="mt-1 text-xs text-muted-foreground">за последние {stats.days} дней</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className={SURFACE_CARD_CLASS}>
             <CardContent className="pt-0">
-              <div className="text-sm text-slate-400">Типов действий</div>
+              <div className="text-sm text-muted-foreground">Типов действий</div>
               <div className="text-2xl font-bold mt-2">{stats.actions_by_type?.length || 0}</div>
-              <div className="text-xs text-slate-500 mt-1">различных операций</div>
+              <div className="mt-1 text-xs text-muted-foreground">различных операций</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800/50 border-slate-700">
+          <Card className={SURFACE_CARD_CLASS}>
             <CardContent className="pt-0">
-              <div className="text-sm text-slate-400">Активных админов</div>
+              <div className="text-sm text-muted-foreground">Активных админов</div>
               <div className="text-2xl font-bold mt-2">{stats.top_admins?.length || 0}</div>
-              <div className="text-xs text-slate-500 mt-1">в этом периоде</div>
+              <div className="mt-1 text-xs text-muted-foreground">в этом периоде</div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      <Card className="bg-slate-800/50 border-slate-700">
+      <Card className={SURFACE_CARD_CLASS}>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Filter className="w-4 h-4" />
@@ -329,14 +332,14 @@ const SystemLogsPage: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
-              <label className="text-sm text-slate-300 mb-2 block">Период (дней)</label>
+              <label className="mb-2 block text-sm text-muted-foreground">Период (дней)</label>
               <select
                 value={daysRange}
                 onChange={(e) => {
                   setDaysRange(Number(e.target.value));
                   setPagination({ ...pagination, offset: 0 });
                 }}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
+                className="h-9 w-full rounded-md border border-border/70 bg-card/60 px-3 text-sm text-foreground"
               >
                 <option value={1}>1 день</option>
                 <option value={7}>7 дней</option>
@@ -346,14 +349,14 @@ const SystemLogsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-sm text-slate-300 mb-2 block">Тип действия</label>
+              <label className="mb-2 block text-sm text-muted-foreground">Тип действия</label>
               <select
                 value={selectedActionType || ''}
                 onChange={(e) => {
                   setSelectedActionType(e.target.value || null);
                   setPagination({ ...pagination, offset: 0 });
                 }}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
+                className="h-9 w-full rounded-md border border-border/70 bg-card/60 px-3 text-sm text-foreground"
               >
                 <option value="">Все</option>
                 {availableActions.map((action) => (
@@ -365,14 +368,14 @@ const SystemLogsPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="text-sm text-slate-300 mb-2 block">Статус</label>
+              <label className="mb-2 block text-sm text-muted-foreground">Статус</label>
               <select
                 value={selectedStatus || ''}
                 onChange={(e) => {
                   setSelectedStatus(e.target.value || null);
                   setPagination({ ...pagination, offset: 0 });
                 }}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-white"
+                className="h-9 w-full rounded-md border border-border/70 bg-card/60 px-3 text-sm text-foreground"
               >
                 <option value="">Все</option>
                 <option value="success">Успешно</option>
@@ -382,12 +385,17 @@ const SystemLogsPage: React.FC = () => {
             </div>
 
             <div className="flex items-end gap-2">
-              <Button onClick={() => loadLogs(selectedActionType, selectedStatus)} disabled={loading}>
+              <Button
+                className="h-9"
+                onClick={() => loadLogs(selectedActionType, selectedStatus)}
+                disabled={loading}
+              >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Обновить
               </Button>
               <Button
                 variant="outline"
+                className={ACTION_BUTTON_CLASS}
                 onClick={() => {
                   if (logs.length === 0) {
                     toast.error('Нет данных для экспорта');
@@ -425,17 +433,17 @@ const SystemLogsPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className="bg-slate-800/50 border-slate-700">
+      <Card className={SURFACE_CARD_CLASS}>
         <CardHeader>
           <CardTitle className="text-base">Логи действий</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8">
-              <Loader className="w-6 h-6 animate-spin text-purple-500" />
+              <Loader className="h-6 w-6 animate-spin text-primary" />
             </div>
           ) : logs.length === 0 ? (
-            <p className="text-center text-slate-400 py-8">Нет логов за выбранный период</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">Нет логов за выбранный период</p>
           ) : (
             <div className="space-y-2 max-h-[min(600px,70vh)] overflow-y-auto">
               {logs.map((log) => (
@@ -455,6 +463,7 @@ const SystemLogsPage: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 border-border/70 hover:bg-muted/60"
                 disabled={pagination.offset === 0}
                 onClick={() =>
                   setPagination({
@@ -465,12 +474,13 @@ const SystemLogsPage: React.FC = () => {
               >
                 ← Назад
               </Button>
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-muted-foreground">
                 Страница {Math.floor(pagination.offset / pagination.limit) + 1} из {pagination.pages}
               </span>
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 border-border/70 hover:bg-muted/60"
                 disabled={pagination.offset + pagination.limit >= pagination.total}
                 onClick={() =>
                   setPagination({
@@ -487,7 +497,7 @@ const SystemLogsPage: React.FC = () => {
       </Card>
 
       {stats?.top_admins && stats.top_admins.length > 0 && (
-        <Card className="bg-slate-800/50 border-slate-700">
+        <Card className={SURFACE_CARD_CLASS}>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <BarChart3 className="w-4 h-4" />
@@ -497,11 +507,11 @@ const SystemLogsPage: React.FC = () => {
           <CardContent>
             <div className="space-y-2">
               {stats.top_admins.map((admin, idx) => (
-                <div key={admin.admin_id} className="flex items-center justify-between p-2 bg-slate-700/30 rounded">
+                <div key={admin.admin_id} className="flex items-center justify-between rounded border border-border/60 bg-card/60 p-2">
                   <div>
                     <p className="font-semibold">{idx + 1}. {admin.admin_name}</p>
                   </div>
-                  <Badge className="bg-purple-600">
+                  <Badge className="border-primary/30 bg-primary/15 text-primary">
                     {admin.action_count} действ{admin.action_count % 10 === 1 && admin.action_count % 100 !== 11
                       ? 'ие'
                       : admin.action_count % 10 >= 2 &&

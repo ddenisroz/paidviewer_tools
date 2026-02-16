@@ -14,6 +14,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+
+def _tts_unavailable_error(tts_url: str, error: Exception) -> HTTPException:
+    detail = {
+        "error": "tts_service_unavailable",
+        "message": "TTS service is unavailable",
+        "tts_service_url": tts_url,
+        "reason": str(error),
+    }
+    return HTTPException(status_code=503, detail=detail)
+
 @router.put("/voices/{voice_id}/settings")
 async def update_voice_settings(
     voice_id: int,
@@ -38,18 +48,20 @@ async def update_voice_settings(
         
         # Для глобальных голосов: обновляем сам голос в TTS Service (reference_text, cfg_strength, speed_preset)
         # Отправляем запрос в TTS Service для обновления настроек голоса
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.put(
-                    f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/settings",
-                    json=settings_dict
-                )
-                if response.status_code == 200:
-                    logger.info(f"[OK] Voice {voice_id} settings updated in TTS Service")
-                else:
-                    logger.warning(f"[WARN] Failed to update voice {voice_id} in TTS Service: {response.status_code}")
-        except Exception as e:
-            logger.error(f"[ERROR] Error updating voice in TTS Service: {e}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.put(
+                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/settings",
+                json=settings_dict
+            )
+        if response.status_code != 200:
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                error_detail = error_json.get('detail', error_detail)
+            except Exception:
+                pass
+            raise HTTPException(status_code=response.status_code, detail=error_detail)
+        logger.info(f"[OK] Voice {voice_id} settings updated in TTS Service")
         
         # Создаём/обновляем персональные настройки пользователя в bot_service
         repo = UserVoiceSettingsRepository(db)
@@ -69,6 +81,9 @@ async def update_voice_settings(
         }
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while updating voice settings: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Update voice settings error: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка обновления настроек: {str(e)}")
@@ -126,6 +141,9 @@ async def test_voice(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while testing voice: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Test voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Test failed: {str(e)}")
@@ -257,6 +275,9 @@ async def upload_voice_proxy(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while uploading voice: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Upload voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to upload voice: {str(e)}")
@@ -299,6 +320,9 @@ async def delete_voice_proxy(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while deleting voice: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Delete voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to delete voice: {str(e)}")
@@ -338,6 +362,9 @@ async def rename_voice_proxy(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while renaming voice: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Rename voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to rename voice: {str(e)}")
@@ -377,6 +404,9 @@ async def transcribe_voice_proxy(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while transcribing voice: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Transcribe voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to transcribe voice: {str(e)}")
@@ -412,6 +442,9 @@ async def retranscribe_voice_proxy(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while retranscribing voice: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Retranscribe voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to retranscribe voice: {str(e)}")
@@ -447,6 +480,9 @@ async def toggle_voice_proxy(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while toggling voice: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Toggle voice error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to toggle voice: {str(e)}")
@@ -481,6 +517,9 @@ async def get_tts_stats(
             
     except HTTPException:
         raise
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
+        logger.warning("TTS service unavailable while loading TTS stats: %s", e)
+        raise _tts_unavailable_error(settings.tts_service_url, e)
     except Exception as e:
         logger.error(f"Get TTS stats error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get TTS stats: {str(e)}")

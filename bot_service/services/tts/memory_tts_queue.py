@@ -59,6 +59,13 @@ class MemoryTTSQueue:
         # Task 5.4: Отслеживание пользователей с отключенной генерацией TTS
         self.disabled_users: Set[int] = set()
 
+    def _mark_task_dropped(self, task: TTSTask, reason: str):
+        """Mark queued task as dropped without processing."""
+        task.status = TaskStatus.FAILED
+        task.completed_at = time.time()
+        task.error = reason
+        self.completed_tasks[task.task_id] = task
+
     async def start(self):
         """Запуск очереди"""
         if self._running:
@@ -108,15 +115,15 @@ class MemoryTTSQueue:
         if self.pending_queue.qsize() >= self.max_size:
             raise RuntimeError("Queue is full")
 
-        # Task 5.4: Проверка активных соединений пользователя
-        if not self.is_user_connected(user_id):
-            logger.info(f"Skipping TTS for user {user_id} - no active connections")
-            raise RuntimeError(f"User {user_id} has no active connections")
-
         # Task 5.4: Проверка, не отключена ли генерация TTS для пользователя
         if user_id in self.disabled_users:
             logger.info(f"Skipping TTS for user {user_id} - TTS generation disabled")
             raise RuntimeError(f"TTS generation disabled for user {user_id}")
+
+        # Task 5.4: Проверка активных соединений пользователя
+        if not self.is_user_connected(user_id):
+            logger.info(f"Skipping TTS for user {user_id} - no active connections")
+            raise RuntimeError(f"User {user_id} has no active connections")
 
         task_id = str(uuid.uuid4())
 
@@ -162,17 +169,30 @@ class MemoryTTSQueue:
             return None
 
         try:
-            task = await asyncio.wait_for(
-                self.pending_queue.get(),
-                timeout=timeout
-            )
+            while self._running:
+                task = await asyncio.wait_for(
+                    self.pending_queue.get(),
+                    timeout=timeout
+                )
 
-            # Обновляем статус
-            task.status = TaskStatus.PROCESSING
-            task.started_at = time.time()
+                if task.user_id in self.disabled_users:
+                    self._mark_task_dropped(task, "TTS generation disabled for user")
+                    logger.info(f"Dropped TTS task {task.task_id}: user {task.user_id} is disabled")
+                    continue
 
-            logger.info(f"TTS task started: {task.task_id}")
-            return task
+                if not self.is_user_connected(task.user_id):
+                    self._mark_task_dropped(task, "No active TTS listeners")
+                    logger.info(f"Dropped TTS task {task.task_id}: user {task.user_id} has no listeners")
+                    continue
+
+                # Обновляем статус
+                task.status = TaskStatus.PROCESSING
+                task.started_at = time.time()
+
+                logger.info(f"TTS task started: {task.task_id}")
+                return task
+
+            return None
 
         except asyncio.TimeoutError:
             return None
@@ -333,7 +353,25 @@ class MemoryTTSQueue:
             user_id: ID пользователя
         """
         self.disabled_users.add(user_id)
-        logger.info(f"Disabled TTS generation for user {user_id}")
+        removed_tasks = 0
+        kept_tasks = []
+
+        while True:
+            try:
+                task = self.pending_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+
+            if task.user_id == user_id:
+                self._mark_task_dropped(task, "TTS generation disabled (no active listeners)")
+                removed_tasks += 1
+            else:
+                kept_tasks.append(task)
+
+        for task in kept_tasks:
+            self.pending_queue.put_nowait(task)
+
+        logger.info(f"Disabled TTS generation for user {user_id}. Dropped pending tasks: {removed_tasks}")
 
     async def enable_for_user(self, user_id: int):
         """

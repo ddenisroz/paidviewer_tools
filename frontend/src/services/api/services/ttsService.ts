@@ -7,7 +7,7 @@ import { logger } from '@/shared/utils/prodLogger';
 import { apiClient, ttsApiClient } from '../client';
 
 import type { ApiResponse, BlockedUser, FilteredWord, LocalTtsConfig, TtsSettings, TtsStatus, TtsVoice } from '../../../types';
-import type { AxiosResponse } from 'axios';
+import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 
 /**
  * TTS Service
@@ -73,7 +73,7 @@ export const ttsService = {
   /**
    * Предпрослушка голоса Google Cloud TTS
    */
-  async previewGcloudVoice(payload: { voice_name: string; text?: string }): Promise<AxiosResponse<ApiResponse<{ audio_url?: string }>>> {
+  async previewGcloudVoice(payload: { voice_name: string; text?: string; mood?: 'neutral' | 'sad' | 'happy'; model_name?: string }): Promise<AxiosResponse<ApiResponse<{ audio_url?: string }>>> {
     return apiClient.post('/api/tts/gcloud/preview', payload);
   },
 
@@ -176,7 +176,10 @@ export const ttsService = {
    */
   async getHealth(): Promise<AxiosResponse<ApiResponse>> {
     try {
-      return await ttsApiClient.get('/health');
+      return await ttsApiClient.get('/health', {
+        timeout: 3000,
+        skipRetry: true,
+      } as AxiosRequestConfig & { skipRetry: boolean });
     } catch (error) {
       logger.error('Error fetching TTS health:', error);
       return {

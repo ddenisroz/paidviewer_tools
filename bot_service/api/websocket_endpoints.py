@@ -131,6 +131,9 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
 
     manager = get_memory_websocket_manager()
     conn_mgr = get_connection_manager()
+    client_role = (websocket.query_params.get("client_role") or "dashboard").strip().lower()
+    presence_only_raw = websocket.query_params.get("presence_only")
+    presence_only = str(presence_only_raw).strip().lower() in {"1", "true", "yes", "on"}
 
     # Zombie Check: Close existing chat connections for this user to prevent duplicates
     # This is a basic implementation; for multiple tabs support, we might need a different strategy.
@@ -153,12 +156,17 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
         websocket,
         user_id_int,
         f"user_{user_id}",
-        "chat"
+        "chat",
+        client_role=client_role,
+        presence_only=presence_only
     )
-    logger.info(f"[WS] Connected: {conn_id} (User: {user_id})")
+    logger.info(
+        f"[WS] Connected: {conn_id} (User: {user_id}, role={client_role}, presence_only={presence_only})"
+    )
     
-    # Send history asynchronously
-    history_task = asyncio.create_task(_send_chat_history(websocket, user_id_int))
+    history_task: asyncio.Task | None = None
+    if not presence_only:
+        history_task = asyncio.create_task(_send_chat_history(websocket, user_id_int))
     
     try:
         while True:
@@ -189,13 +197,20 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
             logger.warning(f"[WS] Error user {user_id}: {e}")
             
     finally:
+        if history_task and not history_task.done():
+            history_task.cancel()
+
         await manager.remove_connection(conn_id)
         
         # Schedule TTS disconnect if no other connections remain
         remaining = manager.get_user_connections(user_id_int)
         if not remaining:
-            logger.info(f"[WS] No active connections for {user_id}, scheduling TTS disconnect")
-            await _schedule_tts_disconnect(user_id_int)
+            pending = conn_mgr.pending_tts_disconnects.get(user_id_int)
+            if pending and not pending.done():
+                logger.debug(f"[WS] TTS disconnect already scheduled for {user_id}, skipping duplicate schedule")
+            else:
+                logger.info(f"[WS] No active connections for {user_id}, scheduling TTS disconnect")
+                await _schedule_tts_disconnect(user_id_int)
         else:
              logger.debug(f"[WS] User {user_id} still has {len(remaining)} connections, skipping disconnect timer")
 

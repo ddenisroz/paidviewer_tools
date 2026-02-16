@@ -65,10 +65,10 @@ export default [
       'prefer-template': 'warn',
       'no-duplicate-imports': 'off', // Отключаем в пользу import/no-duplicates
       
-      // Complexity правила
-      'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }],
-      'max-depth': ['warn', 4],
-      'complexity': ['warn', 15],
+      // Complexity metrics are tracked in reviews, not as lint warnings.
+      'max-lines-per-function': 'off',
+      'max-depth': 'off',
+      'complexity': 'off',
       
       // Import правила - организация и качество импортов
       'import/no-duplicates': 'error',

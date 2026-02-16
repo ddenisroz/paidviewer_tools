@@ -1,10 +1,12 @@
 ﻿import React, { useEffect, useState } from 'react';
 
+/* eslint-disable no-alert */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Edit, Globe, Lock, Settings, TestTube2, Trash2, Upload, User } from 'lucide-react';
+import { AlertCircle, Edit, Globe, Lock, RefreshCw, Settings, TestTube2, Trash2, Upload, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-import { API_BASE_URL, TTS_SERVICE_URL } from '@/constants';
+import { API_BASE_URL } from '@/constants';
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { useTts } from '@/context/TtsContext';
@@ -68,6 +70,29 @@ interface TestVoiceResponse {
     audio_url?: string;
 }
 
+const extractApiErrorMessage = (error: unknown): string | null => {
+    if (!error) return null;
+    const typedError = error as {
+        message?: string;
+        response?: {
+            status?: number;
+            data?: {
+                detail?: string;
+                message?: string;
+                error?: string;
+            };
+        };
+    };
+
+    return (
+        typedError.response?.data?.detail ||
+        typedError.response?.data?.message ||
+        typedError.response?.data?.error ||
+        typedError.message ||
+        null
+    );
+};
+
 const VoiceManagementPageContent: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
@@ -97,7 +122,6 @@ const VoiceManagementPageContent: React.FC = () => {
     const { initializeTts: _initializeTts, engineStatus, isCheckingHealth, checkTtsHealth: _checkTtsHealth } = useTts();
     const isHealthy = engineStatus.loaded;
     const isChecking = isCheckingHealth;
-    const lastCheck: Date | null = null;
     const queryClient = useQueryClient();
     let _audioContext: AudioContext | null = null;
     let _audioSource: AudioBufferSourceNode | null = null;
@@ -298,6 +322,30 @@ const VoiceManagementPageContent: React.FC = () => {
     const globalVoices = globalVoicesData ?? [];
     const userVoices = userVoicesData ?? [];
     const enabledVoiceIds = enabledVoicesData ?? [];
+    const voicesServiceErrorMessage =
+        extractApiErrorMessage(globalVoicesErrorData) ||
+        extractApiErrorMessage(userVoicesErrorData) ||
+        'Сервис голосов временно недоступен';
+    const hasVoicesServiceError = globalVoicesError || userVoicesError;
+    const shownVoiceServiceErrorRef = React.useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!hasVoicesServiceError) {
+            shownVoiceServiceErrorRef.current = null;
+            return;
+        }
+
+        if (shownVoiceServiceErrorRef.current === voicesServiceErrorMessage) {
+            return;
+        }
+
+        shownVoiceServiceErrorRef.current = voicesServiceErrorMessage;
+        addToast({
+            type: 'error',
+            title: 'Сервис голосов недоступен',
+            message: voicesServiceErrorMessage,
+        });
+    }, [addToast, hasVoicesServiceError, voicesServiceErrorMessage]);
 
     useEffect(() => {
         if (whitelistStatus) {
@@ -684,7 +732,7 @@ const VoiceManagementPageContent: React.FC = () => {
         );
     }
 
-    if (!isHealthy && !isChecking && lastCheck) {
+    if (!isHealthy && !isChecking) {
         return (
             <PageWrapper title="Управление голосами">
                 <TtsErrorCard
@@ -718,6 +766,29 @@ const VoiceManagementPageContent: React.FC = () => {
                 accept=".wav,.mp3,.flac,.ogg,.m4a,.aac,.wma,.aiff,.au"
                 style={{ display: 'none', pointerEvents: 'auto' }}
             />
+
+            {hasVoicesServiceError && (
+                <div className="mb-6 bg-red-900/20 border border-red-500/50 rounded-lg p-4 flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <h3 className="text-red-300 font-semibold mb-1">Сервис голосов временно недоступен</h3>
+                        <p className="text-red-200/80 text-sm">{voicesServiceErrorMessage}</p>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            queryClient.invalidateQueries({ queryKey: ['global-voices'] });
+                            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+                        }}
+                        className="border-red-400/50 text-red-200 hover:text-white hover:bg-red-500/20"
+                    >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Повторить
+                    </Button>
+                </div>
+            )}
 
             {!loading && whitelistStatus && whitelistStatus.can_manage_voices === false && (
                 <div className="mb-6 bg-orange-900/20 border border-orange-500/50 rounded-lg p-4 flex items-start gap-3">

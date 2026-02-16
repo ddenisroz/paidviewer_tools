@@ -11,6 +11,11 @@
 - Drops config/rewards use short server-side cache, and dashboard quick actions refresh less frequently.
 - Stream title/category changes now broadcast to clients via WebSocket for immediate UI sync.
 - Dashboard stream info polling increased to 120s; VK stream info now uses the same 60s server cache.
+- Media page: fixed paused-state YouTube controls (seek/volume) by removing click interception over the iframe.
+- Media page: improved volume slider UX (Radix `Slider`) and faster sync with YouTube native volume controls.
+- Media page: quick toggle button label changed from `Приём` to `Заказы on/off`.
+- Media page: improved auto-next transition after track end (proper `current_video` handling + duplicate-end guard).
+- YouTube requests settings: reward orders can now be configured for Twitch and VK Live simultaneously (with backward-compatible legacy fields).
 
 ## [0.05-hotfix-2] - 2026-02-02
 

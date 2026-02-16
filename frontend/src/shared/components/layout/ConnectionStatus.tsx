@@ -11,7 +11,7 @@ import { AlertCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react';
 import { useWebSocketStateSync } from '@/shared/hooks/useWebSocketStateSync';
 
 export const ConnectionStatus: React.FC = () => {
-  const { syncStatus, isConnected, isReconnecting, isFailed } = useWebSocketStateSync();
+  const { syncStatus, isReconnecting, isFailed } = useWebSocketStateSync();
 
   // Determine state
   let icon = <Wifi className="w-5 h-5" />;

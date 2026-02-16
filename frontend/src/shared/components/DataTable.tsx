@@ -1,20 +1,10 @@
-/**
- * DataTable - Универсальная таблица с поиском, фильтрами, сортировкой, пагинацией
- * 
- * Используется в:
- * - UserManagementPage
- * - VoiceManagementPage
- * - SystemLogsPage
- * - CommandsPage
- * - PointsManagementPage
- */
+﻿import React, { useMemo, useState } from 'react';
+/* eslint-disable no-alert */
 
-import React, { useMemo, useState } from 'react';
-
-import { 
-  ArrowDown, 
-  ArrowUp, 
-  ArrowUpDown, 
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -26,17 +16,13 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Input } from '@/shared/components/ui/input';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/shared/components/ui/select';
-
-// ============================================
-// TYPES
-// ============================================
 
 export interface DataTableColumn<T> {
   key: string;
@@ -46,6 +32,9 @@ export interface DataTableColumn<T> {
   searchable?: boolean;
   width?: string;
   align?: 'left' | 'center' | 'right';
+  searchValue?: (row: T) => string;
+  sortValue?: (row: T) => string | number | boolean | null | undefined;
+  filterValue?: (row: T) => string;
 }
 
 export interface DataTableFilter {
@@ -53,6 +42,7 @@ export interface DataTableFilter {
   label: string;
   options: { value: string; label: string }[];
   defaultValue?: string;
+  width?: string;
 }
 
 export interface DataTableBulkAction {
@@ -65,12 +55,10 @@ export interface DataTableBulkAction {
 }
 
 export interface DataTableProps<T> {
-  // Data
   data: T[];
   columns: DataTableColumn<T>[];
   getRowId: (row: T) => string;
-  
-  // Features
+
   searchable?: boolean;
   searchPlaceholder?: string;
   filterable?: boolean;
@@ -78,25 +66,39 @@ export interface DataTableProps<T> {
   sortable?: boolean;
   selectable?: boolean;
   bulkActions?: DataTableBulkAction[];
-  
-  // Pagination
+
   pagination?: boolean;
   pageSize?: number;
   pageSizeOptions?: number[];
-  
-  // Styling
+
   className?: string;
   emptyMessage?: string;
-  
-  // Callbacks
+
   onRowClick?: (row: T) => void;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
 
-// ============================================
-// COMPONENT
-// ============================================
+function asText(value: React.ReactNode): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  return '';
+}
+
+function compareValues(
+  a: string | number | boolean | null | undefined,
+  b: string | number | boolean | null | undefined
+): number {
+  const aVal = a ?? '';
+  const bVal = b ?? '';
+
+  if (typeof aVal === 'number' && typeof bVal === 'number') {
+    return aVal - bVal;
+  }
+
+  return String(aVal).localeCompare(String(bVal), 'en', { numeric: true, sensitivity: 'base' });
+}
 
 export function DataTable<T>({
   data,
@@ -116,10 +118,6 @@ export function DataTable<T>({
   emptyMessage = 'Нет данных',
   onRowClick,
 }: DataTableProps<T>) {
-  // ============================================
-  // STATE
-  // ============================================
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [filterValues, setFilterValues] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -134,82 +132,71 @@ export function DataTable<T>({
   const [currentPage, setCurrentPage] = useState(1);
   const [currentPageSize, setCurrentPageSize] = useState(pageSize);
 
-  // ============================================
-  // FILTERING & SORTING
-  // ============================================
-  
   const filteredData = useMemo(() => {
     let result = [...data];
 
-    // Search
-    if (searchable && searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (searchable && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
       result = result.filter(row => {
-        return columns.some(col => {
-          if (!col.searchable) return false;
-          const value = col.accessor(row);
-          if (typeof value === 'string') {
-            return value.toLowerCase().includes(query);
-          }
-          return false;
+        return columns.some(column => {
+          if (!column.searchable) return false;
+          const text = (column.searchValue ? column.searchValue(row) : asText(column.accessor(row))).toLowerCase();
+          return text.includes(query);
         });
       });
     }
 
-    // Filters
     if (filterable) {
-      Object.entries(filterValues).forEach(([key, value]) => {
-        if (value === 'all') return;
-        
-        const filter = filters.find(f => f.key === key);
-        if (!filter) return;
+      Object.entries(filterValues).forEach(([key, selectedValue]) => {
+        if (selectedValue === 'all') return;
+
+        const column = columns.find(col => col.key === key);
+        if (!column) return;
 
         result = result.filter(row => {
-          const column = columns.find(col => col.key === key);
-          if (!column) return true;
-          
-          const cellValue = column.accessor(row);
-          return String(cellValue) === value;
+          const value = column.filterValue
+            ? column.filterValue(row)
+            : column.searchValue
+              ? column.searchValue(row)
+              : asText(column.accessor(row));
+
+          return value === selectedValue;
         });
       });
     }
 
-    // Sort
     if (sortable && sortColumn && sortDirection) {
       const column = columns.find(col => col.key === sortColumn);
       if (column) {
         result.sort((a, b) => {
-          const aValue = column.accessor(a);
-          const bValue = column.accessor(b);
-          
-          const aStr = String(aValue);
-          const bStr = String(bValue);
-          
-          const comparison = aStr.localeCompare(bStr, 'ru', { numeric: true });
+          const aValue = column.sortValue
+            ? column.sortValue(a)
+            : column.searchValue
+              ? column.searchValue(a)
+              : asText(column.accessor(a));
+          const bValue = column.sortValue
+            ? column.sortValue(b)
+            : column.searchValue
+              ? column.searchValue(b)
+              : asText(column.accessor(b));
+
+          const comparison = compareValues(aValue, bValue);
           return sortDirection === 'asc' ? comparison : -comparison;
         });
       }
     }
 
     return result;
-  }, [data, searchQuery, filterValues, sortColumn, sortDirection, columns, searchable, filterable, filters, sortable]);
+  }, [columns, data, filterValues, filterable, searchQuery, searchable, sortColumn, sortDirection, sortable]);
 
-  // ============================================
-  // PAGINATION
-  // ============================================
-  
   const totalPages = Math.ceil(filteredData.length / currentPageSize);
   const paginatedData = pagination
     ? filteredData.slice((currentPage - 1) * currentPageSize, currentPage * currentPageSize)
     : filteredData;
 
-  // ============================================
-  // SELECTION
-  // ============================================
-  
   const allPageIds = paginatedData.map(getRowId);
   const isAllSelected = allPageIds.length > 0 && allPageIds.every(id => selectedIds.has(id));
-  const _isSomeSelected = allPageIds.some(id => selectedIds.has(id)) && !isAllSelected;
+  const selectedCount = selectedIds.size;
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
@@ -218,13 +205,14 @@ export function DataTable<T>({
         allPageIds.forEach(id => next.delete(id));
         return next;
       });
-    } else {
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        allPageIds.forEach(id => next.add(id));
-        return next;
-      });
+      return;
     }
+
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      allPageIds.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const toggleSelectRow = (id: string) => {
@@ -239,13 +227,9 @@ export function DataTable<T>({
     });
   };
 
-  // ============================================
-  // SORTING
-  // ============================================
-  
   const handleSort = (columnKey: string) => {
     if (!sortable) return;
-    
+
     const column = columns.find(col => col.key === columnKey);
     if (!column?.sortable) return;
 
@@ -256,10 +240,11 @@ export function DataTable<T>({
         setSortColumn(null);
         setSortDirection(null);
       }
-    } else {
-      setSortColumn(columnKey);
-      setSortDirection('asc');
+      return;
     }
+
+    setSortColumn(columnKey);
+    setSortDirection('asc');
   };
 
   const getSortIcon = (columnKey: string) => {
@@ -272,127 +257,142 @@ export function DataTable<T>({
     return <ArrowDown className="h-4 w-4" />;
   };
 
-  // ============================================
-  // BULK ACTIONS
-  // ============================================
-  
   const handleBulkAction = async (action: DataTableBulkAction) => {
-    if (selectedIds.size === 0) return;
+    if (selectedCount === 0) return;
 
-    if (action.confirmMessage) {
-      if (!window.confirm(action.confirmMessage)) return;
+    if (action.confirmMessage && !window.confirm(action.confirmMessage)) {
+      return;
     }
 
     await action.onClick(Array.from(selectedIds));
     setSelectedIds(new Set());
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
-  
+  const resetFilters = () => {
+    const next: Record<string, string> = {};
+    filters.forEach(filter => {
+      next[filter.key] = filter.defaultValue || 'all';
+    });
+    setFilterValues(next);
+    setCurrentPage(1);
+  };
+
+  const hasToolbar = searchable || filterable || (selectable && bulkActions.length > 0);
+
   return (
     <div className={cn('space-y-4', className)}>
-      {/* Toolbar */}
-      {(searchable || filterable || (selectable && bulkActions.length > 0)) && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {/* Search */}
-          {searchable && (
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="pl-9"
-              />
-            </div>
-          )}
+      {hasToolbar && (
+        <div className="rounded-lg border border-border p-3 bg-card/40">
+          <div className="grid gap-3 lg:grid-cols-[minmax(320px,1fr)_auto] lg:items-end">
+            <div className="space-y-2">
+              {searchable && (
+                <div className="relative max-w-lg">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder={searchPlaceholder}
+                    value={searchQuery}
+                    onChange={event => {
+                      setSearchQuery(event.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-9"
+                  />
+                </div>
+              )}
 
-          {/* Filters */}
-          {filterable && filters.length > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              {filters.map(filter => (
-                <Select
-                  key={filter.key}
-                  value={filterValues[filter.key]}
-                  onValueChange={(value) => {
-                    setFilterValues(prev => ({ ...prev, [filter.key]: value }));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder={filter.label} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filter.options.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ))}
-            </div>
-          )}
+              {filterable && filters.length > 0 && (
+                <div className="flex flex-wrap items-end gap-2">
+                  {filters.map(filter => (
+                    <div key={filter.key} className="space-y-1" style={{ width: filter.width || '170px' }}>
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        {filter.label}
+                      </div>
+                      <Select
+                        value={filterValues[filter.key]}
+                        onValueChange={value => {
+                          setFilterValues(prev => ({ ...prev, [filter.key]: value }));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder={filter.label} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filter.options.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
 
-          {/* Bulk Actions */}
-          {selectable && bulkActions.length > 0 && selectedIds.size > 0 && (
-            <div className="flex gap-2 flex-wrap">
-              <span className="text-sm text-muted-foreground self-center">
-                Выбрано: {selectedIds.size}
-              </span>
-              {bulkActions.map(action => (
-                <Button
-                  key={action.key}
-                  variant={action.variant || 'outline'}
-                  size="sm"
-                  onClick={() => handleBulkAction(action)}
-                >
-                  {action.icon}
-                  {action.label}
-                </Button>
-              ))}
+                  <Button variant="ghost" size="sm" className="h-9 px-3" onClick={resetFilters}>
+                    Сбросить
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
+
+            {selectable && bulkActions.length > 0 && (
+              <div className="flex min-h-9 flex-wrap items-center justify-start gap-2 lg:justify-end">
+                <span className={cn('w-28 text-right text-sm text-muted-foreground tabular-nums', selectedCount === 0 && 'opacity-0')}>
+                  Выбрано: {selectedCount}
+                </span>
+                {bulkActions.map(action => (
+                  <Button
+                    key={action.key}
+                    variant={action.variant || 'outline'}
+                    size="sm"
+                    disabled={selectedCount === 0}
+                    className={cn('min-w-[132px] justify-center', selectedCount === 0 && 'opacity-0 pointer-events-none')}
+                    onClick={() => handleBulkAction(action)}
+                  >
+                    {action.icon}
+                    {action.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="rounded-lg border border-gray-700 overflow-hidden">
+      <div className="rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-800/50">
+          <table className="w-full table-fixed">
+            <thead className="bg-muted/40">
               <tr>
-                {/* Selection column */}
                 {selectable && (
-                  <th className="w-12 p-3">
-                    <Checkbox
-                      checked={isAllSelected}
-                      onCheckedChange={toggleSelectAll}
-                    />
+                  <th className="w-12 p-3 text-center align-middle">
+                    <Checkbox checked={isAllSelected} onCheckedChange={toggleSelectAll} />
                   </th>
                 )}
 
-                {/* Data columns */}
                 {columns.map(column => (
                   <th
                     key={column.key}
                     className={cn(
-                      'p-3 text-left font-semibold text-sm',
+                      'p-3 text-sm font-semibold align-middle',
+                      column.align === 'left' && 'text-left',
                       column.align === 'center' && 'text-center',
                       column.align === 'right' && 'text-right',
-                      column.sortable && 'cursor-pointer hover:bg-gray-700/50 transition-colors'
+                      column.sortable && 'cursor-pointer select-none hover:bg-muted transition-colors'
                     )}
                     style={{ width: column.width }}
                     onClick={() => column.sortable && handleSort(column.key)}
                   >
-                    <div className="flex items-center gap-2">
-                      {column.header}
-                      {column.sortable && getSortIcon(column.key)}
+                    <div
+                      className={cn(
+                        'flex items-center gap-2',
+                        column.align === 'left' && 'justify-start',
+                        column.align === 'center' && 'justify-center',
+                        column.align === 'right' && 'justify-end'
+                      )}
+                    >
+                      <span>{column.header}</span>
+                      {column.sortable ? <span className="w-4">{getSortIcon(column.key)}</span> : null}
                     </div>
                   </th>
                 ))}
@@ -418,28 +418,24 @@ export function DataTable<T>({
                     <tr
                       key={rowId}
                       className={cn(
-                        'border-t border-gray-700 transition-colors',
-                        onRowClick && 'cursor-pointer hover:bg-gray-800/50',
-                        isSelected && 'bg-gray-800/30'
+                        'border-t border-border transition-colors',
+                        onRowClick && 'cursor-pointer hover:bg-muted/40',
+                        isSelected && 'bg-muted/50'
                       )}
                       onClick={() => onRowClick?.(row)}
                     >
-                      {/* Selection cell */}
                       {selectable && (
-                        <td className="p-3" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={isSelected}
-                            onCheckedChange={() => toggleSelectRow(rowId)}
-                          />
+                        <td className="p-3 text-center align-middle" onClick={event => event.stopPropagation()}>
+                          <Checkbox checked={isSelected} onCheckedChange={() => toggleSelectRow(rowId)} />
                         </td>
                       )}
 
-                      {/* Data cells */}
                       {columns.map(column => (
                         <td
                           key={column.key}
                           className={cn(
-                            'p-3 text-sm',
+                            'p-3 text-sm align-middle',
+                            column.align === 'left' && 'text-left',
                             column.align === 'center' && 'text-center',
                             column.align === 'right' && 'text-right'
                           )}
@@ -456,15 +452,13 @@ export function DataTable<T>({
         </div>
       </div>
 
-      {/* Pagination */}
       {pagination && totalPages > 1 && (
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {/* Page size selector */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Показать:</span>
+            <span className="text-sm text-muted-foreground">Строк на странице:</span>
             <Select
               value={String(currentPageSize)}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 setCurrentPageSize(Number(value));
                 setCurrentPage(1);
               }}
@@ -482,25 +476,18 @@ export function DataTable<T>({
             </Select>
           </div>
 
-          {/* Page info */}
-          <div className="text-sm text-muted-foreground">
-            Страница {currentPage} из {totalPages} ({filteredData.length} записей)
+          <div className="text-sm text-muted-foreground tabular-nums">
+            Страница {currentPage} из {totalPages} ({filteredData.length} строк)
           </div>
 
-          {/* Page navigation */}
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-            >
+            <Button variant="outline" size="icon" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
               <ChevronsLeft className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
               disabled={currentPage === 1}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -508,7 +495,7 @@ export function DataTable<T>({
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
               disabled={currentPage === totalPages}
             >
               <ChevronRight className="h-4 w-4" />

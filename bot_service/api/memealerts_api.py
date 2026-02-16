@@ -164,11 +164,16 @@ async def grant_coins(
         if not target_user_id and not nickname:
             raise HTTPException(status_code=400, detail="userId or nickname is required")
 
+        try:
+            amount = int(value)
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="value must be an integer")
+
         service = MemeAlertsService(db)
         result = await service.grant_coins(
             user_id=user_id,
             nickname_or_id=target_user_id or nickname,
-            amount=int(value),
+            amount=amount,
             platform="dashboard",
             channel_name="dashboard",
             issued_by=str(user.get("username") or user_id),

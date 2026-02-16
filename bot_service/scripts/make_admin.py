@@ -41,7 +41,7 @@ def make_admin(user_id=None, username=None):
             print("[ERROR] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ")
             return False
         
-        if user.is_admin:
+        if user.role == 'admin' or user.is_admin:
             print(" РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓР¶Рµ СЏРІР»СЏРµС‚СЃСЏ Р°РґРјРёРЅРѕРј:")
             print(f"   ID: {user.id}")
             print(f"   Twitch: {user.twitch_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
@@ -49,6 +49,7 @@ def make_admin(user_id=None, username=None):
             return True
         
         # Р”РµР»Р°РµРј Р°РґРјРёРЅРѕРј
+        user.role = 'admin'
         user.is_admin = True
         db.commit()
         
@@ -56,7 +57,8 @@ def make_admin(user_id=None, username=None):
         print(f"   ID: {user.id}")
         print(f"   Twitch: {user.twitch_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
         print(f"   VK: {user.vk_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
-        print(f"   Admin: {user.is_admin}")
+        print(f"   Role: {user.role}")
+        print(f"   Admin: {user.role == 'admin' or user.is_admin}")
         print("\nРўРµРїРµСЂСЊ РІС‹ РјРѕР¶РµС‚Рµ:")
         print("1. РџРµСЂРµР№С‚Рё РЅР° http://localhost:8000/auth/twitch/bot/login")
         print("2. РђРІС‚РѕСЂРёР·РѕРІР°С‚СЊ Р±РѕС‚Р° С‡РµСЂРµР· OAuth2")
@@ -90,7 +92,7 @@ def list_users():
             print(f"ID: {user.id}")
             print(f"  Twitch: {user.twitch_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
             print(f"  VK: {user.vk_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
-            print(f"  Admin: {' Р”Р°' if user.is_admin else '[ERROR] РќРµС‚'}")
+            print(f"  Admin: {' Р”Р°' if (user.role == 'admin' or user.is_admin) else '[ERROR] РќРµС‚'}")
             print()
         
         print("Р§С‚РѕР±С‹ СЃРґРµР»Р°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р°РґРјРёРЅРѕРј:")

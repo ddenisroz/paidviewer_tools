@@ -66,6 +66,7 @@ interface ChatMessageItemProps {
     truncateWords: (text: string | undefined, maxWords: number) => string;
 }
 
+ 
 const ChatMessageItem = memo<ChatMessageItemProps>(({
     msg,
     index,
@@ -94,6 +95,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
     const usernameColor = settings.username_color
         || (msg.platform === 'twitch' ? '#9146FF' : '#FF4444');
 
+     
     const messageStyle = useMemo(() => {
         const resolvedFontFamily = settings?.font_family
             ? (settings.font_family.includes(',')
@@ -277,7 +279,9 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
             </span>
         </div>
     );
-}, (prevProps, nextProps) => {
+},
+ 
+(prevProps, nextProps) => {
     // Custom comparison function for memo
     // Only re-render if these specific props change
     return (
@@ -307,6 +311,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
 
 ChatMessageItem.displayName = 'ChatMessageItem';
 
+ 
 const ChatOverlay: React.FC = () => {
     const [searchParams] = useSearchParams();
     const token = searchParams.get('token');
@@ -326,6 +331,7 @@ const ChatOverlay: React.FC = () => {
     const processedMessageIds = useRef<Set<string>>(new Set());
     const historyLoadedRef = useRef<boolean>(false);
 
+     
     const containerStyle = useMemo<React.CSSProperties>(() => {
         if (!settings) return {};
 
@@ -349,7 +355,7 @@ const ChatOverlay: React.FC = () => {
             overflow: 'hidden',
             boxSizing: 'border-box'
         };
-    }, [settings?.font_family, settings?.font_size, settings?.font_weight, settings?.text_color, settings?.background_color, settings?.background_opacity, settings?.chat_width, settings?.border_radius]);
+    }, [settings]);
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -421,6 +427,7 @@ const ChatOverlay: React.FC = () => {
 
 
 
+     
     const loadSettings = useCallback(async (isPolling: boolean = false): Promise<void> => {
         if (!token) return;
 
@@ -434,9 +441,7 @@ const ChatOverlay: React.FC = () => {
             const normalizedAnimationType = (data.animation_type === 'slide'
                 ? 'slide-right'
                 : (data.animation_type || 'fade')) as ChatBoxSettings['animation_type'];
-            const normalizedChatDirection = (data.chat_direction === 'vertical-reverse'
-                ? 'vertical'
-                : (data.chat_direction || 'vertical')) as ChatBoxSettings['chat_direction'];
+            const normalizedChatDirection = (data.chat_direction || 'vertical') as ChatBoxSettings['chat_direction'];
 
             const parsedOpacity = Number.parseFloat(String(data.background_opacity));
             const normalizedFontFamily = data.font_family
@@ -566,27 +571,22 @@ const ChatOverlay: React.FC = () => {
 
                     const apiResponse = response.data as ChatHistoryApiResponse;
                     if (apiResponse.success && apiResponse.messages && apiResponse.messages.length > 0) {
-                        const uniqueMessages: ChatMessage[] = [];
                         const seenIds = new Set<string>();
-
-                        for (const msg of apiResponse.messages) {
+                        const uniqueMessages = apiResponse.messages.filter((msg) => {
                             const uniqueKey = msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`;
-                            if (!seenIds.has(uniqueKey)) {
-                                seenIds.add(uniqueKey);
-                                uniqueMessages.push(msg);
-                            }
-                        }
+                            if (seenIds.has(uniqueKey)) return false;
+                            seenIds.add(uniqueKey);
+                            return true;
+                        });
 
                         setMessages(uniqueMessages);
                         processedMessageIds.current = new Set(uniqueMessages.map(msg =>
                             msg.id || `${msg.timestamp}-${msg.author}-${msg.message || msg.content}`
                         ));
                         historyLoadedRef.current = true;
-                        if (uniqueMessages.length > 0) {
-                            const inferredChannel = uniqueMessages[0].channel_name || uniqueMessages[0].channel;
-                            if (inferredChannel) {
-                                setChannelName(prev => prev || inferredChannel);
-                            }
+                        const inferredChannel = uniqueMessages[0]?.channel_name || uniqueMessages[0]?.channel;
+                        if (inferredChannel) {
+                            setChannelName(prev => prev || inferredChannel);
                         }
 
                         setTimeout(() => {
@@ -604,6 +604,7 @@ const ChatOverlay: React.FC = () => {
         return () => clearTimeout(timeoutId);
     }, [userId, settings, messages.length]);
 
+     
     const handleWebSocketMessage = useCallback((data: WebSocketMessage): void => {
         if (data.type === 'cache_invalidate') {
             logger.log('[REFRESH] [CACHE] Received cache invalidation:', data.cache_key);
@@ -618,66 +619,69 @@ const ChatOverlay: React.FC = () => {
             logger.log('[REFRESH] [CHATBOX] Received settings update event');
 
             const updateData = data.data as Partial<ChatBoxSettings> | undefined;
-            setSettings(prevSettings => {
-                if (!prevSettings) return prevSettings;
-                const parsedUpdateOpacity = Number.parseFloat(String(updateData?.background_opacity));
-                const fontSize = clampNumber(
-                    parseIntOr(updateData?.font_size ?? prevSettings.font_size, prevSettings.font_size || 16),
-                    8,
-                    32
-                );
-                const chatWidth = clampNumber(
-                    parseIntOr(updateData?.chat_width ?? prevSettings.chat_width, prevSettings.chat_width || 100),
-                    20,
-                    100
-                );
-                const messageSpacing = clampNumber(
-                    parseIntOr(updateData?.message_spacing ?? prevSettings.message_spacing, prevSettings.message_spacing || 4),
-                    0,
-                    32
-                );
-                const borderRadius = clampNumber(
-                    parseIntOr(updateData?.border_radius ?? prevSettings.border_radius, prevSettings.border_radius || 8),
-                    0,
-                    32
-                );
-                const animationDuration = clampNumber(
-                    parseIntOr(updateData?.animation_duration ?? prevSettings.animation_duration, prevSettings.animation_duration || 300),
-                    0,
-                    2000
-                );
-                const messageFadeSeconds = clampNumber(
-                    parseIntOr(updateData?.message_fade_seconds ?? prevSettings.message_fade_seconds, prevSettings.message_fade_seconds || 60),
-                    10,
-                    60
-                );
-                const textStrokeWidth = clampNumber(
-                    parseFloatOr(updateData?.text_stroke_width ?? prevSettings.text_stroke_width, prevSettings.text_stroke_width || 0),
-                    0,
-                    3
-                );
+            setSettings(
+                 
+                prevSettings => {
+                    if (!prevSettings) return prevSettings;
+                    const parsedUpdateOpacity = Number.parseFloat(String(updateData?.background_opacity));
+                    const fontSize = clampNumber(
+                        parseIntOr(updateData?.font_size ?? prevSettings.font_size, prevSettings.font_size || 16),
+                        8,
+                        32
+                    );
+                    const chatWidth = clampNumber(
+                        parseIntOr(updateData?.chat_width ?? prevSettings.chat_width, prevSettings.chat_width || 100),
+                        20,
+                        100
+                    );
+                    const messageSpacing = clampNumber(
+                        parseIntOr(updateData?.message_spacing ?? prevSettings.message_spacing, prevSettings.message_spacing || 4),
+                        0,
+                        32
+                    );
+                    const borderRadius = clampNumber(
+                        parseIntOr(updateData?.border_radius ?? prevSettings.border_radius, prevSettings.border_radius || 8),
+                        0,
+                        32
+                    );
+                    const animationDuration = clampNumber(
+                        parseIntOr(updateData?.animation_duration ?? prevSettings.animation_duration, prevSettings.animation_duration || 300),
+                        0,
+                        2000
+                    );
+                    const messageFadeSeconds = clampNumber(
+                        parseIntOr(updateData?.message_fade_seconds ?? prevSettings.message_fade_seconds, prevSettings.message_fade_seconds || 60),
+                        10,
+                        60
+                    );
+                    const textStrokeWidth = clampNumber(
+                        parseFloatOr(updateData?.text_stroke_width ?? prevSettings.text_stroke_width, prevSettings.text_stroke_width || 0),
+                        0,
+                        3
+                    );
 
-                const updatedSettings: ChatBoxSettings = {
-                    ...prevSettings,
-                    ...updateData,
-                    font_size: fontSize,
-                    text_stroke_width: textStrokeWidth,
-                    text_stroke_color: updateData?.text_stroke_color || prevSettings.text_stroke_color || '#000000',
-                    background_opacity: Number.isFinite(parsedUpdateOpacity)
-                        ? parsedUpdateOpacity
-                        : (prevSettings.background_opacity ?? 0.5),
-                    background_color: updateData?.background_color || prevSettings.background_color || '#000000',
-                    max_messages: parseIntOr(updateData?.max_messages ?? prevSettings.max_messages, prevSettings.max_messages || 20),
-                    message_spacing: messageSpacing,
-                    message_fade_seconds: messageFadeSeconds,
-                    animation_duration: animationDuration,
-                    chat_width: chatWidth,
-                    border_radius: borderRadius
-                };
+                    const updatedSettings: ChatBoxSettings = {
+                        ...prevSettings,
+                        ...updateData,
+                        font_size: fontSize,
+                        text_stroke_width: textStrokeWidth,
+                        text_stroke_color: updateData?.text_stroke_color || prevSettings.text_stroke_color || '#000000',
+                        background_opacity: Number.isFinite(parsedUpdateOpacity)
+                            ? parsedUpdateOpacity
+                            : (prevSettings.background_opacity ?? 0.5),
+                        background_color: updateData?.background_color || prevSettings.background_color || '#000000',
+                        max_messages: parseIntOr(updateData?.max_messages ?? prevSettings.max_messages, prevSettings.max_messages || 20),
+                        message_spacing: messageSpacing,
+                        message_fade_seconds: messageFadeSeconds,
+                        animation_duration: animationDuration,
+                        chat_width: chatWidth,
+                        border_radius: borderRadius
+                    };
 
-                logger.log('[REFRESH] [CHATBOX] Settings updated:', updatedSettings);
-                return updatedSettings;
-            });
+                    logger.log('[REFRESH] [CHATBOX] Settings updated:', updatedSettings);
+                    return updatedSettings;
+                }
+            );
 
             if (updateData?.channel_name) {
                 setChannelName(updateData.channel_name);

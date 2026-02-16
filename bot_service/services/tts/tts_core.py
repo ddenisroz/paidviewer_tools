@@ -62,6 +62,7 @@ class TtsSettingsRequest(BaseModel):
     filterReplies: bool = Field(False)
     filterMentions: bool = Field(False)
     gcloudVoices: Optional[List[str]] = None
+    gcloudMood: Optional[str] = None
     version: int = Field(1, ge=1)
 
     @field_validator('engine')
@@ -77,6 +78,16 @@ class TtsSettingsRequest(BaseModel):
         if v not in ['website', 'obs']:
             raise ValueError('listeningMode must be either "website" or "obs"')
         return v
+
+    @field_validator('gcloudMood')
+    @classmethod
+    def validate_gcloud_mood(cls, v):
+        if v is None:
+            return v
+        normalized = str(v).strip().lower()
+        if normalized not in {'neutral', 'sad', 'happy'}:
+            raise ValueError('gcloudMood must be one of: neutral, sad, happy')
+        return normalized
 
 
 class BlockUserRequest(BaseModel):

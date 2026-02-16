@@ -12,8 +12,8 @@ logger = logging.getLogger('bot_service')
 class VKLiveBotCore:
     """Основной класс VK Live бота
     
-    IMPORTANT: user_access_token - это токен БОТА (VK_LIVE_USER_TOKEN),
-    отдельного аккаунта VK Live для работы в чате.
+    IMPORTANT: user_access_token - это OAuth токен БОТА,
+    полученный через /auth/vk/bot/login и сохраненный в bot_tokens.
     
     Это НЕ токен стримера! Аналогично Twitch Bot Token.
     """
@@ -21,7 +21,7 @@ class VKLiveBotCore:
     def __init__(self, user_access_token: str, connection_manager: ConnectionManager):
         """
         Args:
-            user_access_token: Токен БОТА (из VK_LIVE_USER_TOKEN) для работы в чате
+            user_access_token: OAuth токен БОТА для работы в чате
             connection_manager: Менеджер соединений
         """
         self.user_access_token = user_access_token  # Токен БОТА для чата
@@ -66,80 +66,44 @@ class VKLiveBotCore:
                 logger.warning(f"Already connected to channel {channel_id}")
                 return True
 
-            # Используем HTTP polling вместо WebSocket!
+            # Use HTTP polling for chat reads.
             from utils.vk_live_http_polling import VKLiveHTTPPolling
-            from core.database import User, UserToken, get_db
+            from core.database import get_db
 
             logger.info(f"[CONNECT] Connecting VK Live HTTP polling to channel: {channel_id}")
 
-            # Получаем OAuth токен пользователя из базы данных
+            resolved_channel = channel_id
+            owner_user_id: Optional[int] = None
+
             db = next(get_db())
             try:
-                # Ищем пользователя по vk_channel_name (case-insensitive)
                 from repositories.user_repository import UserRepository
-                from repositories.user_token_repository import UserTokenRepository
-                
                 user_repo = UserRepository(db)
-                token_repo = UserTokenRepository(db)
-                
-                user = user_repo.get_by_vk_channel_name(channel_id)
-                if not user:
-                    logger.error(f"[ERROR] User not found for VK channel: {channel_id}")
-                    return False
-
-                # Получаем OAuth токен пользователя
-                user_token = token_repo.get_by_user_and_platform(user.id, 'vk')
-
-                if not user_token or not user_token.access_token:
-                    logger.error(f"[ERROR] No VK OAuth token found for channel: {channel_id}")
-                    return False
-
-                # Расшифровываем токен
-                from core.token_encryption import decrypt_token, is_token_encrypted
-
-                oauth_token = user_token.access_token
-                if is_token_encrypted(oauth_token):
-                    oauth_token = decrypt_token(oauth_token)
-
-                # Resolve actual channel slug if stored name is invalid
-                resolved_channel = channel_id
-                vk_client = None
-                try:
-                    from integrations.vk.client import VKClient
-                    from integrations.vk.oauth import VKOAuth
-                    from integrations.base import TokenInfo
-                    vk_client = VKClient(VKOAuth())
-                    info = await vk_client.get_current_user(TokenInfo(access_token=oauth_token))
-                    if info:
-                        channel_obj = info.get("channel") or {}
-                        channel_url = channel_obj.get("url") if isinstance(channel_obj, dict) else None
-                        channel_url = channel_url or info.get("channel_url")
-                        if channel_url:
-                            resolved_channel = channel_url.rstrip('/').split('/')[-1]
-                except Exception as e:
-                    logger.warning(f"[WARN] Could not resolve VK channel URL: {e}")
-                finally:
-                    try:
-                        if vk_client:
-                            await vk_client.close()
-                    except Exception:
-                        pass
-
-                logger.info(f"[OK] Found VK OAuth token for channel: {channel_id}")
+                user = user_repo.get_by_vk_channel_name(channel_id) or user_repo.get_by_vk_username(channel_id)
+                if user:
+                    owner_user_id = user.id
+                    preferred_channel = user.vk_channel_name or user.vk_username
+                    if preferred_channel:
+                        resolved_channel = preferred_channel
+                else:
+                    logger.warning(f"[WARN] User not found for VK channel '{channel_id}', using raw slug")
 
             finally:
                 db.close()
 
-            # Validate resolved channel slug (must be a URL slug, not display name)
+            # Validate resolved channel slug (must be a URL slug, not display name).
+            # Keep original case because some VK identifiers can be case-sensitive.
+            resolved_channel = resolved_channel.strip()
             if not resolved_channel or ' ' in resolved_channel:
                 logger.warning(f"[WARN] VK channel slug invalid for polling: '{resolved_channel}'. Skipping polling.")
                 return False
 
-            # Создаем HTTP polling клиент с OAuth токеном пользователя
+            # Polling always uses dedicated bot token (same model as Twitch bot).
             self.http_polling = VKLiveHTTPPolling(
-                access_token=oauth_token,  # Используем OAuth токен пользователя!
+                access_token=self.user_access_token,
                 channel_url=resolved_channel,
-                user_id=user.id
+                user_id=owner_user_id,
+                token_refresh_mode="bot"
             )
 
             # Запускаем polling с обработчиком сообщений
@@ -409,8 +373,19 @@ class VKLiveBotCore:
 
                             # Обработка награды для заказа YouTube
                             youtube_settings = getattr(tts_settings, 'youtube_settings', None) or {}
-                            if youtube_settings.get('requests_reward_enabled') and youtube_settings.get('requests_reward_platform', 'twitch') == 'vk':
-                                configured_reward = (youtube_settings.get('requests_reward_id') or '').strip()
+                            legacy_platform = youtube_settings.get('requests_reward_platform', 'twitch')
+                            legacy_enabled = bool(youtube_settings.get('requests_reward_enabled'))
+                            legacy_reward_id = (youtube_settings.get('requests_reward_id') or '').strip()
+
+                            vk_reward_enabled = youtube_settings.get('requests_reward_vk_enabled')
+                            if vk_reward_enabled is None:
+                                vk_reward_enabled = legacy_enabled and legacy_platform == 'vk'
+
+                            configured_reward = (youtube_settings.get('requests_reward_vk_id') or '').strip()
+                            if not configured_reward and legacy_platform == 'vk':
+                                configured_reward = legacy_reward_id
+
+                            if vk_reward_enabled:
                                 if configured_reward and configured_reward.lower() == reward_title.lower():
                                     import re
                                     from services.youtube.queue_service import QueueService

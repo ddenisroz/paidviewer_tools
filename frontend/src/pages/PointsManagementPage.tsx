@@ -1,10 +1,12 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 
+/* eslint-disable no-alert */
 import { CheckCircle2, Clock, Edit, Gift, Loader2, MessageCircle, Plus, Power, PowerOff, Trash2, XCircle } from 'lucide-react';
 
 import { PLATFORM_COLORS } from '@/constants/uiConstants';
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
+import { cn } from '@/lib/utils';
 import pointsApi from '@/services/pointsApi';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';
@@ -54,6 +56,12 @@ interface RewardDialogProps {
 interface RedemptionQueueProps {
     platform: 'twitch' | 'vk';
 }
+
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
+const CONTROL_TRIGGER_CLASS = 'h-9 border-border/70 bg-background/80 shadow-none';
+const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
+const TAB_BUTTON_BASE =
+    'inline-flex items-center px-4 py-2 text-sm font-medium transition-colors border-b-2 border-transparent -mb-px';
 
 const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRefresh }) => {
     const [deleting, setDeleting] = useState<boolean>(false);
@@ -105,7 +113,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
     const bgColor = reward.background_color || (platform === 'vk' ? PLATFORM_COLORS.VK_LIVE : PLATFORM_COLORS.TWITCH);
 
     return (
-        <Card className="transition-all hover:ring-2 hover:ring-primary">
+        <Card className={`${SURFACE_CARD_CLASS} transition-all hover:ring-2 hover:ring-primary/30`}>
             <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex-1 min-w-0">
@@ -670,7 +678,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
     if (redemptions.length === 0) {
         return (
             <div className="min-h-[min(400px,60vh)]">
-                <Card>
+                <Card className={SURFACE_CARD_CLASS}>
                     <CardContent className="py-12 text-center">
                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
                         <p className="text-sm text-muted-foreground">
@@ -687,17 +695,17 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
 
     return (
         <div className="min-h-[min(400px,60vh)] space-y-4">
-            <Card>
+            <Card className={SURFACE_CARD_CLASS}>
                 <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                         <div className="flex items-center gap-3 flex-wrap">
                             <div className="flex items-center gap-2">
                                 <Label className="text-sm font-medium whitespace-nowrap">Фильтр:</Label>
                                 <Select value={filterType} onValueChange={(value) => setFilterType(value as 'all' | 'tts' | 'other')}>
-                                    <SelectTrigger className="w-[clamp(140px,25vw,200px)] h-9">
+                                    <SelectTrigger className={`w-[clamp(140px,25vw,200px)] ${CONTROL_TRIGGER_CLASS}`}>
                                         <SelectValue placeholder="Выберите фильтр" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className={CONTROL_CONTENT_CLASS}>
                                         <SelectItem value="all">Все награды</SelectItem>
                                         <SelectItem value="tts">TTS награды</SelectItem>
                                         <SelectItem value="other">Прочие</SelectItem>
@@ -742,7 +750,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                     variant="default"
                                     onClick={handleBulkAccept}
                                     disabled={Array.from(selectedItems).some(id => processing.has(id))}
-                                    className="whitespace-nowrap"
+                                    className="whitespace-nowrap bg-none bg-primary hover:bg-primary/90 shadow-none"
                                 >
                                     <CheckCircle2 className="w-4 h-4 mr-1.5" />
                                     Принять ({selectedItems.size})
@@ -764,7 +772,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             </Card>
 
             {Array.isArray(filteredRedemptions) && filteredRedemptions.length === 0 ? (
-                <Card>
+                <Card className={SURFACE_CARD_CLASS}>
                     <CardContent className="py-12 text-center">
                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
                         <p className="text-sm text-muted-foreground">
@@ -817,7 +825,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         return (
                             <Card
                                 key={demand.id || index}
-                                className={`transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary border-primary/50' : 'border-border/50'} ${isProcessing ? 'opacity-60' : ''}`}
+                                className={`${SURFACE_CARD_CLASS} transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary/40 border-primary/50' : 'border-border/50'} ${isProcessing ? 'opacity-60' : ''}`}
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-start gap-3">
@@ -893,7 +901,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                     handleAccept(demand.id);
                                                 }}
                                                 disabled={isProcessing}
-                                                className="min-w-[clamp(92px,18vw,120px)] h-9"
+                                                className="min-w-[clamp(92px,18vw,120px)] h-9 bg-none bg-primary hover:bg-primary/90 shadow-none"
                                             >
                                                 {isProcessing ? (
                                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -966,7 +974,7 @@ const PointsManagementPage: React.FC = () => {
         window.localStorage.setItem('points_selected_platform', selectedPlatform);
     }, [selectedPlatform]);
 
-    const loadRewards = async (platform: 'twitch' | 'vk', showLoader: boolean = true): Promise<void> => {
+    const loadRewards = useCallback(async (platform: 'twitch' | 'vk', showLoader: boolean = true): Promise<void> => {
         try {
             if (showLoader) {
                 setLoading(true);
@@ -1008,11 +1016,11 @@ const PointsManagementPage: React.FC = () => {
                 setLoading(false);
             }
         }
-    };
+    }, [twitchEnabled, vkEnabled]);
 
     useEffect(() => {
-        loadRewards(selectedPlatform, true);
-    }, [selectedPlatform]);
+        void loadRewards(selectedPlatform, true);
+    }, [selectedPlatform, loadRewards]);
 
     if (loading) {
         return (
@@ -1030,7 +1038,7 @@ const PointsManagementPage: React.FC = () => {
                     <div className="flex">
                         <button
                             onClick={() => setActiveTab('rewards')}
-                            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'rewards'
+                            className={`${TAB_BUTTON_BASE} ${activeTab === 'rewards'
                                 ? 'border-primary text-primary'
                                 : 'border-transparent text-muted-foreground hover:text-foreground'
                                 }`}
@@ -1039,7 +1047,7 @@ const PointsManagementPage: React.FC = () => {
                         </button>
                         <button
                             onClick={() => setActiveTab('queue')}
-                            className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${activeTab === 'queue'
+                            className={`${TAB_BUTTON_BASE} ${activeTab === 'queue'
                                 ? 'border-primary text-primary'
                                 : 'border-transparent text-muted-foreground hover:text-foreground'
                                 }`}
@@ -1049,16 +1057,18 @@ const PointsManagementPage: React.FC = () => {
                     </div>
 
                     {(twitchEnabled || vkEnabled) && (
-                        <div className="flex bg-muted rounded-lg p-1">
+                        <div className="flex items-center gap-1 rounded-md border border-border/70 bg-card/60 p-1">
                             {twitchEnabled && (
                                 <Button
-                                    variant={selectedPlatform === 'twitch' ? 'default' : 'ghost'}
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => setSelectedPlatform('twitch')}
-                                    className={`gap-1.5 h-8 ${selectedPlatform === 'twitch'
-                                        ? 'bg-[#9146FF] text-white hover:bg-[#7d3cff]'
-                                        : 'hover:bg-muted'
-                                        }`}
+                                    className={cn(
+                                        'h-8 gap-1.5 px-2.5 text-xs sm:text-sm',
+                                        selectedPlatform === 'twitch'
+                                            ? 'bg-background text-foreground shadow-sm hover:bg-background'
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-background/60'
+                                    )}
                                 >
                                     <TwitchIcon className="w-3.5 h-3.5" />
                                     Twitch
@@ -1066,13 +1076,15 @@ const PointsManagementPage: React.FC = () => {
                             )}
                             {vkEnabled && (
                                 <Button
-                                    variant={selectedPlatform === 'vk' ? 'default' : 'ghost'}
+                                    variant="ghost"
                                     size="sm"
                                     onClick={() => setSelectedPlatform('vk')}
-                                    className={`gap-1.5 h-8 ${selectedPlatform === 'vk'
-                                        ? 'bg-[#FF4444] text-white hover:bg-[#e03a3a]'
-                                        : 'hover:bg-muted'
-                                        }`}
+                                    className={cn(
+                                        'h-8 gap-1.5 px-2.5 text-xs sm:text-sm',
+                                        selectedPlatform === 'vk'
+                                            ? 'bg-background text-foreground shadow-sm hover:bg-background'
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-background/60'
+                                    )}
                                 >
                                     <VKIcon className="w-3.5 h-3.5" />
                                     VK Live
@@ -1097,7 +1109,7 @@ const PointsManagementPage: React.FC = () => {
                     {activeTab === 'rewards' ? (
                         <div>
                             {rewards.length === 0 ? (
-                                <Card>
+                                <Card className={SURFACE_CARD_CLASS}>
                                     <CardContent className="py-12 text-center">
                                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
                                         <p className="text-sm text-muted-foreground font-medium">Нет наград</p>

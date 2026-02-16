@@ -8,10 +8,11 @@ import httpx
 import base64
 from datetime import timedelta
 from typing import Optional, Dict, Any
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from core.config import settings
-from core.database import db_session
+from core.database import db_session, User, UserToken
 from models.bot_token import BotToken
 from core.token_encryption import encrypt_token, decrypt_token
 from core.datetime_utils import utcnow_naive
@@ -22,10 +23,14 @@ logger = logging.getLogger(__name__)
 
 class VkBotOAuthService:
     """Сервис для OAuth авторизации VK Live бота с refresh token"""
+    REFRESH_IF_NEEDED_THRESHOLD_SECONDS = 15 * 60
     
     # Scopes для бота
     BOT_SCOPES = [
-        'offline'
+        'channel:stream:settings',
+        'channel:points:rewards',
+        'channel:points:rewards:demands',
+        'chat:message:send',
     ]
     
     @staticmethod
@@ -35,7 +40,7 @@ class VkBotOAuthService:
         """
         import urllib.parse
         
-        scopes = ' '.join(VkBotOAuthService.BOT_SCOPES)
+        scopes = ','.join(VkBotOAuthService.BOT_SCOPES)
         redirect_uri = f"{settings.backend_url}/auth/vk/bot/callback"
         
         params = {
@@ -202,13 +207,20 @@ class VkBotOAuthService:
         """
         Получить токен бота из базы данных.
         """
-        def _get(session_db: Session) -> Optional[Dict[str, Any]]:
+        async def _get(session_db: Session) -> Optional[Dict[str, Any]]:
             repo = BotTokenRepository(session_db)
             bot_token = repo.get_by_platform('vk')
-            
+
+            if not bot_token and settings.bot_token_auto_bootstrap_enabled:
+                logger.warning(
+                    "[BOOTSTRAP] VK bot token not found in bot_tokens; trying auto-bootstrap from user OAuth tokens"
+                )
+                if await VkBotOAuthService._bootstrap_from_user_tokens(session_db):
+                    bot_token = repo.get_by_platform('vk')
+
             if not bot_token:
                 return None
-            
+
             return {
                 'access_token': decrypt_token(bot_token.access_token),
                 'refresh_token': decrypt_token(bot_token.refresh_token) if bot_token.refresh_token else None,
@@ -216,12 +228,87 @@ class VkBotOAuthService:
                 'bot_login': bot_token.bot_login,
                 'bot_user_id': bot_token.bot_user_id
             }
-        
+
         if db is not None:
-            return _get(db)
-        
+            return await _get(db)
+
         with db_session() as new_db:
-            return _get(new_db)
+            return await _get(new_db)
+
+    @staticmethod
+    async def _bootstrap_from_user_tokens(session_db: Session) -> bool:
+        """
+        Self-healing fallback:
+        if dedicated VK bot token is missing, seed it from existing OAuth user token.
+        """
+        query = (
+            session_db.query(UserToken)
+            .join(User, User.id == UserToken.user_id)
+            .filter(
+                UserToken.platform == 'vk',
+                UserToken.is_active.is_(True),
+                UserToken.access_token.isnot(None),
+                User.is_active.is_(True),
+                User.is_blocked.is_(False),
+            )
+        )
+
+        if settings.bot_token_auto_bootstrap_admin_only:
+            query = query.filter(or_(User.role == 'admin', User.is_admin.is_(True)))
+
+        if settings.bot_token_auto_bootstrap_require_refresh_token:
+            query = query.filter(UserToken.refresh_token.isnot(None))
+
+        candidates = query.order_by(UserToken.updated_at.desc()).all()
+        if not candidates:
+            logger.warning("[BOOTSTRAP] No eligible VK user OAuth tokens found")
+            return False
+
+        now = utcnow_naive()
+        for candidate in candidates:
+            access_token = decrypt_token(candidate.access_token) if candidate.access_token else None
+            refresh_token = decrypt_token(candidate.refresh_token) if candidate.refresh_token else None
+            if not access_token:
+                continue
+            if settings.bot_token_auto_bootstrap_require_refresh_token and not refresh_token:
+                continue
+
+            expires_in = 30 * 24 * 3600
+            if candidate.expires_at:
+                seconds_left = int((candidate.expires_at - now).total_seconds())
+                if seconds_left <= 60:
+                    continue
+                expires_in = seconds_left
+
+            try:
+                user_info = await VkBotOAuthService.get_bot_user_info(access_token)
+            except Exception as e:
+                logger.warning(
+                    "[BOOTSTRAP] Failed to validate VK user token for user_id=%s: %s",
+                    candidate.user_id,
+                    e,
+                )
+                continue
+
+            saved = await VkBotOAuthService.save_bot_token(
+                access_token=access_token,
+                refresh_token=refresh_token or "",
+                expires_in=expires_in,
+                scopes=candidate.scopes if isinstance(candidate.scopes, list) else [],
+                bot_user_id=str(user_info.get('id') or candidate.platform_user_id or ""),
+                bot_login=user_info.get('login') or "",
+                db=session_db,
+            )
+            if saved:
+                logger.warning(
+                    "[BOOTSTRAP] VK bot token auto-seeded from user token (user_id=%s, login=%s)",
+                    candidate.user_id,
+                    user_info.get('login') or "unknown",
+                )
+                return True
+
+        logger.warning("[BOOTSTRAP] Failed to auto-seed VK bot token from user OAuth tokens")
+        return False
     
     @staticmethod
     async def refresh_bot_token(db: Optional[Session] = None) -> bool:
@@ -304,13 +391,13 @@ class VkBotOAuthService:
                 logger.debug("[INFO] Bot token has no expiration date")
                 return True
             
-            days_left = (bot_token.expires_at - utcnow_naive()).days
-            
-            if days_left >= 7:
-                logger.debug(f"[INFO] VK Bot token valid for {days_left} more days")
+            seconds_left = int((bot_token.expires_at - utcnow_naive()).total_seconds())
+
+            if seconds_left > VkBotOAuthService.REFRESH_IF_NEEDED_THRESHOLD_SECONDS:
+                logger.debug(f"[INFO] VK Bot token valid for {seconds_left} more seconds")
                 return True
-            
-            logger.info(f"[REFRESH] VK Bot token expires in {days_left} days, refreshing...")
+
+            logger.info(f"[REFRESH] VK Bot token expires in {seconds_left} seconds, refreshing...")
             return await VkBotOAuthService.refresh_bot_token(session_db)
         
         try:

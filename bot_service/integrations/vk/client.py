@@ -21,6 +21,19 @@ class VKClient(BaseIntegrationClient):
         super().__init__(self.BASE_URL)
         self.oauth = oauth
 
+    @staticmethod
+    def _normalize_category_id(value: Optional[Any]) -> Optional[str]:
+        """Normalize category identifiers coming from mixed frontend/backend payloads."""
+        if value is None:
+            return None
+
+        normalized = str(value).strip()
+        if not normalized:
+            return None
+        if normalized.lower() in {"none", "null", "undefined"}:
+            return None
+        return normalized
+
     async def _get_headers(self, token: Optional[TokenInfo] = None) -> Dict[str, str]:
         """
         Headers with Authorization.
@@ -196,60 +209,120 @@ class VKClient(BaseIntegrationClient):
         Requires getting current state first to merge.
         """
         try:
-            # 1. Get current state (try candidates)
+            base_candidates = [self.PROD_BASE_URL, self.DEV_BASE_URL]
+            channel_candidates = get_vk_channel_candidates(channel_url)
+
+            # 1. Get current state (try base + channel candidates)
             stream_info: Dict[str, Any] = {}
             last_error: Optional[Exception] = None
-            for candidate in get_vk_channel_candidates(channel_url):
-                try:
-                    current_data = await self.get("v1/channel", token=token, params={"channel_url": candidate})
-                    stream_info = current_data.get("data", {}).get("stream", {})
+            for base_url in base_candidates:
+                for candidate in channel_candidates:
+                    try:
+                        current_data = await self._request_with_base(
+                            base_url,
+                            "GET",
+                            "v1/channel",
+                            token=token,
+                            params={"channel_url": candidate},
+                        )
+                        stream_info = current_data.get("data", {}).get("stream", {}) or {}
+                        if stream_info:
+                            logger.info(f"[VK client] Resolved stream info via {candidate} @ {base_url}")
+                            break
+                    except IntegrationError as e:
+                        last_error = e
+                        if e.status_code == 404 or "channel_not_found" in str(e):
+                            continue
+                        raise
+                if stream_info:
                     break
-                except IntegrationError as e:
-                    last_error = e
-                    if e.status_code == 404 or "channel_not_found" in str(e):
-                        continue
-                    raise
             if not stream_info and last_error:
                 logger.warning(f"[VK client] Failed to resolve stream info before update: {last_error}")
 
             # 2. Build payload
             current_cat_id = None
             if stream_info.get("category"):
-                 current_cat_id = stream_info["category"].get("id")
+                current_cat_id = stream_info["category"].get("id")
 
             payload = {
                 "title": title if title is not None else stream_info.get("title", "")
             }
-            resolved_category_id = str(category_id) if category_id else (str(current_cat_id) if current_cat_id else None)
-            if resolved_category_id:
-                payload["category"] = {"id": resolved_category_id}
+            resolved_category_id = self._normalize_category_id(category_id)
+            if not resolved_category_id:
+                resolved_category_id = self._normalize_category_id(current_cat_id)
+            if not resolved_category_id:
+                try:
+                    fallback_info = await self.get_stream_info(channel_url, token)
+                    if isinstance(fallback_info, dict):
+                        resolved_category_id = self._normalize_category_id(fallback_info.get("category_id"))
+                except Exception as fallback_error:
+                    logger.warning(f"[VK client] Failed fallback category resolution: {fallback_error}")
+
+            if not resolved_category_id:
+                logger.error(
+                    "[VK client] Missing category.id for stream update "
+                    "(channel=%s, title_changed=%s, requested_category=%s)",
+                    channel_url,
+                    title is not None,
+                    category_id,
+                )
+                return False
+
+            payload["category"] = {"id": resolved_category_id}
             if stream_info.get("description"):
                 payload["description"] = stream_info.get("description")
 
             # 3. Update
             body = {"stream": payload}
             last_error = None
-            for candidate in get_vk_channel_candidates(channel_url):
-                try:
-                    await self._request_with_base(
-                        self.PROD_BASE_URL,
-                        "POST",
-                        "v1/channel/stream/edit",
-                        token=token,
-                        params={"channel_url": candidate},
-                        json_data=body
-                    )
-                    logger.info(f"[VK client] Updated stream for {candidate}")
-                    return True
-                except IntegrationError as e:
-                    last_error = e
-                    if e.status_code == 404 or "channel_not_found" in str(e):
-                        continue
-                    raise
+            endpoint_candidates = [
+                "v1/channel/stream/edit",
+                "v1/channel/edit",
+                "v1/stream/edit",
+            ]
+            method_candidates = ["POST", "PATCH", "PUT"]
+
+            for base_url in base_candidates:
+                for endpoint in endpoint_candidates:
+                    for method in method_candidates:
+                        for candidate in channel_candidates:
+                            try:
+                                await self._request_with_base(
+                                    base_url,
+                                    method,
+                                    endpoint,
+                                    token=token,
+                                    params={"channel_url": candidate},
+                                    json_data=body
+                                )
+                                logger.info(
+                                    f"[VK client] Updated stream via {method} {endpoint} "
+                                    f"for {candidate} @ {base_url}"
+                                )
+                                return True
+                            except IntegrationError as e:
+                                last_error = e
+                                if e.status_code in {404, 405}:
+                                    continue
+                                err_str = str(e)
+                                if "unknown_api_method" in err_str or "channel_not_found" in err_str:
+                                    continue
+                                raise
+
             if last_error:
+                if last_error.status_code == 405:
+                    logger.warning(
+                        "[VK client] Stream update methods are not supported by current VK API for channel %s",
+                        channel_url,
+                    )
+                    return False
                 raise last_error
+            return False
 
         except IntegrationError as e:
+            if e.status_code == 405:
+                logger.warning(f"[VK client] Stream update is unsupported by VK API (405): {e}")
+                return False
             logger.error(f"[VK client] Failed to update stream: {e}")
             return False
 

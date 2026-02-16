@@ -28,6 +28,9 @@ import { Card, CardContent } from '@/shared/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 
 type TabType = 'streak' | 'donation' | 'points' | 'rewards' | 'history' | 'widget';
+const TAB_TRIGGER_CLASS =
+  'rounded-none -mb-px whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-300 data-[state=active]:shadow-none gap-2';
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
 
 const DropsMainPage: React.FC = () => {
   const navigate = useNavigate();
@@ -70,22 +73,23 @@ const DropsMainPage: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <PageWrapper title="Drops система">
-        <Card className="card-glass">
+        <Card className={SURFACE_CARD_CLASS}>
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
               <AlertCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-white">
+              <h3 className="text-xl font-semibold text-foreground">
                 Требуется авторизация
               </h3>
-              <p className="text-gray-400 text-sm">
-                Для использования системы лояльности необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+              <p className="text-muted-foreground text-sm break-words">
+                Для работы Drops войдите в систему и подключите Twitch или VK Live.
               </p>
             </div>
             <Button
               onClick={() => navigate('/login')}
-              className="gap-2"
+              variant="outline"
+              className="gap-2 border-border/70"
             >
               <Settings className="w-4 h-4" />
               Войти в систему
@@ -103,22 +107,23 @@ const DropsMainPage: React.FC = () => {
   if (!hasAnyIntegration) {
     return (
       <PageWrapper title="Drops система">
-        <Card className="card-glass">
+        <Card className={SURFACE_CARD_CLASS}>
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
               <AlertCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-white">
+              <h3 className="text-xl font-semibold text-foreground">
                 Нет подключенных интеграций
               </h3>
-              <p className="text-gray-400 text-sm">
-                Для использования системы лояльности необходимо подключить хотя бы одну платформу (Twitch или VK Live)
+              <p className="text-muted-foreground text-sm break-words">
+                Подключите хотя бы одну платформу: Twitch или VK Live.
               </p>
             </div>
             <Button
               onClick={() => navigate('/dashboard/settings')}
-              className="gap-2"
+              variant="outline"
+              className="gap-2 border-border/70"
             >
               <Settings className="w-4 h-4" />
               Перейти в настройки
@@ -133,16 +138,16 @@ const DropsMainPage: React.FC = () => {
   if (!channelName || !user) {
     return (
       <PageWrapper title="Drops система">
-        <Card className="card-glass">
+        <Card className={SURFACE_CARD_CLASS}>
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
               <AlertCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-white">
+              <h3 className="text-xl font-semibold text-foreground">
                 Загрузка данных...
               </h3>
-              <p className="text-gray-400 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Пожалуйста, подождите
               </p>
             </div>
@@ -155,28 +160,46 @@ const DropsMainPage: React.FC = () => {
   return (
     <PageWrapper title="Drops система">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="streak" className="gap-2">
+        <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none bg-transparent p-0 border-b border-border">
+          <TabsTrigger
+            value="streak"
+            className={TAB_TRIGGER_CLASS}
+          >
             <Users className="w-4 h-4" />
             Стрик
           </TabsTrigger>
-          <TabsTrigger value="donation" className="gap-2">
+          <TabsTrigger
+            value="donation"
+            className={TAB_TRIGGER_CLASS}
+          >
             <DollarSign className="w-4 h-4" />
             Донаты
           </TabsTrigger>
-          <TabsTrigger value="points" className="gap-2">
+          <TabsTrigger
+            value="points"
+            className={TAB_TRIGGER_CLASS}
+          >
             <Coins className="w-4 h-4" />
             Баллы
           </TabsTrigger>
-          <TabsTrigger value="rewards" className="gap-2">
+          <TabsTrigger
+            value="rewards"
+            className={TAB_TRIGGER_CLASS}
+          >
             <Package className="w-4 h-4" />
             Награды
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-2">
+          <TabsTrigger
+            value="history"
+            className={TAB_TRIGGER_CLASS}
+          >
             <History className="w-4 h-4" />
             История
           </TabsTrigger>
-          <TabsTrigger value="widget" className="gap-2">
+          <TabsTrigger
+            value="widget"
+            className={TAB_TRIGGER_CLASS}
+          >
             <Monitor className="w-4 h-4" />
             Виджет
           </TabsTrigger>

@@ -32,6 +32,8 @@ interface HistoryEntry {
     created_at?: string;
 }
 
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+
 const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelName }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [offset, setOffset] = useState(0);
@@ -130,7 +132,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
   }, []);
 
   return (
-    <Card>
+    <Card className={SURFACE_CARD_CLASS}>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
@@ -139,7 +141,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
               История наград
             </CardTitle>
             <CardDescription className="mt-1">
-              Все полученные награды зрителями ({history.length} записей)
+              Последние выдачи ({history.length})
             </CardDescription>
           </div>
           <Button
@@ -179,7 +181,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
               {filteredHistory.map((entry) => (
                 <div 
                   key={entry.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  className="flex items-center gap-4 p-4 border border-slate-800 rounded-lg bg-slate-950/60 hover:bg-slate-900/80 transition-colors"
                 >
                   {/* Качество */}
                   <div className="flex-shrink-0">
@@ -202,7 +204,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                         {getDropsTypeLabel(entry.drops_type)}
                       </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">
+                    <p className="text-sm text-muted-foreground line-clamp-2 break-words">
                       {entry.reward_name ?? 'Неизвестная награда'}
                     </p>
                     <div className="flex items-center gap-4 mt-2">

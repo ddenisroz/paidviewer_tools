@@ -1,107 +1,127 @@
 #!/usr/bin/env python3
 """
-Модуль для шифрования и дешифрования токенов
-Использует Fernet (симметричное шифрование)
+Модуль для шифрования и дешифрования токенов.
+Использует Fernet (симметричное шифрование).
+
+Зашифрованные токены помечаются префиксом ENC: для быстрой проверки
+без пробного дешифрования.
 """
 import logging
+import sys
 from cryptography.fernet import Fernet
 from typing import Optional
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Префикс для зашифрованных токенов
+ENCRYPTED_PREFIX = "ENC:"
+
+
+class TokenEncryptionError(Exception):
+    """Raised when token encryption/decryption fails."""
+    pass
+
+
 # Получаем ключ шифрования из настроек
 ENCRYPTION_KEY = settings.token_encryption_key
 
 if not ENCRYPTION_KEY or ENCRYPTION_KEY.startswith('your-'):
-    # Генерируем новый ключ при первом запуске
-    logger.warning("[WARN] TOKEN_ENCRYPTION_KEY not configured properly, generating new key")
+    logger.critical(
+        "[SECURITY] TOKEN_ENCRYPTION_KEY is not configured. "
+        "Generate a key with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\" "
+        "and add it to your .env file as TOKEN_ENCRYPTION_KEY=<key>"
+    )
+    if not settings.is_development:
+        sys.exit(1)
+    # В development генерируем temporary key (НЕ логируем его)
     ENCRYPTION_KEY = Fernet.generate_key().decode()
-    logger.info(f" Generated encryption key. Add to .env: TOKEN_ENCRYPTION_KEY={ENCRYPTION_KEY}")
+    logger.warning("[SECURITY] Using temporary encryption key for development. Tokens will NOT survive restart.")
 
 # Создаем объект для шифрования
 try:
     cipher_suite = Fernet(ENCRYPTION_KEY.encode() if isinstance(ENCRYPTION_KEY, str) else ENCRYPTION_KEY)
 except Exception as e:
-    logger.error(f"[ERROR] Failed to initialize encryption: {e}")
-    # Генерируем новый ключ в случае ошибки
+    logger.critical(f"[SECURITY] Failed to initialize encryption: {e}")
+    if not settings.is_development:
+        sys.exit(1)
     ENCRYPTION_KEY = Fernet.generate_key().decode()
     cipher_suite = Fernet(ENCRYPTION_KEY.encode())
-    logger.info(f" Generated new encryption key. Add to .env: TOKEN_ENCRYPTION_KEY={ENCRYPTION_KEY}")
+    logger.warning("[SECURITY] Using fallback temporary encryption key for development.")
 
 
 def encrypt_token(token: str) -> str:
     """
-    Шифрует токен
-    
+    Шифрует токен и помечает префиксом ENC:.
+
     Args:
         token: Токен для шифрования
-        
+
     Returns:
-        Зашифрованный токен (base64)
+        Зашифрованный токен с префиксом ENC:
+
+    Raises:
+        TokenEncryptionError: При ошибке шифрования
     """
     if not token:
         return token
 
-    try:
-        # Если токен уже зашифрован, возвращаем как есть
-        if is_token_encrypted(token):
-            return token
-
-        # Шифруем токен
-        encrypted = cipher_suite.encrypt(token.encode())
-        return encrypted.decode()
-    except Exception as e:
-        logger.error(f"[ERROR] Failed to encrypt token: {e}")
-        # В случае ошибки возвращаем токен как есть (для совместимости)
+    # Если токен уже зашифрован, возвращаем как есть
+    if is_token_encrypted(token):
         return token
+
+    try:
+        encrypted = cipher_suite.encrypt(token.encode())
+        return ENCRYPTED_PREFIX + encrypted.decode()
+    except Exception as e:
+        raise TokenEncryptionError(f"Failed to encrypt token: {e}") from e
 
 
 def decrypt_token(encrypted_token: str) -> Optional[str]:
     """
-    Дешифрует токен
-    
+    Дешифрует токен.
+
     Args:
-        encrypted_token: Зашифрованный токен
-        
+        encrypted_token: Зашифрованный токен (с или без ENC: префикса)
+
     Returns:
-        Расшифрованный токен или None при ошибке
+        Расшифрованный токен
+
+    Raises:
+        TokenEncryptionError: При ошибке дешифрования
     """
     if not encrypted_token:
         return encrypted_token
 
-    try:
-        # Если токен не зашифрован, возвращаем как есть
-        if not is_token_encrypted(encrypted_token):
-            return encrypted_token
+    # Новый формат: с ENC: префиксом
+    if encrypted_token.startswith(ENCRYPTED_PREFIX):
+        raw = encrypted_token[len(ENCRYPTED_PREFIX):]
+        try:
+            decrypted = cipher_suite.decrypt(raw.encode())
+            return decrypted.decode()
+        except Exception as e:
+            raise TokenEncryptionError(f"Failed to decrypt token: {e}") from e
 
-        # Дешифруем токен
+    # Legacy fallback: попытка расшифровать токен без префикса
+    # (для обратной совместимости со старыми зашифрованными токенами)
+    try:
         decrypted = cipher_suite.decrypt(encrypted_token.encode())
         return decrypted.decode()
-    except Exception as e:
-        logger.error(f"[ERROR] Failed to decrypt token: {e}")
-        # В случае ошибки возвращаем токен как есть (для совместимости)
+    except Exception:
+        # Не зашифрован (plaintext legacy token) — возвращаем как есть
         return encrypted_token
 
 
 def is_token_encrypted(token: str) -> bool:
     """
-    Проверяет, зашифрован ли токен
-    
+    Проверяет, зашифрован ли токен (по наличию ENC: префикса).
+
     Args:
         token: Токен для проверки
-        
+
     Returns:
         True если токен зашифрован, False иначе
     """
     if not token:
         return False
-
-    try:
-        # Пробуем дешифровать токен
-        cipher_suite.decrypt(token.encode())
-        return True
-    except Exception:
-        # Если не получилось дешифровать - токен не зашифрован
-        return False
-
+    return token.startswith(ENCRYPTED_PREFIX)

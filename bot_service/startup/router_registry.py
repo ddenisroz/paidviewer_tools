@@ -82,6 +82,7 @@ ROUTER_CONFIGS = {
         RouterConfig("api.stream_history_api"),
         RouterConfig("api.donationalerts_api"),
         RouterConfig("api.memealerts_api"),
+        RouterConfig("api.memealerts_proxy"),
         RouterConfig("api.platforms_api"),
         RouterConfig("api.proxy_api"),
     ],

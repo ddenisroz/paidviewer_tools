@@ -24,10 +24,11 @@ class MemeAlertsService:
         self.token_repo = UserTokenRepository(db)
 
     def _get_token(self, user_id: int) -> Tuple[str, Optional[str]]:
+        from core.token_encryption import decrypt_token
         token = self.token_repo.get_by_user_and_platform(user_id, "memealerts")
         if not token or not token.access_token:
             raise ValueError("MemeAlerts not connected")
-        return token.access_token, token.platform_user_id
+        return decrypt_token(token.access_token), token.platform_user_id
 
     @staticmethod
     def _decode_token(token: str) -> Dict[str, Any]:

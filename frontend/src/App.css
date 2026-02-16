@@ -361,43 +361,41 @@ body {
   }
 }
 
-/* Полностью скрываем скроллбар */
-::-webkit-scrollbar {
-  width: 0px;
-  background: transparent;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: transparent;
-}
-
-/* Для Firefox */
-html {
-  scrollbar-width: none;
-}
-
-/* Убираем полоску скроллбара полностью */
-body {
+/* Скрываем скроллбар для html и body (главный скролл страницы) */
+html, body {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-
-/* Дополнительно скрываем скроллбар */
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-*::-webkit-scrollbar {
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
   display: none;
+}
+
+/* Тонкий скроллбар для внутренних элементов (поповеры, списки и т.д.) */
+.overflow-y-auto,
+.overflow-auto,
+[data-radix-scroll-area-viewport],
+[data-radix-popover-content] .max-h-64 {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+.overflow-y-auto::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+.overflow-y-auto::-webkit-scrollbar-track,
+.overflow-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb,
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb:hover,
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
 }
 
 /* Body font - использует CSS переменную */

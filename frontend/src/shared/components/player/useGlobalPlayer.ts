@@ -1,8 +1,8 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 import { logger } from '@/shared/utils/prodLogger';
 
-import type { DisplayVideo, YouTubePlayer, ReactPlayerInstance } from './types';
+import type { DisplayVideo, ReactPlayerInstance, YouTubePlayer } from './types';
 
 interface UseGlobalPlayerOptions {
     displayVideo: DisplayVideo | null;
@@ -14,9 +14,10 @@ interface UseGlobalPlayerOptions {
     handlePlayerReady: (event: { target: YouTubePlayer }) => void;
     handlePlayerStateChange: (event: { data: number }) => void;
     handlePlayerError: (event: { data: unknown }) => void;
-    nextVideo: () => void;
+    nextVideo: () => Promise<void>;
 }
 
+ 
 export function useGlobalPlayer({
     displayVideo,
     currentVideo,
@@ -31,6 +32,7 @@ export function useGlobalPlayer({
 }: UseGlobalPlayerOptions) {
     const playerRef = useRef<ReactPlayerInstance>(null);
     const playerWrapperRef = useRef<YouTubePlayer | null>(null);
+    const endedVideoKeyRef = useRef<string | number | null>(null);
 
     const getInternalPlayer = useCallback(() => {
         const internal = playerRef.current?.getInternalPlayer?.();
@@ -143,7 +145,7 @@ export function useGlobalPlayer({
             }
 
             if (diffSeconds > 0) {
-                playerRef.current.seekTo(diffSeconds, 'seconds');
+                playerRef.current.seekTo?.(diffSeconds, 'seconds');
             }
         } catch (e) {
             logger.error("Error syncing time", e);
@@ -158,16 +160,26 @@ export function useGlobalPlayer({
             playerWrapperRef.current = createPlayerWrapper();
         }
         const playerWrapper = playerWrapperRef.current;
+        if (!playerWrapper) return;
         setPlayerRef(playerWrapper, 'global');
         handlePlayerReady({ target: playerWrapper });
         syncPlaybackTime();
     }, [displayVideo, createPlayerWrapper, setPlayerRef, handlePlayerReady, syncPlaybackTime]);
 
+    useEffect(() => {
+        endedVideoKeyRef.current = null;
+    }, [displayVideo?.id, displayVideo?.video_id]);
+
     // Handle video end
     const handleEnded = useCallback(() => {
+        const endedKey = displayVideo?.id ?? displayVideo?.video_id ?? null;
+        if (endedKey !== null && endedVideoKeyRef.current === endedKey) {
+            return;
+        }
+        endedVideoKeyRef.current = endedKey;
         handlePlayerStateChange({ data: 2 }); // pause to avoid brief replay
-        nextVideo();
-    }, [handlePlayerStateChange, nextVideo]);
+        void nextVideo();
+    }, [displayVideo?.id, displayVideo?.video_id, handlePlayerStateChange, nextVideo]);
 
     // Handle errors
     const handleError = useCallback((error: unknown) => {

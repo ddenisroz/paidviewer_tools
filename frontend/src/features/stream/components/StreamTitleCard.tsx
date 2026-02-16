@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { CheckCircle, Loader2, PenLine, Save } from 'lucide-react';
 
 import { useData } from '@/context/DataContext';
@@ -108,7 +109,7 @@ const StreamTitleCard: React.FC = () => {
             if (!success) {
                 setLocalCombine(!value); // Revert on failure
             }
-        } catch (error) {
+        } catch {
             setLocalCombine(!value);
         }
     };
@@ -153,7 +154,7 @@ const StreamTitleCard: React.FC = () => {
                 }, 'saveTitle');
             } else {
                 if (!hasPlatformChange(platform)) return;
-                const payload: any = {};
+                const payload: Partial<Record<'twitch' | 'vk', { title: string }>> = {};
                 payload[platform] = { title };
                 await saveChanges(payload, 'saveTitle');
             }

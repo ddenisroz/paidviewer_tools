@@ -15,6 +15,8 @@ interface DonationHistoryProps {
     channelName: string;
 }
 
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+
 const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, channelName }) => {
   const { data: historyData, isLoading: loading } = useDropsHistory(
     channelName,
@@ -54,7 +56,7 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
   }
 
   return (
-    <Card>
+    <Card className={SURFACE_CARD_CLASS}>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center gap-2">
           <History className="w-5 h-5" />
@@ -66,7 +68,7 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
           {history.map((entry) => (
             <div 
               key={entry.id}
-              className="flex items-center justify-between p-2 border rounded hover:bg-muted/50 transition-colors"
+              className="flex items-center justify-between p-2 border border-slate-800 rounded bg-slate-950/60 hover:bg-slate-900/80 transition-colors"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <DollarSign className="w-4 h-4 text-green-400 flex-shrink-0" />

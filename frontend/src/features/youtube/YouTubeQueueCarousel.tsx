@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 
-import { ChevronDown, ChevronUp, Clock, GripVertical, History, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
+/* eslint-disable no-alert */
+import { ChevronDown, ChevronUp, GripVertical, History, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -132,7 +133,7 @@ const YouTubeQueueCarousel: React.FC = () => {
     removeVideoMutation.mutate(queueId);
   };
 
-  const playVideo = (queueId: number) => {
+  const playVideo = (_queueId: number) => {
     // Skip to this video
     playVideoMutation.mutate();
   };

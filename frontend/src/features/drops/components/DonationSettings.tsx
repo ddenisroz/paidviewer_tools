@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
 import { AlertTriangle, Loader2, Package, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 import { DROPS_CONSTANTS } from '@/constants/drops';
 import { useDonationAlerts } from '@/context/DonationAlertsContext';
@@ -43,7 +44,14 @@ interface DonationSettingsFormData {
   mythical_donation_amount: number[];
 }
 
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const MYTHICAL_MIN_INTERVAL_PRESETS = [1, 3, 6, 12, 24];
+const MYTHICAL_MAX_INTERVAL_PRESETS = [6, 12, 24, 48, 72];
+const MYTHICAL_WINDOW_PRESETS = [5, 10, 15, 30, 60];
+const MYTHICAL_DONATION_PRESETS = [500, 1000, 2000, 5000, 10000];
+
 const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, hasRewards = false }) => {
+  const navigate = useNavigate();
   const { integrations } = useIntegrations();
   const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
   const donationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
@@ -115,7 +123,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       setFormData(initialFormData);
       setIsInitialLoad(false);
     }
-  }, [initialFormData, isInitialLoad]);
+  }, [initialFormData, isInitialLoad, setIsInitialLoad]);
 
   // ✅ ИСПРАВЛЕНИЕ: Используем функциональное обновление и удаляем formData из зависимостей
   // чтобы избежать бесконечного цикла. Проверяем текущие значения через ref или функциональное обновление.
@@ -139,6 +147,32 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
 
   const mythicalEnabledDisplay = formData.mythical_enabled;
   const donationEnabledDisplay = donationalertsConnected ? formData.donation_enabled : false;
+  const mythicalDonationMax = Math.max(
+    DROPS_CONSTANTS.MYTHICAL.MAX_DONATION_AMOUNT,
+    Math.ceil(formData.mythical_donation_amount[0] / 100) * 100
+  );
+  const mythicalIntervalMax = DROPS_CONSTANTS.MYTHICAL.MAX_INTERVAL_HOURS;
+  const mythicalWindowMax = DROPS_CONSTANTS.MYTHICAL.MAX_WINDOW_DURATION_MINUTES;
+
+  const setMythicalMinInterval = (value: number) => {
+    const clamped = Math.max(1, Math.min(mythicalIntervalMax, value));
+    setFormData((prev) => ({ ...prev, mythical_min_interval_hours: [clamped] }));
+  };
+
+  const setMythicalMaxInterval = (value: number) => {
+    const clamped = Math.max(1, Math.min(mythicalIntervalMax, value));
+    setFormData((prev) => ({ ...prev, mythical_max_interval_hours: [clamped] }));
+  };
+
+  const setMythicalWindowDuration = (value: number) => {
+    const clamped = Math.max(1, Math.min(mythicalWindowMax, value));
+    setFormData((prev) => ({ ...prev, mythical_window_duration_minutes: [clamped] }));
+  };
+
+  const setMythicalDonationAmount = (value: number) => {
+    const clamped = Math.max(500, Math.min(mythicalDonationMax, value));
+    setFormData((prev) => ({ ...prev, mythical_donation_amount: [clamped] }));
+  };
 
   const validateMythical = (payload: Partial<DropsConfig>): string | null => {
     if (payload.mythical_enabled) {
@@ -209,7 +243,16 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
 
   useEffect(() => {
     if (!isInitialLoad && config) {
-      autoSave(createPayload());
+      autoSave({
+        donation_amount_common: formData.donation_amount_common[0],
+        donation_amount_rare: formData.donation_amount_rare[0],
+        donation_amount_epic: formData.donation_amount_epic[0],
+        donation_amount_legendary: formData.donation_amount_legendary[0],
+        mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
+        mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
+        mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
+        mythical_donation_amount: formData.mythical_donation_amount[0]
+      });
     }
   }, [
     formData.donation_amount_common,
@@ -221,12 +264,13 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     formData.mythical_window_duration_minutes,
     formData.mythical_donation_amount,
     isInitialLoad,
+    config,
     autoSave
   ]);
 
   if (isLoading || isInitialLoad || !config) {
     return (
-      <Card>
+      <Card className={SURFACE_CARD_CLASS}>
         <CardContent className="p-6">
           <div className="flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -240,7 +284,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     <div className="space-y-4">
       {/* Предупреждение если нет наград */}
       {!hasRewards && (
-        <Card className="border-l-4 border-l-orange-500 border-orange-500/20 bg-orange-500/5">
+        <Card className="border-l-4 border-l-orange-500 border-orange-500/40 bg-slate-950/80 backdrop-blur-sm shadow-md shadow-black/20">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
               <div className="p-1.5 rounded-lg bg-orange-500/10 flex-shrink-0">
@@ -248,13 +292,13 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
               </div>
               <div className="flex-1 space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Для работы donation drops необходимо сначала настроить содержимое сундуков на вкладке <strong className="text-foreground">"Награды"</strong>.
+                  Сначала добавьте награды на вкладке <strong className="text-foreground">"Награды"</strong>.
                 </p>
                 <Button
-                  onClick={() => window.location.href = '/dashboard/drops?tab=rewards'}
+                  onClick={() => navigate('/dashboard/drops?tab=rewards')}
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs"
+                  className="h-8 text-xs border-slate-700 bg-slate-900/70 hover:bg-slate-800"
                 >
                   <Package className="w-3.5 h-3.5 mr-1.5" />
                   Настроить награды
@@ -266,7 +310,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       )}
 
       {/* Настройки донатов - компактно */}
-      <Card>
+      <Card className={SURFACE_CARD_CLASS}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-end">
             <div className="flex items-center gap-2">
@@ -312,15 +356,15 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
 
       {/* Инструкция и цветовая схема */}
       {donationEnabledDisplay && (
-        <Card className="border-purple-500/20 bg-gradient-to-br from-purple-500/5 to-transparent">
+        <Card className={SURFACE_CARD_CLASS}>
           <CardContent className="pt-4 pb-4 space-y-3">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-purple-500/10 flex-shrink-0">
-                <Sparkles className="w-4 h-4 text-purple-400" />
+              <div className="p-2 rounded-lg bg-emerald-500/10 flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-emerald-300" />
               </div>
               <div className="flex-1 space-y-2 text-sm">
-                <p className="text-muted-foreground leading-relaxed">
-                  Система считывает донаты по API через <strong className="text-foreground">DonationAlerts</strong>. Значения зависят от суммы:
+                <p className="text-muted-foreground break-words">
+                  Пороги выпадения по донатам:
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 pt-1">
@@ -348,16 +392,16 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       )}
 
       {/* Мифический lootbox - компактно */}
-      <Card className="border-2 border-pink-500/30 bg-gradient-to-br from-pink-500/10 to-purple-600/5">
+      <Card className={`${SURFACE_CARD_CLASS} border-emerald-500/30`}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2 text-pink-400">
+            <CardTitle className="text-lg flex items-center gap-2 text-emerald-300">
               <img src={MythycClosed} alt="Мифический" className="w-10 h-10 flex-shrink-0" />
               <Sparkles className="w-5 h-5 flex-shrink-0" />
               <span>Мифический drops</span>
             </CardTitle>
             <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium text-pink-300">Включить mythyc drops</Label>
+              <Label className="text-sm font-medium text-emerald-200">Включить mythical drops</Label>
               <div title="Мифический drops работает на основе донатов. Активация происходит только когда стрим онлайн.">
                 <Switch
                   checked={mythicalEnabledDisplay}
@@ -391,31 +435,44 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         </CardHeader>
         {mythicalEnabledDisplay && (
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs">Мин. интервал (ч)</Label>
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_min_interval_hours}
-                    onValueChange={(value) => {
-                      setFormData({ ...formData, mythical_min_interval_hours: value });
-                    }}
-                    min={0}
-                    max={24}
+                    onValueChange={(value) => setMythicalMinInterval(value[0])}
+                    min={1}
+                    max={mythicalIntervalMax}
                     step={1}
                     className="flex-1"
                   />
                   <Input
                     type="number"
-                    min="0"
-                    max="24"
+                    min="1"
+                    max={String(mythicalIntervalMax)}
                     value={formData.mythical_min_interval_hours[0]}
-                    onChange={(e) => {
-                      const value = Math.max(0, Math.min(24, parseInt(e.target.value) || 0));
-                      setFormData({ ...formData, mythical_min_interval_hours: [value] });
-                    }}
+                    onChange={(e) => setMythicalMinInterval(parseInt(e.target.value, 10) || 1)}
                     className="w-16 text-center"
                   />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {MYTHICAL_MIN_INTERVAL_PRESETS.filter((preset) => preset <= mythicalIntervalMax).map((preset) => (
+                    <Button
+                      key={`mythical-min-${preset}`}
+                      type="button"
+                      variant={formData.mythical_min_interval_hours[0] === preset ? 'secondary' : 'outline'}
+                      size="sm"
+                      className={`h-7 px-2 text-xs ${
+                        formData.mythical_min_interval_hours[0] === preset
+                          ? 'bg-slate-700 text-slate-100 border-slate-600'
+                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                      }`}
+                      onClick={() => setMythicalMinInterval(preset)}
+                    >
+                      {preset}ч
+                    </Button>
+                  ))}
                 </div>
               </div>
               <div className="space-y-2">
@@ -423,25 +480,38 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_max_interval_hours}
-                    onValueChange={(value) => {
-                      setFormData({ ...formData, mythical_max_interval_hours: value });
-                    }}
-                    min={0}
-                    max={24}
+                    onValueChange={(value) => setMythicalMaxInterval(value[0])}
+                    min={1}
+                    max={mythicalIntervalMax}
                     step={1}
                     className="flex-1"
                   />
                   <Input
                     type="number"
-                    min="0"
-                    max="24"
+                    min="1"
+                    max={String(mythicalIntervalMax)}
                     value={formData.mythical_max_interval_hours[0]}
-                    onChange={(e) => {
-                      const value = Math.max(0, Math.min(24, parseInt(e.target.value) || 0));
-                      setFormData({ ...formData, mythical_max_interval_hours: [value] });
-                    }}
+                    onChange={(e) => setMythicalMaxInterval(parseInt(e.target.value, 10) || 1)}
                     className="w-16 text-center"
                   />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {MYTHICAL_MAX_INTERVAL_PRESETS.filter((preset) => preset <= mythicalIntervalMax).map((preset) => (
+                    <Button
+                      key={`mythical-max-${preset}`}
+                      type="button"
+                      variant={formData.mythical_max_interval_hours[0] === preset ? 'secondary' : 'outline'}
+                      size="sm"
+                      className={`h-7 px-2 text-xs ${
+                        formData.mythical_max_interval_hours[0] === preset
+                          ? 'bg-slate-700 text-slate-100 border-slate-600'
+                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                      }`}
+                      onClick={() => setMythicalMaxInterval(preset)}
+                    >
+                      {preset}ч
+                    </Button>
+                  ))}
                 </div>
               </div>
               <div className="space-y-2">
@@ -449,25 +519,38 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_window_duration_minutes}
-                    onValueChange={(value) => {
-                      setFormData({ ...formData, mythical_window_duration_minutes: value });
-                    }}
+                    onValueChange={(value) => setMythicalWindowDuration(value[0])}
                     min={1}
-                    max={60}
+                    max={mythicalWindowMax}
                     step={1}
                     className="flex-1"
                   />
                   <Input
                     type="number"
                     min="1"
-                    max="60"
+                    max={String(mythicalWindowMax)}
                     value={formData.mythical_window_duration_minutes[0]}
-                    onChange={(e) => {
-                      const value = Math.max(1, Math.min(60, parseInt(e.target.value) || 1));
-                      setFormData({ ...formData, mythical_window_duration_minutes: [value] });
-                    }}
+                    onChange={(e) => setMythicalWindowDuration(parseInt(e.target.value, 10) || 1)}
                     className="w-16 text-center"
                   />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {MYTHICAL_WINDOW_PRESETS.filter((preset) => preset <= mythicalWindowMax).map((preset) => (
+                    <Button
+                      key={`mythical-window-${preset}`}
+                      type="button"
+                      variant={formData.mythical_window_duration_minutes[0] === preset ? 'secondary' : 'outline'}
+                      size="sm"
+                      className={`h-7 px-2 text-xs ${
+                        formData.mythical_window_duration_minutes[0] === preset
+                          ? 'bg-slate-700 text-slate-100 border-slate-600'
+                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                      }`}
+                      onClick={() => setMythicalWindowDuration(preset)}
+                    >
+                      {preset}м
+                    </Button>
+                  ))}
                 </div>
               </div>
               <div className="space-y-2">
@@ -475,26 +558,39 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                 <div className="flex items-center gap-2">
                   <Slider
                     value={formData.mythical_donation_amount}
-                    onValueChange={(value) => {
-                      setFormData({ ...formData, mythical_donation_amount: value });
-                    }}
+                    onValueChange={(value) => setMythicalDonationAmount(value[0])}
                     min={500}
-                    max={10000}
+                    max={mythicalDonationMax}
                     step={100}
                     className="flex-1"
                   />
                   <Input
                     type="number"
                     min="500"
-                    max="10000"
+                    max={String(mythicalDonationMax)}
                     step="100"
                     value={formData.mythical_donation_amount[0]}
-                    onChange={(e) => {
-                      const value = Math.max(500, Math.min(10000, parseInt(e.target.value) || 500));
-                      setFormData({ ...formData, mythical_donation_amount: [value] });
-                    }}
+                    onChange={(e) => setMythicalDonationAmount(parseInt(e.target.value, 10) || 500)}
                     className="w-20 text-center"
                   />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {MYTHICAL_DONATION_PRESETS.filter((preset) => preset <= mythicalDonationMax).map((preset) => (
+                    <Button
+                      key={`mythical-donation-${preset}`}
+                      type="button"
+                      variant={formData.mythical_donation_amount[0] === preset ? 'secondary' : 'outline'}
+                      size="sm"
+                      className={`h-7 px-2 text-xs ${
+                        formData.mythical_donation_amount[0] === preset
+                          ? 'bg-slate-700 text-slate-100 border-slate-600'
+                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                      }`}
+                      onClick={() => setMythicalDonationAmount(preset)}
+                    >
+                      {preset}₽
+                    </Button>
+                  ))}
                 </div>
               </div>
             </div>

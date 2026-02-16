@@ -4,7 +4,7 @@
 import { apiClient } from '../client';
 
 import type { ApiResponse } from '@/types/api';
-import type { YoutubeObsUrlResponse, YoutubeQueue, YoutubeSettings, YoutubeVideo } from '@/types/youtube';
+import type { YoutubeQueue, YoutubeSettings, YoutubeVideo } from '@/types/youtube';
 import type { AxiosResponse } from 'axios';
 
 /**

@@ -1,14 +1,12 @@
 ﻿import { useEffect } from 'react';
 
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
-import { useAuth } from '@/context/AuthContext';
 import { DataProvider } from '@/context/DataContext';
 import { DonationAlertsProvider } from '@/context/DonationAlertsContext';
 import { PlayerProvider, usePlayer } from '@/context/PlayerContext';
 import { TtsProvider, useTts } from '@/context/TtsContext';
 import { WidgetLayoutProvider } from '@/context/WidgetLayoutContext';
-import GlobalTtsPlayer from '@/features/tts/components/GlobalTtsPlayer';
 import CookieConsent from '@/shared/components/CookieConsent';
 import GlobalPlayer from '@/shared/components/GlobalPlayer';
 import Header from '@/shared/components/layout/Header';
@@ -16,7 +14,7 @@ import Sidebar from '@/shared/components/layout/Sidebar';
 import { composeProviders } from '@/shared/utils/composeProviders';
 // [PACKAGE] Layout-specific провайдеры
 // Эти контексты нужны только внутри dashboard layout
-// AudioPriorityProvider и TtsPlayerProvider теперь в main.tsx (нужны для ChatProvider)
+// TtsPlayerProvider теперь в main.tsx (нужен для ChatProvider)
 const LayoutProviders = composeProviders(
   TtsProvider,
   DataProvider,
@@ -28,10 +26,8 @@ const LayoutProviders = composeProviders(
 // Внутренний компонент для использования usePlayer
 const LayoutContent: React.FC = () => {
   const { isVisible, isTheaterMode } = usePlayer();
-  const { isAuthenticated, isCheckingAuth } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
-  const { toggleTts, ttsEnabled } = useTts(); // Use TTS context
+  const { toggleTts } = useTts(); // Use TTS context
   const currentPath = location.pathname;
   const currentSearch = location.search;
   const searchParams = new URLSearchParams(currentSearch);
@@ -75,9 +71,6 @@ const LayoutContent: React.FC = () => {
           </div>
         </main>
       </div>
-
-      {/* Глобальный TTS плеер (фиксирован справа внизу) */}
-      <GlobalTtsPlayer />
 
       {/* Уведомление о cookies рендерим один раз здесь */}
       <CookieConsent />

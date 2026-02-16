@@ -15,6 +15,7 @@ from repositories.blocked_user_repository import BlockedUserRepository
 from repositories.audio_settings_repository import AudioSettingsRepository
 from repositories.user_repository import UserRepository
 from repositories.user_token_repository import UserTokenRepository
+from repositories.local_tts_repository import LocalTTSRepository
 
 from services.tts.memory_tts_queue import get_memory_tts_queue
 from services.advanced_rate_limiter import advanced_rate_limiter
@@ -154,7 +155,7 @@ class TTSService:
             user_id = kwargs.get('user_id')
             session_id = kwargs.get('session_id')
             
-            settings = self.settings_repo.get_or_create(user_id)
+            settings = self.settings_repo.get_or_create(user_id=user_id, session_id=session_id)
             
             # Version check logic if needed (can be added to repo or here)
             client_version = kwargs.get('client_version')
@@ -162,8 +163,23 @@ class TTSService:
                  if settings.version != client_version:
                      return {"success": False, "error": "Version conflict", "current_version": settings.version}
 
+            payload = dict(kwargs)
+            payload.pop("user_id", None)
+            payload.pop("session_id", None)
+            payload.pop("client_version", None)
+
             # Update
-            updated_settings = self.settings_repo.update_settings(settings, kwargs)
+            updated_settings = self.settings_repo.update_settings(settings, payload)
+
+            listening_mode = payload.get("listening_mode")
+            if user_id and listening_mode in {"website", "obs"}:
+                user = self.user_repo.get_by_id(user_id)
+                if user:
+                    self.user_repo.update(user, {"tts_listening_mode": listening_mode})
+
+            if user_id:
+                from services.memory_websocket_manager import get_memory_websocket_manager
+                await get_memory_websocket_manager().sync_user_tts_generation(user_id)
             
             # Version is auto-incremented inside update_settings
             return {"success": True, "version": getattr(updated_settings, 'version', 1)}
@@ -240,24 +256,31 @@ class TTSService:
         else:
             engine_type = 'gtts'
 
-        if enabled:
-            connection_manager = get_connection_manager()
-            if user.twitch_username:
-                channel_name = user.twitch_username.lower()
-                if channel_name not in connection_manager.tts_enabled_channels:
-                    connection_manager.enable_tts_for_channel(channel_name)
+        listening_mode = getattr(settings, 'listening_mode', None) or getattr(user, 'tts_listening_mode', 'website')
 
-            tokens = self.token_repo.get_all_by_user(user_id)
-            for token in tokens:
-                if token.platform == 'vk' and token.platform_user_id:
-                    vk_channel = str(token.platform_user_id)
-                    if vk_channel not in connection_manager.tts_enabled_channels:
-                        connection_manager.enable_tts_for_channel(vk_channel)
+        has_local_setup = False
+        is_whitelisted = False
+
+        try:
+            local_repo = LocalTTSRepository(self.db)
+            local_config = local_repo.get_active(user_id=user_id)
+            has_local_setup = bool(local_config and local_config.is_healthy)
+        except Exception as exc:
+            logger.warning("Failed to resolve local TTS status for user %s: %s", user_id, exc)
+
+        try:
+            from utils.whitelist_cache import is_user_whitelisted_cached
+            is_whitelisted = bool(is_user_whitelisted_cached(user, self.db))
+        except Exception as exc:
+            logger.warning("Failed to resolve whitelist status for user %s: %s", user_id, exc)
 
         return {
             "enabled": enabled,
-            "listening_mode": getattr(user, 'tts_listening_mode', 'website'),
-            "engine_type": engine_type
+            "listening_mode": listening_mode,
+            "listeningMode": listening_mode,
+            "engine_type": engine_type,
+            "has_local_setup": has_local_setup,
+            "is_whitelisted": is_whitelisted,
         }
 
     # === Platform Settings ===
@@ -298,6 +321,9 @@ class TTSService:
             for t in tokens:
                 if t.platform == 'vk' and t.platform_user_id:
                      connection_manager.enable_tts_for_channel(t.platform_user_id)
+
+            from services.memory_websocket_manager import get_memory_websocket_manager
+            await get_memory_websocket_manager().sync_user_tts_generation(user_id)
             
             return True
         except Exception as e:
@@ -325,6 +351,9 @@ class TTSService:
             for t in tokens:
                 if t.platform == 'vk' and t.platform_user_id:
                      connection_manager.disable_tts_for_channel(t.platform_user_id)
+
+            from services.memory_websocket_manager import get_memory_websocket_manager
+            await get_memory_websocket_manager().sync_user_tts_generation(user_id)
 
             return True
         except Exception as e:

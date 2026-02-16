@@ -7,7 +7,7 @@
 1. **Check user TTS status:**
    ```bash
    cd bot_service
-   python scripts/check_tts_status.py <user_id>
+   python scripts/run_check.py tts-status <user_id>
    ```
 
 2. **Check if bot is connected to chat:**
@@ -76,7 +76,7 @@ psql -d <database> -c "UPDATE users SET tts_enabled = true WHERE id = 1;"
 psql -d <database> -c "INSERT INTO whitelisted_channels (channel_name, platform) VALUES ('yourchy', 'twitch');"
 
 # Check TTS status
-cd bot_service && python scripts/check_tts_status.py 1
+cd bot_service && python scripts/run_check.py tts-status 1
 ```
 
 ---

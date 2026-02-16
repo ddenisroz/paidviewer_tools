@@ -101,7 +101,7 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
 
         window.addEventListener('drops-config-changed', handleDropsConfigChange);
         return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange);
-    }, [channelName, queryClient, setOptimisticStreakState, dropsConfigData]);
+    }, [channelName, queryClient, setOptimisticStreakState, dropsConfigData, optimisticStreakState]);
 
     const handleStreakToggle = () => {
         if (isToggling || !channelName || updateDropsConfigMutation.isPending) return;

@@ -8,6 +8,7 @@ Lifecycle events для FastAPI приложения.
 - Инициализация/остановка ботов
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -57,29 +58,18 @@ async def _startup_commands() -> None:
         db.close()
 
 
-
 async def _startup_services() -> None:
-    """Запуск сервисов (TTS queue, WebSocket manager)."""
+    """Запуск сервисов (TTS queue, WebSocket manager, TTS worker) параллельно."""
+    from services.tts.tts_worker import tts_worker
     try:
-        await get_memory_tts_queue().start()
-        # logger.info("Memory TTS Queue started") - Logged inside start()
+        await asyncio.gather(
+            get_memory_tts_queue().start(),
+            get_memory_websocket_manager().start(),
+            tts_worker.start(),
+        )
+        logger.info("All services started (TTS queue, WebSocket manager, TTS worker)")
     except Exception as e:
-        logger.error(f"Failed to start Memory TTS Queue: {e}")
-        raise
-    
-    try:
-        await get_memory_websocket_manager().start()
-        # logger.info("Memory WebSocket Manager started") - Logged inside start()
-    except Exception as e:
-        logger.error(f"Failed to start Memory WebSocket Manager: {e}")
-        raise
-
-    # [NEW] Start TTS Worker
-    try:
-        from services.tts.tts_worker import tts_worker
-        await tts_worker.start()
-    except Exception as e:
-        logger.error(f"Failed to start TTS Worker: {e}")
+        logger.error(f"Failed to start services: {e}")
         raise
 
 async def _startup_connection_manager() -> None:
@@ -98,19 +88,15 @@ async def _startup_connection_manager() -> None:
         db.close()
 
 async def _startup_background_tasks() -> None:
-    """Запуск фоновых задач."""
-    await background_tasks.start_all_tasks()
-    logger.info("Background tasks started")
-    
-    # Запускаем мониторинг токенов ботов
+    """Запуск фоновых задач параллельно."""
     from services.bot_token_validator import bot_token_validator
-    await bot_token_validator.start_monitoring(check_interval=3600)  # Проверка каждый час
-    logger.info("Bot token monitoring started")
-    
-    # Запускаем автообновление VK токенов
     from services.vk_token_refresh_service import vk_token_refresh_service
-    await vk_token_refresh_service.start()
-    logger.info("VK token refresh service started")
+    await asyncio.gather(
+        background_tasks.start_all_tasks(),
+        bot_token_validator.start_monitoring(check_interval=3600),
+        vk_token_refresh_service.start(),
+    )
+    logger.info("All background tasks started (tasks, token monitoring, VK refresh)")
 
 async def _shutdown_bots() -> None:
     """Остановка всех ботов."""

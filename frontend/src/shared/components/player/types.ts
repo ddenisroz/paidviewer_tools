@@ -35,6 +35,7 @@ export interface DisplayVideo {
     id: string | number;
     video_id: string;
     title: string;
+    url?: string;
     thumbnail?: string;
     thumbnail_url?: string;
     requester_name?: string;

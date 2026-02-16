@@ -47,6 +47,12 @@ interface AuthState {
     triggerIntegrationsRefresh: () => void;
 }
 
+interface AuthStatusPayload {
+    authenticated?: boolean;
+    user?: User;
+    integrations?: User['integrations'];
+}
+
 export const useAuthStore = create<AuthState>()(devtools(
     (set, get) => ({
         // 🚀 ANTI-FLASH: Initialize from localStorage
@@ -94,9 +100,9 @@ export const useAuthStore = create<AuthState>()(devtools(
 
             try {
                 const response = await authService.getAuthStatus();
-                const authData = response.data as any;
+                const authData = response.data as AuthStatusPayload;
 
-                if (authData?.authenticated) {
+                if (authData?.authenticated && authData.user) {
                     const userData = authData.user;
                     const userWithIntegrations = {
                         ...userData,

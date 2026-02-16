@@ -3,10 +3,9 @@ import re
 from typing import Dict, Any, Optional
 
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 # Core & Database
-from core.database import SessionLocal, User, UserToken
+from core.database import SessionLocal, User
 
 # Repositories - Clean Architecture
 from repositories.tts_settings_repository import TTSSettingsRepository
@@ -27,7 +26,7 @@ from constants import TTS_DEFAULT_VOLUME
 
 # Analysis logging for LLM feature verification
 from core.analysis_logging import (
-    log_tts_request, log_feature, log_error as log_analysis_error,
+    log_tts_request, log_error as log_analysis_error,
     set_correlation_id, clear_correlation_id
 )
 
@@ -75,8 +74,6 @@ class TTSHandlerService:
 
             # 2. Database Context
             db = SessionLocal()
-            import time
-            start_time = time.time()
             set_correlation_id()
             try:
                 # 3. Load User and Settings
@@ -118,6 +115,7 @@ class TTSHandlerService:
 
             finally:
                 db.close()
+                clear_correlation_id()
 
         except Exception as e:
             logger.error(f"[ERROR] [{platform.upper()} TTS] Error processing TTS: {e}", exc_info=True)
@@ -271,7 +269,8 @@ class TTSHandlerService:
             "maxLength": tts_settings.max_message_length,
             "skipCommands": tts_settings.skip_commands,
             "voice": tts_settings.voice,
-            "gcloud_voices": getattr(tts_settings, "gcloud_voices", []) or []
+            "gcloud_voices": getattr(tts_settings, "gcloud_voices", []) or [],
+            "gcloud_mood": getattr(tts_settings, "gcloud_mood", "neutral") or "neutral",
         }
         
         if engine_config["voice_settings"]:

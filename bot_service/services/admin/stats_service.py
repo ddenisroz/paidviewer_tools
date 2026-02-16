@@ -313,7 +313,7 @@ class AdminStatsService:
             user_data.append({
                 'id': u.id,
                 'is_guest': False,
-                'is_admin': u.is_admin,
+                'is_admin': bool(u.role == 'admin' or u.is_admin),
                 'is_active': u.is_active,
                 'is_blocked': u.is_blocked,
                 'blocked_reason': u.blocked_reason,
@@ -392,7 +392,7 @@ class AdminStatsService:
             "user": {
                 'id': user.id,
                 'role': user.role,
-                'is_admin': user.is_admin,
+                'is_admin': bool(user.role == 'admin' or user.is_admin),
                 'is_active': user.is_active,
                 'is_blocked': user.is_blocked,
                 'twitch_username': user.twitch_username,

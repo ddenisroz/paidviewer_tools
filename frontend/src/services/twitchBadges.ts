@@ -1,6 +1,7 @@
 ﻿import { logger } from '@/shared/utils/prodLogger';
 
 type BadgeImages = { image_url_1x?: string; image_url_2x?: string; image_url_4x?: string };
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 type BadgeSet = Record<string, BadgeImages>; // version -> images
 type BadgesDict = Record<string, BadgeSet>; // badgeId -> set
 

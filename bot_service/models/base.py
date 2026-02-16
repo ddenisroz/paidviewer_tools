@@ -3,6 +3,7 @@
 Базовая конфигурация SQLAlchemy: engine, SessionLocal, Base.
 """
 import logging
+import os
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine
@@ -20,8 +21,6 @@ if not DATABASE_URL:
 IS_POSTGRESQL = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")
 
 # Allow SQLite for testing
-import os  # noqa: E402
-# Check both env var and settings (settings might not be loaded yet if circular, but here it is imported)
 IS_TESTING = os.getenv("TESTING", "false").lower() == "true" or getattr(settings, 'testing', False)
 
 if not IS_POSTGRESQL and not IS_TESTING:
@@ -66,15 +65,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-def get_db():
-    """Функция-генератор для получения сессии БД (для FastAPI Depends)"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 @contextmanager
 def db_session():
     """
@@ -103,6 +93,7 @@ def init_db():
     """Инициализирует базу данных и создает таблицы, если их нет."""
     from models.moderation import BlockedBot
     from models.drops import DropsQuality
+    from constants import DEFAULT_BLOCKED_BOTS
     
     if engine is None:
         logger.error("[ERROR] База данных не сконфигурирована")
@@ -111,29 +102,7 @@ def init_db():
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
 
-    # Список ботов для блокировки по умолчанию
-    DEFAULT_BLOCKED_BOTS = [
-        'nightbot', 'streamlabs', 'fossabot', 'moobot', 'streamelements',
-        'wizebot', 'ankhbot', 'deepbot', 'phantombot', 'coebot'
-    ]
-
-    # Добавление ботов по умолчанию, если их нет
-    db = SessionLocal()
-    try:
-        existing_bots = {bot.bot_name for bot in db.query(BlockedBot).all()}
-        for bot_name in DEFAULT_BLOCKED_BOTS:
-            if bot_name not in existing_bots:
-                db_bot = BlockedBot(bot_name=bot_name)
-                db.add(db_bot)
-        db.commit()
-        logger.info("[DB] Initialized default blocked bots in database")
-    except Exception as e:
-        logger.error(f"Error initializing blocked bots: {e}")
-        db.rollback()
-    finally:
-        db.close()
-
-    # Инициализация качеств лутбоксов (Drops Qualities)
+    # Seeding: blocked bots + lootbox qualities in one session
     DEFAULT_QUALITIES = [
         {"name": "Common", "color": "#9ca3af", "weight": 100},
         {"name": "Rare", "color": "#3b82f6", "weight": 50},
@@ -144,15 +113,22 @@ def init_db():
 
     db = SessionLocal()
     try:
+        # Blocked bots (normalize to lowercase for consistent matching)
+        existing_bots = {bot.bot_name.lower() for bot in db.query(BlockedBot).all()}
+        for bot_name in DEFAULT_BLOCKED_BOTS:
+            if bot_name.lower() not in existing_bots:
+                db.add(BlockedBot(bot_name=bot_name.lower()))
+        
+        # Lootbox qualities
         existing_qualities = {q.name for q in db.query(DropsQuality).all()}
         for quality_data in DEFAULT_QUALITIES:
             if quality_data["name"] not in existing_qualities:
-                quality = DropsQuality(**quality_data)
-                db.add(quality)
+                db.add(DropsQuality(**quality_data))
+        
         db.commit()
-        logger.info("[REWARD] Initialized default lootbox qualities")
+        logger.info("[DB] Database seeding complete (blocked bots + lootbox qualities)")
     except Exception as e:
-        logger.error(f"Error initializing lootbox qualities: {e}")
+        logger.error(f"Error during database seeding: {e}")
         db.rollback()
     finally:
         db.close()

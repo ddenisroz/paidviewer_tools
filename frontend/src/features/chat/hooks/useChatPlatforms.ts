@@ -1,5 +1,5 @@
 // src/features/chat/hooks/useChatPlatforms.ts
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -81,9 +81,10 @@ export const useChatPlatforms = (userId?: number | null): UseChatPlatformsReturn
                     vk: enabledPlatforms.includes('vk')
                 });
 
+                const responsePayload = response?.data;
                 const normalizedResponse =
-                    typeof response?.data === 'object' && response?.data !== null && 'data' in (response.data as Record<string, unknown>)
-                        ? response.data
+                    responsePayload && typeof responsePayload === 'object' && 'data' in responsePayload
+                        ? responsePayload
                         : { success: true, data: settings };
                 queryClient.setQueryData(queryKeys.tts.platformSettings(), normalizedResponse);
             } catch (error) {

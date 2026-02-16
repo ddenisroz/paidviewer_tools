@@ -17,6 +17,11 @@ interface ApiClientConfig {
   timeout?: number;
 }
 
+type RetryableRequestConfig = AxiosRequestConfig & {
+  _retry?: number;
+  skipRetry?: boolean;
+};
+
 /**
  * Создает настроенный axios instance
  * @param config - Конфигурация клиента
@@ -64,7 +69,7 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
       return response;
     },
     async (error: AxiosError) => {
-      const originalRequest = error.config as unknown;
+      const originalRequest = (error.config || {}) as RetryableRequestConfig;
 
       // Обработка 401 - не авторизован
       if (error.response?.status === 401) {
@@ -83,13 +88,16 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
       }
 
       // Retry logic с экспоненциальной задержкой
-      const originalRequestWithRetry = originalRequest as AxiosRequestConfig & { _retry?: number };
+      const originalRequestWithRetry = originalRequest;
       if (!originalRequestWithRetry._retry) {
         originalRequestWithRetry._retry = 0;
       }
 
       const maxRetries = 2;
-      const shouldRetry = shouldRetryRequest(error) && originalRequestWithRetry._retry < maxRetries;
+      const shouldRetry =
+        !originalRequestWithRetry.skipRetry &&
+        shouldRetryRequest(error) &&
+        originalRequestWithRetry._retry < maxRetries;
 
       if (shouldRetry) {
         originalRequestWithRetry._retry += 1;

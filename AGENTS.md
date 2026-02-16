@@ -12,6 +12,7 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - `deploy/`: Docker compose and deployment assets.
 - `docs/`: architecture and developer guides.
 - `scripts/`: project tooling (e.g., design system migration).
+- `scripts/dev/`: one-off debug/diagnostic scripts (keep root clean).
 - `logs/`: runtime logs (for example `logs/bot_service.log`, `logs/tts_service.log`).
 
 ## Build, Test, and Development Commands
@@ -49,17 +50,62 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - Use per-service `.env` files: `bot_service/.env`, `tts_service/.env`, `tts_service_simple/.env`, `frontend/.env`. Never commit secrets.
 - Deployment guidance lives in `docs/setup/DEPLOYMENT.md`.
 
+## Repository Hygiene
+
+- Keep temporary/local tooling artifacts out of commits (`.playwright-cli/`, `.playwright/`, `playwright-report/`, `*.har`).
+- Remove stale cache/build outputs before release-oriented PRs (`__pycache__/`, `.ruff_cache/`, frontend build dirs, temp audio files).
+- Favor small, reviewable cleanup commits over large mixed refactors.
+- Place one-off backend fix/migration scripts into `bot_service/scripts/archive/legacy/`; keep only operational scripts at `bot_service/scripts/` root.
+
 ## Agent-Specific Instructions
 
 - Automated agents should read `docs/PROJECT_CONTEXT.md` before large changes.
+
+## Authentication & Authorization Rules
+
+- User OAuth entrypoints are `/auth/twitch/login` and `/auth/vk/login` (plus `/auth/vk` alias for VK).
+- User OAuth callbacks are `/auth/twitch/callback` and `/auth/vk/callback`; both must validate CSRF `state` from cookies (`oauth_state` / `oauth_state_vk`).
+- User OAuth callbacks must continue to use shared `oauth_handler.handle_oauth_callback(...)` + `oauth_handler.create_oauth_response(...)` for unified session/token behavior.
+- Session auth is cookie-based (`session_id`). Protected API auth uses `get_current_user`; source of truth is DB user state, not stale session payload.
+- Login creates/replaces active session(s); sessions are intentionally long-lived and should not be dropped on tab switch/browser restart.
+- On new login (not integration-link flow), tokens from other platforms are deactivated for security. In linking flow, existing platform tokens remain active.
+- Guest mode is deprecated/removed; do not add new anonymous-auth flows by default.
+
+### Bot OAuth Rules
+
+- Bot OAuth login endpoints are `/auth/twitch/bot/login` and `/auth/vk/bot/login`; callback endpoints are `/auth/twitch/bot/callback` and `/auth/vk/bot/callback`.
+- Bot OAuth login is admin-gated: valid admin session OR short-lived admin link token (`bot_oauth_token`).
+- One-time admin link tokens are issued by `/api/admin/bot/twitch/login-link` and `/api/admin/bot/vk/login-link` (10-minute TTL).
+- Bot tokens are stored encrypted in DB (`bot_tokens`) and are the runtime source of truth; legacy env token fallback is not used at runtime.
+- After successful bot OAuth callback, token is saved and bot restart is triggered to apply fresh credentials.
+- Bot token status/refresh endpoints must preserve `seconds_left`/`hours_left` fields and near-expiry refresh logic (`needs_refresh` based on threshold, not day rounding).
+- If `bot_tokens` is empty, runtime may auto-bootstrap from eligible admin user OAuth tokens when `BOT_TOKEN_AUTO_BOOTSTRAP_*` settings allow it.
+
+### Auth Performance & Security
+
+- Keep auth endpoint rate limits (`limiter`) on login/callback/refresh/status routes.
+- `/api/auth/status` is optimized: do not restore synchronous external token validation in this endpoint; validation should occur when token is actually used.
+- Admin authorization source is `users.role='admin'`; `users.is_admin` is legacy compatibility only.
 
 ## Behavior Notes
 
 - ChatOverlay relies on `/api/chatbox/settings/by-token` returning `twitch_user_id` to load 7TV channel emotes. Keep this field in sync when touching chatbox settings.
 - YouTube mini-player renders into the sidebar slot `#youtube-mini-player-slot` when present (GlobalPlayer uses a portal).
+- Real-time app sync uses WebSocket (not SSE): client messages (`ping`/`pong`, setting broadcasts), role-aware presence (`client_role=tts_player`), and connection-state reconciliation depend on bidirectional transport.
+- Shared frontend WebSocket is single-leader per user across tabs (BroadcastChannel election). Preserve this behavior when changing reconnect or heartbeat logic.
 - Browser TTS playback is active only when `listening_mode` is `website`; when set to `obs`, in-app TTS playback is suppressed (mode is persisted in `tts_listening_mode`).
+- Browser TTS now plays only via dedicated `/tts-player` tab (`client_role=tts_player`); without this tab, website-mode TTS generation stays disabled.
+- Only one `/tts-player` tab is active for playback at a time; passive tabs stay connected but do not enqueue/play audio until they take control.
+- TTS synthesis is now sink-aware: website mode requires an active `/tts-player` connection, OBS mode requires an active OBS socket; queued tasks are dropped when sinks disappear.
+- TTS/YouTube autoplay must not resume automatically after full page reload; explicit user action is required to start playback again.
+- Audio priority controls were removed; TTS no longer pauses/resumes YouTube automatically.
 - YouTube queue bans set queue items to `status='banned'` and prevent re-adding the same video via `/api/youtube/queue/ban/{queue_id}`.
-- Google Cloud TTS voice pools are stored in `tts_user_settings.gcloud_voices` and used to randomize voices per message.
+- Google Cloud TTS voice pools are stored in `tts_user_settings.gcloud_voices`, sorted by quality (Gemini/Chirp/Neural2 first). If at least one Gemini voice is selected, runtime randomization uses only Gemini voices; otherwise it falls back to the broader premium pool.
+- Google Cloud voice list and persisted selection now allow only Gemini and Chirp3-HD families; legacy voice families are filtered out in API and ignored in runtime selection.
+- Google Cloud preview endpoint (`/api/tts/gcloud/preview`) returns `requested_model` and `fallback_used` to diagnose when Gemini requests degrade to fallback voices.
+- Gemini speaker ids without locale prefix (for example `Kore`, `Aoede`) are treated as Gemini requests in backend voice resolution, not as default Standard voices.
+- Default Gemini model mapping uses `gemini-2.5-flash-tts` unless a preview request explicitly overrides `model_name`.
+- Google Cloud voice style prompt is now backend-controlled via `tts_user_settings.gcloud_mood` (`neutral`/`sad`/`happy`); runtime and preview both use this mood mapping instead of free-form user prompts.
 - Frontend polling intervals are adaptive (reduced outside relevant pages); background polling is disabled where supported.
 - Drops config/rewards responses are cached for 60s server-side with invalidation on updates; dashboard quick actions refresh every 120s.
 - Stream title/category changes broadcast `stream_info_updated` over WebSocket; Twitch stream info cache is kept in sync.
@@ -67,7 +113,15 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - Frontend TTS playback is gated by `tts_enabled` and `tts_enabled_platforms` (stored in localStorage) for UI sync.
 - Frontend localStorage query cache (`rq_cache_`) is auto-pruned by age and count on app startup.
 - VK Live chat badges are passed as image URLs; VK smiles are sent as emotes with positions.
-- Google Cloud TTS engine is available as `gcloud` (requires `GOOGLE_TTS_API_KEY`); fallback remains gTTS.
+- Google Cloud TTS engine is available as `gcloud`; preferred auth is ADC (`gcloud auth application-default login` + quota project), API key fallback remains supported.
+- Rotating backend log file level is configurable via `LOG_FILE_LEVEL` (default `WARNING`), while console verbosity follows `LOG_LEVEL`.
 - VK Live bot connects to all active VK channels on startup.
-- Twitch/VK bot accounts use OAuth bot tokens stored in DB (refreshable). Legacy env bot tokens are supported as fallback (no auto-refresh) and should be avoided in production.
+- Twitch/VK bot accounts use OAuth bot tokens stored in DB (refreshable); runtime does not use legacy env fallback tokens.
+- Bot token status APIs now return `seconds_left`/`hours_left` in addition to `days_left`; `needs_refresh` is driven by near-expiry (15 minutes), not whole-day rounding.
+- VK Live HTTP polling first falls back from dev API to prod API on `401`, then tries token refresh with cooldown to avoid rapid refresh loops.
+- If `bot_tokens` is empty, runtime can auto-bootstrap from existing active admin OAuth user tokens (`BOT_TOKEN_AUTO_BOOTSTRAP_*` settings).
+- Bot OAuth endpoints (`/auth/twitch/bot/login`, `/auth/vk/bot/login`) accept admin session or short-lived admin link token (`bot_oauth_token`), issued via `/api/admin/bot/twitch/login-link` and `/api/admin/bot/vk/login-link`.
+- Admin provisioning is role-based (`users.role='admin'`); bootstrap admin endpoint is removed.
+- Admin authority is sourced from `users.role`; `users.is_admin` is kept only for legacy compatibility.
 - MemeAlerts: `!memegrant <nickname> <amount>` uses MemeAlerts API lookup and grant endpoints; dashboard can show grant/purchase history when connected.
+- Admin UI consistency: prefer semantic tokens (`text-foreground`, `text-muted-foreground`, `bg-card`, `border-border`) over hardcoded gray/white classes; keep heading hierarchy, spacing, and button heights (`h-8`/`h-9`) consistent between admin pages.

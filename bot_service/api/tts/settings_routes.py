@@ -12,7 +12,11 @@ from auth.auth import get_current_user
 from core.config import settings
 from constants import DEFAULT_ENABLED_PLATFORMS
 from services.tts.tts_service import TTSService
-from services.tts.google_cloud_tts import get_google_cloud_tts
+from services.tts.google_cloud_tts import (
+    get_google_cloud_tts,
+    is_gemini_or_chirp_voice,
+    normalize_gcloud_mood,
+)
 from services.tts.tts_core import (
     AudioSettingsRequest,
     TtsSettingsRequest,
@@ -39,7 +43,9 @@ class GcloudVoiceSelectionRequest(BaseModel):
 
 class GcloudVoicePreviewRequest(BaseModel):
     voice_name: str = Field(..., min_length=2, max_length=120)
-    text: Optional[str] = Field(default="Привет! Это тестовый голос Google Cloud.")
+    text: Optional[str] = Field(default="Hello! This is a Google Cloud voice preview.")
+    mood: Optional[str] = Field(default=None, max_length=20)
+    model_name: Optional[str] = Field(default=None, max_length=120)
 
 def get_tts_service(db: Session = Depends(get_db)) -> TTSService:
     return TTSService(db)
@@ -63,32 +69,38 @@ async def update_tts_settings(
     service: TTSService = Depends(get_tts_service)
 ):
     """Update TTS settings."""
-    gcloud_voices = None
-    try:
-        if "gcloudVoices" in settings_req.model_fields_set:
-            gcloud_voices = settings_req.gcloudVoices
-    except Exception:
-        gcloud_voices = settings_req.gcloudVoices
-
-    save_payload = {
-        "user_id": user["id"],
-        "enable_7tv": settings_req.enable7TV,
-        "enable_twitch": settings_req.enableTwitch,
-        "enable_lexicon_filter": settings_req.enableLexiconFilter,
-        "enable_custom_lexicon": settings_req.enableCustomLexicon,
-        "engine": settings_req.engine,
-        "voice": settings_req.voice,
-        "listening_mode": settings_req.listeningMode,
-        "max_message_length": settings_req.maxMessageLength,
-        "skip_commands": settings_req.skipCommands,
-        "use_local_tts": settings_req.useLocalTTS,
-        "filter_replies": settings_req.filterReplies,
-        "filter_mentions": settings_req.filterMentions,
-        "client_version": getattr(settings_req, "version", None)
+    save_payload = {"user_id": user["id"]}
+    field_map = {
+        "enable7TV": "enable_7tv",
+        "enableTwitch": "enable_twitch",
+        "enableLexiconFilter": "enable_lexicon_filter",
+        "enableCustomLexicon": "enable_custom_lexicon",
+        "engine": "engine",
+        "voice": "voice",
+        "listeningMode": "listening_mode",
+        "maxMessageLength": "max_message_length",
+        "skipCommands": "skip_commands",
+        "useLocalTTS": "use_local_tts",
+        "filterReplies": "filter_replies",
+        "filterMentions": "filter_mentions",
+        "gcloudVoices": "gcloud_voices",
+        "gcloudMood": "gcloud_mood",
     }
 
-    if gcloud_voices is not None:
-        save_payload["gcloud_voices"] = gcloud_voices
+    model_fields_set = getattr(settings_req, "model_fields_set", set())
+    for request_field, payload_field in field_map.items():
+        if request_field not in model_fields_set:
+            continue
+        value = getattr(settings_req, request_field, None)
+        if value is None and request_field in {"gcloudVoices", "gcloudMood"}:
+            continue
+        save_payload[payload_field] = value
+
+    if "version" in model_fields_set:
+        save_payload["client_version"] = settings_req.version
+
+    if len(save_payload) == 1:
+        return {"success": True, "message": "No changes provided"}
 
     result = await service.save_tts_settings(**save_payload)
     if not result.get("success"):
@@ -321,12 +333,14 @@ async def get_gcloud_voices(
             "cached": False,
             "available": False,
             "error": result.get("error"),
+            "hint": result.get("hint"),
             "status_code": result.get("status_code"),
         }
     return {
         "voices": result.get("voices", []),
         "cached": result.get("cached", False),
         "available": True,
+        "auth_mode": result.get("auth_mode"),
     }
 
 
@@ -337,9 +351,13 @@ async def set_gcloud_voices(
     service: TTSService = Depends(get_tts_service)
 ):
     """Persist selected Google Cloud TTS voices for user."""
-    voices = [v for v in request.voices if isinstance(v, str) and v.strip()]
+    voices = [
+        v.strip()
+        for v in request.voices
+        if isinstance(v, str) and v.strip() and is_gemini_or_chirp_voice(v.strip())
+    ]
     if not voices:
-        raise HTTPException(status_code=400, detail="At least one voice must be selected")
+        raise HTTPException(status_code=400, detail="Select at least one Gemini or Chirp3-HD voice")
     result = await service.save_tts_settings(user_id=user['id'], gcloud_voices=voices)
     if not result.get("success"):
         raise HTTPException(status_code=500, detail=result.get("error") or "Failed to save voices")
@@ -349,18 +367,39 @@ async def set_gcloud_voices(
 @router.post("/gcloud/preview")
 async def preview_gcloud_voice(
     request: GcloudVoicePreviewRequest,
-    user: dict = Depends(get_current_user)
+    user: dict = Depends(get_current_user),
+    service: TTSService = Depends(get_tts_service),
 ):
     """Preview Google Cloud TTS voice with sample phrase."""
+    requested_mood = request.mood
+    if requested_mood is None:
+        saved_settings = await service.get_tts_settings(user_id=user["id"])
+        requested_mood = (
+            saved_settings.get("gcloud_mood")
+            or saved_settings.get("gcloudMood")
+        )
+    resolved_mood = normalize_gcloud_mood(requested_mood)
+
     gcloud = get_google_cloud_tts()
     result = await gcloud.synthesize_speech(
-        text=request.text or "Привет! Это тестовый голос Google Cloud.",
+        text=request.text or "Hello! This is a Google Cloud voice preview.",
         voice_name=request.voice_name,
         volume_level=50.0,
-        speed=1.0
+        speed=1.0,
+        mood=resolved_mood,
+        model_name=request.model_name,
     )
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error") or "Failed to synthesize preview")
+        status_code = result.get("status_code")
+        http_status = 502 if status_code in {400, 401, 403, 429, 500} else 400
+        raise HTTPException(
+            status_code=http_status,
+            detail={
+                "error": result.get("error") or "Failed to synthesize preview",
+                "hint": result.get("hint"),
+                "status_code": status_code,
+            },
+        )
 
     audio_path = result.get("audio_path")
     if not audio_path:
@@ -368,7 +407,15 @@ async def preview_gcloud_voice(
 
     filename = Path(audio_path).name
     audio_url = f"{settings.backend_url}/api/tts/audio/{filename}"
-    return {"success": True, "audio_url": audio_url, "voice": result.get("voice")}
+    return {
+        "success": True,
+        "audio_url": audio_url,
+        "voice": result.get("voice"),
+        "auth_mode": result.get("auth_mode"),
+        "requested_model": result.get("requested_model"),
+        "fallback_used": bool(result.get("fallback_used")),
+        "mood": resolved_mood,
+    }
 
 # ============================================================================
 # ADDITIONAL SETTINGS (Platform / Listening Mode)
@@ -408,11 +455,12 @@ async def set_listening_mode(
 ):
     """Set listening mode."""
     data = await request.json()
-    mode = data.get("listening_mode")
-    # This is also part of generic settings save_tts_settings
-    # So we can reuse that if possible, or update specific field
-    # service.save_tts_settings supports 'listening_mode'
-    if mode:
-        await service.save_tts_settings(user['id'], listening_mode=mode)
-        return {"success": True}
-    return {"success": False, "error": "Missing mode"}
+    mode = data.get("listening_mode") or data.get("listeningMode")
+    if mode not in {"website", "obs"}:
+        raise HTTPException(status_code=400, detail="Mode must be 'website' or 'obs'")
+
+    result = await service.save_tts_settings(user_id=user['id'], listening_mode=mode)
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error") or "Failed to save listening mode")
+
+    return {"success": True, "listening_mode": mode, "listeningMode": mode}

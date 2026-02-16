@@ -86,7 +86,7 @@ function maybeCleanupQueryCache(): void {
   cleanupQueryCache();
 }
 
-export function getQueryCache<T = unknown>(queryKey: unknown[]): T | null {
+export function getQueryCache<T = unknown>(queryKey: readonly unknown[] | unknown[]): T | null {
   try {
     const cacheKey = `${QUERY_CACHE_PREFIX}${JSON.stringify(queryKey)}`;
     const cached = localStorage.getItem(cacheKey);
@@ -103,7 +103,7 @@ export function getQueryCache<T = unknown>(queryKey: unknown[]): T | null {
   }
 }
 
-export function getQueryCacheWithMaxAge<T = unknown>(queryKey: unknown[], maxAgeMs: number): T | null {
+export function getQueryCacheWithMaxAge<T = unknown>(queryKey: readonly unknown[] | unknown[], maxAgeMs: number): T | null {
   try {
     const cacheKey = `${QUERY_CACHE_PREFIX}${JSON.stringify(queryKey)}`;
     const cached = localStorage.getItem(cacheKey);
@@ -124,7 +124,7 @@ export function getQueryCacheWithMaxAge<T = unknown>(queryKey: unknown[], maxAge
   }
 }
 
-export function setQueryCache<T = unknown>(queryKey: unknown[], data: T): void {
+export function setQueryCache<T = unknown>(queryKey: readonly unknown[] | unknown[], data: T): void {
   try {
     const cacheKey = `${QUERY_CACHE_PREFIX}${JSON.stringify(queryKey)}`;
     const cacheData = {
@@ -139,7 +139,7 @@ export function setQueryCache<T = unknown>(queryKey: unknown[], data: T): void {
   }
 }
 
-export function clearQueryCache(queryKey: unknown[]): void {
+export function clearQueryCache(queryKey: readonly unknown[] | unknown[]): void {
   try {
     const cacheKey = `${QUERY_CACHE_PREFIX}${JSON.stringify(queryKey)}`;
     localStorage.removeItem(cacheKey);

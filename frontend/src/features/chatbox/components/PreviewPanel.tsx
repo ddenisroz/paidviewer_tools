@@ -1,11 +1,13 @@
 ﻿// src/components/chatbox/PreviewPanel.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import MessageContent from '@/features/chat/components/MessageContent';
 import { getGlobalEmotes } from '@/features/chat/utils/emotes';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { VkRoleBadge } from '@/shared/components/RoleBadge';
+
+import type { ChatEmote } from '@/types/chat';
 
 interface ChatBoxSettings {
     font_family: string;
@@ -26,7 +28,9 @@ interface ChatBoxSettings {
     chat_width: number;
     border_radius?: number;
     show_platform_icons: boolean;
+    show_roles?: boolean;
     show_badges: boolean;
+    show_avatars?: boolean;
     show_7tv_emotes: boolean;
     show_links: boolean;
     auto_load_images?: boolean;
@@ -40,7 +44,13 @@ interface PreviewMessage {
     time: string;
     role: string;
     badges: string[];
+    emotes?: ChatEmote[];
+    vk_role_icon_url?: string;
     avatar_url?: string;
+}
+
+interface RenderedPreviewMessage extends PreviewMessage {
+    preview_key: string;
 }
 
 interface PreviewPanelProps {
@@ -63,10 +73,17 @@ const FALLBACK_7TV_EMOTE: EmoteData = {
     animated: false
 };
 
+const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessage => ({
+    ...message,
+    preview_key: `${message.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+});
+
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, twitchChannelName }) => {
     const [badgesReady, setBadgesReady] = useState(false);
     const [globalEmotes, setGlobalEmotes] = useState<Map<string, EmoteData>>(new Map());
-    const [animationTick, setAnimationTick] = useState(0);
+    const [simulatedMessages, setSimulatedMessages] = useState<RenderedPreviewMessage[]>([]);
+    const [lastAnimatedMessageKey, setLastAnimatedMessageKey] = useState<string | null>(null);
+    const nextTemplateIndexRef = useRef(0);
 
     const isHorizontal = settings.chat_direction === 'horizontal';
     const chatWidth = Math.max(20, Math.min(100, settings.chat_width || 100));
@@ -77,6 +94,10 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         const b = parseInt(hex.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     };
+    const panelBackground = hexToRgba(
+        settings.background_color || '#000000',
+        Math.min(0.92, Math.max(0.35, settings.background_opacity + 0.3))
+    );
 
     const getAnimationName = (type: string) => {
         switch (type) {
@@ -104,12 +125,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
             [FALLBACK_7TV_EMOTE.name.toLowerCase(), FALLBACK_7TV_EMOTE]
         ]);
     }, [globalEmotes, settings.show_7tv_emotes]);
-
-    const emoteSample = useMemo(() => {
-        if (!settings.show_7tv_emotes) return null;
-        const first = effectiveGlobalEmotes.values().next().value as EmoteData | undefined;
-        return first?.name ?? null;
-    }, [effectiveGlobalEmotes, settings.show_7tv_emotes]);
 
     const truncateWords = (text: string, maxWords: number = 6): string => {
         if (!text) return '';
@@ -172,12 +187,29 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
     }, [settings.show_7tv_emotes]);
 
     useEffect(() => {
+        const limit = Math.max(1, settings.max_messages);
+        setSimulatedMessages(previewMessages.slice(-limit).map(toRenderedPreviewMessage));
+        setLastAnimatedMessageKey(null);
+        nextTemplateIndexRef.current = 0;
+    }, [previewMessages, settings.max_messages]);
+
+    useEffect(() => {
         if (settings.animation_type === 'none' || settings.animation_duration <= 0) return undefined;
+        if (previewMessages.length === 0) return undefined;
+
         const interval = setInterval(() => {
-            setAnimationTick((prev) => prev + 1);
-        }, Math.max(1500, settings.animation_duration + 400));
+            const template = previewMessages[nextTemplateIndexRef.current % previewMessages.length];
+            nextTemplateIndexRef.current = (nextTemplateIndexRef.current + 1) % previewMessages.length;
+
+            const nextMessage = toRenderedPreviewMessage(template);
+            const limit = Math.max(1, settings.max_messages);
+
+            setSimulatedMessages((prev) => [...prev, nextMessage].slice(-limit));
+            setLastAnimatedMessageKey(nextMessage.preview_key);
+        }, Math.max(1800, settings.animation_duration + 600));
+
         return () => clearInterval(interval);
-    }, [settings.animation_type, settings.animation_duration]);
+    }, [previewMessages, settings.animation_type, settings.animation_duration, settings.max_messages]);
 
     return (
         <div className="h-full flex flex-col">
@@ -211,8 +243,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                 `}
             </style>
             <div
-                className="flex-1 overflow-hidden bg-[#020308]"
+                className="flex-1 overflow-hidden border border-white/10 rounded-md"
                 style={{
+                    backgroundColor: panelBackground,
                     fontFamily: settings.font_family,
                     fontSize: `${settings.font_size}px`,
                     fontWeight: settings.font_weight || 'normal'
@@ -248,9 +281,12 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                             }}
                         >
                             {!isHorizontal && <div style={{ flexGrow: 1 }} />}
-                            {previewMessages.slice(-Math.max(1, settings.max_messages)).map((msg) => {
+                            {simulatedMessages.map((msg) => {
                             const animationName = getAnimationName(settings.animation_type);
-                            const shouldAnimate = settings.animation_type !== 'none' && settings.animation_duration > 0 && animationName;
+                            const shouldAnimate = settings.animation_type !== 'none'
+                                && settings.animation_duration > 0
+                                && animationName
+                                && msg.preview_key === lastAnimatedMessageKey;
                             const platformIconSize = Math.max(12, Math.min(24, settings.font_size));
                             const messageBackground = hexToRgba(settings.background_color || '#000000', settings.background_opacity);
                             const metaGroupStyle: React.CSSProperties = {
@@ -264,11 +300,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                             const showMeta = Boolean(
                                 settings.show_platform_icons ||
                                 (settings.show_badges && msg.badges.length > 0) ||
-                                (settings.show_badges && msg.platform === 'vk' && msg.role)
+                                (settings.show_badges && msg.platform === 'vk' && (msg.vk_role_icon_url || msg.role))
                             );
-                            const messageText = emoteSample
-                                ? msg.message.replace(':hype:', `:${emoteSample}:`)
-                                : msg.message;
+                            const messageText = msg.message;
                             const previewText = isHorizontal
                                 ? truncateWords(messageText, 6)
                                 : messageText;
@@ -277,6 +311,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                     message={previewText}
                                     channelEmotes={settings.show_7tv_emotes ? new Map() : new Map()}
                                     globalEmotes={settings.show_7tv_emotes ? effectiveGlobalEmotes : new Map()}
+                                    twitchEmotes={msg.emotes}
                                     showLinks={settings.show_links}
                                     autoLoadImages={settings.auto_load_images ?? true}
                                 />
@@ -304,7 +339,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
 
                             return (
                                 <div
-                                    key={`${msg.id}-${settings.animation_type}-${settings.animation_duration}-${animationTick}`}
+                                    key={msg.preview_key}
                                     className="text-white"
                                     style={{
                                         ...baseMessageStyle,
@@ -363,7 +398,21 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                     ))}
                                                 </>
                                             )}
-                                            {settings.show_badges && msg.platform === 'vk' && msg.role && (
+                                            {settings.show_badges && msg.platform === 'vk' && msg.vk_role_icon_url && (
+                                                <img
+                                                    src={msg.vk_role_icon_url}
+                                                    alt={msg.role ? `${msg.role} badge` : 'VK role badge'}
+                                                    style={{
+                                                        width: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
+                                                        height: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
+                                                        verticalAlign: 'text-bottom'
+                                                    }}
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                    }}
+                                                />
+                                            )}
+                                            {settings.show_badges && msg.platform === 'vk' && !msg.vk_role_icon_url && msg.role && (
                                                 <VkRoleBadge
                                                     role={msg.role}
                                                     size={Math.max(12, Math.min(18, settings.font_size * 0.9))}
@@ -378,8 +427,27 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                             fontWeight: 600
                                         }}
                                     >
+                                        {settings.show_avatars && msg.avatar_url && (
+                                            <img
+                                                src={msg.avatar_url}
+                                                alt={msg.author}
+                                                style={{
+                                                    width: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
+                                                    height: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
+                                                    borderRadius: '999px',
+                                                    display: 'inline-block',
+                                                    verticalAlign: 'text-bottom',
+                                                    marginRight: '6px',
+                                                }}
+                                            />
+                                        )}
                                         {msg.author}:
                                     </span>{' '}
+                                    {settings.show_roles && msg.role && (
+                                        <span className="text-[10px] text-muted-foreground mr-1">
+                                            [{msg.role}]
+                                        </span>
+                                    )}
                                     <span>{displayMessage}</span>
                                 </div>
                             );

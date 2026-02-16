@@ -1,6 +1,7 @@
 ﻿// src/context/UserSettingsContext.tsx
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
+/* eslint-disable react-refresh/only-export-components */
 import { useSaveUserSettings, useUserSettings as useUserSettingsQuery } from '@/queries/userSettings/userSettingsQueries';
 import cacheManager, { CACHE_CONFIG } from '@/shared/utils/cacheManager';
 import Logger from '@/shared/utils/prodLogger';
@@ -97,16 +98,18 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     useEffect(() => {
         if (settingsData) {
             const data = settingsData as { data?: UserSettings } | UserSettings;
+            const responseData = data as { settings?: UserSettings; data?: unknown };
             let settings: UserSettings | null = null;
 
             // Check if it's an API Response { success: true, settings: {...} }
-            if ('settings' in data && (data as any).settings) {
-                settings = (data as any).settings as UserSettings;
+            if (responseData.settings) {
+                settings = responseData.settings;
             } else if ('data' in data && data.data) {
                 // Check inner data for settings property
-                const innerData = data.data as any;
+                const innerData = data.data as unknown;
                 if (innerData && typeof innerData === 'object' && 'settings' in innerData) {
-                    settings = innerData.settings as UserSettings;
+                    const nestedSettings = (innerData as { settings?: UserSettings }).settings;
+                    settings = nestedSettings ?? (innerData as UserSettings);
                 } else {
                     settings = innerData as UserSettings;
                 }

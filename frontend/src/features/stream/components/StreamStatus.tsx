@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 
-import { Twitch, Users, Wifi, WifiOff } from 'lucide-react';
+import { Users, Wifi, WifiOff } from 'lucide-react';
 
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';

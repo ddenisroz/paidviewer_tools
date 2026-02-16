@@ -3,6 +3,7 @@
  * 
  * These hooks manage voices on the user's LOCAL TTS server (external endpoint).
  */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 

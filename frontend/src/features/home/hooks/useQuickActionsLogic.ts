@@ -83,7 +83,7 @@ export const useQuickActionsLogic = () => {
     useEffect(() => {
         if (ttsStatusResponse?.data) {
             const enabled = (ttsStatusResponse.data as TtsStatusData).enabled;
-            setQueryCache(queryKeys.tts.status(null) as any, ttsStatusResponse.data);
+            setQueryCache(queryKeys.tts.status(null), ttsStatusResponse.data);
             // Update last known state
             if (typeof enabled === 'boolean') {
                 setLastKnownTtsState(enabled);
@@ -116,14 +116,20 @@ export const useQuickActionsLogic = () => {
         onSuccess: (_response, enabled) => {
             // Cache the correct structure with correct key
             const correctKey = queryKeys.tts.status(null);
-            setQueryCache(correctKey as any, { enabled, listening_mode: 'website' });
+            setQueryCache(correctKey, { enabled, listening_mode: 'website' });
 
             // Also update React Query cache directly to inform other components (like TtsContext)
-            queryClient.setQueryData(correctKey, (old: any) => ({
-                ...old,
-                success: true,
-                data: { ...(old?.data || {}), enabled }
-            }));
+            queryClient.setQueryData(correctKey, (old: unknown) => {
+                const previous = (old && typeof old === 'object')
+                    ? old as { data?: Record<string, unknown> }
+                    : {};
+
+                return {
+                    ...previous,
+                    success: true,
+                    data: { ...(previous.data || {}), enabled }
+                };
+            });
 
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
             window.dispatchEvent(new CustomEvent('tts-status-changed', {

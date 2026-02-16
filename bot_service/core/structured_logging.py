@@ -21,6 +21,8 @@ from structlog.types import EventDict, Processor
 
 from core.config import settings
 
+module_logger = logging.getLogger(__name__)
+
 
 def add_app_context(logger: Any, method_name: str, event_dict: EventDict) -> EventDict:
     """
@@ -85,6 +87,52 @@ def censor_sensitive_data(logger: Any, method_name: str, event_dict: EventDict) 
 
 _SETUP_DONE = False
 
+
+def _resolve_log_level(level_name: Any, default_level: int = logging.INFO) -> int:
+    """Resolve log level name (e.g. INFO) to logging constant."""
+    raw_name = str(level_name or "").strip().upper()
+    if not raw_name:
+        return default_level
+
+    resolved = logging.getLevelName(raw_name)
+    if isinstance(resolved, int):
+        return resolved
+
+    module_logger.warning(
+        "Invalid log level '%s', falling back to %s",
+        level_name,
+        logging.getLevelName(default_level),
+    )
+    return default_level
+
+
+def _configure_console_streams_for_utf8() -> None:
+    """
+    Ensure stdout/stderr are UTF-8 so Cyrillic logs are readable on Windows terminals.
+
+    Safe no-op for environments that do not support stream reconfiguration.
+    """
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream is None:
+            continue
+
+        reconfigure = getattr(stream, "reconfigure", None)
+        if not callable(reconfigure):
+            continue
+
+        try:
+            reconfigure(encoding="utf-8", errors="replace", newline="\n", line_buffering=True)
+        except TypeError:
+            # Fallback for Python builds without full reconfigure signature support.
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+        except Exception:
+            continue
+
+
 def setup_structured_logging():
     """
     Configure structured logging for the application.
@@ -97,15 +145,21 @@ def setup_structured_logging():
         return
     _SETUP_DONE = True
 
-    # Determine processors based on environment
-    # Determine processors based on environment
-    processors: list[Processor] = [
-        # Add log level
-        structlog.stdlib.add_log_level,
-        
-        # Add timestamp
-        structlog.processors.TimeStamper(fmt="iso"),
-        
+    _configure_console_streams_for_utf8()
+
+    json_logs_enabled = settings.is_production or getattr(settings, 'enable_json_logs', False)
+    log_level = _resolve_log_level(getattr(settings, "log_level", "INFO"), logging.INFO)
+
+    processors: list[Processor] = []
+
+    # Keep explicit level/timestamp enrichment for JSON logs.
+    if json_logs_enabled:
+        processors.extend([
+            structlog.stdlib.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+        ])
+
+    processors.extend([
         # Add caller information (file, line, function)
         structlog.processors.CallsiteParameterAdder(
             parameters=[
@@ -114,54 +168,65 @@ def setup_structured_logging():
                 structlog.processors.CallsiteParameter.FUNC_NAME,
             ]
         ),
-        
         # Add application context
         add_app_context,
-        
-        # Add severity level
-        add_severity_level,
-        
+    ])
+
+    if json_logs_enabled:
+        processors.append(add_severity_level)
+
+    processors.extend([
         # Censor sensitive data
         censor_sensitive_data,
-        
         # Add exception info
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
-    ]
+    ])
     
     # Choose renderer based on environment
-    if settings.is_production or getattr(settings, 'enable_json_logs', False):
+    if json_logs_enabled:
         # JSON for production (machine-readable)
         processors.append(structlog.processors.JSONRenderer())
         structlog.processors.JSONRenderer()
     else:
         # Console for development (human-readable)
-        processors.append(structlog.dev.ConsoleRenderer(colors=True))
-        structlog.dev.ConsoleRenderer(colors=True)
+        # Keep colors disabled to avoid ANSI escape noise in rotated log files.
+        processors.append(structlog.dev.ConsoleRenderer(colors=False))
     
     # Configure structlog
     structlog.configure(
         processors=processors,
         wrapper_class=structlog.make_filtering_bound_logger(
-            logging.INFO  # Always use INFO level to reduce noise
+            log_level
         ),
         context_class=dict,
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
     
-    # Configure standard library logging
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=logging.INFO,  # Always use INFO level to reduce noise
+    # Configure standard library logging in a predictable single-line format.
+    console_formatter = logging.Formatter(
+        fmt="%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
     )
+
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.setLevel(log_level)
+
+    import io
+    utf8_stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True)
+    console_handler = logging.StreamHandler(utf8_stdout)
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(console_formatter)
+    root_logger.addHandler(console_handler)
     
     # Redirect warnings to logging
     logging.captureWarnings(True)
 
-    # Silence noisy libraries
-    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    # Keep uvicorn startup/error logs, but hide verbose access duplicates.
+    logging.getLogger("uvicorn").setLevel(logging.INFO)
+    logging.getLogger("uvicorn.error").setLevel(logging.INFO)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("fastapi").setLevel(logging.WARNING)
     logging.getLogger("watchfiles").setLevel(logging.CRITICAL)
@@ -178,15 +243,15 @@ def setup_structured_logging():
     logger.info(
         "structured_logging_initialized",
         environment=settings.environment,
-        json_logs=settings.is_production or getattr(settings, 'enable_json_logs', False)
+        json_logs=json_logs_enabled
     )
 
 
 def setup_log_rotation():
     """
     Setup log file rotation.
-    
-    Only logs WARNING and above to keep files small.
+
+    File log level is configurable via settings.log_file_level.
     """
     from logging.handlers import RotatingFileHandler
     
@@ -202,7 +267,9 @@ def setup_log_rotation():
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     
-    # Single rotating file handler - WARNING and above only
+    file_log_level = _resolve_log_level(getattr(settings, "log_file_level", "WARNING"), logging.WARNING)
+
+    # Single rotating file handler with configurable level
     handler = RotatingFileHandler(
         log_file,
         maxBytes=5 * 1024 * 1024,  # 5 MB max
@@ -210,7 +277,7 @@ def setup_log_rotation():
         encoding="utf-8",
     )
     handler.setFormatter(formatter)
-    handler.setLevel(logging.WARNING)  # Only WARNING, ERROR, CRITICAL
+    handler.setLevel(file_log_level)
     
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)

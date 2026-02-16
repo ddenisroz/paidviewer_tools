@@ -5,7 +5,7 @@
  */
 import { useCallback, useState } from 'react';
 
-import { TTS_SERVICE_URL } from '@/constants';
+import { API_BASE_URL, TTS_SERVICE_URL } from '@/constants';
 import { useTtsPlayer } from '@/context/TtsPlayerContext';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
@@ -89,9 +89,12 @@ export function useChatWebSocket({
 
     const handleTtsAudio = useCallback((data: TtsAudioMessage) => {
         const audioData = data.data || data;
-        const isTtsEnabled = typeof window === 'undefined'
-            ? true
-            : window.localStorage.getItem('tts_enabled') !== 'false';
+        const isTtsEnabled = (() => {
+            if (typeof window === 'undefined') return true;
+            const stored = window.localStorage.getItem('tts_enabled');
+            if (stored === null) return true;
+            return stored === 'true';
+        })();
 
         if (!isTtsEnabled) {
             logger.debug('[TTS] Ignoring audio event because global TTS is disabled');
@@ -126,10 +129,14 @@ export function useChatWebSocket({
             if (audioUrl && !audioUrl.startsWith('http://') && !audioUrl.startsWith('https://')) {
                 if (audioUrl.startsWith('/audio/') && TTS_SERVICE_URL) {
                     audioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
-                    logger.debug(`[LINK] Converted relative audio URL to full URL: ${audioUrl}`);
+                } else if (audioUrl.startsWith('/')) {
+                    audioUrl = `${API_BASE_URL}${audioUrl}`;
+                } else if (TTS_SERVICE_URL) {
+                    audioUrl = `${TTS_SERVICE_URL}/${audioUrl.replace(/^\/+/, '')}`;
                 } else {
                     logger.warn(`[WARN] Audio URL is relative but could not convert: ${audioUrl}`);
                 }
+                logger.debug(`[LINK] Resolved audio URL: ${audioUrl}`);
             }
 
             // Add to TTS player queue

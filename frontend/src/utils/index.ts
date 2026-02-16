@@ -1,5 +1,6 @@
 ﻿import { REGEX, TIMEOUTS, VALIDATION } from '@/constants';
 
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { formatDate as formatDateUtil, formatRelativeTime as formatRelativeTimeUtil } from '../shared/utils/formatUtils';
 import { capitalize as capitalizeUtil, stripHtml as stripHtmlUtil, truncateString as truncateUtil } from '../shared/utils/stringUtils';
 

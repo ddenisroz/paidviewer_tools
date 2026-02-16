@@ -1,484 +1,416 @@
-﻿import React, { useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-    AlertCircle,
-    Bot,
-    CheckCircle,
-    ExternalLink,
-    Info,
-    RefreshCw,
-    Square
+  CheckCircle2,
+  Clock,
+  Copy,
+  ExternalLink,
+  Info,
+  LogIn,
+  RefreshCw,
+  Server,
 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import { API_BASE_URL, TTS_SERVICE_URL } from '@/constants';
-import { useTts } from '@/context/TtsContext';
-import { useBotTokenStatusQuery, useRefreshBotTokenMutation } from '@/queries/admin/adminQueries';
+import { API_BASE_URL } from '@/constants';
 import { adminService } from '@/services/api/services/adminService';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { PageLoader } from '@/shared/components/ui/loader';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
+type Platform = 'twitch' | 'vk';
 
-// Types for bot management
-export interface BotData {
-    name: string;
-    status: 'running' | 'stopped' | 'error';
-    connections?: number;
+interface BotTokenStatus {
+  configured: boolean;
+  bot_login?: string;
+  days_left?: number | null;
+  hours_left?: number | null;
+  seconds_left?: number | null;
+  needs_refresh?: boolean;
+  has_refresh_token?: boolean;
 }
 
-export interface TtsStatus {
-    status: string;
-    healthy: boolean;
-    available: boolean;
-    error?: string;
-    url?: string;
+interface PlatformBotRuntime {
+  connected: boolean;
+  channels: number;
+  is_ready?: boolean;
+  is_running?: boolean;
 }
 
-// Types for bot status from API
-interface BotStatusFromApi {
-    connected: boolean;
-    channels: number;
-    is_ready?: boolean;
-    is_running?: boolean;
-}
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
+const ACTION_BUTTON_CLASS = 'h-9 border-border/70 hover:bg-muted/60 shadow-none';
 
-interface BotsObjectFromApi {
-    twitch?: BotStatusFromApi;
-    vk?: BotStatusFromApi;
-}
+const PLATFORM_META: Record<Platform, { label: string; color: string }> = {
+  twitch: { label: 'Twitch', color: '#9146ff' },
+  vk: { label: 'VK Live', color: '#0077ff' },
+};
 
-// Helper functions
-function parseBotsResponse(data: { bots?: BotData[] | BotsObjectFromApi }): BotData[] {
-    if (!data?.bots) return [];
+/** SVG icons */
+const TwitchIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z" />
+  </svg>
+);
 
-    // Если bots уже массив - вернуть его
-    if (Array.isArray(data.bots)) {
-        return data.bots;
-    }
+const VKIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M15.684 0H8.316C1.592 0 0 1.592 0 8.316v7.368C0 22.408 1.592 24 8.316 24h7.368C22.408 24 24 22.408 24 15.684V8.316C24 1.592 22.391 0 15.684 0zm3.692 17.123h-1.744c-.66 0-.864-.525-2.05-1.727-1.033-1-1.49-1.135-1.744-1.135-.356 0-.458.102-.458.593v1.575c0 .424-.135.678-1.253.678-1.846 0-3.896-1.12-5.339-3.202-2.17-3.048-2.763-5.339-2.763-5.805 0-.254.102-.491.593-.491h1.744c.44 0 .61.203.78.678.864 2.49 2.303 4.675 2.896 4.675.22 0 .322-.102.322-.66V9.721c-.068-1.186-.695-1.287-.695-1.71 0-.203.17-.407.44-.407h2.744c.373 0 .508.203.508.643v3.473c0 .372.17.508.271.508.22 0 .407-.136.813-.542 1.254-1.406 2.151-3.574 2.151-3.574.119-.254.322-.491.763-.491h1.744c.525 0 .644.27.525.643-.22 1.017-2.354 4.031-2.354 4.031-.186.305-.254.44 0 .78.186.254.796.779 1.203 1.253.745.847 1.32 1.558 1.473 2.05.17.49-.085.744-.576.744z" />
+  </svg>
+);
 
-    // Если bots - объект с twitch/vk, преобразовать в массив
-    const botsObj = data.bots as BotsObjectFromApi;
-    const result: BotData[] = [];
+const PlatformIcon: React.FC<{ platform: Platform; className?: string }> = ({ platform, className }) =>
+  platform === 'twitch' ? <TwitchIcon className={className} /> : <VKIcon className={className} />;
 
-    if (botsObj.twitch) {
-        const twitch = botsObj.twitch;
-        result.push({
-            name: 'Twitch Bot',
-            status: twitch.is_ready ? 'running' : (twitch.connected ? 'stopped' : 'error'),
-            connections: twitch.channels
-        });
-    }
+/* ─── helpers ─── */
+const withBusy = async (
+  setBusy: React.Dispatch<React.SetStateAction<Record<string, boolean>>>,
+  key: string,
+  fn: () => Promise<void>,
+) => {
+  setBusy(prev => ({ ...prev, [key]: true }));
+  try { await fn(); } finally { setBusy(prev => ({ ...prev, [key]: false })); }
+};
 
-    if (botsObj.vk) {
-        const vk = botsObj.vk;
-        result.push({
-            name: 'VK Live Bot',
-            status: vk.is_running ? 'running' : (vk.connected ? 'stopped' : 'error'),
-            connections: vk.channels
-        });
-    }
+const formatTokenTimeLeft = (status: BotTokenStatus): string => {
+  if (typeof status.seconds_left !== 'number') {
+    return `${status.days_left ?? '?'} days left`;
+  }
 
-    return result;
-}
+  if (status.seconds_left <= 0) return 'expired';
 
-function parseTtsResponse(data: { status?: string; healthy?: boolean; url?: string }): TtsStatus {
-    return {
-        status: data?.status || 'unknown',
-        healthy: data?.healthy || false,
-        available: data?.healthy || false,
-        url: data?.url,
-    };
-}
+  const days = Math.floor(status.seconds_left / 86400);
+  const hours = Math.floor((status.seconds_left % 86400) / 3600);
+  const minutes = Math.floor((status.seconds_left % 3600) / 60);
 
-function getBotServiceStatus(bots: BotData[]): 'running' | 'error' | 'stopped' {
-    if (bots.length === 0) return 'stopped';
-    const hasError = bots.some(b => b.status === 'error');
-    if (hasError) return 'error';
-    const hasRunning = bots.some(b => b.status === 'running');
-    return hasRunning ? 'running' : 'stopped';
-}
+  if (days > 0) return `${days}d ${hours}h left`;
+  if (hours > 0) return `${hours}h ${minutes}m left`;
+  return `${Math.max(minutes, 1)}m left`;
+};
 
-function getBotServiceDescription(bots: BotData[]): string {
-    if (bots.length === 0) return 'Нет подключенных ботов';
-    const running = bots.filter(b => b.status === 'running').length;
-    return `${running} из ${bots.length} ботов активно`;
-}
-
-type RestartingState = Record<string, boolean>;
-
+/* ─── component ─── */
 const BotManagementPage: React.FC = () => {
-    // Service Status State
-    const [bots, setBots] = useState<BotData[]>([]);
-    const [ttsStatus, setTtsStatus] = useState<TtsStatus | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
-    const [restarting, setRestarting] = useState<RestartingState>({});
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-    // OAuth Token State (Moved from BotManagementCard)
-    const { data: tokenStatus, isLoading: tokenLoading } = useBotTokenStatusQuery();
-    const refreshMutation = useRefreshBotTokenMutation();
-    const refreshing = refreshMutation.isPending;
+  const [loading, setLoading] = useState(true);
+  const [runtimeBots, setRuntimeBots] = useState<Record<Platform, PlatformBotRuntime>>({
+    twitch: { connected: false, channels: 0 },
+    vk: { connected: false, channels: 0 },
+  });
+  const [tokenStatus, setTokenStatus] = useState<Record<Platform, BotTokenStatus>>({
+    twitch: { configured: false },
+    vk: { configured: false },
+  });
+  const [oneTimeLink, setOneTimeLink] = useState<{ platform: Platform; url: string } | null>(null);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
 
-    const { engineStatus: _engineStatus } = useTts();
-
-    const loadBotsStatus = async (): Promise<void> => {
-        try {
-            setLoading(true);
-            const response = await adminService.getBotsStatus();
-            const botsArray = parseBotsResponse(response.data as Parameters<typeof parseBotsResponse>[0]);
-            setBots(botsArray);
-        } catch (error) {
-            logger.error('Error loading bots status:', error);
-            toast.error('Ошибка загрузки статуса ботов');
-            setBots([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const loadTtsStatus = async (): Promise<void> => {
-        try {
-            const response = await adminService.getTtsStatus();
-            const ttsData = parseTtsResponse(response.data as Parameters<typeof parseTtsResponse>[0]);
-            setTtsStatus(ttsData);
-        } catch (error: unknown) {
-            logger.error('Error loading TTS status:', error);
-            const err = error as { response?: { data?: { detail?: string } }; message?: string };
-            setTtsStatus({
-                status: 'error',
-                healthy: false,
-                available: false,
-                error: err.response?.data?.detail || err.message || 'Failed to check TTS status',
-                url: TTS_SERVICE_URL
-            });
-        }
-    };
-
-    const restartBotService = async (): Promise<void> => {
-        try {
-            setRestarting(prev => ({ ...prev, 'bot_service': true }));
-            await adminService.restartBotService();
-            toast.success('Bot Service перезапущен');
-            await loadBotsStatus();
-        } catch (error) {
-            logger.error('Error restarting bot service:', error);
-            toast.error('Ошибка перезапуска Bot Service');
-        } finally {
-            setRestarting(prev => ({ ...prev, 'bot_service': false }));
-        }
-    };
-
-    const restartTtsEngine = async (): Promise<void> => {
-        try {
-            setRestarting(prev => ({ ...prev, 'tts_engine': true }));
-            await adminService.restartTtsEngine();
-            toast.success('TTS движок перезапущен');
-        } catch (error) {
-            logger.error('Error restarting TTS engine:', error);
-            toast.error('Ошибка перезапуска TTS движка');
-        } finally {
-            setRestarting(prev => ({ ...prev, 'tts_engine': false }));
-        }
-    };
-
-    // OAuth Actions
-    const handleAuthorizeBot = () => {
-        window.location.href = `${API_BASE_URL}/auth/twitch/bot/login`;
-    };
-
-    const handleRefreshToken = () => {
-        refreshMutation.mutate();
-    };
-
-    const getDaysLeftColor = (days?: number): "default" | "destructive" | "secondary" | "outline" => {
-        if (!days) return 'default';
-        if (days < 7) return 'destructive';
-        if (days < 30) return 'secondary';
-        return 'outline';
-    };
-
-    const getDaysLeftText = (days?: number) => {
-        if (!days) return 'Неизвестно';
-        if (days < 1) return 'Истекает сегодня!';
-        if (days === 1) return '1 день';
-        if (days < 7) return `${days} дней (внимание!)`;
-        return `${days} дней`;
-    };
-
-    const currentBotStatus = getBotServiceStatus(bots);
-
-    const getBotServiceStatusBadge = (): React.ReactNode => {
-        switch (currentBotStatus) {
-            case 'running':
-                return <Badge variant="outline" className="text-green-600 border-green-600">Запущен</Badge>;
-            case 'error':
-                return <Badge variant="outline" className="text-red-600 border-red-600">Ошибка</Badge>;
-            default:
-                return <Badge variant="outline" className="text-muted-foreground border-border">Остановлен</Badge>;
-        }
-    };
-
-    useEffect(() => {
-        loadBotsStatus();
-        loadTtsStatus();
-        const interval = setInterval(() => {
-            loadBotsStatus();
-            loadTtsStatus();
-        }, 10000);
-        return () => clearInterval(interval);
-    }, []);
-
-    if (loading && !tokenStatus) {
-        return (
-            <div className="container mx-auto p-6">
-                <PageLoader message="Загрузка статуса систем..." />
-            </div>
-        );
+  /* ─── data fetching ─── */
+  const fetchRuntimeStatus = useCallback(async () => {
+    const response = await adminService.getBotsStatus();
+    const data = response.data as { bots?: Record<Platform, PlatformBotRuntime> };
+    if (data.bots) {
+      setRuntimeBots({
+        twitch: data.bots.twitch ?? { connected: false, channels: 0 },
+        vk: data.bots.vk ?? { connected: false, channels: 0 },
+      });
     }
+  }, []);
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400 flex items-center">
-                        <Bot className="w-8 h-8 mr-3 text-purple-400" />
-                        Управление ботами
-                    </h1>
-                    <p className="text-muted-foreground">
-                        Управление, авторизация и мониторинг ботов Twitch и VK Live
-                    </p>
-                </div>
+  const fetchTokenStatus = useCallback(async (platform: Platform) => {
+    const response = await adminService.getBotTokenStatus(platform);
+    const data = response.data as unknown as BotTokenStatus;
+    setTokenStatus(prev => ({
+      ...prev,
+      [platform]: {
+        configured: Boolean(data?.configured),
+        bot_login: data?.bot_login,
+        days_left: data?.days_left ?? null,
+        hours_left: data?.hours_left ?? null,
+        seconds_left: data?.seconds_left ?? null,
+        needs_refresh: data?.needs_refresh,
+        has_refresh_token: data?.has_refresh_token,
+      },
+    }));
+  }, []);
 
-                <div className="flex items-center space-x-4">
-                    <Button onClick={loadBotsStatus} variant="outline" className="hover:bg-primary/10">
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        Обновить
-                    </Button>
-                </div>
-            </div>
+  const refreshAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      await Promise.all([fetchRuntimeStatus(), fetchTokenStatus('twitch'), fetchTokenStatus('vk')]);
+    } catch (error) {
+      logger.error('Failed to refresh bot management data', error);
+      toast.error('Failed to refresh bot status');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchRuntimeStatus, fetchTokenStatus]);
 
-            <div className="grid gap-6 md:grid-cols-2">
-                {/* 1. Bot Service Status */}
-                <Card className="card-glass border-slate-700/50">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                            <Bot className="w-5 h-5 text-purple-400" />
-                            Bot Service
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-4">
-                                {currentBotStatus === 'running' ? (
-                                    <CheckCircle className="w-8 h-8 text-green-500 drop-shadow-[0_0_10px_rgba(74,222,128,0.5)]" />
-                                ) : currentBotStatus === 'error' ? (
-                                    <Square className="w-8 h-8 text-red-500" />
-                                ) : (
-                                    <Square className="w-8 h-8 text-muted-foreground" />
-                                )}
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="font-semibold text-foreground">Статус сервиса</h3>
-                                        {getBotServiceStatusBadge()}
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {getBotServiceDescription(bots)}
-                                    </p>
-                                </div>
-                            </div>
+  /* ─── actions ─── */
+  const handleRestartBotService = () =>
+    withBusy(setBusy, 'restart', async () => {
+      try {
+        await adminService.restartBotService();
+        toast.success('Bot service restarted');
+        await fetchRuntimeStatus();
+      } catch {
+        toast.error('Failed to restart bot service');
+      }
+    });
 
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={restartBotService}
-                                disabled={restarting['bot_service']}
-                                className={currentBotStatus === 'running'
-                                    ? "border-green-600/50 text-green-500 hover:bg-green-500/10"
-                                    : "border-red-600/50 text-red-500 hover:bg-red-500/10"
-                                }
-                            >
-                                {restarting['bot_service'] ? (
-                                    <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                                ) : (
-                                    <RefreshCw className="w-4 h-4 mr-1" />
-                                )}
-                                Перезапустить
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+  const handleAuthorize = (platform: Platform) => {
+    window.location.href = `${API_BASE_URL}/auth/${platform}/bot/login`;
+  };
 
-                {/* 2. TTS Engine Status */}
-                <Card className="card-glass border-slate-700/50">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                            <Info className="w-5 h-5 text-blue-400" />
-                            TTS Engine
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-4">
-                                <div className="flex-shrink-0">
-                                    <Badge
-                                        variant="outline"
-                                        className={
-                                            ttsStatus?.healthy
-                                                ? "text-green-400 border-green-500/50 bg-green-500/10"
-                                                : "text-red-400 border-red-500/50 bg-red-500/10"
-                                        }
-                                    >
-                                        {ttsStatus?.healthy ? 'Активен' : 'Недоступен'}
-                                    </Badge>
-                                </div>
-                                <div className="overflow-hidden">
-                                    <p className="text-sm font-medium truncate text-foreground">
-                                        {ttsStatus?.url || TTS_SERVICE_URL}
-                                    </p>
-                                    {ttsStatus?.error && (
-                                        <span className="text-red-400 text-xs block mt-1 truncate">{ttsStatus.error}</span>
-                                    )}
-                                </div>
-                            </div>
+  const handleCreateLink = (platform: Platform) =>
+    withBusy(setBusy, `link-${platform}`, async () => {
+      try {
+        const response = await adminService.createBotLoginLink(platform);
+        const data = response.data as { url?: string };
+        if (!data.url) { toast.error('Backend did not return login URL'); return; }
+        setOneTimeLink({ platform, url: data.url });
+        toast.success(`${PLATFORM_META[platform].label} one-time link created`);
+      } catch {
+        toast.error(`Failed to create ${PLATFORM_META[platform].label} link`);
+      }
+    });
 
-                            {!ttsStatus?.healthy && (
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={restartTtsEngine}
-                                    disabled={restarting['tts_engine']}
-                                    className="border-red-600/50 text-red-500 hover:bg-red-500/10"
-                                >
-                                    {restarting['tts_engine'] ? (
-                                        <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
-                                    ) : (
-                                        <RefreshCw className="w-4 h-4 mr-1" />
-                                    )}
-                                    Перезапустить
-                                </Button>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+  const handleCopyLink = async () => {
+    if (!oneTimeLink) return;
+    try {
+      await navigator.clipboard.writeText(oneTimeLink.url);
+      toast.success('Link copied');
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
 
-            {/* 3. OAuth Авторизация */}
-            <Card className="card-glass border-slate-700/50">
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Bot className="w-5 h-5 text-purple-400" />
-                            <CardTitle>Авторизация бота (Twitch)</CardTitle>
-                        </div>
-                        {tokenStatus?.configured && tokenStatus.type === 'oauth' && (
-                            <Badge variant="outline" className="gap-1 border-green-500/50 text-green-400 bg-green-500/10">
-                                <CheckCircle className="w-3 h-3" />
-                                Авторизован
-                            </Badge>
-                        )}
-                    </div>
-                    <CardDescription>
-                        Управление OAuth токеном для бота. Необходимо для работы чат-бота и модерации.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {tokenLoading ? (
-                        <div className="flex justify-center py-4">
-                            <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : tokenStatus?.configured ? (
-                        <div className="flex flex-col md:flex-row gap-6">
-                            <div className="flex-1 space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800/50">
-                                        <span className="text-xs text-muted-foreground block mb-1">Логин бота</span>
-                                        <span className="font-mono font-medium text-purple-300">{tokenStatus.bot_login || 'Unknown'}</span>
-                                    </div>
-                                    <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800/50">
-                                        <span className="text-xs text-muted-foreground block mb-1">Статус токена</span>
-                                        <div className="flex items-center gap-2">
-                                            {tokenStatus.type === 'legacy' ? (
-                                                <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/50">
-                                                    Legacy Env Token
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant={getDaysLeftColor(tokenStatus.days_left)}>
-                                                    {getDaysLeftText(tokenStatus.days_left)}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+  const handleRefreshToken = (platform: Platform) =>
+    withBusy(setBusy, `refresh-${platform}`, async () => {
+      try {
+        const response = await adminService.refreshBotToken(platform);
+        const data = response.data as { success?: boolean; message?: string };
+        if (!data.success) { toast.error(data.message || 'Refresh failed'); return; }
+        toast.success(data.message || `${PLATFORM_META[platform].label} token refreshed`);
+        await Promise.all([fetchTokenStatus(platform), fetchRuntimeStatus()]);
+      } catch {
+        toast.error(`Failed to refresh ${PLATFORM_META[platform].label} token`);
+      }
+    });
 
-                                {tokenStatus.type === 'legacy' ? (
-                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
-                                        <AlertCircle className="w-4 h-4 mt-0.5" />
-                                        <div className="text-sm">
-                                            <p className="font-bold mb-1">Используется устаревший метод (env)</p>
-                                            <p>Бот работает через токен из .env файла. Автообновление токена недоступно.</p>
-                                            <p className="mt-1 opacity-80">Рекомендуется авторизовать бота через кнопку справа для автоматического обновления.</p>
-                                        </div>
-                                    </div>
-                                ) : tokenStatus.needs_refresh && (
-                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
-                                        <AlertCircle className="w-4 h-4 mt-0.5" />
-                                        <p className="text-sm">Токен скоро истечет, пожалуйста обновите его вручную.</p>
-                                    </div>
-                                )}
-                            </div>
+  /* ─── OAuth return feedback ─── */
+  useEffect(() => {
+    const success = searchParams.get('bot_auth_success');
+    const error = searchParams.get('bot_auth_error');
+    const platform = searchParams.get('platform');
 
-                            <div className="flex flex-col gap-3 justify-center min-w-[200px]">
-                                <Button
-                                    variant="outline"
-                                    onClick={handleRefreshToken}
-                                    disabled={refreshing}
-                                    className="hover:bg-primary/10"
-                                >
-                                    {refreshing ? (
-                                        <>
-                                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                            Обновление...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <RefreshCw className="w-4 h-4 mr-2" />
-                                            Обновить токен
-                                        </>
-                                    )}
-                                </Button>
-                                <Button
-                                    onClick={handleAuthorizeBot}
-                                    className="bg-[#9146FF] hover:bg-[#7a3adc] text-white shadow-lg shadow-purple-900/20"
-                                >
-                                    <ExternalLink className="w-4 h-4 mr-2" />
-                                    Переавторизовать
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center py-6 space-y-4">
-                            <div className="bg-blue-500/10 text-blue-400 p-4 rounded-lg inline-flex items-center gap-2 mb-2 border border-blue-500/20">
-                                <Info className="w-5 h-5" />
-                                <span>Бот не авторизован или токен истек</span>
-                            </div>
-                            <p className="text-muted-foreground max-w-md mx-auto">
-                                Нажмите кнопку ниже, чтобы авторизовать бота через Twitch. Это откроет новое окно.
-                            </p>
-                            <Button onClick={handleAuthorizeBot} size="lg" className="bg-[#9146FF] hover:bg-[#7a3adc] text-white shadow-lg shadow-purple-900/20">
-                                <Bot className="w-5 h-5 mr-2" />
-                                Авторизовать бота
-                            </Button>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+    if (success === 'true') {
+      toast.success(`${platform === 'vk' ? 'VK' : 'Twitch'} bot authorized`);
+      navigate('/dashboard/dolbaebadmintts?tab=bots', { replace: true });
+    } else if (error) {
+      toast.error(`Bot auth failed: ${error}`);
+      navigate('/dashboard/dolbaebadmintts?tab=bots', { replace: true });
+    }
+  }, [navigate, searchParams]);
+
+  useEffect(() => { refreshAll(); }, [refreshAll]);
+
+  /* ─── derived state ─── */
+  const runtimeSummary = useMemo(() => {
+    const twitchOk = runtimeBots.twitch.connected && (runtimeBots.twitch.is_ready !== false);
+    const vkOk = runtimeBots.vk.connected && runtimeBots.vk.is_running;
+    const count = [twitchOk, vkOk].filter(Boolean).length;
+    if (count === 0) return 'No active bots';
+    return `${count}/2 bot(s) connected`;
+  }, [runtimeBots]);
+
+  const getBadge = (platform: Platform) => {
+    const token = tokenStatus[platform];
+    const runtime = runtimeBots[platform];
+    if (!token.configured) return { label: 'Not configured', variant: 'destructive' as const };
+    if (runtime.connected && (runtime.is_ready !== false || runtime.is_running))
+      return { label: 'Connected', variant: 'default' as const };
+    if (token.needs_refresh) return { label: 'Needs refresh', variant: 'secondary' as const };
+    return { label: 'Ready', variant: 'outline' as const };
+  };
+
+  /* ─── render ─── */
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold">Bot Connect</h2>
+          <p className="text-sm text-muted-foreground">Manage dedicated bot OAuth tokens for Twitch and VK Live</p>
         </div>
-    );
+        <Button variant="outline" size="sm" className={ACTION_BUTTON_CLASS} onClick={refreshAll} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {/* Runtime card */}
+      <Card className={SURFACE_CARD_CLASS}>
+        <CardHeader className="py-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium">Bot runtime</CardTitle>
+            <span className="text-xs text-muted-foreground">{runtimeSummary}</span>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0 pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex gap-2">
+              {(['twitch', 'vk'] as Platform[]).map(p => {
+                const rt = runtimeBots[p];
+                const online = rt.connected && (rt.is_ready !== false || rt.is_running);
+                return (
+                  <Badge key={p} variant={online ? 'default' : 'secondary'} className="gap-1.5">
+                    <PlatformIcon platform={p} className="h-3 w-3" />
+                    {PLATFORM_META[p].label}: {online ? `${rt.channels} ch` : 'off'}
+                  </Badge>
+                );
+              })}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`ml-auto ${ACTION_BUTTON_CLASS}`}
+              onClick={handleRestartBotService}
+              disabled={busy['restart']}
+            >
+              <Server className="h-3.5 w-3.5 mr-1.5" />
+              Restart
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Platform cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {(['twitch', 'vk'] as Platform[]).map(platform => {
+          const status = tokenStatus[platform];
+          const badge = getBadge(platform);
+          const meta = PLATFORM_META[platform];
+
+          return (
+            <Card key={platform} className={SURFACE_CARD_CLASS}>
+              <CardHeader className="py-4 pb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <PlatformIcon platform={platform} className="h-5 w-5" />
+                    <CardTitle className="text-base" style={{ color: meta.color }}>
+                      {meta.label}
+                    </CardTitle>
+                  </div>
+                  <Badge variant={badge.variant}>{badge.label}</Badge>
+                </div>
+                {status.configured && (
+                  <CardDescription className="mt-1">
+                    Bot: <strong>{status.bot_login || 'unknown'}</strong>
+                  </CardDescription>
+                )}
+              </CardHeader>
+
+              <CardContent className="pt-0 pb-4 space-y-3">
+                {status.configured ? (
+                  <>
+                    {/* Token details */}
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5" />
+                        {formatTokenTimeLeft(status)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Refresh: {status.has_refresh_token ? 'yes' : 'no'}
+                      </span>
+                    </div>
+
+                    {/* Actions for configured bot */}
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 border-border/70 hover:bg-muted/60"
+                        onClick={() => handleRefreshToken(platform)}
+                        disabled={busy[`refresh-${platform}`]}
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${busy[`refresh-${platform}`] ? 'animate-spin' : ''}`} />
+                        Refresh token
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 border-border/70 hover:bg-muted/60"
+                        onClick={() => handleCreateLink(platform)}
+                        disabled={busy[`link-${platform}`]}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                        One-time link
+                      </Button>
+                      {oneTimeLink?.platform === platform && (
+                        <Button variant="outline" size="sm" className="h-8 border-border/70 hover:bg-muted/60" onClick={handleCopyLink}>
+                          <Copy className="h-3.5 w-3.5 mr-1.5" />
+                          Copy link
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* One-time link display */}
+                    {oneTimeLink?.platform === platform && (
+                      <div className="rounded border border-border/70 bg-card/60 p-2 text-xs break-all">
+                        <span className="text-muted-foreground">Link: </span>
+                        {oneTimeLink.url}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Not configured — setup card */
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-border/70 border-dashed bg-card/60 p-3">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+                        <div className="space-y-1 text-sm">
+                          <p className="font-medium text-foreground">First-time setup</p>
+                          <ol className="list-decimal list-inside space-y-0.5 text-xs text-muted-foreground">
+                            <li>Click <strong>Authorize bot</strong> below</li>
+                            <li>Log in with the <strong>bot account</strong> on {meta.label}</li>
+                            <li>Token is saved — bot starts automatically</li>
+                          </ol>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={() => handleAuthorize(platform)}
+                      className="w-full"
+                      style={{ backgroundColor: meta.color, borderColor: meta.color }}
+                    >
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Authorize bot
+                    </Button>
+
+                    <p className="text-[11px] text-center text-muted-foreground">
+                      Or use a{' '}
+                      <button
+                        className="underline hover:text-foreground"
+                        onClick={() => handleCreateLink(platform)}
+                        disabled={busy[`link-${platform}`]}
+                      >
+                        one-time link
+                      </button>{' '}
+                      to authorize from another browser
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 export default BotManagementPage;
-
-
-

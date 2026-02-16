@@ -1,17 +1,19 @@
 ﻿import React, { useMemo, useState } from 'react';
 
+/* eslint-disable no-alert */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {
     AlertCircle,
     CheckCircle2,
     ChevronDown,
     Clock,
+    Coins,
     Crown,
     Edit2,
     Filter,
     Info,
-    Mic,
-    Coins,
     MessageSquare,
+    Mic,
     Play,
     Plus,
     Radio,
@@ -104,7 +106,43 @@ interface CommandCardProps {
     onDelete?: (commandId: number) => void;
 }
 
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
+const CONTROL_TRIGGER_CLASS = 'h-9 w-full border-border/70 bg-background/80 shadow-none';
+const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
+const TAB_TRIGGER_CLASS =
+    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none';
+
+const hasBrokenSymbols = (text: string): boolean => {
+    const normalized = text.trim();
+    const compactText = normalized.replace(/\s+/g, '');
+    if (!compactText) return false;
+
+    const brokenChars = (compactText.match(/[?�]/g) || []).length;
+    if (brokenChars >= 3 && brokenChars / compactText.length > 0.35) {
+        return true;
+    }
+
+    // Common mojibake pattern (UTF-8 text decoded as cp1251): "РџСЂРёРІРµС‚"
+    const mojibakePairs = (normalized.match(/[РС][^\s]/g) || []).length;
+    return mojibakePairs >= 3 && (mojibakePairs * 2) / compactText.length > 0.3;
+};
+
+const toSafeText = (value: string | undefined | null, fallback: string): string => {
+    if (!value) return fallback;
+    const normalized = value.trim();
+    if (!normalized) return fallback;
+    return hasBrokenSymbols(normalized) ? fallback : normalized;
+};
+
+const normalizeTag = (tag: string | undefined | null): string => {
+    return toSafeText(tag, 'Без категории');
+};
+
 const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onToggle, onEdit, onDelete }) => {
+    const safeCommandName = toSafeText(command.name, 'unknown');
+    const safeDescription = toSafeText(command.description, 'Описание команды недоступно');
+    const safeResponse = toSafeText(command.response, '');
+
     const getRoleIcon = (role: string | undefined): React.ReactNode => {
         if (!role || role.trim() === '') {
             return <Users className="h-3 w-3" />;
@@ -148,7 +186,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> }
         ];
         const option = roleOptions.find(opt => opt.value === mappedRole);
-        return option ? option.label : `[WARN] ${role}`;
+        return option ? option.label : 'Неизвестная роль';
     };
 
 
@@ -166,24 +204,23 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
     };
 
     return (
-        <Card className="h-full transition-all duration-300 ease-in-out">
+        <Card className={`h-full ${SURFACE_CARD_CLASS}`}>
             <CardHeader className="pb-1">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Terminal className="h-3 w-3 text-primary" />
                         <code className="text-sm font-bold font-mono bg-muted px-2 py-1 rounded text-foreground">
-                            !{command.name}
+                            !{safeCommandName}
                         </code>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2 transition-all duration-300 ease-in-out">
-                            <Badge variant={command.enabled ? "default" : "secondary"} className="transition-all duration-300 ease-in-out">
+                        <div className="flex items-center gap-2">
+                            <Badge variant={command.enabled ? "default" : "secondary"}>
                                 {command.enabled ? 'Включена' : 'Отключена'}
                             </Badge>
                             <Switch
                                 checked={command.enabled}
                                 onCheckedChange={(checked) => onToggle(command.name, { is_enabled: checked }, command.id)}
-                                className="transition-all duration-300 ease-in-out"
                             />
                         </div>
                         {type === 'custom' && (
@@ -194,13 +231,13 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             </CardHeader>
             <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                    {command.description || 'Описание команды не указано'}
+                    {safeDescription}
                 </p>
 
-                {command.response && (
+                {safeResponse && (
                     <div className="p-2 bg-muted/30 rounded-md border-l-2 border-primary/20">
                         <p className="text-xs font-medium text-primary mb-1">Ответ:</p>
-                        <p className="text-xs text-muted-foreground line-clamp-2">"{command.response}"</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2">"{safeResponse}"</p>
                     </div>
                 )}
 
@@ -231,17 +268,18 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
 
                 {command.tags && Array.isArray(command.tags) && command.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                        {command.tags.map(tag => {
-                            const config = getTagConfig(tag);
+                        {command.tags.map((tag, index) => {
+                            const safeTag = toSafeText(tag, 'Без категории');
+                            const config = getTagConfig(safeTag);
                             const IconComponent = config.icon;
                             return (
                                 <Badge
-                                    key={tag}
+                                    key={`${tag}-${index}`}
                                     variant="outline"
                                     className={`text-xs px-2 py-0.5 flex items-center gap-1 ${config.color}`}
                                 >
                                     <IconComponent className="h-3 w-3" />
-                                    {tag}
+                                    {safeTag}
                                 </Badge>
                             );
                         })}
@@ -321,14 +359,22 @@ const CommandsPage: React.FC = () => {
         extra_settings: {}
     });
 
-    const basicCommands = commandsData?.basic_commands || [];
-    const customCommands = commandsData?.custom_commands || [];
+    const basicCommands = useMemo<ChatCommand[]>(() => {
+        return commandsData?.basic_commands || [];
+    }, [commandsData?.basic_commands]);
+    const customCommands = useMemo<ChatCommand[]>(() => {
+        return commandsData?.custom_commands || [];
+    }, [commandsData?.custom_commands]);
 
     // Все хуки должны быть вызваны до любых условных return (правило React Hooks)
     const basicTags = useMemo(() => {
-        return [...new Set(basicCommands.flatMap((cmd: ChatCommand) => {
-            return Array.isArray(cmd.tags) ? cmd.tags : [];
-        }))] as string[];
+        const normalizedTags = basicCommands.flatMap((cmd: ChatCommand) => {
+            if (!Array.isArray(cmd.tags)) {
+                return [];
+            }
+            return cmd.tags.map(tag => normalizeTag(typeof tag === 'string' ? tag : String(tag)));
+        });
+        return [...new Set(normalizedTags)] as string[];
     }, [basicCommands]);
 
     if (!isAuthenticated) {
@@ -399,8 +445,11 @@ const CommandsPage: React.FC = () => {
             const matchesSearch = command.name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
                 command.description?.toLowerCase().includes(basicSearchTerm.toLowerCase());
 
+            const normalizedCommandTags = Array.isArray(command.tags)
+                ? command.tags.map(tag => normalizeTag(typeof tag === 'string' ? tag : String(tag)))
+                : [];
             const matchesTags = selectedBasicTags.length === 0 || selectedBasicTags.some(selectedTag =>
-                command.tags && Array.isArray(command.tags) && command.tags.includes(selectedTag)
+                normalizedCommandTags.includes(selectedTag)
             );
 
             const matchesPlatform = platformFilter === 'all' ||
@@ -424,8 +473,6 @@ const CommandsPage: React.FC = () => {
         });
     };
 
-    const areAllTagsSelected = selectedBasicTags.length === basicTags.length && basicTags.length > 0;
-
     const toggleTag = (tag: string): void => {
         setSelectedBasicTags(prev =>
             prev.includes(tag)
@@ -436,10 +483,6 @@ const CommandsPage: React.FC = () => {
 
     const clearAllFilters = (): void => {
         setSelectedBasicTags([]);
-    };
-
-    const selectAllFilters = (): void => {
-        setSelectedBasicTags([...basicTags]);
     };
 
     const handleCreateCommand = (): void => {
@@ -548,16 +591,26 @@ const CommandsPage: React.FC = () => {
     return (
         <PageWrapper>
             <Tabs defaultValue="basic" className="space-y-6">
-                <TabsList>
-                    <TabsTrigger value="basic">Базовые команды</TabsTrigger>
-                    <TabsTrigger value="custom">Кастомные команды</TabsTrigger>
+                <TabsList className="h-auto w-full justify-start rounded-none bg-transparent p-0 border-b border-border">
+                    <TabsTrigger
+                        value="basic"
+                        className={TAB_TRIGGER_CLASS}
+                    >
+                        Базовые команды
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="custom"
+                        className={TAB_TRIGGER_CLASS}
+                    >
+                        Кастомные команды
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4">
-                    <Card className="transition-all duration-200">
+                    <Card className={SURFACE_CARD_CLASS}>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between mb-4" />
-                            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                            <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,1fr)_200px_230px] gap-3 mb-6 items-center">
                                 <div className="flex-1">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -569,12 +622,12 @@ const CommandsPage: React.FC = () => {
                                         />
                                     </div>
                                 </div>
-
+                                
                                 <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                                <SelectTrigger className="w-[clamp(150px,22vw,200px)]">
+                                <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                         <SelectValue placeholder="Все платформы" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className={CONTROL_CONTENT_CLASS}>
                                         <SelectItem value="all">Все платформы</SelectItem>
                                         <SelectItem value="twitch">
                                             <div className="flex items-center gap-2">
@@ -602,18 +655,26 @@ const CommandsPage: React.FC = () => {
                                 <div className="relative">
                                     <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-9 min-w-[clamp(150px,22vw,200px)]">
-                                                <Filter className="h-4 w-4 mr-2" />
-                                                Фильтр по тегам
-                                                {selectedBasicTags.length > 0 && (
-                                                    <Badge variant="secondary" className="ml-2">
+                                            <Button variant="outline" size="sm" className="h-9 w-full justify-between">
+                                                <span className="inline-flex items-center gap-2">
+                                                    <Filter className="h-4 w-4" />
+                                                    Фильтр по тегам
+                                                </span>
+                                                <span className="inline-flex items-center gap-1 min-w-[42px] justify-end">
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className={`h-5 px-1.5 ${selectedBasicTags.length === 0 ? 'opacity-0' : ''}`}
+                                                    >
                                                         {selectedBasicTags.length}
                                                     </Badge>
-                                                )}
-                                                <ChevronDown className="h-4 w-4 ml-2" />
+                                                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isFilterOpen ? 'rotate-180' : ''}`} />
+                                                </span>
                                             </Button>
                                         </PopoverTrigger>
-                                        <PopoverContent className="w-64 p-0" align="start">
+                                        <PopoverContent
+                                            className="w-64 p-0 border-border/70 bg-popover/95 backdrop-blur-sm origin-top-left data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:duration-200 data-[state=closed]:duration-150 data-[state=open]:ease-out data-[state=closed]:ease-in"
+                                            align="start"
+                                        >
                                             <div className="p-3 border-b">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <h4 className="font-medium text-sm">Фильтр по тегам</h4>
@@ -672,9 +733,9 @@ const CommandsPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {getFilteredBasicCommands().map((command: ChatCommand) => (
-                                    <div key={command.id || command.name} className="transition-all duration-200">
+                                    <div key={command.id || command.name}>
                                         <CommandCard
                                             command={command}
                                             type="basic"
@@ -689,7 +750,7 @@ const CommandsPage: React.FC = () => {
                 </TabsContent>
 
                 <TabsContent value="custom" className="space-y-4">
-                    <Card className="transition-all duration-200">
+                    <Card className={SURFACE_CARD_CLASS}>
                         <CardHeader className="flex flex-row items-center justify-between">
                             <div>
                                 <CardTitle className="flex items-center gap-2">
@@ -702,7 +763,7 @@ const CommandsPage: React.FC = () => {
                             </div>
                             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                                 <DialogTrigger asChild>
-                                    <Button>
+                                    <Button variant="outline" className="h-9 border-border/70">
                                         <Plus className="h-4 w-4 mr-2" />
                                         Создать команду
                                     </Button>
@@ -749,14 +810,14 @@ const CommandsPage: React.FC = () => {
                                                         platforms: value
                                                     }))}
                                                 >
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                                         <SelectValue placeholder="Выберите платформы">
                                                             {createForm.platforms === 'twitch,vk' || !createForm.platforms
                                                                 ? 'Все платформы'
                                                                 : getPlatformLabel(createForm.platforms)}
                                                         </SelectValue>
                                                     </SelectTrigger>
-                                                    <SelectContent>
+                                                    <SelectContent className={CONTROL_CONTENT_CLASS}>
                                                         {platformsToShow.map(option => (
                                                             <SelectItem key={option.value} value={option.value}>
                                                                 {option.label}
@@ -774,12 +835,12 @@ const CommandsPage: React.FC = () => {
                                                         allowed_roles: value
                                                     }))}
                                                 >
-                                                    <SelectTrigger>
+                                                    <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                                         <SelectValue placeholder="Выберите доступ">
                                                             {roleOptions.find(opt => opt.value === createForm.allowed_roles)?.label || 'Выберите доступ'}
                                                         </SelectValue>
                                                     </SelectTrigger>
-                                                    <SelectContent>
+                                                    <SelectContent className={CONTROL_CONTENT_CLASS}>
                                                         {roleOptions.map(option => (
                                                             <SelectItem key={option.value} value={option.value}>
                                                                 {option.label}
@@ -807,7 +868,7 @@ const CommandsPage: React.FC = () => {
                                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                                             Отмена
                                         </Button>
-                                        <Button onClick={handleCreateCommand}>
+                                        <Button onClick={handleCreateCommand} className="h-9 bg-none bg-primary hover:bg-primary/90 shadow-none">
                                             <Save className="h-4 w-4 mr-2" />
                                             Создать
                                         </Button>
@@ -819,7 +880,7 @@ const CommandsPage: React.FC = () => {
                             {customCommands.length > 0 && (
                                 <>
                                     <div className="flex items-center justify-between mb-4" />
-                                    <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,1fr)_200px_230px] gap-3 mb-6 items-center">
                                         <div className="flex-1">
                                             <div className="relative">
                                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -833,10 +894,10 @@ const CommandsPage: React.FC = () => {
                                         </div>
 
                                         <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                                        <SelectTrigger className="w-[clamp(150px,22vw,200px)]">
-                                                <SelectValue placeholder="Все платформы" />
-                                            </SelectTrigger>
-                                            <SelectContent>
+                                        <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
+                                            <SelectValue placeholder="Все платформы" />
+                                        </SelectTrigger>
+                                            <SelectContent className={CONTROL_CONTENT_CLASS}>
                                                 <SelectItem value="all">Все платформы</SelectItem>
                                                 <SelectItem value="twitch">
                                                     <div className="flex items-center gap-2">
@@ -860,6 +921,7 @@ const CommandsPage: React.FC = () => {
                                                 </SelectItem>
                                             </SelectContent>
                                         </Select>
+                                        <div />
                                     </div>
                                 </>
                             )}
@@ -874,9 +936,9 @@ const CommandsPage: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-all duration-200">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {getFilteredCustomCommands().map((command: ChatCommand) => (
-                                        <div key={command.id || command.name} className="transition-all duration-200">
+                                        <div key={command.id || command.name}>
                                             <CommandCard
                                                 command={command}
                                                 type="custom"
@@ -937,14 +999,14 @@ const CommandsPage: React.FC = () => {
                                             platforms: value
                                         }))}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                             <SelectValue placeholder="Выберите платформы">
                                                 {editForm.platforms === 'twitch,vk' || !editForm.platforms
                                                     ? 'Все платформы'
                                                     : getPlatformLabel(editForm.platforms)}
                                             </SelectValue>
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent className={CONTROL_CONTENT_CLASS}>
                                             {platformsToShow.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
@@ -962,12 +1024,12 @@ const CommandsPage: React.FC = () => {
                                             allowed_roles: value
                                         }))}
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                             <SelectValue placeholder="Выберите доступ">
                                                 {roleOptions.find(opt => opt.value === editForm.allowed_roles)?.label || 'Выберите доступ'}
                                             </SelectValue>
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent className={CONTROL_CONTENT_CLASS}>
                                             {roleOptions.map(option => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
@@ -1022,7 +1084,10 @@ const CommandsPage: React.FC = () => {
                         <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                             Отмена
                         </Button>
-                        <Button onClick={() => handleUpdateCommand(editingCommand?.id ? Number(editingCommand.id) : undefined)}>
+                        <Button
+                            onClick={() => handleUpdateCommand(editingCommand?.id ? Number(editingCommand.id) : undefined)}
+                            className="h-9 bg-none bg-primary hover:bg-primary/90 shadow-none"
+                        >
                             <Save className="h-4 w-4 mr-2" />
                             Сохранить
                         </Button>

@@ -1,5 +1,5 @@
 ﻿// src/hooks/useLootboxLogic.ts
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { dropsService } from '@/services/api/services/dropsService';
 import { logger } from '@/shared/utils/prodLogger';
@@ -29,7 +29,7 @@ export const useLootboxLogic = (channelName?: string): UseLootboxLogicReturn => 
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
-    const loadConfig = async (): Promise<void> => {
+    const loadConfig = useCallback(async (): Promise<void> => {
         if (!channelName) return;
         
         setLoading(true);
@@ -44,9 +44,9 @@ export const useLootboxLogic = (channelName?: string): UseLootboxLogicReturn => 
         } finally {
             setLoading(false);
         }
-    };
+    }, [channelName]);
 
-    const saveConfig = async (newConfig: Partial<LootboxConfig>): Promise<void> => {
+    const saveConfig = useCallback(async (newConfig: Partial<LootboxConfig>): Promise<void> => {
         if (!config || !channelName) return;
         
         setSaving(true);
@@ -67,17 +67,17 @@ export const useLootboxLogic = (channelName?: string): UseLootboxLogicReturn => 
         } finally {
             setSaving(false);
         }
-    };
+    }, [config, channelName]);
 
-    const updateConfig = (key: string, value: string | number | boolean): void => {
+    const updateConfig = useCallback((key: string, value: string | number | boolean): void => {
         setConfig(prev => prev ? { ...prev, [key]: value } : null);
-    };
+    }, []);
 
     useEffect(() => {
         if (channelName) {
-            loadConfig();
+            void loadConfig();
         }
-    }, [channelName]);
+    }, [channelName, loadConfig]);
 
     return {
         config,

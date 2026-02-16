@@ -212,6 +212,8 @@ def capture_message(message: str, level: str = "info", **extra):
 
 # Convenience decorators
 
+import functools
+
 def with_sentry_context(**context):
     """
     Decorator to add context to all Sentry events in a function.
@@ -222,6 +224,7 @@ def with_sentry_context(**context):
             ...
     """
     def decorator(func):
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             with sentry_sdk.push_scope() as scope:
                 for key, value in context.items():

@@ -6,6 +6,7 @@
  * - Data is successfully synced
  * - Data is out of sync (error)
  */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 
 import { AlertCircle, CheckCircle2, Loader2, WifiOff } from 'lucide-react';

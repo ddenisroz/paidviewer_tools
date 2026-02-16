@@ -96,13 +96,13 @@ const TtsPlatformSelector: React.FC = () => {
       id: 'twitch',
       name: 'Twitch',
       icon: TwitchIcon,
-      description: '??????? ????????? ?? Twitch ????',
+      description: 'Озвучивать сообщения из Twitch чата',
     },
     {
       id: 'vk',
       name: 'VK Live',
       icon: VKIcon,
-      description: '??????? ????????? ?? VK Live ????',
+      description: 'Озвучивать сообщения из VK Live чата',
     },
   ];
 
@@ -118,14 +118,14 @@ const TtsPlatformSelector: React.FC = () => {
       accentBg: 'bg-purple-500/15',
       accentBorder: 'border-purple-500/30',
       pill: 'bg-purple-500/15 text-purple-200 border border-purple-500/30',
-      toggleOn: 'bg-purple-500',
+      toggleOn: 'bg-emerald-500',
     },
     vk: {
       accentText: 'text-red-300',
       accentBg: 'bg-red-500/15',
       accentBorder: 'border-red-500/30',
       pill: 'bg-red-500/15 text-red-200 border border-red-500/30',
-      toggleOn: 'bg-red-500',
+      toggleOn: 'bg-emerald-500',
     },
   };
 
@@ -136,9 +136,9 @@ const TtsPlatformSelector: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold text-foreground flex items-center">
               <Volume2 className="w-5 h-5 mr-2 text-primary" />
-              ????????? TTS
+              Платформы TTS
             </h3>
-            <p className="text-sm text-muted-foreground mt-1">????? ???????? ??? ???????</p>
+            <p className="text-sm text-muted-foreground mt-1">Выберите источники для озвучки</p>
           </div>
 
           <div className="flex items-center space-x-2">
@@ -175,12 +175,12 @@ const TtsPlatformSelector: React.FC = () => {
 
           <div className="ml-3 flex-1">
             <p className={`font-medium ${ttsEnabled ? 'text-emerald-200' : 'text-muted-foreground'}`}>
-              {ttsEnabled ? 'TTS ???????' : 'TTS ????????'}
+              {ttsEnabled ? 'TTS включен' : 'TTS выключен'}
             </p>
             <p className={`text-sm ${ttsEnabled ? 'text-emerald-300' : 'text-muted-foreground'}`}>
               {ttsEnabled
-                ? `??????? ?? ${enabledPlatforms.length} ?????????(??)`
-                : '??????? ????????? ?????????'
+                ? `Активно на ${enabledPlatforms.length} платформ(е/ах)`
+                : 'Включите главный переключатель'
               }
             </p>
           </div>
@@ -188,7 +188,7 @@ const TtsPlatformSelector: React.FC = () => {
       </div>
 
       <div className="p-6">
-        <h4 className="text-md font-medium text-foreground mb-4">????? ????????</h4>
+        <h4 className="text-md font-medium text-foreground mb-4">Выбор платформ</h4>
 
         <div className="space-y-4">
           {platforms.map(platform => {
@@ -221,7 +221,7 @@ const TtsPlatformSelector: React.FC = () => {
                     ? styles.pill
                     : 'bg-muted/60 text-muted-foreground border border-border'
                     }`}>
-                    {isActive ? '???????' : '????????'}
+                    {isActive ? 'Активно' : 'Выкл'}
                   </span>
 
                   <button
@@ -252,10 +252,10 @@ const TtsPlatformSelector: React.FC = () => {
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-yellow-100">
-                TTS ???????, ?? ??? ???????? ????????
+                TTS включен, но платформы не выбраны
               </h3>
               <div className="mt-2 text-sm text-yellow-200/80">
-                <p>???????? ???? ?? ???? ????????? ??? ??????? ?????????.</p>
+                <p>Включите хотя бы одну платформу для начала озвучки.</p>
               </div>
             </div>
           </div>

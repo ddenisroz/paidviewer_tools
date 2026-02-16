@@ -2,12 +2,12 @@ import logging
 import json
 import asyncio
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 import uuid
 
 from sqlalchemy import func
 
-from core.database import SessionLocal, ChatMessage, User
+from core.database import SessionLocal, User
 
 from repositories.user_repository import UserRepository
 from repositories.chat_message_repository import ChatMessageRepository
@@ -96,13 +96,35 @@ class NotificationService:
                     "timestamp": datetime.now().isoformat()
                 }
             }
-            
-            connections = get_memory_websocket_manager().connections
-            if not connections:
+
+            target_user_id, listening_mode = self._resolve_user_and_listening_mode(channel_name, platform)
+            if not target_user_id:
+                logger.debug(
+                    "[TTS] Skip broadcast: could not resolve owner for %s:%s",
+                    platform,
+                    channel_name,
+                )
                 return False
 
-            sent_count = await self._broadcast_to_connections(connections, json.dumps(tts_event))
-            logger.info(f"[VOLUME] TTS audio sent to {sent_count}/{len(connections)} connections")
+            manager = get_memory_websocket_manager()
+            sent_count = await manager.send_to_user(
+                target_user_id,
+                tts_event,
+                client_roles={"tts_player"},
+            )
+            if sent_count == 0 and listening_mode != "website":
+                # OBS mode doesn't require dedicated tts_player tab; keep legacy delivery path.
+                sent_count = await manager.send_to_user(
+                    target_user_id,
+                    tts_event,
+                    exclude_presence_only=True
+                )
+            logger.info(
+                "[VOLUME] TTS audio sent to %s connections (user=%s, mode=%s)",
+                sent_count,
+                target_user_id,
+                listening_mode,
+            )
             return sent_count > 0
 
         except Exception as e:
@@ -182,6 +204,32 @@ class NotificationService:
                 )
         except Exception as e:
             logger.error(f"Failed to save message to DB: {e}")
+        finally:
+            db.close()
+
+    def _resolve_user_and_listening_mode(self, channel_name: str, platform: str) -> Tuple[Optional[int], str]:
+        db = SessionLocal()
+        try:
+            user_repo = UserRepository(db)
+            user: Optional[User] = None
+
+            if platform == "twitch":
+                user = user_repo.get_by_twitch_username(channel_name)
+            elif platform == "vk":
+                user = user_repo.get_by_vk_channel_name(channel_name)
+                if not user:
+                    user = db.query(User).filter(func.lower(User.vk_username) == channel_name.lower()).first()
+            else:
+                return None, "website"
+
+            if not user:
+                return None, "website"
+
+            listening_mode = getattr(user, "tts_listening_mode", "website") or "website"
+            return user.id, listening_mode
+        except Exception as error:
+            logger.error("Failed to resolve TTS owner for %s:%s: %s", platform, channel_name, error)
+            return None, "website"
         finally:
             db.close()
 

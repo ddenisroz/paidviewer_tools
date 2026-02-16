@@ -1,11 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+/* eslint-disable react-refresh/only-export-components */
 import { keepPreviousData } from '@tanstack/react-query';
 import { useLocation } from 'react-router-dom';
 
 
 import { STORAGE_KEYS } from '@/constants';
-import { useGlobalVoices, useToggleTts, useTtsHealth, useTtsStatus } from '@/queries/tts/ttsQueries';
+import { useGlobalVoices, useToggleTts, useTtsStatus } from '@/queries/tts/ttsQueries';
+import { ttsService } from '@/services/api/services/ttsService';
 import { useToast } from '@/shared/components/ui/toast';
 import { useButtonPosition } from '@/shared/hooks/useButtonPosition';
 import { logger } from '@/shared/utils/prodLogger';
@@ -63,10 +65,12 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const [ttsEnabled, setTtsEnabled] = useState<boolean>(false);
     const [isWhitelisted, setIsWhitelisted] = useState<boolean | null>(null);
     const [voices, setVoices] = useState<TtsVoice[]>([]);
-    const [engineStatus, setEngineStatus] = useState<EngineStatus>({ loaded: false, error: null });
+    const [engineStatus, setEngineStatus] = useState<EngineStatus>({ loaded: true, error: null });
     const [notificationCallback, setNotificationCallback] = useState<((message: string, type?: string) => void) | null>(null);
     const [isInitialized, setIsInitialized] = useState<boolean>(false);
     const [isToggling, setIsToggling] = useState<boolean>(false);
+    const [isCheckingHealth, setIsCheckingHealth] = useState<boolean>(false);
+    const [selectedEngineType, setSelectedEngineType] = useState<string | null>(null);
 
 
 
@@ -75,34 +79,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const ttsStatusInterval = isTtsPage ? 30 * 1000 : 120 * 1000;
 
     const channelName = null;
-
-    const { data: healthData, isLoading: isCheckingHealth, error: healthError } = useTtsHealth({
-        enabled: !!user && isTtsPage,
-        refetchInterval: 30 * 1000,
-        refetchIntervalInBackground: false,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
-    });
-
-    // React Query v5: onSuccess moved to useEffect
-    useEffect(() => {
-        if (healthData) {
-            const healthResponse = (healthData?.data || healthData) as { tts_engine_loaded?: boolean };
-            const isHealthy = healthResponse?.tts_engine_loaded === true;
-            if (isHealthy) {
-                setEngineStatus({ loaded: true, error: null });
-            } else {
-                setEngineStatus({ loaded: false, error: "TTS движок не готов" });
-            }
-        }
-    }, [healthData]);
-
-    useEffect(() => {
-        if (healthError) {
-            logger.error("TTS Health check failed:", healthError);
-            setEngineStatus({ loaded: false, error: "Не удается подключиться к TTS сервису" });
-        }
-    }, [healthError]);
+    const shouldCheckF5Health = !!user && (selectedEngineType === 'cloud' || selectedEngineType === 'local');
 
     const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
         enabled: !!user,
@@ -120,6 +97,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
                 enabled?: boolean;
                 is_whitelisted?: boolean;
                 has_local_setup?: boolean;
+                engine_type?: string;
                 listening_mode?: 'website' | 'obs';
                 listeningMode?: 'website' | 'obs';
             };
@@ -135,6 +113,12 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
 
                 if (typeof statusResponse.is_whitelisted === 'boolean') {
                     setIsWhitelisted(statusResponse.is_whitelisted);
+                }
+
+                const engineType = statusResponse.engine_type ?? null;
+                setSelectedEngineType(engineType);
+                if (engineType !== 'cloud' && engineType !== 'local') {
+                    setEngineStatus({ loaded: true, error: null });
                 }
 
                 if (statusResponse.has_local_setup) {
@@ -159,6 +143,41 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             }
         }
     }, [statusData]);
+
+    const runF5HealthCheck = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
+        if (isCheckingHealth) {
+            return { isHealthy: engineStatus.loaded, isChecking: true };
+        }
+
+        if (!shouldCheckF5Health) {
+            setEngineStatus({ loaded: true, error: null });
+            return { isHealthy: true, isChecking: false };
+        }
+
+        setIsCheckingHealth(true);
+        try {
+            const response = await ttsService.getHealth();
+            const payload = (response.data?.data || response.data) as {
+                tts_engine_loaded?: boolean;
+                status?: string;
+            };
+            const isHealthy = payload?.tts_engine_loaded === true || payload?.status === 'healthy';
+
+            if (isHealthy) {
+                setEngineStatus({ loaded: true, error: null });
+            } else {
+                setEngineStatus({ loaded: false, error: 'F5 TTS сервис недоступен' });
+            }
+
+            return { isHealthy, isChecking: false };
+        } catch (error) {
+            logger.error('TTS Health check failed:', error);
+            setEngineStatus({ loaded: false, error: 'Не удается подключиться к F5 TTS сервису' });
+            return { isHealthy: false, isChecking: false };
+        } finally {
+            setIsCheckingHealth(false);
+        }
+    }, [isCheckingHealth, engineStatus.loaded, shouldCheckF5Health]);
 
     const { data: voicesData } = useGlobalVoices({
         enabled: !!user && engineStatus.loaded,
@@ -218,8 +237,8 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     }, [user, refetchStatus]);
 
     const checkTtsHealth = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
-        return { isHealthy: engineStatus.loaded, isChecking: isCheckingHealth };
-    }, [engineStatus.loaded, isCheckingHealth]);
+        return runF5HealthCheck();
+    }, [runF5HealthCheck]);
 
     useEffect(() => {
         const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
@@ -240,16 +259,24 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     }, [toggleTtsMutation.isPending]);
 
     const toggleTts = useCallback(async (_event: unknown = null): Promise<void> => {
-        if (isToggling || toggleTtsMutation.isPending) {
+        if (isToggling || toggleTtsMutation.isPending || isCheckingHealth) {
             return;
         }
 
-        // Note: We no longer block on engineStatus or whitelist checks
-        // The API will handle validation and return appropriate errors
-        // This allows Shift+T shortcut to work without waiting for health checks
+        const nextEnabled = !ttsEnabled;
+        if (nextEnabled && shouldCheckF5Health) {
+            const healthState = await runF5HealthCheck();
+            if (!healthState.isHealthy) {
+                const message = 'F5 TTS недоступен. Включение озвучки отменено.';
+                if (notificationCallback) {
+                    notificationCallback(message, 'error');
+                }
+                return;
+            }
+        }
 
-        toggleTtsMutation.mutate(!ttsEnabled);
-    }, [ttsEnabled, isToggling, toggleTtsMutation]);
+        toggleTtsMutation.mutate(nextEnabled);
+    }, [ttsEnabled, isToggling, toggleTtsMutation, isCheckingHealth, shouldCheckF5Health, runF5HealthCheck, notificationCallback]);
 
     const initializeTts = useCallback(async (): Promise<void> => {
         if (!isInitialized && user) {
@@ -294,4 +321,5 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         </TtsContext.Provider>
     );
 };
+
 

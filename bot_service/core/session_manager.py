@@ -35,85 +35,6 @@ class SessionManager:
         # - явном логауте пользователя
         # - логине с другого устройства (все старые сессии завершаются)
 
-    def create_or_get_user_by_platform(self, platform: str, platform_user_id: str, avatar_url: str, db: Session, current_user_id: int = None, username: str = None) -> User:
-        """Находит пользователя по ID платформы или создает нового, если он не найден."""
-        logger.info(f"[SEARCH] Looking for existing user with {platform} ID: {platform_user_id}")
-
-        # Ищем по токенам текущей платформы
-        token = db.query(UserToken).filter(
-            UserToken.platform == platform,
-            UserToken.platform_user_id == platform_user_id
-        ).first()
-
-        if token:
-            logger.info(f"[OK] Found existing token for {platform} user {platform_user_id}")
-            # Получаем пользователя по user_id
-            user = db.query(User).filter(User.id == token.user_id).first()
-            if user:
-                logger.info(f"[OK] Found existing user (ID: {user.id}) for {platform} user {platform_user_id}")
-                # Обновляем username если он передан и еще не установлен
-                if username and platform == "twitch" and not user.twitch_username:
-                    user.twitch_username = username
-                    db.commit()
-                    logger.info(f"[UPDATE] Set twitch_username to {username}")
-                elif username and platform == "vk" and not user.vk_username:
-                    user.vk_username = username
-                    db.commit()
-                    logger.info(f"[UPDATE] Set vk_username to {username}")
-                return user
-            else:
-                logger.warning(f"[WARN] Token found but user ID {token.user_id} doesn't exist - creating new user")
-        else:
-            logger.info(f"[ERROR] No existing token found for {platform} user {platform_user_id}")
-
-            # Если есть current_user_id (пользователь подключает интеграцию), добавляем токен к текущему пользователю
-            if current_user_id:
-                logger.info(f"[CHANNELS] User {current_user_id} is connecting {platform} integration - adding token to existing account")
-                user = db.query(User).filter(User.id == current_user_id).first()
-                if user:
-                    logger.info(f"[OK] Adding {platform} token to existing user {current_user_id}")
-                    return user
-                else:
-                    logger.warning(f"[WARN] Current user {current_user_id} not found - creating new user")
-
-        # Создаем нового пользователя (если токен не найден или пользователь не найден)
-        logger.info(f"[NEW] Creating a new user for {platform} user {platform_user_id}")
-
-        # БЕЗОПАСНОСТЬ: Проверяем админские права через базу данных
-        # Создаем пользователя как обычного, админские права назначаются отдельно
-        is_admin = False
-
-        # Проверяем, есть ли пользователь в таблице админов
-        from core.database import AdminUser
-        admin_user = db.query(AdminUser).filter(
-            AdminUser.platform == platform,
-            AdminUser.platform_user_id == platform_user_id
-        ).first()
-
-        if admin_user and admin_user.is_active:
-            is_admin = True
-            logger.info(f"Admin user found in database: {platform}:{platform_user_id}")
-
-        logger.info(f"Creating new user: platform='{platform}', platform_user_id='{platform_user_id}', is_admin={is_admin}")
-
-        # Создаем пользователя с username если он передан
-        # Используем role вместо is_admin
-        role = 'admin' if is_admin else 'user'
-        new_user = User(role=role)
-        if username and platform == "twitch":
-            new_user.twitch_username = username
-        elif username and platform == "vk":
-            new_user.vk_username = username
-
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-
-        if is_admin:
-            logger.info(f"[OK] Created new admin user with ID: {new_user.id}")
-        else:
-            logger.info(f"[OK] Created new user with ID: {new_user.id}")
-        return new_user
 
     def _merge_user_accounts(self, source_user_id: int, target_user_id: int, db: Session):
         """Объединяет два аккаунта: переносит все данные от source к target"""
@@ -188,6 +109,10 @@ class SessionManager:
 
             # Переносим другие связанные данные (если есть)
             # Здесь можно добавить перенос команд, голосов, истории и т.д.
+
+            # Удаляем source_user, так как все данные перенесены
+            db.delete(source_user)
+            logger.info(f"[DELETE] Source user {source_user_id} deleted after merge")
 
             db.commit()
             logger.info(f"Successfully merged user {source_user_id} into user {target_user_id}")
@@ -358,38 +283,6 @@ class SessionManager:
             logger.error(f"Error getting tokens for user {user_id}, platform {platform}: {e}")
             return None
 
-    def terminate_all_sessions_for_channel(self, channel_name: str, reason: str = "new_login", db: Optional[Session] = None) -> None:
-        """Завершает все авторизованные сессии для указанного канала."""
-        def _terminate(session_db: Session):
-            all_sessions = session_db.query(UserSession).filter(
-                UserSession.is_active
-            ).all()
-
-            # Фильтруем по каналу в device_info
-            channel_sessions = [
-                s for s in all_sessions
-                if s.device_info and s.device_info.get("monitored_channel") == channel_name
-            ]
-
-            for session in channel_sessions:
-                session.is_active = False
-                logger.info(f"[TERMINATE] Terminated session {session.session_id} for channel {channel_name}, reason: {reason}")
-
-            logger.info(f"[OK] Terminated {len(channel_sessions)} sessions for channel {channel_name}")
-
-            # Отправка WebSocket уведомлений
-            try:
-                import asyncio
-                asyncio.create_task(self._notify_all_sessions_terminated_for_channel(channel_name, reason))
-            except Exception as e:
-                logger.error(f"Error sending WebSocket notification for channel {channel_name}: {e}")
-
-        if db is not None:
-            _terminate(db)
-            db.commit()
-        else:
-            with db_session() as new_db:
-                _terminate(new_db)
 
     def terminate_user_sessions(self, user_id: int, reason: str = "logout", db: Optional[Session] = None) -> None:
         """Завершает все активные сессии указанного пользователя."""
@@ -508,11 +401,18 @@ class SessionManager:
                 if session.device_info and isinstance(session.device_info, dict):
                     login_platform = session.device_info.get('platform')
 
+                # Fallback: derive login_platform from user's linked platforms
+                if not login_platform:
+                    if user.twitch_username:
+                        login_platform = 'twitch'
+                    elif user.vk_username:
+                        login_platform = 'vk'
+
                 return {
                     "user_id": user.id,
                     "id": user.id,
                     "session_id": session_id,
-                    "is_admin": user.is_admin,
+                    "is_admin": bool(getattr(user, "role", None) == "admin" or user.is_admin),
                     "is_blocked": user.is_blocked,
                     "blocked_reason": user.blocked_reason,
                     "blocked_at": user.blocked_at,
@@ -558,7 +458,7 @@ class SessionManager:
                 cutoff_date = utcnow_naive() - timedelta(days=days_old)
 
                 old_sessions = db.query(UserSession).filter(
-                    not UserSession.is_active,
+                    UserSession.is_active == False,
                     UserSession.last_activity < cutoff_date
                 ).all()
 
@@ -598,7 +498,7 @@ class SessionManager:
 
                 cutoff_date = utcnow_naive() - timedelta(days=7)
                 old_inactive = db.query(UserSession).filter(
-                    not UserSession.is_active,
+                    UserSession.is_active == False,
                     UserSession.last_activity < cutoff_date
                 ).count()
 

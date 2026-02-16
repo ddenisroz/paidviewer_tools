@@ -2,6 +2,7 @@
 
 import { Copy, ExternalLink, Loader2, Monitor, Settings2 } from 'lucide-react';
 
+import { DROPS_CONSTANTS } from '@/constants/drops';
 import { useDropsConfig, useGenerateDropsWidgetUrl, useUpdateDropsConfig } from '@/queries/drops/dropsQueries';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
@@ -24,6 +25,23 @@ interface FormData {
   widget_opening_duration_ms: number[];
   widget_result_duration_ms: number[];
 }
+
+interface TimingPreset {
+  id: string;
+  label: string;
+  description: string;
+  spinning: number;
+  opening: number;
+  result: number;
+}
+
+const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const WIDGET_TIMING_PRESETS: TimingPreset[] = [
+  { id: 'fast', label: 'Быстро', description: 'Короткая анимация', spinning: 900, opening: 700, result: 3200 },
+  { id: 'balanced', label: 'Баланс', description: 'Оптимальный вариант', spinning: 1500, opening: 1000, result: 5500 },
+  { id: 'cinematic', label: 'Кино', description: 'Более эффектно', spinning: 2400, opening: 1400, result: 8200 },
+];
+const clampDuration = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) => {
   const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
@@ -55,23 +73,58 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     widget_result_duration_ms: [5500]
   });
 
+  const setSpinningDuration = (value: number): void => {
+    setFormData((prev) => ({
+      ...prev,
+      widget_spinning_duration_ms: [clampDuration(value, 500, DROPS_CONSTANTS.WIDGET.MAX_SPINNING_MS)],
+    }));
+  };
+
+  const setOpeningDuration = (value: number): void => {
+    setFormData((prev) => ({
+      ...prev,
+      widget_opening_duration_ms: [clampDuration(value, 500, DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS)],
+    }));
+  };
+
+  const setResultDuration = (value: number): void => {
+    setFormData((prev) => ({
+      ...prev,
+      widget_result_duration_ms: [clampDuration(value, 2000, DROPS_CONSTANTS.WIDGET.MAX_RESULT_MS)],
+    }));
+  };
+
+  const applyTimingPreset = (preset: TimingPreset): void => {
+    setFormData({
+      widget_spinning_duration_ms: [clampDuration(preset.spinning, 500, DROPS_CONSTANTS.WIDGET.MAX_SPINNING_MS)],
+      widget_opening_duration_ms: [clampDuration(preset.opening, 500, DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS)],
+      widget_result_duration_ms: [clampDuration(preset.result, 2000, DROPS_CONSTANTS.WIDGET.MAX_RESULT_MS)],
+    });
+  };
+
   // Init settings
   useEffect(() => {
     if (config) {
       setFormData({
-        widget_spinning_duration_ms: [config.widget_spinning_duration_ms ?? 1500],
-        widget_opening_duration_ms: [config.widget_opening_duration_ms ?? 1000],
-        widget_result_duration_ms: [config.widget_result_duration_ms ?? 5500]
+        widget_spinning_duration_ms: [
+          clampDuration(config.widget_spinning_duration_ms ?? 1500, 500, DROPS_CONSTANTS.WIDGET.MAX_SPINNING_MS)
+        ],
+        widget_opening_duration_ms: [
+          clampDuration(config.widget_opening_duration_ms ?? 1000, 500, DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS)
+        ],
+        widget_result_duration_ms: [
+          clampDuration(config.widget_result_duration_ms ?? 5500, 2000, DROPS_CONSTANTS.WIDGET.MAX_RESULT_MS)
+        ]
       });
     }
   }, [config]);
 
   // Load widget URL
   useEffect(() => {
-    if (user && channelName && !widgetUrl) {
+    if (user && channelName && !widgetUrl && !generateWidgetUrlMutation.isPending) {
       generateWidgetUrlMutation.mutate(false);
     }
-  }, [user, channelName]);
+  }, [user, channelName, widgetUrl, generateWidgetUrlMutation, generateWidgetUrlMutation.isPending, generateWidgetUrlMutation.mutate]);
 
   // [OK] Auto-save
   const { autoSave } = useAutoSave(
@@ -102,9 +155,11 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
   ]);
 
   useEffect(() => {
+    const timeoutRef = saveTimeoutRef;
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+      const timeoutId = timeoutRef.current;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     };
   }, []);
@@ -123,30 +178,66 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
   return (
     <div className="space-y-4">
       {/* Настройки анимации */}
-      <Card>
+      <Card className={SURFACE_CARD_CLASS}>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Settings2 className="w-5 h-5" />
             Настройки анимации
           </CardTitle>
           <CardDescription className="text-xs">
-            Длительность фаз анимации открытия сундуков в OBS виджете
+            Длительность этапов анимации в OBS-виджете
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {WIDGET_TIMING_PRESETS.map((preset) => {
+              const isActive =
+                formData.widget_spinning_duration_ms[0] === preset.spinning &&
+                formData.widget_opening_duration_ms[0] === preset.opening &&
+                formData.widget_result_duration_ms[0] === preset.result;
+              return (
+                <Button
+                  key={preset.id}
+                  type="button"
+                  variant={isActive ? 'secondary' : 'outline'}
+                  className={`h-auto min-h-14 flex-col items-start gap-0.5 py-2 px-3 text-left ${
+                    isActive
+                      ? 'bg-slate-700 text-slate-100 border-slate-600'
+                      : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                  }`}
+                  onClick={() => applyTimingPreset(preset)}
+                >
+                  <span className="text-xs font-semibold">{preset.label}</span>
+                  <span className="text-[11px] text-slate-400">{preset.description}</span>
+                </Button>
+              );
+            })}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Крутка (мс)</Label>
                 <span className="text-lg font-semibold">{formData.widget_spinning_duration_ms[0]}</span>
               </div>
-              <Slider
-                value={formData.widget_spinning_duration_ms}
-                onValueChange={(value) => setFormData({ ...formData, widget_spinning_duration_ms: value })}
-                min={500}
-                max={5000}
-                step={100}
-              />
+              <div className="flex items-center gap-2">
+                <Slider
+                  value={formData.widget_spinning_duration_ms}
+                  onValueChange={(value) => setSpinningDuration(value[0])}
+                  min={500}
+                  max={DROPS_CONSTANTS.WIDGET.MAX_SPINNING_MS}
+                  step={100}
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  value={formData.widget_spinning_duration_ms[0]}
+                  onChange={(e) => setSpinningDuration(parseInt(e.target.value, 10) || 500)}
+                  min={500}
+                  max={DROPS_CONSTANTS.WIDGET.MAX_SPINNING_MS}
+                  className="w-24 text-center"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -154,13 +245,24 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                 <Label className="text-sm">Открытие (мс)</Label>
                 <span className="text-lg font-semibold">{formData.widget_opening_duration_ms[0]}</span>
               </div>
-              <Slider
-                value={formData.widget_opening_duration_ms}
-                onValueChange={(value) => setFormData({ ...formData, widget_opening_duration_ms: value })}
-                min={500}
-                max={3000}
-                step={100}
-              />
+              <div className="flex items-center gap-2">
+                <Slider
+                  value={formData.widget_opening_duration_ms}
+                  onValueChange={(value) => setOpeningDuration(value[0])}
+                  min={500}
+                  max={DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS}
+                  step={100}
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  value={formData.widget_opening_duration_ms[0]}
+                  onChange={(e) => setOpeningDuration(parseInt(e.target.value, 10) || 500)}
+                  min={500}
+                  max={DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS}
+                  className="w-24 text-center"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -168,25 +270,36 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                 <Label className="text-sm">Результат (мс)</Label>
                 <span className="text-lg font-semibold">{formData.widget_result_duration_ms[0]}</span>
               </div>
-              <Slider
-                value={formData.widget_result_duration_ms}
-                onValueChange={(value) => setFormData({ ...formData, widget_result_duration_ms: value })}
-                min={2000}
-                max={15000}
-                step={500}
-              />
+              <div className="flex items-center gap-2">
+                <Slider
+                  value={formData.widget_result_duration_ms}
+                  onValueChange={(value) => setResultDuration(value[0])}
+                  min={2000}
+                  max={DROPS_CONSTANTS.WIDGET.MAX_RESULT_MS}
+                  step={500}
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  value={formData.widget_result_duration_ms[0]}
+                  onChange={(e) => setResultDuration(parseInt(e.target.value, 10) || 2000)}
+                  min={2000}
+                  max={DROPS_CONSTANTS.WIDGET.MAX_RESULT_MS}
+                  className="w-24 text-center"
+                />
+              </div>
             </div>
           </div>
 
           {/* [OK] Removed save button - auto-save works */}
-          <p className="text-xs text-muted-foreground italic">
-            Настройки сохраняются автоматически при изменении
+          <p className="text-xs text-muted-foreground">
+            Сохранение происходит автоматически
           </p>
         </CardContent>
       </Card>
 
       {/* URL виджета */}
-      <Card>
+      <Card className={SURFACE_CARD_CLASS}>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Monitor className="w-5 h-5" />
@@ -204,7 +317,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   size="sm"
                   onClick={handleRegenerateWidgetUrl}
                   disabled={generateWidgetUrlMutation.isPending}
-                  className="gap-2 text-xs"
+                  className="gap-2 text-xs border-slate-700 bg-slate-900/70 hover:bg-slate-800"
                 >
                   {generateWidgetUrlMutation.isPending ? (
                     <>
@@ -219,7 +332,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   )}
                 </Button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Input
                   value={widgetUrl}
                   readOnly
@@ -229,7 +342,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   variant="outline"
                   size="sm"
                   onClick={copyWidgetUrl}
-                  className="gap-2"
+                  className="gap-2 border-slate-700 bg-slate-900/70 hover:bg-slate-800"
                 >
                   <Copy className="w-4 h-4" />
                   Копировать
@@ -238,7 +351,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   variant="outline"
                   size="sm"
                   onClick={() => window.open(widgetUrl, '_blank')}
-                  className="gap-2"
+                  className="gap-2 border-slate-700 bg-slate-900/70 hover:bg-slate-800"
                 >
                   <ExternalLink className="w-4 h-4" />
                   Открыть виджет
@@ -246,7 +359,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
               </div>
             </div>
           ) : (
-            <div className="p-4 border rounded-lg bg-muted/50">
+            <div className="p-4 border border-slate-800 rounded-lg bg-slate-950/50">
               <p className="text-sm text-muted-foreground">
                 URL виджета загружается...
               </p>

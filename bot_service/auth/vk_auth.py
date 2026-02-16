@@ -43,6 +43,7 @@ async def vk_auth(request: Request):
 
     # Генерируем state для защиты от CSRF
     state = secrets.token_urlsafe(16)
+    # Сохраняем state в сессию для CSRF проверки
 
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
@@ -55,7 +56,17 @@ async def vk_auth(request: Request):
 
     logger.info("VK Live auth URL generated")
 
-    return RedirectResponse(url=auth_url)
+    response = RedirectResponse(url=auth_url)
+    # Сохраняем state в cookie для CSRF проверки в callback
+    response.set_cookie(
+        key="oauth_state_vk",
+        value=state,
+        max_age=600,  # 10 минут
+        httponly=True,
+        samesite="lax",
+        secure=settings.is_production
+    )
+    return response
 
 @router.get("/auth/vk/login")
 @limiter.limit("10/minute")
@@ -73,6 +84,7 @@ async def login_vk(request: Request):
 
     # Генерируем state для защиты от CSRF
     state = secrets.token_urlsafe(16)
+    # Сохраняем state в сессию для CSRF проверки
 
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
@@ -85,7 +97,16 @@ async def login_vk(request: Request):
 
     logger.info("VK Live API login URL generated")
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url=auth_url)
+    response = RedirectResponse(url=auth_url)
+    response.set_cookie(
+        key="oauth_state_vk",
+        value=state,
+        max_age=600,
+        httponly=True,
+        samesite="lax",
+        secure=settings.is_production
+    )
+    return response
 
 @router.get("/auth/vk/callback")
 @limiter.limit("20/minute")
@@ -109,6 +130,12 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     if not code:
         logger.error("No authorization code received from VK")
         raise HTTPException(status_code=400, detail="No authorization code received from VK. Please try again.")
+
+    # CSRF: валидация state
+    expected_state = request.cookies.get("oauth_state_vk")
+    if not state or state != expected_state:
+        logger.warning(f"VK OAuth CSRF state mismatch: got {state}, expected {expected_state}")
+        raise HTTPException(status_code=400, detail="Invalid OAuth state (CSRF protection)")
 
     # Используем настройки из централизованной конфигурации
     VK_REDIRECT_URI = f"{BACKEND_URL}/auth/vk/callback"
@@ -389,10 +416,10 @@ async def vk_logout(request: Request, response: Response):
             except Exception as e:
                 logger.error(f"[ERROR] Error disconnecting bots during logout: {e}")
 
-            # Удаляем все токены интеграций пользователя
-            if user_id and user_id != -1:  # Не гостевой пользователь
-                session_manager.clear_user_tokens(user_id)
-                logger.info(f"[DELETE] Cleared all integration tokens for user {user_id}")
+            # Примечание: НЕ удаляем токены интеграций при логауте.
+            # Токены платформ (Twitch, VK, DonationAlerts) должны persist
+            # между сессиями. Пользователь может перелогиниться и сохранить интеграции.
+            # Для полного удаления интеграций есть отдельные эндпоинты.
         else:
             logger.warning(f"Could not get user data for session {session_id} during VK logout")
 

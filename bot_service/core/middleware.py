@@ -71,12 +71,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware для логирования запросов"""
 
     async def dispatch(self, request: Request, call_next):
-        # Логируем ВCЕХ запросы к /auth/twitch/callback
-        if "/auth/twitch/callback" in str(request.url):
-            logger.info(f"!!! MIDDLEWARE: Twitch callback request: {request.url}")
-            logger.info(f"!!! MIDDLEWARE: Method: {request.method}")
-            logger.info(f"!!! MIDDLEWARE: Headers: {dict(request.headers)}")
-
         start_time = time.time()
 
         # Получаем информацию о пользователе из токена (если есть)

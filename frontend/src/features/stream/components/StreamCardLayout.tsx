@@ -30,6 +30,12 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
 }) => {
     const [isLinking, setIsLinking] = useState(false);
 
+    useEffect(() => {
+        if (!bothEnabled && isLinking) {
+            setIsLinking(false);
+        }
+    }, [bothEnabled, isLinking]);
+
     // Handle toggle with cooldown
     const handleLinkToggle = async (value: boolean) => {
         if (isLinking) return;

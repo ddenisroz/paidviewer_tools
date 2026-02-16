@@ -3,6 +3,8 @@
  * Tracks and logs performance metrics
  */
 
+import { logger } from '@/utils/prodLogger';
+
 interface PerformanceMetric {
   name: string;
   duration: number;
@@ -93,18 +95,17 @@ class PerformanceMonitor {
    */
   logSummary(): void {
     if (this.metrics.length === 0) {
-      console.log('[Performance] No metrics recorded');
+      logger.debug('[Performance] No metrics recorded');
       return;
     }
 
     const slowest = this.getSlowestOperations(5);
-    console.group('[Performance] Summary');
-    console.log(`Total operations: ${this.metrics.length}`);
-    console.log('Slowest operations:');
+    logger.debug('[Performance] Summary');
+    logger.debug(`Total operations: ${this.metrics.length}`);
+    logger.debug('Slowest operations:');
     slowest.forEach((metric, index) => {
-      console.log(`  ${index + 1}. ${metric.name}: ${metric.duration.toFixed(2)}ms`);
+      logger.debug(`  ${index + 1}. ${metric.name}: ${metric.duration.toFixed(2)}ms`);
     });
-    console.groupEnd();
   }
 }
 

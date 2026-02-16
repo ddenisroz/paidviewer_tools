@@ -7,6 +7,7 @@ import logging
 from sqlalchemy.orm import Session
 from core.database import User, UserToken
 from core.datetime_utils import utcnow_naive
+from core.token_encryption import encrypt_token
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +70,10 @@ class UserCreationService:
                         logger.info(f"[REFRESH] [USER_CREATION] Updating token for existing user {existing_user.id}")
 
                         existing_token.user_id = existing_user.id
-                        existing_token.access_token = access_token
+                        existing_token.access_token = encrypt_token(access_token)
                         existing_token.updated_at = utcnow_naive()
                         if refresh_token:
-                            existing_token.refresh_token = refresh_token
+                            existing_token.refresh_token = encrypt_token(refresh_token)
                         if expires_at:
                             existing_token.expires_at = expires_at
                         if scopes:
@@ -89,8 +90,8 @@ class UserCreationService:
                             user_id=existing_user.id,
                             platform=platform,
                             platform_user_id=platform_user_id,
-                            access_token=access_token,
-                            refresh_token=refresh_token,
+                            access_token=encrypt_token(access_token),
+                            refresh_token=encrypt_token(refresh_token) if refresh_token else None,
                             expires_at=expires_at,
                             scopes=scopes,
                             avatar_url=avatar_url
@@ -125,10 +126,10 @@ class UserCreationService:
                 if access_token:
                     logger.info(f"[REFRESH] [USER_CREATION] Updating token for {platform}:{platform_user_id}")
 
-                    existing_token.access_token = access_token
+                    existing_token.access_token = encrypt_token(access_token)
                     existing_token.updated_at = utcnow_naive()
                     if refresh_token:
-                        existing_token.refresh_token = refresh_token
+                        existing_token.refresh_token = encrypt_token(refresh_token)
                     if expires_at:
                         existing_token.expires_at = expires_at
                     if scopes:
@@ -164,49 +165,8 @@ class UserCreationService:
             else:
                 logger.warning(f"[WARN] [USER_CREATION] Current user {current_user_id} not found")
 
-        # 4. Ищем существующего пользователя без username для данной платформы
-        # Это нужно для случаев, когда пользователь уже существует, но username не установлен
-        if platform == "twitch":
-            # Ищем пользователя без twitch_username
-            existing_user = db.query(User).filter(User.twitch_username.is_(None)).first()
-        elif platform == "vk":
-            # Ищем пользователя без vk_username
-            existing_user = db.query(User).filter(User.vk_username.is_(None)).first()
-        else:
-            existing_user = None
-
-        if existing_user:
-            logger.info(f"[OK] [USER_CREATION] Found existing user without {platform}_username (ID: {existing_user.id})")
-
-            # Устанавливаем username
-            if username and platform == "twitch" and not existing_user.twitch_username:
-                existing_user.twitch_username = username
-                db.commit()
-                logger.info(f"[REFRESH] [USER_CREATION] Set twitch_username to {username}")
-            elif username and platform == "vk" and not existing_user.vk_username:
-                existing_user.vk_username = username
-                db.commit()
-                logger.info(f"[REFRESH] [USER_CREATION] Set vk_username to {username}")
-
-            # Создаем токен для существующего пользователя БЕЗ валидации
-            if access_token:
-                logger.info(f"[REFRESH] [USER_CREATION] Creating token for existing user {existing_user.id}")
-
-                new_token = UserToken(
-                    user_id=existing_user.id,
-                    platform=platform,
-                    platform_user_id=platform_user_id,
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                    expires_at=expires_at,
-                    scopes=scopes,
-                    avatar_url=avatar_url
-                )
-                db.add(new_token)
-                db.commit()
-                logger.info(f"[OK] [USER_CREATION] Created token for existing user {existing_user.id}")
-
-            return existing_user
+        # 4. (УДАЛЕНО) Опасный поиск пользователя без username — мог привязать
+        # токены к произвольному чужому аккаунту.
 
         # 5. Создаем нового пользователя (валидация токена будет при использовании)
         logger.info(f"[NEW] [USER_CREATION] Creating new user for {platform}:{platform_user_id}")
@@ -234,8 +194,8 @@ class UserCreationService:
                     user_id=new_user.id,
                     platform=platform,
                     platform_user_id=platform_user_id,
-                    access_token=access_token,
-                    refresh_token=refresh_token,
+                    access_token=encrypt_token(access_token),
+                    refresh_token=encrypt_token(refresh_token) if refresh_token else None,
                     expires_at=expires_at,
                     scopes=scopes,
                     avatar_url=avatar_url

@@ -4,6 +4,7 @@ Centralized configuration management using pydantic-settings
 Replaces hardcoded values and os.getenv() calls throughout the application
 """
 import logging
+import os
 from typing import Optional, List
 from pydantic import Field, field_validator, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
     """Application settings with validation and type safety"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=os.getenv("ENV_FILE", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -81,7 +82,6 @@ class Settings(BaseSettings):
         default="http://localhost:8000/auth/twitch/callback",
         description="Twitch OAuth redirect URI"
     )
-    twitch_bot_token: Optional[str] = Field(default=None, description="Twitch bot OAuth token")
 
     # === VK LIVE INTEGRATION ===
     vk_client_id: Optional[str] = Field(default=None, description="VK client ID")
@@ -94,7 +94,6 @@ class Settings(BaseSettings):
         default="https://auth.live.vkvideo.ru/app/oauth2/authorize",
         description="VK auth base URL"
     )
-    vk_live_user_token: Optional[str] = Field(default=None, description="VK Live user token")
 
     # === YOUTUBE INTEGRATION ===
     youtube_api_key: Optional[str] = Field(default=None, description="YouTube Data API key")
@@ -108,7 +107,12 @@ class Settings(BaseSettings):
     )
 
     # === EXTERNAL APIS ===
-    google_tts_api_key: Optional[str] = Field(default=None, description="Google Cloud TTS API key")
+    google_cloud_api_key: Optional[str] = Field(default=None, description="Google Cloud API key (YouTube + TTS)")
+    google_tts_api_key: Optional[str] = Field(default=None, description="Google Cloud TTS API key (fallback alias)")
+    google_cloud_project_id: Optional[str] = Field(
+        default=None,
+        description="Google Cloud Project ID used for ADC quota project/x-goog-user-project",
+    )
     huggingface_token: Optional[str] = Field(default=None, description="HuggingFace API token")
     deepseek_api_key: Optional[str] = Field(default=None, description="DeepSeek API key")
     deepseek_base_url: str = Field(default="https://api.deepseek.com", description="DeepSeek API base URL")
@@ -131,6 +135,10 @@ class Settings(BaseSettings):
 
     # === LOGGING ===
     log_file: str = Field(default="logs/bot_service.log", description="Log file path")
+    log_file_level: str = Field(
+        default="WARNING",
+        description="Log level for rotating file handler (DEBUG/INFO/WARNING/ERROR/CRITICAL)",
+    )
     enable_json_logs: bool = Field(default=False, description="Enable JSON formatted logs")
     enable_log_rotation: bool = Field(default=True, description="Enable log rotation")
 
@@ -143,6 +151,20 @@ class Settings(BaseSettings):
 
     # === TESTING ===
     testing: bool = Field(default=False, description="Enable testing mode")
+
+    # === BOT TOKEN BOOTSTRAP ===
+    bot_token_auto_bootstrap_enabled: bool = Field(
+        default=True,
+        description="Allow auto-bootstrap of missing bot_tokens from existing user OAuth tokens",
+    )
+    bot_token_auto_bootstrap_admin_only: bool = Field(
+        default=True,
+        description="When auto-bootstrap is enabled, use only admin user tokens as source",
+    )
+    bot_token_auto_bootstrap_require_refresh_token: bool = Field(
+        default=False,
+        description="Require refresh_token on source user token for bot token auto-bootstrap",
+    )
 
     # === COMPUTED FIELDS ===
     @computed_field

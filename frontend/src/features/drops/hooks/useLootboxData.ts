@@ -1,5 +1,5 @@
 ﻿// src/hooks/useLootboxData.ts
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { createMockLootboxes } from '@/features/drops/utils/lootboxImages';
 import { lootboxService } from '@/services/api/services/lootboxService';
@@ -44,12 +44,7 @@ export const useLootboxData = (channelName: string) => {
     const [imageLootboxes, setImageLootboxes] = useState<ImageLootbox[]>([]);
     const [gameFieldData, setGameFieldData] = useState<GameDayData[]>(createInitialGameData);
 
-    useEffect(() => {
-        loadData();
-        setImageLootboxes(createMockLootboxes() as ImageLootbox[]);
-    }, [channelName]);
-
-    const loadData = async (): Promise<void> => {
+    const loadData = useCallback(async (): Promise<void> => {
         try {
             setIsLoading(true);
             const [openingsRes] = await Promise.all([
@@ -65,7 +60,12 @@ export const useLootboxData = (channelName: string) => {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [channelName]);
+
+    useEffect(() => {
+        void loadData();
+        setImageLootboxes(createMockLootboxes() as ImageLootbox[]);
+    }, [loadData]);
 
     return {
         recentOpenings,

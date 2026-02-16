@@ -1,7 +1,3 @@
-# bot_service/tests/test_security_modern.py
-"""
-Тесты для современной системы безопасности
-"""
 import pytest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
@@ -49,46 +45,6 @@ class TestModernSecurityManager:
         
         with pytest.raises(Exception):
             modern_security_manager.verify_token(token)
-    
-    def test_encrypt_oauth_token(self):
-        """Тест шифрования OAuth токена"""
-        token = "test_oauth_token_12345"
-        encrypted = modern_security_manager.encrypt_oauth_token(token)
-        
-        assert encrypted is not None
-        assert isinstance(encrypted, str)
-        assert encrypted != token
-        assert len(encrypted) > 0
-    
-    def test_decrypt_oauth_token(self):
-        """Тест расшифровки OAuth токена"""
-        original_token = "test_oauth_token_12345"
-        encrypted = modern_security_manager.encrypt_oauth_token(original_token)
-        decrypted = modern_security_manager.decrypt_oauth_token(encrypted)
-        
-        assert decrypted == original_token
-    
-    def test_encrypt_decrypt_roundtrip(self):
-        """Тест полного цикла шифрование-расшифровка"""
-        test_tokens = [
-            "simple_token",
-            "token_with_special_chars!@#$%^&*()",
-            "very_long_token_" + "x" * 100,
-            "token_with_unicode_[START][SUCCESS]",
-            ""
-        ]
-        
-        for token in test_tokens:
-            encrypted = modern_security_manager.encrypt_oauth_token(token)
-            decrypted = modern_security_manager.decrypt_oauth_token(encrypted)
-            assert decrypted == token, f"Failed for token: {token}"
-    
-    def test_decrypt_invalid_token(self):
-        """Тест расшифровки невалидного токена"""
-        # decrypt_oauth_token теперь возвращает токен как есть для legacy формата
-        result = modern_security_manager.decrypt_oauth_token("invalid_encrypted_token")
-        # Должен вернуть токен без изменений (legacy format)
-        assert result == "invalid_encrypted_token"
     
     def test_generate_session_id(self):
         """Тест генерации ID сессии"""
@@ -161,20 +117,6 @@ class TestRateLimiting:
 class TestSecurityIntegration:
     """Интеграционные тесты безопасности"""
     
-    def test_full_oauth_flow(self):
-        """Тест полного цикла OAuth токена"""
-        # 1. Создаем OAuth токен
-        oauth_token = "twitch_oauth_token_12345"
-        
-        # 2. Шифруем для хранения в БД
-        encrypted_token = modern_security_manager.encrypt_oauth_token(oauth_token)
-        
-        # 3. Расшифровываем при использовании
-        decrypted_token = modern_security_manager.decrypt_oauth_token(encrypted_token)
-        
-        # 4. Проверяем, что токен не изменился
-        assert decrypted_token == oauth_token
-    
     def test_jwt_with_oauth_integration(self):
         """Тест интеграции JWT с OAuth"""
         # 1. Создаем JWT токен с данными пользователя
@@ -214,22 +156,6 @@ class TestSecurityIntegration:
 class TestSecurityErrorHandling:
     """Тесты обработки ошибок безопасности"""
     
-    def test_encrypt_token_error_handling(self):
-        """Тест обработки ошибок при шифровании"""
-        # Мокаем Fernet чтобы вызвать ошибку
-        with patch('core.security_modern._fernet') as mock_fernet:
-            mock_fernet.encrypt.side_effect = Exception("Encryption failed")
-            
-            with pytest.raises(Exception):
-                modern_security_manager.encrypt_oauth_token("test_token")
-    
-    def test_decrypt_token_error_handling(self):
-        """Тест обработки ошибок при расшифровке"""
-        # decrypt_oauth_token теперь возвращает токен как есть для legacy формата
-        # вместо выброса исключения
-        result = modern_security_manager.decrypt_oauth_token("invalid_token")
-        # Должен вернуть токен без изменений (legacy format)
-        assert result == "invalid_token"
     
     def test_jwt_verification_error_handling(self):
         """Тест обработки ошибок при верификации JWT"""

@@ -44,6 +44,8 @@ export interface TtsSettings {
   skipCommands?: boolean;
   useLocalTTS?: boolean;
   gcloudVoices?: string[];
+  gcloudMood?: 'neutral' | 'sad' | 'happy';
+  gcloud_mood?: 'neutral' | 'sad' | 'happy';
 }
 
 /**

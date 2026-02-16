@@ -3,7 +3,6 @@
 Сервис управления ботами (статус, перезапуск).
 """
 
-import asyncio
 import logging
 
 import httpx
@@ -11,6 +10,7 @@ import httpx
 from core.config import settings
 from core.datetime_utils import utcnow_naive
 from core.connection_manager import get_connection_manager
+from core.database import get_db
 from startup.bot_registry import get_bot_registry
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,11 @@ class BotControlService:
         await registry.stop_twitch_bot()
 
         # Получаем активные каналы
-        active_channels = connection_manager.get_active_channels()
+        db = next(get_db())
+        try:
+            active_channels = await connection_manager.get_twitch_channels_for_bot(db)
+        finally:
+            db.close()
         from startup.bot_initializer import initialize_twitch_bot
 
         success = await initialize_twitch_bot(active_channels)
@@ -129,17 +133,18 @@ class BotControlService:
         await registry.stop_vk_bot()
 
         # Получаем активные каналы
-        active_channels = connection_manager.get_active_channels()
+        db = next(get_db())
+        try:
+            active_channels = await connection_manager.get_vk_channels_for_bot(db)
+        finally:
+            db.close()
         from startup.bot_initializer import initialize_vk_bot
 
-        success = await initialize_vk_bot()
+        success = await initialize_vk_bot(active_channels)
         if not success:
             return {"error": "VK bot OAuth token not configured. Use /auth/vk/bot/login"}
 
         # Подключаем к каналам
-        if registry.vk_bot:
-            for channel_name in active_channels:
-                await registry.vk_bot.connect_to_channel(channel_name)
 
         logger.info(f"[OK] VK Live bot restarted with channels: {active_channels}")
         return {

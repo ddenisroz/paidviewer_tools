@@ -218,8 +218,19 @@ class Bot(TwitchBotCore):
                         tts_settings = tts_repo.get_or_create(user_id=user.id)
                         yt_settings = getattr(tts_settings, 'youtube_settings', {}) or {}
                         
-                        reward_platform = yt_settings.get('requests_reward_platform', 'twitch')
-                        if reward_platform == 'twitch' and yt_settings.get('requests_reward_enabled') and yt_settings.get('requests_reward_id') == reward_id:
+                        legacy_platform = yt_settings.get('requests_reward_platform', 'twitch')
+                        legacy_enabled = bool(yt_settings.get('requests_reward_enabled'))
+                        legacy_reward_id = (yt_settings.get('requests_reward_id') or '').strip()
+
+                        twitch_reward_enabled = yt_settings.get('requests_reward_twitch_enabled')
+                        if twitch_reward_enabled is None:
+                            twitch_reward_enabled = legacy_enabled and legacy_platform == 'twitch'
+
+                        twitch_reward_id = (yt_settings.get('requests_reward_twitch_id') or '').strip()
+                        if not twitch_reward_id and legacy_platform == 'twitch':
+                            twitch_reward_id = legacy_reward_id
+
+                        if twitch_reward_enabled and twitch_reward_id and twitch_reward_id == reward_id:
                             logger.info(f"[YOUTUBE] Detected Request via Reward: {reward_id}")
                             
                             from services.youtube.queue_service import QueueService

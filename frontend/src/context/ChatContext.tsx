@@ -9,7 +9,10 @@
  * - useChatHistory: загрузка истории чата
  * - useAudioUnlock: разблокировка аудио после user interaction
  */
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+
+import { useLocation } from 'react-router-dom';
 
 import { API_BASE_URL } from '@/constants';
 import { type BotStatusType, useBotConnection } from '@/features/admin/hooks/useBotConnection';
@@ -21,7 +24,6 @@ import { useAudioUnlock } from '@/shared/hooks/useAudioUnlock';
 import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
 import { logger } from '@/shared/utils/prodLogger';
 
-import { useLocation } from 'react-router-dom';
 
 import { useAuth } from './AuthContext';
 import { useIntegrations } from './IntegrationsContext';

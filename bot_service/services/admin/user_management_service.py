@@ -54,6 +54,12 @@ class UserManagementService:
                 user.role = request['role']
                 changes.append(f"role: {old_role} -> {request['role']}")
 
+        # Keep legacy boolean in sync while old checks still exist.
+        expected_is_admin = user.role == 'admin'
+        if user.is_admin != expected_is_admin:
+            user.is_admin = expected_is_admin
+            changes.append(f"is_admin -> {expected_is_admin}")
+
         repo.update(user)
 
         if changes:

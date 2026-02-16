@@ -101,7 +101,7 @@ async def auth_status(request: Request, db: Session = Depends(get_db)):
                 "twitch_username": user.twitch_username,
                 "vk_username": user.vk_username,
                 "vk_channel_name": user.vk_channel_name,
-                "is_admin": user.is_admin
+                "is_admin": bool(user.role == "admin" or user.is_admin)
             }
     except Exception as e:
         logger.error(f"[ERROR] Error getting user data: {e}")

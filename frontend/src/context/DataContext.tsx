@@ -1,8 +1,10 @@
 ﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useLocation } from 'react-router-dom';
 
-import { expandQueryWithAliases } from '@/constants/categoryAliases';
+import { expandQueryWithAliases, getCategoriesByAlias } from '@/constants/categoryAliases';
 import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo } from '@/queries/stream/streamQueries';
 import { streamService } from '@/services/api/services/streamService';
 import { useToast } from '@/shared/components/ui/toast';
@@ -20,6 +22,21 @@ function normalizeString(str: string): string {
         .replace(/[-–—]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+}
+
+function getCategoryInitials(categoryName: string): string {
+    return normalizeString(categoryName)
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((word) => word[0] ?? '')
+        .join('');
+}
+
+function getAudienceScore(category: StreamCategory): number {
+    const categoryRecord = category as unknown as Record<string, unknown>;
+    const rawValue = categoryRecord.viewers ?? categoryRecord.viewer_count ?? 0;
+    const normalized = Number(rawValue);
+    return Number.isFinite(normalized) ? normalized : 0;
 }
 
 function levenshteinDistance(a: string, b: string): number {
@@ -59,6 +76,12 @@ function calculateRelevance(categoryName: string, query: string): number {
     if (catNormalized === queryNormalized) return 0;
     if (catLower === queryLower) return 0.5;
     if (catNormalized.startsWith(queryNormalized)) return 1;
+
+    if (queryNormalized.length >= 2 && queryNormalized.length <= 4) {
+        const categoryInitials = getCategoryInitials(categoryName);
+        if (categoryInitials === queryNormalized) return 0.75;
+        if (categoryInitials.startsWith(queryNormalized)) return 0.9;
+    }
 
     const catWords = catNormalized.split(/\s+/).filter(w => w.length > 0);
     const queryWords = queryNormalized.split(/\s+/).filter(w => w.length > 0);
@@ -147,12 +170,31 @@ function calculateRelevance(categoryName: string, query: string): number {
 function sortCategoriesByRelevance(categories: StreamCategory[], query: string): StreamCategory[] {
     if (!query || query.trim() === '') return categories;
 
+    const aliasTargets = new Set(
+        getCategoriesByAlias(query).map((aliasName) => normalizeString(aliasName))
+    );
+
     return [...categories].sort((a, b) => {
-        const scoreA = calculateRelevance(a.name, query);
-        const scoreB = calculateRelevance(b.name, query);
+        let scoreA = calculateRelevance(a.name, query);
+        let scoreB = calculateRelevance(b.name, query);
+
+        if (aliasTargets.size > 0) {
+            if (aliasTargets.has(normalizeString(a.name))) {
+                scoreA -= 2;
+            }
+            if (aliasTargets.has(normalizeString(b.name))) {
+                scoreB -= 2;
+            }
+        }
 
         if (scoreA !== scoreB) {
             return scoreA - scoreB;
+        }
+
+        const audienceA = getAudienceScore(a);
+        const audienceB = getAudienceScore(b);
+        if (audienceA !== audienceB) {
+            return audienceB - audienceA;
         }
 
         return a.name.localeCompare(b.name);
@@ -410,12 +452,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             return;
         }
         if (force) {
-            if (integrations.twitch?.enabled) {
-                await refetchTwitch();
-            }
-            if (integrations.vk?.enabled) {
-                await refetchVk();
-            }
+            const promises: Promise<unknown>[] = [];
+            if (integrations.twitch?.enabled) promises.push(refetchTwitch());
+            if (integrations.vk?.enabled) promises.push(refetchVk());
+            await Promise.all(promises);
         }
     }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, refetchTwitch, refetchVk]);
 
@@ -487,7 +527,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                 setStatus(prev => ({ ...prev, [statusType]: 'error' }));
                 logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
 
-                const errorResponse = error as { response?: { status?: number } };
+                const errorResponse = error as { response?: { status?: number; data?: { message?: string; detail?: string } } };
+                const backendMessage = errorResponse.response?.data?.message || errorResponse.response?.data?.detail;
                 if (errorResponse.response?.status === 401) {
                     addToast({
                         type: 'error',
@@ -495,15 +536,22 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
                         message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.'
                     });
                 } else {
-                    addToast({ type: 'error', title: 'Ошибка', message: 'Не удалось сохранить изменения. Данные откатываются...' });
+                    addToast({
+                        type: 'error',
+                        title: 'Ошибка',
+                        message: backendMessage || 'Не удалось сохранить изменения. Данные откатываются...'
+                    });
                 }
 
                 logger.log('[REFRESH] [DATA CONTEXT] Rolling back to server data...');
+                const rollbackSnapshot = initialDataRef.current;
+                setCurrentData(rollbackSnapshot);
+                setQueryCache(['stream-data', user?.id], rollbackSnapshot);
                 loadStreamData(true);
                 setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
             },
         });
-    }, [initialData, currentData, integrations.twitch?.enabled, integrations.vk?.enabled, loadStreamData, addToast, updateStreamMutation]);
+    }, [initialData, currentData, integrations.twitch?.enabled, integrations.vk?.enabled, user?.id, loadStreamData, addToast, updateStreamMutation]);
 
     const searchCategories = useCallback(async (platform: 'twitch' | 'vk', query: string): Promise<StreamCategory[]> => {
         logger.log('DataContext: Searching categories:', {
@@ -621,7 +669,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         } finally {
             setLoading(prev => ({ ...prev, categories: false }));
         }
-    }, [integrations.twitch?.enabled, integrations.vk?.enabled, addToast, isAuthenticated, integrationsLoading]);
+    }, [integrations, addToast, isAuthenticated, integrationsLoading]);
 
     const value = useMemo<DataContextValue>(() => ({
         initialData,
@@ -644,4 +692,3 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         </DataContext.Provider>
     );
 };
-

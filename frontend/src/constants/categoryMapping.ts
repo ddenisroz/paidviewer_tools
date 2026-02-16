@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 const normalizationCache = new Map<string, string>();
 
 function normalizeCategoryName(name: string): string {

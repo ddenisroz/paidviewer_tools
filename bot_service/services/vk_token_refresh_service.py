@@ -15,6 +15,7 @@ from core.database import get_db, UserToken
 from core.config import settings
 from core.datetime_utils import utcnow_naive
 from repositories.user_token_repository import UserTokenRepository
+from core.token_encryption import encrypt_token, decrypt_token
 
 logger = structlog.get_logger(__name__)
 
@@ -181,7 +182,7 @@ class VKTokenRefreshService:
         # Подготовить данные для запроса
         data = {
             'grant_type': 'refresh_token',
-            'refresh_token': token.refresh_token,
+            'refresh_token': decrypt_token(token.refresh_token),
             'client_id': settings.vk_client_id,
             'client_secret': settings.vk_client_secret
         }
@@ -197,10 +198,10 @@ class VKTokenRefreshService:
         token_data = response.json()
         
         # Обновить токен в базе данных
-        token.access_token = token_data['access_token']
+        token.access_token = encrypt_token(token_data['access_token'])
         
         if 'refresh_token' in token_data:
-            token.refresh_token = token_data['refresh_token']
+            token.refresh_token = encrypt_token(token_data['refresh_token'])
             
         if 'expires_in' in token_data:
             token.expires_at = utcnow_naive() + timedelta(

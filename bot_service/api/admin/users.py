@@ -195,7 +195,7 @@ async def add_to_whitelist(
             platform = "twitch"
         
         from models.pydantic_models import AddToWhitelistRequest
-        request_data = AddToWhitelistRequest(channel_name=username, platform=platform)
+        request_data = AddToWhitelistRequest(username=username, platform=platform)
         
         result = await whitelist_service.add_to_whitelist(request_data, db)
         
@@ -229,7 +229,7 @@ async def get_whitelist(
                 'platform': entry.platform,
                 'created_at': entry.created_at.isoformat() if entry.created_at else None
             }
-            for entry in result.whitelist
+            for entry in result.whitelist_users
         ]
         
         return JSONResponse(content={
@@ -265,7 +265,7 @@ async def remove_from_whitelist(
             platform = "twitch"  # Default
         
         from models.pydantic_models import AddToWhitelistRequest
-        request_data = AddToWhitelistRequest(channel_name=username, platform=platform)
+        request_data = AddToWhitelistRequest(username=username, platform=platform)
         
         result = await whitelist_service.remove_from_whitelist(request_data, db)
         
