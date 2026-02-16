@@ -116,7 +116,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             case 'twitch':
                 return <Twitch className="h-4 w-4 text-purple-500" />;
             case 'vk':
-                return <VKIcon className="h-4 w-4 text-[#FF0062]" />;
+                return <VKIcon className="h-4 w-4 text-[#FF4444]" />;
             default:
                 return <MessageCircle className="h-4 w-4 text-gray-500" />;
         }
@@ -186,6 +186,24 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                                         );
                                                     }
                                                     return null;
+                                                })}
+                                            </span>
+                                        )}
+                                        {message.badges && message.badges.length > 0 && message.platform === 'vk' && (
+                                            <span className="flex items-center gap-0.5">
+                                                {message.badges.map((badge, idx) => {
+                                                    if (!badge || typeof badge !== 'string') return null;
+                                                    return (
+                                                        <img
+                                                            key={`vk-badge-${idx}`}
+                                                            src={badge}
+                                                            alt="vk-badge"
+                                                            className="h-4 w-4 inline-block object-contain align-text-bottom"
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                            }}
+                                                        />
+                                                    );
                                                 })}
                                             </span>
                                         )}

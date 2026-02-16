@@ -64,7 +64,7 @@ async def get_all_users(
         }
     except Exception as e:
         logger.error(f"Error getting users list: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{user_id}")
@@ -91,7 +91,7 @@ async def get_user_details(
         raise
     except Exception as e:
         logger.error(f"Error getting user details: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/{user_id}/block")
@@ -130,7 +130,7 @@ async def block_user(
     except Exception as e:
         logger.error(f"Error blocking user: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/{user_id}/unblock")
@@ -164,7 +164,7 @@ async def unblock_user(
     except Exception as e:
         logger.error(f"Error unblocking user: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/{user_id}")
@@ -200,7 +200,7 @@ async def update_user(
     except Exception as e:
         logger.error(f"Error updating user: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/{user_id}")
@@ -238,7 +238,7 @@ async def delete_user(
     except Exception as e:
         logger.error(f"Error deleting user: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/stats/overview")
@@ -281,4 +281,4 @@ async def get_stats_overview(
         }
     except Exception as e:
         logger.error(f"Error getting stats overview: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

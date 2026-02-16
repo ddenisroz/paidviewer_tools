@@ -1,5 +1,5 @@
 """
-API endpoints для получения Twitch badges
+API endpoints РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ Twitch badges
 """
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
@@ -11,30 +11,30 @@ from cachetools import TTLCache
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# [OK] PERFORMANCE: Кеш для App Access Token (1 час TTL)
-# Избегаем повторных запросов к Twitch OAuth для каждого запроса badges
-_app_token_cache = TTLCache(maxsize=1, ttl=3600)  # 1 час
+# [OK] PERFORMANCE: РљРµС€ РґР»СЏ App Access Token (1 С‡Р°СЃ TTL)
+# РР·Р±РµРіР°РµРј РїРѕРІС‚РѕСЂРЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ Рє Twitch OAuth РґР»СЏ РєР°Р¶РґРѕРіРѕ Р·Р°РїСЂРѕСЃР° badges
+_app_token_cache = TTLCache(maxsize=1, ttl=3600)  # 1 С‡Р°СЃ
 _CACHE_KEY = "app_access_token"
 
 
 async def get_cached_app_token() -> str:
     """
-    Получить App Access Token с кешированием
+    РџРѕР»СѓС‡РёС‚СЊ App Access Token СЃ РєРµС€РёСЂРѕРІР°РЅРёРµРј
     
     Returns:
         access_token: Twitch App Access Token
         
     Raises:
-        HTTPException: Если не удалось получить токен
+        HTTPException: Р•СЃР»Рё РЅРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ С‚РѕРєРµРЅ
     """
-    # Проверяем кеш
+    # РџСЂРѕРІРµСЂСЏРµРј РєРµС€
     if _CACHE_KEY in _app_token_cache:
         logger.debug("[OK] [CACHE HIT] Using cached App Access Token")
         return _app_token_cache[_CACHE_KEY]
 
     logger.debug("[ERROR] [CACHE MISS] Fetching new App Access Token")
 
-    # Получаем новый токен
+    # РџРѕР»СѓС‡Р°РµРј РЅРѕРІС‹Р№ С‚РѕРєРµРЅ
     client_id = settings.twitch_client_id
     client_secret = settings.twitch_client_secret
 
@@ -55,7 +55,7 @@ async def get_cached_app_token() -> str:
                 token_data = await response.json()
                 access_token = token_data["access_token"]
 
-                # Сохраняем в кеш
+                # РЎРѕС…СЂР°РЅСЏРµРј РІ РєРµС€
                 _app_token_cache[_CACHE_KEY] = access_token
                 logger.info("[OK] [CACHE] Stored new App Access Token (TTL: 3600s)")
 
@@ -69,15 +69,15 @@ async def get_cached_app_token() -> str:
 @router.get("/badges/global")
 async def get_twitch_global_badges() -> JSONResponse:
     """
-    Получить маппинг глобальных Twitch badges (публичный endpoint)
+    РџРѕР»СѓС‡РёС‚СЊ РјР°РїРїРёРЅРі РіР»РѕР±Р°Р»СЊРЅС‹С… Twitch badges (РїСѓР±Р»РёС‡РЅС‹Р№ endpoint)
     """
     try:
         client_id = settings.twitch_client_id
 
-        # [OK] PERFORMANCE: Используем кешированный App Access Token
+        # [OK] PERFORMANCE: РСЃРїРѕР»СЊР·СѓРµРј РєРµС€РёСЂРѕРІР°РЅРЅС‹Р№ App Access Token
         access_token = await get_cached_app_token()
 
-        # Получаем badges
+        # РџРѕР»СѓС‡Р°РµРј badges
         badges = await get_global_badges(client_id, access_token)
 
         return JSONResponse(content={"success": True, "badges": badges})
@@ -85,14 +85,14 @@ async def get_twitch_global_badges() -> JSONResponse:
         raise
     except Exception as e:
         logger.error(f"[ERROR] Error fetching global badges: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/badges/channel/{identifier}")
 async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
     """
-    Получить маппинг badges конкретного канала (публичный endpoint)
-    Принимает либо broadcaster_id (число), либо username (строка)
+    РџРѕР»СѓС‡РёС‚СЊ РјР°РїРїРёРЅРі badges РєРѕРЅРєСЂРµС‚РЅРѕРіРѕ РєР°РЅР°Р»Р° (РїСѓР±Р»РёС‡РЅС‹Р№ endpoint)
+    РџСЂРёРЅРёРјР°РµС‚ Р»РёР±Рѕ broadcaster_id (С‡РёСЃР»Рѕ), Р»РёР±Рѕ username (СЃС‚СЂРѕРєР°)
     """
     try:
         client_id = settings.twitch_client_id
@@ -101,15 +101,15 @@ async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
             logger.error("Twitch credentials not configured")
             return JSONResponse(content={"success": True, "badges": {}})
 
-        # [OK] PERFORMANCE: Используем кешированный App Access Token
+        # [OK] PERFORMANCE: РСЃРїРѕР»СЊР·СѓРµРј РєРµС€РёСЂРѕРІР°РЅРЅС‹Р№ App Access Token
         access_token = await get_cached_app_token()
 
         import aiohttp
         async with aiohttp.ClientSession() as session:
-            # Определяем, что передано: username или broadcaster_id
+            # РћРїСЂРµРґРµР»СЏРµРј, С‡С‚Рѕ РїРµСЂРµРґР°РЅРѕ: username РёР»Рё broadcaster_id
             broadcaster_id = identifier
 
-            # Если identifier не является числом, значит это username - конвертируем в broadcaster_id
+            # Р•СЃР»Рё identifier РЅРµ СЏРІР»СЏРµС‚СЃСЏ С‡РёСЃР»РѕРј, Р·РЅР°С‡РёС‚ СЌС‚Рѕ username - РєРѕРЅРІРµСЂС‚РёСЂСѓРµРј РІ broadcaster_id
             if not identifier.isdigit():
                 logger.info(f"Converting username '{identifier}' to broadcaster_id...")
                 headers = {
@@ -133,10 +133,10 @@ async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
                     else:
                         error_text = await user_response.text()
                         logger.error(f"Failed to get user info: {user_response.status} - {error_text}")
-                        # Если не удалось получить user info, возвращаем пустые badges вместо ошибки
+                        # Р•СЃР»Рё РЅРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ user info, РІРѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚С‹Рµ badges РІРјРµСЃС‚Рѕ РѕС€РёР±РєРё
                         return JSONResponse(content={"success": True, "badges": {}})
 
-            # Получаем badges
+            # РџРѕР»СѓС‡Р°РµРј badges
             badges = await get_channel_badges(broadcaster_id, client_id, access_token)
 
             return JSONResponse(content={"success": True, "badges": badges})
@@ -144,6 +144,6 @@ async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
         raise
     except Exception as e:
         logger.error(f"[ERROR] Error fetching channel badges: {e}", exc_info=True)
-        # Возвращаем пустые badges вместо ошибки, чтобы не ломать интерфейс
+        # Р’РѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚С‹Рµ badges РІРјРµСЃС‚Рѕ РѕС€РёР±РєРё, С‡С‚РѕР±С‹ РЅРµ Р»РѕРјР°С‚СЊ РёРЅС‚РµСЂС„РµР№СЃ
         return JSONResponse(content={"success": True, "badges": {}})
 

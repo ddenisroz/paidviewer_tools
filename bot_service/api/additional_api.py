@@ -2,12 +2,12 @@
 """
 Additional API endpoints.
 
-REFACTORED: Бизнес-логика вынесена в сервисы:
+REFACTORED: Р‘РёР·РЅРµСЃ-Р»РѕРіРёРєР° РІС‹РЅРµСЃРµРЅР° РІ СЃРµСЂРІРёСЃС‹:
 - IntegrationManagementService
 - ChatHistoryService  
 - AccountDeletionService
 
-Этот файл содержит ТОЛЬКО роутинг и преобразование данных.
+Р­С‚РѕС‚ С„Р°Р№Р» СЃРѕРґРµСЂР¶РёС‚ РўРћР›Р¬РљРћ СЂРѕСѓС‚РёРЅРі Рё РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёРµ РґР°РЅРЅС‹С….
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api", tags=["additional"])
 
 @router.get("/auth/user/me")
 async def get_user_me(user: dict = Depends(get_current_user)):
-    """Получить информацию о текущем пользователе."""
+    """РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ С‚РµРєСѓС‰РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ."""
     return JSONResponse(content={
         "id": user.get("id"),
         "twitch_username": user.get("twitch_username"),
@@ -43,7 +43,7 @@ async def get_user_me(user: dict = Depends(get_current_user)):
 
 @router.get("/auth/session/status")
 async def get_session_status(user: dict = Depends(get_current_user)):
-    """Получить статус сессии."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ СЃРµСЃСЃРёРё."""
     return JSONResponse(content={
         "authenticated": True,
         "user_id": user.get("id"),
@@ -54,7 +54,7 @@ async def get_session_status(user: dict = Depends(get_current_user)):
 
 @router.post("/clear-verifications")
 async def clear_verifications(user: dict = Depends(get_current_user)):
-    """Очистить верификации."""
+    """РћС‡РёСЃС‚РёС‚СЊ РІРµСЂРёС„РёРєР°С†РёРё."""
     logger.info(f"Clear verifications requested by user {user['id']}")
     return JSONResponse(content={"success": True, "message": "Verifications cleared"})
 
@@ -66,7 +66,7 @@ async def get_integrations(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Получить список интеграций пользователя с валидацией токенов."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РёРЅС‚РµРіСЂР°С†РёР№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РІР°Р»РёРґР°С†РёРµР№ С‚РѕРєРµРЅРѕРІ."""
     try:
         user_id = user.get("id")
         if not user_id:
@@ -76,7 +76,7 @@ async def get_integrations(
             user_id, db
         )
         
-        # Конвертируем в формат API
+        # РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј РІ С„РѕСЂРјР°С‚ API
         result = {}
         for platform, info in integrations.items():
             result[platform] = {
@@ -100,7 +100,7 @@ async def disconnect_integration(
     db: Session = Depends(get_db),
 ):
     """
-    Отключить интеграцию (отключить бота и удалить токены).
+    РћС‚РєР»СЋС‡РёС‚СЊ РёРЅС‚РµРіСЂР°С†РёСЋ (РѕС‚РєР»СЋС‡РёС‚СЊ Р±РѕС‚Р° Рё СѓРґР°Р»РёС‚СЊ С‚РѕРєРµРЅС‹).
     """
     user_id = user.get("id")
     if not user_id:
@@ -114,11 +114,11 @@ async def disconnect_integration(
             "success": True, 
             "message": f"{platform} bot disconnected"
         })
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Resource not found")
     except Exception as e:
         logger.error(f"Error disconnecting {platform}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/integrations/{platform}/remove")
@@ -128,8 +128,8 @@ async def remove_integration(
     db: Session = Depends(get_db),
 ):
     """
-    ПОЛНОСТЬЮ удалить интеграцию.
-    После этого потребуется полная переавторизация.
+    РџРћР›РќРћРЎРўР¬Р® СѓРґР°Р»РёС‚СЊ РёРЅС‚РµРіСЂР°С†РёСЋ.
+    РџРѕСЃР»Рµ СЌС‚РѕРіРѕ РїРѕС‚СЂРµР±СѓРµС‚СЃСЏ РїРѕР»РЅР°СЏ РїРµСЂРµР°РІС‚РѕСЂРёР·Р°С†РёСЏ.
     """
     user_id = user.get("id")
     if not user_id:
@@ -143,12 +143,12 @@ async def remove_integration(
             "success": True, 
             "message": f"{platform} integration fully removed. Re-authorization required."
         })
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Resource not found")
     except Exception as e:
         logger.error(f"Error removing {platform}: {e}")
         return JSONResponse(
-            content={"success": False, "error": str(e)}, 
+            content={"success": False, "error": "Internal server error"}, 
             status_code=500
         )
 
@@ -163,7 +163,7 @@ async def get_chat_history(
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    """Получить историю сообщений чата."""
+    """РџРѕР»СѓС‡РёС‚СЊ РёСЃС‚РѕСЂРёСЋ СЃРѕРѕР±С‰РµРЅРёР№ С‡Р°С‚Р°."""
     try:
         if not current_user:
             return JSONResponse(content={"success": True, "messages": []})
@@ -174,7 +174,7 @@ async def get_chat_history(
             user_id, channel, platform, limit, db
         )
         
-        # Конвертируем DTO в dict для JSON
+        # РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј DTO РІ dict РґР»СЏ JSON
         messages_data = [msg.to_dict() for msg in messages]
         
         logger.info(f"[CHAT] Returning {len(messages_data)} messages")
@@ -188,7 +188,7 @@ async def get_chat_history(
     except Exception as e:
         logger.error(f"[CHAT] Error: {e}", exc_info=True)
         return JSONResponse(
-            content={"success": False, "messages": [], "error": str(e)},
+            content={"success": False, "messages": [], "error": "Internal server error"},
             status_code=500
         )
 
@@ -202,11 +202,11 @@ async def permanently_delete_user(
     db: Session = Depends(get_db),
 ):
     """
-    [ADMIN ONLY] Окончательное удаление пользователя из базы данных.
+    [ADMIN ONLY] РћРєРѕРЅС‡Р°С‚РµР»СЊРЅРѕРµ СѓРґР°Р»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РёР· Р±Р°Р·С‹ РґР°РЅРЅС‹С….
     
-    ВНИМАНИЕ: Это действие НЕОБРАТИМО!
+    Р’РќРРњРђРќРР•: Р­С‚Рѕ РґРµР№СЃС‚РІРёРµ РќР•РћР‘Р РђРўРРњРћ!
     """
-    # Проверка прав администратора
+    # РџСЂРѕРІРµСЂРєР° РїСЂР°РІ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°
     if not current_user.get('is_admin', False):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -218,11 +218,11 @@ async def permanently_delete_user(
             "success": result.success,
             "message": result.message,
         })
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Resource not found")
     except Exception as e:
         logger.error(f"[ADMIN] Error deleting user: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/user/delete-account")
@@ -232,10 +232,10 @@ async def delete_user_account(
     db: Session = Depends(get_db),
 ):
     """
-    ПОЛНОЕ удаление аккаунта пользователя.
+    РџРћР›РќРћР• СѓРґР°Р»РµРЅРёРµ Р°РєРєР°СѓРЅС‚Р° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ.
     
-    Удаляет ВСЕ данные пользователя и анонимизирует его запись.
-    После удаления пользователь будет разлогинен.
+    РЈРґР°Р»СЏРµС‚ Р’РЎР• РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Рё Р°РЅРѕРЅРёРјРёР·РёСЂСѓРµС‚ РµРіРѕ Р·Р°РїРёСЃСЊ.
+    РџРѕСЃР»Рµ СѓРґР°Р»РµРЅРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ Р±СѓРґРµС‚ СЂР°Р·Р»РѕРіРёРЅРµРЅ.
     """
     user_id = user.get("id")
     if not user_id:
@@ -244,7 +244,7 @@ async def delete_user_account(
     try:
         result = await account_deletion_service.soft_delete_account(user_id, db)
         
-        # Очищаем cookie сессии
+        # РћС‡РёС‰Р°РµРј cookie СЃРµСЃСЃРёРё
         response = JSONResponse(content={
             "success": result.success,
             "message": result.message,
@@ -254,8 +254,9 @@ async def delete_user_account(
         
         return response
         
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Resource not found")
     except Exception as e:
         logger.error(f"[ACCOUNT] Error deleting account: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+

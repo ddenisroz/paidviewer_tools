@@ -82,7 +82,7 @@ const ChatCardHeader: React.FC<ChatCardHeaderProps> = ({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-8 w-8 p-0 transition-colors text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-600 hover:bg-blue-600/10"
+                                className="h-8 w-8 p-0 transition-colors text-muted-foreground border-border hover:text-blue-400 hover:border-blue-600 hover:bg-blue-600/10"
                             >
                                 <Settings className="h-4 w-4" />
                             </Button>

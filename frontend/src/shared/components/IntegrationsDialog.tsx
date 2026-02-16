@@ -110,14 +110,14 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                     {/* VK Live Integration */}
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
-                            <VKIcon />
+                            <VKIcon className="text-[#FF4444]" />
                             <p className="font-semibold">VK Live</p>
                         </div>
                         <Switch
                             checked={integrations.vk?.enabled || false}
                             onCheckedChange={handleVkToggle}
                             disabled={isLoading || integrations.vk?.enabled === null}
-                            className="data-[state=checked]:from-[#FF4444] data-[state=checked]:to-[#e03a3a] data-[state=checked]:border-[#FF4444]"
+                            className="data-[state=checked]:bg-none data-[state=checked]:bg-[#FF4444] data-[state=checked]:border-[#FF4444] data-[state=checked]:from-transparent data-[state=checked]:to-transparent"
                         />
                     </div>
 

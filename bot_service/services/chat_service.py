@@ -93,7 +93,7 @@ class ChatService:
             return {
                 "success": False,
                 "messages": [],
-                "error": str(e)
+                "error": "Internal server error"
             }
 
     def _parse_badges(self, badges) -> Optional[List]:

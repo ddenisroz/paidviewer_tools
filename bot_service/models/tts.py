@@ -29,6 +29,7 @@ class TTSUserSettings(Base):
     engine = Column(String, nullable=False, default='gtts')
     voice = Column(String, nullable=False, default='female_1')
     listening_mode = Column(String, nullable=False, default='website')
+    gcloud_voices = Column(JSON, nullable=False, default=list)
 
     # Платформы для озвучки
     enabled_platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])

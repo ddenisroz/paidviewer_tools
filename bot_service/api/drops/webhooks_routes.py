@@ -26,13 +26,13 @@ async def get_drops_triggers(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает список триггеров Drops (stub)"""
+    """РџРѕР»СѓС‡Р°РµС‚ СЃРїРёСЃРѕРє С‚СЂРёРіРіРµСЂРѕРІ Drops (stub)"""
     try:
         logger.info(f"[PACKAGE] [DROPS] Getting triggers for user {current_user.get('id')}")
         return {"success": True, "triggers": []}
     except Exception as e:
         logger.error(f"[ERROR] [DROPS] Error getting triggers: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения триггеров")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ С‚СЂРёРіРіРµСЂРѕРІ")
 
 
 @router.post("/triggers")
@@ -41,13 +41,13 @@ async def create_drops_trigger(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создает новый триггер Drops (stub)"""
+    """РЎРѕР·РґР°РµС‚ РЅРѕРІС‹Р№ С‚СЂРёРіРіРµСЂ Drops (stub)"""
     try:
         logger.info(f"[PACKAGE] [DROPS] Creating trigger for user {current_user.get('id')}")
-        return {"success": True, "message": "Триггер будет создан", "trigger_id": 1}
+        return {"success": True, "message": "РўСЂРёРіРіРµСЂ Р±СѓРґРµС‚ СЃРѕР·РґР°РЅ", "trigger_id": 1}
     except Exception as e:
         logger.error(f"[ERROR] [DROPS] Error creating trigger: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка создания триггера")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ С‚СЂРёРіРіРµСЂР°")
 
 
 @router.put("/triggers/{trigger_id}")
@@ -57,13 +57,13 @@ async def update_drops_trigger(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновляет триггер Drops (stub)"""
+    """РћР±РЅРѕРІР»СЏРµС‚ С‚СЂРёРіРіРµСЂ Drops (stub)"""
     try:
         logger.info(f"[PACKAGE] [DROPS] Updating trigger {trigger_id}")
-        return {"success": True, "message": "Триггер будет обновлен"}
+        return {"success": True, "message": "РўСЂРёРіРіРµСЂ Р±СѓРґРµС‚ РѕР±РЅРѕРІР»РµРЅ"}
     except Exception as e:
         logger.error(f"[ERROR] [DROPS] Error updating trigger: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обновления триггера")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ С‚СЂРёРіРіРµСЂР°")
 
 
 @router.delete("/triggers/{trigger_id}")
@@ -72,13 +72,13 @@ async def delete_drops_trigger(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удаляет триггер Drops (stub)"""
+    """РЈРґР°Р»СЏРµС‚ С‚СЂРёРіРіРµСЂ Drops (stub)"""
     try:
         logger.info(f"[PACKAGE] [DROPS] Deleting trigger {trigger_id}")
-        return {"success": True, "message": "Триггер будет удален"}
+        return {"success": True, "message": "РўСЂРёРіРіРµСЂ Р±СѓРґРµС‚ СѓРґР°Р»РµРЅ"}
     except Exception as e:
         logger.error(f"[ERROR] [DROPS] Error deleting trigger: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка удаления триггера")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ С‚СЂРёРіРіРµСЂР°")
 
 
 @router.post("/triggers/test/{trigger_id}")
@@ -87,13 +87,13 @@ async def test_drops_trigger(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Тестирует триггер Drops (stub)"""
+    """РўРµСЃС‚РёСЂСѓРµС‚ С‚СЂРёРіРіРµСЂ Drops (stub)"""
     try:
         logger.info(f"[PACKAGE] [DROPS] Testing trigger {trigger_id}")
-        return {"success": True, "message": "Триггер тестируется"}
+        return {"success": True, "message": "РўСЂРёРіРіРµСЂ С‚РµСЃС‚РёСЂСѓРµС‚СЃСЏ"}
     except Exception as e:
         logger.error(f"[ERROR] [DROPS] Error testing trigger: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка тестирования триггера")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ С‚СЂРёРіРіРµСЂР°")
 
 
 # === WIDGET API ===
@@ -103,7 +103,7 @@ async def get_user_from_token(
     token: str,
     db: Session = Depends(get_db)
 ):
-    """Получить user_id по токену виджета (для виджета, без авторизации)"""
+    """РџРѕР»СѓС‡РёС‚СЊ user_id РїРѕ С‚РѕРєРµРЅСѓ РІРёРґР¶РµС‚Р° (РґР»СЏ РІРёРґР¶РµС‚Р°, Р±РµР· Р°РІС‚РѕСЂРёР·Р°С†РёРё)"""
     try:
         repo = DropsRewardRepository(db)
         config = repo.get_config_by_token(token)
@@ -132,20 +132,20 @@ async def generate_widget_url(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Генерирует или возвращает существующий URL для OBS виджета"""
+    """Р“РµРЅРµСЂРёСЂСѓРµС‚ РёР»Рё РІРѕР·РІСЂР°С‰Р°РµС‚ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ URL РґР»СЏ OBS РІРёРґР¶РµС‚Р°"""
     try:
         user_repo = UserRepository(db)
         user = user_repo.get_by_id(current_user["id"])
 
         if not user:
-            raise HTTPException(status_code=400, detail="Пользователь не найден")
+            raise HTTPException(status_code=400, detail="РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ")
 
         channel_name = user.twitch_username or user.vk_channel_name or user.username or "unknown"
 
         if channel_name == "unknown":
             raise HTTPException(
                 status_code=400,
-                detail="Необходимо подключить платформу (Twitch/VK) для создания виджета"
+                detail="РќРµРѕР±С…РѕРґРёРјРѕ РїРѕРґРєР»СЋС‡РёС‚СЊ РїР»Р°С‚С„РѕСЂРјСѓ (Twitch/VK) РґР»СЏ СЃРѕР·РґР°РЅРёСЏ РІРёРґР¶РµС‚Р°"
             )
 
         from services.drops.drops_service import DropsService
@@ -219,7 +219,7 @@ async def generate_widget_url(
     except Exception as e:
         logger.error(f"Error generating widget URL: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка генерации URL виджета: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РіРµРЅРµСЂР°С†РёРё URL РІРёРґР¶РµС‚Р°: {str(e)}")
 
 
 # === WEBHOOKS ===
@@ -229,7 +229,7 @@ async def donationalerts_webhook(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Обработка вебхука от DonationAlerts для Drops"""
+    """РћР±СЂР°Р±РѕС‚РєР° РІРµР±С…СѓРєР° РѕС‚ DonationAlerts РґР»СЏ Drops"""
     try:
         from services.drops.drops_service import DropsService
 
@@ -241,7 +241,7 @@ async def donationalerts_webhook(
         message = data.get('message', '')
         alert_id = data.get('id', '')
 
-        logger.info(f"[REWARD] [DONATION DROPS] Received donation: {donor_name} - {donation_amount}₽")
+        logger.info(f"[REWARD] [DONATION DROPS] Received donation: {donor_name} - {donation_amount}в‚Ѕ")
 
         user_repo = UserRepository(db)
         user_token = user_repo.get_token_by_platform('donationalerts', data.get('user_id', ''))
@@ -296,7 +296,7 @@ async def donationalerts_webhook(
             logger.error(f"[ERROR] Error processing donation {alert_id}: {e}", exc_info=True)
 
         if result:
-            logger.info(f"[REWARD] [DONATION DROPS] {donor_name} получил {result['reward']} ({result['quality']})")
+            logger.info(f"[REWARD] [DONATION DROPS] {donor_name} РїРѕР»СѓС‡РёР» {result['reward']} ({result['quality']})")
 
             from utils.websocket_helper import broadcast_drops_event
             await broadcast_drops_event(result)
@@ -307,4 +307,4 @@ async def donationalerts_webhook(
 
     except Exception as e:
         logger.error(f"Error processing DonationAlerts webhook: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}

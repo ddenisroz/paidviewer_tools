@@ -176,7 +176,7 @@ const Header: React.FC = () => {
 
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <TwitchIcon width="24" height="24" />
+                                            <TwitchIcon width="24" height="24" className="text-[#9146FF]" />
                                             <span className="text-sm">Twitch</span>
                                         </div>
                                         <button
@@ -193,7 +193,7 @@ const Header: React.FC = () => {
 
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <VKIcon width="24" height="24" />
+                                            <VKIcon width="24" height="24" className="text-[#FF4444]" />
                                             <span className="text-sm">VK Live</span>
                                         </div>
                                         <button

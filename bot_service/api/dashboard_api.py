@@ -1,7 +1,7 @@
 # bot_service/api/dashboard_api.py
 """
-Dashboard API - Batch endpoint для инициализации дашборда.
-Объединяет несколько запросов в один для оптимизации производительности.
+Dashboard API - Batch endpoint РґР»СЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РґР°С€Р±РѕСЂРґР°.
+РћР±СЉРµРґРёРЅСЏРµС‚ РЅРµСЃРєРѕР»СЊРєРѕ Р·Р°РїСЂРѕСЃРѕРІ РІ РѕРґРёРЅ РґР»СЏ РѕРїС‚РёРјРёР·Р°С†РёРё РїСЂРѕРёР·РІРѕРґРёС‚РµР»СЊРЅРѕСЃС‚Рё.
 Refactored to use DashboardService (Clean Architecture).
 """
 import logging
@@ -24,15 +24,15 @@ async def get_dashboard_init(
     db: Session = Depends(get_db)
 ) -> JSONResponse:
     """
-    Batch endpoint для инициализации дашборда.
+    Batch endpoint РґР»СЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РґР°С€Р±РѕСЂРґР°.
     
-    Возвращает все необходимые данные одним запросом:
-    - user: информация о пользователе
-    - integrations: статус интеграций (Twitch, VK, DonationAlerts)
-    - tts: настройки TTS
-    - chat_history: последние сообщения чата (50)
+    Р’РѕР·РІСЂР°С‰Р°РµС‚ РІСЃРµ РЅРµРѕР±С…РѕРґРёРјС‹Рµ РґР°РЅРЅС‹Рµ РѕРґРЅРёРј Р·Р°РїСЂРѕСЃРѕРј:
+    - user: РёРЅС„РѕСЂРјР°С†РёСЏ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ
+    - integrations: СЃС‚Р°С‚СѓСЃ РёРЅС‚РµРіСЂР°С†РёР№ (Twitch, VK, DonationAlerts)
+    - tts: РЅР°СЃС‚СЂРѕР№РєРё TTS
+    - chat_history: РїРѕСЃР»РµРґРЅРёРµ СЃРѕРѕР±С‰РµРЅРёСЏ С‡Р°С‚Р° (50)
     
-    Это заменяет 4-6 отдельных запросов при загрузке главной страницы.
+    Р­С‚Рѕ Р·Р°РјРµРЅСЏРµС‚ 4-6 РѕС‚РґРµР»СЊРЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ РїСЂРё Р·Р°РіСЂСѓР·РєРµ РіР»Р°РІРЅРѕР№ СЃС‚СЂР°РЅРёС†С‹.
     """
     try:
         service = DashboardService(db)
@@ -43,7 +43,7 @@ async def get_dashboard_init(
     except Exception as e:
         logger.error(f"[ERROR] [DASHBOARD] Error loading init data: {e}", exc_info=True)
         return JSONResponse(
-            content={"success": False, "error": str(e)},
+            content={"success": False, "error": "Internal server error"},
             status_code=500
         )
 

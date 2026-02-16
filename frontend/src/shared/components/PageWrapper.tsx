@@ -6,12 +6,12 @@ interface PageWrapperProps {
     actions?: ReactNode;
     children: ReactNode;
     className?: string;
-    hideTitle?: boolean; // Опция для скрытия заголовка (например, на главной)
+    hideTitle?: boolean; // Option to hide page title (e.g. on Home)
 }
 
 /**
- * Унифицированная обертка для всех страниц дашборда
- * Обеспечивает единообразное позиционирование заголовков и контента
+ * Unified wrapper for dashboard pages.
+ * Keeps consistent spacing and header layout.
  */
 export const PageWrapper: React.FC<PageWrapperProps> = ({
     title,
@@ -23,18 +23,18 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({
 }) => {
     return (
         <div className={`container mx-auto px-6 py-4 space-y-6 min-h-[600px] ${className}`} style={{ scrollbarGutter: 'stable' }}>
-            {/* Заголовок страницы */}
+            {/* Page title */}
             {(title && !hideTitle) && (
                 <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-white">{title}</h1>
+                    <h1 className="text-3xl font-bold text-foreground">{title}</h1>
                 </div>
             )}
 
-            {/* Description и actions */}
+            {/* Description and actions */}
             {(description || actions) && (
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     {description && (
-                        <p className="text-slate-400 text-sm">
+                        <p className="text-muted-foreground text-sm">
                             {description}
                         </p>
                     )}
@@ -46,7 +46,7 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({
                 </div>
             )}
 
-            {/* Контент страницы */}
+            {/* Page content */}
             <div className="space-y-6">
                 {children}
             </div>
@@ -55,4 +55,3 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({
 };
 
 export default PageWrapper;
-

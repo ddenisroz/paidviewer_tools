@@ -1,6 +1,6 @@
 # bot_service/api/commands.py
 """
-API для управления командами бота.
+API РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ РєРѕРјР°РЅРґР°РјРё Р±РѕС‚Р°.
 Following Clean Architecture - only routing, no business logic.
 """
 import logging
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/commands", tags=["commands"])
 # ===== Pydantic Models =====
 
 class CommandCreate(BaseModel):
-    """Создание новой команды"""
+    """РЎРѕР·РґР°РЅРёРµ РЅРѕРІРѕР№ РєРѕРјР°РЅРґС‹"""
     command_name: str
     response_text: str
     platforms: str = "twitch,vk"
@@ -36,7 +36,7 @@ class CommandCreate(BaseModel):
     @field_validator('command_name')
     @classmethod
     def sanitize_command_name(cls, v):
-        """Санитизация имени команды"""
+        """РЎР°РЅРёС‚РёР·Р°С†РёСЏ РёРјРµРЅРё РєРѕРјР°РЅРґС‹"""
         if not v or not v.strip():
             raise ValueError('Command name cannot be empty')
         return sanitize_input(v, max_length=20)
@@ -44,12 +44,12 @@ class CommandCreate(BaseModel):
     @field_validator('response_text')
     @classmethod
     def sanitize_response_text(cls, v):
-        """Санитизация текста ответа"""
+        """РЎР°РЅРёС‚РёР·Р°С†РёСЏ С‚РµРєСЃС‚Р° РѕС‚РІРµС‚Р°"""
         return sanitize_input(v, max_length=500)
 
 
 class CommandUpdate(BaseModel):
-    """Обновление команды"""
+    """РћР±РЅРѕРІР»РµРЅРёРµ РєРѕРјР°РЅРґС‹"""
     is_enabled: Optional[bool] = None
     platforms: Optional[str] = None
     allowed_roles: Optional[str] = None
@@ -60,14 +60,14 @@ class CommandUpdate(BaseModel):
     @field_validator('response_text')
     @classmethod
     def sanitize_response_text(cls, v):
-        """Санитизация текста ответа при обновлении"""
+        """РЎР°РЅРёС‚РёР·Р°С†РёСЏ С‚РµРєСЃС‚Р° РѕС‚РІРµС‚Р° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё"""
         if v is not None:
             return sanitize_input(v, max_length=500)
         return v
 
 
 class CommandOverrideCreate(BaseModel):
-    """Создание user override для базовой команды"""
+    """РЎРѕР·РґР°РЅРёРµ user override РґР»СЏ Р±Р°Р·РѕРІРѕР№ РєРѕРјР°РЅРґС‹"""
     command_name: str
     alias: Optional[str] = None
     platforms: Optional[str] = None
@@ -78,7 +78,7 @@ class CommandOverrideCreate(BaseModel):
 
 
 class CommandResponse(BaseModel):
-    """Ответ с информацией о команде"""
+    """РћС‚РІРµС‚ СЃ РёРЅС„РѕСЂРјР°С†РёРµР№ Рѕ РєРѕРјР°РЅРґРµ"""
     id: int
     command_name: str
     response_text: str
@@ -97,6 +97,38 @@ def get_command_service() -> CommandService:
     """Get CommandService instance."""
     return CommandService()
 
+def _command_error_message(status_code: int) -> str:
+    if status_code == 404:
+        return "Command not found"
+    if status_code == 403:
+        return "Insufficient permissions"
+    return "Invalid command data"
+
+
+def _is_not_found_error(error_text: str) -> bool:
+    normalized = error_text.lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "not found",
+            "\u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d",   # не найден
+            "\u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430",  # не найдена
+        )
+    )
+
+
+def _is_forbidden_error(error_text: str) -> bool:
+    normalized = error_text.lower()
+    return any(
+        marker in normalized
+        for marker in (
+            "forbidden",
+            "permission",
+            "\u043d\u0435\u0442 \u043f\u0440\u0430\u0432",  # нет прав
+            "\u043d\u0435\u043b\u044c\u0437\u044f",  # нельзя
+        )
+    )
+
 
 # ===== API Endpoints =====
 
@@ -105,7 +137,7 @@ async def get_commands(
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Получить все команды"""
+    """РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ РєРѕРјР°РЅРґС‹"""
     user_id = current_user.get('id') if current_user else None
     log_request("/api/commands", "GET", None, user_id)
     commands_logger.info(f"Getting commands for {'guest' if not user_id or user_id == -1 else f'user {user_id}'}")
@@ -117,8 +149,8 @@ async def get_commands(
         return result
     except Exception as e:
         commands_logger.error(f"[X] Error getting commands: {e}", exc_info=True)
-        log_response("/api/commands", 500, {"error": str(e)})
-        raise HTTPException(status_code=500, detail="Ошибка получения команд")
+        log_response("/api/commands", 500, {"error": "Internal server error"})
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РєРѕРјР°РЅРґ")
 
 
 @router.get("")
@@ -126,7 +158,7 @@ async def get_commands_no_slash(
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Получить все команды (без слеша)"""
+    """РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ РєРѕРјР°РЅРґС‹ (Р±РµР· СЃР»РµС€Р°)"""
     return await get_commands(current_user, db)
 
 
@@ -138,7 +170,7 @@ async def create_command(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать новую кастомную команду"""
+    """РЎРѕР·РґР°С‚СЊ РЅРѕРІСѓСЋ РєР°СЃС‚РѕРјРЅСѓСЋ РєРѕРјР°РЅРґСѓ"""
     try:
         service = get_command_service()
         result = service.create_custom_command(
@@ -153,12 +185,12 @@ async def create_command(
         )
         return result
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid command data")
     except Exception as e:
         logger.error(f"Error creating command: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка создания команды")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РєРѕРјР°РЅРґС‹")
 
 
 @router.put("/{command_id}")
@@ -170,7 +202,7 @@ async def update_command(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить команду по ID"""
+    """РћР±РЅРѕРІРёС‚СЊ РєРѕРјР°РЅРґСѓ РїРѕ ID"""
     try:
         service = get_command_service()
         result = service.update_command(
@@ -182,12 +214,13 @@ async def update_command(
         return result
 
     except ValueError as e:
-        status_code = 404 if "не найдена" in str(e) else 403 if "Нельзя" in str(e) or "Нет прав" in str(e) else 400
-        raise HTTPException(status_code=status_code, detail=str(e))
+        error_text = str(e)
+        status_code = 404 if _is_not_found_error(error_text) else 403 if _is_forbidden_error(error_text) else 400
+        raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
     except Exception as e:
         logger.error(f"Error updating command: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка обновления команды")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РєРѕРјР°РЅРґС‹")
 
 
 @router.post("/override")
@@ -198,7 +231,7 @@ async def create_command_override(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать user override для глобальной команды"""
+    """РЎРѕР·РґР°С‚СЊ user override РґР»СЏ РіР»РѕР±Р°Р»СЊРЅРѕР№ РєРѕРјР°РЅРґС‹"""
     try:
         service = get_command_service()
         result = service.create_command_override(
@@ -215,12 +248,12 @@ async def create_command_override(
         return result
 
     except ValueError as e:
-        status_code = 404 if "не найдена" in str(e) else 400
-        raise HTTPException(status_code=status_code, detail=str(e))
+        status_code = 404 if _is_not_found_error(str(e)) else 400
+        raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
     except Exception as e:
         logger.error(f"Error creating override: {e}", exc_info=True)
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка создания override")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ override")
 
 
 @router.delete("/{command_id}")
@@ -231,7 +264,7 @@ async def delete_command(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить кастомную команду"""
+    """РЈРґР°Р»РёС‚СЊ РєР°СЃС‚РѕРјРЅСѓСЋ РєРѕРјР°РЅРґСѓ"""
     try:
         service = get_command_service()
         result = service.delete_command(
@@ -242,9 +275,10 @@ async def delete_command(
         return result
 
     except ValueError as e:
-        status_code = 404 if "не найдена" in str(e) else 403
-        raise HTTPException(status_code=status_code, detail=str(e))
+        status_code = 404 if _is_not_found_error(str(e)) else 403
+        raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
     except Exception as e:
         logger.error(f"Error deleting command: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка удаления команды")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ РєРѕРјР°РЅРґС‹")
+

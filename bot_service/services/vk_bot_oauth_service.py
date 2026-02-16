@@ -228,20 +228,19 @@ class VkBotOAuthService:
         """
         Обновить токен бота используя refresh_token.
         """
-        def _refresh(session_db: Session) -> bool:
+        async def _refresh(session_db: Session) -> bool:
             try:
                 repo = BotTokenRepository(session_db)
                 bot_token = repo.get_by_platform('vk')
-                
+
                 if not bot_token or not bot_token.refresh_token:
                     logger.error("[ERROR] No VK bot token or refresh token found")
                     return False
-                
+
                 refresh_token = decrypt_token(bot_token.refresh_token)
-                
+
                 logger.info("[REFRESH] Refreshing VK bot token...")
-                
-                # Basic Auth for Refresh
+
                 credentials = f"{settings.vk_client_id}:{settings.vk_client_secret}"
                 base64_credentials = base64.b64encode(credentials.encode()).decode()
 
@@ -250,57 +249,50 @@ class VkBotOAuthService:
                     "Authorization": f"Basic {base64_credentials}"
                 }
 
-                # Выполняем refresh запрос
-                async def _do_refresh():
-                    async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
-                        return await client.post(
-                            "https://api.live.vkvideo.ru/oauth/server/token",
-                            data={
-                                "grant_type": "refresh_token",
-                                "refresh_token": refresh_token
-                            },
-                            headers=headers
-                        )
-                
-                import asyncio
-                response = asyncio.run(_do_refresh())
-                
+                async with httpx.AsyncClient(timeout=15.0, trust_env=False) as client:
+                    response = await client.post(
+                        "https://api.live.vkvideo.ru/oauth/server/token",
+                        data={
+                            "grant_type": "refresh_token",
+                            "refresh_token": refresh_token
+                        },
+                        headers=headers
+                    )
+
                 if response.status_code == 200:
                     data = response.json()
-                    
-                    # Обновляем токен в БД
+
                     bot_token.access_token = encrypt_token(data["access_token"])
                     if data.get("refresh_token"):
                         bot_token.refresh_token = encrypt_token(data["refresh_token"])
                     bot_token.expires_at = utcnow_naive() + timedelta(seconds=data["expires_in"])
                     bot_token.updated_at = utcnow_naive()
-                    
+
                     repo.save(bot_token)
-                    
+
                     logger.info(f"[OK] VK bot token refreshed for {bot_token.bot_login}")
                     return True
-                
-                else:
-                    logger.error(f"[ERROR] Failed to refresh VK bot token: {response.status_code} - {response.text}")
-                    return False
-                
+
+                logger.error(f"[ERROR] Failed to refresh VK bot token: {response.status_code} - {response.text}")
+                return False
+
             except Exception as e:
                 logger.error(f"Error refreshing VK bot token: {e}")
                 session_db.rollback()
                 return False
-        
+
         if db is not None:
-            return _refresh(db)
-        
+            return await _refresh(db)
+
         with db_session() as new_db:
-            return _refresh(new_db)
+            return await _refresh(new_db)
     
     @staticmethod
     async def refresh_if_needed(db: Optional[Session] = None) -> bool:
         """
         Проверить и обновить токен если истекает в течение 7 дней.
         """
-        def _check_and_refresh(session_db: Session) -> bool:
+        async def _check_and_refresh(session_db: Session) -> bool:
             repo = BotTokenRepository(session_db)
             bot_token = repo.get_by_platform('vk')
             
@@ -319,14 +311,14 @@ class VkBotOAuthService:
                 return True
             
             logger.info(f"[REFRESH] VK Bot token expires in {days_left} days, refreshing...")
-            return VkBotOAuthService.refresh_bot_token(session_db)
+            return await VkBotOAuthService.refresh_bot_token(session_db)
         
         try:
             if db is not None:
-                return _check_and_refresh(db)
+                return await _check_and_refresh(db)
             
             with db_session() as new_db:
-                return _check_and_refresh(new_db)
+                return await _check_and_refresh(new_db)
                 
         except Exception as e:
             logger.error(f"Error checking bot token expiration: {e}")

@@ -77,7 +77,7 @@ class AccountService:
         except Exception as e:
             logger.error(f"[ERROR] [DELETE ACCOUNT] Error: {e}", exc_info=True)
             self.db.rollback()
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Internal server error"}
 
     async def permanently_delete_user(
         self,
@@ -130,7 +130,7 @@ class AccountService:
         except Exception as e:
             logger.error(f"[ERROR] [ADMIN DELETE] Error: {e}", exc_info=True)
             self.db.rollback()
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Internal server error"}
 
     async def _disconnect_user_bots(self, user: User, connection_manager) -> None:
         """Disconnect all bots from user's channels."""

@@ -167,7 +167,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
         </div>
 
         {/* История */}
-        <div className="space-y-2 max-h-[600px] overflow-y-auto">
+        <div className="space-y-2 max-h-[min(600px,70vh)] overflow-y-auto">
           {filteredHistory.length === 0 && !loading ? (
             <div className="text-center py-12 text-muted-foreground">
               <History className="w-12 h-12 mx-auto mb-4 opacity-50" />

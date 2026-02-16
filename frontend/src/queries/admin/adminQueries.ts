@@ -17,6 +17,7 @@ import type { AxiosError } from 'axios';
 export interface BotTokenStatus {
   success: boolean;
   configured: boolean;
+  type?: 'oauth' | 'legacy';
   bot_login?: string;
   bot_user_id?: string;
   expires_at?: string;

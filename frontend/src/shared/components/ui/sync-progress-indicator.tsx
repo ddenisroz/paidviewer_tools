@@ -35,8 +35,8 @@ export const SyncProgressIndicator: React.FC<SyncProgressIndicatorProps> = ({
       <div
         className={cn(
           'flex items-center justify-between gap-4 rounded-lg border px-4 py-3',
-          isReconciling && 'border-blue-200 bg-blue-50',
-          error && 'border-red-200 bg-red-50',
+          isReconciling && 'border-blue-500/20 bg-blue-500/10',
+          error && 'border-red-500/20 bg-red-500/10',
           className
         )}
         role="status"
@@ -45,12 +45,12 @@ export const SyncProgressIndicator: React.FC<SyncProgressIndicatorProps> = ({
         <div className="flex items-center gap-3">
           {isReconciling && (
             <>
-              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <Loader2 className="h-5 w-5 animate-spin text-blue-300" />
               <div>
-                <p className="text-sm font-medium text-blue-900">
+                <p className="text-sm font-medium text-blue-200">
                   Синхронизация состояния...
                 </p>
-                <p className="text-xs text-blue-700">
+                <p className="text-xs text-blue-300">
                   Обновление данных с сервера
                 </p>
               </div>
@@ -58,12 +58,12 @@ export const SyncProgressIndicator: React.FC<SyncProgressIndicatorProps> = ({
           )}
           {error && (
             <>
-              <AlertCircle className="h-5 w-5 text-red-600" />
+              <AlertCircle className="h-5 w-5 text-red-300" />
               <div>
-                <p className="text-sm font-medium text-red-900">
+                <p className="text-sm font-medium text-red-200">
                   Ошибка синхронизации
                 </p>
-                <p className="text-xs text-red-700">
+                <p className="text-xs text-red-300">
                   {error.message || 'Не удалось синхронизировать данные'}
                 </p>
               </div>
@@ -71,8 +71,8 @@ export const SyncProgressIndicator: React.FC<SyncProgressIndicatorProps> = ({
           )}
         </div>
         {lastReconciliation && !isReconciling && !error && (
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
             <span>
               Синхронизировано{' '}
               {new Date(lastReconciliation).toLocaleTimeString('ru-RU')}
@@ -88,8 +88,8 @@ export const SyncProgressIndicator: React.FC<SyncProgressIndicatorProps> = ({
       <div
         className={cn(
           'flex items-center gap-2 text-sm',
-          isReconciling && 'text-blue-600',
-          error && 'text-red-600',
+          isReconciling && 'text-blue-300',
+          error && 'text-red-300',
           className
         )}
         role="status"
@@ -167,7 +167,7 @@ export const ManualSyncButton: React.FC<{
       disabled={isReconciling}
       className={cn(
         'inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium',
-        'border border-gray-300 bg-white hover:bg-gray-50',
+        'border border-border bg-background/50 hover:bg-background/70',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'transition-colors duration-200',
         className
@@ -184,7 +184,7 @@ export const ManualSyncButton: React.FC<{
         {isReconciling ? 'Синхронизация...' : 'Синхронизировать'}
       </span>
       {lastReconciliation && !isReconciling && (
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-muted-foreground">
           ({new Date(lastReconciliation).toLocaleTimeString('ru-RU')})
         </span>
       )}

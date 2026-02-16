@@ -86,7 +86,7 @@ async def get_pool_status(current_user: dict = Depends(get_current_user)):
         }
     except Exception as e:
         logger.error(f"Error getting pool status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/health")
@@ -121,10 +121,10 @@ async def database_health_check(
             "status": "healthy",
             "response_time_ms": round(response_time_ms, 2)
         }
-    except Exception as e:
+    except Exception:
         health_data["checks"]["connectivity"] = {
             "status": "unhealthy",
-            "error": str(e)
+            "error": "Internal server error"
         }
     
     # 2. Pool status
@@ -157,10 +157,10 @@ async def database_health_check(
                 "active_connections": checked_out,
                 "total_connections": total
             }
-    except Exception as e:
+    except Exception:
         health_data["checks"]["connection_pool"] = {
             "status": "error",
-            "error": str(e)
+            "error": "Internal server error"
         }
     
     # 3. Active queries check (PostgreSQL specific)
@@ -177,11 +177,11 @@ async def database_health_check(
             "status": "healthy",
             "count": active_queries
         }
-    except Exception as e:
+    except Exception:
         # Not critical if this fails (might not be PostgreSQL)
         health_data["checks"]["active_queries"] = {
             "status": "unavailable",
-            "error": str(e)
+            "error": "Internal server error"
         }
     
     # Overall status
@@ -248,7 +248,7 @@ async def get_slow_queries(
         }
     except Exception as e:
         logger.error(f"Error getting slow queries: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/table-stats")
@@ -293,7 +293,7 @@ async def get_table_statistics(
         }
     except Exception as e:
         logger.error(f"Error getting table stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/index-usage")
@@ -348,4 +348,4 @@ async def get_index_usage(
         }
     except Exception as e:
         logger.error(f"Error getting index usage: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

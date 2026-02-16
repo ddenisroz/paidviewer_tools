@@ -11,7 +11,7 @@ export interface TtsStatus {
   platform?: 'twitch' | 'vk' | 'youtube';
   is_playing?: boolean;
   current_voice?: string;
-  engine_type?: 'gtts' | 'local' | 'cloud';
+  engine_type?: 'gtts' | 'local' | 'cloud' | 'gcloud';
   has_local_setup?: boolean;
 }
 
@@ -43,6 +43,7 @@ export interface TtsSettings {
   maxMessageLength?: number;
   skipCommands?: boolean;
   useLocalTTS?: boolean;
+  gcloudVoices?: string[];
 }
 
 /**

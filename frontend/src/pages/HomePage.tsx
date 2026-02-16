@@ -209,16 +209,16 @@ const HomePage: React.FC = () => {
 
             <div className="space-y-6 max-w-6xl mx-auto overflow-visible">
                 {!isAuthenticated ? (
-                    <Card className="border-gray-700">
+                    <Card className="card-glass border-border">
                         <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-                            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-                                <MessageCircle className="w-10 h-10 text-gray-500" />
+                            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                                <MessageCircle className="w-10 h-10 text-muted-foreground" />
                             </div>
                             <div className="space-y-2 max-w-md">
-                                <h3 className="text-xl font-semibold text-gray-200">
+                                <h3 className="text-xl font-semibold text-foreground">
                                     Требуется авторизация
                                 </h3>
-                                <p className="text-gray-400 text-sm">
+                                <p className="text-muted-foreground text-sm">
                                     Для использования функций бота необходимо войти через Twitch или VK Live
                                 </p>
                             </div>
@@ -232,16 +232,16 @@ const HomePage: React.FC = () => {
                         </CardContent>
                     </Card>
                 ) : !hasAnyIntegration ? (
-                    <Card className="border-gray-700">
+                    <Card className="card-glass border-border">
                         <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-                            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-                                <MessageCircle className="w-10 h-10 text-gray-500" />
+                            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                                <MessageCircle className="w-10 h-10 text-muted-foreground" />
                             </div>
                             <div className="space-y-2 max-w-md">
-                                <h3 className="text-xl font-semibold text-gray-200">
+                                <h3 className="text-xl font-semibold text-foreground">
                                     У вас нет подключенных интеграций
                                 </h3>
-                                <p className="text-gray-400 text-sm">
+                                <p className="text-muted-foreground text-sm">
                                     Автоматический выход...
                                 </p>
                             </div>

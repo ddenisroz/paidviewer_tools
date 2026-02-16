@@ -89,6 +89,31 @@ export function useChatWebSocket({
 
     const handleTtsAudio = useCallback((data: TtsAudioMessage) => {
         const audioData = data.data || data;
+        const isTtsEnabled = typeof window === 'undefined'
+            ? true
+            : window.localStorage.getItem('tts_enabled') !== 'false';
+
+        if (!isTtsEnabled) {
+            logger.debug('[TTS] Ignoring audio event because global TTS is disabled');
+            return;
+        }
+
+        const platform = typeof audioData.platform === 'string' ? audioData.platform.toLowerCase() : null;
+        if (platform && typeof window !== 'undefined') {
+            const storedPlatforms = window.localStorage.getItem('tts_enabled_platforms');
+            if (storedPlatforms) {
+                try {
+                    const enabledPlatforms = JSON.parse(storedPlatforms) as string[];
+                    if (Array.isArray(enabledPlatforms) && enabledPlatforms.length > 0 && !enabledPlatforms.includes(platform)) {
+                        logger.debug(`[TTS] Ignoring audio event for disabled platform: ${platform}`);
+                        return;
+                    }
+                } catch (error) {
+                    logger.warn('[TTS] Failed to parse enabled platforms from storage:', error);
+                }
+            }
+        }
+
         if (!audioData.audio_url) {
             logger.warn('TTS audio event received but no audio_url provided');
             return;

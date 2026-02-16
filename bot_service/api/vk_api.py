@@ -68,13 +68,13 @@ async def update_vk_category(
         result = await vk_api.update_stream_category(user_id, category_id, session_id)
 
         if result:
-            return JSONResponse(content={"success": True, "message": "Категория успешно обновлена"})
+            return JSONResponse(content={"success": True, "message": "РљР°С‚РµРіРѕСЂРёСЏ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅР°"})
         else:
-            raise HTTPException(status_code=400, detail="Не удалось обновить категорию")
+            raise HTTPException(status_code=400, detail="РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ")
 
     except Exception as e:
         logger.error(f"Error updating VK category: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка обновления категории: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РєР°С‚РµРіРѕСЂРёРё: {str(e)}")
 
 @router.post("/update-title")
 async def update_vk_title(
@@ -93,13 +93,13 @@ async def update_vk_title(
         result = await vk_api.update_stream_title(user_id, title, session_id)
 
         if result:
-            return JSONResponse(content={"success": True, "message": "Название успешно обновлено"})
+            return JSONResponse(content={"success": True, "message": "РќР°Р·РІР°РЅРёРµ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅРѕ"})
         else:
-            raise HTTPException(status_code=400, detail="Не удалось обновить название")
+            raise HTTPException(status_code=400, detail="РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РЅР°Р·РІР°РЅРёРµ")
 
     except Exception as e:
         logger.error(f"Error updating VK title: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка обновления названия: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РЅР°Р·РІР°РЅРёСЏ: {str(e)}")
 
 @router.get("/categories")
 async def get_vk_categories(
@@ -150,7 +150,7 @@ async def get_vk_categories(
     except Exception as e:
         logger.error(f"[ERROR] [VK CATEGORIES] Error: {e}")
         return JSONResponse(
-            content={"success": False, "categories": [], "error": str(e)},
+            content={"success": False, "categories": [], "error": "Internal server error"},
             status_code=500
         )
 
@@ -169,8 +169,8 @@ async def get_vk_stream_info(
         if stream_info:
             return JSONResponse(content=stream_info)
         else:
-            return JSONResponse(content={"success": False, "message": "Стрим не найден"})
+            return JSONResponse(content={"success": False, "message": "РЎС‚СЂРёРј РЅРµ РЅР°Р№РґРµРЅ"})
 
     except Exception as e:
         logger.error(f"Error getting VK stream info: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)

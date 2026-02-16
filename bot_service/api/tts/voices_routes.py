@@ -55,14 +55,14 @@ async def check_whitelist_status(
     db: Session = Depends(get_db)
 ):
     """
-    Проверить статус whitelist для управления голосами (только для авторизованных пользователей)
+    РџСЂРѕРІРµСЂРёС‚СЊ СЃС‚Р°С‚СѓСЃ whitelist РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ РіРѕР»РѕСЃР°РјРё (С‚РѕР»СЊРєРѕ РґР»СЏ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№)
     """
     try:
         if not user or not user.get('id') or user.get('id') <= 0:
             return {
                 "is_whitelisted": False,
                 "can_manage_voices": False,
-                "message": "Требуется авторизация"
+                "message": "РўСЂРµР±СѓРµС‚СЃСЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ"
             }
 
         user_repo = UserRepository(db)
@@ -72,16 +72,16 @@ async def check_whitelist_status(
         if not db_user:
             return {"is_whitelisted": False, "can_manage_voices": False}
 
-        # Проверяем наличие локального TTS endpoint
+        # РџСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ Р»РѕРєР°Р»СЊРЅРѕРіРѕ TTS endpoint
         local_endpoint = local_repo.get_active(user_id=user['id'])
         has_local_setup = local_endpoint and local_endpoint.is_healthy
 
-        # Если есть локальный endpoint - разрешаем доступ к управлению голосами без whitelist
+        # Р•СЃР»Рё РµСЃС‚СЊ Р»РѕРєР°Р»СЊРЅС‹Р№ endpoint - СЂР°Р·СЂРµС€Р°РµРј РґРѕСЃС‚СѓРї Рє СѓРїСЂР°РІР»РµРЅРёСЋ РіРѕР»РѕСЃР°РјРё Р±РµР· whitelist
         if has_local_setup:
             logger.info(f"[LOCAL] User {user['id']} has local TTS setup, allowing voice management")
             return {"is_whitelisted": True, "can_manage_voices": True, "has_local_setup": True}
 
-        # Получаем платформу, через которую пользователь АВТОРИЗОВАЛСЯ
+        # РџРѕР»СѓС‡Р°РµРј РїР»Р°С‚С„РѕСЂРјСѓ, С‡РµСЂРµР· РєРѕС‚РѕСЂСѓСЋ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РђР’РўРћР РР—РћР’РђР›РЎРЇ
         login_platform = user.get('login_platform')
 
         if not login_platform:
@@ -89,19 +89,19 @@ async def check_whitelist_status(
             return {
                 "is_whitelisted": False,
                 "can_manage_voices": False,
-                "message": "Не удалось определить платформу авторизации"
+                "message": "РќРµ СѓРґР°Р»РѕСЃСЊ РѕРїСЂРµРґРµР»РёС‚СЊ РїР»Р°С‚С„РѕСЂРјСѓ Р°РІС‚РѕСЂРёР·Р°С†РёРё"
             }
 
-        # Проверяем whitelist ТОЛЬКО для платформы авторизации
-        # Проверяем whitelist с кешированием (проверяем обе платформы)
+        # РџСЂРѕРІРµСЂСЏРµРј whitelist РўРћР›Р¬РљРћ РґР»СЏ РїР»Р°С‚С„РѕСЂРјС‹ Р°РІС‚РѕСЂРёР·Р°С†РёРё
+        # РџСЂРѕРІРµСЂСЏРµРј whitelist СЃ РєРµС€РёСЂРѕРІР°РЅРёРµРј (РїСЂРѕРІРµСЂСЏРµРј РѕР±Рµ РїР»Р°С‚С„РѕСЂРјС‹)
         from utils.whitelist_cache import is_user_whitelisted_cached
         is_whitelisted = is_user_whitelisted_cached(db_user, db)
 
         if is_whitelisted:
-            # Определяем платформу для которой пользователь в whitelist
+            # РћРїСЂРµРґРµР»СЏРµРј РїР»Р°С‚С„РѕСЂРјСѓ РґР»СЏ РєРѕС‚РѕСЂРѕР№ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РІ whitelist
             platform = None
             
-            # Проверяем Twitch whitelist
+            # РџСЂРѕРІРµСЂСЏРµРј Twitch whitelist
             if db_user.twitch_username:
                 from utils.whitelist_cache import is_channel_whitelisted_cached
                 if is_channel_whitelisted_cached(db_user.twitch_username.lower(), 'twitch', db):
@@ -109,7 +109,7 @@ async def check_whitelist_status(
                     logger.info(f"[OK] User {user['id']} ({db_user.twitch_username}) whitelisted on Twitch")
                     return {"is_whitelisted": True, "can_manage_voices": True, "platform": platform}
 
-            # Проверяем VK whitelist (username или channel_name)
+            # РџСЂРѕРІРµСЂСЏРµРј VK whitelist (username РёР»Рё channel_name)
             if db_user.vk_username or db_user.vk_channel_name:
                 from utils.whitelist_cache import is_channel_whitelisted_cached
                 vk_channel = db_user.vk_channel_name or db_user.vk_username
@@ -118,18 +118,18 @@ async def check_whitelist_status(
                     logger.info(f"[OK] User {user['id']} ({vk_channel}) whitelisted on VK")
                     return {"is_whitelisted": True, "can_manage_voices": True, "platform": platform}
 
-            # Если is_whitelisted вернул True, но platform не определился - все равно разрешаем
-            channel_name = db_user.twitch_username or db_user.vk_username or db_user.vk_channel_name or 'неизвестен'
+            # Р•СЃР»Рё is_whitelisted РІРµСЂРЅСѓР» True, РЅРѕ platform РЅРµ РѕРїСЂРµРґРµР»РёР»СЃСЏ - РІСЃРµ СЂР°РІРЅРѕ СЂР°Р·СЂРµС€Р°РµРј
+            channel_name = db_user.twitch_username or db_user.vk_username or db_user.vk_channel_name or 'РЅРµРёР·РІРµСЃС‚РµРЅ'
             logger.warning(f"[WARN] User {user['id']} ({channel_name}) is_whitelisted=True but platform not found, allowing access anyway")
             return {"is_whitelisted": True, "can_manage_voices": True, "platform": login_platform or "unknown"}
 
-        channel_name = db_user.twitch_username or db_user.vk_username or db_user.vk_channel_name or 'неизвестен'
+        channel_name = db_user.twitch_username or db_user.vk_username or db_user.vk_channel_name or 'РЅРµРёР·РІРµСЃС‚РµРЅ'
         logger.warning(f"[ERROR] User {user['id']} ({channel_name}) NOT whitelisted")
         return {"is_whitelisted": False, "can_manage_voices": False}
 
     except Exception as e:
         logger.error(f"Error checking whitelist status: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка проверки whitelist")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё whitelist")
 
 @voices_router.get("/", response_model=List[VoiceSchema])
 async def get_all_voices(
@@ -137,7 +137,7 @@ async def get_all_voices(
     user: dict = Depends(get_current_user),
     service: VoiceManagementService = Depends(get_voice_service)
 ):
-    """Получить все голоса"""
+    """РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ РіРѕР»РѕСЃР°"""
     try:
         # NOTE: This seems to duplicate get_global_voices functionality or intends to get ALL voices?
         # Based on previous implementation: it called TTS_SERVICE_URL/api/voices
@@ -148,7 +148,7 @@ async def get_all_voices(
         return await service.get_global_voices() 
     except Exception as e:
         logger.error(f"Error getting voices: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения голосов")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РіРѕР»РѕСЃРѕРІ")
 
 # ============================================================================
 # USER VOICES ENDPOINTS - /api/user/voices
@@ -161,12 +161,12 @@ async def get_user_voices(
     user: dict = Depends(get_current_user),
     service: VoiceManagementService = Depends(get_voice_service)
 ):
-    """Получить все голоса пользователя"""
+    """РџРѕР»СѓС‡РёС‚СЊ РІСЃРµ РіРѕР»РѕСЃР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
         return await service.get_user_custom_voices(user_id)
     except Exception as e:
         logger.error(f"Error getting user voices: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения голосов")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РіРѕР»РѕСЃРѕРІ")
 
 @user_voices_router.post("/upload")
 async def upload_user_voice(
@@ -177,10 +177,10 @@ async def upload_user_voice(
     user: dict = Depends(check_user_whitelisted),
     service: VoiceManagementService = Depends(get_voice_service)
 ):
-    """Загрузить пользовательский голос"""
+    """Р—Р°РіСЂСѓР·РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ РіРѕР»РѕСЃ"""
     try:
         if user['id'] != user_id and not user.get('is_admin', False):
-            raise HTTPException(status_code=403, detail="Вы можете загружать голоса только для себя")
+            raise HTTPException(status_code=403, detail="Р’С‹ РјРѕР¶РµС‚Рµ Р·Р°РіСЂСѓР¶Р°С‚СЊ РіРѕР»РѕСЃР° С‚РѕР»СЊРєРѕ РґР»СЏ СЃРµР±СЏ")
 
         # Read file content
         file_content = await file.read()
@@ -198,7 +198,7 @@ async def upload_user_voice(
         raise
     except Exception as e:
         logger.error(f"Error uploading voice: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка загрузки голоса")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё РіРѕР»РѕСЃР°")
 
 @user_voices_router.get("/enabled/{user_id}")
 async def get_user_enabled_voices(
@@ -206,11 +206,11 @@ async def get_user_enabled_voices(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список ID включенных голосов для пользователя"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє ID РІРєР»СЋС‡РµРЅРЅС‹С… РіРѕР»РѕСЃРѕРІ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
         # TODO: Move to service
         if user['id'] != user_id and not user.get('is_admin', False):
-            raise HTTPException(status_code=403, detail="Нет доступа")
+            raise HTTPException(status_code=403, detail="РќРµС‚ РґРѕСЃС‚СѓРїР°")
 
         tts_service_url = settings.tts_service_url or DEFAULT_TTS_SERVICE_URL
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -219,12 +219,12 @@ async def get_user_enabled_voices(
         if response.status_code == 200:
             return response.json()
         else:
-            raise HTTPException(status_code=response.status_code, detail="Ошибка получения включенных голосов")
+            raise HTTPException(status_code=response.status_code, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РІРєР»СЋС‡РµРЅРЅС‹С… РіРѕР»РѕСЃРѕРІ")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error getting enabled voices: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения включенных голосов")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РІРєР»СЋС‡РµРЅРЅС‹С… РіРѕР»РѕСЃРѕРІ")
 
 @user_voices_router.post("/enabled/{user_id}")
 async def update_user_enabled_voices(
@@ -233,11 +233,11 @@ async def update_user_enabled_voices(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить список включенных голосов для пользователя"""
+    """РћР±РЅРѕРІРёС‚СЊ СЃРїРёСЃРѕРє РІРєР»СЋС‡РµРЅРЅС‹С… РіРѕР»РѕСЃРѕРІ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
         # TODO: Move to service
         if user['id'] != user_id and not user.get('is_admin', False):
-            raise HTTPException(status_code=403, detail="Нет доступа")
+            raise HTTPException(status_code=403, detail="РќРµС‚ РґРѕСЃС‚СѓРїР°")
 
         tts_service_url = settings.tts_service_url or DEFAULT_TTS_SERVICE_URL
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -249,12 +249,12 @@ async def update_user_enabled_voices(
         if response.status_code == 200:
             return response.json()
         else:
-            raise HTTPException(status_code=response.status_code, detail="Ошибка обновления включенных голосов")
+            raise HTTPException(status_code=response.status_code, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РІРєР»СЋС‡РµРЅРЅС‹С… РіРѕР»РѕСЃРѕРІ")
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating enabled voices: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обновления включенных голосов")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РІРєР»СЋС‡РµРЅРЅС‹С… РіРѕР»РѕСЃРѕРІ")
 
 # ============================================================================
 # VOICE MANAGEMENT ENDPOINTS (Custom and Global Voices)
@@ -272,7 +272,7 @@ async def get_user_custom_voices(
         return {"success": True, "voices": voices}
     except Exception as e:
         logger.error(f"Error fetching custom voices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @voices_router.get("/global")
@@ -326,7 +326,7 @@ async def get_global_voices(
 
     except Exception as e:
         logger.error(f"Error fetching global voices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @voices_router.put("/user/settings/{voice_id}")
@@ -358,7 +358,7 @@ async def update_user_voice_settings(
         raise
     except Exception as e:
         logger.error(f"Error updating voice settings: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @voices_router.delete("/user/custom/{voice_id}")
@@ -381,7 +381,7 @@ async def delete_custom_voice(
         raise
     except Exception as e:
         logger.error(f"Error deleting custom voice: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # Admin endpoints for global voice management
@@ -398,7 +398,7 @@ async def admin_get_global_voices(
         return {"success": True, "voices": voices}
     except Exception as e:
         logger.error(f"Error fetching global voices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @voices_router.put("/admin/global/{voice_id}")
@@ -421,7 +421,7 @@ async def admin_update_global_voice(
         raise
     except Exception as e:
         logger.error(f"Error updating global voice settings: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @voices_router.delete("/admin/global/{voice_id}")
@@ -456,7 +456,7 @@ async def admin_delete_global_voice(
         raise
     except Exception as e:
         logger.error(f"Error deleting global voice: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @voices_router.put("/admin/global/{voice_id}/rename")
@@ -479,7 +479,7 @@ async def admin_rename_global_voice(
         raise
     except Exception as e:
         logger.error(f"Error renaming global voice: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @voices_router.post("/admin/upload")
 @require_permission(Permission.MANAGE_GLOBAL_VOICES)
@@ -513,4 +513,4 @@ async def admin_upload_voice(
         raise
     except Exception as e:
         logger.error(f"Error uploading global voice: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка загрузки голоса")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё РіРѕР»РѕСЃР°")

@@ -107,18 +107,20 @@ class CommandRepository(BaseRepository[BotCommand]):
         if custom_cmd and self._check_platform(custom_cmd, platform):
             return custom_cmd
 
-        # 2. Override
+        # 2. Override (allow disabled override to block global command)
         override_cmd = self.db.query(BotCommand).filter(
             and_(
                 BotCommand.command_type == 'override',
                 BotCommand.user_id == user_id,
                 BotCommand.command_name == command_name,
-                BotCommand.is_enabled == True
             )
         ).first()
-        
-        if override_cmd and self._check_platform(override_cmd, platform):
-            return override_cmd
+
+        if override_cmd:
+            if self._check_platform(override_cmd, platform):
+                if not override_cmd.is_enabled:
+                    return None
+                return override_cmd
 
         # 3. Global
         global_cmd = self.db.query(BotCommand).filter(

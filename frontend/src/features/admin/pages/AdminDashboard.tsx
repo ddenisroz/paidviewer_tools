@@ -83,10 +83,10 @@ const AdminDashboard: React.FC = () => {
         <CardContent>
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-300">
+              <span className="text-muted-foreground">
                 {stats?.system?.storage_used_gb?.toFixed(1) || '0.0'} GB / {stats?.system?.storage_total_gb || '0'} GB
               </span>
-              <span className="font-medium text-gray-400">{storagePercent.toFixed(1)}%</span>
+              <span className="font-medium text-muted-foreground">{storagePercent.toFixed(1)}%</span>
             </div>
             <div className="h-2 bg-slate-800/50 rounded-full overflow-hidden border border-slate-700/50">
               <div

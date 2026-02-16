@@ -20,6 +20,7 @@ interface Integrations {
 interface User {
     twitch_username?: string;
     vk_username?: string;
+    vk_channel_name?: string;
 }
 
 /**
@@ -85,8 +86,9 @@ export async function loadCompleteChatHistory(
     }
 
     // Load VK history
-    if (integrations?.vk?.enabled && user?.vk_username) {
-        const vkMessages = await fetchPlatformHistory('vk', user.vk_username, limit);
+    const vkChannel = user?.vk_channel_name || user?.vk_username;
+    if (integrations?.vk?.enabled && vkChannel) {
+        const vkMessages = await fetchPlatformHistory('vk', vkChannel, limit);
         historyMessages.push(...vkMessages);
     }
 

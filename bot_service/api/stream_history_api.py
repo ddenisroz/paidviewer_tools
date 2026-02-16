@@ -1,6 +1,6 @@
 # bot_service/api/stream_history_api.py
 """
-API для истории стримов.
+API РґР»СЏ РёСЃС‚РѕСЂРёРё СЃС‚СЂРёРјРѕРІ.
 Clean Architecture: uses ChatMessageRepository for data access.
 """
 from fastapi import APIRouter, Depends
@@ -38,7 +38,7 @@ async def get_stream_history(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить историю стримов/сообщений"""
+    """РџРѕР»СѓС‡РёС‚СЊ РёСЃС‚РѕСЂРёСЋ СЃС‚СЂРёРјРѕРІ/СЃРѕРѕР±С‰РµРЅРёР№"""
     try:
         repo = ChatMessageRepository(db)
         
@@ -65,7 +65,7 @@ async def get_stream_history(
         }
     except Exception as e:
         logger.error(f"Error getting stream history: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.get("/stats")
@@ -75,7 +75,7 @@ async def get_stream_stats(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить статистику стрима"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ СЃС‚СЂРёРјР°"""
     try:
         repo = ChatMessageRepository(db)
         stats = repo.get_stats(channel_name=channel_name, platform=platform)
@@ -86,5 +86,5 @@ async def get_stream_stats(
         }
     except Exception as e:
         logger.error(f"Error getting stream stats: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 

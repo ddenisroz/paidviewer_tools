@@ -17,7 +17,7 @@ from core.database import get_db
 from auth.auth import get_current_user
 from core.datetime_utils import utcnow_naive
 from core.config import settings
-from services.admin import get_admin_stats_service, AdminStatsService
+from services.admin import get_admin_stats_service
 
 logger = logging.getLogger(__name__)
 
@@ -36,13 +36,13 @@ async def get_dashboard_stats(
     db: Session = Depends(get_db)
 ):
     """
-    Получить статистику для Dashboard админ-панели.
+    РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РґР»СЏ Dashboard Р°РґРјРёРЅ-РїР°РЅРµР»Рё.
     
     Returns:
-        - users: статистика пользователей
-        - tts: статистика TTS
-        - bots: статус ботов
-        - system: системная статистика
+        - users: СЃС‚Р°С‚РёСЃС‚РёРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+        - tts: СЃС‚Р°С‚РёСЃС‚РёРєР° TTS
+        - bots: СЃС‚Р°С‚СѓСЃ Р±РѕС‚РѕРІ
+        - system: СЃРёСЃС‚РµРјРЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР°
     """
     try:
         require_admin(user)
@@ -104,7 +104,7 @@ async def get_dashboard_stats(
         raise
     except Exception as e:
         logger.error(f"Error getting dashboard stats: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.get("/list")
@@ -112,7 +112,7 @@ async def get_admin_list(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список для админ-панели."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РґР»СЏ Р°РґРјРёРЅ-РїР°РЅРµР»Рё."""
     try:
         require_admin(user)
         
@@ -124,14 +124,14 @@ async def get_admin_list(
         raise
     except Exception as e:
         logger.error(f"Error getting admin list: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.get("/bots/status")
 async def get_bots_status(
     user: dict = Depends(get_current_user)
 ):
-    """Получить статус всех ботов."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ РІСЃРµС… Р±РѕС‚РѕРІ."""
     try:
         require_admin(user)
         
@@ -167,14 +167,14 @@ async def get_bots_status(
         raise
     except Exception as e:
         logger.error(f"Error getting bots status: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.get("/tts/status")
 async def get_tts_status(
     user: dict = Depends(get_current_user)
 ):
-    """Получить статус TTS сервиса."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ TTS СЃРµСЂРІРёСЃР°."""
     try:
         require_admin(user)
         
@@ -197,13 +197,13 @@ async def get_tts_status(
                     "url": tts_service_url
                 }
             }
-        except Exception as e:
+        except Exception:
             return {
                 "success": True,
                 "tts_service": {
                     "healthy": False,
                     "available": False,
-                    "error": str(e),
+                    "error": "Internal server error",
                     "status": "offline",
                     "url": tts_service_url
                 }
@@ -213,7 +213,7 @@ async def get_tts_status(
         raise
     except Exception as e:
         logger.error(f"Error getting TTS status: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.get("/monitoring/metrics")
@@ -221,7 +221,7 @@ async def get_monitoring_metrics(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить метрики мониторинга."""
+    """РџРѕР»СѓС‡РёС‚СЊ РјРµС‚СЂРёРєРё РјРѕРЅРёС‚РѕСЂРёРЅРіР°."""
     try:
         require_admin(user)
         
@@ -252,7 +252,7 @@ async def get_monitoring_metrics(
         raise
     except Exception as e:
         logger.error(f"Error getting monitoring metrics: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.get("/analytics")
@@ -260,7 +260,7 @@ async def get_analytics(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить аналитику системы."""
+    """РџРѕР»СѓС‡РёС‚СЊ Р°РЅР°Р»РёС‚РёРєСѓ СЃРёСЃС‚РµРјС‹."""
     try:
         logger.info(f"[STATS] [ANALYTICS] Request from user {user.get('id')}")
         require_admin(user)
@@ -299,4 +299,4 @@ async def get_analytics(
         logger.error(f"[ERROR] [ANALYTICS] Error getting analytics: {e}")
         import traceback
         logger.error(f"[ERROR] [ANALYTICS] Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения аналитики: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ Р°РЅР°Р»РёС‚РёРєРё: {str(e)}")

@@ -8,6 +8,7 @@ import logging
 from typing import Optional, Callable, Dict, Set
 
 from utils.vk_channel_url import extract_vk_channel_slug
+from utils.vk_chat_parser import build_message_text_and_emotes, extract_vk_badge_urls, normalize_parts
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class VKLiveHTTPPolling:
     # Default to dev API per VK docs.
     API_BASE_URL = DEV_API_BASE_URL
 
-    def __init__(self, access_token: str, channel_url: str):
+    def __init__(self, access_token: str, channel_url: str, user_id: Optional[int] = None):
         """
         Args:
             access_token: OAuth токен пользователя VK Live
@@ -27,6 +28,7 @@ class VKLiveHTTPPolling:
         """
         self.access_token = access_token
         self.channel_url = channel_url
+        self.user_id = user_id
         self.is_running = False
         self.poll_task = None
         self.message_handler: Optional[Callable] = None
@@ -150,7 +152,10 @@ class VKLiveHTTPPolling:
                             await self._process_message(message)
 
                     elif response.status == 401:
-                        logger.warning("[REFRESH] VK Live OAuth token expired, needs refresh")
+                        logger.warning("[REFRESH] VK Live OAuth token expired, attempting refresh")
+                        if await self._refresh_access_token():
+                            await self._fetch_and_process_messages(retry=True)
+                            return
                     elif response.status == 403:
                         logger.error(f"[ERROR] Forbidden: No access to channel {self.channel_url}")
                     else:
@@ -168,8 +173,43 @@ class VKLiveHTTPPolling:
                             return
                         logger.error(f"[ERROR] Error fetching messages: {response.status} - {error_text}")
 
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            if not retry and self.api_base_url != self.PROD_API_BASE_URL:
+                logger.warning(f"[VK HTTP] Error on dev API ({e}), switching to prod.")
+                self.api_base_url = self.PROD_API_BASE_URL
+                await self._fetch_and_process_messages(retry=True)
+                return
+            logger.error(f"Error fetching VK Live messages: {e}")
         except Exception as e:
             logger.error(f"Error fetching VK Live messages: {e}")
+
+    async def _refresh_access_token(self) -> bool:
+        if not self.user_id:
+            return False
+        try:
+            from services.token_refresh_service import token_refresh_service
+            from repositories.user_token_repository import UserTokenRepository
+            from core.database import get_db
+            from core.token_encryption import decrypt_token, is_token_encrypted
+
+            refreshed = await token_refresh_service.refresh_on_401(self.user_id, 'vk')
+            if not refreshed:
+                return False
+
+            for db in get_db():
+                repo = UserTokenRepository(db)
+                token = repo.get_by_user_and_platform(self.user_id, 'vk')
+                if not token or not token.access_token:
+                    return False
+                access_token = token.access_token
+                if is_token_encrypted(access_token):
+                    access_token = decrypt_token(access_token)
+                self.access_token = access_token
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"[REFRESH] Failed to refresh VK token: {e}")
+            return False
 
     async def _process_message(self, message: Dict):
         """Обработать одно сообщение"""
@@ -206,23 +246,10 @@ class VKLiveHTTPPolling:
             is_moderator = author.get("is_moderator", False)
             is_owner = author.get("is_owner", False)
 
-            # Извлекаем текст сообщения из parts
-            message_text = ""
-            parts = message.get("parts", [])
-            for part in parts:
-                if "text" in part:
-                    text_content = part["text"].get("content", "")
-                    message_text += text_content
-                # [OK] Также обрабатываем другие типы parts (упоминания, смайлы и т.д.)
-                elif "mention" in part:
-                    message_text += f"@{part['mention'].get('nick', '')}"
-                elif "smile" in part:
-                    message_text += f":{part['smile'].get('name', '')}:"
-                # [OK] Если есть другие типы parts (например, ссылки), добавляем их
-                elif "link" in part:
-                    link_url = part["link"].get("url", "")
-                    if link_url:
-                        message_text += link_url
+            # Извлекаем текст сообщения + эмоты
+            parts = normalize_parts(message.get("parts", []), message.get("data"))
+            message_text, emotes = build_message_text_and_emotes(parts)
+            badges = extract_vk_badge_urls(author)
 
             # [OK] НЕ пропускаем сообщения, даже если текст пустой - возможно это только ссылка или эмодзи
             # Проверяем наличие хотя бы одного part
@@ -241,7 +268,9 @@ class VKLiveHTTPPolling:
                 "text": message_text,
                 "created_at": created_at,
                 "channel": self.channel_url,
-                "platform": "vk"
+                "platform": "vk",
+                "badges": badges,
+                "emotes": emotes or None
             }
 
             # Отправляем в обработчик

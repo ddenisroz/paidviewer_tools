@@ -47,6 +47,10 @@ init_sentry()
 # Setup structured logging
 setup_structured_logging()
 
+# Initialize analysis logging for LLM analysis (enabled via ANALYSIS_MODE=true)
+from core.analysis_logging import get_analysis_logger
+analysis_logger = get_analysis_logger()
+
 # === Logging ===
 logger = logging.getLogger(__name__)
 

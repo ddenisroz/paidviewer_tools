@@ -154,7 +154,7 @@ class VoiceManagementService:
                 raise
             except Exception as e:
                 logger.error(f"Error updating custom voice settings: {e}")
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail="Internal server error")
     async def upload_user_voice(self, user_id: int, name: str, filename: str, content: bytes, content_type: str) -> Dict[str, Any]:
         """
         Upload a user voice.
@@ -287,7 +287,7 @@ class VoiceManagementService:
             raise
         except Exception as e:
             logger.error(f"Error updating global voice: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     async def admin_delete_global_voice(self, voice_id: int) -> bool:
         """Delete a global voice (admin)."""
@@ -303,7 +303,7 @@ class VoiceManagementService:
             raise
         except Exception as e:
             logger.error(f"Error deleting global voice: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Internal server error")
 
     async def admin_rename_global_voice(self, voice_id: int, new_name: str) -> bool:
         """Rename a global voice (admin)."""
@@ -320,4 +320,4 @@ class VoiceManagementService:
             raise
         except Exception as e:
             logger.error(f"Error renaming global voice: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Internal server error")

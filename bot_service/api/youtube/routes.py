@@ -60,7 +60,7 @@ logger = logging.getLogger('bot_service')
 
 
 
-# Создаем роутер для YouTube API
+# РЎРѕР·РґР°РµРј СЂРѕСѓС‚РµСЂ РґР»СЏ YouTube API
 
 
 youtube_router = APIRouter(prefix="/api/youtube", tags=["youtube"])
@@ -69,7 +69,7 @@ youtube_router = APIRouter(prefix="/api/youtube", tags=["youtube"])
 
 
 
-# Pydantic модели для API
+# Pydantic РјРѕРґРµР»Рё РґР»СЏ API
 
 
 class AddVideoRequest(BaseModel):
@@ -144,7 +144,7 @@ class QueueManagementRequest(BaseModel):
 
 
 
-# Инициализируем сервисы
+# РРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј СЃРµСЂРІРёСЃС‹
 
 
 queue_service = QueueService()
@@ -156,13 +156,13 @@ youtube_service = YouTubeService()
 
 
 
-# Вспомогательная функция для отправки WebSocket уведомлений
+# Р’СЃРїРѕРјРѕРіР°С‚РµР»СЊРЅР°СЏ С„СѓРЅРєС†РёСЏ РґР»СЏ РѕС‚РїСЂР°РІРєРё WebSocket СѓРІРµРґРѕРјР»РµРЅРёР№
 
 
 async def notify_queue_update(user_id: int = None, session_id: str = None, db: Session = None):
 
 
-    """Отправляет WebSocket уведомление об обновлении очереди"""
+    """РћС‚РїСЂР°РІР»СЏРµС‚ WebSocket СѓРІРµРґРѕРјР»РµРЅРёРµ РѕР± РѕР±РЅРѕРІР»РµРЅРёРё РѕС‡РµСЂРµРґРё"""
 
 
     try:
@@ -177,7 +177,7 @@ async def notify_queue_update(user_id: int = None, session_id: str = None, db: S
 
 
 
-        # Определяем получателя уведомления
+        # РћРїСЂРµРґРµР»СЏРµРј РїРѕР»СѓС‡Р°С‚РµР»СЏ СѓРІРµРґРѕРјР»РµРЅРёСЏ
 
 
         target_id = str(user_id) if user_id else session_id
@@ -240,7 +240,7 @@ async def add_video_to_queue(
 ):
 
 
-    """Добавление видео в очередь (только для авторизованных пользователей)"""
+    """Р”РѕР±Р°РІР»РµРЅРёРµ РІРёРґРµРѕ РІ РѕС‡РµСЂРµРґСЊ (С‚РѕР»СЊРєРѕ РґР»СЏ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№)"""
 
 
     user_id = user.get('id')
@@ -264,7 +264,7 @@ async def add_video_to_queue(
 
 
 
-    # [OK] VALIDATION: Проверяем YouTube URL или выполняем поиск по запросу
+    # [OK] VALIDATION: РџСЂРѕРІРµСЂСЏРµРј YouTube URL РёР»Рё РІС‹РїРѕР»РЅСЏРµРј РїРѕРёСЃРє РїРѕ Р·Р°РїСЂРѕСЃСѓ
 
 
     from validators.youtube_validators import validate_youtube_url
@@ -378,13 +378,13 @@ async def add_video_to_queue(
 
 
 
-    logger.debug(f"[OK] [YOUTUBE] Valid URL: {video_input} → video_id: {video_id}")
+    logger.debug(f"[OK] [YOUTUBE] Valid URL: {video_input} в†’ video_id: {video_id}")
 
 
 
 
 
-    # [OK] RATE LIMITING: Проверяем количество видео в очереди (макс 10)
+    # [OK] RATE LIMITING: РџСЂРѕРІРµСЂСЏРµРј РєРѕР»РёС‡РµСЃС‚РІРѕ РІРёРґРµРѕ РІ РѕС‡РµСЂРµРґРё (РјР°РєСЃ 10)
 
 
     from constants import MAX_YOUTUBE_QUEUE_SIZE
@@ -429,10 +429,10 @@ async def add_video_to_queue(
     try:
 
 
-        # Временно используем заглушки для requester info
+        # Р’СЂРµРјРµРЅРЅРѕ РёСЃРїРѕР»СЊР·СѓРµРј Р·Р°РіР»СѓС€РєРё РґР»СЏ requester info
 
 
-        # В реальной системе это будет из сессии/чата
+        # Р’ СЂРµР°Р»СЊРЅРѕР№ СЃРёСЃС‚РµРјРµ СЌС‚Рѕ Р±СѓРґРµС‚ РёР· СЃРµСЃСЃРёРё/С‡Р°С‚Р°
 
 
         result = await queue_service.add_video_to_queue(
@@ -447,7 +447,7 @@ async def add_video_to_queue(
             video_url=video_input,
 
 
-            channel_name="web_interface",  # Добавлено через веб-интерфейс
+            channel_name="web_interface",  # Р”РѕР±Р°РІР»РµРЅРѕ С‡РµСЂРµР· РІРµР±-РёРЅС‚РµСЂС„РµР№СЃ
 
 
             platform="web",
@@ -477,7 +477,7 @@ async def add_video_to_queue(
         if result["success"]:
 
 
-            # Отправляем WebSocket уведомление об обновлении очереди
+            # РћС‚РїСЂР°РІР»СЏРµРј WebSocket СѓРІРµРґРѕРјР»РµРЅРёРµ РѕР± РѕР±РЅРѕРІР»РµРЅРёРё РѕС‡РµСЂРµРґРё
 
 
             await notify_queue_update(user_id=user_id, session_id=None, db=db)
@@ -492,7 +492,7 @@ async def add_video_to_queue(
                 "success": True,
 
 
-                "message": "Видео добавлено в очередь",
+                "message": "Р’РёРґРµРѕ РґРѕР±Р°РІР»РµРЅРѕ РІ РѕС‡РµСЂРµРґСЊ",
 
 
                 "queue_item": result["queue_item"]
@@ -523,7 +523,7 @@ async def add_video_to_queue(
         logger.error(f"Error adding video to queue via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка добавления видео")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РґРѕР±Р°РІР»РµРЅРёСЏ РІРёРґРµРѕ")
 
 
 
@@ -544,7 +544,7 @@ async def get_queue(
 ):
 
 
-    """Получение очереди видео с текущим воспроизводящимся видео (только для авторизованных)"""
+    """РџРѕР»СѓС‡РµРЅРёРµ РѕС‡РµСЂРµРґРё РІРёРґРµРѕ СЃ С‚РµРєСѓС‰РёРј РІРѕСЃРїСЂРѕРёР·РІРѕРґСЏС‰РёРјСЃСЏ РІРёРґРµРѕ (С‚РѕР»СЊРєРѕ РґР»СЏ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹С…)"""
 
 
     try:
@@ -574,7 +574,7 @@ async def get_queue(
 
 
 
-        # Текущее видео - первое в очереди (все уже отфильтрованы по status='pending')
+        # РўРµРєСѓС‰РµРµ РІРёРґРµРѕ - РїРµСЂРІРѕРµ РІ РѕС‡РµСЂРµРґРё (РІСЃРµ СѓР¶Рµ РѕС‚С„РёР»СЊС‚СЂРѕРІР°РЅС‹ РїРѕ status='pending')
 
 
         current_video = queue_items[0] if queue_items and len(queue_items) > 0 else None
@@ -632,7 +632,7 @@ async def get_queue(
         logger.error(f"Error getting queue via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка получения очереди")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РѕС‡РµСЂРµРґРё")
 
 
 
@@ -653,7 +653,7 @@ async def get_next_video(
 ):
 
 
-    """Получение следующего видео в очереди"""
+    """РџРѕР»СѓС‡РµРЅРёРµ СЃР»РµРґСѓСЋС‰РµРіРѕ РІРёРґРµРѕ РІ РѕС‡РµСЂРµРґРё"""
 
 
     try:
@@ -689,7 +689,7 @@ async def get_next_video(
                 "success": False,
 
 
-                "message": "Очередь пуста"
+                "message": "РћС‡РµСЂРµРґСЊ РїСѓСЃС‚Р°"
 
 
             }
@@ -704,7 +704,7 @@ async def get_next_video(
         logger.error(f"Error getting next video via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка получения следующего видео")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ СЃР»РµРґСѓСЋС‰РµРіРѕ РІРёРґРµРѕ")
 
 
 
@@ -725,13 +725,13 @@ async def skip_to_next_video(
 ):
 
 
-    """Пропустить текущее видео и перейти к следующему"""
+    """РџСЂРѕРїСѓСЃС‚РёС‚СЊ С‚РµРєСѓС‰РµРµ РІРёРґРµРѕ Рё РїРµСЂРµР№С‚Рё Рє СЃР»РµРґСѓСЋС‰РµРјСѓ"""
 
 
     try:
 
 
-        # Получаем текущую очередь
+        # РџРѕР»СѓС‡Р°РµРј С‚РµРєСѓС‰СѓСЋ РѕС‡РµСЂРµРґСЊ
 
 
         queue_items = queue_service.get_queue(user_id=user["id"], db=db)
@@ -749,7 +749,7 @@ async def skip_to_next_video(
                 "success": False,
 
 
-                "message": "Очередь пуста",
+                "message": "РћС‡РµСЂРµРґСЊ РїСѓСЃС‚Р°",
 
 
                 "current_video": None
@@ -761,7 +761,7 @@ async def skip_to_next_video(
 
 
 
-        # Первое видео в очереди - это текущее, отмечаем его как проигранное
+        # РџРµСЂРІРѕРµ РІРёРґРµРѕ РІ РѕС‡РµСЂРµРґРё - СЌС‚Рѕ С‚РµРєСѓС‰РµРµ, РѕС‚РјРµС‡Р°РµРј РµРіРѕ РєР°Рє РїСЂРѕРёРіСЂР°РЅРЅРѕРµ
 
 
         current_video_id = queue_items[0]['id']
@@ -776,13 +776,13 @@ async def skip_to_next_video(
         if not success:
 
 
-            raise HTTPException(status_code=404, detail="Не удалось отметить видео как проигранное")
+            raise HTTPException(status_code=404, detail="РќРµ СѓРґР°Р»РѕСЃСЊ РѕС‚РјРµС‚РёС‚СЊ РІРёРґРµРѕ РєР°Рє РїСЂРѕРёРіСЂР°РЅРЅРѕРµ")
 
 
 
 
 
-        # Получаем следующее видео (теперь оно первое в очереди)
+        # РџРѕР»СѓС‡Р°РµРј СЃР»РµРґСѓСЋС‰РµРµ РІРёРґРµРѕ (С‚РµРїРµСЂСЊ РѕРЅРѕ РїРµСЂРІРѕРµ РІ РѕС‡РµСЂРµРґРё)
 
 
         updated_queue = queue_service.get_queue(user_id=user["id"], db=db)
@@ -794,7 +794,7 @@ async def skip_to_next_video(
 
 
 
-        # Отправляем WebSocket уведомление об обновлении очереди
+        # РћС‚РїСЂР°РІР»СЏРµРј WebSocket СѓРІРµРґРѕРјР»РµРЅРёРµ РѕР± РѕР±РЅРѕРІР»РµРЅРёРё РѕС‡РµСЂРµРґРё
 
 
         await notify_queue_update(user["id"], db=db)
@@ -809,7 +809,7 @@ async def skip_to_next_video(
             "success": True,
 
 
-            "message": "Переход к следующему видео",
+            "message": "РџРµСЂРµС…РѕРґ Рє СЃР»РµРґСѓСЋС‰РµРјСѓ РІРёРґРµРѕ",
 
 
             "current_video": current_video
@@ -833,7 +833,7 @@ async def skip_to_next_video(
         logger.error(f"Error skipping to next video via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка перехода к следующему видео")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРµСЂРµС…РѕРґР° Рє СЃР»РµРґСѓСЋС‰РµРјСѓ РІРёРґРµРѕ")
 
 
 
@@ -889,7 +889,7 @@ async def play_queue_item(
 
         logger.error(f"Error moving queue item to top via API: {e}")
 
-        raise HTTPException(status_code=500, detail="Ошибка при переключении видео")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїСЂРё РїРµСЂРµРєР»СЋС‡РµРЅРёРё РІРёРґРµРѕ")
 
 @youtube_router.post("/queue/ban/{queue_id}")
 async def ban_queue_item(
@@ -936,7 +936,7 @@ async def remove_from_queue(
 ):
 
 
-    """Удаление видео из очереди"""
+    """РЈРґР°Р»РµРЅРёРµ РІРёРґРµРѕ РёР· РѕС‡РµСЂРµРґРё"""
 
 
     try:
@@ -951,7 +951,7 @@ async def remove_from_queue(
         if success:
 
 
-            # Отправляем WebSocket уведомление об обновлении очереди
+            # РћС‚РїСЂР°РІР»СЏРµРј WebSocket СѓРІРµРґРѕРјР»РµРЅРёРµ РѕР± РѕР±РЅРѕРІР»РµРЅРёРё РѕС‡РµСЂРµРґРё
 
 
             await notify_queue_update(user["id"], db)
@@ -966,7 +966,7 @@ async def remove_from_queue(
                 "success": True,
 
 
-                "message": "Видео удалено из очереди"
+                "message": "Р’РёРґРµРѕ СѓРґР°Р»РµРЅРѕ РёР· РѕС‡РµСЂРµРґРё"
 
 
             }
@@ -975,7 +975,7 @@ async def remove_from_queue(
         else:
 
 
-            raise HTTPException(status_code=404, detail="Видео не найдено в очереди")
+            raise HTTPException(status_code=404, detail="Р’РёРґРµРѕ РЅРµ РЅР°Р№РґРµРЅРѕ РІ РѕС‡РµСЂРµРґРё")
 
 
 
@@ -987,7 +987,7 @@ async def remove_from_queue(
         logger.error(f"Error removing video from queue via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка удаления видео")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ РІРёРґРµРѕ")
 
 
 
@@ -996,7 +996,7 @@ async def remove_from_queue(
 @youtube_router.delete("/queue/clear")
 
 
-@youtube_router.post("/clear")  # Alias для совместимости с frontend
+@youtube_router.post("/clear")  # Alias РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё СЃ frontend
 
 
 async def clear_queue(
@@ -1011,7 +1011,7 @@ async def clear_queue(
 ):
 
 
-    """Очистка всей очереди"""
+    """РћС‡РёСЃС‚РєР° РІСЃРµР№ РѕС‡РµСЂРµРґРё"""
 
 
     try:
@@ -1023,7 +1023,7 @@ async def clear_queue(
 
 
 
-        # Отправляем WebSocket уведомление об обновлении очереди
+        # РћС‚РїСЂР°РІР»СЏРµРј WebSocket СѓРІРµРґРѕРјР»РµРЅРёРµ РѕР± РѕР±РЅРѕРІР»РµРЅРёРё РѕС‡РµСЂРµРґРё
 
 
         await notify_queue_update(user["id"], db)
@@ -1038,7 +1038,7 @@ async def clear_queue(
             "success": True,
 
 
-            "message": f"Очередь очищена ({cleared_count} видео удалено)"
+            "message": f"РћС‡РµСЂРµРґСЊ РѕС‡РёС‰РµРЅР° ({cleared_count} РІРёРґРµРѕ СѓРґР°Р»РµРЅРѕ)"
 
 
         }
@@ -1053,7 +1053,7 @@ async def clear_queue(
         logger.error(f"Error clearing queue via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка очистки очереди")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕС‡РёСЃС‚РєРё РѕС‡РµСЂРµРґРё")
 
 
 
@@ -1077,7 +1077,7 @@ async def mark_as_played(
 ):
 
 
-    """Отметить видео как проигранное"""
+    """РћС‚РјРµС‚РёС‚СЊ РІРёРґРµРѕ РєР°Рє РїСЂРѕРёРіСЂР°РЅРЅРѕРµ"""
 
 
     try:
@@ -1092,7 +1092,7 @@ async def mark_as_played(
         if success:
 
 
-            # Отправляем WebSocket уведомление об обновлении очереди
+            # РћС‚РїСЂР°РІР»СЏРµРј WebSocket СѓРІРµРґРѕРјР»РµРЅРёРµ РѕР± РѕР±РЅРѕРІР»РµРЅРёРё РѕС‡РµСЂРµРґРё
 
 
             await notify_queue_update(user["id"], db)
@@ -1107,7 +1107,7 @@ async def mark_as_played(
                 "success": True,
 
 
-                "message": "Видео отмечено как проигранное"
+                "message": "Р’РёРґРµРѕ РѕС‚РјРµС‡РµРЅРѕ РєР°Рє РїСЂРѕРёРіСЂР°РЅРЅРѕРµ"
 
 
             }
@@ -1116,7 +1116,7 @@ async def mark_as_played(
         else:
 
 
-            raise HTTPException(status_code=404, detail="Видео не найдено в очереди")
+            raise HTTPException(status_code=404, detail="Р’РёРґРµРѕ РЅРµ РЅР°Р№РґРµРЅРѕ РІ РѕС‡РµСЂРµРґРё")
 
 
 
@@ -1128,7 +1128,7 @@ async def mark_as_played(
         logger.error(f"Error marking video as played via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка обновления статуса видео")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ СЃС‚Р°С‚СѓСЃР° РІРёРґРµРѕ")
 
 
 
@@ -1140,7 +1140,7 @@ async def mark_as_played(
 async def get_video_info(video_url: str):
 
 
-    """Получение информации о YouTube видео"""
+    """РџРѕР»СѓС‡РµРЅРёРµ РёРЅС„РѕСЂРјР°С†РёРё Рѕ YouTube РІРёРґРµРѕ"""
 
 
     try:
@@ -1149,7 +1149,7 @@ async def get_video_info(video_url: str):
         if not youtube_service.is_valid_youtube_url(video_url):
 
 
-            raise HTTPException(status_code=400, detail="Неверный YouTube URL")
+            raise HTTPException(status_code=400, detail="РќРµРІРµСЂРЅС‹Р№ YouTube URL")
 
 
 
@@ -1179,7 +1179,7 @@ async def get_video_info(video_url: str):
         else:
 
 
-            raise HTTPException(status_code=404, detail="Не удалось получить информацию о видео")
+            raise HTTPException(status_code=404, detail="РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РІРёРґРµРѕ")
 
 
 
@@ -1197,7 +1197,7 @@ async def get_video_info(video_url: str):
         logger.error(f"Error getting video info via API: {e}")
 
 
-        raise HTTPException(status_code=500, detail="Ошибка получения информации о видео")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РёРЅС„РѕСЂРјР°С†РёРё Рѕ РІРёРґРµРѕ")
 
 
 
@@ -1224,7 +1224,7 @@ async def search_youtube_videos(
 ):
 
 
-    """Поиск YouTube видео по названию или популярным видео"""
+    """РџРѕРёСЃРє YouTube РІРёРґРµРѕ РїРѕ РЅР°Р·РІР°РЅРёСЋ РёР»Рё РїРѕРїСѓР»СЏСЂРЅС‹Рј РІРёРґРµРѕ"""
 
 
     log_request("/youtube/search", "GET", {"query": query}, user.get('id'))
@@ -1242,7 +1242,7 @@ async def search_youtube_videos(
         if not query or len(query.strip()) < 2:
 
 
-            # Возвращаем список популярных видео если нет поиска
+            # Р’РѕР·РІСЂР°С‰Р°РµРј СЃРїРёСЃРѕРє РїРѕРїСѓР»СЏСЂРЅС‹С… РІРёРґРµРѕ РµСЃР»Рё РЅРµС‚ РїРѕРёСЃРєР°
 
 
             response = {
@@ -1320,7 +1320,7 @@ async def search_youtube_videos(
 
 
 
-        # Используем yt-dlp для поиска (без скачивания)
+        # РСЃРїРѕР»СЊР·СѓРµРј yt-dlp РґР»СЏ РїРѕРёСЃРєР° (Р±РµР· СЃРєР°С‡РёРІР°РЅРёСЏ)
 
 
         import yt_dlp
@@ -1338,7 +1338,7 @@ async def search_youtube_videos(
             'no_warnings': True,
 
 
-            'default_search': 'ytsearch5',  # Ищем 5 результатов
+            'default_search': 'ytsearch5',  # РС‰РµРј 5 СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ
 
 
             'extract_flat': True,
@@ -1407,7 +1407,7 @@ async def search_youtube_videos(
             logger.warning(f"yt-dlp search failed: {yt_error}, using fallback")
 
 
-            # Fallback: возвращаем пустой результат
+            # Fallback: РІРѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚РѕР№ СЂРµР·СѓР»СЊС‚Р°С‚
 
 
             search_results = []
@@ -1452,10 +1452,10 @@ async def search_youtube_videos(
         logger.error(f"Error searching YouTube: {e}")
 
 
-        log_response("/youtube/search", 500, {"error": str(e)}, time.time() - start_time)
+        log_response("/youtube/search", 500, {"error": "Internal server error"}, time.time() - start_time)
 
 
-        raise HTTPException(status_code=500, detail="Ошибка поиска видео YouTube")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕРёСЃРєР° РІРёРґРµРѕ YouTube")
 
 
 

@@ -1,7 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle2, RefreshCw, Settings, Volume2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Play, RefreshCw, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
@@ -31,6 +31,7 @@ import PageWrapper from '@/shared/components/PageWrapper';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { logger } from '@/shared/utils/prodLogger';
@@ -56,7 +57,7 @@ interface TtsSettingsState {
 
 interface TtsStatusData {
     enabled?: boolean;
-    engine_type?: 'cloud' | 'local' | 'gtts';
+    engine_type?: 'cloud' | 'local' | 'gtts' | 'gcloud';
 }
 
 interface TtsSettingsData {
@@ -66,6 +67,15 @@ interface TtsSettingsData {
     filterMentions?: boolean;
     version?: number;
     listeningMode?: 'website' | 'obs';
+    gcloudVoices?: string[];
+    gcloud_voices?: string[];
+}
+
+interface GcloudVoice {
+    name: string;
+    languageCodes?: string[];
+    ssmlGender?: string;
+    naturalSampleRateHertz?: number;
 }
 
 interface AudioSettingsData {
@@ -99,12 +109,19 @@ const TtsMainPageContent: React.FC = () => {
 
     const [basicTtsEnabled, setBasicTtsEnabled] = useState<boolean>(false);
     const [aiTtsEnabled, setAiTtsEnabled] = useState<boolean>(false);
+    const [gcloudTtsEnabled, setGcloudTtsEnabled] = useState<boolean>(false);
     const [ttsTriggerMode, setTtsTriggerMode] = useState<'all_messages' | 'channel_points'>('all_messages');
-    const [ttsEngine, setTtsEngine] = useState<'cloud' | 'local' | 'gtts'>('cloud');
+    const [ttsEngine, setTtsEngine] = useState<'cloud' | 'local' | 'gtts' | 'gcloud'>('cloud');
+    const [f5Mode, setF5Mode] = useState<'cloud' | 'local'>('cloud');
     const [listeningMode, setListeningMode] = useState<'website' | 'obs'>('website');
     const [obsUrl, setObsUrl] = useState<string>('');
     const [showObsUrl, setShowObsUrl] = useState<boolean>(false);
     const [localVolume, setLocalVolume] = useState<number>(50);
+    const [gcloudVoices, setGcloudVoices] = useState<GcloudVoice[]>([]);
+    const [selectedGcloudVoices, setSelectedGcloudVoices] = useState<string[]>([]);
+    const [isLoadingGcloudVoices, setIsLoadingGcloudVoices] = useState<boolean>(false);
+    const [isSavingGcloudVoices, setIsSavingGcloudVoices] = useState<boolean>(false);
+    const [previewingGcloudVoice, setPreviewingGcloudVoice] = useState<string | null>(null);
 
     const [platformSettings, setPlatformSettings] = useState<PlatformSettings>({
         enabled_platforms: ['twitch', 'vk'],
@@ -125,12 +142,18 @@ const TtsMainPageContent: React.FC = () => {
     useEffect(() => {
         const statusData = ttsStatus?.data;
         if (statusData?.enabled !== undefined) {
-            const isCloud = statusData.engine_type === 'cloud';
-            setBasicTtsEnabled(statusData.enabled && !isCloud);
-            setAiTtsEnabled(statusData.enabled && isCloud);
+            const engineType = statusData.engine_type || 'gtts';
+            const isF5 = engineType === 'cloud' || engineType === 'local';
+            const isGcloud = engineType === 'gcloud';
+            setBasicTtsEnabled(statusData.enabled && engineType === 'gtts');
+            setAiTtsEnabled(statusData.enabled && isF5);
+            setGcloudTtsEnabled(statusData.enabled && isGcloud);
 
             if (statusData.engine_type) {
-                setTtsEngine(statusData.engine_type as 'cloud' | 'local' | 'gtts');
+                setTtsEngine(statusData.engine_type as 'cloud' | 'local' | 'gtts' | 'gcloud');
+                if (isF5) {
+                    setF5Mode(statusData.engine_type as 'cloud' | 'local');
+                }
             }
         }
     }, [ttsStatus]);
@@ -141,13 +164,18 @@ const TtsMainPageContent: React.FC = () => {
 
     const volumeDebounceRef = useRef<NodeJS.Timeout | null>(null);
     const settingsDebounceRef = useRef<NodeJS.Timeout | null>(null);
+    const gcloudSaveDebounceRef = useRef<NodeJS.Timeout | null>(null);
+    const gcloudPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+    const gcloudSelectionInitializedRef = useRef<boolean>(false);
+    const gcloudVoicesRequestStartedRef = useRef<boolean>(false);
 
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled;
     const isVkConnected = integrations.vk?.enabled;
     const _hasAnyIntegration = isTwitchConnected || isVkConnected;
     const hasLocalSetup = localStorage.getItem('tts_has_local_setup') === 'true';
-    const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled;
+    const isAnyTtsEnabled = basicTtsEnabled || aiTtsEnabled || gcloudTtsEnabled;
+    const f5EngineLabel = f5Mode === 'local' ? 'Локально' : 'Облачно';
 
     const toggleTtsMutation = useToggleTts({
         onSuccess: () => {
@@ -220,8 +248,8 @@ const TtsMainPageContent: React.FC = () => {
     const ttsStatusData = ttsStatusResponse?.data;
 
     // Only show loading if we don't have health data yet
-    const isF5TTSDataLoading = (isLoadingTtsStatus || isWhitelisted === null) && !engineStatus.loaded;
-    const canUseF5TTS = !isF5TTSDataLoading && (hasLocalSetup || (isWhitelisted !== null && isWhitelisted !== false));
+    const isF5TTSDataLoading = isChecking;
+    const canUseF5TTS = hasLocalSetup || isWhitelisted === true;
 
     const { data: ttsSettingsResponse } = useTtsSettings({
         enabled: !!isAuthenticated,
@@ -262,12 +290,17 @@ const TtsMainPageContent: React.FC = () => {
 
             const basicEnabled = enabled && engineType === 'gtts';
             const aiEnabled = enabled && (engineType === 'cloud' || engineType === 'local');
+            const gcloudEnabled = enabled && engineType === 'gcloud';
 
             setBasicTtsEnabled(prev => prev !== basicEnabled ? basicEnabled : prev);
             setAiTtsEnabled(prev => prev !== aiEnabled ? aiEnabled : prev);
+            setGcloudTtsEnabled(prev => prev !== gcloudEnabled ? gcloudEnabled : prev);
 
-            if (engineType === 'local' || engineType === 'cloud') {
+            if (engineType === 'local' || engineType === 'cloud' || engineType === 'gcloud') {
                 setTtsEngine(prev => prev !== engineType ? engineType : prev);
+                if (engineType === 'local' || engineType === 'cloud') {
+                    setF5Mode(engineType);
+                }
             } else {
                 setTtsEngine(prev => prev !== 'cloud' ? 'cloud' : prev);
             }
@@ -300,6 +333,17 @@ const TtsMainPageContent: React.FC = () => {
             if (settingsData.listeningMode) {
                 setListeningMode(prev => prev !== settingsData.listeningMode ? settingsData.listeningMode! : prev);
             }
+
+            const gcloudSelection = Array.isArray(settingsData.gcloudVoices)
+                ? settingsData.gcloudVoices
+                : Array.isArray(settingsData.gcloud_voices)
+                    ? settingsData.gcloud_voices
+                    : null;
+
+            if (gcloudSelection) {
+                setSelectedGcloudVoices(gcloudSelection);
+                gcloudSelectionInitializedRef.current = gcloudSelection.length > 0;
+            }
         }
     }, [ttsSettingsData]);
 
@@ -309,6 +353,51 @@ const TtsMainPageContent: React.FC = () => {
             setLocalVolume(prev => prev !== audioData.websiteVolume ? audioData.websiteVolume! : prev);
         }
     }, [audioSettingsData]);
+
+    useEffect(() => {
+        if (!(gcloudTtsEnabled || ttsEngine === 'gcloud')) {
+            gcloudVoicesRequestStartedRef.current = false;
+        }
+    }, [gcloudTtsEnabled, ttsEngine]);
+
+    useEffect(() => {
+        const shouldLoadVoices = gcloudTtsEnabled || ttsEngine === 'gcloud';
+        if (
+            !shouldLoadVoices
+            || isLoadingGcloudVoices
+            || gcloudVoices.length > 0
+            || gcloudVoicesRequestStartedRef.current
+        ) {
+            return;
+        }
+
+        gcloudVoicesRequestStartedRef.current = true;
+        setIsLoadingGcloudVoices(true);
+        ttsService.getGcloudVoices('ru-RU')
+            .then((response) => {
+                const payload = response.data as { voices?: GcloudVoice[]; data?: { voices?: GcloudVoice[] } };
+                const voices = payload?.data?.voices || payload?.voices || [];
+                setGcloudVoices(voices);
+
+                if (!gcloudSelectionInitializedRef.current && selectedGcloudVoices.length === 0 && voices.length > 0) {
+                    const allVoices = voices.map((voice) => voice.name).filter(Boolean);
+                    if (allVoices.length > 0) {
+                        setSelectedGcloudVoices(allVoices);
+                        gcloudSelectionInitializedRef.current = true;
+                        ttsService.saveGcloudVoices(allVoices).catch(() => {
+                            toast.error('Не удалось сохранить голоса Google Cloud');
+                        });
+                    }
+                }
+            })
+            .catch((error: unknown) => {
+                logger.error('Error loading Google Cloud voices:', error);
+                toast.error('Не удалось загрузить голоса Google Cloud');
+            })
+            .finally(() => {
+                setIsLoadingGcloudVoices(false);
+            });
+    }, [gcloudTtsEnabled, ttsEngine, gcloudVoices.length, isLoadingGcloudVoices, selectedGcloudVoices.length]);
 
     useEffect(() => {
         const platformData = platformSettingsData as PlatformSettingsData | undefined;
@@ -327,6 +416,23 @@ const TtsMainPageContent: React.FC = () => {
             });
         }
     }, [platformSettingsData]);
+
+    useEffect(() => {
+        const handleTtsSettingsChanged = (event: CustomEvent<{ enabledPlatforms?: ('twitch' | 'vk')[] }>): void => {
+            const enabledPlatforms = Array.isArray(event.detail?.enabledPlatforms) ? event.detail.enabledPlatforms : [];
+            setPlatformSettings(prev => {
+                const next = {
+                    ...prev,
+                    enabled_platforms: enabledPlatforms as ('twitch' | 'vk')[]
+                };
+                queryClient.setQueryData(queryKeys.tts.platformSettings(), { success: true, data: next });
+                return next;
+            });
+        };
+
+        window.addEventListener('tts-settings-changed', handleTtsSettingsChanged as EventListener);
+        return () => window.removeEventListener('tts-settings-changed', handleTtsSettingsChanged as EventListener);
+    }, [queryClient]);
 
     useEffect(() => {
         const modeData = modeSettingsData as ModeSettingsData | undefined;
@@ -431,8 +537,27 @@ const TtsMainPageContent: React.FC = () => {
         if (newValue) {
             setBasicTtsEnabled(true);
             setAiTtsEnabled(false);
+            setGcloudTtsEnabled(false);
         } else {
             setBasicTtsEnabled(false);
+        }
+
+        if (!newValue && (aiTtsEnabled || gcloudTtsEnabled)) {
+            const nextEngine = gcloudTtsEnabled ? 'gcloud' : f5Mode;
+            switchEngineMutation.mutate(nextEngine, {
+                onSuccess: () => {
+                    setTtsEngine(nextEngine);
+                    queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+                    window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
+                    toast.success('Переключено на альтернативный движок');
+                },
+                onError: (error: unknown) => {
+                    setBasicTtsEnabled(true);
+                    logger.error('Error switching engine:', error);
+                    toast.error('Ошибка переключения движка');
+                },
+            });
+            return;
         }
 
         toggleTtsMutation.mutate(newValue, {
@@ -440,10 +565,11 @@ const TtsMainPageContent: React.FC = () => {
                 // [OK] Инвалидируем кэш для получения актуального статуса
                 queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
 
-                if (newValue && aiTtsEnabled) {
+                if (newValue && (aiTtsEnabled || gcloudTtsEnabled)) {
                     switchEngineMutation.mutate('gtts', {
                         onSuccess: () => {
                             setAiTtsEnabled(false);
+                            setGcloudTtsEnabled(false);
                         },
                     });
                 } else {
@@ -472,6 +598,7 @@ const TtsMainPageContent: React.FC = () => {
         if (newValue) {
             setAiTtsEnabled(true);
             setBasicTtsEnabled(true);
+            setGcloudTtsEnabled(false);
         } else {
             setAiTtsEnabled(false);
         }
@@ -482,9 +609,10 @@ const TtsMainPageContent: React.FC = () => {
                     // [OK] Инвалидируем кэш для получения актуального статуса
                     queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
                     setBasicTtsEnabled(true);
-                    const engineType = ttsEngine === 'local' ? 'local' : 'cloud';
+                    const engineType = f5Mode;
                     switchEngineMutation.mutate(engineType, {
                         onSuccess: () => {
+                            setTtsEngine(engineType);
                             toast.success('F5-TTS включен');
                             window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
                         },
@@ -502,16 +630,18 @@ const TtsMainPageContent: React.FC = () => {
                 },
             });
         } else {
-            const engineType = newValue ? (ttsEngine === 'local' ? 'local' : 'cloud') : 'gtts';
+            const engineType = newValue ? f5Mode : 'gtts';
             switchEngineMutation.mutate(engineType, {
                 onSuccess: () => {
                     // [OK] Инвалидируем кэш для получения актуального статуса
                     queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
 
                     if (newValue) {
+                        setTtsEngine(engineType);
                         toast.success('F5-TTS включен');
                         window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
                     } else {
+                        setTtsEngine('gtts');
                         toast.success('Переключено на Google TTS');
                     }
                 },
@@ -525,11 +655,90 @@ const TtsMainPageContent: React.FC = () => {
         }
     };
 
-    const handleEngineChange = (engine: 'cloud' | 'local'): void => {
-        setTtsEngine(engine);
-        if (aiTtsEnabled) {
-            switchEngineMutation.mutate(engine);
+    const handleGcloudTtsToggle = (): void => {
+        const newValue = !gcloudTtsEnabled;
+
+        if (newValue) {
+            setGcloudTtsEnabled(true);
+            setAiTtsEnabled(false);
+            setBasicTtsEnabled(false);
+            setTtsEngine('gcloud');
+        } else {
+            setGcloudTtsEnabled(false);
+            setBasicTtsEnabled(true);
+            setTtsEngine('gtts');
         }
+
+        if (newValue && !isAnyTtsEnabled) {
+            toggleTtsMutation.mutate(true, {
+                onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+                    switchEngineMutation.mutate('gcloud', {
+                        onSuccess: () => {
+                            toast.success('Google Cloud TTS включен');
+                            window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
+                        },
+                        onError: (error: unknown) => {
+                            setGcloudTtsEnabled(false);
+                            logger.error('Error switching engine:', error);
+                            toast.error('Ошибка переключения движка');
+                        },
+                    });
+                },
+                onError: (error: unknown) => {
+                    setGcloudTtsEnabled(false);
+                    logger.error('Error enabling TTS:', error);
+                    toast.error('Ошибка включения TTS');
+                },
+            });
+        } else {
+            const engineType = newValue ? 'gcloud' : 'gtts';
+            switchEngineMutation.mutate(engineType, {
+                onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+                    if (newValue) {
+                        toast.success('Google Cloud TTS включен');
+                        window.dispatchEvent(new CustomEvent('tts-status-changed', { detail: { enabled: true } }));
+                    } else {
+                        toast.success('Переключено на Google TTS');
+                    }
+                },
+                onError: (error: unknown) => {
+                    setGcloudTtsEnabled(!newValue);
+                    logger.error('Error switching engine:', error);
+                    toast.error('Ошибка переключения движка');
+                },
+            });
+        }
+    };
+
+    const handleF5ModeChange = (mode: 'cloud' | 'local'): void => {
+        if (mode === f5Mode) return;
+        if (mode === 'local' && !hasLocalSetup) {
+            toast.error('Сначала настройте локальный F5-TTS во вкладке "Локальный TTS"');
+            return;
+        }
+        if (mode === 'cloud' && isWhitelisted !== true) {
+            toast.error('Доступ к F5 Cloud отсутствует');
+            return;
+        }
+
+        setF5Mode(mode);
+        if (!aiTtsEnabled) {
+            return;
+        }
+
+        switchEngineMutation.mutate(mode, {
+            onSuccess: () => {
+                setTtsEngine(mode);
+                queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+                toast.success(mode === 'local' ? 'F5-TTS: локальный режим' : 'F5-TTS: облачный режим');
+            },
+            onError: (error: unknown) => {
+                logger.error('Error switching F5 mode:', error);
+                toast.error('Ошибка переключения режима F5');
+            },
+        });
     };
 
     const handleListeningModeChange = (mode: 'website' | 'obs'): void => {
@@ -548,6 +757,88 @@ const TtsMainPageContent: React.FC = () => {
             saveAudioSettingsMutation.mutate({ websiteVolume: value });
         }, 300);
     }, [saveAudioSettingsMutation]);
+
+    const persistGcloudVoices = useCallback((voices: string[]): void => {
+        if (gcloudSaveDebounceRef.current) {
+            clearTimeout(gcloudSaveDebounceRef.current);
+        }
+
+        const uniqueVoices = Array.from(new Set(voices)).filter(Boolean);
+
+        gcloudSaveDebounceRef.current = setTimeout(() => {
+            setIsSavingGcloudVoices(true);
+            ttsService.saveGcloudVoices(uniqueVoices)
+                .then(() => {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.tts.settings() });
+                })
+                .catch((error: unknown) => {
+                    logger.error('Error saving Google Cloud voices:', error);
+                    toast.error('Не удалось сохранить голоса Google Cloud');
+                })
+                .finally(() => {
+                    setIsSavingGcloudVoices(false);
+                });
+        }, 250);
+    }, [queryClient]);
+
+    const handleGcloudVoiceToggle = useCallback((voiceName: string, checked: boolean): void => {
+        setSelectedGcloudVoices(prev => {
+            const next = checked
+                ? Array.from(new Set([...prev, voiceName]))
+                : prev.filter(name => name !== voiceName);
+
+            if (next.length === 0) {
+                toast.error('Нужно выбрать хотя бы один голос');
+                return prev;
+            }
+
+            persistGcloudVoices(next);
+            return next;
+        });
+    }, [persistGcloudVoices]);
+
+    const handleGcloudPreview = useCallback(async (voiceName: string): Promise<void> => {
+        if (previewingGcloudVoice === voiceName) return;
+
+        setPreviewingGcloudVoice(voiceName);
+        try {
+            if (gcloudPreviewAudioRef.current) {
+                gcloudPreviewAudioRef.current.pause();
+                gcloudPreviewAudioRef.current.currentTime = 0;
+            }
+
+            const response = await ttsService.previewGcloudVoice({
+                voice_name: voiceName,
+                text: 'Привет! Это тестовый голос Google Cloud.'
+            });
+            const payload = response.data as { audio_url?: string; data?: { audio_url?: string } };
+            const audioUrl = payload?.data?.audio_url || payload?.audio_url;
+
+            if (!audioUrl) {
+                toast.error('Не удалось получить аудио для предпрослушки');
+                setPreviewingGcloudVoice(null);
+                return;
+            }
+
+            const audio = new Audio(audioUrl);
+            gcloudPreviewAudioRef.current = audio;
+            audio.volume = Math.min(1, Math.max(0, localVolume / 100));
+
+            audio.onended = () => {
+                setPreviewingGcloudVoice(null);
+            };
+            audio.onerror = () => {
+                setPreviewingGcloudVoice(null);
+                toast.error('Ошибка воспроизведения предпрослушки');
+            };
+
+            await audio.play();
+        } catch (error: unknown) {
+            logger.error('Error previewing Google Cloud voice:', error);
+            toast.error('Не удалось воспроизвести голос');
+            setPreviewingGcloudVoice(null);
+        }
+    }, [previewingGcloudVoice, localVolume]);
 
     const handleTtsSettingChange = useCallback((key: keyof TtsSettingsState, value: boolean | number): void => {
         const newSettings = { ...ttsSettings, [key]: value };
@@ -710,25 +1001,7 @@ const TtsMainPageContent: React.FC = () => {
                             <Card className="card-glass flex flex-col">
                                 <CardHeader className="pb-3">
                                     <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base font-bold">Движок синтеза</CardTitle>
-                                        <div className="flex items-center gap-2">
-                                            {isChecking ? (
-                                                <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                                                    <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                                                    Проверка...
-                                                </div>
-                                            ) : isHealthy ? (
-                                                <div className="flex items-center gap-1.5 text-xs text-green-400">
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                    F5-TTS Доступен
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-1.5 text-xs text-yellow-400">
-                                                    <AlertCircle className="w-3.5 h-3.5" />
-                                                    F5-TTS Недоступен
-                                                </div>
-                                            )}
-                                        </div>
+                                        <CardTitle className="text-base font-bold">Озвучка</CardTitle>
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4 flex-1 flex flex-col">
@@ -744,13 +1017,13 @@ const TtsMainPageContent: React.FC = () => {
                                         />
                                     </div>
 
-                                    {/* Основной движок */}
+                                    {/* Базовая озвучка */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Основной движок</label>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Базовая озвучка</label>
                                         <div className="space-y-2">
                                             <div
                                                 onClick={handleBasicTtsToggle}
-                                                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${basicTtsEnabled && !aiTtsEnabled
+                                                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${basicTtsEnabled && !aiTtsEnabled && !gcloudTtsEnabled
                                                     ? 'bg-purple-600/15 border border-gray-700/50'
                                                     : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
                                                     }`}
@@ -760,15 +1033,42 @@ const TtsMainPageContent: React.FC = () => {
                                                     <div className="text-xs text-gray-400">Базовый, бесплатно</div>
                                                 </div>
                                                 <Switch
-                                                    checked={basicTtsEnabled && !aiTtsEnabled}
+                                                    checked={basicTtsEnabled && !aiTtsEnabled && !gcloudTtsEnabled}
                                                     onCheckedChange={handleBasicTtsToggle}
                                                     onClick={(e) => e.stopPropagation()}
                                                     className="data-[state=checked]:bg-purple-600"
                                                 />
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Advanced озвучка */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="block text-xs font-semibold text-gray-400">Advanced озвучка</label>
+                                            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                                                {isF5TTSDataLoading ? (
+                                                    <>
+                                                        <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
+                                                        Проверка F5...
+                                                    </>
+                                                ) : isHealthy ? (
+                                                    <>
+                                                        <CheckCircle2 className="w-3 h-3 text-green-400" />
+                                                        F5 доступен
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <AlertCircle className="w-3 h-3 text-yellow-400" />
+                                                        F5 недоступен
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-2">
                                             <div
-                                                onClick={!isHealthy || !canUseF5TTS || isF5TTSDataLoading ? undefined : handleAiTtsToggle}
-                                                className={`group flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${!isHealthy || !canUseF5TTS || isF5TTSDataLoading
+                                                onClick={(!isHealthy || !canUseF5TTS || isF5TTSDataLoading) ? undefined : handleAiTtsToggle}
+                                                className={`group flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${(!isHealthy || !canUseF5TTS || isF5TTSDataLoading)
                                                     ? 'opacity-50 cursor-not-allowed bg-gray-800/20 border border-gray-700/30'
                                                     : aiTtsEnabled
                                                         ? 'cursor-pointer bg-purple-600/15 border border-gray-700/50'
@@ -777,7 +1077,7 @@ const TtsMainPageContent: React.FC = () => {
                                             >
                                                 <div>
                                                     <div className="text-sm font-semibold text-white flex items-center gap-2">
-                                                        F5-TTS (AI)
+                                                        F5 TTS
                                                         {isF5TTSDataLoading && (
                                                             <RefreshCw className="w-3 h-3 animate-spin text-gray-400" />
                                                         )}
@@ -786,10 +1086,10 @@ const TtsMainPageContent: React.FC = () => {
                                                         {isF5TTSDataLoading
                                                             ? 'Проверка статуса...'
                                                             : !isHealthy
-                                                                ? 'Сервис недоступен'
+                                                                ? 'F5 сервис недоступен'
                                                                 : !canUseF5TTS
                                                                     ? 'Требуется whitelist'
-                                                                    : 'Качественная озвучка'}
+                                                                    : f5EngineLabel}
                                                     </div>
                                                 </div>
                                                 <Switch
@@ -800,34 +1100,105 @@ const TtsMainPageContent: React.FC = () => {
                                                     className="data-[state=checked]:bg-purple-600"
                                                 />
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Cloud / Local селектор */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Сервер обработки</label>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <button
-                                                onClick={() => handleEngineChange('cloud')}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${ttsEngine === 'cloud'
-                                                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                            <div className="flex items-center justify-between px-2">
+                                                <span className="text-[11px] text-gray-500">Режим F5</span>
+                                                <div className="flex gap-1.5">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleF5ModeChange('cloud')}
+                                                        disabled={isWhitelisted !== true}
+                                                        className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all duration-200 ${f5Mode === 'cloud'
+                                                            ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30'
+                                                            : 'bg-gray-800/60 text-gray-400 border border-gray-700/50 hover:bg-gray-700/60'
+                                                            } ${(isWhitelisted !== true) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        Облако
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleF5ModeChange('local')}
+                                                        disabled={!hasLocalSetup}
+                                                        className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-all duration-200 ${f5Mode === 'local'
+                                                            ? 'bg-purple-600 text-white shadow-sm shadow-purple-600/30'
+                                                            : 'bg-gray-800/60 text-gray-400 border border-gray-700/50 hover:bg-gray-700/60'
+                                                            } ${(!hasLocalSetup) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        Локально
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div
+                                                onClick={handleGcloudTtsToggle}
+                                                className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all duration-200 ${gcloudTtsEnabled
+                                                    ? 'bg-purple-600/15 border border-gray-700/50'
+                                                    : 'bg-gray-800/30 border border-gray-700/50 hover:bg-gray-700/40 hover:border-gray-600/50'
                                                     }`}
                                             >
-                                                Cloud
-                                            </button>
-                                            <button
-                                                onClick={() => handleEngineChange('local')}
-                                                disabled={!hasLocalSetup}
-                                                className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${!hasLocalSetup
-                                                    ? 'opacity-40 cursor-not-allowed bg-gray-800/30 text-gray-600'
-                                                    : ttsEngine === 'local'
-                                                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
-                                                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
-                                                    }`}
-                                            >
-                                                Local
-                                            </button>
+                                                <div>
+                                                    <div className="text-sm font-semibold text-white">Google Cloud TTS</div>
+                                                    <div className="text-xs text-gray-400">Качественный, облачный</div>
+                                                </div>
+                                                <Switch
+                                                    checked={gcloudTtsEnabled}
+                                                    onCheckedChange={handleGcloudTtsToggle}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="data-[state=checked]:bg-purple-600"
+                                                />
+                                            </div>
+                                            {(gcloudTtsEnabled || ttsEngine === 'gcloud') && (
+                                                <div className="rounded-lg border border-gray-700/40 bg-gray-900/40 p-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <div className="text-xs font-semibold text-gray-200">Голоса Google Cloud</div>
+                                                            <div className="text-[10px] text-gray-500">Случайный голос из выбранных</div>
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-500">
+                                                            {isSavingGcloudVoices ? 'Сохранение...' : `${selectedGcloudVoices.length}/${gcloudVoices.length || 0}`}
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-2 space-y-2 max-h-40 overflow-auto pr-1">
+                                                        {isLoadingGcloudVoices ? (
+                                                            <div className="text-xs text-gray-500">Загрузка голосов...</div>
+                                                        ) : gcloudVoices.length === 0 ? (
+                                                            <div className="text-xs text-gray-500">Голоса недоступны. Проверьте ключ Google Cloud.</div>
+                                                        ) : (
+                                                            gcloudVoices.map((voice) => {
+                                                                const isSelected = selectedGcloudVoices.includes(voice.name);
+                                                                return (
+                                                                    <div
+                                                                        key={voice.name}
+                                                                        className="flex items-center justify-between rounded-md border border-gray-700/40 bg-gray-800/40 px-2 py-1.5"
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Checkbox
+                                                                                checked={isSelected}
+                                                                                onCheckedChange={(val) => handleGcloudVoiceToggle(voice.name, Boolean(val))}
+                                                                            />
+                                                                            <div className="flex flex-col">
+                                                                                <span className="text-xs text-gray-200">{voice.name}</span>
+                                                                                <span className="text-[10px] text-gray-500">
+                                                                                    {(voice.ssmlGender || 'NEUTRAL').toLowerCase()}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleGcloudPreview(voice.name)}
+                                                                            className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-700/60 bg-gray-900/40 text-gray-300 hover:bg-gray-800/60 hover:text-white"
+                                                                        >
+                                                                            {previewingGcloudVoice === voice.name ? (
+                                                                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                                                            ) : (
+                                                                                <Play className="h-3.5 w-3.5" />
+                                                                            )}
+                                                                        </button>
+                                                                    </div>
+                                                                );
+                                                            })
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

@@ -306,11 +306,11 @@ const Sidebar: React.FC = () => {
                         </nav>
                     </div>
 
-                    {/* Мини-плеер YouTube (слот для портала) */}
-                    <div
-                        id="youtube-mini-player-slot"
-                        className="mt-auto px-2 pb-4 overflow-visible"
-                    />
+                    {/* Мини-плееры (слоты для портала) */}
+                    <div className="mt-auto px-2 pb-4 overflow-visible space-y-3">
+                        <div id="tts-mini-player-slot" className="overflow-visible" />
+                        <div id="youtube-mini-player-slot" className="overflow-visible" />
+                    </div>
 
                 </div>
             </div>

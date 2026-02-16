@@ -1,0 +1,86 @@
+import { useEffect, useMemo, useState } from 'react';
+
+import { API_BASE_URL } from '@/constants';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Button } from '@/shared/components/ui/button';
+import { Loader } from '@/shared/components/ui/loader';
+
+const MemeAlertsCallback = () => {
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [message, setMessage] = useState<string>('Подключаем MemeAlerts...');
+
+  const params = useMemo(() => {
+    const hash = window.location.hash?.replace(/^#/, '') || '';
+    return new URLSearchParams(hash);
+  }, []);
+
+  useEffect(() => {
+    const accessToken = params.get('access_token') || '';
+    const refreshToken = params.get('refresh_token') || undefined;
+
+    if (!accessToken) {
+      setStatus('error');
+      setMessage('Токен не найден. Запустите закладку на странице MemeAlerts.');
+      return;
+    }
+
+    const connect = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/memealerts/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data?.success) {
+          throw new Error(data?.error || 'Не удалось подключить MemeAlerts');
+        }
+
+        setStatus('success');
+        setMessage('MemeAlerts подключен. Можно возвращаться в панель.');
+
+        const newUrl = `${window.location.origin}${window.location.pathname}`;
+        window.history.replaceState({}, '', newUrl);
+      } catch (error) {
+        const err = error as Error;
+        setStatus('error');
+        setMessage(err.message || 'Ошибка подключения MemeAlerts');
+      }
+    };
+
+    void connect();
+  }, [params]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+      <Card className="w-full max-w-md card-glass">
+        <CardHeader>
+          <CardTitle>MemeAlerts</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {status === 'loading' ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader className="h-4 w-4" />
+              <span>{message}</span>
+            </div>
+          ) : (
+            <p className={status === 'success' ? 'text-green-400' : 'text-red-400'}>{message}</p>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => (window.location.href = '/dashboard/media?tab=memealerts')}
+          >
+            Вернуться в панель
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default MemeAlertsCallback;

@@ -1,13 +1,13 @@
 """
 MemeAlerts API endpoints for coin grants and OAuth token management
 """
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlalchemy.orm import Session
 from core.database import get_db
 from auth.auth import get_current_user, get_current_user_optional
 from repositories.user_token_repository import UserTokenRepository
+from services.memealerts_service import MemeAlertsService
 import logging
-import httpx
 import jwt
 
 logger = logging.getLogger(__name__)
@@ -60,7 +60,7 @@ async def get_memealerts_status(
         return {"success": True, "connected": False}
     except Exception as e:
         logger.error(f"Error getting MemeAlerts status: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/connect")
@@ -91,8 +91,8 @@ async def connect_memealerts(
                 raise HTTPException(status_code=400, detail="Token does not contain streamer ID")
             
             logger.info(f"MemeAlerts token decoded: streamer_id={streamer_id}, scope={token_scope}")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid token format")
 
         # Optional: Validate token by making a test API call
         # This verifies the token is actually valid and not expired
@@ -122,7 +122,7 @@ async def connect_memealerts(
         raise
     except Exception as e:
         logger.error(f"Error connecting MemeAlerts: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/disconnect")
@@ -140,7 +140,7 @@ async def disconnect_memealerts(
         return {"success": True, "connected": False}
     except Exception as e:
         logger.error(f"Error disconnecting MemeAlerts: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/grant")
@@ -151,67 +151,56 @@ async def grant_coins(
 ):
     """
     Grant MemeCoins to a user.
-    Expects: { userId: string, value: number }
+    Expects: { userId?: string, nickname?: string, value: number }
     """
     try:
         user_id = user.get('id')
-        
-        # Get stored token
-        token_repo = UserTokenRepository(db)
-        token = token_repo.get_by_user_and_platform(user_id, "memealerts")
-        
-        if not token or not token.access_token:
-            raise HTTPException(status_code=401, detail="MemeAlerts not connected")
-
-        # Decode token to get streamer ID
-        try:
-            decoded = decode_memealerts_token(token.access_token)
-            streamer_id = decoded.get("id")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail="Invalid stored token format")
-
-        if not streamer_id:
-            raise HTTPException(status_code=400, detail="Could not determine streamer ID from token")
-
-        target_user_id = grant_data.get("userId")
+        target_user_id = (grant_data.get("userId") or "").strip()
+        nickname = (grant_data.get("nickname") or "").strip()
         value = grant_data.get("value")
 
-        if not target_user_id or value is None:
-            raise HTTPException(status_code=400, detail="userId and value are required")
+        if value is None:
+            raise HTTPException(status_code=400, detail="value is required")
+        if not target_user_id and not nickname:
+            raise HTTPException(status_code=400, detail="userId or nickname is required")
 
-        # Prepare API request payload
-        payload = {
-            "userId": target_user_id,
-            "streamerId": streamer_id,
-            "value": int(value)
-        }
+        service = MemeAlertsService(db)
+        result = await service.grant_coins(
+            user_id=user_id,
+            nickname_or_id=target_user_id or nickname,
+            amount=int(value),
+            platform="dashboard",
+            channel_name="dashboard",
+            issued_by=str(user.get("username") or user_id),
+            source="ui",
+        )
 
-        logger.info(f"[MemeAlerts] Granting {value} coins from {streamer_id} to {target_user_id}")
+        if not result.get("success"):
+            return {"success": False, "error": result.get("error"), "detail": result.get("detail")}
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{MEMEALERTS_API_BASE}/user/give-bonus",
-                json=payload,
-                headers={
-                    "Authorization": f"Bearer {token.access_token}",
-                    "Content-Type": "application/json"
-                }
-            )
-            
-            if response.status_code not in (200, 201):
-                logger.error(f"MemeAlerts API Error: {response.status_code} - {response.text}")
-                return {
-                    "success": False, 
-                    "error": f"API Error: {response.status_code}", 
-                    "detail": response.text
-                }
-
-            result = response.json()
-            logger.info(f"[OK] MemeAlerts grant successful: {result}")
-            return {"success": True, "data": result}
+        logger.info(f"[OK] MemeAlerts grant successful: {result}")
+        return {"success": True, "data": result}
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error granting coins: {e}", exc_info=True)
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
+
+
+@router.get("/history")
+async def get_memealerts_history(
+    limit: int = Query(50, ge=1, le=200),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get MemeAlerts grant/purchase history from MemeAlerts API."""
+    try:
+        user_id = user.get("id")
+        service = MemeAlertsService(db)
+        result = await service.fetch_history(user_id=user_id, limit=limit)
+        return result
+    except Exception as e:
+        logger.error(f"Error loading MemeAlerts history: {e}", exc_info=True)
+        return {"success": False, "error": "Internal server error", "grants": [], "purchases": [], "unknown": []}
+

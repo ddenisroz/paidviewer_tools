@@ -1,9 +1,9 @@
 """
-API endpoints для управления наградами VK Live Channel Points
+API endpoints РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ РЅР°РіСЂР°РґР°РјРё VK Live Channel Points
 
-Документация: docs/vk/Методы_Баллы.md
-Автор: AI Assistant
-Дата: 27 декабря 2025
+Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
+РђРІС‚РѕСЂ: AI Assistant
+Р”Р°С‚Р°: 27 РґРµРєР°Р±СЂСЏ 2025
 """
 import logging
 from typing import List, Optional
@@ -27,19 +27,19 @@ router = APIRouter(prefix="/api/vk/channel_points", tags=["vk-channel-points"])
 # === Pydantic Models ===
 
 class RewardCreate(BaseModel):
-    """Модель для создания награды"""
-    name: str = Field(..., min_length=1, max_length=100, description="Название награды")
-    price: int = Field(..., ge=1, description="Цена в баллах")
-    description: str = Field(default="", max_length=500, description="Описание награды")
-    background_color: int = Field(default=0, description="Цвет фона (число)")
-    is_message_required: bool = Field(default=False, description="Требуется ли сообщение")
-    max_uses_count: Optional[int] = Field(default=None, ge=1, description="Максимум использований")
-    max_uses_count_per_user: Optional[int] = Field(default=None, ge=1, description="Максимум на пользователя")
-    repair_timeout: Optional[int] = Field(default=None, ge=0, description="Время перезарядки (секунды)")
+    """РњРѕРґРµР»СЊ РґР»СЏ СЃРѕР·РґР°РЅРёСЏ РЅР°РіСЂР°РґС‹"""
+    name: str = Field(..., min_length=1, max_length=100, description="РќР°Р·РІР°РЅРёРµ РЅР°РіСЂР°РґС‹")
+    price: int = Field(..., ge=1, description="Р¦РµРЅР° РІ Р±Р°Р»Р»Р°С…")
+    description: str = Field(default="", max_length=500, description="РћРїРёСЃР°РЅРёРµ РЅР°РіСЂР°РґС‹")
+    background_color: int = Field(default=0, description="Р¦РІРµС‚ С„РѕРЅР° (С‡РёСЃР»Рѕ)")
+    is_message_required: bool = Field(default=False, description="РўСЂРµР±СѓРµС‚СЃСЏ Р»Рё СЃРѕРѕР±С‰РµРЅРёРµ")
+    max_uses_count: Optional[int] = Field(default=None, ge=1, description="РњР°РєСЃРёРјСѓРј РёСЃРїРѕР»СЊР·РѕРІР°РЅРёР№")
+    max_uses_count_per_user: Optional[int] = Field(default=None, ge=1, description="РњР°РєСЃРёРјСѓРј РЅР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ")
+    repair_timeout: Optional[int] = Field(default=None, ge=0, description="Р’СЂРµРјСЏ РїРµСЂРµР·Р°СЂСЏРґРєРё (СЃРµРєСѓРЅРґС‹)")
 
 
 class RewardUpdate(BaseModel):
-    """Модель для обновления награды"""
+    """РњРѕРґРµР»СЊ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ РЅР°РіСЂР°РґС‹"""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     price: Optional[int] = Field(None, ge=1)
     description: Optional[str] = Field(None, max_length=500)
@@ -51,25 +51,25 @@ class RewardUpdate(BaseModel):
 
 
 class RewardDemandAction(BaseModel):
-    """Модель для принятия/отклонения запросов"""
-    demand_ids: List[int] = Field(..., min_length=1, description="Список ID запросов")
+    """РњРѕРґРµР»СЊ РґР»СЏ РїСЂРёРЅСЏС‚РёСЏ/РѕС‚РєР»РѕРЅРµРЅРёСЏ Р·Р°РїСЂРѕСЃРѕРІ"""
+    demand_ids: List[int] = Field(..., min_length=1, description="РЎРїРёСЃРѕРє ID Р·Р°РїСЂРѕСЃРѕРІ")
 
 
 # === Helper Functions ===
 
 def get_vk_token(user_id: int, db: Session) -> str:
     """
-    Получить VK OAuth токен пользователя через репозиторий
+    РџРѕР»СѓС‡РёС‚СЊ VK OAuth С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№
     
     Args:
-        user_id: ID пользователя
+        user_id: ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
         db: Database session
         
     Returns:
-        str: Расшифрованный VK токен
+        str: Р Р°СЃС€РёС„СЂРѕРІР°РЅРЅС‹Р№ VK С‚РѕРєРµРЅ
         
     Raises:
-        HTTPException: Если токен не найден
+        HTTPException: Р•СЃР»Рё С‚РѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ
     """
     token_repo = UserTokenRepository(db)
     user_token = token_repo.get_by_user_and_platform(user_id, 'vk')
@@ -77,10 +77,10 @@ def get_vk_token(user_id: int, db: Session) -> str:
     if not user_token or not user_token.access_token:
         raise HTTPException(
             status_code=404,
-            detail="VK токен не найден. Пожалуйста, подключите VK Live."
+            detail="VK С‚РѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ. РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РїРѕРґРєР»СЋС‡РёС‚Рµ VK Live."
         )
     
-    # Расшифровать токен
+    # Р Р°СЃС€РёС„СЂРѕРІР°С‚СЊ С‚РѕРєРµРЅ
     token = user_token.access_token
     if is_token_encrypted(token):
         token = decrypt_token(token)
@@ -90,17 +90,17 @@ def get_vk_token(user_id: int, db: Session) -> str:
 
 def get_channel_url(user_id: int, db: Session) -> str:
     """
-    Получить VK channel URL пользователя через репозиторий
+    РџРѕР»СѓС‡РёС‚СЊ VK channel URL РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№
     
     Args:
-        user_id: ID пользователя
+        user_id: ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
         db: Database session
         
     Returns:
         str: VK channel URL
         
     Raises:
-        HTTPException: Если channel URL не найден
+        HTTPException: Р•СЃР»Рё channel URL РЅРµ РЅР°Р№РґРµРЅ
     """
     user_repo = UserRepository(db)
     user = user_repo.get_by_id(user_id)
@@ -108,7 +108,7 @@ def get_channel_url(user_id: int, db: Session) -> str:
     if not user or not user.vk_channel_name:
         raise HTTPException(
             status_code=404,
-            detail="VK канал не найден. Пожалуйста, подключите VK Live."
+            detail="VK РєР°РЅР°Р» РЅРµ РЅР°Р№РґРµРЅ. РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РїРѕРґРєР»СЋС‡РёС‚Рµ VK Live."
         )
         
     return normalize_vk_channel_url(user.vk_channel_name)
@@ -122,9 +122,9 @@ async def get_balance(
     db: Session = Depends(get_db)
 ):
     """
-    Получить баланс баллов на канале
+    РџРѕР»СѓС‡РёС‚СЊ Р±Р°Р»Р°РЅСЃ Р±Р°Р»Р»РѕРІ РЅР° РєР°РЅР°Р»Рµ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     GET /v1/channel_point
     """
     try:
@@ -144,7 +144,7 @@ async def get_balance(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error getting balance: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/rewards")
@@ -153,9 +153,9 @@ async def get_rewards(
     db: Session = Depends(get_db)
 ):
     """
-    Получить список наград за баллы
+    РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РЅР°РіСЂР°Рґ Р·Р° Р±Р°Р»Р»С‹
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     GET /v1/channel_point/rewards
     """
     try:
@@ -175,7 +175,7 @@ async def get_rewards(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error getting rewards: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/rewards/manage")
@@ -184,14 +184,14 @@ async def get_rewards_manage_info(
     db: Session = Depends(get_db)
 ):
     """
-    Получить список наград для управления
+    РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РЅР°РіСЂР°Рґ РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ
     
-    Требования:
-    - Авторизация: пользователь
-    - Доступность: владелец канала
-    - Разрешения: channel:points:manage
+    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    - РђРІС‚РѕСЂРёР·Р°С†РёСЏ: РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ
+    - Р”РѕСЃС‚СѓРїРЅРѕСЃС‚СЊ: РІР»Р°РґРµР»РµС† РєР°РЅР°Р»Р°
+    - Р Р°Р·СЂРµС€РµРЅРёСЏ: channel:points:manage
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     GET /v1/channel_point/rewards/manage_info
     """
     try:
@@ -211,7 +211,7 @@ async def get_rewards_manage_info(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error getting rewards manage info: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards")
@@ -221,14 +221,14 @@ async def create_reward(
     db: Session = Depends(get_db)
 ):
     """
-    Создать награду за баллы
+    РЎРѕР·РґР°С‚СЊ РЅР°РіСЂР°РґСѓ Р·Р° Р±Р°Р»Р»С‹
     
-    Требования:
-    - Авторизация: пользователь
-    - Доступность: владелец канала
-    - Разрешения: channel:points:manage
+    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    - РђРІС‚РѕСЂРёР·Р°С†РёСЏ: РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ
+    - Р”РѕСЃС‚СѓРїРЅРѕСЃС‚СЊ: РІР»Р°РґРµР»РµС† РєР°РЅР°Р»Р°
+    - Р Р°Р·СЂРµС€РµРЅРёСЏ: channel:points:manage
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     POST /v1/channel_point/reward/create
     """
     try:
@@ -257,7 +257,7 @@ async def create_reward(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error creating reward: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/rewards/{reward_id}")
@@ -267,9 +267,9 @@ async def get_reward_info(
     db: Session = Depends(get_db)
 ):
     """
-    Получить информацию о награде для управления
+    РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РЅР°РіСЂР°РґРµ РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     GET /v1/channel_point/reward/manage_info
     """
     try:
@@ -290,7 +290,7 @@ async def get_reward_info(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error getting reward info: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/rewards/{reward_id}")
@@ -301,20 +301,20 @@ async def update_reward(
     db: Session = Depends(get_db)
 ):
     """
-    Редактировать награду
+    Р РµРґР°РєС‚РёСЂРѕРІР°С‚СЊ РЅР°РіСЂР°РґСѓ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     POST /v1/channel_point/reward/edit
     """
     try:
         token = get_vk_token(current_user['id'], db)
         channel_url = get_channel_url(current_user['id'], db)
         
-        # Собрать только заполненные поля
+        # РЎРѕР±СЂР°С‚СЊ С‚РѕР»СЊРєРѕ Р·Р°РїРѕР»РЅРµРЅРЅС‹Рµ РїРѕР»СЏ
         reward_fields = reward.model_dump(exclude_none=True)
         
         if not reward_fields:
-            raise HTTPException(status_code=400, detail="Нет полей для обновления")
+            raise HTTPException(status_code=400, detail="РќРµС‚ РїРѕР»РµР№ РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ")
         
         async with VKLiveAPIClient() as client:
             await client.edit_reward(
@@ -325,14 +325,14 @@ async def update_reward(
             )
             
         logger.info(f"Reward updated: {reward_id}")
-        return {"success": True, "message": "Награда обновлена"}
+        return {"success": True, "message": "РќР°РіСЂР°РґР° РѕР±РЅРѕРІР»РµРЅР°"}
         
     except VKAPIError as e:
         logger.error(f"VK API error: {e.error_message}")
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error updating reward: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/{reward_id}/enable")
@@ -342,9 +342,9 @@ async def enable_reward(
     db: Session = Depends(get_db)
 ):
     """
-    Включить награду
+    Р’РєР»СЋС‡РёС‚СЊ РЅР°РіСЂР°РґСѓ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     POST /v1/channel_point/reward/enable
     """
     try:
@@ -359,14 +359,14 @@ async def enable_reward(
             )
             
         logger.info(f"Reward enabled: {reward_id}")
-        return {"success": True, "message": "Награда включена"}
+        return {"success": True, "message": "РќР°РіСЂР°РґР° РІРєР»СЋС‡РµРЅР°"}
         
     except VKAPIError as e:
         logger.error(f"VK API error: {e.error_message}")
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error enabling reward: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/{reward_id}/disable")
@@ -376,9 +376,9 @@ async def disable_reward(
     db: Session = Depends(get_db)
 ):
     """
-    Отключить награду
+    РћС‚РєР»СЋС‡РёС‚СЊ РЅР°РіСЂР°РґСѓ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     POST /v1/channel_point/reward/disable
     """
     try:
@@ -393,14 +393,14 @@ async def disable_reward(
             )
             
         logger.info(f"Reward disabled: {reward_id}")
-        return {"success": True, "message": "Награда отключена"}
+        return {"success": True, "message": "РќР°РіСЂР°РґР° РѕС‚РєР»СЋС‡РµРЅР°"}
         
     except VKAPIError as e:
         logger.error(f"VK API error: {e.error_message}")
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error disabling reward: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/rewards/{reward_id}")
@@ -410,9 +410,9 @@ async def delete_reward(
     db: Session = Depends(get_db)
 ):
     """
-    Удалить награду
+    РЈРґР°Р»РёС‚СЊ РЅР°РіСЂР°РґСѓ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     POST /v1/channel_point/reward/delete
     """
     try:
@@ -427,14 +427,14 @@ async def delete_reward(
             )
             
         logger.info(f"Reward deleted: {reward_id}")
-        return {"success": True, "message": "Награда удалена"}
+        return {"success": True, "message": "РќР°РіСЂР°РґР° СѓРґР°Р»РµРЅР°"}
         
     except VKAPIError as e:
         logger.error(f"VK API error: {e.error_message}")
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error deleting reward: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/rewards/demands")
@@ -445,14 +445,14 @@ async def get_reward_demands(
     db: Session = Depends(get_db)
 ):
     """
-    Получить список запросов наград
+    РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р·Р°РїСЂРѕСЃРѕРІ РЅР°РіСЂР°Рґ
     
-    Требования:
-    - Авторизация: пользователь
-    - Доступность: владелец канала
-    - Разрешения: channel:points:rewards:demands:read
+    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    - РђРІС‚РѕСЂРёР·Р°С†РёСЏ: РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ
+    - Р”РѕСЃС‚СѓРїРЅРѕСЃС‚СЊ: РІР»Р°РґРµР»РµС† РєР°РЅР°Р»Р°
+    - Р Р°Р·СЂРµС€РµРЅРёСЏ: channel:points:rewards:demands:read
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     GET /v1/channel_point/reward/demands
     """
     try:
@@ -474,7 +474,7 @@ async def get_reward_demands(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error getting reward demands: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/demands/accept")
@@ -484,9 +484,9 @@ async def accept_reward_demands(
     db: Session = Depends(get_db)
 ):
     """
-    Принять запросы наград
+    РџСЂРёРЅСЏС‚СЊ Р·Р°РїСЂРѕСЃС‹ РЅР°РіСЂР°Рґ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     POST /v1/channel_point/reward/demand/accept
     """
     try:
@@ -503,7 +503,7 @@ async def accept_reward_demands(
         logger.info(f"Accepted {len(action.demand_ids)} reward demands")
         return {
             "success": True,
-            "message": f"Принято запросов: {len(action.demand_ids)}"
+            "message": f"РџСЂРёРЅСЏС‚Рѕ Р·Р°РїСЂРѕСЃРѕРІ: {len(action.demand_ids)}"
         }
         
     except VKAPIError as e:
@@ -511,7 +511,7 @@ async def accept_reward_demands(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error accepting reward demands: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/demands/reject")
@@ -521,9 +521,9 @@ async def reject_reward_demands(
     db: Session = Depends(get_db)
 ):
     """
-    Отклонить запросы наград
+    РћС‚РєР»РѕРЅРёС‚СЊ Р·Р°РїСЂРѕСЃС‹ РЅР°РіСЂР°Рґ
     
-    Документация: docs/vk/Методы_Баллы.md
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: docs/vk/РњРµС‚РѕРґС‹_Р‘Р°Р»Р»С‹.md
     POST /v1/channel_point/reward/demand/reject
     """
     try:
@@ -540,7 +540,7 @@ async def reject_reward_demands(
         logger.info(f"Rejected {len(action.demand_ids)} reward demands")
         return {
             "success": True,
-            "message": f"Отклонено запросов: {len(action.demand_ids)}"
+            "message": f"РћС‚РєР»РѕРЅРµРЅРѕ Р·Р°РїСЂРѕСЃРѕРІ: {len(action.demand_ids)}"
         }
         
     except VKAPIError as e:
@@ -548,4 +548,4 @@ async def reject_reward_demands(
         raise HTTPException(status_code=400, detail=e.error_message)
     except Exception as e:
         logger.error(f"Error rejecting reward demands: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

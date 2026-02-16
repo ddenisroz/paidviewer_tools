@@ -11,6 +11,7 @@ import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 // Critical pages - загружаем сразу (только auth flow)
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DonationAlertsCallback from './pages/DonationAlertsCallback';
+import MemeAlertsCallback from './pages/MemeAlertsCallback';
 import LoginPage from './pages/LoginPage';
 import AuthGuard from './shared/components/AuthGuard';
 
@@ -64,6 +65,11 @@ const App: React.FC = () => {
                     <Route path="/donationalerts/callback" element={
                         <RouteErrorBoundary routeName="DonationAlerts Callback">
                             <DonationAlertsCallback />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/memealerts/callback" element={
+                        <RouteErrorBoundary routeName="MemeAlerts Callback">
+                            <MemeAlertsCallback />
                         </RouteErrorBoundary>
                     } />
 

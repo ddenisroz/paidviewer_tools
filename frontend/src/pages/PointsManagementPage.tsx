@@ -3,6 +3,7 @@
 import { CheckCircle2, Clock, Edit, Gift, Loader2, MessageCircle, Plus, Power, PowerOff, Trash2, XCircle } from 'lucide-react';
 
 import { PLATFORM_COLORS } from '@/constants/uiConstants';
+import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import pointsApi from '@/services/pointsApi';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
@@ -392,7 +393,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                     type="checkbox"
                                     checked={formData.is_message_required}
                                     onChange={(e) => setFormData({ ...formData, is_message_required: e.target.checked })}
-                                    className="w-4 h-4 rounded border-gray-300"
+                                    className="w-4 h-4 rounded border-border"
                                 />
                                 <Label htmlFor="is_message_required" className="text-sm cursor-pointer">
                                     Требуется сообщение от пользователя
@@ -459,7 +460,7 @@ const RewardDialog: React.FC<RewardDialogProps> = ({ open, onClose, reward, plat
                                     type="checkbox"
                                     checked={formData.should_redemptions_skip_request_queue}
                                     onChange={(e) => setFormData({ ...formData, should_redemptions_skip_request_queue: e.target.checked })}
-                                    className="w-4 h-4 rounded border-gray-300"
+                                    className="w-4 h-4 rounded border-border"
                                 />
                                 <Label htmlFor="should_redemptions_skip_request_queue" className="text-sm cursor-pointer">
                                     Автоматически выполнять (без очереди)
@@ -660,7 +661,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
 
     if (loading) {
         return (
-            <div className="flex justify-center py-12 min-h-[400px]">
+            <div className="flex justify-center py-12 min-h-[min(400px,60vh)]">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
         );
@@ -668,7 +669,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
 
     if (redemptions.length === 0) {
         return (
-            <div className="min-h-[400px]">
+            <div className="min-h-[min(400px,60vh)]">
                 <Card>
                     <CardContent className="py-12 text-center">
                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
@@ -685,7 +686,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
     }
 
     return (
-        <div className="min-h-[400px] space-y-4">
+        <div className="min-h-[min(400px,60vh)] space-y-4">
             <Card>
                 <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -693,7 +694,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                             <div className="flex items-center gap-2">
                                 <Label className="text-sm font-medium whitespace-nowrap">Фильтр:</Label>
                                 <Select value={filterType} onValueChange={(value) => setFilterType(value as 'all' | 'tts' | 'other')}>
-                                    <SelectTrigger className="w-[160px] h-9">
+                                    <SelectTrigger className="w-[clamp(140px,25vw,200px)] h-9">
                                         <SelectValue placeholder="Выберите фильтр" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -706,7 +707,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
 
                             {filteredRedemptions.length > 0 && (
                                 <>
-                                    <div className="h-6 w-px bg-gray-700" />
+                                    <div className="h-6 w-px bg-border" />
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-muted-foreground whitespace-nowrap">
                                             Найдено: <span className="font-semibold text-foreground">{filteredRedemptions.length}</span>
@@ -816,7 +817,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         return (
                             <Card
                                 key={demand.id || index}
-                                className={`transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary border-primary/50' : 'border-gray-700/50'} ${isProcessing ? 'opacity-60' : ''}`}
+                                className={`transition-all hover:shadow-lg ${isSelected ? 'ring-2 ring-primary border-primary/50' : 'border-border/50'} ${isProcessing ? 'opacity-60' : ''}`}
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-start gap-3">
@@ -836,7 +837,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                     });
                                                 }}
                                                 disabled={isProcessing}
-                                                className="w-4 h-4 rounded border-gray-600 bg-background cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-primary"
+                                                className="w-4 h-4 rounded border-border bg-background cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed accent-primary"
                                             />
                                         </div>
 
@@ -857,7 +858,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                             <div className="flex items-center gap-2 mb-3 flex-wrap">
                                                 <Badge
                                                     variant={isTtsReward ? "default" : "outline"}
-                                                    className={`text-xs font-medium ${isTtsReward ? 'bg-purple-600/20 text-purple-300 border-purple-600/30' : 'bg-gray-800/50'}`}
+                                                    className={`text-xs font-medium ${isTtsReward ? 'bg-purple-600/20 text-purple-300 border-purple-600/30' : 'bg-muted/50'}`}
                                                 >
                                                     {rewardTitle}
                                                 </Badge>
@@ -867,7 +868,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                             </div>
 
                                             {message && (
-                                                <div className="mb-3 p-3 rounded-md bg-gray-800/50 border border-gray-700/50">
+                                                <div className="mb-3 p-3 rounded-md bg-muted/50 border border-border/50">
                                                     <div className="flex items-start gap-2">
                                                         <MessageCircle className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                                                         <p className="text-sm text-foreground break-words flex-1 leading-relaxed">
@@ -892,7 +893,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                     handleAccept(demand.id);
                                                 }}
                                                 disabled={isProcessing}
-                                                className="min-w-[100px] h-9"
+                                                className="min-w-[clamp(92px,18vw,120px)] h-9"
                                             >
                                                 {isProcessing ? (
                                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -911,7 +912,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                     handleReject(demand.id);
                                                 }}
                                                 disabled={isProcessing}
-                                                className="min-w-[100px] h-9"
+                                                className="min-w-[clamp(92px,18vw,120px)] h-9"
                                             >
                                                 <XCircle className="w-4 h-4 mr-1.5" />
                                                 Отклонить
@@ -930,10 +931,17 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
 
 const PointsManagementPage: React.FC = () => {
     // useAuth unused
+    const { user } = useAuth();
     const { integrations } = useIntegrations();
 
     // Если нет прав или не авторизован то сразу return
-    const [selectedPlatform, setSelectedPlatform] = useState<'twitch' | 'vk'>('twitch');
+    const [selectedPlatform, setSelectedPlatform] = useState<'twitch' | 'vk'>(() => {
+        const stored = typeof window !== 'undefined' ? window.localStorage.getItem('points_selected_platform') : null;
+        if (stored === 'twitch' || stored === 'vk') {
+            return stored;
+        }
+        return 'twitch';
+    });
     const [activeTab, setActiveTab] = useState<'rewards' | 'queue'>('rewards');
     const [rewards, setRewards] = useState<PlatformReward[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -944,23 +952,34 @@ const PointsManagementPage: React.FC = () => {
     const vkEnabled = integrations?.vk?.enabled || false;
 
     useEffect(() => {
-        if (twitchEnabled && selectedPlatform === 'twitch') {
-            return;
-        } else if (vkEnabled && selectedPlatform === 'vk') {
-            return;
-        } else if (twitchEnabled) {
-            setSelectedPlatform('twitch');
-        } else if (vkEnabled) {
-            setSelectedPlatform('vk');
-        }
-    }, [twitchEnabled, vkEnabled, selectedPlatform]);
+        setSelectedPlatform(prev => {
+            if (prev === 'twitch' && twitchEnabled) return prev;
+            if (prev === 'vk' && vkEnabled) return prev;
+            if (vkEnabled) return 'vk';
+            if (twitchEnabled) return 'twitch';
+            return prev;
+        });
+    }, [twitchEnabled, vkEnabled]);
 
-    const loadRewards = async (showLoader: boolean = true): Promise<void> => {
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        window.localStorage.setItem('points_selected_platform', selectedPlatform);
+    }, [selectedPlatform]);
+
+    const loadRewards = async (platform: 'twitch' | 'vk', showLoader: boolean = true): Promise<void> => {
         try {
             if (showLoader) {
                 setLoading(true);
             }
-            const data = await pointsApi.getRewards(selectedPlatform) as RewardsResponse;
+            if (platform === 'twitch' && !twitchEnabled) {
+                setRewards([]);
+                return;
+            }
+            if (platform === 'vk' && !vkEnabled) {
+                setRewards([]);
+                return;
+            }
+            const data = await pointsApi.getRewards(platform) as RewardsResponse;
 
             const sortedRewards = (data.rewards || []).sort((a: PlatformReward, b: PlatformReward) => {
                 if (a.is_enabled === b.is_enabled) return 0;
@@ -975,7 +994,10 @@ const PointsManagementPage: React.FC = () => {
 
             if (apiError.status === 404) {
                 toast.error('Настройки не загружены. Попробуйте снова позднее', { duration: 5000 });
-            } else if (apiError.status === 403 || errorMessage.includes('партнёр или аффилейт') || errorMessage.includes('partner or affiliate')) {
+            } else if (
+                platform === 'twitch' &&
+                (apiError.status === 403 || errorMessage.includes('партнёр или аффилейт') || errorMessage.includes('partner or affiliate'))
+            ) {
                 toast.error('Аккаунт Twitch должен быть подключен для партнёров и аффилейтов', { duration: 5000 });
             } else {
                 toast.error('Настройки не загружены. Попробуйте снова позднее', { duration: 5000 });
@@ -989,7 +1011,7 @@ const PointsManagementPage: React.FC = () => {
     };
 
     useEffect(() => {
-        loadRewards(true);
+        loadRewards(selectedPlatform, true);
     }, [selectedPlatform]);
 
     if (loading) {
@@ -1090,7 +1112,7 @@ const PointsManagementPage: React.FC = () => {
                                             reward={reward}
                                             platform={selectedPlatform}
                                             onEdit={() => setEditingReward(reward)}
-                                            onRefresh={() => loadRewards(false)}
+                                            onRefresh={() => loadRewards(selectedPlatform, false)}
                                         />
                                     ))}
                                 </div>
@@ -1110,11 +1132,13 @@ const PointsManagementPage: React.FC = () => {
                 }}
                 reward={editingReward}
                 platform={selectedPlatform}
-                channelName={selectedPlatform === 'vk' ? integrations.vk?.username : integrations.twitch?.username}
+                channelName={selectedPlatform === 'vk'
+                    ? (user?.vk_channel_name || user?.vk_username || integrations.vk?.username)
+                    : (user?.twitch_username || integrations.twitch?.username)}
                 onSuccess={() => {
                     setShowCreateDialog(false);
                     setEditingReward(null);
-                    loadRewards(false);
+                    loadRewards(selectedPlatform, false);
                 }}
             />
         </div>

@@ -25,6 +25,8 @@ Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, an
    - `tts_service/.env`
    - `tts_service_simple/.env`
    - `frontend/.env`
+   - Optional: set `DEEPSEEK_API_KEY` in `bot_service/.env` to enable `!analyze`
+   - Optional: set `GOOGLE_CLOUD_API_KEY` in `bot_service/.env` for YouTube + Google Cloud TTS
 2. Run migration/bootstrap:
    - Windows: `.\scripts\migrate.ps1`
    - Linux/Mac: `./scripts/migrate.sh`

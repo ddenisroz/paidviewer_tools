@@ -44,6 +44,7 @@ class TTSSettingsUpdateRequest(BaseModel):
     listening_mode: Optional[str] = None
     enabled_platforms: Optional[list] = None
     tts_mode: Optional[str] = None
+    gcloud_voices: Optional[list] = None
 
 
 class AudioSettingsUpdateRequest(BaseModel):
@@ -95,7 +96,7 @@ async def get_my_settings(
         }
     except Exception as e:
         logger.error(f"Error getting user settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/me")
@@ -115,11 +116,11 @@ async def update_my_settings(
         update_data = request.model_dump(exclude_unset=True)
         result = user_service.update_settings(current_user, update_data, db)
         return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid settings data")
     except Exception as e:
         logger.error(f"Error updating user settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/me/tts")
@@ -139,7 +140,7 @@ async def update_my_tts_settings(
         
         # Validate inputs
         if request.engine is not None:
-            valid_engines = ['gtts', 'f5tts']
+            valid_engines = ['gtts', 'f5tts', 'gcloud']
             if request.engine not in valid_engines:
                 raise HTTPException(status_code=400, detail=f"Invalid engine. Must be one of: {valid_engines}")
 
@@ -154,14 +155,18 @@ async def update_my_tts_settings(
                 raise HTTPException(status_code=400, detail=f"Invalid TTS mode. Must be one of: {valid_modes}")
 
         # Update via service
-        result = await tts_service.save_tts_settings(
-            user_id=user_id,
-            engine=request.engine,
-            voice=request.voice,
-            listening_mode=request.listening_mode,
-            enabled_platforms=request.enabled_platforms,
-            tts_mode=request.tts_mode
-        )
+        save_payload = {
+            "user_id": user_id,
+            "engine": request.engine,
+            "voice": request.voice,
+            "listening_mode": request.listening_mode,
+            "enabled_platforms": request.enabled_platforms,
+            "tts_mode": request.tts_mode,
+        }
+        if request.gcloud_voices is not None:
+            save_payload["gcloud_voices"] = request.gcloud_voices
+
+        result = await tts_service.save_tts_settings(**save_payload)
         
         if not result.get("success"):
             raise HTTPException(status_code=400, detail=result.get("error", "Failed to update TTS settings"))
@@ -174,7 +179,7 @@ async def update_my_tts_settings(
         raise
     except Exception as e:
         logger.error(f"Error updating TTS settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/me/audio")
@@ -221,7 +226,7 @@ async def update_my_audio_settings(
         raise
     except Exception as e:
         logger.error(f"Error updating audio settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/{user_id}")
@@ -255,4 +260,5 @@ async def get_user_settings(
         }
     except Exception as e:
         logger.error(f"Error getting user settings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+

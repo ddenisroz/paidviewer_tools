@@ -271,18 +271,25 @@ class ConnectionManager(ConnectionManagerCore):
         try:
             # Получаем ВСЕ каналы с активным VK токеном
             from core.database import User, UserToken
-
+            from sqlalchemy import or_
             # Ищем пользователей с активным VK токеном
             vk_users = db.query(User).join(UserToken).filter(
                 UserToken.platform == 'vk',
                 UserToken.is_active.is_(True),
-                User.vk_channel_name.isnot(None)
+                or_(User.vk_channel_name.isnot(None), User.vk_username.isnot(None))
             ).all()
 
             vk_channels = []
             for user in vk_users:
                 # Используем vk_channel_name как основной идентификатор канала
                 channel_name = user.vk_channel_name or user.vk_username
+                if user.vk_channel_name and user.vk_username and user.vk_channel_name.lower() != user.vk_username.lower():
+                    logger.info(
+                        "[VK] User %s: using vk_channel_name='%s' (vk_username='%s')",
+                        user.id,
+                        user.vk_channel_name,
+                        user.vk_username,
+                    )
                 if channel_name:
                     candidate = channel_name.strip().lower()
                     if ' ' in candidate:
@@ -290,7 +297,7 @@ class ConnectionManager(ConnectionManagerCore):
                         continue
                     vk_channels.append(candidate)
 
-            logger.info(f"Found {len(vk_channels)} VK Live channels to listen: {vk_channels}")
+            logger.info(f"Found {len(vk_channels)} VK Live channels to listen (channel slugs): {vk_channels}")
             return vk_channels
         except Exception as e:
             logger.error(f"Error getting VK channels: {e}", exc_info=True)
@@ -332,3 +339,4 @@ class ConnectionManager(ConnectionManagerCore):
             logger.info("ConnectionManager cleanup completed")
         except Exception as e:
             logger.error(f"Error during ConnectionManager cleanup: {e}")
+

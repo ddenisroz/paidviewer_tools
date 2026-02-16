@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TTS Manager для bot_service
-Управляет двумя TTS системами:
-1. AI TTS (F5-TTS) - через HTTP запросы к tts_service (требует whitelist)
-2. Базовая TTS (gTTS) - локальная, fallback система (доступна всем)
+TTS Manager РґР»СЏ bot_service
+РЈРїСЂР°РІР»СЏРµС‚ РґРІСѓРјСЏ TTS СЃРёСЃС‚РµРјР°РјРё:
+1. AI TTS (F5-TTS) - С‡РµСЂРµР· HTTP Р·Р°РїСЂРѕСЃС‹ Рє tts_service (С‚СЂРµР±СѓРµС‚ whitelist)
+2. Р‘Р°Р·РѕРІР°СЏ TTS (gTTS) - Р»РѕРєР°Р»СЊРЅР°СЏ, fallback СЃРёСЃС‚РµРјР° (РґРѕСЃС‚СѓРїРЅР° РІСЃРµРј)
 """
 
 import logging
@@ -13,6 +13,7 @@ import asyncio
 from typing import Optional, Dict
 from pathlib import Path
 import time
+import random
 
 from core.config import settings
 from constants import (
@@ -23,27 +24,28 @@ from constants import (
 )
 
 from services.tts.basic_tts import get_basic_tts
+from services.tts.google_cloud_tts import get_google_cloud_tts
 
 logger = logging.getLogger(__name__)
 
 
 class TTSManager:
     """
-    Менеджер TTS систем для bot_service.
+    РњРµРЅРµРґР¶РµСЂ TTS СЃРёСЃС‚РµРј РґР»СЏ bot_service.
     
-    Архитектура:
-    - AI TTS (F5-TTS) находится на отдельной машине (tts_service)
-    - Базовая TTS (gTTS) работает локально в bot_service как fallback
+    РђСЂС…РёС‚РµРєС‚СѓСЂР°:
+    - AI TTS (F5-TTS) РЅР°С…РѕРґРёС‚СЃСЏ РЅР° РѕС‚РґРµР»СЊРЅРѕР№ РјР°С€РёРЅРµ (tts_service)
+    - Р‘Р°Р·РѕРІР°СЏ TTS (gTTS) СЂР°Р±РѕС‚Р°РµС‚ Р»РѕРєР°Р»СЊРЅРѕ РІ bot_service РєР°Рє fallback
     
-    Логика работы:
-    1. Если AI TTS включена и доступна -> используем F5-TTS через HTTP
-    2. Если AI TTS недоступна или не включена -> fallback на базовую TTS (gTTS)
-    3. Базовая TTS всегда доступна как резервная система
+    Р›РѕРіРёРєР° СЂР°Р±РѕС‚С‹:
+    1. Р•СЃР»Рё AI TTS РІРєР»СЋС‡РµРЅР° Рё РґРѕСЃС‚СѓРїРЅР° -> РёСЃРїРѕР»СЊР·СѓРµРј F5-TTS С‡РµСЂРµР· HTTP
+    2. Р•СЃР»Рё AI TTS РЅРµРґРѕСЃС‚СѓРїРЅР° РёР»Рё РЅРµ РІРєР»СЋС‡РµРЅР° -> fallback РЅР° Р±Р°Р·РѕРІСѓСЋ TTS (gTTS)
+    3. Р‘Р°Р·РѕРІР°СЏ TTS РІСЃРµРіРґР° РґРѕСЃС‚СѓРїРЅР° РєР°Рє СЂРµР·РµСЂРІРЅР°СЏ СЃРёСЃС‚РµРјР°
     
-    Улучшения (Task 5.3):
-    - Использует settings.tts_service_url из конфигурации
-    - Health check перед каждым синтезом
-    - Exponential backoff для retry логики
+    РЈР»СѓС‡С€РµРЅРёСЏ (Task 5.3):
+    - РСЃРїРѕР»СЊР·СѓРµС‚ settings.tts_service_url РёР· РєРѕРЅС„РёРіСѓСЂР°С†РёРё
+    - Health check РїРµСЂРµРґ РєР°Р¶РґС‹Рј СЃРёРЅС‚РµР·РѕРј
+    - Exponential backoff РґР»СЏ retry Р»РѕРіРёРєРё
     """
 
     def __init__(self):
@@ -51,24 +53,25 @@ class TTSManager:
         self.tts_service_url = settings.tts_service_url
         self.backend_url = settings.backend_url
         self.basic_tts = get_basic_tts()
+        self.google_cloud_tts = get_google_cloud_tts()
 
-        # Кеш состояния TTS сервиса
+        # РљРµС€ СЃРѕСЃС‚РѕСЏРЅРёСЏ TTS СЃРµСЂРІРёСЃР°
         self._tts_service_available = True
         self._last_health_check = 0
         self._health_check_interval = TTS_HEALTH_CHECK_INTERVAL
 
-        logger.info(f"[OK] TTS Manager инициализирован. TTS Service URL: {self.tts_service_url}")
+        logger.info(f"[OK] TTS Manager РёРЅРёС†РёР°Р»РёР·РёСЂРѕРІР°РЅ. TTS Service URL: {self.tts_service_url}")
 
     async def get_user_tts_endpoint(self, user_id: int, db_session) -> Optional[str]:
         """
-        Получить TTS endpoint пользователя (локальный или централизованный).
+        РџРѕР»СѓС‡РёС‚СЊ TTS endpoint РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (Р»РѕРєР°Р»СЊРЅС‹Р№ РёР»Рё С†РµРЅС‚СЂР°Р»РёР·РѕРІР°РЅРЅС‹Р№).
         
         Args:
-            user_id: ID пользователя
-            db_session: Сессия БД
+            user_id: ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+            db_session: РЎРµСЃСЃРёСЏ Р‘Р”
             
         Returns:
-            URL endpoint или None (использовать централизованный)
+            URL endpoint РёР»Рё None (РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ С†РµРЅС‚СЂР°Р»РёР·РѕРІР°РЅРЅС‹Р№)
         """
         try:
             from repositories.local_tts_repository import LocalTTSRepository
@@ -78,7 +81,7 @@ class TTSManager:
             local_config = repo.get_healthy(user_id=user_id)
 
             if local_config:
-                logger.info(f"[LOCAL] Используется локальный TTS endpoint для user_id={user_id}: {local_config.endpoint_url}")
+                logger.info(f"[LOCAL] РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ Р»РѕРєР°Р»СЊРЅС‹Р№ TTS endpoint РґР»СЏ user_id={user_id}: {local_config.endpoint_url}")
                 return local_config.endpoint_url
 
             return None
@@ -89,22 +92,22 @@ class TTSManager:
 
     async def check_tts_service_health(self, force_check: bool = False) -> bool:
         """
-        Проверка доступности TTS сервиса (F5-TTS) с улучшенной обработкой ошибок.
+        РџСЂРѕРІРµСЂРєР° РґРѕСЃС‚СѓРїРЅРѕСЃС‚Рё TTS СЃРµСЂРІРёСЃР° (F5-TTS) СЃ СѓР»СѓС‡С€РµРЅРЅРѕР№ РѕР±СЂР°Р±РѕС‚РєРѕР№ РѕС€РёР±РѕРє.
         
         Args:
-            force_check: Принудительная проверка, игнорируя кеш (для админки)
+            force_check: РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅР°СЏ РїСЂРѕРІРµСЂРєР°, РёРіРЅРѕСЂРёСЂСѓСЏ РєРµС€ (РґР»СЏ Р°РґРјРёРЅРєРё)
         
         Returns:
-            bool: True если сервис доступен
+            bool: True РµСЃР»Рё СЃРµСЂРІРёСЃ РґРѕСЃС‚СѓРїРµРЅ
         """
         current_time = time.time()
 
-        # Проверяем кеш только если не форсируем проверку
+        # РџСЂРѕРІРµСЂСЏРµРј РєРµС€ С‚РѕР»СЊРєРѕ РµСЃР»Рё РЅРµ С„РѕСЂСЃРёСЂСѓРµРј РїСЂРѕРІРµСЂРєСѓ
         if not force_check and current_time - self._last_health_check < self._health_check_interval:
             return self._tts_service_available
 
         try:
-            # Используем короткий таймаут для health check
+            # РСЃРїРѕР»СЊР·СѓРµРј РєРѕСЂРѕС‚РєРёР№ С‚Р°Р№РјР°СѓС‚ РґР»СЏ health check
             timeout = aiohttp.ClientTimeout(total=5, connect=2)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
@@ -114,12 +117,12 @@ class TTSManager:
                         data = await response.json()
                         is_healthy = data.get("tts_engine_loaded", False)
 
-                        # Логируем изменение статуса только если он изменился
+                        # Р›РѕРіРёСЂСѓРµРј РёР·РјРµРЅРµРЅРёРµ СЃС‚Р°С‚СѓСЃР° С‚РѕР»СЊРєРѕ РµСЃР»Рё РѕРЅ РёР·РјРµРЅРёР»СЃСЏ
                         if is_healthy != self._tts_service_available:
                             if is_healthy:
-                                logger.info("[OK] TTS Service (F5-TTS) стал доступен")
+                                logger.info("[OK] TTS Service (F5-TTS) СЃС‚Р°Р» РґРѕСЃС‚СѓРїРµРЅ")
                             else:
-                                logger.warning("[WARN] TTS Service (F5-TTS) недоступен, fallback на базовую TTS")
+                                logger.warning("[WARN] TTS Service (F5-TTS) РЅРµРґРѕСЃС‚СѓРїРµРЅ, fallback РЅР° Р±Р°Р·РѕРІСѓСЋ TTS")
 
                         self._tts_service_available = is_healthy
                         self._last_health_check = current_time
@@ -144,9 +147,9 @@ class TTSManager:
             self._last_health_check = current_time
             return False
         except Exception as e:
-            # Не логируем ошибку при принудительной проверке из админки
+            # РќРµ Р»РѕРіРёСЂСѓРµРј РѕС€РёР±РєСѓ РїСЂРё РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕР№ РїСЂРѕРІРµСЂРєРµ РёР· Р°РґРјРёРЅРєРё
             if not force_check:
-                logger.error(f"[ERROR] Ошибка проверки TTS Service: {e}")
+                logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё TTS Service: {e}")
             self._tts_service_available = False
             self._last_health_check = current_time
             return False
@@ -157,31 +160,37 @@ class TTSManager:
         text: str,
         author: str,
         user_id: int = None,
-        volume_level: float = TTS_DEFAULT_VOLUME,  # Используем константу вместо хардкода
+        volume_level: float = TTS_DEFAULT_VOLUME,  # РСЃРїРѕР»СЊР·СѓРµРј РєРѕРЅСЃС‚Р°РЅС‚Сѓ РІРјРµСЃС‚Рѕ С…Р°СЂРґРєРѕРґР°
         use_ai_tts: bool = False,
         use_basic_tts: bool = True,
         connection_manager=None,
         tts_settings: dict = None,
         word_filter: list = None,
         blocked_users: list = None,
-        db_session=None
+        db_session=None,
+        engine: Optional[str] = None
     ) -> Dict:
         """
-        Синтезирует речь с автоматическим fallback на базовую TTS.
+        РЎРёРЅС‚РµР·РёСЂСѓРµС‚ СЂРµС‡СЊ СЃ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёРј fallback РЅР° Р±Р°Р·РѕРІСѓСЋ TTS.
         
-        [OK] НОВАЯ ЛОГИКА: 
-        - Если use_ai_tts=True, пытаемся F5-TTS ДО 3 раз
-        - Если F5-TTS падает или недоступен → автоматический fallback на gTTS
-        - Базовая TTS ВСЕГДА включена как резервная система
+        [OK] РќРћР’РђРЇ Р›РћР“РРљРђ: 
+        - Р•СЃР»Рё use_ai_tts=True, РїС‹С‚Р°РµРјСЃСЏ F5-TTS Р”Рћ 3 СЂР°Р·
+        - Р•СЃР»Рё F5-TTS РїР°РґР°РµС‚ РёР»Рё РЅРµРґРѕСЃС‚СѓРїРµРЅ в†’ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРёР№ fallback РЅР° gTTS
+        - Р‘Р°Р·РѕРІР°СЏ TTS Р’РЎР•Р“Р”Рђ РІРєР»СЋС‡РµРЅР° РєР°Рє СЂРµР·РµСЂРІРЅР°СЏ СЃРёСЃС‚РµРјР°
         """
-        logger.info(f"[MIC] TTS запрос: канал={channel_name}, текст='{text[:50]}...', AI={use_ai_tts}")
+        resolved_engine = engine
+        if not resolved_engine:
+            resolved_engine = "f5tts" if use_ai_tts else "gtts"
 
-        # [OK] ВСЕГДА включаем базовую TTS как fallback (по умолчанию)
-        # Переопределяем: если use_ai_tts=True, пытаемся AI, но fallback=gTTS
-        final_use_basic_tts = True  # ВСЕГДА используем gTTS как fallback
+        logger.info(f"[MIC] Engine resolved: {resolved_engine}")
+        logger.info(f"[MIC] TTS Р·Р°РїСЂРѕСЃ: РєР°РЅР°Р»={channel_name}, С‚РµРєСЃС‚='{text[:50]}...', AI={use_ai_tts}")
 
-        # Приоритет 1: AI TTS (F5-TTS) через HTTP с retry логикой и exponential backoff
-        if use_ai_tts:
+        # [OK] Р’РЎР•Р“Р”Рђ РІРєР»СЋС‡Р°РµРј Р±Р°Р·РѕРІСѓСЋ TTS РєР°Рє fallback (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ)
+        # РџРµСЂРµРѕРїСЂРµРґРµР»СЏРµРј: РµСЃР»Рё use_ai_tts=True, РїС‹С‚Р°РµРјСЃСЏ AI, РЅРѕ fallback=gTTS
+        final_use_basic_tts = True  # Р’РЎР•Р“Р”Рђ РёСЃРїРѕР»СЊР·СѓРµРј gTTS РєР°Рє fallback
+
+        # РџСЂРёРѕСЂРёС‚РµС‚ 1: AI TTS (F5-TTS) С‡РµСЂРµР· HTTP СЃ retry Р»РѕРіРёРєРѕР№ Рё exponential backoff
+        if resolved_engine == "f5tts" and use_ai_tts:
             logger.info("[MIC] [PRIORITY 1] Trying AI TTS (F5-TTS) with fallback support")
             max_retries = TTS_MAX_RETRIES
             base_retry_delay = TTS_RETRY_DELAY
@@ -193,12 +202,12 @@ class TTSManager:
                     tts_endpoint = local_endpoint
                     logger.info(f"[LOCAL] Using local TTS endpoint: {local_endpoint}")
 
-            # Health check перед началом синтеза
+            # Health check РїРµСЂРµРґ РЅР°С‡Р°Р»РѕРј СЃРёРЅС‚РµР·Р°
             is_healthy = await self.check_tts_service_health()
             if not is_healthy:
-                logger.warning("[WARN] TTS Service недоступен по health check, пропускаем AI TTS")
+                logger.warning("[WARN] TTS Service РЅРµРґРѕСЃС‚СѓРїРµРЅ РїРѕ health check, РїСЂРѕРїСѓСЃРєР°РµРј AI TTS")
             else:
-                # Проверяем доступность TTS сервиса с retry и exponential backoff
+                # РџСЂРѕРІРµСЂСЏРµРј РґРѕСЃС‚СѓРїРЅРѕСЃС‚СЊ TTS СЃРµСЂРІРёСЃР° СЃ retry Рё exponential backoff
                 for attempt in range(1, max_retries + 1):
                     try:
                         result = await self._synthesize_via_tts_service(
@@ -206,54 +215,70 @@ class TTSManager:
                             tts_settings, word_filter, blocked_users, tts_endpoint=tts_endpoint
                         )
                         if result.get("success"):
-                            logger.info(f"[OK] AI TTS (F5-TTS) синтез успешен (попытка {attempt}/{max_retries})")
+                            logger.info(f"[OK] AI TTS (F5-TTS) СЃРёРЅС‚РµР· СѓСЃРїРµС€РµРЅ (РїРѕРїС‹С‚РєР° {attempt}/{max_retries})")
                             return result
                         else:
-                            logger.warning(f"[WARN] AI TTS попытка {attempt}/{max_retries} не удалась: {result.get('error')}")
+                            logger.warning(f"[WARN] AI TTS РїРѕРїС‹С‚РєР° {attempt}/{max_retries} РЅРµ СѓРґР°Р»Р°СЃСЊ: {result.get('error')}")
                             if attempt < max_retries:
                                 # Exponential backoff: 1s, 2s, 4s
                                 delay = base_retry_delay * (2 ** (attempt - 1))
-                                logger.info(f"⏳ Ожидание {delay}s перед следующей попыткой...")
+                                logger.info(f"вЏі РћР¶РёРґР°РЅРёРµ {delay}s РїРµСЂРµРґ СЃР»РµРґСѓСЋС‰РµР№ РїРѕРїС‹С‚РєРѕР№...")
                                 await asyncio.sleep(delay)
 
                     except asyncio.TimeoutError:
-                        logger.warning(f"[WARN] AI TTS timeout (попытка {attempt}/{max_retries})")
+                        logger.warning(f"[WARN] AI TTS timeout (РїРѕРїС‹С‚РєР° {attempt}/{max_retries})")
                         if attempt < max_retries:
                             delay = base_retry_delay * (2 ** (attempt - 1))
                             await asyncio.sleep(delay)
                     except aiohttp.ClientError as e:
-                        logger.warning(f"[WARN] AI TTS connection error (попытка {attempt}/{max_retries}): {e}")
+                        logger.warning(f"[WARN] AI TTS connection error (РїРѕРїС‹С‚РєР° {attempt}/{max_retries}): {e}")
                         if attempt < max_retries:
                             delay = base_retry_delay * (2 ** (attempt - 1))
                             await asyncio.sleep(delay)
                     except Exception as e:
-                        logger.error(f"[ERROR] Ошибка AI TTS (попытка {attempt}/{max_retries}): {e}")
+                        logger.error(f"[ERROR] РћС€РёР±РєР° AI TTS (РїРѕРїС‹С‚РєР° {attempt}/{max_retries}): {e}")
                         if attempt < max_retries:
                             delay = base_retry_delay * (2 ** (attempt - 1))
                             await asyncio.sleep(delay)
                         else:
-                            logger.error("[ERROR] Все попытки AI TTS исчерпаны, используем fallback на gTTS")
+                            logger.error("[ERROR] Р’СЃРµ РїРѕРїС‹С‚РєРё AI TTS РёСЃС‡РµСЂРїР°РЅС‹, РёСЃРїРѕР»СЊР·СѓРµРј fallback РЅР° gTTS")
 
-                logger.warning(f"[WARN] AI TTS (F5-TTS) недоступен после {max_retries} попыток, fallback на базовую TTS (gTTS)")
+                logger.warning(f"[WARN] AI TTS (F5-TTS) РЅРµРґРѕСЃС‚СѓРїРµРЅ РїРѕСЃР»Рµ {max_retries} РїРѕРїС‹С‚РѕРє, fallback РЅР° Р±Р°Р·РѕРІСѓСЋ TTS (gTTS)")
 
-        # Приоритет 2: Базовая TTS (gTTS) - ВСЕГДА доступна как fallback
+        # РџСЂРёРѕСЂРёС‚РµС‚ 2: Р‘Р°Р·РѕРІР°СЏ TTS (gTTS) - Р’РЎР•Р“Р”Рђ РґРѕСЃС‚СѓРїРЅР° РєР°Рє fallback
+        if resolved_engine == "gcloud":
+            logger.info("[MIC] [PRIORITY 1B] Trying Google Cloud TTS with fallback support")
+            try:
+                result = await self._synthesize_via_google_cloud_tts(
+                    text=text,
+                    volume_level=volume_level,
+                    tts_settings=tts_settings or {}
+                )
+                if result.get("success"):
+                    logger.info("[OK] Google Cloud TTS synthesis succeeded")
+                    self.cleanup_old_files_if_needed()
+                    return result
+                logger.warning(f"[WARN] Google Cloud TTS failed: {result.get('error')}, fallback to gTTS")
+            except Exception as e:
+                logger.error(f"[ERROR] Google Cloud TTS error: {e}")
+
         if final_use_basic_tts:
             logger.info("[MIC] [PRIORITY 2] Using basic TTS (gTTS) - ALWAYS AVAILABLE AS FALLBACK")
             try:
                 result = await self._synthesize_via_basic_tts(text, volume_level)
                 if result.get("success"):
-                    logger.info("[OK] Базовая TTS (gTTS) синтез успешен")
+                    logger.info("[OK] Р‘Р°Р·РѕРІР°СЏ TTS (gTTS) СЃРёРЅС‚РµР· СѓСЃРїРµС€РµРЅ")
                     self.cleanup_old_files_if_needed()
                     return result
                 else:
-                    logger.error(f"[ERROR] Базовая TTS (gTTS) синтез не удался: {result.get('error')}")
+                    logger.error(f"[ERROR] Р‘Р°Р·РѕРІР°СЏ TTS (gTTS) СЃРёРЅС‚РµР· РЅРµ СѓРґР°Р»СЃСЏ: {result.get('error')}")
                     return {"success": False, "error": "Basic TTS synthesis failed"}
             except Exception as e:
-                logger.error(f"[ERROR] Ошибка базовой TTS (gTTS): {e}")
+                logger.error(f"[ERROR] РћС€РёР±РєР° Р±Р°Р·РѕРІРѕР№ TTS (gTTS): {e}")
                 return {"success": False, "error": f"Basic TTS error: {e}"}
 
-        # Если ничего не сработало (почти невозможно)
-        logger.error("[ERROR] Ни одна TTS система не смогла выполнить синтез")
+        # Р•СЃР»Рё РЅРёС‡РµРіРѕ РЅРµ СЃСЂР°Р±РѕС‚Р°Р»Рѕ (РїРѕС‡С‚Рё РЅРµРІРѕР·РјРѕР¶РЅРѕ)
+        logger.error("[ERROR] РќРё РѕРґРЅР° TTS СЃРёСЃС‚РµРјР° РЅРµ СЃРјРѕРіР»Р° РІС‹РїРѕР»РЅРёС‚СЊ СЃРёРЅС‚РµР·")
         return {"success": False, "error": "No TTS system available"}
 
     async def _synthesize_via_tts_service(
@@ -270,19 +295,19 @@ class TTSManager:
         tts_endpoint: str = None
     ) -> Dict:
         """
-        Синтез через удаленный TTS сервис (F5-TTS) с улучшенной обработкой ошибок.
+        РЎРёРЅС‚РµР· С‡РµСЂРµР· СѓРґР°Р»РµРЅРЅС‹Р№ TTS СЃРµСЂРІРёСЃ (F5-TTS) СЃ СѓР»СѓС‡С€РµРЅРЅРѕР№ РѕР±СЂР°Р±РѕС‚РєРѕР№ РѕС€РёР±РѕРє.
         
         Args:
-            tts_endpoint: URL TTS сервиса (локальный или централизованный)
+            tts_endpoint: URL TTS СЃРµСЂРІРёСЃР° (Р»РѕРєР°Р»СЊРЅС‹Р№ РёР»Рё С†РµРЅС‚СЂР°Р»РёР·РѕРІР°РЅРЅС‹Р№)
         
         Returns:
-            Dict с результатом синтеза или ошибкой
+            Dict СЃ СЂРµР·СѓР»СЊС‚Р°С‚РѕРј СЃРёРЅС‚РµР·Р° РёР»Рё РѕС€РёР±РєРѕР№
         """
         try:
-            # Используем переданный endpoint или дефолтный
+            # РСЃРїРѕР»СЊР·СѓРµРј РїРµСЂРµРґР°РЅРЅС‹Р№ endpoint РёР»Рё РґРµС„РѕР»С‚РЅС‹Р№
             endpoint = tts_endpoint or self.tts_service_url
 
-            # Настраиваем таймауты: 30s total, 10s connect
+            # РќР°СЃС‚СЂР°РёРІР°РµРј С‚Р°Р№РјР°СѓС‚С‹: 30s total, 10s connect
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
 
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -304,16 +329,16 @@ class TTSManager:
                         selected_voice = result.get("selected_voice")
                         audio_url_raw = result.get("audio_url")  # Extract audio URL from response
 
-                        # [START] FIX: Преобразуем относительный путь в полный URL для фронтенда
+                        # [START] FIX: РџСЂРµРѕР±СЂР°Р·СѓРµРј РѕС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ РІ РїРѕР»РЅС‹Р№ URL РґР»СЏ С„СЂРѕРЅС‚РµРЅРґР°
                         if audio_url_raw:
                             if audio_url_raw.startswith('http://') or audio_url_raw.startswith('https://'):
-                                # Уже полный URL
+                                # РЈР¶Рµ РїРѕР»РЅС‹Р№ URL
                                 audio_url = audio_url_raw
                             elif audio_url_raw.startswith('/'):
-                                # Относительный путь - добавляем TTS_SERVICE_URL
+                                # РћС‚РЅРѕСЃРёС‚РµР»СЊРЅС‹Р№ РїСѓС‚СЊ - РґРѕР±Р°РІР»СЏРµРј TTS_SERVICE_URL
                                 audio_url = f"{endpoint}{audio_url_raw}"
                             else:
-                                # Просто имя файла - добавляем путь к audio endpoint
+                                # РџСЂРѕСЃС‚Рѕ РёРјСЏ С„Р°Р№Р»Р° - РґРѕР±Р°РІР»СЏРµРј РїСѓС‚СЊ Рє audio endpoint
                                 audio_url = f"{endpoint}/api/tts/audio/{audio_url_raw}"
                         else:
                             audio_url = None
@@ -321,12 +346,12 @@ class TTSManager:
                         logger.info(f"[MIC] TTS Service response: {result}")
                         logger.info(f"[LINK] Audio URL (raw): {audio_url_raw}, (full): {audio_url}")
 
-                        # Если есть connection_manager и выбран голос, проверяем приоритетную громкость
+                        # Р•СЃР»Рё РµСЃС‚СЊ connection_manager Рё РІС‹Р±СЂР°РЅ РіРѕР»РѕСЃ, РїСЂРѕРІРµСЂСЏРµРј РїСЂРёРѕСЂРёС‚РµС‚РЅСѓСЋ РіСЂРѕРјРєРѕСЃС‚СЊ
                         if connection_manager and selected_voice:
                             priority_volume = connection_manager.get_voice_volume(channel_name, selected_voice)
-                            if priority_volume != TTS_DEFAULT_VOLUME:  # Если есть кастомная громкость (не дефолтная)
-                                logger.info(f"[VOLUME] Приоритетная громкость для голоса {selected_voice}: {priority_volume}% (default: {TTS_DEFAULT_VOLUME}%)")
-                                # Пересылаем запрос с приоритетной громкостью
+                            if priority_volume != TTS_DEFAULT_VOLUME:  # Р•СЃР»Рё РµСЃС‚СЊ РєР°СЃС‚РѕРјРЅР°СЏ РіСЂРѕРјРєРѕСЃС‚СЊ (РЅРµ РґРµС„РѕР»С‚РЅР°СЏ)
+                                logger.info(f"[VOLUME] РџСЂРёРѕСЂРёС‚РµС‚РЅР°СЏ РіСЂРѕРјРєРѕСЃС‚СЊ РґР»СЏ РіРѕР»РѕСЃР° {selected_voice}: {priority_volume}% (default: {TTS_DEFAULT_VOLUME}%)")
+                                # РџРµСЂРµСЃС‹Р»Р°РµРј Р·Р°РїСЂРѕСЃ СЃ РїСЂРёРѕСЂРёС‚РµС‚РЅРѕР№ РіСЂРѕРјРєРѕСЃС‚СЊСЋ
                                 data["volume_level"] = priority_volume
                                 async with session.post(url, json=data, timeout=timeout) as priority_response:
                                     if priority_response.status == 200:
@@ -336,7 +361,7 @@ class TTSManager:
                                             "voice": selected_voice,
                                             "volume": priority_volume,
                                             "tts_type": "ai_f5",
-                                            "audio_url": audio_url  # [OK] Полный URL
+                                            "audio_url": audio_url  # [OK] РџРѕР»РЅС‹Р№ URL
                                         }
 
                         return {
@@ -344,11 +369,11 @@ class TTSManager:
                             "voice": selected_voice,
                             "volume": volume_level,
                             "tts_type": "ai_f5",
-                            "audio_url": audio_url  # [OK] Полный URL
+                            "audio_url": audio_url  # [OK] РџРѕР»РЅС‹Р№ URL
                         }
                     else:
                         error_text = await response.text()
-                        logger.error(f"[ERROR] TTS Service вернул ошибку {response.status}: {error_text}")
+                        logger.error(f"[ERROR] TTS Service РІРµСЂРЅСѓР» РѕС€РёР±РєСѓ {response.status}: {error_text}")
                         return {"success": False, "error": f"TTS Service error: {response.status}"}
 
         except asyncio.TimeoutError:
@@ -358,8 +383,8 @@ class TTSManager:
             logger.error(f"[ERROR] TTS Service connection error: {e}")
             return {"success": False, "error": f"Connection error: {str(e)}"}
         except Exception as e:
-            logger.error(f"[ERROR] Ошибка при запросе к TTS Service: {e}")
-            return {"success": False, "error": str(e)}
+            logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРё Р·Р°РїСЂРѕСЃРµ Рє TTS Service: {e}")
+            return {"success": False, "error": "Internal server error"}
 
     async def _synthesize_via_basic_tts(
         self,
@@ -367,11 +392,11 @@ class TTSManager:
         volume_level: float
     ) -> Dict:
         """
-        Синтез через локальную базовую TTS (gTTS).
-        Работает ПОЛНОСТЬЮ локально без зависимости от tts_service.
+        РЎРёРЅС‚РµР· С‡РµСЂРµР· Р»РѕРєР°Р»СЊРЅСѓСЋ Р±Р°Р·РѕРІСѓСЋ TTS (gTTS).
+        Р Р°Р±РѕС‚Р°РµС‚ РџРћР›РќРћРЎРўР¬Р® Р»РѕРєР°Р»СЊРЅРѕ Р±РµР· Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ tts_service.
         """
         try:
-            # gTTS синхронный, но быстрый, можно вызвать напрямую
+            # gTTS СЃРёРЅС…СЂРѕРЅРЅС‹Р№, РЅРѕ Р±С‹СЃС‚СЂС‹Р№, РјРѕР¶РЅРѕ РІС‹Р·РІР°С‚СЊ РЅР°РїСЂСЏРјСѓСЋ
             audio_path = self.basic_tts.synthesize_speech(
                 text=text,
                 volume_level=volume_level,
@@ -379,8 +404,8 @@ class TTSManager:
             )
 
             if audio_path:
-                # [OK] ИСПОЛЬЗУЕМ ЛОКАЛЬНОЕ ОБСЛУЖИВАНИЕ БЕЗ ЗАГРУЗКИ НА TTS_SERVICE
-                # Базовая TTS работает НЕЗАВИСИМО от tts_service
+                # [OK] РРЎРџРћР›Р¬Р—РЈР•Рњ Р›РћРљРђР›Р¬РќРћР• РћР‘РЎР›РЈР–РР’РђРќРР• Р‘Р•Р— Р—РђР“Р РЈР—РљР РќРђ TTS_SERVICE
+                # Р‘Р°Р·РѕРІР°СЏ TTS СЂР°Р±РѕС‚Р°РµС‚ РќР•Р—РђР’РРЎРРњРћ РѕС‚ tts_service
                 filename = Path(audio_path).name
                 # Use backend_url from settings
                 audio_url = f"{self.backend_url}/api/tts/audio/{filename}"
@@ -394,7 +419,7 @@ class TTSManager:
                     "volume": volume_level,
                     "tts_type": "basic_gtts",
                     "audio_url": audio_url,
-                    "audio_path": audio_path  # Оставляем для внутреннего использования
+                    "audio_path": audio_path  # РћСЃС‚Р°РІР»СЏРµРј РґР»СЏ РІРЅСѓС‚СЂРµРЅРЅРµРіРѕ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ
                 }
             else:
                 logger.error("[ERROR] [BASIC TTS] synthesis_speech returned None")
@@ -402,11 +427,55 @@ class TTSManager:
 
         except Exception as e:
             logger.error(f"[ERROR] [BASIC TTS] Error: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Internal server error"}
+
+    async def _synthesize_via_google_cloud_tts(
+        self,
+        text: str,
+        volume_level: float,
+        tts_settings: dict
+    ) -> Dict:
+        """
+        Synthesize via Google Cloud TTS.
+        """
+        try:
+            voice_pool = []
+            if tts_settings:
+                voice_pool = tts_settings.get("gcloud_voices") or tts_settings.get("gcloudVoices") or []
+            voice_name = random.choice(voice_pool) if voice_pool else (tts_settings.get("voice") if tts_settings else None)
+            result = await self.google_cloud_tts.synthesize_speech(
+                text=text,
+                volume_level=volume_level,
+                speed=1.0,
+                voice_name=voice_name
+            )
+
+            if not result.get("success"):
+                return result
+
+            audio_path = result.get("audio_path")
+            if not audio_path:
+                return {"success": False, "error": "No audio_path returned"}
+
+            filename = Path(audio_path).name
+            audio_url = f"{self.backend_url}/api/tts/audio/{filename}"
+
+            return {
+                "success": True,
+                "voice": result.get("voice") or "google_cloud",
+                "volume": volume_level,
+                "tts_type": "google_cloud",
+                "audio_url": audio_url,
+                "audio_path": audio_path
+            }
+
+        except Exception as e:
+            logger.error(f"[ERROR] Google Cloud TTS error: {e}")
+            return {"success": False, "error": "Internal server error"}
 
     async def _upload_to_tts_service(self, audio_path: str) -> Optional[str]:
         """
-        Загружает аудио файл в TTS сервис для обслуживания.
+        Р—Р°РіСЂСѓР¶Р°РµС‚ Р°СѓРґРёРѕ С„Р°Р№Р» РІ TTS СЃРµСЂРІРёСЃ РґР»СЏ РѕР±СЃР»СѓР¶РёРІР°РЅРёСЏ.
         """
         try:
             import aiohttp
@@ -418,7 +487,7 @@ class TTSManager:
                 audio_data = await f.read()
 
             async with aiohttp.ClientSession() as session:
-                # Отправляем файл в TTS сервис
+                # РћС‚РїСЂР°РІР»СЏРµРј С„Р°Р№Р» РІ TTS СЃРµСЂРІРёСЃ
                 data = aiohttp.FormData()
                 data.add_field('file', audio_data, filename=filename, content_type='audio/wav')
 
@@ -426,44 +495,44 @@ class TTSManager:
                     if response.status == 200:
                         await response.json()
                         audio_url = f"{self.tts_service_url}/api/audio/{filename}"
-                        logger.info(f"[OK] Аудио файл загружен в TTS сервис: {audio_url}")
+                        logger.info(f"[OK] РђСѓРґРёРѕ С„Р°Р№Р» Р·Р°РіСЂСѓР¶РµРЅ РІ TTS СЃРµСЂРІРёСЃ: {audio_url}")
                         return audio_url
                     else:
-                        logger.warning(f"[WARN] Не удалось загрузить в TTS сервис: {response.status}")
+                        logger.warning(f"[WARN] РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РІ TTS СЃРµСЂРІРёСЃ: {response.status}")
                         return None
 
         except Exception as e:
-            logger.error(f"[ERROR] Ошибка загрузки в TTS сервис: {e}")
+            logger.error(f"[ERROR] РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё РІ TTS СЃРµСЂРІРёСЃ: {e}")
             return None
 
     def cleanup_old_files(self):
-        """Очистка старых временных файлов базовой TTS"""
+        """РћС‡РёСЃС‚РєР° СЃС‚Р°СЂС‹С… РІСЂРµРјРµРЅРЅС‹С… С„Р°Р№Р»РѕРІ Р±Р°Р·РѕРІРѕР№ TTS"""
         try:
             self.basic_tts.cleanup_old_files()
         except Exception as e:
-            logger.error(f"[ERROR] Ошибка при очистке файлов: {e}")
+            logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРё РѕС‡РёСЃС‚РєРµ С„Р°Р№Р»РѕРІ: {e}")
 
     def cleanup_old_files_if_needed(self):
-        """Очистка старых файлов при необходимости (каждые 10 синтезов)"""
+        """РћС‡РёСЃС‚РєР° СЃС‚Р°СЂС‹С… С„Р°Р№Р»РѕРІ РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё (РєР°Р¶РґС‹Рµ 10 СЃРёРЅС‚РµР·РѕРІ)"""
         if not hasattr(self, '_synthesis_count'):
             self._synthesis_count = 0
 
         self._synthesis_count += 1
 
-        # Очищаем каждые 10 синтезов
+        # РћС‡РёС‰Р°РµРј РєР°Р¶РґС‹Рµ 10 СЃРёРЅС‚РµР·РѕРІ
         if self._synthesis_count % 10 == 0:
             try:
                 self.cleanup_old_files()
-                logger.info(f"[CLEAN] Периодическая очистка TTS файлов (синтез #{self._synthesis_count})")
+                logger.info(f"[CLEAN] РџРµСЂРёРѕРґРёС‡РµСЃРєР°СЏ РѕС‡РёСЃС‚РєР° TTS С„Р°Р№Р»РѕРІ (СЃРёРЅС‚РµР· #{self._synthesis_count})")
             except Exception as e:
-                logger.error(f"[ERROR] Ошибка при периодической очистке: {e}")
+                logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРё РїРµСЂРёРѕРґРёС‡РµСЃРєРѕР№ РѕС‡РёСЃС‚РєРµ: {e}")
 
 
-# Глобальный экземпляр TTS Manager
+# Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ СЌРєР·РµРјРїР»СЏСЂ TTS Manager
 _tts_manager_instance = None
 
 def get_tts_manager() -> TTSManager:
-    """Получить глобальный экземпляр TTS Manager (singleton)"""
+    """РџРѕР»СѓС‡РёС‚СЊ РіР»РѕР±Р°Р»СЊРЅС‹Р№ СЌРєР·РµРјРїР»СЏСЂ TTS Manager (singleton)"""
     global _tts_manager_instance
     if _tts_manager_instance is None:
         _tts_manager_instance = TTSManager()

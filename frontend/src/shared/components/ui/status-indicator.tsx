@@ -29,36 +29,36 @@ const StatusIndicator: React.FC<StatusIndicatorProps> = ({
             case 'success':
                 return {
                     icon: CheckCircle,
-                    color: 'text-green-600',
-                    bgColor: 'bg-green-100',
+                    color: 'text-emerald-300',
+                    bgColor: 'bg-emerald-500/15',
                     message: message || 'Готово'
                 };
             case 'error':
                 return {
                     icon: AlertCircle,
-                    color: 'text-red-600',
-                    bgColor: 'bg-red-100',
+                    color: 'text-red-300',
+                    bgColor: 'bg-red-500/15',
                     message: message || 'Ошибка'
                 };
             case 'loading':
                 return {
                     icon: Loader2,
-                    color: 'text-blue-600',
-                    bgColor: 'bg-blue-100',
+                    color: 'text-blue-300',
+                    bgColor: 'bg-blue-500/15',
                     message: message || 'Загрузка...'
                 };
             case 'pending':
                 return {
                     icon: Clock,
-                    color: 'text-yellow-600',
-                    bgColor: 'bg-yellow-100',
+                    color: 'text-yellow-300',
+                    bgColor: 'bg-yellow-500/15',
                     message: message || 'Ожидание'
                 };
             default:
                 return {
                     icon: Clock,
-                    color: 'text-gray-600',
-                    bgColor: 'bg-gray-100',
+                    color: 'text-muted-foreground',
+                    bgColor: 'bg-muted/60',
                     message: message || 'Неизвестно'
                 };
         }

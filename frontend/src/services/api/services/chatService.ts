@@ -24,6 +24,11 @@ interface GuestStatusResponse {
   connected?: boolean;
 }
 
+interface ChatAnalysisResponse {
+  result?: string;
+  channel_name?: string;
+}
+
 /**
  * Chat Service
  */
@@ -59,6 +64,13 @@ export const chatService = {
    */
   async getChatHistory(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/chat/history', { params });
+  },
+
+  /**
+   * Запустить анализ пользователя по сообщениям
+   */
+  async analyzeUser(data: { username: string; platform: 'twitch' | 'vk'; channel_name?: string }): Promise<AxiosResponse<ApiResponse<ChatAnalysisResponse>>> {
+    return apiClient.post('/api/chat/analysis', data);
   },
 
   /**

@@ -223,7 +223,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
                     {platform === 'twitch' ? (
                       <TwitchIcon className="w-5 h-5 text-purple-400" />
                     ) : (
-                      <VKIcon className="w-5 h-5 text-[#FF0062]" />
+                      <VKIcon className="w-5 h-5 text-[#FF4444]" />
                     )}
 
                     <div className="flex items-center gap-2">

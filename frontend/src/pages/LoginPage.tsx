@@ -114,7 +114,7 @@ const LoginPage: React.FC = () => {
 
         return (
             <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative">
-                <Card className="login-card w-full max-w-sm shadow-2xl h-[280px] flex items-center justify-center animate-fade-in">
+                <Card className="login-card w-full max-w-sm shadow-2xl h-[min(280px,70vh)] flex items-center justify-center animate-fade-in">
                     <CardContent className="flex flex-col items-center gap-3">
                         <div className="relative w-8 h-8">
                             <div className="absolute inset-0 rounded-full border-2 border-green-400/30"></div>
@@ -142,7 +142,7 @@ const LoginPage: React.FC = () => {
                         </p>
                     </div>
                 </CardHeader>
-                <CardContent className="px-8 pb-8 h-[140px]">
+                <CardContent className="px-8 pb-8 h-[min(140px,35vh)]">
                     <div className="space-y-4 animate-fade-in">
                         <button
                             onClick={() => handleLogin('twitch')}

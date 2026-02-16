@@ -153,7 +153,7 @@ async def save_chatbox_settings(
     except ValueError as e:
         # Version conflict
         logger.warning(f"Version conflict for user {user_id}: {e}")
-        raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=409, detail="Version conflict")
 
     widget_url = _get_widget_url(settings.widget_token)
     response = _settings_to_response(settings, widget_url)
@@ -250,5 +250,6 @@ async def get_settings_by_token(
         "auto_load_images": settings.auto_load_images,
         "version": settings.version if hasattr(settings, 'version') else 1
     }
+
 
 

@@ -267,7 +267,7 @@ const SupportTicketsPage: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="bg-gray-800/50 border border-gray-600/30 p-3 rounded-lg mb-3">
+                    <div className="bg-muted/50 border border-border/30 p-3 rounded-lg mb-3">
                       <p className="text-sm text-white whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{ticket.message}</p>
                     </div>
 
@@ -343,7 +343,7 @@ const SupportTicketsPage: React.FC = () => {
 
               <div>
                 <Label>���������</Label>
-                <div className="bg-gray-800/50 border border-gray-600/30 p-3 rounded-lg">
+                <div className="bg-muted/50 border border-border/30 p-3 rounded-lg">
                   <p className="text-sm text-white whitespace-pre-wrap break-words" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{selectedTicket.message}</p>
                 </div>
               </div>
@@ -367,7 +367,7 @@ const SupportTicketsPage: React.FC = () => {
                           <span className="font-medium text-sm text-white">
                             {response.is_admin_response ? '�������������' : '������������'}
                           </span>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-muted-foreground">
                             {formatDate(response.created_at)}
                           </span>
                         </div>
@@ -396,7 +396,7 @@ const SupportTicketsPage: React.FC = () => {
                   <Button
                     onClick={handleSendResponse}
                     disabled={!newResponse.trim() || isSubmittingResponse}
-                    className="min-w-[100px]"
+                    className="min-w-[clamp(92px,18vw,120px)]"
                   >
                     {isSubmittingResponse ? (
                       <>

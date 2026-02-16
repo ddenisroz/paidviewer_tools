@@ -83,10 +83,15 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
             },
         )
 
+    # Do not expose internal exception details on 5xx responses.
+    response_detail = exc.detail
+    if exc.status_code >= 500:
+        response_detail = "Внутренняя ошибка сервера"
+
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "detail": exc.detail,
+            "detail": response_detail,
             "timestamp": utcnow_naive().isoformat(),
         },
     )

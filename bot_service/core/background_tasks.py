@@ -88,67 +88,28 @@ class BackgroundTasks:
                 if db:
                     db.close()
 
-    async def refresh_vk_bot_token(self):
-        """Автоматическое обновление VK Live bot token каждые 50 минут (до истечения в 60 минут)"""
-        import os
-        import base64
-        import httpx
-
+    async def refresh_bot_oauth_tokens(self):
+        """Плановое обновление OAuth токенов ботов (Twitch/VK)"""
         while True:
             try:
-                # Ждем 50 минут перед обновлением токена (ClientCredentials token живет 3600 сек = 60 минут)
-                await asyncio.sleep(50 * 60)
+                # Проверяем раз в час
+                await asyncio.sleep(60 * 60)
 
-                vk_client_id = settings.vk_client_id
-                vk_client_secret = settings.vk_client_secret
-
-                if not vk_client_id or not vk_client_secret:
-                    logger.debug("VK_CLIENT_ID or VK_CLIENT_SECRET not configured, skipping token refresh")
-                    continue
-
-                logger.info("[REFRESH] [VK TOKEN] Starting automatic token refresh...")
+                logger.info("[REFRESH] [BOT TOKEN] Checking bot OAuth tokens...")
 
                 try:
-                    # Подготавливаем Basic Auth
-                    credentials = f"{vk_client_id}:{vk_client_secret}"
-                    base64_credentials = base64.b64encode(credentials.encode()).decode()
+                    from services.twitch_bot_oauth_service import twitch_bot_oauth_service
+                    from services.vk_bot_oauth_service import vk_bot_oauth_service
 
-                    headers = {
-                        "Authorization": f"Basic {base64_credentials}",
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    }
-
-                    payload = {
-                        "grant_type": "client_credentials"
-                    }
-
-                    async with httpx.AsyncClient(timeout=10.0, trust_env=False) as client:
-                        token_response = await client.post(
-                            "https://api.live.vkvideo.ru/oauth/server/token",
-                            data=payload,
-                            headers=headers
-                        )
-
-                        if token_response.status_code == 200:
-                            token_data = token_response.json()
-                            vk_access_token = token_data.get("access_token")
-                            expires_in = token_data.get("expires_in", 3600)
-
-                            if vk_access_token:
-                                # Сохраняем новый токен в переменную окружения
-                                os.environ["VK_LIVE_USER_TOKEN"] = vk_access_token
-                                logger.info(f"[OK] [VK TOKEN] Token refreshed successfully (expires in {expires_in} seconds)")
-                            else:
-                                logger.error("[ERROR] [VK TOKEN] No access_token in response")
-                        else:
-                            logger.error(f"[ERROR] [VK TOKEN] Token refresh failed: {token_response.status_code} - {token_response.text}")
+                    await twitch_bot_oauth_service.refresh_if_needed()
+                    await vk_bot_oauth_service.refresh_if_needed()
 
                 except Exception as e:
-                    logger.error(f"[ERROR] [VK TOKEN] Error during token refresh: {e}")
+                    logger.error(f"[ERROR] [BOT TOKEN] Error refreshing bot OAuth tokens: {e}")
 
             except Exception as e:
-                logger.error(f"[ERROR] [VK TOKEN] Error in refresh_vk_bot_token loop: {e}")
-                await asyncio.sleep(60)  # Если ошибка, ждем минуту перед повтором
+                logger.error(f"[ERROR] [BOT TOKEN] Error in refresh_bot_oauth_tokens loop: {e}")
+                await asyncio.sleep(60)
 
     async def cleanup_task(self):
         """Фоновая задача для очистки неактивных каналов и клиентов (как в оригинале)"""
@@ -290,7 +251,7 @@ class BackgroundTasks:
         self.tasks = [
             asyncio.create_task(self.cleanup_old_chat_messages()),      # Очистка истории чата (каждый час)
             asyncio.create_task(self.cleanup_expired_sessions()),       # Очистка истекших сессий (каждые 5 минут)
-            asyncio.create_task(self.refresh_vk_bot_token()),          # Обновление VK bot токена (каждые 50 минут)
+            asyncio.create_task(self.refresh_bot_oauth_tokens()),      # Обновление OAuth токенов ботов (каждый час)
             asyncio.create_task(self.refresh_user_oauth_tokens()),     # Обновление OAuth токенов (каждые 2 часа)
             asyncio.create_task(self.cleanup_task()),                  # Очистка неактивных каналов (каждую минуту)
             asyncio.create_task(self.cleanup_deleted_accounts())       # Окончательное удаление аккаунтов (каждые 24 часа)
@@ -299,7 +260,7 @@ class BackgroundTasks:
         logger.info("[OK] [BACKGROUND] Started 6 background tasks:")
         logger.info("   - cleanup_old_chat_messages (every 1 hour)")
         logger.info("   - cleanup_expired_sessions (every 5 minutes)")
-        logger.info("   - refresh_vk_bot_token (every 50 minutes)")
+        logger.info("   - refresh_bot_oauth_tokens (every 1 hour)")
         logger.info("   - refresh_user_oauth_tokens (every 2 hours)")
         logger.info("   - cleanup_task (every 1 minute)")
         logger.info("   - cleanup_deleted_accounts (every 24 hours)")

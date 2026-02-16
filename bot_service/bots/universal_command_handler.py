@@ -12,10 +12,17 @@ from bots.mixins.queue_handler_mixin import QueueHandlerMixin
 from bots.mixins.stream_info_handler_mixin import StreamInfoHandlerMixin
 from bots.mixins.tts_handler_mixin import TTSHandlerMixin
 from bots.mixins.general_handler_mixin import GeneralHandlerMixin
+from bots.mixins.memealerts_handler_mixin import MemeAlertsHandlerMixin
 
 logger = logging.getLogger('bot_service')
 
-class UniversalCommandHandler(QueueHandlerMixin, StreamInfoHandlerMixin, TTSHandlerMixin, GeneralHandlerMixin):
+class UniversalCommandHandler(
+    QueueHandlerMixin,
+    StreamInfoHandlerMixin,
+    TTSHandlerMixin,
+    GeneralHandlerMixin,
+    MemeAlertsHandlerMixin,
+):
     """Универсальный обреботчик команд с поддержкой глобальных команд, overrides и кастомных
     
     Inherits functionality from:

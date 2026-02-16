@@ -62,7 +62,7 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+        <div className="space-y-2 max-h-[min(300px,50vh)] overflow-y-auto">
           {history.map((entry) => (
             <div 
               key={entry.id}

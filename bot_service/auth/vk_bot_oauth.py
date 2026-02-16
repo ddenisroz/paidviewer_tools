@@ -1,6 +1,6 @@
 # bot_service/auth/vk_bot_oauth.py
 """
-OAuth авторизация для VK Live бота с поддержкой refresh_token.
+OAuth Р°РІС‚РѕСЂРёР·Р°С†РёСЏ РґР»СЏ VK Live Р±РѕС‚Р° СЃ РїРѕРґРґРµСЂР¶РєРѕР№ refresh_token.
 """
 
 import logging
@@ -25,10 +25,10 @@ router = APIRouter()
 @limiter.limit("5/minute")
 async def login_vk_bot(request: Request):
     """
-    Инициировать OAuth авторизацию для VK Live бота.
+    РРЅРёС†РёРёСЂРѕРІР°С‚СЊ OAuth Р°РІС‚РѕСЂРёР·Р°С†РёСЋ РґР»СЏ VK Live Р±РѕС‚Р°.
     
-    Требует права администратора.
-    Перенаправляет на VK для авторизации бота.
+    РўСЂРµР±СѓРµС‚ РїСЂР°РІР° Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°.
+    РџРµСЂРµРЅР°РїСЂР°РІР»СЏРµС‚ РЅР° VK РґР»СЏ Р°РІС‚РѕСЂРёР·Р°С†РёРё Р±РѕС‚Р°.
     """
     try:
         session_data = get_session_data(request)
@@ -47,7 +47,7 @@ async def login_vk_bot(request: Request):
                 detail="Admin rights required. Please contact administrator."
             )
         
-        # Генерируем state для защиты от CSRF
+        # Р“РµРЅРµСЂРёСЂСѓРµРј state РґР»СЏ Р·Р°С‰РёС‚С‹ РѕС‚ CSRF
         state = secrets.token_urlsafe(16)
         
         auth_url = vk_bot_oauth_service.get_authorization_url(state)
@@ -58,7 +58,7 @@ async def login_vk_bot(request: Request):
         response.set_cookie(
             key="vk_bot_oauth_state",
             value=state,
-            max_age=600,  # 10 минут
+            max_age=600,  # 10 РјРёРЅСѓС‚
             httponly=True,
             secure=settings.environment == "production"
         )
@@ -69,7 +69,7 @@ async def login_vk_bot(request: Request):
         raise
     except Exception as e:
         logger.error(f"Error generating VK bot OAuth URL: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/auth/vk/bot/callback")
@@ -83,7 +83,7 @@ async def vk_bot_callback(
     error_description: str = None
 ):
     """
-    Обработка OAuth callback для VK Live бота.
+    РћР±СЂР°Р±РѕС‚РєР° OAuth callback РґР»СЏ VK Live Р±РѕС‚Р°.
     """
     logger.info(f"[VK BOT OAUTH] Callback received. Query params: {dict(request.query_params)}")
     
@@ -101,7 +101,7 @@ async def vk_bot_callback(
         raise HTTPException(status_code=400, detail="Invalid state parameter")
     
     try:
-        # 1. Обмен кода на токены
+        # 1. РћР±РјРµРЅ РєРѕРґР° РЅР° С‚РѕРєРµРЅС‹
         logger.info("[VK BOT OAUTH] Exchanging code for tokens...")
         token_data = await vk_bot_oauth_service.exchange_code_for_token(code)
         
@@ -115,7 +115,7 @@ async def vk_bot_callback(
         
         logger.info(f"[VK BOT OAUTH] Token exchange successful. Expires in: {expires_in}s")
         
-        # 2. Получаем информацию о боте
+        # 2. РџРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Р±РѕС‚Рµ
         logger.info("[VK BOT OAUTH] Getting bot user info...")
         bot_info = await vk_bot_oauth_service.get_bot_user_info(access_token)
         
@@ -124,7 +124,7 @@ async def vk_bot_callback(
         
         logger.info(f"[VK BOT OAUTH] Bot: {bot_login} (ID: {bot_user_id})")
         
-        # 3. Сохраняем токены в базу данных
+        # 3. РЎРѕС…СЂР°РЅСЏРµРј С‚РѕРєРµРЅС‹ РІ Р±Р°Р·Сѓ РґР°РЅРЅС‹С…
         logger.info("[VK BOT OAUTH] Saving bot tokens to database...")
         success = await vk_bot_oauth_service.save_bot_token(
             access_token=access_token,
@@ -141,7 +141,7 @@ async def vk_bot_callback(
         
         logger.info("[OK] [VK BOT OAUTH] Bot tokens saved successfully")
         
-        # 4. Перезапускаем бота
+        # 4. РџРµСЂРµР·Р°РїСѓСЃРєР°РµРј Р±РѕС‚Р°
         logger.info("[VK BOT OAUTH] Restarting VK bot with new token...")
         from startup.bot_registry import get_bot_registry
         from startup.bot_initializer import initialize_vk_bot
@@ -155,7 +155,7 @@ async def vk_bot_callback(
         await initialize_vk_bot()
         logger.info("[OK] [VK BOT OAUTH] Bot restarted with new token")
         
-        # Редирект на админ панель
+        # Р РµРґРёСЂРµРєС‚ РЅР° Р°РґРјРёРЅ РїР°РЅРµР»СЊ
         response = RedirectResponse(
             url=f"{settings.frontend_url}/admin/settings?bot_auth_success=true"
         )
@@ -178,10 +178,10 @@ async def get_vk_bot_token_status(
     current_user: Dict[str, Any] = Depends(get_admin_user)
 ):
     """
-    Получить статус токена VK бота.
+    РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ С‚РѕРєРµРЅР° VK Р±РѕС‚Р°.
     """
     try:
-        # 1. Ищем в БД
+        # 1. РС‰РµРј РІ Р‘Р”
         bot_token = await vk_bot_oauth_service.get_bot_token(db)
         
         if bot_token:
@@ -207,15 +207,14 @@ async def get_vk_bot_token_status(
                 "has_refresh_token": bool(bot_token.get('refresh_token'))
             }
 
-        # 2. Legacy .env
+        # Legacy env fallback (no refresh)
         if settings.vk_live_user_token:
-             # Простая проверка
-             return {
+            return {
                 "success": True,
                 "configured": True,
                 "type": "legacy",
                 "message": "Using .env token (might be expired or limited)"
-             }
+            }
 
         return {
             "success": False,
@@ -225,4 +224,4 @@ async def get_vk_bot_token_status(
         
     except Exception as e:
         logger.error(f"Error getting VK bot token status: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -6,6 +6,8 @@ import websockets
 from typing import Dict, Optional, Callable
 import structlog
 
+from utils.vk_chat_parser import build_message_text_and_emotes, extract_vk_badge_urls, normalize_parts
+
 logger = structlog.get_logger(__name__)
 
 class VKLiveWebSocketClient:
@@ -482,28 +484,17 @@ class VKLiveWebSocketClient:
             author = message_data.get("author", {})
             message_id = message_data.get("id")
             created_at = message_data.get("created_at")
-            parts = message_data.get("parts", [])
+            parts = normalize_parts(message_data.get("parts", []), message_data.get("data"))
 
             # Формируем текст сообщения
-            message_text = ""
-            for part in parts:
-                if "text" in part:
-                    message_text += part["text"].get("content", "")
-                elif "mention" in part:
-                    message_text += f"@{part['mention'].get('nick', '')}"
-                elif "smile" in part:
-                    message_text += f":{part['smile'].get('name', '')}:"
-                # [OK] Обрабатываем ссылки если они в отдельном part
-                elif "link" in part:
-                    link_url = part["link"].get("url", "")
-                    if link_url:
-                        message_text += link_url
+            message_text, emotes = build_message_text_and_emotes(parts)
 
             # Извлекаем информацию об авторе
             author_id = author.get("id")
             author_nick = author.get("nick", "Unknown")
             is_moderator = author.get("is_moderator", False)
             is_owner = author.get("is_owner", False)
+            badges = extract_vk_badge_urls(author)
 
             # Логируем сообщение
             logger.info(f"VK Live chat message from {author_nick} ({author_id}): {message_text}")
@@ -518,7 +509,9 @@ class VKLiveWebSocketClient:
                     "is_moderator": is_moderator,
                     "is_owner": is_owner,
                     "message_id": message_id,
-                    "created_at": created_at
+                    "created_at": created_at,
+                    "badges": badges,
+                    "emotes": emotes or None
                 })
 
         except Exception as e:

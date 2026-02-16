@@ -10,6 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Placeholder token - should be replaced with a real one for testing
 # or loaded from .env/DB
 TOKEN = os.environ.get("VK_LIVE_USER_TOKEN", "")
+VERIFY_SSL = os.environ.get("VK_API_VERIFY_SSL", "true").lower() != "false"
 
 BASE_URL = "https://apidev.live.vkvideo.ru"
 
@@ -27,9 +28,9 @@ async def check_endpoints():
         "Content-Type": "application/json"
     }
 
-    print(f"Checking endpoints with token: {TOKEN[:5]}...")
+    print("Checking endpoints with configured token...")
 
-    async with httpx.AsyncClient(verify=False) as client:
+    async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
         for ep in endpoints:
             try:
                 print(f"Checking {ep}...")

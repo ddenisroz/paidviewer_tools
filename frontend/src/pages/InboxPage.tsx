@@ -253,16 +253,16 @@ const InboxPage: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <PageWrapper title="Поддержка">
-        <Card className="border-gray-700">
+        <Card className="card-glass border-border">
           <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-              <AlertCircle className="w-10 h-10 text-gray-500" />
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-muted-foreground" />
             </div>
             <div className="space-y-2 max-w-md">
-              <h3 className="text-xl font-semibold text-gray-200">
+              <h3 className="text-xl font-semibold text-foreground">
                 Требуется авторизация
               </h3>
-              <p className="text-gray-400 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Для доступа к поддержке необходимо войти в систему
               </p>
             </div>
@@ -307,7 +307,7 @@ const InboxPage: React.FC = () => {
         {loading ? (
           <PageLoader message="Загрузка тикетов..." />
         ) : tickets.length === 0 ? (
-          <Card className="border-dashed border-2">
+          <Card className="card-glass border-dashed border-2 border-border">
             <CardContent className="p-12 text-center">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-xl font-semibold mb-2">Нет активных тикетов</h3>
@@ -365,7 +365,7 @@ const InboxPage: React.FC = () => {
       </div>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[min(700px,92vw)] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Тикет #{selectedTicket?.id}
@@ -434,7 +434,7 @@ const InboxPage: React.FC = () => {
                     <Button
                       onClick={handleSendResponse}
                       disabled={!newResponse.trim() || isSubmitting}
-                      className="min-w-[100px]"
+                    className="min-w-[clamp(92px,18vw,120px)]"
                     >
                       {isSubmitting ? (
                         <>
@@ -464,7 +464,7 @@ const InboxPage: React.FC = () => {
       </Dialog>
 
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[min(500px,92vw)] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Создать тикет
@@ -523,7 +523,7 @@ const InboxPage: React.FC = () => {
               <Button
                 type="submit"
                 disabled={isCreating || Object.keys(createFormErrors).length > 0}
-                className="min-w-[100px]"
+                className="min-w-[clamp(92px,18vw,120px)]"
                 title={Object.keys(createFormErrors).length > 0 ? 'Исправьте ошибки перед отправкой' : ''}
               >
                 {isCreating ? (

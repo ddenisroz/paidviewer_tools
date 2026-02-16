@@ -57,6 +57,27 @@ export const ttsService = {
   },
 
   /**
+   * Получить список голосов Google Cloud TTS
+   */
+  async getGcloudVoices(language = 'ru-RU'): Promise<AxiosResponse<ApiResponse<{ voices: unknown[] }>>> {
+    return apiClient.get('/api/tts/gcloud/voices', { params: { language } });
+  },
+
+  /**
+   * Сохранить выбранные голоса Google Cloud TTS
+   */
+  async saveGcloudVoices(voices: string[]): Promise<AxiosResponse<ApiResponse<{ voices: string[] }>>> {
+    return apiClient.post('/api/tts/gcloud/voices', { voices });
+  },
+
+  /**
+   * Предпрослушка голоса Google Cloud TTS
+   */
+  async previewGcloudVoice(payload: { voice_name: string; text?: string }): Promise<AxiosResponse<ApiResponse<{ audio_url?: string }>>> {
+    return apiClient.post('/api/tts/gcloud/preview', payload);
+  },
+
+  /**
    * Получить аудио настройки TTS
    * @returns Promise с ответом API
    */

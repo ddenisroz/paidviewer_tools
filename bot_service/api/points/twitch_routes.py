@@ -22,7 +22,7 @@ async def get_twitch_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить награды Twitch канала"""
+    """РџРѕР»СѓС‡РёС‚СЊ РЅР°РіСЂР°РґС‹ Twitch РєР°РЅР°Р»Р°"""
     try:
         rewards = await platform_service.get_rewards(user['id'], 'twitch', db)
         
@@ -36,7 +36,7 @@ async def get_twitch_rewards(
         raise
     except Exception as e:
         logger.error(f"[ERROR] [TWITCH REWARDS] Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения наград Twitch: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РЅР°РіСЂР°Рґ Twitch: {str(e)}")
 
 @points_twitch_router.post("/rewards/twitch/create")
 @limiter.limit("10/minute")
@@ -46,7 +46,7 @@ async def create_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать награду на Twitch"""
+    """РЎРѕР·РґР°С‚СЊ РЅР°РіСЂР°РґСѓ РЅР° Twitch"""
     try:
         result = await platform_service.create_reward(
             user['id'], 'twitch', reward_data.dict(), db
@@ -62,7 +62,7 @@ async def create_twitch_reward(
         raise
     except Exception as e:
         logger.error(f"Error creating Twitch reward: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Неожиданная ошибка при создании награды Twitch: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РќРµРѕР¶РёРґР°РЅРЅР°СЏ РѕС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё РЅР°РіСЂР°РґС‹ Twitch: {str(e)}")
 
 @points_twitch_router.patch("/rewards/twitch/{reward_id}")
 async def update_twitch_reward(
@@ -71,7 +71,7 @@ async def update_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить награду на Twitch"""
+    """РћР±РЅРѕРІРёС‚СЊ РЅР°РіСЂР°РґСѓ РЅР° Twitch"""
     try:
         result = await platform_service.update_reward(
             user['id'], 'twitch', reward_id, reward_data.dict(), db
@@ -87,7 +87,7 @@ async def update_twitch_reward(
         raise
     except Exception as e:
         logger.error(f"Error updating Twitch reward: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Неожиданная ошибка при обновлении награды Twitch: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РќРµРѕР¶РёРґР°РЅРЅР°СЏ РѕС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РЅР°РіСЂР°РґС‹ Twitch: {str(e)}")
 
 @points_twitch_router.delete("/rewards/twitch/{reward_id}")
 async def delete_twitch_reward(
@@ -95,21 +95,21 @@ async def delete_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить награду на Twitch"""
+    """РЈРґР°Р»РёС‚СЊ РЅР°РіСЂР°РґСѓ РЅР° Twitch"""
     try:
         await platform_service.delete_reward(user['id'], 'twitch', reward_id, db)
 
         return JSONResponse(content={
             "success": True,
             "platform": "twitch",
-            "message": "Награда удалена"
+            "message": "РќР°РіСЂР°РґР° СѓРґР°Р»РµРЅР°"
         })
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error deleting Twitch reward: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Неожиданная ошибка при удалении награды Twitch: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РќРµРѕР¶РёРґР°РЅРЅР°СЏ РѕС€РёР±РєР° РїСЂРё СѓРґР°Р»РµРЅРёРё РЅР°РіСЂР°РґС‹ Twitch: {str(e)}")
 
 @points_twitch_router.get("/platform/rewards")
 async def get_platform_rewards(
@@ -117,7 +117,7 @@ async def get_platform_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить награды напрямую с платформы (Twitch или VK Live) - универсальный эндпоинт"""
+    """РџРѕР»СѓС‡РёС‚СЊ РЅР°РіСЂР°РґС‹ РЅР°РїСЂСЏРјСѓСЋ СЃ РїР»Р°С‚С„РѕСЂРјС‹ (Twitch РёР»Рё VK Live) - СѓРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ СЌРЅРґРїРѕРёРЅС‚"""
     try:
         rewards = await platform_service.get_rewards(user['id'], platform, db)
 
@@ -131,7 +131,7 @@ async def get_platform_rewards(
         raise
     except Exception as e:
         logger.error(f"Error getting platform rewards: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Ошибка получения наград: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РЅР°РіСЂР°Рґ: {str(e)}")
 
 @points_twitch_router.post("/platform/rewards/create")
 async def create_platform_reward(
@@ -140,7 +140,7 @@ async def create_platform_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать награду на платформе (Twitch или VK Live) - универсальный эндпоинт"""
+    """РЎРѕР·РґР°С‚СЊ РЅР°РіСЂР°РґСѓ РЅР° РїР»Р°С‚С„РѕСЂРјРµ (Twitch РёР»Рё VK Live) - СѓРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ СЌРЅРґРїРѕРёРЅС‚"""
     try:
         result = await platform_service.create_reward(
             user['id'], platform, reward_data, db
@@ -156,7 +156,7 @@ async def create_platform_reward(
         raise
     except Exception as e:
         logger.error(f"Error creating platform reward: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.delete("/platform/rewards/{reward_id}")
 async def delete_platform_reward(
@@ -165,20 +165,20 @@ async def delete_platform_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить награду на платформе - универсальный эндпоинт"""
+    """РЈРґР°Р»РёС‚СЊ РЅР°РіСЂР°РґСѓ РЅР° РїР»Р°С‚С„РѕСЂРјРµ - СѓРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ СЌРЅРґРїРѕРёРЅС‚"""
     try:
         await platform_service.delete_reward(user['id'], platform, reward_id, db)
 
         return {
             "success": True,
-            "message": "Награда удалена"
+            "message": "РќР°РіСЂР°РґР° СѓРґР°Р»РµРЅР°"
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error deleting platform reward: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.get("/platform/redemptions")
 async def get_platform_redemptions(
@@ -188,7 +188,7 @@ async def get_platform_redemptions(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список использований награды с платформы"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РёСЃРїРѕР»СЊР·РѕРІР°РЅРёР№ РЅР°РіСЂР°РґС‹ СЃ РїР»Р°С‚С„РѕСЂРјС‹"""
     try:
         redemptions = await platform_service.get_redemptions(
             user['id'], platform, reward_id, status, db
@@ -204,7 +204,7 @@ async def get_platform_redemptions(
         raise
     except Exception as e:
         logger.error(f"Error getting platform redemptions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.patch("/platform/redemptions/{redemption_id}")
 async def update_platform_redemption(
@@ -215,22 +215,22 @@ async def update_platform_redemption(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить статус использования награды (одобрить/отклонить)"""
+    """РћР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РЅР°РіСЂР°РґС‹ (РѕРґРѕР±СЂРёС‚СЊ/РѕС‚РєР»РѕРЅРёС‚СЊ)"""
     try:
         success = await platform_service.update_redemption_status(
             user['id'], platform, reward_id, redemption_id, status, db
         )
 
         if not success:
-             raise HTTPException(status_code=500, detail="Ошибка обновления статуса")
+             raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ СЃС‚Р°С‚СѓСЃР°")
              
         return {
             "success": True,
-            "message": f"Статус обновлен: {status}"
+            "message": f"РЎС‚Р°С‚СѓСЃ РѕР±РЅРѕРІР»РµРЅ: {status}"
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating platform redemption: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

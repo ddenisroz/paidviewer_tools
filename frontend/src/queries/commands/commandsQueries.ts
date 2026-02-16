@@ -65,6 +65,8 @@ const mapApiCommandToFrontend = (cmd: ApiCommandResponse): ChatCommand => {
     response: cmd.response_text || '',
     enabled: cmd.is_enabled,
     cooldown: cmd.cooldown_seconds || 0,
+    alias: cmd.alias || undefined,
+    parent_command_id: cmd.parent_command_id,
     user_level,
     platform,
     created_at: cmd.created_at,

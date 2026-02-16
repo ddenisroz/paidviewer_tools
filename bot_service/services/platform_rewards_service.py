@@ -2,7 +2,6 @@ import logging
 from typing import Dict, Any, List, Optional
 from fastapi import HTTPException
 
-from core.connection_manager import get_connection_manager
 from api.vk_api import vk_api
 import asyncio
 
@@ -74,7 +73,12 @@ class PlatformRewardsService:
     async def _get_vk_rewards(self, channel_name: str, access_token: str) -> List[Dict[str, Any]]:
         rewards = await vk_api.get_rewards_manage_info(channel_name, access_token)
         if rewards is None:
-            raise HTTPException(status_code=400, detail="Не удалось получить награды от VK")
+            rewards = await vk_api.get_channel_rewards(channel_name, access_token)
+        if rewards is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Не удалось получить награды от VK (проверьте, что баллы включены и у токена есть нужные права)"
+            )
         
         # Normalize VK rewards
         normalized_rewards = []
@@ -425,9 +429,10 @@ class PlatformRewardsService:
         elif isinstance(e, RateLimitError):
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
         elif isinstance(e, AuthenticationError):
-            raise HTTPException(status_code=403, detail=str(e))
+            raise HTTPException(status_code=403, detail="Authentication failed")
         else:
             # Check status code in Base Exception
             if e.status_code:
                 raise HTTPException(status_code=e.status_code, detail=f"Integration Error: {e.message}")
             raise HTTPException(status_code=500, detail=f"Platform API Error: {e.message}")
+

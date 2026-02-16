@@ -63,6 +63,7 @@ class TestTTSSettingsRepository:
         assert 'engine' in settings_dict
         assert 'voice' in settings_dict
         assert 'enable_7tv' in settings_dict
+        assert 'gcloud_voices' in settings_dict
 
 
 class TestAudioSettingsRepository:

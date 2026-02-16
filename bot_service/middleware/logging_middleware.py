@@ -121,7 +121,7 @@ class StructuredLoggingMiddleware(BaseHTTPMiddleware):
                 category="error",
                 level="error",
                 data={
-                    "error": str(e),
+                    "error": "Internal server error",
                     "duration_ms": duration_ms,
                 }
             )

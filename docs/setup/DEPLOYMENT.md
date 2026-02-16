@@ -210,8 +210,11 @@ DONATION_ALERTS_CLIENT_SECRET=your-da-secret
 DONATION_ALERTS_REDIRECT_URI=http://localhost:8000/auth/donationalerts/callback
 
 # === EXTERNAL APIS (Optional) ===
-GOOGLE_TTS_API_KEY=your-google-tts-key
-YOUTUBE_API_KEY=your-youtube-key
+# Google Cloud key for YouTube + TTS
+GOOGLE_CLOUD_API_KEY=your-google-cloud-key
+DEEPSEEK_API_KEY=your-deepseek-key
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
 
 # === RATE LIMITING ===
 RATE_LIMIT_DEFAULT=60/minute
@@ -241,8 +244,8 @@ F5_TTS_MODEL_PATH=./models/f5_tts
 F5_TTS_DEVICE=cuda  # cuda, cpu, or mps (Mac)
 F5_TTS_MAX_WORKERS=2
 
-# === GOOGLE TTS CONFIGURATION ===
-GOOGLE_TTS_API_KEY=your-google-tts-key
+# === GOOGLE CLOUD TTS CONFIGURATION ===
+GOOGLE_CLOUD_API_KEY=your-google-cloud-key
 GOOGLE_TTS_LANGUAGE=ru-RU
 
 # === CLOUDFLARE TUNNEL (Production) ===

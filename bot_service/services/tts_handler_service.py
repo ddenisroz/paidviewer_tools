@@ -25,6 +25,12 @@ from api.moderation_api import is_user_blocked_from_tts
 from utils.blocked_bot_cache import is_bot_blocked_cached
 from constants import TTS_DEFAULT_VOLUME
 
+# Analysis logging for LLM feature verification
+from core.analysis_logging import (
+    log_tts_request, log_feature, log_error as log_analysis_error,
+    set_correlation_id, clear_correlation_id
+)
+
 logger = logging.getLogger('bot_service.tts')
 
 class TTSHandlerService:
@@ -69,6 +75,9 @@ class TTSHandlerService:
 
             # 2. Database Context
             db = SessionLocal()
+            import time
+            start_time = time.time()
+            set_correlation_id()
             try:
                 # 3. Load User and Settings
                 user_data = self._load_user_and_settings(db, channel_identifier, platform)
@@ -112,7 +121,8 @@ class TTSHandlerService:
 
         except Exception as e:
             logger.error(f"[ERROR] [{platform.upper()} TTS] Error processing TTS: {e}", exc_info=True)
-            return {"success": False, "error": str(e)}
+            log_analysis_error(feature='tts_handler', error=e, context=f"process_message_{platform}")
+            return {"success": False, "error": "Internal server error"}
 
     def _check_initial_conditions(self, text, username, channel_identifier, platform, connection_manager, skip_if_command):
         # Skip commands
@@ -196,8 +206,9 @@ class TTSHandlerService:
         use_ai_tts_requested = False
         if connection_manager:
             use_ai_tts_requested = connection_manager.is_tts_enabled(channel_identifier)
-        
-        use_ai_tts = (tts_settings.engine == 'f5tts')
+
+        engine = tts_settings.engine or 'gtts'
+        use_ai_tts = (engine == 'f5tts')
         use_basic_tts = True
 
         if use_ai_tts and not use_ai_tts_requested:
@@ -242,6 +253,7 @@ class TTSHandlerService:
                      final_volume = user_voice_config.volume
 
         return {
+            "engine": engine,
             "use_ai_tts": use_ai_tts,
             "use_basic_tts": use_basic_tts,
             "volume": final_volume,
@@ -258,7 +270,8 @@ class TTSHandlerService:
             "enableProfanity": tts_settings.enable_lexicon_filter,
             "maxLength": tts_settings.max_message_length,
             "skipCommands": tts_settings.skip_commands,
-            "voice": tts_settings.voice
+            "voice": tts_settings.voice,
+            "gcloud_voices": getattr(tts_settings, "gcloud_voices", []) or []
         }
         
         if engine_config["voice_settings"]:
@@ -274,17 +287,28 @@ class TTSHandlerService:
             volume_level=engine_config["volume"],
             use_ai_tts=engine_config["use_ai_tts"],
             use_basic_tts=engine_config["use_basic_tts"],
+            engine=engine_config["engine"],
             connection_manager=connection_manager,
             tts_settings=tts_settings_dict
         )
 
         if result.get("success"):
+            # Log successful TTS request for analysis
+            log_tts_request(
+                text=text,
+                voice=result.get("voice", tts_settings.voice or "default"),
+                success=True,
+                user_id=user_id,
+                duration_ms=result.get("processing_time_ms", 0),
+                audio_size=result.get("audio_size")
+            )
+            
             # Auto-accept rewards (if applicable)
-             if reward_id and hasattr(tts_settings, 'tts_mode') and tts_settings.tts_mode == 'channel_points':
+            if reward_id and hasattr(tts_settings, 'tts_mode') and tts_settings.tts_mode == 'channel_points':
                 await self._auto_accept_reward(db, user_id, platform, reward_id)
 
-             # Broadcast Audio
-             await notification_service.broadcast_tts_audio(
+            # Broadcast Audio
+            await notification_service.broadcast_tts_audio(
                 audio_data={
                     "audio_url": result.get("audio_url"),
                     "voice": result.get("voice", "unknown"),
@@ -298,6 +322,14 @@ class TTSHandlerService:
                 platform=platform
             )
         else:
+            # Log failed TTS request
+            log_tts_request(
+                text=text,
+                voice=tts_settings.voice or "default",
+                success=False,
+                user_id=user_id,
+                error=result.get("error")
+            )
             logger.error(f"[ERROR] [{platform.upper()} TTS] Synthesis FAILED: {result.get('error')}")
 
         return result

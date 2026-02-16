@@ -76,5 +76,5 @@ async def synthesize_text(
         logger.error(f"Synthesis error: {e}")
         import traceback
         logger.error(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 

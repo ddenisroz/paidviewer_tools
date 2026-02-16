@@ -33,6 +33,10 @@ Required backend fields (minimum):
 - `TWITCH_CLIENT_ID`
 - `TWITCH_CLIENT_SECRET`
 
+Optional backend fields:
+- `DEEPSEEK_API_KEY` (enables `!analyze`)
+- `GOOGLE_CLOUD_API_KEY` (Google Cloud TTS + YouTube Data API)
+
 ## 3) Migrate database
 ```powershell
 cd bot_service

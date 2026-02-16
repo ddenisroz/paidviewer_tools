@@ -55,7 +55,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
             <div
                 ref={setMessagesContainerRef}
                 onScroll={onScroll}
-                className="h-[400px] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
+                className="h-[min(400px,60vh)] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
             >
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                     <MessageSquare className="h-12 w-12 mb-3 opacity-50" />
@@ -73,7 +73,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
             <div
                 ref={setMessagesContainerRef}
                 onScroll={onScroll}
-                className="h-[400px] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
+                className="h-[min(400px,60vh)] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
             >
                 <div className="flex flex-col min-h-full">
                     <div className="flex-grow" />
@@ -108,7 +108,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                             })}
                                         </span>
 
-                                        {msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+                                        {msg.platform === 'twitch' && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
                                             <>
                                                 {msg.badges.map((badge, idx) => {
                                                     if (!badge || typeof badge !== 'string' || !badge.includes('/')) {
@@ -155,6 +155,28 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                             </>
                                         )}
 
+                                        {msg.platform === 'vk' && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+                                            <>
+                                                {msg.badges.map((badge, idx) => {
+                                                    if (!badge || typeof badge !== 'string') {
+                                                        return null;
+                                                    }
+                                                    return (
+                                                        <img
+                                                            key={idx}
+                                                            src={badge}
+                                                            alt="vk-badge"
+                                                            className="inline-block align-text-bottom mr-0.5 object-contain"
+                                                            style={{ width: '16px', height: '16px' }}
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                            }}
+                                                        />
+                                                    );
+                                                })}
+                                            </>
+                                        )}
+
                                         <span
                                             className={`font-medium cursor-pointer hover:underline ${msg.platform === 'twitch'
                                                     ? 'text-purple-400'
@@ -179,7 +201,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                                 channelEmotes={channelEmotes}
                                                 globalEmotes={globalEmotes}
                                                 twitchEmotes={msg.emotes}
-                                                showLinks={showImages}
+                                                showLinks={true}
                                                 autoLoadImages={showImages}
                                             />
                                         </span>

@@ -1,4 +1,4 @@
-﻿# bot_service/api/moderation_api.py
+# bot_service/api/moderation_api.py
 """API for user moderation (TTS blocking and platform timeouts)"""
 import logging
 from fastapi import APIRouter, Depends, HTTPException
@@ -85,7 +85,7 @@ async def get_muted_users(
 
     except Exception as e:
         logger.error(f"Error getting muted users: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # Helper function exposed for other modules if needed (e.g. TTS engine)
 def is_user_blocked_from_tts(channel_name: str, platform: str, username: str) -> bool:

@@ -160,11 +160,13 @@ const YoutubeIntegrationPage: React.FC = () => {
     const [requestsRewardId, setRequestsRewardId] = useState<string>('');
     const [requestsRewardPlatform, setRequestsRewardPlatform] = useState<'twitch' | 'vk'>('twitch');
     const [isCreatingReward, setIsCreatingReward] = useState(false);
+    const [isOrdersSaving, setIsOrdersSaving] = useState(false);
     const [newRewardTitle, setNewRewardTitle] = useState('Заказ видео');
     const [newRewardCost, setNewRewardCost] = useState(1000);
     const { lastJsonMessage } = useChat();
     const hasVideo = Boolean(currentVideo || queue.length > 0);
     const ordersClosed = !requestsCommandEnabled && !requestsRewardEnabled;
+    const lastOrdersStateRef = useRef<{ command: boolean; reward: boolean } | null>(null);
 
     const loadYoutubeSettings = useCallback(async (): Promise<void> => {
         try {
@@ -210,11 +212,55 @@ const YoutubeIntegrationPage: React.FC = () => {
         }
     };
 
+    const persistOrdersState = useCallback(async (nextCommand: boolean, nextReward: boolean, successMessage: string): Promise<void> => {
+        const previous = { command: requestsCommandEnabled, reward: requestsRewardEnabled };
+        setRequestsCommandEnabled(nextCommand);
+        setRequestsRewardEnabled(nextReward);
+        setIsOrdersSaving(true);
+        try {
+            await youtubeService.saveSettings({
+                requests_command_enabled: nextCommand,
+                requests_reward_enabled: nextReward,
+            });
+            toast.success(successMessage);
+        } catch (error) {
+            logger.error('Error saving YouTube settings:', error);
+            setRequestsCommandEnabled(previous.command);
+            setRequestsRewardEnabled(previous.reward);
+            toast.error('Не удалось изменить приём заказов');
+        } finally {
+            setIsOrdersSaving(false);
+        }
+    }, [requestsCommandEnabled, requestsRewardEnabled]);
+
+    const handleToggleOrders = useCallback(async (): Promise<void> => {
+        if (isOrdersSaving) return;
+        if (ordersClosed) {
+            const restore = lastOrdersStateRef.current ?? { command: true, reward: false };
+            await persistOrdersState(restore.command, restore.reward, 'Приём заказов открыт');
+        } else {
+            lastOrdersStateRef.current = {
+                command: requestsCommandEnabled,
+                reward: requestsRewardEnabled
+            };
+            await persistOrdersState(false, false, 'Приём заказов закрыт');
+        }
+    }, [isOrdersSaving, ordersClosed, persistOrdersState, requestsCommandEnabled, requestsRewardEnabled]);
+
 
 
     useEffect(() => {
         loadYoutubeSettings();
     }, []); // [OK] Пустой массив зависимостей - запускаем только один раз при монтировании
+
+    useEffect(() => {
+        if (requestsCommandEnabled || requestsRewardEnabled) {
+            lastOrdersStateRef.current = {
+                command: requestsCommandEnabled,
+                reward: requestsRewardEnabled
+            };
+        }
+    }, [requestsCommandEnabled, requestsRewardEnabled]);
 
     // Set player container for GlobalPlayer portal - switches between normal and theater containers
     useEffect(() => {
@@ -334,16 +380,16 @@ const YoutubeIntegrationPage: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <PageWrapper title="YouTube Заказы">
-                <Card className="border-gray-700">
+                <Card className="card-glass border-border">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-muted-foreground" />
                         </div>
                         <div className="space-y-2 max-w-md">
-                            <h3 className="text-xl font-semibold text-gray-200">
+                            <h3 className="text-xl font-semibold text-foreground">
                                 Требуется авторизация
                             </h3>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-muted-foreground text-sm">
                                 Для использования YouTube заказов необходимо войти в систему и привязать хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
@@ -380,19 +426,19 @@ const YoutubeIntegrationPage: React.FC = () => {
             </Dialog>
 
             <Dialog open={isSettingsDialogOpen} onOpenChange={setIsSettingsDialogOpen}>
-                <DialogContent className="sm:max-w-[425px] bg-gray-900 border-gray-700">
+                <DialogContent className="sm:max-w-[425px] bg-background border-border">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-semibold text-white">Способы заказа</DialogTitle>
-                        <DialogDescription className="text-gray-400">
+                        <DialogTitle className="text-xl font-semibold text-foreground">Способы заказа</DialogTitle>
+                        <DialogDescription className="text-muted-foreground">
                             Настройте как зрители могут добавлять видео
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="py-4 space-y-6">
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
                             <div className="space-y-1">
-                                <Label className="text-base text-white">Приём заказов</Label>
-                                <p className="text-xs text-gray-400">Быстро закрыть или открыть все способы заказа</p>
+                                <Label className="text-base text-foreground">Приём заказов</Label>
+                                <p className="text-xs text-muted-foreground">Быстро закрыть или открыть все способы заказа</p>
                             </div>
                             <Button
                                 variant="outline"
@@ -412,10 +458,10 @@ const YoutubeIntegrationPage: React.FC = () => {
                         </div>
 
                         {/* Command Section */}
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
                             <div className="space-y-1">
-                                <Label htmlFor="cmd-enabled" className="text-base text-white">Команда</Label>
-                                <p className="text-xs text-gray-400">Бесплатный заказ через чат (название задаётся в Команды)</p>
+                                <Label htmlFor="cmd-enabled" className="text-base text-foreground">Команда</Label>
+                                <p className="text-xs text-muted-foreground">Бесплатный заказ через чат (название задаётся в Команды)</p>
                             </div>
                             <Switch
                                 id="cmd-enabled"
@@ -426,10 +472,10 @@ const YoutubeIntegrationPage: React.FC = () => {
 
                         {/* Reward Section */}
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700/50">
+                            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
                                 <div className="space-y-1">
-                                    <Label htmlFor="reward-enabled" className="text-base text-white">Баллы канала</Label>
-                                    <p className="text-xs text-gray-400">
+                                    <Label htmlFor="reward-enabled" className="text-base text-foreground">Баллы канала</Label>
+                                    <p className="text-xs text-muted-foreground">
                                         {requestsRewardPlatform === 'vk' ? 'Заказ за награду VK Live' : 'Заказ за награду Twitch'}
                                     </p>
                                 </div>
@@ -452,7 +498,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     disabled={!integrations.twitch?.enabled}
                                     className={requestsRewardPlatform === 'twitch'
                                         ? 'bg-[#9146FF] hover:bg-[#7d3cff] text-white'
-                                        : 'border-gray-700/60'}
+                                        : 'border-border/60'}
                                 >
                                     Twitch
                                 </Button>
@@ -464,7 +510,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                     disabled={!integrations.vk?.enabled}
                                     className={requestsRewardPlatform === 'vk'
                                         ? 'bg-[#FF4444] hover:bg-[#e03a3a] text-white'
-                                        : 'border-gray-700/60'}
+                                        : 'border-border/60'}
                                 >
                                     VK Live
                                 </Button>
@@ -481,7 +527,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                         value={requestsRewardId}
                                                         onChange={(e) => setRequestsRewardId(e.target.value)}
                                                         placeholder={requestsRewardPlatform === 'vk' ? 'Название награды...' : 'ID награды...'}
-                                                        className="bg-gray-800 border-gray-600 text-white font-mono text-xs h-9"
+                                                        className="bg-muted border-border text-foreground font-mono text-xs h-9"
                                                     />
                                                 </div>
                                                 <Button
@@ -495,20 +541,20 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     Создать
                                                 </Button>
                                             </div>
-                                            <p className="text-[10px] text-gray-500">
+                                            <p className="text-[10px] text-muted-foreground">
                                                 {requestsRewardPlatform === 'vk'
                                                     ? 'Введите точное название награды VK Live или создайте новую'
                                                     : 'Вставьте ID существующей награды или создайте новую автоматически'}
                                             </p>
                                         </div>
                                     ) : (
-                                        <div className="bg-gray-800/80 rounded-lg p-3 border border-purple-500/30 space-y-3">
+                                        <div className="bg-muted/80 rounded-lg p-3 border border-purple-500/30 space-y-3">
                                             <div className="flex justify-between items-center">
                                                 <span className="text-xs font-medium text-purple-300">Новая награда</span>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="h-5 w-5 p-0 text-gray-400 hover:text-white"
+                                                    className="h-5 w-5 p-0 text-muted-foreground hover:text-white"
                                                     onClick={() => setIsCreatingReward(false)}
                                                 >
                                                     <X className="h-3 w-3" />
@@ -519,7 +565,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     value={newRewardTitle}
                                                     onChange={(e) => setNewRewardTitle(e.target.value)}
                                                     placeholder="Название"
-                                                    className="h-8 bg-gray-900/50 border-gray-600 text-xs"
+                                                    className="h-8 bg-background/50 border-border text-xs"
                                                 />
                                                 <div className="flex gap-2">
                                                     <Input
@@ -527,7 +573,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                         value={newRewardCost}
                                                         onChange={(e) => setNewRewardCost(Number(e.target.value))}
                                                         placeholder="Цена"
-                                                        className="h-8 bg-gray-900/50 border-gray-600 text-xs flex-1"
+                                                        className="h-8 bg-background/50 border-border text-xs flex-1"
                                                     />
                                                     <Button
                                                         size="sm"
@@ -545,8 +591,8 @@ const YoutubeIntegrationPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <DialogFooter className="border-t border-gray-800 pt-3">
-                        <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)} className="border-gray-700 text-gray-400 hover:text-white">Отмена</Button>
+                    <DialogFooter className="border-t border-border pt-3">
+                        <Button variant="outline" onClick={() => setIsSettingsDialogOpen(false)} className="border-border text-muted-foreground hover:text-white">Отмена</Button>
                         <Button onClick={handleSaveSettings}>Сохранить</Button>
                     </DialogFooter>
                 </DialogContent>
@@ -556,7 +602,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                     <Card className="card-glass">
                         <CardContent className="p-4">
                             <div className="w-full flex flex-col xl:flex-row gap-4 items-start">
-                                <div className="w-full xl:w-[360px] space-y-3">
+                                <div className="w-full xl:w-[clamp(260px,32vw,360px)] space-y-3">
                                     <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
                                         {/* Container for YouTube portal from GlobalPlayer */}
                                         <div
@@ -593,7 +639,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     disabled={!hasVideo}
                                                     title="Следующее"
                                                     aria-label="Следующее"
-                                                    className="h-12 w-12 border-gray-700/60 hover:border-purple-500/60"
+                                                    className="h-12 w-12 border-border/60 hover:border-purple-500/60"
                                                 >
                                                     <SkipForward className="w-5 h-5" />
                                                 </Button>
@@ -601,11 +647,22 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             <div className="flex items-center gap-2">
                                                 <Button
                                                     variant="outline"
+                                                    onClick={handleToggleOrders}
+                                                    disabled={isOrdersSaving}
+                                                    title={ordersClosed ? "Открыть приём заказов" : "Закрыть приём заказов"}
+                                                    aria-label={ordersClosed ? "Открыть приём заказов" : "Закрыть приём заказов"}
+                                                    className={`h-10 px-3 gap-2 border-border/60 disabled:opacity-60 ${ordersClosed ? 'text-red-300 border-red-500/40 hover:bg-red-500/10' : 'text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10'}`}
+                                                >
+                                                    {ordersClosed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                    <span className="text-xs font-medium">Приём</span>
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
                                                     size="icon"
                                                     onClick={() => setIsSettingsDialogOpen(true)}
                                                     title="Настройки заказа"
                                                     aria-label="Настройки заказа"
-                                                    className="h-10 w-10 border-gray-700/60"
+                                                    className="h-10 w-10 border-border/60"
                                                 >
                                                     <Settings className="h-4 w-4" />
                                                 </Button>
@@ -640,7 +697,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 disabled={!hasVideo}
                                                 title={isMuted ? "Включить звук" : "Выключить звук"}
                                                 aria-label={isMuted ? "Включить звук" : "Выключить звук"}
-                                                className="h-10 w-10 border-gray-700/60"
+                                                className="h-10 w-10 border-border/60"
                                             >
                                                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                                             </Button>
@@ -650,7 +707,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 max={100}
                                                 step={1}
                                                 disabled={!hasVideo}
-                                                className="flex-1 min-w-[160px]"
+                                                className="flex-1 min-w-[clamp(140px,22vw,180px)]"
                                             />
                                             <span className="text-sm text-purple-200 bg-purple-500/10 px-2 py-1 rounded">
                                                 {isMuted ? 0 : (volume ?? 100)}%
@@ -662,7 +719,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                         </CardContent>
                     </Card >
 
-                    <Card className="card-glass flex flex-col overflow-hidden max-h-[520px]">
+                    <Card className="card-glass flex flex-col overflow-hidden max-h-[min(520px,65vh)]">
                         <CardHeader className="pb-3">
                             <CardTitle>Очередь ({queue.length})</CardTitle>
                         </CardHeader>
@@ -686,7 +743,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                 </div >
             ) : (
                 <Card className="transition-all duration-300 w-full bg-black border-none h-full">
-                    <CardContent className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-3 h-full p-3">
+                    <CardContent className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] gap-3 h-full p-3">
                         <div className="flex flex-col h-full min-h-0 overflow-hidden">
                             <div className="flex-1 min-h-0 bg-black rounded-lg overflow-hidden relative">
                                 {/* Container for YouTube portal from GlobalPlayer in theater mode */}
@@ -731,6 +788,17 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         </Button>
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            onClick={handleToggleOrders}
+                                            disabled={isOrdersSaving}
+                                            title={ordersClosed ? "Открыть приём заказов" : "Закрыть приём заказов"}
+                                            aria-label={ordersClosed ? "Открыть приём заказов" : "Закрыть приём заказов"}
+                                            className={`h-10 px-3 gap-2 disabled:opacity-60 ${ordersClosed ? 'text-red-300 border-red-500/40 hover:bg-red-500/10' : 'text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10'}`}
+                                        >
+                                            {ordersClosed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            <span className="text-xs font-medium">Приём</span>
+                                        </Button>
                                         <Button
                                             variant="outline"
                                             size="icon"
@@ -782,7 +850,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         max={100}
                                         step={1}
                                         disabled={!hasVideo}
-                                        className="flex-1 min-w-[160px]"
+                                        className="flex-1 min-w-[clamp(140px,22vw,180px)]"
                                     />
                                     <span className="text-sm text-purple-200 bg-purple-500/10 px-2 py-1 rounded">
                                         {isMuted ? 0 : (volume ?? 100)}%

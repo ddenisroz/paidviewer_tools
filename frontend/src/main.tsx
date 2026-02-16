@@ -23,8 +23,10 @@ import { UserSettingsProvider } from './context/UserSettingsContext'
 import { queryClient } from './lib/queryClient'
 import { initSentry } from './lib/sentry'
 import { composeProviders } from './shared/utils/composeProviders'
+import { cleanupQueryCache } from './shared/utils/queryPersist'
 
 initSentry()
+cleanupQueryCache()
 
 // [TARGET] Core провайдеры - только самые критичные для начального рендера
 // Toast - обязательно сразу (для уведомлений)

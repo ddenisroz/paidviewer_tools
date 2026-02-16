@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { AlertCircle, Coins, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 
@@ -6,40 +6,35 @@ import { logger } from '@/shared/utils/prodLogger';
 import { toast } from 'sonner';
 
 import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 
 
 
 const MEMEALERTS_API_BASE = '/api/memealerts';
 const MEMEALERTS_LOGIN_URL = 'https://memealerts.com';
-const POPUP_CHECK_INTERVAL = 1000; // Check every second
-const POPUP_TIMEOUT = 300000; // 5 minutes max wait
 
 export const MemeAlertsRewards: React.FC = () => {
     const [statusLoading, setStatusLoading] = useState(true);
     const [isConnected, setIsConnected] = useState(false);
     const [connecting, setConnecting] = useState(false);
-    const [grantUserId, setGrantUserId] = useState('');
+    const [grantTarget, setGrantTarget] = useState('');
     const [grantValue, setGrantValue] = useState<number>(10);
     const [granting, setGranting] = useState(false);
     const [manualAccessToken, setManualAccessToken] = useState('');
     const [manualRefreshToken, setManualRefreshToken] = useState('');
     const [manualSaving, setManualSaving] = useState(false);
-
-    const popupRef = useRef<Window | null>(null);
-    const intervalRef = useRef<NodeJS.Timeout | null>(null);
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [history, setHistory] = useState<{ grants: any[]; purchases: any[]; unknown: any[] }>({
+        grants: [],
+        purchases: [],
+        unknown: []
+    });
 
     useEffect(() => {
         checkStatus();
-        return () => {
-            // Cleanup on unmount
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        };
     }, []);
 
     const checkStatus = async () => {
@@ -54,18 +49,21 @@ export const MemeAlertsRewards: React.FC = () => {
         }
     };
 
-    const checkStatusSilent = async (): Promise<boolean> => {
+    const fetchHistory = async () => {
         try {
-            const response = await fetch(`${MEMEALERTS_API_BASE}/status`);
+            setHistoryLoading(true);
+            const response = await fetch(`${MEMEALERTS_API_BASE}/history?limit=50`);
             const data = await response.json();
-            if (data?.connected) {
-                setIsConnected(true);
-                return true;
-            }
-        } catch {
-            // ignore
+            setHistory({
+                grants: data.grants || [],
+                purchases: data.purchases || [],
+                unknown: data.unknown || []
+            });
+        } catch (error) {
+            logger.error('History load error', error);
+        } finally {
+            setHistoryLoading(false);
         }
-        return false;
     };
 
     const saveTokenToBackend = async (accessToken: string, refreshToken?: string) => {
@@ -98,22 +96,6 @@ export const MemeAlertsRewards: React.FC = () => {
         }
     };
 
-    const cleanupPopup = useCallback(() => {
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-        if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-        }
-        if (popupRef.current && !popupRef.current.closed) {
-            popupRef.current.close();
-        }
-        popupRef.current = null;
-        setConnecting(false);
-    }, []);
-
     useEffect(() => {
         const handleMessage = async (event: MessageEvent) => {
             if (!event?.data || typeof event.data !== 'object') return;
@@ -121,102 +103,56 @@ export const MemeAlertsRewards: React.FC = () => {
             if (!data.access_token) return;
 
             const success = await saveTokenToBackend(data.access_token, data.refresh_token);
-            if (success) cleanupPopup();
+            if (success) setConnecting(false);
         };
 
         window.addEventListener('message', handleMessage);
         return () => window.removeEventListener('message', handleMessage);
-    }, [cleanupPopup, saveTokenToBackend]);
+    }, [saveTokenToBackend]);
+
+    useEffect(() => {
+        if (isConnected) {
+            fetchHistory();
+        }
+    }, [isConnected]);
+
+    const callbackUrl = useMemo(() => `${window.location.origin}/memealerts/callback`, []);
+    const bookmarkletCode = useMemo(() => (
+        `javascript:(()=>{const t=localStorage.getItem('accessToken')||localStorage.getItem('access_token');` +
+        `const r=localStorage.getItem('refreshToken')||localStorage.getItem('refresh_token');` +
+        `if(!t){alert('MemeAlerts token not found. Make sure you are logged in.');return;}` +
+        `window.location.href='${callbackUrl}#access_token='+encodeURIComponent(t)+'&refresh_token='+(r?encodeURIComponent(r):'');})();`
+    ), [callbackUrl]);
 
     const handleConnect = useCallback(() => {
-        // Open popup window
-        const width = 500;
-        const height = 700;
-        const left = window.screenX + (window.outerWidth - width) / 2;
-        const top = window.screenY + (window.outerHeight - height) / 2;
-
-        const popup = window.open(
-            MEMEALERTS_LOGIN_URL,
-            'memealerts_auth',
-            `width=${width},height=${height},left=${left},top=${top},scrollbars=yes`
-        );
-
+        const popup = window.open(MEMEALERTS_LOGIN_URL, '_blank', 'width=500,height=700,scrollbars=yes');
         if (!popup) {
-            toast.error("Не удалось открыть окно авторизации", {
-                description: "Пожалуйста, разрешите всплывающие окна для этого сайта"
+            toast.error("Не удалось открыть MemeAlerts", {
+                description: "Разрешите всплывающие окна или откройте сайт вручную"
             });
             return;
         }
-
-        popupRef.current = popup;
         setConnecting(true);
-
         toast.info("Авторизуйтесь в MemeAlerts", {
-            description: "После входа окно закроется автоматически"
+            description: "После входа используйте закладку (код ниже) для передачи токена"
         });
+        setTimeout(() => {
+            setConnecting(false);
+            checkStatus();
+        }, 5000);
+    }, []);
 
-        // Start polling for token
-        intervalRef.current = setInterval(async () => {
-            try {
-                // Check if popup is closed
-                if (!popupRef.current || popupRef.current.closed) {
-                    cleanupPopup();
-                    checkStatus();
-                    toast.info("Auth window closed");
-                    return;
-                }
-
-                const connected = await checkStatusSilent();
-                if (connected) {
-                    cleanupPopup();
-                    return;
-                }
-
-                // Try to access popup's localStorage (only works when on same origin or after redirect)
-                // Due to cross-origin restrictions, this may throw until the popup is on a same-origin page
-                try {
-                    const popupUrl = popupRef.current.location.href;
-
-                    // Check if user is on dashboard/stickers (authenticated pages)
-                    if (popupUrl.includes('memealerts.com/dashboard') ||
-                        popupUrl.includes('memealerts.com/stickers') ||
-                        popupUrl.includes('memealerts.com/settings')) {
-
-                        // Try to get token from localStorage
-                        const accessToken = popupRef.current.localStorage.getItem('accessToken');
-                        const refreshToken = popupRef.current.localStorage.getItem('refreshToken');
-
-                        if (accessToken) {
-                            logger.log('[MemeAlerts] Token captured successfully');
-
-                            // Save to backend
-                            const success = await saveTokenToBackend(accessToken, refreshToken || undefined);
-
-                            if (success) {
-                                cleanupPopup();
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // Cross-origin error - popup is on different domain (e.g., Twitch OAuth)
-                    // This is expected, continue polling
-                }
-            } catch (e) {
-                // General error, continue polling
-            }
-        }, POPUP_CHECK_INTERVAL);
-
-        // Set timeout to stop polling after max wait time
-        timeoutRef.current = setTimeout(() => {
-            if (popupRef.current) {
-                cleanupPopup();
-                toast.warning("Время авторизации истекло", {
-                    description: "Попробуйте снова"
-                });
-            }
-        }, POPUP_TIMEOUT);
-
-    }, [cleanupPopup, checkStatus, checkStatusSilent, saveTokenToBackend]);
+    const handleCopyBookmarklet = async () => {
+        try {
+            await navigator.clipboard.writeText(bookmarkletCode);
+            toast.success("Код закладки скопирован", {
+                description: "Вставьте в новую закладку и нажмите ее на MemeAlerts"
+            });
+        } catch (error) {
+            logger.error('Clipboard error', error);
+            toast.error("Не удалось скопировать код. Скопируйте вручную.");
+        }
+    };
 
     const handleManualSave = async () => {
         const accessToken = manualAccessToken.trim();
@@ -254,8 +190,8 @@ export const MemeAlertsRewards: React.FC = () => {
     };
 
     const handleGrant = async () => {
-        if (!grantUserId || !grantValue) {
-            toast.error("Укажите User ID и количество монет");
+        if (!grantTarget || !grantValue) {
+            toast.error("Укажите никнейм/ID и количество монет");
             return;
         }
 
@@ -265,16 +201,17 @@ export const MemeAlertsRewards: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: grantUserId,
+                    nickname: grantTarget,
                     value: grantValue
                 })
             });
             const data = await response.json();
 
             if (data.success) {
-                toast.success(`Отправлено ${grantValue} монет пользователю ${grantUserId}`, {
+                toast.success(`Отправлено ${grantValue} монет пользователю ${grantTarget}`, {
                     description: "Монеты выданы!"
                 });
+                fetchHistory();
             } else {
                 toast.error(data.error || "Не удалось выдать монеты", {
                     description: "Ошибка"
@@ -285,6 +222,13 @@ export const MemeAlertsRewards: React.FC = () => {
         } finally {
             setGranting(false);
         }
+    };
+
+    const formatTimestamp = (value?: string) => {
+        if (!value) return '—';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString('ru-RU', { hour12: false });
     };
 
     if (statusLoading) {
@@ -304,6 +248,36 @@ export const MemeAlertsRewards: React.FC = () => {
                 </div>
             </div>
 
+            <div className="rounded-xl border border-border/60 bg-background/50 p-4">
+                <div className="flex flex-col gap-3">
+                    <div>
+                        <h4 className="font-semibold text-white">Быстрое подключение MemeAlerts</h4>
+                        <p className="text-sm text-muted-foreground">
+                            Из другого окна нельзя прочитать токен из-за политики браузера. Самый удобный способ —
+                            закладка, которая переносит токен на нашу страницу подтверждения.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={handleConnect} disabled={connecting}>
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Открыть MemeAlerts
+                        </Button>
+                        <Button variant="outline" onClick={handleCopyBookmarklet}>
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                            Скопировать код закладки
+                        </Button>
+                    </div>
+                    <div className="rounded-lg bg-slate-900/40 border border-slate-800/50 p-3 text-xs text-muted-foreground font-mono break-all">
+                        {bookmarkletCode}
+                    </div>
+                    <ol className="text-sm text-muted-foreground list-decimal pl-5 space-y-1">
+                        <li>Создайте новую закладку и вставьте код выше.</li>
+                        <li>Откройте MemeAlerts, авторизуйтесь и нажмите эту закладку.</li>
+                        <li>Вы попадете на страницу подтверждения, токен сохранится.</li>
+                    </ol>
+                </div>
+            </div>
+
             {!isConnected ? (
                 <div className="rounded-xl bg-gradient-to-br from-gray-800/50 to-gray-900/50 border border-gray-700/50 p-6 space-y-5">
                     <div className="flex items-start gap-4">
@@ -314,7 +288,7 @@ export const MemeAlertsRewards: React.FC = () => {
                             <h4 className="font-semibold text-white">Авторизация через MemeAlerts</h4>
                             <p className="text-sm text-gray-400 leading-relaxed">
                                 Подключите MemeAlerts для выдачи мемкоинов вашим зрителям.
-                                После авторизации токен сохранится автоматически.
+                                После авторизации используйте закладку выше или вставьте токен вручную.
                             </p>
                         </div>
                     </div>
@@ -342,13 +316,15 @@ export const MemeAlertsRewards: React.FC = () => {
                         <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
                             <RefreshCw className="h-4 w-4 animate-spin text-blue-400 flex-shrink-0" />
                             <p className="text-xs text-blue-300">
-                                Авторизуйтесь в открывшемся окне через Twitch, Google или VK.
+                                Авторизуйтесь в MemeAlerts и нажмите созданную закладку.
                             </p>
                         </div>
                     )}
                     <div className="mt-4 space-y-3 rounded-lg border border-white/10 bg-black/20 p-4">
                         <p className="text-xs text-gray-400">
-                            Если автоматическое подключение не сработало, вставьте access token вручную.
+                            Если подключение не произошло, можно вставить токен вручную.
+                            Откройте DevTools в MemeAlerts → Application → Local Storage → memealerts.com и скопируйте
+                            accessToken (и refreshToken при наличии).
                         </p>
                         <div className="space-y-2">
                             <Label>Access token</Label>
@@ -376,44 +352,100 @@ export const MemeAlertsRewards: React.FC = () => {
                 </div>
             ) : (
                 <div className="space-y-6">
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="p-4 rounded-lg card-glass space-y-4">
-                            <h4 className="font-semibold flex items-center gap-2 text-white">
-                                <Coins className="h-4 w-4 text-yellow-500" />
-                                Выдать монеты
-                            </h4>
-                            <div className="space-y-2">
-                                <Label>User ID получателя</Label>
-                                <Input
-                                    placeholder="ID пользователя MemeAlerts"
-                                    value={grantUserId}
-                                    onChange={(e) => setGrantUserId(e.target.value)}
-                                    className="bg-black/20 border-white/10"
-                                />
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,320px)_1fr]">
+                        <div className="space-y-4">
+                            <div className="p-4 rounded-lg card-glass space-y-4">
+                                <h4 className="font-semibold flex items-center gap-2 text-white">
+                                    <Coins className="h-4 w-4 text-yellow-500" />
+                                    Выдать мемкоины
+                                </h4>
+                                <div className="space-y-2">
+                                    <Label>Никнейм или ID</Label>
+                                    <Input
+                                        placeholder="nickname или 12345"
+                                        value={grantTarget}
+                                        onChange={(e) => setGrantTarget(e.target.value)}
+                                        className="bg-black/20 border-white/10"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Количество</Label>
+                                    <Input
+                                        type="number"
+                                        placeholder="10"
+                                        value={grantValue}
+                                        onChange={(e) => setGrantValue(Number(e.target.value))}
+                                        className="bg-black/20 border-white/10"
+                                    />
+                                </div>
+                                <Button onClick={handleGrant} disabled={granting} className="w-full">
+                                    {granting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Выдать монеты
+                                </Button>
                             </div>
-                            <div className="space-y-2">
-                                <Label>Количество</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="10"
-                                    value={grantValue}
-                                    onChange={(e) => setGrantValue(Number(e.target.value))}
-                                    className="bg-black/20 border-white/10"
-                                />
+
+                            <div className="p-4 rounded-lg card-glass space-y-4">
+                                <h4 className="font-semibold text-white">Статус подключения</h4>
+                                <p className="text-sm text-green-400 font-medium">✓ Активно</p>
+                                <Button variant="destructive" size="sm" onClick={handleDisconnect} disabled={connecting}>
+                                    {connecting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                                    Отключить
+                                </Button>
                             </div>
-                            <Button onClick={handleGrant} disabled={granting} className="w-full">
-                                {granting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Выдать монеты
-                            </Button>
                         </div>
 
                         <div className="p-4 rounded-lg card-glass space-y-4">
-                            <h4 className="font-semibold text-white">Статус подключения</h4>
-                            <p className="text-sm text-green-400 font-medium">✓ Активно</p>
-                            <Button variant="destructive" size="sm" onClick={handleDisconnect} disabled={connecting}>
-                                {connecting && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                                Отключить
-                            </Button>
+                            <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-white">История мемкоинов</h4>
+                                <Button variant="outline" size="sm" onClick={fetchHistory} disabled={historyLoading}>
+                                    {historyLoading && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                                    Обновить
+                                </Button>
+                            </div>
+                            <Tabs defaultValue="grants">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="grants">Выдачи</TabsTrigger>
+                                    <TabsTrigger value="purchases">Покупки</TabsTrigger>
+                                </TabsList>
+                                <TabsContent value="grants">
+                                    <div className="max-h-72 overflow-y-auto space-y-2">
+                                        {history.grants.length === 0 && (
+                                            <p className="text-sm text-muted-foreground">Нет данных по выдачам.</p>
+                                        )}
+                                        {history.grants.map((item, index) => (
+                                            <div key={`${item.id || index}`} className="flex items-center justify-between rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm">
+                                                <div>
+                                                    <p className="text-white font-medium">{item.user_name || item.user_id || 'Пользователь'}</p>
+                                                    <p className="text-xs text-muted-foreground">{formatTimestamp(item.created_at)}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-green-400 font-semibold">+{item.amount || 0}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.type || 'grant'}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </TabsContent>
+                                <TabsContent value="purchases">
+                                    <div className="max-h-72 overflow-y-auto space-y-2">
+                                        {history.purchases.length === 0 && (
+                                            <p className="text-sm text-muted-foreground">Нет данных по покупкам.</p>
+                                        )}
+                                        {history.purchases.map((item, index) => (
+                                            <div key={`${item.id || index}`} className="flex items-center justify-between rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm">
+                                                <div>
+                                                    <p className="text-white font-medium">{item.user_name || item.user_id || 'Пользователь'}</p>
+                                                    <p className="text-xs text-muted-foreground">{formatTimestamp(item.created_at)}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-purple-400 font-semibold">{item.amount || 0}</p>
+                                                    <p className="text-xs text-muted-foreground">{item.type || 'purchase'}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
                         </div>
                     </div>
                 </div>

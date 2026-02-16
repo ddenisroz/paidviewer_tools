@@ -21,6 +21,10 @@ logging_config = LoggingConfig("tts_service")
 app_log_level = os.getenv("LOG_LEVEL", "INFO")
 logger = logging_config.setup_logging(app_log_level)
 
+# Инициализация логирования для LLM анализа (активируется через ANALYSIS_MODE=true)
+from analysis_logging import get_analysis_logger
+analysis_logger = get_analysis_logger()
+
 def main():
     """Главная функция запуска TTS Service"""
     try:

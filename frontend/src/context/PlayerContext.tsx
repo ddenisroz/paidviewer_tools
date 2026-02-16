@@ -225,6 +225,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const volumeSaveTimeoutRef = useRef<number | null>(null);
     const lastSavedVolumeRef = useRef<number | null>(null);
     const playerSourceRef = useRef<PlayerSource | null>(null);
+    const pauseReasonRef = useRef<'user' | 'system' | null>(null);
     const [playerContainerRef, setPlayerContainer] = React.useState<HTMLDivElement | null>(null);
     const { isAuthenticated } = useAuth();
     const { lastJsonMessage, isConnected: isChatConnected } = useChat();
@@ -379,8 +380,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         try {
             if (state.playerRef) {
                 if (state.isPlaying) {
+                    pauseReasonRef.current = 'user';
                     state.playerRef.pauseVideo();
                 } else {
+                    pauseReasonRef.current = null;
                     state.playerRef.playVideo();
                 }
             }
@@ -538,6 +541,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         const player = playerEvent.target;
 
         if (playerState === 1) {
+            pauseReasonRef.current = null;
             if (!window.ytUserStarted) {
                 try {
                     player.pauseVideo();
@@ -555,7 +559,12 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             window.ytUserStarted = true;
             logger.debug('▶ [YOUTUBE] Playing, mini-player visible');
         } else if (playerState === 2) {
+            const pauseReason = pauseReasonRef.current;
+            pauseReasonRef.current = null;
             dispatch({ type: 'SET_PLAYING', payload: false });
+            if (pauseReason !== 'system') {
+                dispatch({ type: 'SET_USER_PAUSED', payload: true });
+            }
             logger.debug('⏸ [YOUTUBE] Paused');
         } else if (playerState === 0) {
             logger.debug('[SKIP] [YOUTUBE] Video ended, switching to next');
@@ -678,10 +687,12 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
             if (action === 'pause_youtube' && state.playerRef && state.isPlaying) {
                 logger.debug('⏸ [YouTube] Pausing for TTS');
+                pauseReasonRef.current = 'system';
                 state.playerRef.pauseVideo();
                 dispatch({ type: 'SET_PLAYING', payload: false });
             } else if (action === 'resume_youtube' && state.playerRef && !state.isPlaying && state.currentVideo) {
                 logger.debug('▶ [YouTube] Resuming after TTS');
+                pauseReasonRef.current = null;
                 state.playerRef.playVideo();
                 dispatch({ type: 'SET_PLAYING', payload: true });
             } else if (action === 'duck_youtube' && state.playerRef) {

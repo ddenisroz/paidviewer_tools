@@ -26,6 +26,7 @@ const GlobalPlayer: React.FC = () => {
     const {
         currentVideo,
         isPlaying,
+        userPaused,
         volume,
         isMuted,
         isVisible,
@@ -47,6 +48,7 @@ const GlobalPlayer: React.FC = () => {
     } = usePlayer();
 
     const [showQueue, setShowQueue] = useState(false);
+    const [playerReady, setPlayerReady] = useState(false);
     const [miniPlayerContainer, setMiniPlayerContainer] = useState<HTMLElement | null>(null);
     const [playerRoot] = useState<HTMLDivElement | null>(() => {
         if (typeof document === 'undefined') return null;
@@ -162,6 +164,8 @@ const GlobalPlayer: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ReactPlayerAny = ReactPlayer as any;
 
+    const shouldInterceptClicks = isOnYoutubePage && playerReady && !isPlaying;
+
     const reactPlayerComponent = hasVideo ? (
         <div className="relative w-full h-full">
             <ReactPlayerAny
@@ -175,7 +179,10 @@ const GlobalPlayer: React.FC = () => {
                 controls={true}
                 pip={false}
                 stopOnUnmount={false}
-                onReady={handleReady}
+                onReady={() => {
+                    setPlayerReady(true);
+                    handleReady();
+                }}
                 onPlay={handlePlay}
                 onPause={handlePause}
                 onEnded={handleEnded}
@@ -194,14 +201,21 @@ const GlobalPlayer: React.FC = () => {
                     }
                 }}
             />
-            {isOnYoutubePage && !isPlaying && (
-                <button
-                    type="button"
-                    aria-label="Плей"
-                    onClick={togglePlayPause}
-                    className="absolute inset-0 cursor-pointer z-10"
-                    style={{ background: 'transparent' }}
-                />
+            {shouldInterceptClicks && (
+                <>
+                    <button
+                        type="button"
+                        aria-label={isPlaying ? "Пауза" : "Плей"}
+                        onClick={togglePlayPause}
+                        className="absolute left-0 right-0 top-0 bottom-[clamp(40px,8%,64px)] cursor-pointer z-10"
+                        style={{ background: 'transparent' }}
+                    />
+                    {userPaused && !isPlaying && (
+                        <div className="absolute top-2 left-2 z-10 pointer-events-none rounded-full bg-black/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white/90">
+                            Пауза
+                        </div>
+                    )}
+                </>
             )}
         </div>
     ) : null;

@@ -46,7 +46,7 @@ async def system_status(
         }
     except Exception as e:
         logger.error(f"Error getting system status: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.get("/metrics")
 async def get_metrics():
@@ -61,7 +61,7 @@ async def get_metrics():
         }
     except Exception as e:
         logger.error(f"Error getting metrics: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.get("/metrics/prometheus")
 async def get_prometheus_metrics():
@@ -75,7 +75,7 @@ async def get_prometheus_metrics():
         }
     except Exception as e:
         logger.error(f"Error getting Prometheus URL: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.get("/info")
 async def system_info():
@@ -126,7 +126,7 @@ async def generate_api_key(
     except Exception as e:
         logger.error(f"Error generating API key: {e}")
         db.rollback()
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.get("/logs")
 async def get_system_logs(
@@ -196,7 +196,7 @@ async def get_system_logs(
         }
     except Exception as e:
         logger.error(f"Error getting system logs: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.post("/restart")
 async def restart_system(
@@ -216,7 +216,7 @@ async def restart_system(
         }
     except Exception as e:
         logger.error(f"Error restarting system: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.post("/csp-report")
 async def csp_report(request: Request):
@@ -230,4 +230,4 @@ async def csp_report(request: Request):
         return {"success": True, "message": "CSP violation reported"}
     except Exception as e:
         logger.error(f"Error processing CSP report: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}

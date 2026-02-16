@@ -1,14 +1,15 @@
 """
-Сервис для валидации и мониторинга токенов ботов.
+РЎРµСЂРІРёСЃ РґР»СЏ РІР°Р»РёРґР°С†РёРё Рё РјРѕРЅРёС‚РѕСЂРёРЅРіР° С‚РѕРєРµРЅРѕРІ Р±РѕС‚РѕРІ.
 
-Токены ботов (TWITCH_BOT_TOKEN, VK_LIVE_USER_TOKEN) не имеют refresh_token,
-поэтому требуют ручного обновления при истечении.
+OAuth Р±РѕС‚-С‚РѕРєРµРЅС‹ С…СЂР°РЅСЏС‚СЃСЏ РІ Р‘Р” Рё РјРѕРіСѓС‚ РѕР±РЅРѕРІР»СЏС‚СЊСЃСЏ РїРѕ refresh_token.
+Legacy env-С‚РѕРєРµРЅС‹ (TWITCH_BOT_TOKEN, VK_LIVE_USER_TOKEN) РїРѕРґРґРµСЂР¶РёРІР°СЋС‚СЃСЏ РєР°Рє fallback,
+РЅРѕ РЅРµ РёРјРµСЋС‚ refresh_token Рё С‚СЂРµР±СѓСЋС‚ СЂСѓС‡РЅРѕРіРѕ РѕР±РЅРѕРІР»РµРЅРёСЏ РїСЂРё РёСЃС‚РµС‡РµРЅРёРё.
 
-Этот сервис:
-- Валидирует токены при старте
-- Периодически проверяет их валидность
-- Уведомляет о проблемах
-- Предоставляет инструкции по обновлению
+Р­С‚РѕС‚ СЃРµСЂРІРёСЃ:
+- Р’Р°Р»РёРґРёСЂСѓРµС‚ С‚РѕРєРµРЅС‹ РїСЂРё СЃС‚Р°СЂС‚Рµ
+- РџРµСЂРёРѕРґРёС‡РµСЃРєРё РїСЂРѕРІРµСЂСЏРµС‚ РёС… РІР°Р»РёРґРЅРѕСЃС‚СЊ
+- РЈРІРµРґРѕРјР»СЏРµС‚ Рѕ РїСЂРѕР±Р»РµРјР°С…
+- РџСЂРµРґРѕСЃС‚Р°РІР»СЏРµС‚ РёРЅСЃС‚СЂСѓРєС†РёРё РїРѕ РѕР±РЅРѕРІР»РµРЅРёСЋ
 """
 
 import logging
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class BotTokenValidator:
-    """Валидатор токенов ботов"""
+    """Р’Р°Р»РёРґР°С‚РѕСЂ С‚РѕРєРµРЅРѕРІ Р±РѕС‚РѕРІ"""
     
     def __init__(self):
         self.last_twitch_check: Optional[datetime] = None
@@ -37,40 +38,44 @@ class BotTokenValidator:
     
     async def validate_twitch_bot_token(self) -> Dict[str, Any]:
         """
-        Валидирует Twitch bot token.
-        Приоритет: Token из БД > Token из .env
+        Р’Р°Р»РёРґРёСЂСѓРµС‚ Twitch bot token.
+        РџСЂРёРѕСЂРёС‚РµС‚: Token РёР· Р‘Р” > Token РёР· .env
         
         Returns:
             dict: {
                 'valid': bool,
                 'user_id': str,
                 'login': str,
-                'error': str (если invalid)
+                'error': str (РµСЃР»Рё invalid)
             }
         """
-        # 1. Пытаемся получить токен из БД
+        # 1. РџС‹С‚Р°РµРјСЃСЏ РїРѕР»СѓС‡РёС‚СЊ С‚РѕРєРµРЅ РёР· Р‘Р”
         try:
             bot_token = await twitch_bot_oauth_service.get_bot_token()
             token_to_check = bot_token.get('access_token') if bot_token else None
         except Exception as e:
             logger.error(f"[BOT TOKEN] Failed to get token from DB: {e}")
             token_to_check = None
+        use_env_fallback = False
 
-        # 2. Если нет в БД, пробуем из .env (Legacy)
+        # 2. Р•СЃР»Рё РЅРµС‚ РІ Р‘Р” вЂ” РёСЃРїРѕР»СЊР·СѓРµРј env fallback (Р±РµР· refresh)
         if not token_to_check:
             if settings.twitch_bot_token:
-                logger.info("[BOT TOKEN] Using legacy token from .env")
-                token_to_check = settings.twitch_bot_token.replace("oauth:", "")
+                token_to_check = settings.twitch_bot_token
+                use_env_fallback = True
+                logger.warning("[BOT TOKEN] Using legacy Twitch bot token from .env (no refresh)")
             else:
-                logger.warning("[BOT TOKEN] TWITCH_BOT_TOKEN not configured in DB or .env")
+                logger.error("[BOT TOKEN] Twitch bot OAuth token not configured")
                 return {
                     'valid': False,
                     'error': 'Token not configured',
-                    'instructions': 'Authorize bot in Admin Panel'
+                    'instructions': 'Authorize bot via /auth/twitch/bot/login'
                 }
         
         try:
-            # Twitch validate endpoint
+            # Twitch validate endpoint (strip oauth: prefix if present)
+            if isinstance(token_to_check, str) and token_to_check.startswith("oauth:"):
+                token_to_check = token_to_check.split("oauth:", 1)[1]
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
                     'https://id.twitch.tv/oauth2/validate',
@@ -109,12 +114,12 @@ class BotTokenValidator:
                      if refresh_success:
                           logger.info("[BOT TOKEN] Auto-refresh successful, re-validating...")
                           return await self.validate_twitch_bot_token() # Recursion (safe, one level usually)
-                
+
                 return {
                     'valid': False,
                     'error': 'Token invalid or expired',
                     'status_code': 401,
-                    'instructions': 'Please re-authorize bot in Admin Panel'
+                    'instructions': 'Update TWITCH_BOT_TOKEN in .env' if use_env_fallback else 'Please re-authorize bot in Admin Panel'
                 }
             
             else:
@@ -129,28 +134,29 @@ class BotTokenValidator:
             logger.error(f"[ERROR] [BOT TOKEN] Failed to validate Twitch token: {e}")
             return {
                 'valid': False,
-                'error': str(e)
+                'error': "Internal server error"
             }
     
     async def validate_vk_bot_token(self) -> Dict[str, Any]:
         """
-        Валидирует VK Live bot token.
+        Р’Р°Р»РёРґРёСЂСѓРµС‚ VK Live bot token.
         
         Returns:
             dict: {
                 'valid': bool,
-                'error': str (если invalid)
+                'error': str (РµСЃР»Рё invalid)
             }
         """
-        import os
         from repositories.bot_token_repository import BotTokenRepository
         from core.database import db_session
         from core.token_encryption import decrypt_token
 
-        # Приоритет: DB > os.environ > settings (.env)
+        # РџСЂРёРѕСЂРёС‚РµС‚: DB (OAuth bot token)
         vk_token = None
+        has_db_token = False
+        use_env_fallback = False
         
-        # 1. Пытаемся получить из БД (BotToken)
+        # 1. РџС‹С‚Р°РµРјСЃСЏ РїРѕР»СѓС‡РёС‚СЊ РёР· Р‘Р” (BotToken)
         try:
              with db_session() as db:
                   repo = BotTokenRepository(db)
@@ -158,23 +164,25 @@ class BotTokenValidator:
                   if bot_token and bot_token.access_token:
                        try:
                             vk_token = decrypt_token(bot_token.access_token)
+                            has_db_token = True
                             logger.info("[BOT TOKEN] Using VK bot token from DB")
                        except Exception as e:
                             logger.error(f"[BOT TOKEN] Failed to decrypt VK token from DB: {e}")
         except Exception as e:
              logger.error(f"[BOT TOKEN] Failed to get VK token from DB: {e}")
 
-        # 2. Fallback to Env/Settings
         if not vk_token:
-            vk_token = os.environ.get("VK_LIVE_USER_TOKEN") or settings.vk_live_user_token
-        
-        if not vk_token:
-            logger.info("[INFO] [BOT TOKEN] VK_LIVE_USER_TOKEN not configured (optional)")
-            return {
-                'valid': False,
-                'error': 'Token not configured',
-                'optional': True
-            }
+            if settings.vk_live_user_token:
+                vk_token = settings.vk_live_user_token
+                use_env_fallback = True
+                logger.warning("[BOT TOKEN] Using legacy VK bot token from .env (no refresh)")
+            else:
+                logger.error("[ERROR] [BOT TOKEN] VK bot OAuth token not configured")
+                return {
+                    'valid': False,
+                    'error': 'Token not configured',
+                    'instructions': 'Authorize VK bot via /auth/vk/bot/login'
+                }
         
         try:
             # VK Live validation priorities:
@@ -202,27 +210,30 @@ class BotTokenValidator:
                     'type': 'user_token'
                 }
             
-            # Check 2: App Token (Fallback for Client Credentials)
             elif response.status_code == 401:
-                 if vk_token == os.environ.get("VK_LIVE_USER_TOKEN"):
-                      self.vk_token_valid = True
-                      self.last_vk_check = utcnow_naive()
-                      logger.info("[OK] [BOT TOKEN] VK Live bot token is VALID (App Token via Env)")
-                      return {
-                           'valid': True,
-                           'type': 'app_token_trusted'
-                      }
-
                  self.vk_token_valid = False
                  logger.error("=" * 80)
                  logger.error("[ERROR] [BOT TOKEN] VK Live bot token is INVALID or EXPIRED!")
                  logger.error(f"[ERROR] API Response: {response.status_code}")
                  logger.error("=" * 80)
-                 
+
+                 # Attempt refresh if OAuth bot token exists
+                 if has_db_token:
+                      try:
+                           from services.vk_bot_oauth_service import vk_bot_oauth_service
+                           logger.info("[BOT TOKEN] Attempting VK bot token refresh...")
+                           refresh_success = await vk_bot_oauth_service.refresh_bot_token()
+                           if refresh_success:
+                                logger.info("[BOT TOKEN] VK bot token refreshed, re-validating...")
+                                return await self.validate_vk_bot_token()
+                      except Exception as refresh_error:
+                           logger.error(f"[BOT TOKEN] VK bot token refresh failed: {refresh_error}")
+
                  return {
                     'valid': False,
                     'error': 'Token invalid or expired',
-                    'status_code': 401
+                    'status_code': 401,
+                    'instructions': 'Update VK_LIVE_USER_TOKEN in .env' if use_env_fallback else 'Re-authorize VK bot'
                 }
             
             else:
@@ -239,12 +250,12 @@ class BotTokenValidator:
             logger.error(traceback.format_exc())
             return {
                 'valid': False,
-                'error': str(e)
+                'error': "Internal server error"
             }
     
     async def validate_all_tokens(self) -> Dict[str, Dict[str, Any]]:
         """
-        Валидирует все токены ботов.
+        Р’Р°Р»РёРґРёСЂСѓРµС‚ РІСЃРµ С‚РѕРєРµРЅС‹ Р±РѕС‚РѕРІ.
         
         Returns:
             dict: {
@@ -261,7 +272,7 @@ class BotTokenValidator:
             'vk': await self.validate_vk_bot_token()
         }
         
-        # Сводка
+        # РЎРІРѕРґРєР°
         logger.info("=" * 80)
         logger.info("[BOT TOKEN] Validation Summary:")
         logger.info(f"  Twitch: {'[VALID]' if results['twitch']['valid'] else '[INVALID]'}")
@@ -272,10 +283,10 @@ class BotTokenValidator:
     
     async def start_monitoring(self, check_interval: int = 3600):
         """
-        Запускает периодический мониторинг токенов.
+        Р—Р°РїСѓСЃРєР°РµС‚ РїРµСЂРёРѕРґРёС‡РµСЃРєРёР№ РјРѕРЅРёС‚РѕСЂРёРЅРі С‚РѕРєРµРЅРѕРІ.
         
         Args:
-            check_interval: Интервал проверки в секундах (по умолчанию 1 час)
+            check_interval: РРЅС‚РµСЂРІР°Р» РїСЂРѕРІРµСЂРєРё РІ СЃРµРєСѓРЅРґР°С… (РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ 1 С‡Р°СЃ)
         """
         if self._monitoring_task and not self._monitoring_task.done():
             logger.warning("[BOT TOKEN] Monitoring already running")
@@ -285,7 +296,7 @@ class BotTokenValidator:
         self._monitoring_task = asyncio.create_task(self._monitoring_loop(check_interval))
     
     async def stop_monitoring(self):
-        """Останавливает мониторинг токенов"""
+        """РћСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ РјРѕРЅРёС‚РѕСЂРёРЅРі С‚РѕРєРµРЅРѕРІ"""
         if self._monitoring_task:
             self._monitoring_task.cancel()
             try:
@@ -295,7 +306,7 @@ class BotTokenValidator:
             logger.info("[BOT TOKEN] Monitoring stopped")
     
     async def _monitoring_loop(self, interval: int):
-        """Цикл мониторинга токенов"""
+        """Р¦РёРєР» РјРѕРЅРёС‚РѕСЂРёРЅРіР° С‚РѕРєРµРЅРѕРІ"""
         while True:
             try:
                 await asyncio.sleep(interval)
@@ -303,7 +314,7 @@ class BotTokenValidator:
                 logger.info("[BOT TOKEN] Periodic token validation...")
                 results = await self.validate_all_tokens()
                 
-                # Если токен стал невалидным - логируем предупреждение
+                # Р•СЃР»Рё С‚РѕРєРµРЅ СЃС‚Р°Р» РЅРµРІР°Р»РёРґРЅС‹Рј - Р»РѕРіРёСЂСѓРµРј РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµ
                 if not results['twitch']['valid']:
                     logger.error("[ALERT] Twitch bot token is invalid! Bot will not work!")
                 
@@ -317,10 +328,10 @@ class BotTokenValidator:
     
     def get_status(self) -> Dict[str, Any]:
         """
-        Получить текущий статус токенов.
+        РџРѕР»СѓС‡РёС‚СЊ С‚РµРєСѓС‰РёР№ СЃС‚Р°С‚СѓСЃ С‚РѕРєРµРЅРѕРІ.
         
         Returns:
-            dict: Статус всех токенов
+            dict: РЎС‚Р°С‚СѓСЃ РІСЃРµС… С‚РѕРєРµРЅРѕРІ
         """
         return {
             'twitch': {
@@ -335,5 +346,5 @@ class BotTokenValidator:
         }
 
 
-# Глобальный экземпляр
+# Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ СЌРєР·РµРјРїР»СЏСЂ
 bot_token_validator = BotTokenValidator()

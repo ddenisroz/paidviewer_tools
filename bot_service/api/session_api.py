@@ -1,6 +1,6 @@
 # bot_service/api/session_api.py
 """
-API для управления сессиями.
+API РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ СЃРµСЃСЃРёСЏРјРё.
 Refactored to use SessionService (Clean Architecture).
 """
 import logging
@@ -18,19 +18,19 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 @router.post("/clear-legacy")
 async def clear_legacy_sessions(db: Session = Depends(get_db)):
-    """Очистить legacy сессии (test_channel, старые VK ID)"""
+    """РћС‡РёСЃС‚РёС‚СЊ legacy СЃРµСЃСЃРёРё (test_channel, СЃС‚Р°СЂС‹Рµ VK ID)"""
     try:
         service = SessionService(db)
         cleared = service.clear_legacy_sessions()
         return {"success": True, "cleared": cleared}
     except Exception as e:
         logger.error(f"Error clearing legacy sessions: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.get("/active-channels")
 async def get_active_channels(db: Session = Depends(get_db)):
-    """Получить список активных каналов"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р°РєС‚РёРІРЅС‹С… РєР°РЅР°Р»РѕРІ"""
     try:
         service = SessionService(db)
         channels = service.get_active_channels()
@@ -42,12 +42,12 @@ async def get_active_channels(db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"Error getting active channels: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.get("/active-sessions")
 async def get_active_sessions(db: Session = Depends(get_db)):
-    """Получить детальную информацию об активных сессиях"""
+    """РџРѕР»СѓС‡РёС‚СЊ РґРµС‚Р°Р»СЊРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ РѕР± Р°РєС‚РёРІРЅС‹С… СЃРµСЃСЃРёСЏС…"""
     try:
         service = SessionService(db)
         sessions = service.get_active_sessions_details()
@@ -59,7 +59,7 @@ async def get_active_sessions(db: Session = Depends(get_db)):
         }
     except Exception as e:
         logger.error(f"Error getting active sessions: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/disconnect/{channel_name}")
@@ -68,9 +68,9 @@ async def disconnect_channel(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Принудительно отключить канал"""
+    """РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ РѕС‚РєР»СЋС‡РёС‚СЊ РєР°РЅР°Р»"""
     try:
-        # Проверяем права пользователя (только админы)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
         if not user.get('is_admin', False):
             raise HTTPException(status_code=403, detail="Admin access required")
 
@@ -86,7 +86,7 @@ async def disconnect_channel(
         raise
     except Exception as e:
         logger.error(f"Error disconnecting channel {channel_name}: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.get("/user-tokens")
@@ -95,13 +95,13 @@ async def get_user_tokens(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить токены пользователя"""
+    """РџРѕР»СѓС‡РёС‚СЊ С‚РѕРєРµРЅС‹ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
-        # Если user_id не указан, используем текущего пользователя
+        # Р•СЃР»Рё user_id РЅРµ СѓРєР°Р·Р°РЅ, РёСЃРїРѕР»СЊР·СѓРµРј С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
         if user_id is None:
             user_id = user['id']
 
-        # Проверяем права доступа
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР°
         if not user.get('is_admin', False) and user['id'] != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -118,7 +118,7 @@ async def get_user_tokens(
         raise
     except Exception as e:
         logger.error(f"Error getting user tokens: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/refresh-token/{token_id}")
@@ -127,11 +127,11 @@ async def refresh_token(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить токен пользователя (обновить timestamp)"""
+    """РћР±РЅРѕРІРёС‚СЊ С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (РѕР±РЅРѕРІРёС‚СЊ timestamp)"""
     try:
         service = SessionService(db)
         
-        # Проверка прав доступа
+        # РџСЂРѕРІРµСЂРєР° РїСЂР°РІ РґРѕСЃС‚СѓРїР°
         token_owner_id = service.get_token_owner(token_id)
         if not token_owner_id:
              raise HTTPException(status_code=404, detail="Token not found")
@@ -139,8 +139,8 @@ async def refresh_token(
         if not user.get('is_admin', False) and user['id'] != token_owner_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        # Выполняем обновление
-        # (передаем user_id для доп. проверки внутри сервиса, хотя мы уже проверили)
+        # Р’С‹РїРѕР»РЅСЏРµРј РѕР±РЅРѕРІР»РµРЅРёРµ
+        # (РїРµСЂРµРґР°РµРј user_id РґР»СЏ РґРѕРї. РїСЂРѕРІРµСЂРєРё РІРЅСѓС‚СЂРё СЃРµСЂРІРёСЃР°, С…РѕС‚СЏ РјС‹ СѓР¶Рµ РїСЂРѕРІРµСЂРёР»Рё)
         success = service.refresh_token(token_id, token_owner_id)
 
         return {"success": True, "message": "Token refreshed successfully"}
@@ -149,4 +149,4 @@ async def refresh_token(
         raise
     except Exception as e:
         logger.error(f"Error refreshing token {token_id}: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}

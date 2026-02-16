@@ -48,8 +48,8 @@ class StreamInfoService:
             username = user.twitch_username
             logger.info(f"[STREAM_INFO] Twitch username: {username}")
         elif platform_name == 'vk':
-            username = user.vk_channel_name or user.vk_username # VKPlatform uses channel name
-            logger.info(f"[STREAM_INFO] VK username: {username}")
+            username = user.vk_channel_name or user.vk_username  # VKPlatform uses channel slug
+            logger.info(f"[STREAM_INFO] VK channel slug: {username}")
             
         if not username:
             logger.warning(f"[STREAM_INFO] No username found for user {user_id} on platform {platform_name}")

@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/drops", tags=["drops"])
 # === PYDANTIC MODELS ===
 
 class DropsOpenRequest(BaseModel):
-    """Запрос на получение Drops"""
+    """Р—Р°РїСЂРѕСЃ РЅР° РїРѕР»СѓС‡РµРЅРёРµ Drops"""
     drops_type: str = Field(..., pattern="^(streak|donation|mythical)$")
     viewer_id: str = Field(..., min_length=1, max_length=100)
     viewer_name: str = Field(..., min_length=1, max_length=100)
@@ -34,7 +34,7 @@ class DropsOpenRequest(BaseModel):
 # === UTILITY FUNCTIONS ===
 
 def get_user_id(current_user: dict) -> int:
-    """Возвращает user_id для текущего пользователя"""
+    """Р’РѕР·РІСЂР°С‰Р°РµС‚ user_id РґР»СЏ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     if not current_user:
         return None
     user_id = current_user.get('id')
@@ -53,14 +53,14 @@ def get_drops_service(db: Session):
 
 @router.get("/qualities")
 async def get_drops_qualities(db: Session = Depends(get_db)):
-    """Получает список качеств лутбоксов"""
+    """РџРѕР»СѓС‡Р°РµС‚ СЃРїРёСЃРѕРє РєР°С‡РµСЃС‚РІ Р»СѓС‚Р±РѕРєСЃРѕРІ"""
     try:
         service = get_drops_service(db)
         qualities = service.get_all_qualities()
         return {"success": True, "data": qualities}
     except Exception as e:
         logger.error(f"Error getting drops qualities: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения качеств лутбоксов")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РєР°С‡РµСЃС‚РІ Р»СѓС‚Р±РѕРєСЃРѕРІ")
 
 
 @router.get("/history/{channel_name}")
@@ -72,7 +72,7 @@ async def get_drops_history(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает историю лутбоксов для канала"""
+    """РџРѕР»СѓС‡Р°РµС‚ РёСЃС‚РѕСЂРёСЋ Р»СѓС‚Р±РѕРєСЃРѕРІ РґР»СЏ РєР°РЅР°Р»Р°"""
     try:
         service = get_drops_service(db)
         
@@ -108,7 +108,7 @@ async def get_drops_history(
         }
     except Exception as e:
         logger.error(f"Error getting drops history: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения истории лутбоксов")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РёСЃС‚РѕСЂРёРё Р»СѓС‚Р±РѕРєСЃРѕРІ")
 
 
 @router.post("/open")
@@ -129,7 +129,7 @@ async def open_drops(
         
         config = drops_service.get_config_by_user_id(current_user["id"])
         if not config:
-            raise HTTPException(status_code=404, detail="Конфигурация Drops не найдена")
+            raise HTTPException(status_code=404, detail="РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ Drops РЅРµ РЅР°Р№РґРµРЅР°")
         
         quality_name = None
         
@@ -144,7 +144,7 @@ async def open_drops(
             if not streak or streak.current_streak < config.streak_days_common:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Недостаточный стрик. Требуется минимум {config.streak_days_common} дней"
+                    detail=f"РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅС‹Р№ СЃС‚СЂРёРє. РўСЂРµР±СѓРµС‚СЃСЏ РјРёРЅРёРјСѓРј {config.streak_days_common} РґРЅРµР№"
                 )
             
             if streak.current_streak >= config.streak_days_legendary:
@@ -158,7 +158,7 @@ async def open_drops(
                 
         elif request.drops_type == "donation":
             if not request.donation_amount:
-                raise HTTPException(status_code=400, detail="Сумма доната не указана")
+                raise HTTPException(status_code=400, detail="РЎСѓРјРјР° РґРѕРЅР°С‚Р° РЅРµ СѓРєР°Р·Р°РЅР°")
             
             if request.donation_amount >= config.donation_amount_legendary:
                 quality_name = "Legendary"
@@ -171,15 +171,15 @@ async def open_drops(
             else:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Недостаточная сумма доната. Минимум {config.donation_amount_common}"
+                    detail=f"РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅР°СЏ СЃСѓРјРјР° РґРѕРЅР°С‚Р°. РњРёРЅРёРјСѓРј {config.donation_amount_common}"
                 )
                 
         elif request.drops_type == "mythical":
             quality_name = "Mythical"
             if not drops_service._can_activate_mythical(config):
-                raise HTTPException(status_code=400, detail="Мифический лутбокс еще не доступен")
+                raise HTTPException(status_code=400, detail="РњРёС„РёС‡РµСЃРєРёР№ Р»СѓС‚Р±РѕРєСЃ РµС‰Рµ РЅРµ РґРѕСЃС‚СѓРїРµРЅ")
         else:
-            raise HTTPException(status_code=400, detail="Неизвестный тип лутбокса")
+            raise HTTPException(status_code=400, detail="РќРµРёР·РІРµСЃС‚РЅС‹Р№ С‚РёРї Р»СѓС‚Р±РѕРєСЃР°")
         
         try:
             drop_result = calc_service.calculate_drop(
@@ -190,7 +190,7 @@ async def open_drops(
             )
         except ValueError as e:
             logger.error(f"[ERROR] [DROPS] Failed to calculate drop: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail="Internal server error")
         
         quality = drops_service.get_quality_by_name(quality_name)
         
@@ -247,7 +247,7 @@ async def open_drops(
         raise
     except Exception as e:
         logger.error(f"Error opening drops: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Ошибка открытия лутбокса")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕС‚РєСЂС‹С‚РёСЏ Р»СѓС‚Р±РѕРєСЃР°")
 
 
 @router.get("/stats/{channel_name}")
@@ -257,7 +257,7 @@ async def get_drops_stats(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает статистику Drops для канала"""
+    """РџРѕР»СѓС‡Р°РµС‚ СЃС‚Р°С‚РёСЃС‚РёРєСѓ Drops РґР»СЏ РєР°РЅР°Р»Р°"""
     try:
         service = get_drops_service(db)
         stats = service.get_full_channel_stats(
@@ -268,7 +268,7 @@ async def get_drops_stats(
         return {"success": True, "data": stats}
     except Exception as e:
         logger.error(f"Error getting drops stats: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения статистики Drops")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ СЃС‚Р°С‚РёСЃС‚РёРєРё Drops")
 
 
 @router.get("/streaks/{channel_name}")
@@ -280,7 +280,7 @@ async def get_user_streaks(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает список стриков пользователей"""
+    """РџРѕР»СѓС‡Р°РµС‚ СЃРїРёСЃРѕРє СЃС‚СЂРёРєРѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№"""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
@@ -315,7 +315,7 @@ async def get_user_streaks(
         raise
     except Exception as e:
         logger.error(f"Error getting user streaks: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения стриков пользователей")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ СЃС‚СЂРёРєРѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№")
 
 
 @router.post("/streak/reset/{channel_name}")
@@ -324,7 +324,7 @@ async def reset_streak_statistics(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Сбрасывает всю статистику стриков для канала"""
+    """РЎР±СЂР°СЃС‹РІР°РµС‚ РІСЃСЋ СЃС‚Р°С‚РёСЃС‚РёРєСѓ СЃС‚СЂРёРєРѕРІ РґР»СЏ РєР°РЅР°Р»Р°"""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
@@ -340,15 +340,15 @@ async def reset_streak_statistics(
         )
         
         if not config:
-            raise HTTPException(status_code=404, detail="Конфигурация не найдена")
+            raise HTTPException(status_code=404, detail="РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
         
         deleted_count = service.reset_channel_streaks(user_id=user_id, channel_name=channel_name)
         
-        drops_logger.info(f"[DELETE] [STREAK RESET] Удалено {deleted_count} записей для {channel_name}")
+        drops_logger.info(f"[DELETE] [STREAK RESET] РЈРґР°Р»РµРЅРѕ {deleted_count} Р·Р°РїРёСЃРµР№ РґР»СЏ {channel_name}")
         
         return {
             "success": True,
-            "message": "Статистика стриков сброшена",
+            "message": "РЎС‚Р°С‚РёСЃС‚РёРєР° СЃС‚СЂРёРєРѕРІ СЃР±СЂРѕС€РµРЅР°",
             "data": {"channel_name": channel_name, "platform": "all", "deleted_count": deleted_count}
         }
     except HTTPException:
@@ -356,7 +356,7 @@ async def reset_streak_statistics(
     except Exception as e:
         logger.error(f"Error resetting streak statistics: {e}")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка сброса статистики стриков")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СЃР±СЂРѕСЃР° СЃС‚Р°С‚РёСЃС‚РёРєРё СЃС‚СЂРёРєРѕРІ")
 
 
 @router.get("/mythical-session/{channel_name}")
@@ -366,7 +366,7 @@ async def get_active_mythical_session(
     current_user: Optional[dict] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Получить активную сессию мифического сундука"""
+    """РџРѕР»СѓС‡РёС‚СЊ Р°РєС‚РёРІРЅСѓСЋ СЃРµСЃСЃРёСЋ РјРёС„РёС‡РµСЃРєРѕРіРѕ СЃСѓРЅРґСѓРєР°"""
     try:
         service = get_drops_service(db)
         
@@ -393,4 +393,4 @@ async def get_active_mythical_session(
         raise
     except Exception as e:
         logger.error(f"Error getting active mythical session: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения активной сессии")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё")

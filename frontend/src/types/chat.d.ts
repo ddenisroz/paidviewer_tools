@@ -16,7 +16,7 @@ export interface ChatMessage {
   platform: 'twitch' | 'vk' | 'youtube';
   channel_name?: string;
   channel?: string; // Альтернативное поле для канала
-  badges?: string[];
+  badges?: string[]; // Twitch: badgeId/version, VK: badge image URLs
   emotes?: ChatEmote[];
   role?: string;
   color?: string;

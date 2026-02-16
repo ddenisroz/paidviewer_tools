@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Check, Copy, Palette, RefreshCw, Settings2, Sparkles, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
+import { useAuth } from '@/context/AuthContext';
 import ColorInput from '@/features/chatbox/components/ColorInput';
 import PreviewPanel from '@/features/chatbox/components/PreviewPanel';
 import {
@@ -73,9 +74,9 @@ const DEFAULT_SETTINGS: ChatBoxSettings = {
 };
 
 const PREVIEW_MESSAGES: PreviewMessage[] = [
-    { id: 1, platform: 'twitch', author: 'Streamer', message: 'Привет всем! ??', time: '12:00', role: 'Broadcaster', badges: ['broadcaster/1'], avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=S' },
+    { id: 1, platform: 'twitch', author: 'Streamer', message: 'Привет всем! :hype:', time: '12:00', role: 'Broadcaster', badges: ['broadcaster/1'], avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=S' },
     { id: 2, platform: 'twitch', author: 'VIPUser', message: 'Смотрите клип: https://example.com', time: '12:01', role: 'VIP', badges: ['vip/1'], avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=V' },
-    { id: 3, platform: 'vk', author: 'Viewer1', message: 'Это было :hype:!', time: '12:02', role: 'Moderator', badges: [], avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=VK' },
+    { id: 3, platform: 'vk', author: 'Viewer1', message: 'Это было :hype:! Вот мем: https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif', time: '12:02', role: 'Moderator', badges: [], avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=VK' },
     { id: 4, platform: 'twitch', author: 'Moderator', message: 'Всем привет!', time: '12:03', role: 'Moderator', badges: ['moderator/1'], avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=M' }
 ];
 
@@ -99,6 +100,7 @@ const CHAT_DIRECTION_OPTIONS = [
 ];
 
 const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onClose, onSave }) => {
+    const { user } = useAuth();
     const [settings, setSettings] = useState<ChatBoxSettings>(DEFAULT_SETTINGS);
     const [initialSettings, setInitialSettings] = useState<ChatBoxSettings | null>(null);
     const [loading, setLoading] = useState(false);
@@ -237,7 +239,11 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         {/* Left: Preview */}
                         <div className="lg:w-80 w-full flex-shrink-0 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
                             <div className="flex-1 border border-[#0b1422] rounded-lg overflow-hidden bg-[#020308] min-h-[240px]">
-                                <PreviewPanel settings={settings} previewMessages={PREVIEW_MESSAGES} />
+                                <PreviewPanel
+                                    settings={settings}
+                                    previewMessages={PREVIEW_MESSAGES}
+                                    twitchChannelName={(user?.integrations?.twitch as { channel_name?: string })?.channel_name || user?.twitch_username || null}
+                                />
                             </div>
 
                             {/* OBS URL */}

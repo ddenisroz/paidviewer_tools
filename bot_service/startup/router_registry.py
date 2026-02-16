@@ -46,6 +46,7 @@ ROUTER_CONFIGS = {
         RouterConfig("api.points_api_endpoints", router_name="points_router"),
         RouterConfig("api.session_api"),
         RouterConfig("api.bot_control_api"),
+        RouterConfig("api.chat_analysis_api"),
         RouterConfig("api.stream_info_api"),
         RouterConfig("api.additional_api"),
         RouterConfig("api.dashboard_api"),
@@ -125,6 +126,10 @@ def register_all_routers(app: FastAPI) -> None:
                 logger.error(f"Failed to import router from {config.module_path}: {e}")
             except AttributeError as e:
                 logger.error(f"Router '{config.router_name}' not found in {config.module_path}: {e}")
+            except Exception:
+                logger.exception(
+                    f"Unexpected error while loading router from {config.module_path}"
+                )
     
     logger.info(f"Registered {registered_count} routers")
 

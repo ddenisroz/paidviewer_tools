@@ -10,6 +10,8 @@ import {
     Filter,
     Info,
     Mic,
+    Coins,
+    MessageSquare,
     Play,
     Plus,
     Radio,
@@ -156,9 +158,11 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             'Общее': { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
             'Медиа и интерактивность': { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
             'TTS ИИ озвучка': { icon: Mic, color: 'bg-green-500/10 text-green-600 border-green-500/20' },
-            'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' }
+            'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
+            'Управление чатом': { icon: MessageSquare, color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20' },
+            'Memealerts': { icon: Coins, color: 'bg-pink-500/10 text-pink-500 border-pink-500/20' }
         };
-        return tagConfig[tag] || { icon: Tag, color: 'bg-gray-500/10 text-gray-600 border-gray-500/20' };
+        return tagConfig[tag] || { icon: Tag, color: 'bg-muted/60 text-muted-foreground border-border' };
     };
 
     return (
@@ -330,16 +334,16 @@ const CommandsPage: React.FC = () => {
     if (!isAuthenticated) {
         return (
             <PageWrapper title="Команды">
-                <Card className="border-gray-700">
+                <Card className="card-glass border-border">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-                        <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
-                            <AlertCircle className="w-10 h-10 text-gray-500" />
+                        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
+                            <AlertCircle className="w-10 h-10 text-muted-foreground" />
                         </div>
                         <div className="space-y-2 max-w-md">
-                            <h3 className="text-xl font-semibold text-gray-200">
+                            <h3 className="text-xl font-semibold text-foreground">
                                 Требуется авторизация
                             </h3>
-                            <p className="text-gray-400 text-sm">
+                            <p className="text-muted-foreground text-sm">
                                 Для использования управления командами необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
                             </p>
                         </div>
@@ -373,11 +377,13 @@ const CommandsPage: React.FC = () => {
         'Общее': { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
         'Медиа и интерактивность': { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
         'TTS ИИ озвучка': { icon: Mic, color: 'bg-green-500/10 text-green-600 border-green-500/20' },
-        'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' }
+        'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
+        'Управление чатом': { icon: MessageSquare, color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20' },
+        'Memealerts': { icon: Coins, color: 'bg-pink-500/10 text-pink-500 border-pink-500/20' }
     };
 
     const getTagConfig = (tag: string): TagConfig => {
-        return tagConfig[tag] || { icon: Tag, color: 'bg-gray-500/10 text-gray-600 border-gray-500/20' };
+        return tagConfig[tag] || { icon: Tag, color: 'bg-muted/60 text-muted-foreground border-border' };
     };
 
     const availablePlatforms = platformOptions.filter(opt => opt.enabled);
@@ -550,25 +556,11 @@ const CommandsPage: React.FC = () => {
                 <TabsContent value="basic" className="space-y-4">
                     <Card className="transition-all duration-200">
                         <CardContent className="pt-6">
-                            <div className="flex items-center justify-between mb-4">
-                                {(basicSearchTerm || selectedBasicTags.length > 0 || platformFilter !== 'all') && (
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                            setBasicSearchTerm('');
-                                            setSelectedBasicTags([]);
-                                            setPlatformFilter('all');
-                                        }}
-                                    >
-                                        Сбросить фильтры
-                                    </Button>
-                                )}
-                            </div>
+                            <div className="flex items-center justify-between mb-4" />
                             <div className="flex flex-col sm:flex-row gap-4 mb-6">
                                 <div className="flex-1">
                                     <div className="relative">
-                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                                         <Input
                                             placeholder="Поиск команд..."
                                             value={basicSearchTerm}
@@ -579,7 +571,7 @@ const CommandsPage: React.FC = () => {
                                 </div>
 
                                 <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                                    <SelectTrigger className="w-[180px]">
+                                <SelectTrigger className="w-[clamp(150px,22vw,200px)]">
                                         <SelectValue placeholder="Все платформы" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -589,7 +581,7 @@ const CommandsPage: React.FC = () => {
                                                 {integrations?.twitch?.enabled ? (
                                                     <CheckCircle2 className="h-3 w-3 text-green-600" />
                                                 ) : (
-                                                    <XCircle className="h-3 w-3 text-gray-400" />
+                                                    <XCircle className="h-3 w-3 text-muted-foreground" />
                                                 )}
                                                 Twitch
                                             </div>
@@ -599,7 +591,7 @@ const CommandsPage: React.FC = () => {
                                                 {integrations?.vk?.enabled ? (
                                                     <CheckCircle2 className="h-3 w-3 text-green-600" />
                                                 ) : (
-                                                    <XCircle className="h-3 w-3 text-gray-400" />
+                                                    <XCircle className="h-3 w-3 text-muted-foreground" />
                                                 )}
                                                 VK Live
                                             </div>
@@ -610,7 +602,7 @@ const CommandsPage: React.FC = () => {
                                 <div className="relative">
                                     <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-9 min-w-[180px]">
+                                            <Button variant="outline" size="sm" className="h-9 min-w-[clamp(150px,22vw,200px)]">
                                                 <Filter className="h-4 w-4 mr-2" />
                                                 Фильтр по тегам
                                                 {selectedBasicTags.length > 0 && (
@@ -826,24 +818,11 @@ const CommandsPage: React.FC = () => {
                         <CardContent>
                             {customCommands.length > 0 && (
                                 <>
-                                    <div className="flex items-center justify-between mb-4">
-                                        {(customSearchTerm || platformFilter !== 'all') && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setCustomSearchTerm('');
-                                                    setPlatformFilter('all');
-                                                }}
-                                            >
-                                                Сбросить фильтры
-                                            </Button>
-                                        )}
-                                    </div>
+                                    <div className="flex items-center justify-between mb-4" />
                                     <div className="flex flex-col sm:flex-row gap-4 mb-6">
                                         <div className="flex-1">
                                             <div className="relative">
-                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                                                 <Input
                                                     placeholder="Поиск кастомных команд..."
                                                     value={customSearchTerm}
@@ -854,7 +833,7 @@ const CommandsPage: React.FC = () => {
                                         </div>
 
                                         <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                                            <SelectTrigger className="w-[180px]">
+                                        <SelectTrigger className="w-[clamp(150px,22vw,200px)]">
                                                 <SelectValue placeholder="Все платформы" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -864,7 +843,7 @@ const CommandsPage: React.FC = () => {
                                                         {integrations?.twitch?.enabled ? (
                                                             <CheckCircle2 className="h-3 w-3 text-green-600" />
                                                         ) : (
-                                                            <XCircle className="h-3 w-3 text-gray-400" />
+                                                            <XCircle className="h-3 w-3 text-muted-foreground" />
                                                         )}
                                                         Twitch
                                                     </div>
@@ -874,7 +853,7 @@ const CommandsPage: React.FC = () => {
                                                         {integrations?.vk?.enabled ? (
                                                             <CheckCircle2 className="h-3 w-3 text-green-600" />
                                                         ) : (
-                                                            <XCircle className="h-3 w-3 text-gray-400" />
+                                                            <XCircle className="h-3 w-3 text-muted-foreground" />
                                                         )}
                                                         VK Live
                                                     </div>

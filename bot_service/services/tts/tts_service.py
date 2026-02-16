@@ -127,7 +127,7 @@ class TTSService:
 
         except Exception as e:
             logger.error(f"Error in synthesize: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Internal server error"}
 
     # === Settings Management ===
 
@@ -170,7 +170,7 @@ class TTSService:
         
         except Exception as e:
             logger.error(f"Error saving TTS settings: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Internal server error"}
 
     # === Filter Management ===
 
@@ -231,6 +231,15 @@ class TTSService:
             return {"enabled": False, "listening_mode": "website", "error": "User not found"}
         enabled = getattr(user, 'tts_enabled', False)
 
+        settings = self.settings_repo.get_or_create(user_id=user_id)
+        engine = getattr(settings, 'engine', 'gtts')
+        if engine == 'f5tts':
+            engine_type = 'local' if getattr(settings, 'use_local_tts', False) else 'cloud'
+        elif engine == 'gcloud':
+            engine_type = 'gcloud'
+        else:
+            engine_type = 'gtts'
+
         if enabled:
             connection_manager = get_connection_manager()
             if user.twitch_username:
@@ -247,7 +256,8 @@ class TTSService:
 
         return {
             "enabled": enabled,
-            "listening_mode": getattr(user, 'tts_listening_mode', 'website')
+            "listening_mode": getattr(user, 'tts_listening_mode', 'website'),
+            "engine_type": engine_type
         }
 
     # === Platform Settings ===

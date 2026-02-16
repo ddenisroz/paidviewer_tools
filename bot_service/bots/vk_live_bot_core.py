@@ -138,7 +138,8 @@ class VKLiveBotCore:
             # Создаем HTTP polling клиент с OAuth токеном пользователя
             self.http_polling = VKLiveHTTPPolling(
                 access_token=oauth_token,  # Используем OAuth токен пользователя!
-                channel_url=resolved_channel
+                channel_url=resolved_channel,
+                user_id=user.id
             )
 
             # Запускаем polling с обработчиком сообщений
@@ -257,6 +258,8 @@ class VKLiveBotCore:
             message.get("platform", "vk")
             is_owner = author.get("is_owner", False) or author.get("is_broadcaster", False)
             is_moderator = author.get("is_moderator", False)
+            badges = message.get("badges")
+            emotes = message.get("emotes")
 
             # Определяем роль для VK Live
             role = None
@@ -276,7 +279,8 @@ class VKLiveBotCore:
                 platform="vk",
                 channel=channel_id,
                 role=role,
-                badges=None  # VK Live не предоставляет badges через API
+                badges=badges,
+                emotes=emotes
             )
             logger.info("[OK] [VK MSG] Broadcast completed, processing command checks...")
 

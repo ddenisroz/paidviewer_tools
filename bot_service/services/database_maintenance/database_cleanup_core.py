@@ -76,7 +76,7 @@ class DatabaseCleanupCore:
         except Exception as e:
             logger.error(f"[ERROR] Error cleaning up old data: {e}", exc_info=True)
             self.db.rollback()
-            return {'messages_deleted': 0, 'old_messages_deleted': 0, 'limit_based_deleted': 0, 'users_cleaned': 0, 'error': str(e)}
+            return {'messages_deleted': 0, 'old_messages_deleted': 0, 'limit_based_deleted': 0, 'users_cleaned': 0, 'error': "Internal server error"}
 
     def _cleanup_user_message_limits(self) -> int:
         """Clean excess messages for users over limit."""
@@ -171,7 +171,7 @@ class DatabaseCleanupCore:
 
         except Exception as e:
             logger.error(f"Error cleaning cache: {e}")
-            return {'deleted_files': 0, 'freed_space_bytes': 0, 'error': str(e)}
+            return {'deleted_files': 0, 'freed_space_bytes': 0, 'error': "Internal server error"}
 
     def sync_user_message_counts(self) -> Dict[str, int]:
         """Sync user message counters with actual DB data."""

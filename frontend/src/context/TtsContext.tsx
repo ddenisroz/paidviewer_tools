@@ -128,6 +128,9 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
                 setTtsEnabled(statusResponse.enabled);
                 if (typeof window !== 'undefined') {
                     window.localStorage.setItem('tts_enabled', String(statusResponse.enabled));
+                    window.dispatchEvent(new CustomEvent('tts-status-changed', {
+                        detail: { enabled: statusResponse.enabled }
+                    }));
                 }
 
                 if (typeof statusResponse.is_whitelisted === 'boolean') {

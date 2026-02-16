@@ -61,11 +61,11 @@ const DonationAlertsCallback: React.FC = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-lg text-center">
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="card-glass p-8 rounded-lg shadow-lg text-center border border-border">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-        <h2 className="text-xl font-semibold text-white mb-2">DonationAlerts</h2>
-        <p className="text-gray-300">{status}</p>
+        <h2 className="text-xl font-semibold text-foreground mb-2">DonationAlerts</h2>
+        <p className="text-muted-foreground">{status}</p>
       </div>
     </div>
   );

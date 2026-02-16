@@ -114,8 +114,8 @@ class ChatHistoryService:
         
         if db_user.twitch_username:
             return db_user.twitch_username, "twitch"
-        elif db_user.vk_username:
-            return db_user.vk_username, "vk"
+        elif db_user.vk_channel_name or db_user.vk_username:
+            return db_user.vk_channel_name or db_user.vk_username, "vk"
         
         return None, None
     

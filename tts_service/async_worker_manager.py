@@ -3,6 +3,7 @@ import asyncio
 import logging
 import time
 import json
+import os
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
@@ -10,6 +11,12 @@ import redis
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
+
+# Analysis logging for LLM feature verification
+from analysis_logging import (
+    log_tts_generation, log_gpu_worker, log_error, 
+    set_correlation_id, clear_correlation_id
+)
 
 class TaskPriority(Enum):
     LOW = 1
@@ -314,6 +321,9 @@ class AsyncWorkerManager:
                     
                     logger.info(f"Worker {worker_id} processing task {task.task_id} (priority: {task.priority.name})")
                     
+                    # Set correlation ID for request tracing
+                    set_correlation_id(task.task_id[:8])
+                    
                     # Обрабатываем задачу
                     start_time = time.time()
                     success = await self._process_task(task, worker_id)
@@ -323,6 +333,15 @@ class AsyncWorkerManager:
                     if success:
                         stats.tasks_processed += 1
                         self.global_stats['completed_tasks'] += 1
+                        
+                        # Analysis logging for LLM
+                        log_tts_generation(
+                            text=task.text,
+                            voice=task.voice,
+                            success=True,
+                            user_id=task.user_id,
+                            duration_ms=processing_time * 1000,
+                        )
                         
                         # Логируем использование пользователя
                         if task.user_id:
@@ -344,6 +363,16 @@ class AsyncWorkerManager:
                     else:
                         stats.tasks_failed += 1
                         self.global_stats['failed_tasks'] += 1
+                        
+                        # Analysis logging for failed tasks
+                        log_tts_generation(
+                            text=task.text,
+                            voice=task.voice,
+                            success=False,
+                            user_id=task.user_id,
+                            duration_ms=processing_time * 1000,
+                            error="Processing failed"
+                        )
                         
                         # Логируем неудачный запрос
                         if task.user_id:
@@ -374,14 +403,19 @@ class AsyncWorkerManager:
                     stats.current_task = None
                     self.global_stats['last_activity'] = time.time()
                     
+                    # Clear correlation ID after task
+                    clear_correlation_id()
+                    
                 else:
                     # Нет задач, ждем
                     await asyncio.sleep(self.poll_interval)
                     
             except Exception as e:
                 logger.error(f"Error in worker {worker_id}: {e}")
+                log_error(feature='tts_worker', error=e, context=f"worker_{worker_id}")
                 stats.is_active = False
                 stats.current_task = None
+                clear_correlation_id()
                 await asyncio.sleep(1)
 
     async def _get_next_task(self) -> Optional[WorkerTask]:

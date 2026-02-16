@@ -648,7 +648,7 @@ const VoiceManagementPageContent: React.FC = () => {
     if (showLoader) {
         return (
             <PageWrapper title="Управление голосами">
-                <div className="flex justify-center items-center min-h-[400px]">
+                <div className="flex justify-center items-center min-h-[min(400px,60vh)]">
                     <PageLoader />
                 </div>
             </PageWrapper>
@@ -1216,15 +1216,15 @@ const VoiceManagementPageContent: React.FC = () => {
                         </div>
                     )}
                     <DialogFooter className="flex-wrap gap-2">
-                        <Button onClick={handleTestVoice} variant="outline" disabled={isTestingVoice} className="flex-1 min-w-[100px]">
+                        <Button onClick={handleTestVoice} variant="outline" disabled={isTestingVoice} className="flex-1 min-w-[clamp(92px,18vw,120px)]">
                             <TestTube2 className="h-4 w-4 mr-2" />{isTestingVoice ? 'Генерирую...' : 'Тест'}
                         </Button>
                         {currentVoice?.voice_type === 'user' && (
-                            <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[140px] text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
+                            <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[clamp(120px,22vw,160px)] text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
                                 <Edit className="h-4 w-4 mr-2" />Переименовать
                             </Button>
                         )}
-                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[120px] bg-blue-600 hover:bg-blue-700">
+                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[clamp(110px,20vw,140px)] bg-blue-600 hover:bg-blue-700">
                             <Settings className="h-4 w-4 mr-2" />Сохранить
                         </Button>
                     </DialogFooter>

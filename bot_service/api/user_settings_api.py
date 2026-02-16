@@ -79,8 +79,8 @@ async def get_user_settings(
         settings_response = service.get_settings(current_user, db)
         logger.info(f"[API] get_user_settings returning: {settings_response}")
         return settings_response
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid settings data")
     except Exception as e:
         logger.error(f"Error getting user settings: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения настроек пользователя")
@@ -100,8 +100,8 @@ async def update_user_settings(
             update_data=settings_update.model_dump(exclude_unset=True),
             db=db
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid settings data")
     except Exception as e:
         logger.error(f"Error updating user settings: {e}")
         db.rollback()
@@ -117,8 +117,8 @@ async def get_chat_settings(
     try:
         service = get_settings_service()
         return service.get_chat_settings(current_user, db)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid settings data")
     except Exception as e:
         logger.error(f"Error getting chat settings: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения настроек чата")
@@ -133,8 +133,9 @@ async def get_obs_settings(
     try:
         service = get_settings_service()
         return service.get_obs_settings(current_user, db)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid settings data")
     except Exception as e:
         logger.error(f"Error getting OBS settings: {e}")
         raise HTTPException(status_code=500, detail="Ошибка получения настроек OBS")
+

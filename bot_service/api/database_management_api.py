@@ -21,9 +21,9 @@ async def get_database_stats(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает статистику базы данных"""
+    """РџРѕР»СѓС‡Р°РµС‚ СЃС‚Р°С‚РёСЃС‚РёРєСѓ Р±Р°Р·С‹ РґР°РЅРЅС‹С…"""
     try:
-        # Проверяем права доступа (только админы)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -38,14 +38,14 @@ async def get_database_stats(
 
     except Exception as e:
         logger.error(f"Error getting database stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/backups")
 async def list_backups(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список всех резервных копий"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РІСЃРµС… СЂРµР·РµСЂРІРЅС‹С… РєРѕРїРёР№"""
     try:
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
@@ -62,7 +62,7 @@ async def list_backups(
         raise
     except Exception as e:
         logger.error(f"Error listing backups: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/cleanup")
 async def cleanup_database(
@@ -70,9 +70,9 @@ async def cleanup_database(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Очищает старые данные из базы данных"""
+    """РћС‡РёС‰Р°РµС‚ СЃС‚Р°СЂС‹Рµ РґР°РЅРЅС‹Рµ РёР· Р±Р°Р·С‹ РґР°РЅРЅС‹С…"""
     try:
-        # Проверяем права доступа (только админы)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -86,28 +86,28 @@ async def cleanup_database(
             "timestamp": utcnow_naive().isoformat()
         }
 
-        # Выполняем очистку в зависимости от типа
+        # Р’С‹РїРѕР»РЅСЏРµРј РѕС‡РёСЃС‚РєСѓ РІ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РѕС‚ С‚РёРїР°
         if cleanup_type in ["logs", "all"]:
-            # Очистка логов старше 30 дней
+            # РћС‡РёСЃС‚РєР° Р»РѕРіРѕРІ СЃС‚Р°СЂС€Рµ 30 РґРЅРµР№
             log_stats = cleanup_service.cleanup_old_data()
             result["data"]["logs"] = log_stats
             logger.info(f"Cleaned up logs: {log_stats}")
 
         if cleanup_type in ["cache", "all"]:
-            # Очистка кеша
+            # РћС‡РёСЃС‚РєР° РєРµС€Р°
             cache_cleanup = cleanup_service.cleanup_cache()
             result["data"]["cache"] = cache_cleanup
             logger.info(f"Cleaned up cache: {cache_cleanup}")
 
         if cleanup_type == "backup":
-            # Создание резервной копии
+            # РЎРѕР·РґР°РЅРёРµ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё
             backup_result = cleanup_service.create_backup()
             result["data"]["backup"] = backup_result
             result["message"] = "Backup created successfully"
             logger.info(f"Backup created: {backup_result}")
 
         if cleanup_type == "restore":
-            # Восстановление из резервной копии
+            # Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ РёР· СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё
             restore_result = cleanup_service.restore_from_backup()
             result["data"]["restore"] = restore_result
             result["message"] = "Restored from backup successfully"
@@ -117,7 +117,7 @@ async def cleanup_database(
 
     except Exception as e:
         logger.error(f"Error cleaning up database: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.delete("/backups/{filename}")
 async def delete_backup(
@@ -125,7 +125,7 @@ async def delete_backup(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить конкретную резервную копию"""
+    """РЈРґР°Р»РёС‚СЊ РєРѕРЅРєСЂРµС‚РЅСѓСЋ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ"""
     try:
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
@@ -146,7 +146,7 @@ async def delete_backup(
         raise
     except Exception as e:
         logger.error(f"Error deleting backup: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/backups/{filename}/restore")
 async def restore_backup(
@@ -154,7 +154,7 @@ async def restore_backup(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Восстановить БД из конкретной резервной копии"""
+    """Р’РѕСЃСЃС‚Р°РЅРѕРІРёС‚СЊ Р‘Р” РёР· РєРѕРЅРєСЂРµС‚РЅРѕР№ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё"""
     try:
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
@@ -175,16 +175,16 @@ async def restore_backup(
         raise
     except Exception as e:
         logger.error(f"Error restoring backup: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/optimize")
 async def optimize_database(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Оптимизирует базу данных"""
+    """РћРїС‚РёРјРёР·РёСЂСѓРµС‚ Р±Р°Р·Сѓ РґР°РЅРЅС‹С…"""
     try:
-        # Проверяем права доступа (только админы)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -200,7 +200,7 @@ async def optimize_database(
 
     except Exception as e:
         logger.error(f"Error optimizing database: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/user-stats/{username}")
 async def get_user_database_stats(
@@ -209,9 +209,9 @@ async def get_user_database_stats(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получает статистику сообщений конкретного пользователя"""
+    """РџРѕР»СѓС‡Р°РµС‚ СЃС‚Р°С‚РёСЃС‚РёРєСѓ СЃРѕРѕР±С‰РµРЅРёР№ РєРѕРЅРєСЂРµС‚РЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
-        # Проверяем права доступа (только админы)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -230,7 +230,7 @@ async def get_user_database_stats(
 
     except Exception as e:
         logger.error(f"Error getting user database stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/cleanup-user/{username}")
 async def cleanup_user_data(
@@ -240,9 +240,9 @@ async def cleanup_user_data(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Очищает старые данные конкретного пользователя"""
+    """РћС‡РёС‰Р°РµС‚ СЃС‚Р°СЂС‹Рµ РґР°РЅРЅС‹Рµ РєРѕРЅРєСЂРµС‚РЅРѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
-        # Проверяем права доступа (только админы)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -263,16 +263,16 @@ async def cleanup_user_data(
 
     except Exception as e:
         logger.error(f"Error cleaning up user data: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/sync-message-counts")
 async def sync_message_counts(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Синхронизирует счетчики сообщений пользователей с реальными данными"""
+    """РЎРёРЅС…СЂРѕРЅРёР·РёСЂСѓРµС‚ СЃС‡РµС‚С‡РёРєРё СЃРѕРѕР±С‰РµРЅРёР№ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ СЂРµР°Р»СЊРЅС‹РјРё РґР°РЅРЅС‹РјРё"""
     try:
-        # Проверяем права доступа (только админы)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
         if not current_user.get("is_admin"):
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -288,4 +288,4 @@ async def sync_message_counts(
 
     except Exception as e:
         logger.error(f"Error syncing message counts: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")

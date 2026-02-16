@@ -165,7 +165,7 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = Rea
                     </span>
                     
                     {/* Badges */}
-                    {msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+                    {msg.platform === 'twitch' && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
                       <>
                         {msg.badges.map((badge, idx) => {
                           if (!badge || typeof badge !== 'string' || !badge.includes('/')) {
@@ -199,6 +199,28 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = Rea
                               src={badgeUrl}
                               alt={badgeId}
                               title={badge}
+                              className="inline-block align-text-bottom mr-0.5 object-contain"
+                              style={{ width: '16px', height: '16px' }}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          );
+                        })}
+                      </>
+                    )}
+
+                    {msg.platform === 'vk' && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
+                      <>
+                        {msg.badges.map((badge, idx) => {
+                          if (!badge || typeof badge !== 'string') {
+                            return null;
+                          }
+                          return (
+                            <img 
+                              key={idx} 
+                              src={badge}
+                              alt="vk-badge"
                               className="inline-block align-text-bottom mr-0.5 object-contain"
                               style={{ width: '16px', height: '16px' }}
                               onError={(e) => {

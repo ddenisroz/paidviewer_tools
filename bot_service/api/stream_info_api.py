@@ -29,7 +29,7 @@ def get_stream_service(db: Session = Depends(get_db)) -> StreamInfoService:
 @router.get("/twitch/stream")
 async def get_twitch_stream_basic(user: dict = Depends(get_current_user)):
     """
-    Получить информацию о Twitch стриме (legacy basic info)
+    РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Twitch СЃС‚СЂРёРјРµ (legacy basic info)
     """
     return JSONResponse(content={
         "is_live": False,
@@ -44,7 +44,7 @@ async def get_twitch_stream_info(
     user: dict = Depends(get_current_user),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Получить детальную информацию о Twitch стриме (cached for 30s)"""
+    """РџРѕР»СѓС‡РёС‚СЊ РґРµС‚Р°Р»СЊРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Twitch СЃС‚СЂРёРјРµ (cached for 30s)"""
     try:
         user_id = user.get("id")
         session_id = user.get("session_id")
@@ -97,8 +97,8 @@ async def update_stream(
     user: dict = Depends(get_current_user),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Обновить информацию о стриме (title или category)"""
-    """Обновить информацию о стриме (title или category)"""
+    """РћР±РЅРѕРІРёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ СЃС‚СЂРёРјРµ (title РёР»Рё category)"""
+    """РћР±РЅРѕРІРёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ СЃС‚СЂРёРјРµ (title РёР»Рё category)"""
     logger.info("[STREAM UPDATE] Request received")
     
     try:
@@ -166,7 +166,7 @@ async def update_stream(
 
     except Exception as e:
         logger.error(f"Error in stream update: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 @router.get("/twitch/categories")
 async def search_twitch_categories(
@@ -174,7 +174,7 @@ async def search_twitch_categories(
     user: dict = Depends(get_current_user_optional),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Поиск категорий Twitch"""
+    """РџРѕРёСЃРє РєР°С‚РµРіРѕСЂРёР№ Twitch"""
     user_id = user.get("id") if user else None
     categories = await service.search_categories("twitch", search, user_id)
     return JSONResponse(content={"categories": categories})

@@ -216,7 +216,7 @@ const BotManagementPage: React.FC = () => {
             case 'error':
                 return <Badge variant="outline" className="text-red-600 border-red-600">Ошибка</Badge>;
             default:
-                return <Badge variant="outline" className="text-gray-600 border-gray-600">Остановлен</Badge>;
+                return <Badge variant="outline" className="text-muted-foreground border-border">Остановлен</Badge>;
         }
     };
 
@@ -276,7 +276,7 @@ const BotManagementPage: React.FC = () => {
                                 ) : currentBotStatus === 'error' ? (
                                     <Square className="w-8 h-8 text-red-500" />
                                 ) : (
-                                    <Square className="w-8 h-8 text-gray-500" />
+                                    <Square className="w-8 h-8 text-muted-foreground" />
                                 )}
                                 <div>
                                     <div className="flex items-center gap-2">
@@ -372,7 +372,7 @@ const BotManagementPage: React.FC = () => {
                             <Bot className="w-5 h-5 text-purple-400" />
                             <CardTitle>Авторизация бота (Twitch)</CardTitle>
                         </div>
-                        {tokenStatus?.configured && tokenStatus.has_refresh_token && (
+                        {tokenStatus?.configured && tokenStatus.type === 'oauth' && (
                             <Badge variant="outline" className="gap-1 border-green-500/50 text-green-400 bg-green-500/10">
                                 <CheckCircle className="w-3 h-3" />
                                 Авторизован
@@ -399,7 +399,6 @@ const BotManagementPage: React.FC = () => {
                                     <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800/50">
                                         <span className="text-xs text-muted-foreground block mb-1">Статус токена</span>
                                         <div className="flex items-center gap-2">
-                                            {/* @ts-ignore - type is not fully typed in frontend yet */}
                                             {tokenStatus.type === 'legacy' ? (
                                                 <Badge variant="secondary" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/50">
                                                     Legacy Env Token
@@ -413,7 +412,6 @@ const BotManagementPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* @ts-ignore */}
                                 {tokenStatus.type === 'legacy' ? (
                                     <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
                                         <AlertCircle className="w-4 h-4 mt-0.5" />

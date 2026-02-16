@@ -437,7 +437,7 @@ const SystemLogsPage: React.FC = () => {
           ) : logs.length === 0 ? (
             <p className="text-center text-slate-400 py-8">Нет логов за выбранный период</p>
           ) : (
-            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            <div className="space-y-2 max-h-[min(600px,70vh)] overflow-y-auto">
               {logs.map((log) => (
                 <LogItem
                   key={log.id}

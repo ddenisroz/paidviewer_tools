@@ -59,7 +59,15 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - YouTube mini-player renders into the sidebar slot `#youtube-mini-player-slot` when present (GlobalPlayer uses a portal).
 - Browser TTS playback is active only when `listening_mode` is `website`; when set to `obs`, in-app TTS playback is suppressed (mode is persisted in `tts_listening_mode`).
 - YouTube queue bans set queue items to `status='banned'` and prevent re-adding the same video via `/api/youtube/queue/ban/{queue_id}`.
+- Google Cloud TTS voice pools are stored in `tts_user_settings.gcloud_voices` and used to randomize voices per message.
 - Frontend polling intervals are adaptive (reduced outside relevant pages); background polling is disabled where supported.
 - Drops config/rewards responses are cached for 60s server-side with invalidation on updates; dashboard quick actions refresh every 120s.
 - Stream title/category changes broadcast `stream_info_updated` over WebSocket; Twitch stream info cache is kept in sync.
 - Dashboard stream-info polling runs every 120s; stream-info cache applies to both Twitch and VK.
+- Frontend TTS playback is gated by `tts_enabled` and `tts_enabled_platforms` (stored in localStorage) for UI sync.
+- Frontend localStorage query cache (`rq_cache_`) is auto-pruned by age and count on app startup.
+- VK Live chat badges are passed as image URLs; VK smiles are sent as emotes with positions.
+- Google Cloud TTS engine is available as `gcloud` (requires `GOOGLE_TTS_API_KEY`); fallback remains gTTS.
+- VK Live bot connects to all active VK channels on startup.
+- Twitch/VK bot accounts use OAuth bot tokens stored in DB (refreshable). Legacy env bot tokens are supported as fallback (no auto-refresh) and should be avoided in production.
+- MemeAlerts: `!memegrant <nickname> <amount>` uses MemeAlerts API lookup and grant endpoints; dashboard can show grant/purchase history when connected.

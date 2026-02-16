@@ -186,7 +186,7 @@ def setup_log_rotation():
     """
     Setup log file rotation.
     
-    Rotates logs daily and keeps last 30 days.
+    Only logs WARNING and above to keep files small.
     """
     from logging.handlers import RotatingFileHandler
     
@@ -196,16 +196,22 @@ def setup_log_rotation():
         log_file = repo_root / log_file
     log_file.parent.mkdir(parents=True, exist_ok=True)
     
-    # Create rotating file handler
+    # Formatter with timestamp
+    formatter = logging.Formatter(
+        '%(asctime)s | %(levelname)-8s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    # Single rotating file handler - WARNING and above only
     handler = RotatingFileHandler(
         log_file,
-        maxBytes=10 * 1024 * 1024,  # 10 MB
-        backupCount=10,  # Keep 10 files
+        maxBytes=5 * 1024 * 1024,  # 5 MB max
+        backupCount=5,  # Keep 5 files = 25 MB total max
         encoding="utf-8",
     )
-    handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.setFormatter(formatter)
+    handler.setLevel(logging.WARNING)  # Only WARNING, ERROR, CRITICAL
     
-    # Add handler to root logger
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
 

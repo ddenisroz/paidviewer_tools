@@ -35,7 +35,7 @@ async def get_admin_users(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список пользователей для админки."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РґР»СЏ Р°РґРјРёРЅРєРё."""
     try:
         require_admin(user)
         
@@ -47,7 +47,7 @@ async def get_admin_users(
         raise
     except Exception as e:
         logger.error(f"Error getting admin users: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.post("/users/{user_id}/block")
@@ -58,10 +58,10 @@ async def block_user(
     db: Session = Depends(get_db)
 ):
     """
-    Комплексная блокировка пользователя:
-    1. Блокирует доступ через OAuth (User.is_blocked)
-    2. Блокирует все его каналы в гостевом режиме (BlockedChannel)
-    3. Отключает бота от всех каналов пользователя
+    РљРѕРјРїР»РµРєСЃРЅР°СЏ Р±Р»РѕРєРёСЂРѕРІРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ:
+    1. Р‘Р»РѕРєРёСЂСѓРµС‚ РґРѕСЃС‚СѓРї С‡РµСЂРµР· OAuth (User.is_blocked)
+    2. Р‘Р»РѕРєРёСЂСѓРµС‚ РІСЃРµ РµРіРѕ РєР°РЅР°Р»С‹ РІ РіРѕСЃС‚РµРІРѕРј СЂРµР¶РёРјРµ (BlockedChannel)
+    3. РћС‚РєР»СЋС‡Р°РµС‚ Р±РѕС‚Р° РѕС‚ РІСЃРµС… РєР°РЅР°Р»РѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
     """
     try:
         require_admin(user)
@@ -115,7 +115,7 @@ async def block_user(
     except Exception as e:
         logger.error(f"Error blocking user: {e}")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.post("/users/{user_id}/unblock")
@@ -124,7 +124,7 @@ async def unblock_user(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Комплексная разблокировка пользователя."""
+    """РљРѕРјРїР»РµРєСЃРЅР°СЏ СЂР°Р·Р±Р»РѕРєРёСЂРѕРІРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ."""
     try:
         require_admin(user)
         
@@ -143,7 +143,7 @@ async def unblock_user(
     except Exception as e:
         logger.error(f"Error unblocking user: {e}")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.get("/sessions")
@@ -154,7 +154,7 @@ async def get_sessions(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список активных сессий."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р°РєС‚РёРІРЅС‹С… СЃРµСЃСЃРёР№."""
     try:
         require_admin(user)
         
@@ -166,7 +166,7 @@ async def get_sessions(
         raise
     except Exception as e:
         logger.error(f"Error getting sessions: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.post("/whitelist/add")
@@ -175,7 +175,7 @@ async def add_to_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Добавить пользователя в whitelist."""
+    """Р”РѕР±Р°РІРёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ whitelist."""
     try:
         require_admin(user)
         
@@ -208,7 +208,7 @@ async def add_to_whitelist(
     except Exception as e:
         logger.error(f"Error adding to whitelist: {e}")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.get("/whitelist")
@@ -216,7 +216,7 @@ async def get_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список пользователей в whitelist."""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РІ whitelist."""
     try:
         require_admin(user)
         
@@ -241,7 +241,7 @@ async def get_whitelist(
         raise
     except Exception as e:
         logger.error(f"Error getting whitelist: {e}")
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
 
 
 @router.delete("/whitelist/{username}")
@@ -251,7 +251,7 @@ async def remove_from_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить пользователя из whitelist."""
+    """РЈРґР°Р»РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РёР· whitelist."""
     try:
         require_admin(user)
         
@@ -278,4 +278,4 @@ async def remove_from_whitelist(
     except Exception as e:
         logger.error(f"Error removing from whitelist: {e}")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": str(e)}, status_code=500)
+        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)

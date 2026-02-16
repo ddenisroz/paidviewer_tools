@@ -356,7 +356,7 @@ class PlatformSyncService:
                 'roles_synced': False,
                 'channel_points_synced': False,
                 'success': False,
-                'error': str(e)
+                'error': "Internal server error"
             }
 
     async def sync_all_users(self, platform: Optional[str] = None, db: Session = None) -> Dict[str, int]:
@@ -412,7 +412,7 @@ class PlatformSyncService:
                 'total_users': 0,
                 'success_count': 0,
                 'failed_count': 0,
-                'error': str(e)
+                'error': "Internal server error"
             }
 
 

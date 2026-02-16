@@ -107,21 +107,13 @@ class BotControlService:
         # Останавливаем текущий бот
         await registry.stop_twitch_bot()
 
-        # Проверяем токен
-        bot_token = settings.twitch_bot_token
-        if not bot_token:
-            return {"error": "TWITCH_BOT_TOKEN not configured"}
-
         # Получаем активные каналы
         active_channels = connection_manager.get_active_channels()
+        from startup.bot_initializer import initialize_twitch_bot
 
-        # Создаем новый экземпляр
-        from bots.twitch_bot import Bot
-        new_bot = Bot(bot_token, active_channels, connection_manager)
-        new_task = asyncio.create_task(new_bot.start())
-
-        registry.twitch_bot = new_bot
-        registry.twitch_task = new_task
+        success = await initialize_twitch_bot(active_channels)
+        if not success:
+            return {"error": "Twitch bot OAuth token not configured. Use /auth/twitch/bot/login"}
 
         logger.info(f"[OK] Twitch bot restarted with channels: {active_channels}")
         return {
@@ -136,25 +128,18 @@ class BotControlService:
         # Останавливаем текущий бот
         await registry.stop_vk_bot()
 
-        # Проверяем токен
-        vk_token = settings.vk_live_user_token
-        if not vk_token:
-            return {"error": "VK_LIVE_USER_TOKEN not configured"}
-
         # Получаем активные каналы
         active_channels = connection_manager.get_active_channels()
+        from startup.bot_initializer import initialize_vk_bot
 
-        # Создаем новый экземпляр
-        from bots.vk_live_bot import VKLiveBot
-        new_bot = VKLiveBot(vk_token, connection_manager)
-        new_task = asyncio.create_task(new_bot.start_bot())
-
-        registry.vk_bot = new_bot
-        registry.vk_task = new_task
+        success = await initialize_vk_bot()
+        if not success:
+            return {"error": "VK bot OAuth token not configured. Use /auth/vk/bot/login"}
 
         # Подключаем к каналам
-        for channel_name in active_channels:
-            await new_bot.join_channel(channel_name)
+        if registry.vk_bot:
+            for channel_name in active_channels:
+                await registry.vk_bot.connect_to_channel(channel_name)
 
         logger.info(f"[OK] VK Live bot restarted with channels: {active_channels}")
         return {

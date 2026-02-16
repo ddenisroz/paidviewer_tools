@@ -59,9 +59,12 @@ async def check_username_availability(
 
 
 @router.post("/logout")
-async def logout(current_user: dict = Depends(get_current_user)):
+async def logout(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """Logout current user."""
-    return await auth_handlers.logout(current_user)
+    return await auth_handlers.logout(current_user, db)
 
 
 @router.get("/status")

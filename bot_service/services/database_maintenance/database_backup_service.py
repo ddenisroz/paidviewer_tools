@@ -13,24 +13,24 @@ class DatabaseBackupService:
     """Service for database backup and restore operations"""
 
     def create_backup(self) -> Dict[str, Any]:
-        """Создает резервную копию базы данных"""
+        """РЎРѕР·РґР°РµС‚ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ Р±Р°Р·С‹ РґР°РЅРЅС‹С…"""
         try:
             backup_dir = os.path.join(os.getcwd(), 'backups')
             os.makedirs(backup_dir, exist_ok=True)
 
-            # PostgreSQL: используем pg_dump
+            # PostgreSQL: РёСЃРїРѕР»СЊР·СѓРµРј pg_dump
             from core.config import settings as app_settings
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             database_url = app_settings.database_url
             if not database_url or 'postgresql://' not in database_url:
                 return {'success': False, 'error': 'PostgreSQL DATABASE_URL not configured'}
 
-            # Парсим DATABASE_URL для pg_dump
+            # РџР°СЂСЃРёРј DATABASE_URL РґР»СЏ pg_dump
             parsed = urlparse(database_url)
             backup_file = os.path.join(backup_dir, f'backup_{timestamp}.sql')
 
             try:
-                # Формируем команду pg_dump
+                # Р¤РѕСЂРјРёСЂСѓРµРј РєРѕРјР°РЅРґСѓ pg_dump
                 pg_dump_cmd = [
                     'pg_dump',
                     '-h', parsed.hostname or 'localhost',
@@ -40,7 +40,7 @@ class DatabaseBackupService:
                     '-f', backup_file
                 ]
 
-                # Устанавливаем пароль через переменную окружения
+                # РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј РїР°СЂРѕР»СЊ С‡РµСЂРµР· РїРµСЂРµРјРµРЅРЅСѓСЋ РѕРєСЂСѓР¶РµРЅРёСЏ
                 env = os.environ.copy()
                 if parsed.password:
                     env['PGPASSWORD'] = parsed.password
@@ -64,14 +64,14 @@ class DatabaseBackupService:
                 return {'success': False, 'error': 'pg_dump not found. Install PostgreSQL client tools.'}
             except Exception as e:
                 logger.error(f"PostgreSQL backup error: {e}")
-                return {'success': False, 'error': str(e)}
+                return {'success': False, 'error': "Internal server error"}
 
         except Exception as e:
             logger.error(f"Error creating backup: {e}")
-            return {'success': False, 'error': str(e)}
+            return {'success': False, 'error': "Internal server error"}
 
     def restore_from_backup(self) -> Dict[str, Any]:
-        """Восстанавливает БД из последней резервной копии (PostgreSQL)"""
+        """Р’РѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ Р‘Р” РёР· РїРѕСЃР»РµРґРЅРµР№ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё (PostgreSQL)"""
         try:
             backup_dir = os.path.join(os.getcwd(), 'backups')
             if not os.path.exists(backup_dir):
@@ -83,7 +83,7 @@ class DatabaseBackupService:
             if not database_url or 'postgresql://' not in database_url:
                 return {'success': False, 'error': 'PostgreSQL DATABASE_URL not configured'}
 
-            # Находим последний SQL бэкап
+            # РќР°С…РѕРґРёРј РїРѕСЃР»РµРґРЅРёР№ SQL Р±СЌРєР°Рї
             backup_files = sorted(pathlib.Path(backup_dir).glob('backup_*.sql'),
                                  key=lambda p: p.stat().st_mtime, reverse=True)
 
@@ -96,22 +96,22 @@ class DatabaseBackupService:
 
         except Exception as e:
             logger.error(f"Error restoring backup: {e}")
-            return {'success': False, 'error': str(e)}
+            return {'success': False, 'error': "Internal server error"}
 
     def restore_from_backup_file(self, filename: str) -> Dict[str, Any]:
-        """Восстанавливает БД из конкретной резервной копии (PostgreSQL)"""
+        """Р’РѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ Р‘Р” РёР· РєРѕРЅРєСЂРµС‚РЅРѕР№ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё (PostgreSQL)"""
         try:
             backup_dir = os.path.join(os.getcwd(), 'backups')
             backup_file = os.path.join(backup_dir, filename)
 
-            # PostgreSQL: проверяем расширение .sql
+            # PostgreSQL: РїСЂРѕРІРµСЂСЏРµРј СЂР°СЃС€РёСЂРµРЅРёРµ .sql
             if not filename.startswith('backup_') or not filename.endswith('.sql'):
                 return {'success': False, 'error': 'Invalid PostgreSQL backup filename (must be .sql)'}
 
             if not os.path.exists(backup_file):
                 return {'success': False, 'error': 'Backup file not found'}
 
-            # Проверяем что путь нормализован
+            # РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РїСѓС‚СЊ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅ
             if os.path.abspath(backup_file) != backup_file or '..' in filename:
                 return {'success': False, 'error': 'Invalid file path'}
 
@@ -123,7 +123,7 @@ class DatabaseBackupService:
             parsed = urlparse(database_url)
 
             try:
-                # Используем psql для восстановления
+                # РСЃРїРѕР»СЊР·СѓРµРј psql РґР»СЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ
                 psql_cmd = [
                     'psql',
                     '-h', parsed.hostname or 'localhost',
@@ -154,13 +154,13 @@ class DatabaseBackupService:
                 return {'success': False, 'error': 'psql not found. Install PostgreSQL client tools.'}
             except Exception as e:
                 logger.error(f"PostgreSQL restore error: {e}")
-                return {'success': False, 'error': str(e)}
+                return {'success': False, 'error': "Internal server error"}
         except Exception as e:
             logger.error(f"Error restoring from {filename}: {e}")
-            return {'success': False, 'error': str(e)}
+            return {'success': False, 'error': "Internal server error"}
 
     def list_backups(self) -> Dict[str, Any]:
-        """Получает список всех резервных копий"""
+        """РџРѕР»СѓС‡Р°РµС‚ СЃРїРёСЃРѕРє РІСЃРµС… СЂРµР·РµСЂРІРЅС‹С… РєРѕРїРёР№"""
         try:
             backup_dir = os.path.join(os.getcwd(), 'backups')
             if not os.path.exists(backup_dir):
@@ -178,7 +178,7 @@ class DatabaseBackupService:
                         'modified_at': datetime.fromtimestamp(stat.st_mtime).isoformat()
                     })
 
-            # Сортируем по дате создания (новые первыми)
+            # РЎРѕСЂС‚РёСЂСѓРµРј РїРѕ РґР°С‚Рµ СЃРѕР·РґР°РЅРёСЏ (РЅРѕРІС‹Рµ РїРµСЂРІС‹РјРё)
             backups.sort(key=lambda x: x['created_at'], reverse=True)
 
             return {
@@ -189,22 +189,22 @@ class DatabaseBackupService:
             }
         except Exception as e:
             logger.error(f"Error listing backups: {e}")
-            return {'success': False, 'error': str(e), 'backups': []}
+            return {'success': False, 'error': "Internal server error", 'backups': []}
 
     def delete_backup(self, filename: str) -> Dict[str, Any]:
-        """Удаляет конкретную резервную копию"""
+        """РЈРґР°Р»СЏРµС‚ РєРѕРЅРєСЂРµС‚РЅСѓСЋ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ"""
         try:
             backup_dir = os.path.join(os.getcwd(), 'backups')
             file_path = os.path.join(backup_dir, filename)
 
-            # Безопасность: проверяем что файл находится в backup_dir и имеет правильное имя
+            # Р‘РµР·РѕРїР°СЃРЅРѕСЃС‚СЊ: РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ С„Р°Р№Р» РЅР°С…РѕРґРёС‚СЃСЏ РІ backup_dir Рё РёРјРµРµС‚ РїСЂР°РІРёР»СЊРЅРѕРµ РёРјСЏ
             if not filename.startswith('backup_') or not (filename.endswith('.db') or filename.endswith('.sql')):
                 return {'success': False, 'error': 'Invalid backup filename'}
 
             if not os.path.exists(file_path):
                 return {'success': False, 'error': 'Backup file not found'}
 
-            # Проверяем что путь нормализован (защита от path traversal)
+            # РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РїСѓС‚СЊ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅ (Р·Р°С‰РёС‚Р° РѕС‚ path traversal)
             if os.path.abspath(file_path) != file_path or '..' in filename:
                 return {'success': False, 'error': 'Invalid file path'}
 
@@ -219,4 +219,4 @@ class DatabaseBackupService:
             }
         except Exception as e:
             logger.error(f"Error deleting backup: {e}")
-            return {'success': False, 'error': str(e)}
+            return {'success': False, 'error': "Internal server error"}

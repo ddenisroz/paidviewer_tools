@@ -132,7 +132,7 @@ class IntegrationService:
 
         except Exception as e:
             logger.error(f"Error disconnecting {platform}: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Internal server error"}
 
     async def remove_integration(
         self,
@@ -169,7 +169,7 @@ class IntegrationService:
 
         except Exception as e:
             logger.error(f"Error removing {platform} integration: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": "Internal server error"}
 
     async def _disconnect_twitch_bot(self, channel_name: str) -> None:
         """Disconnect Twitch bot from channel."""

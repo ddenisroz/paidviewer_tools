@@ -499,7 +499,7 @@ const LootboxManagement: React.FC = () => {
                 <TabsContent value="lootboxes" className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {lootboxes.map((lootbox) => (
-                            <Card key={lootbox.id} className="bg-gray-800 border-gray-700">
+                            <Card key={lootbox.id} className="bg-muted border-border">
                                 <CardHeader>
                                     <CardTitle className="text-white flex items-center justify-between">
                                         <span className="flex items-center">
@@ -510,7 +510,7 @@ const LootboxManagement: React.FC = () => {
                                             {lootbox.type === 'free' ? '����������' : '�������'}
                                         </Badge>
                                     </CardTitle>
-                                    <CardDescription className="text-gray-400">
+                                    <CardDescription className="text-muted-foreground">
                                         {lootbox.description}
                                     </CardDescription>
                                 </CardHeader>
@@ -521,7 +521,7 @@ const LootboxManagement: React.FC = () => {
                                                 {lootbox.price} ?
                                             </p>
                                         )}
-                                        <p className="text-sm text-gray-300">
+                                        <p className="text-sm text-muted-foreground">
                                             ������: {lootbox.rewards?.length || 0}
                                         </p>
                                         <div className="flex space-x-2">
@@ -544,25 +544,25 @@ const LootboxManagement: React.FC = () => {
                 <TabsContent value="achievements" className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {achievements.map((achievement) => (
-                            <Card key={achievement.id} className="bg-gray-800 border-gray-700">
+                            <Card key={achievement.id} className="bg-muted border-border">
                                 <CardHeader>
                                     <CardTitle className="text-white flex items-center">
                                         <Trophy className="w-5 h-5 mr-2 text-yellow-400" />
                                         {achievement.name}
                                     </CardTitle>
-                                    <CardDescription className="text-gray-400">
+                                    <CardDescription className="text-muted-foreground">
                                         {achievement.description}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-2">
-                                        <p className="text-sm text-gray-300">
+                                        <p className="text-sm text-muted-foreground">
                                             ���: {achievement.type}
                                         </p>
-                                        <p className="text-sm text-gray-300">
+                                        <p className="text-sm text-muted-foreground">
                                             ����������: {achievement.requirement_value}
                                         </p>
-                                        <p className="text-sm text-gray-300">
+                                        <p className="text-sm text-muted-foreground">
                                             �������: {achievement.reward_type} x{achievement.reward_value}
                                         </p>
                                         <div className="flex space-x-2">
@@ -583,10 +583,10 @@ const LootboxManagement: React.FC = () => {
                 </TabsContent>
 
                 <TabsContent value="settings" className="space-y-4">
-                    <Card className="bg-gray-800 border-gray-700">
+                    <Card className="bg-muted border-border">
                         <CardHeader>
                             <CardTitle className="text-white">OBS ����������</CardTitle>
-                            <CardDescription className="text-gray-400">
+                            <CardDescription className="text-muted-foreground">
                                 ��������� ���������� � OBS ��� ��������
                             </CardDescription>
                         </CardHeader>
@@ -599,7 +599,7 @@ const LootboxManagement: React.FC = () => {
                                     readOnly
                                     className="bg-gray-700"
                                 />
-                                <p className="text-xs text-gray-400 mt-1">
+                                <p className="text-xs text-muted-foreground mt-1">
                                     ���������� ���� URL � OBS WebSocket Source
                                 </p>
                             </div>

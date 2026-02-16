@@ -49,7 +49,7 @@ const ChatImage: React.FC<{ src: string }> = memo(({ src }) => (
             src={src}
             alt="Изображение"
             loading="lazy"
-            className="max-w-[200px] max-h-[200px] rounded"
+            className="max-w-[min(200px,45vw)] max-h-[min(200px,45vw)] rounded"
             onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';

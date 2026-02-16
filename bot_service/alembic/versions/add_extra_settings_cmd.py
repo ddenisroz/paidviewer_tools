@@ -7,6 +7,7 @@ Create Date: 2026-01-31
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.engine.reflection import Inspector
 
 # revision identifiers, used by Alembic.
 revision = 'add_extra_settings_cmd'
@@ -17,8 +18,16 @@ depends_on = None
 
 def upgrade():
     # Add extra_settings column to bot_commands
-    op.add_column('bot_commands', sa.Column('extra_settings', sa.JSON(), nullable=True))
+    conn = op.get_bind()
+    inspector = Inspector.from_engine(conn)
+    columns = [col.get('name') for col in inspector.get_columns('bot_commands')]
+    if 'extra_settings' not in columns:
+        op.add_column('bot_commands', sa.Column('extra_settings', sa.JSON(), nullable=True))
 
 
 def downgrade():
-    op.drop_column('bot_commands', 'extra_settings')
+    conn = op.get_bind()
+    inspector = Inspector.from_engine(conn)
+    columns = [col.get('name') for col in inspector.get_columns('bot_commands')]
+    if 'extra_settings' in columns:
+        op.drop_column('bot_commands', 'extra_settings')

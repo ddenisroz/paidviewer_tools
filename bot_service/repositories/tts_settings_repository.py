@@ -76,6 +76,7 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
             "engine": settings.engine,
             "voice": settings.voice,
             "listening_mode": settings.listening_mode,
+            "gcloud_voices": settings.gcloud_voices or [],
             "max_message_length": settings.max_message_length,
             "skip_commands": settings.skip_commands,
             "use_local_tts": settings.use_local_tts,

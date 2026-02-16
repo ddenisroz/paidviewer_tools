@@ -1,5 +1,5 @@
 # bot_service/api/support_api.py
-"""API для системы поддержки.
+"""API РґР»СЏ СЃРёСЃС‚РµРјС‹ РїРѕРґРґРµСЂР¶РєРё.
 
 Clean Architecture: uses SupportTicketRepository for data access.
 """
@@ -85,7 +85,7 @@ async def get_support_tickets(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить тикеты поддержки"""
+    """РџРѕР»СѓС‡РёС‚СЊ С‚РёРєРµС‚С‹ РїРѕРґРґРµСЂР¶РєРё"""
     try:
         ticket_repo = SupportTicketRepository(db)
         if user.get('is_admin', False):
@@ -96,7 +96,7 @@ async def get_support_tickets(
         return {"success": True, "tickets": [format_ticket(t) for t in tickets], "total": len(tickets)}
     except Exception as e:
         logger.error(f"Error getting support tickets: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.get("/my-tickets")
@@ -104,14 +104,14 @@ async def get_my_tickets(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить мои тикеты поддержки"""
+    """РџРѕР»СѓС‡РёС‚СЊ РјРѕРё С‚РёРєРµС‚С‹ РїРѕРґРґРµСЂР¶РєРё"""
     try:
         ticket_repo = SupportTicketRepository(db)
         tickets = ticket_repo.get_by_user_id(user['id'])
         return {"success": True, "tickets": [format_ticket(t) for t in tickets], "total": len(tickets)}
     except Exception as e:
         logger.error(f"Error getting user tickets: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.get("/tickets/{ticket_id}")
@@ -120,7 +120,7 @@ async def get_ticket(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить конкретный тикет"""
+    """РџРѕР»СѓС‡РёС‚СЊ РєРѕРЅРєСЂРµС‚РЅС‹Р№ С‚РёРєРµС‚"""
     try:
         ticket_repo = SupportTicketRepository(db)
         ticket = ticket_repo.get(ticket_id)
@@ -146,7 +146,7 @@ async def get_ticket(
         raise
     except Exception as e:
         logger.error(f"Error getting ticket {ticket_id}: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/tickets")
@@ -157,7 +157,7 @@ async def create_ticket(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать новый тикет поддержки"""
+    """РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ С‚РёРєРµС‚ РїРѕРґРґРµСЂР¶РєРё"""
     try:
         subject = sanitize_input(subject, max_length=100)
         message = sanitize_input(message, max_length=2000)
@@ -180,7 +180,7 @@ async def create_ticket(
         raise
     except Exception as e:
         logger.error(f"Error creating ticket: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/tickets/{ticket_id}/respond")
@@ -190,7 +190,7 @@ async def respond_to_ticket(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Ответить на тикет"""
+    """РћС‚РІРµС‚РёС‚СЊ РЅР° С‚РёРєРµС‚"""
     try:
         message = sanitize_input(message, max_length=2000)
         
@@ -222,7 +222,7 @@ async def respond_to_ticket(
         raise
     except Exception as e:
         logger.error(f"Error responding to ticket {ticket_id}: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 
 @router.post("/tickets/{ticket_id}/close")
@@ -231,7 +231,7 @@ async def close_ticket(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Закрыть тикет"""
+    """Р—Р°РєСЂС‹С‚СЊ С‚РёРєРµС‚"""
     try:
         ticket_repo = SupportTicketRepository(db)
         ticket = ticket_repo.get(ticket_id)
@@ -249,5 +249,5 @@ async def close_ticket(
         raise
     except Exception as e:
         logger.error(f"Error closing ticket {ticket_id}: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 

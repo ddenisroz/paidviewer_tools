@@ -1,19 +1,18 @@
 # bot_service/core/auth_handlers.py
-"""Обработчики аутентификации"""
+"""РћР±СЂР°Р±РѕС‚С‡РёРєРё Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёРё"""
 from __future__ import annotations
 import logging
 from fastapi import HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from core.database import get_db
-from core.config import settings
 from auth.auth import get_current_user
 from services.user_identity_service import UserIdentityService, UserType
 
 logger = logging.getLogger(__name__)
 
 class AuthHandlers:
-    """Класс для обработки аутентификации"""
+    """РљР»Р°СЃСЃ РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёРё"""
 
     def __init__(self):
         # We don't need TwitchAPI here anymore.
@@ -30,7 +29,7 @@ class AuthHandlers:
         return RedirectResponse(url=auth_url)
 
     async def api_twitch_login(self):
-        """API endpoint для Twitch login"""
+        """API endpoint РґР»СЏ Twitch login"""
         from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f"{settings.backend_url}/auth/twitch/callback"
@@ -40,7 +39,7 @@ class AuthHandlers:
         return {"auth_url": auth_url}
 
     async def api_twitch_auth(self):
-        """API endpoint для Twitch auth"""
+        """API endpoint РґР»СЏ Twitch auth"""
         from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f"{settings.backend_url}/auth/twitch/callback"
@@ -54,7 +53,7 @@ class AuthHandlers:
         try:
             logger.info(f"Twitch callback - code: {code[:10]}...")
 
-            # Получаем текущую сессию (если есть)
+            # РџРѕР»СѓС‡Р°РµРј С‚РµРєСѓС‰СѓСЋ СЃРµСЃСЃРёСЋ (РµСЃР»Рё РµСЃС‚СЊ)
             session_id = request.cookies.get("session_id")
             current_user_from_session = None
             if session_id:
@@ -71,7 +70,7 @@ class AuthHandlers:
             if not twitch_platform:
                  raise HTTPException(status_code=500, detail="Twitch platform not initialized")
 
-            # Получаем токен доступа
+            # РџРѕР»СѓС‡Р°РµРј С‚РѕРєРµРЅ РґРѕСЃС‚СѓРїР°
             logger.info("Getting access token from Twitch...")
             token_data = await twitch_platform.authenticate(code)
 
@@ -91,7 +90,7 @@ class AuthHandlers:
             if not access_token:
                 raise HTTPException(status_code=400, detail="Failed to get access token")
 
-            # Получаем информацию о пользователе
+            # РџРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ
             logger.info("Getting user data from Twitch...")
             user_data = await twitch_platform.get_user_info(access_token)
 
@@ -108,20 +107,20 @@ class AuthHandlers:
                 logger.error("No user ID in Twitch response")
                 raise HTTPException(status_code=400, detail="Failed to get user info")
 
-            # Используем централизованный сервис создания пользователей
+            # РСЃРїРѕР»СЊР·СѓРµРј С†РµРЅС‚СЂР°Р»РёР·РѕРІР°РЅРЅС‹Р№ СЃРµСЂРІРёСЃ СЃРѕР·РґР°РЅРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
             from core.user_creation_service import user_creation_service
 
-            # Определяем, это привязка интеграции или новый вход
+            # РћРїСЂРµРґРµР»СЏРµРј, СЌС‚Рѕ РїСЂРёРІСЏР·РєР° РёРЅС‚РµРіСЂР°С†РёРё РёР»Рё РЅРѕРІС‹Р№ РІС…РѕРґ
             is_linking_integration = False
             current_user_id = None
             if current_user_from_session:
                 existing_user_id = current_user_from_session.get('user_id')
-                if existing_user_id and existing_user_id > 0:  # Не гостевая сессия
+                if existing_user_id and existing_user_id > 0:  # РќРµ РіРѕСЃС‚РµРІР°СЏ СЃРµСЃСЃРёСЏ
                     is_linking_integration = True
                     current_user_id = existing_user_id
                     logger.info(f"[LINK] Linking Twitch account to existing user_id: {existing_user_id}")
 
-            # Создаем или находим пользователя с включением scopes
+            # РЎРѕР·РґР°РµРј РёР»Рё РЅР°С…РѕРґРёРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РІРєР»СЋС‡РµРЅРёРµРј scopes
             user = await user_creation_service.find_or_create_user(
                 db=db,
                 platform="twitch",
@@ -139,7 +138,7 @@ class AuthHandlers:
             user_id = user.id
             logger.info(f"[OK] User resolved: ID={user_id}, twitch_username={user.twitch_username}")
 
-            # КРИТИЧНО: Создаем UserSettings если его нет
+            # РљР РРўРР§РќРћ: РЎРѕР·РґР°РµРј UserSettings РµСЃР»Рё РµРіРѕ РЅРµС‚
             from core.database import UserSettings
             existing_settings = db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
             if not existing_settings:
@@ -153,13 +152,13 @@ class AuthHandlers:
                 db.commit()
                 logger.info(f"[OK] UserSettings created for {twitch_username}")
 
-                # Подключаем бота к каналу пользователя
+                # РџРѕРґРєР»СЋС‡Р°РµРј Р±РѕС‚Р° Рє РєР°РЅР°Р»Сѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
                 try:
                     from startup.bot_registry import get_bot_registry
                     bot_instance = get_bot_registry().twitch_bot
                     if bot_instance:
                         import asyncio
-                        # Проверяем что бот не уже подключен к этому каналу
+                        # РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ Р±РѕС‚ РЅРµ СѓР¶Рµ РїРѕРґРєР»СЋС‡РµРЅ Рє СЌС‚РѕРјСѓ РєР°РЅР°Р»Сѓ
                         if not bot_instance.is_connected_to_channel(twitch_username.lower()):
                             asyncio.create_task(bot_instance.join_channel(twitch_username.lower()))
                             logger.info(f"[BOT] Bot joining channel: {twitch_username.lower()}")
@@ -168,25 +167,25 @@ class AuthHandlers:
                 except Exception as e:
                     logger.warning(f"Could not connect bot to channel on login: {e}")
 
-            # Управление сессиями
+            # РЈРїСЂР°РІР»РµРЅРёРµ СЃРµСЃСЃРёСЏРјРё
             from core.session_manager import session_manager
 
             if is_linking_integration:
-                # Если это привязка второй платформы - НЕ завершаем старые сессии, используем текущую
+                # Р•СЃР»Рё СЌС‚Рѕ РїСЂРёРІСЏР·РєР° РІС‚РѕСЂРѕР№ РїР»Р°С‚С„РѕСЂРјС‹ - РќР• Р·Р°РІРµСЂС€Р°РµРј СЃС‚Р°СЂС‹Рµ СЃРµСЃСЃРёРё, РёСЃРїРѕР»СЊР·СѓРµРј С‚РµРєСѓС‰СѓСЋ
                 logger.info("[LINK] Integration linking - using current session")
                 session_id = request.cookies.get("session_id")
                 if not session_id:
-                     # Если по какой-то причине cookie нет - создаем новую сессию
+                     # Р•СЃР»Рё РїРѕ РєР°РєРѕР№-С‚Рѕ РїСЂРёС‡РёРЅРµ cookie РЅРµС‚ - СЃРѕР·РґР°РµРј РЅРѕРІСѓСЋ СЃРµСЃСЃРёСЋ
                     logger.warning("No session cookie found during integration linking, creating new session")
                     device_info = {
                         "user_agent": request.headers.get("user-agent"),
                         "ip": getattr(request.client, 'host', 'unknown'),
-                        "monitored_channel": twitch_username.lower(),  # Используем username, а не ID
+                        "monitored_channel": twitch_username.lower(),  # РСЃРїРѕР»СЊР·СѓРµРј username, Р° РЅРµ ID
                         "platform": "twitch"
                     }
                     session_id = session_manager.create_session(user_id, device_info=device_info)
 
-                    # Уведомляем connection_manager о новой активной сессии
+                    # РЈРІРµРґРѕРјР»СЏРµРј connection_manager Рѕ РЅРѕРІРѕР№ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё
                     try:
                         from core.connection_manager import get_connection_manager
                         connection_manager = get_connection_manager()
@@ -195,22 +194,22 @@ class AuthHandlers:
                     except Exception as e:
                         logger.error(f"Error notifying connection_manager: {e}")
             else:
-                # Если это новый вход - завершаем ВСЕ старые сессии (принцип одной активной сессии)
+                # Р•СЃР»Рё СЌС‚Рѕ РЅРѕРІС‹Р№ РІС…РѕРґ - Р·Р°РІРµСЂС€Р°РµРј Р’РЎР• СЃС‚Р°СЂС‹Рµ СЃРµСЃСЃРёРё (РїСЂРёРЅС†РёРї РѕРґРЅРѕР№ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё)
                 logger.info(f"[SECURITY] New login detected for user {user_id}. Terminating ALL old sessions...")
                 session_manager.terminate_user_sessions(user_id, "new_login", db)
                 logger.info("[OK] All old sessions terminated. Creating new session...")
 
-                # Создаем новую сессию для пользователя с правильным device_info
+                # РЎРѕР·РґР°РµРј РЅРѕРІСѓСЋ СЃРµСЃСЃРёСЋ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РїСЂР°РІРёР»СЊРЅС‹Рј device_info
                 device_info = {
                     "user_agent": request.headers.get("user-agent"),
                     "ip": getattr(request.client, 'host', 'unknown'),
-                    "monitored_channel": twitch_username.lower(),  # Используем username, а не ID
+                    "monitored_channel": twitch_username.lower(),  # РСЃРїРѕР»СЊР·СѓРµРј username, Р° РЅРµ ID
                     "platform": "twitch"
                 }
                 session_id = session_manager.create_session(user_id, device_info=device_info)
                 logger.info(f"[OK] New session created: {session_id}")
 
-                # Уведомляем connection_manager о новой активной сессии
+                # РЈРІРµРґРѕРјР»СЏРµРј connection_manager Рѕ РЅРѕРІРѕР№ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё
                 try:
                     from core.connection_manager import get_connection_manager
                     connection_manager = get_connection_manager()
@@ -219,17 +218,17 @@ class AuthHandlers:
                 except Exception as e:
                     logger.error(f"Error notifying connection_manager: {e}")
 
-            # Создаем ответ с httpOnly cookie
+            # РЎРѕР·РґР°РµРј РѕС‚РІРµС‚ СЃ httpOnly cookie
             from fastapi.responses import RedirectResponse
             from core.config import settings
 
-            # Используем 302 вместо 307 для лучшей совместимости с cookies
+            # РСЃРїРѕР»СЊР·СѓРµРј 302 РІРјРµСЃС‚Рѕ 307 РґР»СЏ Р»СѓС‡С€РµР№ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё СЃ cookies
             response = RedirectResponse(url=f"{settings.frontend_url}/dashboard", status_code=302)
 
-            # Явно удаляем старую cookie перед установкой новой
+            # РЇРІРЅРѕ СѓРґР°Р»СЏРµРј СЃС‚Р°СЂСѓСЋ cookie РїРµСЂРµРґ СѓСЃС‚Р°РЅРѕРІРєРѕР№ РЅРѕРІРѕР№
             response.delete_cookie(key="session_id", path="/")
 
-            # Устанавливаем новую cookie
+            # РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј РЅРѕРІСѓСЋ cookie
             from core.cookie_config import get_session_cookie_settings
             cookie_settings = get_session_cookie_settings(session_id)
             response.set_cookie(**cookie_settings)
@@ -245,35 +244,39 @@ class AuthHandlers:
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
 
-    # VK OAuth теперь полностью обрабатывается через auth/vk_auth.py роутер
-    # Методы vk_login() и vk_callback() удалены
+    # VK OAuth С‚РµРїРµСЂСЊ РїРѕР»РЅРѕСЃС‚СЊСЋ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚СЃСЏ С‡РµСЂРµР· auth/vk_auth.py СЂРѕСѓС‚РµСЂ
+    # РњРµС‚РѕРґС‹ vk_login() Рё vk_callback() СѓРґР°Р»РµРЅС‹
 
-    async def logout(self, current_user: dict = Depends(get_current_user)):
-        """Logout пользователя - удаляет ВСЕ токены и завершает все сессии"""
+    async def logout(
+        self,
+        current_user: dict = Depends(get_current_user),
+        db: Session | None = None,
+    ):
+        """Logout user and terminate all sessions/tokens."""
         from fastapi.responses import JSONResponse
+        from core.database import User
         from core.session_manager import session_manager
 
-        # Валидируем данные пользователя
         if not UserIdentityService.validate_user_data(current_user):
             raise HTTPException(status_code=400, detail="Invalid user data")
 
         user_type = UserIdentityService.get_user_type(current_user)
         user_id = current_user.get("id")
 
-        if user_id:
-            # Отключаем бота от каналов пользователя ПЕРЕД удалением токенов
-            if user_type == UserType.AUTHENTICATED and user_id > 0:
-                logger.info(f"[BOT] Logout: Disconnecting bot from user {user_id} channels")
-                from core.database import get_db, User
-                db = next(get_db())
-                try:
-                    user = db.query(User).filter(User.id == user_id).first()
+        owns_db_session = db is None
+        db_session = db or next(get_db())
+
+        try:
+            if user_id:
+                if user_type == UserType.AUTHENTICATED and user_id > 0:
+                    logger.info(f"[BOT] Logout: Disconnecting bot from user {user_id} channels")
+                    user = db_session.query(User).filter(User.id == user_id).first()
                     if user:
-                        # Отключаем Twitch бота
                         if user.twitch_username:
                             logger.info(f"[BOT] Disconnecting Twitch bot from channel: {user.twitch_username}")
                             try:
                                 from startup.bot_registry import get_bot_registry
+
                                 bot_instance = get_bot_registry().twitch_bot
                                 if bot_instance:
                                     await bot_instance.part_channels([user.twitch_username])
@@ -281,61 +284,55 @@ class AuthHandlers:
                             except Exception as e:
                                 logger.error(f"[ERROR] Error disconnecting Twitch bot: {e}")
 
-                        # Отключаем VK Live бота
                         if user.vk_channel_name:
                             logger.info(f"[BOT] Disconnecting VK Live bot from channel: {user.vk_channel_name}")
                             try:
                                 from startup.bot_registry import get_bot_registry
+
                                 vk_live_bot_instance = get_bot_registry().vk_bot
                                 if vk_live_bot_instance:
                                     await vk_live_bot_instance.disconnect_from_channel(user.vk_channel_name)
                                     logger.info(f"[OK] VK Live bot disconnected from {user.vk_channel_name}")
                             except Exception as e:
                                 logger.error(f"[ERROR] Error disconnecting VK Live bot: {e}")
-                finally:
-                    db.close()
 
-            # Для авторизованных пользователей - удаляем ВСЕ токены
-            if user_type == UserType.AUTHENTICATED and user_id > 0:
-                logger.info(f"[DELETE] Logout: Deleting ALL tokens for user {user_id}")
-                session_manager.clear_all_user_tokens(user_id)
-                logger.info(f"[OK] Tokens deleted. User {user_id} will need to re-authenticate")
+                if user_type == UserType.AUTHENTICATED and user_id > 0:
+                    logger.info(f"[DELETE] Logout: Deleting ALL tokens for user {user_id}")
+                    session_manager.clear_all_user_tokens(user_id)
+                    logger.info(f"[OK] Tokens deleted. User {user_id} will need to re-authenticate")
 
-            # Завершаем все сессии пользователя
-            logger.info(f"[DELETE] Logout: Terminating all sessions for user {user_id}")
-            from core.database import get_db
-            db = next(get_db())
-            try:
-                session_manager.terminate_user_sessions(user_id, "user_logout", db)
-                logger.info(f"[OK] All sessions terminated for user {user_id}")
-            except Exception as e:
-                logger.error(f"Error terminating sessions during logout: {e}")
-            finally:
-                db.close()
+                logger.info(f"[DELETE] Logout: Terminating all sessions for user {user_id}")
+                try:
+                    session_manager.terminate_user_sessions(user_id, "user_logout", db_session)
+                    logger.info(f"[OK] All sessions terminated for user {user_id}")
+                except Exception as e:
+                    logger.error(f"Error terminating sessions during logout: {e}")
+        finally:
+            if owns_db_session:
+                db_session.close()
 
-        # Создаем ответ
         is_guest = user_type == UserType.GUEST
-        response = JSONResponse(content={
-            "success": True,
-            "message": "Logged out successfully",
-            "tokens_deleted": not is_guest
-        })
+        response = JSONResponse(
+            content={
+                "success": True,
+                "message": "Logged out successfully",
+                "tokens_deleted": not is_guest,
+            }
+        )
 
-        # Добавляем CORS заголовки
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRFToken"
         response.headers["Access-Control-Allow-Credentials"] = "true"
 
-        # Очищаем httpOnly cookie
         response.delete_cookie(
             key="session_id",
             httponly=True,
-            samesite="lax"
+            samesite="lax",
         )
 
         logger.info(f"[LOGOUT] User {user_id} logged out successfully")
         return response
 
-# Создаем экземпляр для использования
+# РЎРѕР·РґР°РµРј СЌРєР·РµРјРїР»СЏСЂ РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ
 auth_handlers = AuthHandlers()

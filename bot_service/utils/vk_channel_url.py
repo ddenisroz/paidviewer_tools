@@ -20,6 +20,8 @@ def extract_vk_channel_slug(channel_url: Optional[str]) -> Optional[str]:
         return value
     if value.startswith("http://") or value.startswith("https://"):
         value = value.rstrip("/").split("/")[-1]
+    # Strip query/fragment just in case malformed values were stored
+    value = value.split("?", 1)[0].split("#", 1)[0].split("&", 1)[0]
     return value
 
 

@@ -274,7 +274,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                                     {availablePlatforms.map(platform => (
                                         <SelectItem key={platform} value={platform}>
                                             <div className="flex items-center gap-1.5">
-                                                {platform === 'twitch' ? <TwitchIcon className="w-3.5 h-3.5 text-purple-400" /> : <VKIcon className="w-3.5 h-3.5 text-[#FF0062]" />}
+                                                {platform === 'twitch' ? <TwitchIcon className="w-3.5 h-3.5 text-purple-400" /> : <VKIcon className="w-3.5 h-3.5 text-[#FF4444]" />}
                                                 <span className="text-xs">{platform === 'twitch' ? 'Twitch' : 'VK'}</span>
                                             </div>
                                         </SelectItem>
@@ -293,7 +293,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                     </div>
 
                     {/* Список */}
-                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto custom-scrollbar pr-1">
+                    <div className="space-y-1.5 max-h-[min(160px,30vh)] overflow-y-auto custom-scrollbar pr-1">
                         {loadingUsers ? (
                             <div className="flex flex-col items-center justify-center py-8 text-gray-500">
                                 <div className="w-5 h-5 border-2 border-gray-600 border-t-red-400 rounded-full animate-spin mb-2" />
@@ -312,7 +312,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                                 >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <div className={`w-5 h-5 rounded-full flex items-center justify-center ${blockedUser.platform === 'twitch' ? 'bg-purple-500/10' : 'bg-rose-500/10'}`}>
-                                            {blockedUser.platform === 'twitch' ? <TwitchIcon className="w-3 h-3 text-purple-400" /> : <VKIcon className="w-3 h-3 text-[#FF0062]" />}
+                                            {blockedUser.platform === 'twitch' ? <TwitchIcon className="w-3 h-3 text-purple-400" /> : <VKIcon className="w-3 h-3 text-[#FF4444]" />}
                                         </div>
                                         <span className="text-sm text-gray-200 truncate font-medium">{blockedUser.username}</span>
                                     </div>
@@ -373,7 +373,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                     </div>
 
                     {/* Список слов - тегами */}
-                    <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto custom-scrollbar content-start pr-1">
+                    <div className="flex flex-wrap gap-2 max-h-[min(160px,30vh)] overflow-y-auto custom-scrollbar content-start pr-1">
                         {loadingWords ? (
                             <div className="w-full flex flex-col items-center justify-center py-8 text-gray-500">
                                 <div className="w-5 h-5 border-2 border-gray-600 border-t-indigo-400 rounded-full animate-spin mb-2" />

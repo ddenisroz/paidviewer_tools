@@ -15,6 +15,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 
 from core.database import get_db, init_db, BotCommand
+from core.config import settings
 from core.connection_manager import get_connection_manager
 from core.background_tasks import background_tasks
 from services.tts.memory_tts_queue import get_memory_tts_queue
@@ -39,8 +40,13 @@ async def _startup_commands() -> None:
             BotCommand.command_type == 'global',
             BotCommand.user_id.is_(None)
         ).first()
-        if not has_global:
-            logger.info("[STARTUP] Seeding global bot commands")
+        has_memegrant = db.query(BotCommand).filter(
+            BotCommand.command_type == 'global',
+            BotCommand.user_id.is_(None),
+            BotCommand.command_name == 'memegrant'
+        ).first()
+        if not has_global or not has_memegrant:
+            logger.info("[STARTUP] Seeding/refreshing global bot commands")
             from init_global_commands import init_global_commands
             init_global_commands()
         else:
@@ -175,6 +181,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Usage:
         app = FastAPI(lifespan=lifespan)
     """
+    if settings.testing:
+        logger.info("Testing mode enabled: skipping heavy startup/shutdown services")
+        yield
+        return
+
     # === STARTUP ===
     logger.info("Bot service starting on port 8000")
     

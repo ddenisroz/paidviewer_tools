@@ -34,6 +34,8 @@ const SettingsPage: React.FC = () => {
     const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
 
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
+    const twitchLabel = integrations.twitch?.channel_name || user?.twitch_username || integrations.twitch?.username;
+    const vkLabel = integrations.vk?.channel_name || user?.vk_channel_name || user?.vk_username || integrations.vk?.username;
 
     const handlePlatformConnect = (platform: 'twitch' | 'vk'): void => {
         const authUrl = `${API_BASE_URL}/auth/${platform}/login`;
@@ -134,11 +136,11 @@ const SettingsPage: React.FC = () => {
                         <Card className="card-glass p-4 flex flex-col justify-between h-full">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <TwitchIcon width="32" height="32" />
+                                    <TwitchIcon width="32" height="32" className="text-[#9146FF]" />
                                     <div className="flex flex-col">
                                         <Label className="text-base font-medium text-foreground">Twitch</Label>
                                         <span className="text-xs text-muted-foreground">
-                                            {integrations.twitch?.username || 'Не подключено'}
+                                            {twitchLabel || 'Не подключено'}
                                         </span>
                                     </div>
                                 </div>
@@ -154,18 +156,18 @@ const SettingsPage: React.FC = () => {
                         <Card className="card-glass p-4 flex flex-col justify-between h-full">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <VKIcon width="32" height="32" />
+                                    <VKIcon width="32" height="32" className="text-[#FF4444]" />
                                     <div className="flex flex-col">
                                         <Label className="text-base font-medium text-foreground">VK Live</Label>
                                         <span className="text-xs text-muted-foreground">
-                                            {integrations.vk?.username || 'Не подключено'}
+                                            {vkLabel || 'Не подключено'}
                                         </span>
                                     </div>
                                 </div>
                                 <Switch
                                     checked={integrations.vk?.enabled || false}
                                     onCheckedChange={handleVkToggle}
-                                    className="data-[state=checked]:bg-[#FF4444]"
+                                    className="data-[state=checked]:bg-none data-[state=checked]:bg-[#FF4444] data-[state=checked]:border-[#FF4444] data-[state=checked]:from-transparent data-[state=checked]:to-transparent"
                                 />
                             </div>
                         </Card>
@@ -211,7 +213,7 @@ const SettingsPage: React.FC = () => {
                                         onClick={() => setTtsPreference('pause')}
                                         className={`rounded-xl border px-4 py-3 text-left transition-all ${ttsPreference === 'pause'
                                             ? 'border-purple-500/40 bg-purple-500/10 text-white shadow-[0_0_0_1px_rgba(168,85,247,0.25)]'
-                                            : 'border-gray-700/60 bg-gray-900/40 text-gray-300 hover:border-purple-500/40'}`}
+                                            : 'border-border/60 bg-background/40 text-muted-foreground hover:border-purple-500/40'}`}
                                     >
                                         <div className="text-sm font-semibold">Пауза YouTube</div>
                                         <div className="text-xs text-muted-foreground">Полная остановка во время TTS</div>
@@ -221,7 +223,7 @@ const SettingsPage: React.FC = () => {
                                         onClick={() => setTtsPreference('duck')}
                                         className={`rounded-xl border px-4 py-3 text-left transition-all ${ttsPreference === 'duck'
                                             ? 'border-purple-500/40 bg-purple-500/10 text-white shadow-[0_0_0_1px_rgba(168,85,247,0.25)]'
-                                            : 'border-gray-700/60 bg-gray-900/40 text-gray-300 hover:border-purple-500/40'}`}
+                                            : 'border-border/60 bg-background/40 text-muted-foreground hover:border-purple-500/40'}`}
                                     >
                                         <div className="text-sm font-semibold">Приглушение</div>
                                         <div className="text-xs text-muted-foreground">Снижение громкости до 20%</div>
@@ -231,7 +233,7 @@ const SettingsPage: React.FC = () => {
                                         onClick={() => setTtsPreference('none')}
                                         className={`rounded-xl border px-4 py-3 text-left transition-all ${ttsPreference === 'none'
                                             ? 'border-purple-500/40 bg-purple-500/10 text-white shadow-[0_0_0_1px_rgba(168,85,247,0.25)]'
-                                            : 'border-gray-700/60 bg-gray-900/40 text-gray-300 hover:border-purple-500/40'}`}
+                                            : 'border-border/60 bg-background/40 text-muted-foreground hover:border-purple-500/40'}`}
                                     >
                                         <div className="text-sm font-semibold">Без изменений</div>
                                         <div className="text-xs text-muted-foreground">YouTube продолжает играть</div>

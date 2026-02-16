@@ -11,6 +11,7 @@ interface User {
     id?: number;
     twitch_username?: string;
     vk_username?: string;
+    vk_channel_name?: string;
 }
 
 interface UseChatActionsReturn {
@@ -55,7 +56,9 @@ export const useChatActions = (_user?: User | null): UseChatActionsReturn => {
 
         let channelName = msg.channel || msg.channel_name;
         if (!channelName) {
-            channelName = platform === 'twitch' ? currentUser?.twitch_username : currentUser?.vk_username;
+            channelName = platform === 'twitch'
+                ? currentUser?.twitch_username
+                : (currentUser?.vk_channel_name || currentUser?.vk_username);
         }
 
         if (!channelName) {

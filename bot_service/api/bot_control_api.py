@@ -41,7 +41,7 @@ async def get_bot_status(
         raise
     except Exception as e:
         logger.error(f"Error getting bot status: {e}")
-        return {"connected": False, "error": str(e)}
+        return {"connected": False, "error": "Internal server error"}
 
 @router.post("/chat/connect")
 async def connect_chat(
@@ -65,7 +65,7 @@ async def connect_chat(
         raise
     except Exception as e:
         logger.error(f"Error connecting chat: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.post("/chat/disconnect")
 async def disconnect_chat(
@@ -89,7 +89,7 @@ async def disconnect_chat(
         raise
     except Exception as e:
         logger.error(f"Error disconnecting chat: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 
 @router.get("/chat/status")
 async def get_chat_status(
@@ -112,7 +112,7 @@ async def get_chat_status(
         raise
     except Exception as e:
         logger.error(f"Error getting chat status: {e}")
-        return {"connected": False, "error": str(e)}
+        return {"connected": False, "error": "Internal server error"}
 
 @router.post("/chat/reconnect")
 async def reconnect_chat(
@@ -136,5 +136,5 @@ async def reconnect_chat(
         raise
     except Exception as e:
         logger.error(f"Error reconnecting chat: {e}")
-        return {"success": False, "error": str(e)}
+        return {"success": False, "error": "Internal server error"}
 

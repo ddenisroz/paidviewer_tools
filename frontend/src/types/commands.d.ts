@@ -12,6 +12,8 @@ export interface ChatCommand {
   response: string;
   enabled: boolean;
   cooldown?: number;
+  alias?: string;
+  parent_command_id?: number;
   user_level?: 'everyone' | 'subscriber' | 'moderator' | 'broadcaster';
   platform?: 'twitch' | 'vk' | 'youtube' | 'all';
   channel_name?: string;

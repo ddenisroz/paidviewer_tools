@@ -9,7 +9,7 @@ import aiohttp
 
 from .vk_auth import VKAuth
 from .vk_base import VK_API_TIMEOUT
-from utils.vk_channel_url import normalize_vk_channel_url
+from utils.vk_channel_url import get_vk_channel_candidates, normalize_vk_channel_url
 
 logger = logging.getLogger(__name__)
 
@@ -49,23 +49,20 @@ class VKRewards(VKAuth):
     async def get_channel_rewards(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
         """Get list of channel rewards."""
         try:
-            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/rewards"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
             }
-            params = {"channel_url": channel_url}
-
-            async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
-                async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return cast(Optional[List[Dict[str, Any]]], data.get("data", {}).get("rewards", []))
-                    else:
+            for candidate in get_vk_channel_candidates(channel_url):
+                params = {"channel_url": candidate}
+                async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
+                    async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return cast(Optional[List[Dict[str, Any]]], data.get("data", {}).get("rewards", []))
                         response_text = await response.text()
-                        logger.error(f"VK channel rewards error: {response.status} - {response_text}")
-                        return None
+                        logger.error(f"VK channel rewards error ({candidate}): {response.status} - {response_text}")
 
         except Exception as e:
             logger.error(f"Error getting VK channel rewards: {e}")
@@ -102,23 +99,20 @@ class VKRewards(VKAuth):
     async def get_rewards_manage_info(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
         """Get rewards management info (for streamer)."""
         try:
-            channel_url = normalize_vk_channel_url(channel_url)
             url = f"{self.BASE_URL}/v1/channel_point/rewards/manage_info"
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
             }
-            params = {"channel_url": channel_url}
-            
-            async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
-                async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return cast(Optional[List[Dict[str, Any]]], data.get("data", {}).get("rewards", []))
-                    else:
+            for candidate in get_vk_channel_candidates(channel_url):
+                params = {"channel_url": candidate}
+                async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
+                    async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            return cast(Optional[List[Dict[str, Any]]], data.get("data", {}).get("rewards", []))
                         response_text = await response.text()
-                        logger.error(f"VK rewards manage info error: {response.status} - {response_text}")
-                        return None
+                        logger.error(f"VK rewards manage info error ({candidate}): {response.status} - {response_text}")
         except Exception as e:
              logger.error(f"Error getting VK rewards manage info: {e}")
              return None

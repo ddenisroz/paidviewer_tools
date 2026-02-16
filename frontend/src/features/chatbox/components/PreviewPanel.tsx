@@ -46,6 +46,7 @@ interface PreviewMessage {
 interface PreviewPanelProps {
     settings: ChatBoxSettings;
     previewMessages: PreviewMessage[];
+    twitchChannelName?: string | null;
 }
 
 interface EmoteData {
@@ -62,9 +63,10 @@ const FALLBACK_7TV_EMOTE: EmoteData = {
     animated: false
 };
 
-const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }) => {
+const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, twitchChannelName }) => {
     const [badgesReady, setBadgesReady] = useState(false);
     const [globalEmotes, setGlobalEmotes] = useState<Map<string, EmoteData>>(new Map());
+    const [animationTick, setAnimationTick] = useState(0);
 
     const isHorizontal = settings.chat_direction === 'horizontal';
     const chatWidth = Math.max(20, Math.min(100, settings.chat_width || 100));
@@ -117,12 +119,33 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
     };
 
     useEffect(() => {
-        if (!settings.show_badges) return;
+        let active = true;
+        if (!settings.show_badges) {
+            setBadgesReady(false);
+            return undefined;
+        }
 
-        twitchBadgesService.loadGlobalBadges()
-            .then(() => setBadgesReady(true))
-            .catch(() => setBadgesReady(false));
-    }, [settings.show_badges]);
+        const loadBadges = async () => {
+            try {
+                await twitchBadgesService.loadGlobalBadges();
+                if (twitchChannelName) {
+                    await twitchBadgesService.loadChannelBadges(twitchChannelName);
+                }
+                if (active) {
+                    setBadgesReady(true);
+                }
+            } catch {
+                if (active) {
+                    setBadgesReady(false);
+                }
+            }
+        };
+
+        loadBadges();
+        return () => {
+            active = false;
+        };
+    }, [settings.show_badges, twitchChannelName]);
 
     useEffect(() => {
         let isActive = true;
@@ -147,6 +170,14 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
             isActive = false;
         };
     }, [settings.show_7tv_emotes]);
+
+    useEffect(() => {
+        if (settings.animation_type === 'none' || settings.animation_duration <= 0) return undefined;
+        const interval = setInterval(() => {
+            setAnimationTick((prev) => prev + 1);
+        }, Math.max(1500, settings.animation_duration + 400));
+        return () => clearInterval(interval);
+    }, [settings.animation_type, settings.animation_duration]);
 
     return (
         <div className="h-full flex flex-col">
@@ -173,6 +204,10 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
                         60% { opacity: 1; transform: translateY(-6px) scale(1.02); }
                         100% { opacity: 1; transform: translateY(0) scale(1); }
                     }
+                    @keyframes previewMarquee {
+                        0% { transform: translateX(0); }
+                        100% { transform: translateX(-50%); }
+                    }
                 `}
             </style>
             <div
@@ -193,21 +228,27 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
                     }}
                 >
                     <div
-                        className={`${isHorizontal ? 'overflow-x-auto' : 'overflow-y-auto'} chatbox-preview-scroll`}
+                        className={`${isHorizontal ? 'overflow-x-hidden' : 'overflow-y-auto'} chatbox-preview-scroll`}
                         style={{
                             width: `${chatWidth}%`,
                             maxWidth: '100%',
                             height: '100%',
-                            display: 'flex',
-                            flexDirection: isHorizontal ? 'row' : 'column',
-                            alignItems: isHorizontal ? 'center' : 'stretch',
-                            gap: isHorizontal ? '8px' : `${settings.message_spacing}px`,
-                            paddingRight: isHorizontal ? '8px' : '0',
                             paddingBottom: isHorizontal ? '8px' : '0'
                         }}
                     >
-                        {!isHorizontal && <div style={{ flexGrow: 1 }} />}
-                        {previewMessages.slice(-Math.max(1, settings.max_messages)).map((msg) => {
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: isHorizontal ? 'row' : 'column',
+                                alignItems: isHorizontal ? 'center' : 'stretch',
+                                gap: isHorizontal ? '8px' : `${settings.message_spacing}px`,
+                                paddingRight: isHorizontal ? '40%' : '0',
+                                width: isHorizontal ? 'max-content' : '100%',
+                                animation: isHorizontal ? 'previewMarquee 18s linear infinite' : undefined
+                            }}
+                        >
+                            {!isHorizontal && <div style={{ flexGrow: 1 }} />}
+                            {previewMessages.slice(-Math.max(1, settings.max_messages)).map((msg) => {
                             const animationName = getAnimationName(settings.animation_type);
                             const shouldAnimate = settings.animation_type !== 'none' && settings.animation_duration > 0 && animationName;
                             const platformIconSize = Math.max(12, Math.min(24, settings.font_size));
@@ -263,7 +304,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
 
                             return (
                                 <div
-                                    key={`${msg.id}-${settings.animation_type}-${settings.animation_duration}`}
+                                    key={`${msg.id}-${settings.animation_type}-${settings.animation_duration}-${animationTick}`}
                                     className="text-white"
                                     style={{
                                         ...baseMessageStyle,
@@ -276,16 +317,21 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
                                         <span style={metaGroupStyle}>
                                             {settings.show_platform_icons && (
                                                 msg.platform === 'twitch' ? (
-                                                    <TwitchIcon className="inline-block" style={{ width: `${platformIconSize}px`, height: `${platformIconSize}px`, verticalAlign: 'text-bottom' }} />
+                                                    <TwitchIcon className="inline-block" style={{ width: `${platformIconSize}px`, height: `${platformIconSize}px`, verticalAlign: 'text-bottom', color: '#9146FF' }} />
                                                 ) : (
-                                                    <VKIcon className="inline-block" style={{ width: `${platformIconSize}px`, height: `${platformIconSize}px`, verticalAlign: 'text-bottom' }} />
+                                                    <VKIcon className="inline-block" style={{ width: `${platformIconSize}px`, height: `${platformIconSize}px`, verticalAlign: 'text-bottom', color: '#FF4444' }} />
                                                 )
                                             )}
                                             {settings.show_badges && badgesReady && msg.badges.length > 0 && msg.platform === 'twitch' && (
                                                 <>
                                                     {msg.badges.map((badge) => {
                                                         const [badgeId, version] = badge.split('/');
-                                                        const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
+                                                        const badgeUrl = twitchBadgesService.getBadgeUrl(
+                                                            badgeId,
+                                                            version,
+                                                            '1x',
+                                                            twitchChannelName || null
+                                                        );
                                                         if (!badgeUrl) return null;
 
                                                         const badgeSize = Math.max(14, Math.min(24, settings.font_size * 1.1));
@@ -337,7 +383,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages }
                                     <span>{displayMessage}</span>
                                 </div>
                             );
-                        })}
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>
