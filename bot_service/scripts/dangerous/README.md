@@ -19,3 +19,6 @@ Before running any of them:
 2. Ensure recent DB backup exists.
 3. Prefer dry-run/read-only alternatives when available.
 
+Current safety options:
+- `clear_database.py` supports `--dry-run` and `--yes`.
+- `reset_db.py` supports `--dry-run` and `--yes`.

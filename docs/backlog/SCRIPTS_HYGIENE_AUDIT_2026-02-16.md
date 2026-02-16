@@ -10,6 +10,9 @@ Audit of `bot_service/scripts` with focus on:
 1. Moved one-off helpers to `bot_service/scripts/archive/legacy/`.
 2. Kept operational scripts in `bot_service/scripts/`.
 3. Updated script docs (`README_MAINTENANCE.md`, `archive/README.md`).
+4. Added safety CLI flags to destructive DB scripts:
+   - `clear_database.py`: `--dry-run`, `--yes`
+   - `reset_db.py`: `--dry-run`, `--yes`
 
 ## Archived in This Pass
 
@@ -43,4 +46,3 @@ Audit of `bot_service/scripts` with focus on:
 |---|---:|---|
 | Consolidate `check_*` scripts into a single CLI | Medium | Requires interface design and docs migration |
 | Move dangerous scripts into dedicated `scripts/dangerous/` | Medium | Needs team agreement and runbook updates |
-| Add argparse + `--dry-run` to destructive scripts | Medium/High | Behavioral change, requires testing |

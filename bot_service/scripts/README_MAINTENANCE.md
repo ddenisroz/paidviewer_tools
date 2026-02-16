@@ -41,6 +41,13 @@ admin/bootstrap tasks, and DB maintenance.
 - `check_postgres_connection.ps1`
 - `fix_postgres_setup.ps1`
 
+Safe CLI options for destructive DB scripts:
+- `python scripts/clear_database.py clear --dry-run`
+- `python scripts/clear_database.py clear --yes`
+- `python scripts/clear_database.py restore --dry-run`
+- `python scripts/reset_db.py --dry-run`
+- `python scripts/reset_db.py --yes`
+
 ## Unified Checks Launcher
 
 Use `run_check.py` to avoid memorizing exact script names:

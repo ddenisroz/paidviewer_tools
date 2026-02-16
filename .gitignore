@@ -396,6 +396,7 @@ cache/
 output/
 .playwright/
 .playwright-cli/
+.playwrite/
 playwright-report/
 bot_service/temp/
 bot_service/cache/

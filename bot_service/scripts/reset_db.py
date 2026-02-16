@@ -1,45 +1,62 @@
 #!/usr/bin/env python3
 """
-РЎРєСЂРёРїС‚ РґР»СЏ СЃР±СЂРѕСЃР° Р±Р°Р·С‹ РґР°РЅРЅС‹С….
-РЈРґР°Р»СЏРµС‚ РІСЃРµ С‚Р°Р±Р»РёС†С‹ Рё РїРµСЂРµСЃРѕР·РґР°РµС‚ РёС… СЃ РЅР°С‡Р°Р»СЊРЅС‹РјРё РґР°РЅРЅС‹РјРё.
+Reset database by dropping all tables and recreating schema/seed data.
 """
-import sys
-import os
 
-# Р”РѕР±Р°РІР»СЏРµРј РєРѕСЂРЅРµРІСѓСЋ РґРёСЂРµРєС‚РѕСЂРёСЋ РІ РїСѓС‚СЊ
+import argparse
+import logging
+import os
+import sys
+
+from dotenv import load_dotenv
+
+# Add bot_service root for local imports.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Р—Р°РіСЂСѓР¶Р°РµРј РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ
-from dotenv import load_dotenv
 load_dotenv()
 
 from models.base import Base, engine, init_db  # noqa: E402
-import logging  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def reset_database():
-    """РЎР±СЂР°СЃС‹РІР°РµС‚ Р±Р°Р·Сѓ РґР°РЅРЅС‹С…: СѓРґР°Р»СЏРµС‚ РІСЃРµ С‚Р°Р±Р»РёС†С‹ Рё РїРµСЂРµСЃРѕР·РґР°РµС‚ РёС…."""
-    logger.info("пёЏ РЈРґР°Р»РµРЅРёРµ РІСЃРµС… С‚Р°Р±Р»РёС†...")
-    
-    # РРјРїРѕСЂС‚РёСЂСѓРµРј РІСЃРµ РјРѕРґРµР»Рё РґР»СЏ СЂРµРіРёСЃС‚СЂР°С†РёРё РІ metadata
-    
-    # РЈРґР°Р»СЏРµРј РІСЃРµ С‚Р°Р±Р»РёС†С‹
+def reset_database(dry_run: bool = False) -> None:
+    """Drop and recreate all tables."""
+    if dry_run:
+        table_names = sorted(Base.metadata.tables.keys())
+        logger.info("[DRY-RUN] Reset database preview mode. No changes will be made.")
+        logger.info(
+            "[DRY-RUN] Tables that would be dropped: %s",
+            ", ".join(table_names) if table_names else "(no mapped tables found)",
+        )
+        logger.info("[DRY-RUN] Would call init_db() to recreate schema and seed data")
+        return
+
+    logger.info("[RESET] Dropping all tables...")
     Base.metadata.drop_all(bind=engine)
-    logger.info(" Р’СЃРµ С‚Р°Р±Р»РёС†С‹ СѓРґР°Р»РµРЅС‹")
-    
-    # РџРµСЂРµСЃРѕР·РґР°РµРј С‚Р°Р±Р»РёС†С‹ Рё РёРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РґР°РЅРЅС‹Рµ
-    logger.info(" РЎРѕР·РґР°РЅРёРµ С‚Р°Р±Р»РёС† Рё РёРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РґР°РЅРЅС‹С…...")
+    logger.info("[OK] All tables dropped")
+
+    logger.info("[RESET] Recreating schema and seed data...")
     init_db()
-    
-    logger.info(" Р‘Р°Р·Р° РґР°РЅРЅС‹С… СѓСЃРїРµС€РЅРѕ СЃР±СЂРѕС€РµРЅР°!")
+    logger.info("[OK] Database reset complete")
 
 
 if __name__ == "__main__":
-    confirm = input("вљ пёЏ Р­С‚Рѕ СѓРґР°Р»РёС‚ Р’РЎР• РґР°РЅРЅС‹Рµ РёР· Р±Р°Р·С‹ РґР°РЅРЅС‹С…. РџСЂРѕРґРѕР»Р¶РёС‚СЊ? (yes/no): ")
-    if confirm.lower() == "yes":
-        reset_database()
-    else:
-        logger.info("[ERROR] РћРїРµСЂР°С†РёСЏ РѕС‚РјРµРЅРµРЅР°")
+    parser = argparse.ArgumentParser(description="Reset app database")
+    parser.add_argument("--dry-run", action="store_true", help="Preview mode without changing the database")
+    parser.add_argument("--yes", action="store_true", help="Skip interactive confirmation")
+    args = parser.parse_args()
+
+    if args.dry_run:
+        reset_database(dry_run=True)
+        sys.exit(0)
+
+    if not args.yes:
+        print("[WARN] This will DELETE ALL DATA from the database and recreate schema.")
+        confirm = input("Continue? (yes/no): ").strip().lower()
+        if confirm not in {"yes", "y", "да", "д"}:
+            logger.info("[INFO] Operation cancelled")
+            sys.exit(0)
+
+    reset_database()
