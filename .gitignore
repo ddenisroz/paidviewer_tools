@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -217,7 +217,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+/public/
 
 # Storybook build outputs
 .out
@@ -308,10 +308,9 @@ monitoring_viewer_enhanced.py
 backup_manager_demo.py
 install_*.py
 
-# Production files
-docker-compose.prod.yml
-env.production.example
-*.prod
+# Production local overrides
+*.prod.local
+env.production.local
 
 # Test output and temporary files (added during cleanup)
 pytest_*.txt
@@ -382,12 +381,15 @@ tts_service/logs/*.log
 bot_service/.env
 bot_service/.env.*
 !bot_service/env.example
+!bot_service/.env.example
 frontend/.env
 frontend/.env.*
 !frontend/env.example
+!frontend/.env.example
 tts_service/.env
 tts_service/.env.*
 !tts_service/env.example
+!tts_service/.env.example
 
 # Temp and cache
 temp/
@@ -472,3 +474,9 @@ certs/
 users_*.md
 collection_errors.txt
 lint_output.txt
+
+# Keep source/assets that were previously shadowed by broad patterns
+!frontend/public/
+!frontend/public/**
+!frontend/src/lib/
+!frontend/src/lib/**

@@ -1,0 +1,308 @@
+version: '3.8'
+
+services:
+  # Postgres Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: tts_postgres_prod
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-app_data}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis для кеширования и rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: tts_redis_prod
+    command: redis-server --requirepass ${REDIS_PASSWORD:-your_redis_password}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # TTS Service - генерация речи
+  tts_service:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_tts_service_prod
+    ports:
+      - "8001:8001"
+    environment:
+      - ENVIRONMENT=production
+      - TTS_DEBUG=false
+      - TTS_LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - HF_HOME=/app/f5_tts_cache
+      - CORS_ORIGINS=${FRONTEND_URL:-https://yourdomain.com}
+      - TTS_WORKERS=4
+      # Redis
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      # Async Architecture
+      - MAX_CONCURRENT_SYNTHESIS=4
+      - MAX_CONCURRENT_CONVERSIONS=8
+    volumes:
+      - ./tts_service/audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - ./tts_service/backups:/app/backups
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # TTS Workers - обработка очередей
+  tts_worker_1:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_worker_1_prod
+    command: python worker.py
+    environment:
+      - ENVIRONMENT=production
+      - TTS_DEBUG=false
+      - TTS_LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - HF_HOME=/app/f5_tts_cache
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - WORKER_ID=worker_1
+    volumes:
+      - ./tts_service/audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tts_worker_2:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_worker_2_prod
+    command: python worker.py
+    environment:
+      - ENVIRONMENT=production
+      - TTS_DEBUG=false
+      - TTS_LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - HF_HOME=/app/f5_tts_cache
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - WORKER_ID=worker_2
+    volumes:
+      - ./tts_service/audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tts_worker_3:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_worker_3_prod
+    command: python worker.py
+    environment:
+      - ENVIRONMENT=production
+      - TTS_DEBUG=false
+      - TTS_LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - HF_HOME=/app/f5_tts_cache
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - WORKER_ID=worker_3
+    volumes:
+      - ./tts_service/audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tts_worker_4:
+    build:
+      context: ./tts_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_worker_4_prod
+    command: python worker.py
+    environment:
+      - ENVIRONMENT=production
+      - TTS_DEBUG=false
+      - TTS_LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - HF_HOME=/app/f5_tts_cache
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - WORKER_ID=worker_4
+    volumes:
+      - ./tts_service/audio:/app/audio
+      - ./tts_service/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Bot Service - основной API
+  bot_service:
+    build:
+      context: ./bot_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_bot_service_prod
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALGORITHM=HS256
+      
+      # URLs
+      - BACKEND_URL=${BACKEND_URL:-https://yourdomain.com}
+      - FRONTEND_URL=${FRONTEND_URL:-https://yourdomain.com}
+      - TTS_SERVICE_URL=http://tts_service:8001
+      
+      # Redis
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - RATE_LIMIT_ENABLED=true
+      - MAX_REQUESTS_PER_MINUTE=60
+      
+      # Twitch
+      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
+      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
+      - TWITCH_BOT_TOKEN=${TWITCH_BOT_TOKEN}
+      - TWITCH_REDIRECT_URI=${BACKEND_URL:-https://yourdomain.com}/auth/twitch/callback
+      
+      # VK
+      - VK_CLIENT_ID=${VK_CLIENT_ID}
+      - VK_CLIENT_SECRET=${VK_CLIENT_SECRET}
+      - VK_REDIRECT_URI=${BACKEND_URL:-https://yourdomain.com}/auth/vk/callback
+      - VK_AUTH_BASE_URL=https://auth.live.vkvideo.ru/app/oauth2/authorize
+      - VK_LIVE_USER_TOKEN=${VK_LIVE_USER_TOKEN}
+      
+      # YouTube
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      
+      # DonationAlerts
+      - DONATIONALERTS_CLIENT_ID=${DONATIONALERTS_CLIENT_ID}
+      - DONATIONALERTS_CLIENT_SECRET=${DONATIONALERTS_CLIENT_SECRET}
+      
+      # Hugging Face
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - HF_HOME=/app/f5_tts_cache
+      
+      # CORS
+      - ALLOWED_ORIGINS=${FRONTEND_URL:-https://yourdomain.com}
+      
+      # Admin
+      - ADMIN_USERS=${ADMIN_USERS}
+      
+      # Security
+      - SESSION_COOKIE_SECURE=true
+      - SESSION_COOKIE_HTTPONLY=true
+      - ENABLE_SECURITY_HEADERS=true
+      
+      # Logging
+      - ENABLE_JSON_LOGS=true
+      - ENABLE_LOG_ROTATION=true
+    volumes:
+      - ./bot_service/core/data:/app/core/data
+      - ./bot_service/logs:/app/logs
+      - ./bot_service/backups:/app/backups
+      - bot_cache:/app/f5_tts_cache
+    depends_on:
+      redis:
+        condition: service_healthy
+      tts_service:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend - React UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_BOT_SERVICE_URL=${BACKEND_URL:-https://yourdomain.com}
+        - VITE_BOT_SERVICE_WS_URL=${BACKEND_WS_URL:-wss://yourdomain.com}
+        - VITE_TTS_SERVICE_URL=http://tts_service:8001
+    container_name: tts_frontend_prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_cache:/var/cache/nginx
+    depends_on:
+      - bot_service
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  tts_cache:
+    driver: local
+  bot_cache:
+    driver: local
+  nginx_cache:
+    driver: local
+
+networks:
+  default:
+    name: tts_network
+    driver: bridge
