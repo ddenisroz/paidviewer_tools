@@ -1,10 +1,11 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { API_BASE_URL } from '@/constants';
 import { logger } from '@/shared/utils/prodLogger';
 
 const SEVENTV_REST_BASE = 'https://7tv.io/v3';
 const SEVENTV_REST_API_BASE = 'https://api.7tv.app/v3';
-const REQUEST_TIMEOUT = 5000;
+const REQUEST_TIMEOUT = 3500;
+const EMOTES_CACHE_TTL_MS = 15 * 60 * 1000;
+const EMPTY_CACHE_TTL_MS = 90 * 1000;
 
 interface EmoteData {
   id: string;
@@ -37,6 +38,8 @@ interface Emote {
 type EmoteMap = Map<string, EmoteData>;
 
 const emotesCache = new Map<string, EmoteMap>();
+const emotesCacheExpiry = new Map<string, number>();
+const emotesInFlight = new Map<string, Promise<EmoteMap>>();
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}, timeout: number = REQUEST_TIMEOUT): Promise<Response> {
   const controller = new AbortController();
@@ -46,6 +49,79 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit = {}
   } finally {
     clearTimeout(id);
   }
+}
+
+function getCachedEmotes(cacheKey: string): EmoteMap | null {
+  const cached = emotesCache.get(cacheKey);
+  if (!cached) return null;
+
+  const expiresAt = emotesCacheExpiry.get(cacheKey) ?? 0;
+  if (expiresAt > Date.now()) {
+    return cached;
+  }
+
+  emotesCache.delete(cacheKey);
+  emotesCacheExpiry.delete(cacheKey);
+  return null;
+}
+
+function setCachedEmotes(cacheKey: string, data: EmoteMap): void {
+  const ttl = data.size > 0 ? EMOTES_CACHE_TTL_MS : EMPTY_CACHE_TTL_MS;
+  emotesCache.set(cacheKey, data);
+  emotesCacheExpiry.set(cacheKey, Date.now() + ttl);
+}
+
+async function runWithInFlightDedup(cacheKey: string, loader: () => Promise<EmoteMap>): Promise<EmoteMap> {
+  const inFlight = emotesInFlight.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const promise = loader().finally(() => {
+    emotesInFlight.delete(cacheKey);
+  });
+  emotesInFlight.set(cacheKey, promise);
+  return promise;
+}
+
+async function fetchEmotesFromSetEndpoint(endpoint: string): Promise<EmoteMap> {
+  const response = await fetchWithTimeout(endpoint);
+  if (!response.ok) {
+    return new Map();
+  }
+  const emoteSet = await response.json() as { emotes?: Emote[] };
+  return buildEmoteMap(emoteSet?.emotes || []);
+}
+
+async function resolveFirstNonEmptyEmotes(fetchers: Array<() => Promise<EmoteMap>>): Promise<EmoteMap> {
+  if (fetchers.length === 0) return new Map();
+
+  return new Promise<EmoteMap>((resolve) => {
+    let pending = fetchers.length;
+    let resolved = false;
+
+    const completeIfDone = () => {
+      pending -= 1;
+      if (!resolved && pending <= 0) {
+        resolve(new Map());
+      }
+    };
+
+    fetchers.forEach((fetcher) => {
+      fetcher()
+        .then((result) => {
+          if (!resolved && result.size > 0) {
+            resolved = true;
+            resolve(result);
+            return;
+          }
+          completeIfDone();
+        })
+        .catch(() => {
+          completeIfDone();
+        });
+    });
+  });
 }
 
 function proxy7tvUrl(url: string | undefined): string | undefined {
@@ -117,15 +193,9 @@ async function fetchEmotesFromUserEndpoint(endpoint: string): Promise<EmoteMap> 
       `${SEVENTV_REST_API_BASE}/emote-sets/${emoteSetId}`,
       `${SEVENTV_REST_BASE}/emote-sets/${emoteSetId}`
     ];
-    for (const emoteSetEndpoint of emoteSetEndpoints) {
-      const emoteSetResponse = await fetchWithTimeout(emoteSetEndpoint);
-      if (!emoteSetResponse.ok) {
-        continue;
-      }
-      const emoteSet = await emoteSetResponse.json() as { emotes?: Emote[] };
-      return buildEmoteMap(emoteSet?.emotes || []);
-    }
-    return new Map();
+    return resolveFirstNonEmptyEmotes(
+      emoteSetEndpoints.map((emoteSetEndpoint) => () => fetchEmotesFromSetEndpoint(emoteSetEndpoint))
+    );
   } catch (error) {
     logger.debug('[WARN] [7TV] Error fetching channel emotes by user id:', error);
     return new Map();
@@ -142,14 +212,9 @@ async function getChannelEmotesByUsername(channelName: string): Promise<EmoteMap
     `${SEVENTV_REST_BASE}/users/twitch/${encoded}`,
     `${SEVENTV_REST_API_BASE}/users/twitch/${encoded}`
   ];
-
-  for (const endpoint of endpoints) {
-    const emotes = await fetchEmotesFromUserEndpoint(endpoint);
-    if (emotes.size > 0) {
-      return emotes;
-    }
-  }
-  return new Map();
+  return resolveFirstNonEmptyEmotes(
+    endpoints.map((endpoint) => () => fetchEmotesFromUserEndpoint(endpoint))
+  );
 }
 
 export async function getChannelEmotes(channelName: string, twitchUserId?: string | null): Promise<EmoteMap> {
@@ -160,38 +225,37 @@ export async function getChannelEmotes(channelName: string, twitchUserId?: strin
       return new Map();
     }
     const cacheKey = twitchUserId ? `twitch:${twitchUserId}` : normalizedChannel;
-    if (emotesCache.has(cacheKey)) {
-      return emotesCache.get(cacheKey)!;
-    }
+    const cached = getCachedEmotes(cacheKey);
+    if (cached) return cached;
 
-    if (twitchUserId) {
-      const emotesById = await getChannelEmotesByUserId(twitchUserId);
-      if (emotesById.size > 0) {
-        emotesCache.set(cacheKey, emotesById);
-        return emotesById;
+    return runWithInFlightDedup(cacheKey, async () => {
+      let emotesMap = new Map<string, EmoteData>();
+
+      if (twitchUserId) {
+        const emotesById = await getChannelEmotesByUserId(twitchUserId);
+        if (emotesById.size > 0) {
+          emotesMap = emotesById;
+        }
       }
-    }
 
-    if (!canUseChannelName) {
-      return new Map();
-    }
-
-    logger.debug(`[DEBUG] [7TV] Fetching emotes for Twitch user: ${normalizedChannel}`);
-    const emotesMap = await getChannelEmotesByUsername(normalizedChannel);
-    emotesMap.forEach((value) => {
-      if (value.url) {
-        value.url = proxy7tvUrl(value.url) ?? value.url;
+      if (emotesMap.size === 0 && canUseChannelName) {
+        logger.debug(`[DEBUG] [7TV] Fetching emotes for Twitch user: ${normalizedChannel}`);
+        emotesMap = await getChannelEmotesByUsername(normalizedChannel);
       }
+
+      emotesMap.forEach((value) => {
+        if (value.url) {
+          value.url = proxy7tvUrl(value.url) ?? value.url;
+        }
+      });
+
+      setCachedEmotes(cacheKey, emotesMap);
+      return emotesMap;
     });
-
-    if (emotesMap.size > 0) {
-      emotesCache.set(cacheKey, emotesMap);
-    }
-    return emotesMap;
   } catch (error: unknown) {
     const err = error as Error;
     if (err?.name === 'AbortError') {
-      logger.debug('[WARN] [7TV] Request timeout (5s exceeded)');
+      logger.debug('[WARN] [7TV] Request timeout (3.5s exceeded)');
     } else {
       logger.debug('[WARN] [7TV] Error fetching channel emotes:', err?.message || error);
     }
@@ -201,35 +265,29 @@ export async function getChannelEmotes(channelName: string, twitchUserId?: strin
 
 export async function getGlobalEmotes(): Promise<EmoteMap> {
   try {
-    if (emotesCache.has('global')) {
-      return emotesCache.get('global')!;
-    }
+    const cached = getCachedEmotes('global');
+    if (cached) return cached;
 
-    logger.debug('[DEBUG] [7TV] Fetching global emotes');
+    return runWithInFlightDedup('global', async () => {
+      logger.debug('[DEBUG] [7TV] Fetching global emotes');
 
-    const globalEndpoints = [
-      `${SEVENTV_REST_API_BASE}/emote-sets/global`,
-      `${SEVENTV_REST_BASE}/emote-sets/global`
-    ];
+      const globalEndpoints = [
+        `${SEVENTV_REST_API_BASE}/emote-sets/global`,
+        `${SEVENTV_REST_BASE}/emote-sets/global`
+      ];
+      const emotesMap = await resolveFirstNonEmptyEmotes(
+        globalEndpoints.map((endpoint) => () => fetchEmotesFromSetEndpoint(endpoint))
+      );
 
-    for (const endpoint of globalEndpoints) {
-      const response = await fetchWithTimeout(endpoint);
-      if (!response.ok) {
-        continue;
-      }
-      const result = await response.json() as { emotes?: Emote[] };
-      const emotes = result?.emotes ?? [];
-      const emotesMap = buildEmoteMap(emotes);
       emotesMap.forEach((value) => {
         if (value.url) {
           value.url = proxy7tvUrl(value.url) ?? value.url;
         }
       });
-      emotesCache.set('global', emotesMap);
-      return emotesMap;
-    }
 
-    return new Map();
+      setCachedEmotes('global', emotesMap);
+      return emotesMap;
+    });
   } catch (error: unknown) {
     const err = error as Error;
     if (err?.name === 'AbortError') {
@@ -278,6 +336,8 @@ export function processEmotes(message: string, channelEmotes: EmoteMap = new Map
 
 export function clearEmotesCache(): void {
   emotesCache.clear();
+  emotesCacheExpiry.clear();
+  emotesInFlight.clear();
 }
 
 export async function getAllEmotesForChannel(channelName: string, twitchUserId?: string | null): Promise<{ channelEmotes: EmoteMap; globalEmotes: EmoteMap }> {

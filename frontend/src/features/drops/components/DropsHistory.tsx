@@ -32,7 +32,7 @@ interface HistoryEntry {
     created_at?: string;
 }
 
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 
 const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelName }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,7 +41,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
   const limit = 50;
   const queryClient = useQueryClient();
 
-  // [OK] НОВЫЙ КОД: Используем централизованный hook для загрузки истории
+  // [OK] НОВЫЙ КОД: �?спользуем централизованный hook для загрузки истории
   const { data: historyData, isLoading: loading, refetch } = useDropsHistory(
     channelName,
     { limit, offset },
@@ -138,7 +138,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
           <div>
             <CardTitle className="flex items-center gap-2">
               <History className="w-5 h-5" />
-              История наград
+              �?стория наград
             </CardTitle>
             <CardDescription className="mt-1">
               Последние выдачи ({history.length})
@@ -168,12 +168,12 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
           />
         </div>
 
-        {/* История */}
+        {/* �?стория */}
         <div className="space-y-2 max-h-[min(600px,70vh)] overflow-y-auto">
           {filteredHistory.length === 0 && !loading ? (
             <div className="text-center py-12 text-muted-foreground">
               <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>История пуста</p>
+              <p>�?стория пуста</p>
               <p className="text-xs mt-1">Награды появятся здесь после первых выдач</p>
             </div>
           ) : (
@@ -181,7 +181,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
               {filteredHistory.map((entry) => (
                 <div 
                   key={entry.id}
-                  className="flex items-center gap-4 p-4 border border-slate-800 rounded-lg bg-slate-950/60 hover:bg-slate-900/80 transition-colors"
+                  className="flex items-center gap-4 p-4 border border-border/70 rounded-lg bg-card/60 hover:bg-card/70 transition-colors"
                 >
                   {/* Качество */}
                   <div className="flex-shrink-0">
@@ -196,7 +196,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                     </div>
                   </div>
 
-                  {/* Информация */}
+                  {/* �?нформация */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h4 className="font-semibold truncate">{entry.viewer_name}</h4>
@@ -215,7 +215,7 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                       )}
                       {entry.donation_amount && (
                         <span className="text-xs text-muted-foreground">
-                          {entry.donation_amount}₽
+                          {entry.donation_amount}в‚Ѕ
                         </span>
                       )}
                       {entry.messages_count && (
@@ -261,5 +261,6 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
 });
 
 export default DropsHistory;
+
 
 

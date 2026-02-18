@@ -29,8 +29,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 
 type TabType = 'streak' | 'donation' | 'points' | 'rewards' | 'history' | 'widget';
 const TAB_TRIGGER_CLASS =
-  'rounded-none -mb-px whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-300 data-[state=active]:shadow-none gap-2';
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+  'rounded-none -mb-px whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-400 data-[state=active]:shadow-none gap-2';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
+const TAB_LIST_CONTAINER_CLASS = 'mb-4 border-b border-border';
 
 const DropsMainPage: React.FC = () => {
   const navigate = useNavigate();
@@ -160,73 +161,75 @@ const DropsMainPage: React.FC = () => {
   return (
     <PageWrapper title="Drops система">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)} className="w-full">
-        <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none bg-transparent p-0 border-b border-border">
-          <TabsTrigger
-            value="streak"
-            className={TAB_TRIGGER_CLASS}
-          >
-            <Users className="w-4 h-4" />
-            Стрик
-          </TabsTrigger>
-          <TabsTrigger
-            value="donation"
-            className={TAB_TRIGGER_CLASS}
-          >
-            <DollarSign className="w-4 h-4" />
-            Донаты
-          </TabsTrigger>
-          <TabsTrigger
-            value="points"
-            className={TAB_TRIGGER_CLASS}
-          >
-            <Coins className="w-4 h-4" />
-            Баллы
-          </TabsTrigger>
-          <TabsTrigger
-            value="rewards"
-            className={TAB_TRIGGER_CLASS}
-          >
-            <Package className="w-4 h-4" />
-            Награды
-          </TabsTrigger>
-          <TabsTrigger
-            value="history"
-            className={TAB_TRIGGER_CLASS}
-          >
-            <History className="w-4 h-4" />
-            История
-          </TabsTrigger>
-          <TabsTrigger
-            value="widget"
-            className={TAB_TRIGGER_CLASS}
-          >
-            <Monitor className="w-4 h-4" />
-            Виджет
-          </TabsTrigger>
-        </TabsList>
+        <div className={TAB_LIST_CONTAINER_CLASS}>
+          <TabsList className="h-auto w-full justify-start overflow-x-auto overflow-y-hidden hide-scrollbar rounded-none bg-transparent p-0">
+            <TabsTrigger
+              value="streak"
+              className={TAB_TRIGGER_CLASS}
+            >
+              <Users className="w-4 h-4" />
+              Стрик
+            </TabsTrigger>
+            <TabsTrigger
+              value="donation"
+              className={TAB_TRIGGER_CLASS}
+            >
+              <DollarSign className="w-4 h-4" />
+              Донаты
+            </TabsTrigger>
+            <TabsTrigger
+              value="points"
+              className={TAB_TRIGGER_CLASS}
+            >
+              <Coins className="w-4 h-4" />
+              Баллы
+            </TabsTrigger>
+            <TabsTrigger
+              value="rewards"
+              className={TAB_TRIGGER_CLASS}
+            >
+              <Package className="w-4 h-4" />
+              Награды
+            </TabsTrigger>
+            <TabsTrigger
+              value="history"
+              className={TAB_TRIGGER_CLASS}
+            >
+              <History className="w-4 h-4" />
+              История
+            </TabsTrigger>
+            <TabsTrigger
+              value="widget"
+              className={TAB_TRIGGER_CLASS}
+            >
+              <Monitor className="w-4 h-4" />
+              Виджет
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="streak" className="space-y-4">
+        <TabsContent value="streak" className="mt-4 w-full min-h-[420px] space-y-4">
           <StreakSettings channelName={channelName} user={user} />
           <StreakTracker channelName={channelName} user={user} />
         </TabsContent>
 
-        <TabsContent value="donation" className="space-y-4">
+        <TabsContent value="donation" className="mt-4 w-full min-h-[420px] space-y-4">
           <DonationSettings channelName={channelName} user={user} />
         </TabsContent>
 
-        <TabsContent value="points" className="space-y-4">
+        <TabsContent value="points" className="mt-4 w-full min-h-[420px] space-y-4">
           <PointsRewards channelName={channelName} user={user} />
         </TabsContent>
 
-        <TabsContent value="rewards" className="space-y-4">
+        <TabsContent value="rewards" className="mt-4 w-full min-h-[420px] space-y-4">
           <RewardsManager channelName={channelName} user={user} onRewardsCountChange={setRewardsCount} />
         </TabsContent>
 
-        <TabsContent value="history" className="space-y-4">
+        <TabsContent value="history" className="mt-4 w-full min-h-[420px] space-y-4">
           <DropsHistory channelName={channelName} user={user} />
         </TabsContent>
 
-        <TabsContent value="widget" className="space-y-4">
+        <TabsContent value="widget" className="mt-4 w-full min-h-[420px] space-y-4">
           <WidgetSettings channelName={channelName} user={user} />
         </TabsContent>
       </Tabs>
@@ -235,5 +238,6 @@ const DropsMainPage: React.FC = () => {
 };
 
 export default DropsMainPage;
+
 
 

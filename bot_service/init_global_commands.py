@@ -255,6 +255,13 @@ def init_global_commands():
                 "tags": "Memealerts",
                 "allowed_roles": "broadcaster,moderator",
                 "cooldown_seconds": 5
+            },
+            {
+                "command_name": "givema",
+                "description": "Alias для memegrant: !givema <nick> <amount>",
+                "tags": "Memealerts",
+                "allowed_roles": "broadcaster,moderator",
+                "cooldown_seconds": 5
             }
 
         ]

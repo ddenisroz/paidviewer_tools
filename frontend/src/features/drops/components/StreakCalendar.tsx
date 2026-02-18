@@ -27,8 +27,6 @@ const QUALITY_CONFIGS: QualityConfig[] = [
     { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed }
 ];
 
-const STREAK_DAY_PRESETS = [1, 3, 7, 14, 30, 60];
-
 interface StreakCalendarFormData {
     streak_days_common: number[];
     streak_days_rare: number[];
@@ -65,10 +63,9 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                 {QUALITY_CONFIGS.map((quality) => {
                     const fieldName = `streak_days_${quality.id}`;
                     const value = formData[fieldName][0];
-                    const availablePresets = STREAK_DAY_PRESETS.filter((preset) => preset <= maxStreakDays);
 
                     return (
-                        <div key={quality.id} className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+                        <div key={quality.id} className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <img
@@ -82,12 +79,12 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-1 border border-slate-700 bg-slate-900/80 rounded-lg">
+                                <div className="flex items-center gap-1 border border-border/70 bg-card/70 rounded-lg">
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className="h-7 w-7 p-0 hover:bg-slate-800"
+                                        className="h-8 w-8 p-0 hover:bg-accent"
                                         onClick={() => handleDayChange(quality.id, -1)}
                                     >
                                         <Minus className="w-3 h-3" />
@@ -96,7 +93,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                         type="number"
                                         value={value}
                                         onChange={(e) => handleInputChange(quality.id, e.target.value)}
-                                        className="w-16 h-7 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        className="w-16 h-8 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         min="1"
                                         max={maxStreakDays}
                                     />
@@ -104,31 +101,12 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        className="h-7 w-7 p-0 hover:bg-slate-800"
+                                        className="h-8 w-8 p-0 hover:bg-accent"
                                         onClick={() => handleDayChange(quality.id, 1)}
                                     >
                                         <Plus className="w-3 h-3" />
                                     </Button>
                                 </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-1.5">
-                                {availablePresets.map((preset) => (
-                                    <Button
-                                        key={`${quality.id}-${preset}`}
-                                        type="button"
-                                        variant={value === preset ? 'secondary' : 'outline'}
-                                        size="sm"
-                                        className={`h-7 px-2 text-xs ${
-                                            value === preset
-                                                ? 'bg-slate-700 text-slate-100 border-slate-600'
-                                                : 'border-slate-700 text-slate-300 hover:bg-slate-800/80'
-                                        }`}
-                                        onClick={() => setFormData({ ...formData, [fieldName]: [preset] })}
-                                    >
-                                        {preset}
-                                    </Button>
-                                ))}
                             </div>
 
                             <Slider
@@ -139,6 +117,10 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                 step={1}
                                 className="w-full"
                             />
+                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                                <span>1</span>
+                                <span>{maxStreakDays}</span>
+                            </div>
                         </div>
                     );
                 })}
@@ -148,4 +130,3 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
 };
 
 export default StreakCalendar;
-

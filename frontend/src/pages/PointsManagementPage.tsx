@@ -1098,7 +1098,7 @@ const PointsManagementPage: React.FC = () => {
             <div className="min-h-[400px]">
                 <div className="mb-6 h-10">
                     {activeTab === 'rewards' && (
-                        <Button onClick={() => setShowCreateDialog(true)} className="w-full h-10" variant="outline">
+                        <Button onClick={() => setShowCreateDialog(true)} className="w-full h-10">
                             <Plus className="w-4 h-4 mr-2" />
                             Создать награду
                         </Button>

@@ -18,6 +18,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Skip rate limiting for static files and specific paths if needed.
         path = request.url.path
+        if request.method.upper() == "OPTIONS":
+            return await call_next(request)
+
         if path.startswith("/static") or path.startswith("/docs") or path.startswith("/openapi.json"):
             return await call_next(request)
 
@@ -31,7 +34,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         elif path.startswith("/api/tts/status"):
             action = "default"  # Higher limit for passive status checks.
         elif path.startswith("/api/tts"):
-            action = "tts"
+            # Read endpoints are polled heavily by dashboard UI; keep strict limits
+            # only for mutating/expensive TTS actions (POST/PUT/PATCH/DELETE).
+            action = "api" if request.method.upper() == "GET" else "tts"
         elif path.startswith("/api/upload") or path.startswith("/upload"):
             action = "upload"
         elif path.startswith("/api"):

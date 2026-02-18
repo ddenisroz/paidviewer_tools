@@ -118,7 +118,7 @@
   --z-modal: 50;
   --z-popover: 60;
   --z-tooltip: 70;
-  --z-toast: 80;
+  --z-toast: 13000;
   --z-max: 9999;
 }
 

@@ -12,7 +12,7 @@ import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DonationAlertsCallback from './pages/DonationAlertsCallback';
 import LoginPage from './pages/LoginPage';
-
+import MemeAlertsCallback from './pages/MemeAlertsCallback';
 import AuthGuard from './shared/components/AuthGuard';
 
 // Minimal loading - no skeletons, pages appear instantly
@@ -20,7 +20,7 @@ const MinimalFallback = () => <div className="min-h-screen" />;
 
 // All other pages - lazy loading for better initial load performance
 const HomePage = lazy(() => import('./pages/HomePage'));
-const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsMainPage'));
 const TtsMainPage = lazy(() => import('./features/tts/pages/TtsMainPage'));
 const VoiceManagementPage = lazy(() => import('./features/tts/pages/VoiceManagementPage'));
 const LocalTTSSettingsPage = lazy(() => import('./features/tts/pages/LocalTTSSettingsPage'));
@@ -66,6 +66,11 @@ const App: React.FC = () => {
                     <Route path="/donationalerts/callback" element={
                         <RouteErrorBoundary routeName="DonationAlerts Callback">
                             <DonationAlertsCallback />
+                        </RouteErrorBoundary>
+                    } />
+                    <Route path="/memealerts/callback" element={
+                        <RouteErrorBoundary routeName="MemeAlerts Callback">
+                            <MemeAlertsCallback />
                         </RouteErrorBoundary>
                     } />
 

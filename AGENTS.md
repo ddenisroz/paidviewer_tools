@@ -124,4 +124,9 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - Admin provisioning is role-based (`users.role='admin'`); bootstrap admin endpoint is removed.
 - Admin authority is sourced from `users.role`; `users.is_admin` is kept only for legacy compatibility.
 - MemeAlerts: `!memegrant <nickname> <amount>` uses MemeAlerts API lookup and grant endpoints; dashboard can show grant/purchase history when connected.
+- MemeAlerts: `!givema <nickname> <amount>` is an alias of `!memegrant` on Twitch and VK.
+- MemeAlerts grant nickname resolution uses `user/find` with fallback to `user/find/streamer`; when upstream rejects with `401/403`, backend returns explicit hint that the user may not yet be present in channel supporters.
+- MemeAlerts history source: `Выдачи` come from local DB table `memealerts_grant_history`, and `Покупки` come from MemeAlerts `POST /supporters` with `streamerId`.
+- MemeAlerts points-reward auto grants use `tts_user_settings.youtube_settings.memealerts_settings.points_reward`; Twitch match is by `reward_id`, VK match is by reward title from ChatBot message.
+- MemeAlerts donation auto-conversion uses `tts_user_settings.youtube_settings.memealerts_settings.donation_auto` and requires connected DonationAlerts token before enabling.
 - Admin UI consistency: prefer semantic tokens (`text-foreground`, `text-muted-foreground`, `bg-card`, `border-border`) over hardcoded gray/white classes; keep heading hierarchy, spacing, and button heights (`h-8`/`h-9`) consistent between admin pages.

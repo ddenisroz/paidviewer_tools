@@ -12,7 +12,6 @@ export { chatService } from './chatService';
 export { integrationsService } from './integrationsService';
 export { chatboxService } from './chatboxService';
 export { lootboxService } from './lootboxService';
-export { supportService } from './supportService';
 export { adminService } from './adminService';
 export { userSettingsService } from './userSettingsService';
 

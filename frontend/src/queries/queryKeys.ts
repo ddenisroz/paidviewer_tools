@@ -128,14 +128,5 @@ export const queryKeys = {
     sessions: () => ['admin', 'sessions'] as const,
     ttsStatus: () => ['admin', 'tts-status'] as const,
   },
-
-  // Support
-  support: {
-    all: ['support'] as const,
-    myTickets: () => ['support', 'my-tickets'] as const,
-    ticket: (ticketId?: number) => ['support', 'ticket', ticketId] as const,
-    ticketResponses: (ticketId?: number) => ['support', 'ticket', ticketId, 'responses'] as const,
-    adminTickets: (params?: Record<string, unknown>) => ['support', 'admin-tickets', params] as const,
-  },
 };
 

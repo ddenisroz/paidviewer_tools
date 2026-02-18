@@ -63,8 +63,9 @@ const LayoutContent: React.FC = () => {
       <div className="flex flex-col h-full overflow-hidden">
         <Header />
         <main
-          className={`flex flex-1 flex-col gap-2 sm:gap-4 p-2 sm:p-4 lg:gap-6 lg:p-6 bg-muted/40 relative transition-all duration-300 overflow-y-auto ${showPlayerPadding ? 'pb-24' : ''
+          className={`flex flex-1 flex-col gap-2 sm:gap-4 p-2 sm:p-4 lg:gap-6 lg:p-6 bg-background/95 relative transition-all duration-300 overflow-y-auto ${showPlayerPadding ? 'pb-24' : ''
             }`}
+          style={{ scrollbarGutter: 'stable both-edges' }}
         >
           <div className="max-w-7xl w-full mx-auto flex-1">
             <Outlet />

@@ -102,6 +102,20 @@ const initialState: PlayerState = {
     error: null
 };
 
+const MINI_PLAYER_MINIMIZED_STORAGE_KEY = 'yt_player_minimized';
+
+const initializePlayerState = (baseState: PlayerState): PlayerState => {
+    if (typeof window === 'undefined') {
+        return baseState;
+    }
+
+    const isMinimized = window.localStorage.getItem(MINI_PLAYER_MINIMIZED_STORAGE_KEY) === '1';
+    return {
+        ...baseState,
+        isMinimized
+    };
+};
+
  
 const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState => {
     switch (action.type) {
@@ -230,7 +244,7 @@ interface PlayerProviderProps {
 
  
 export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
-    const [state, dispatch] = useReducer(playerReducer, initialState);
+    const [state, dispatch] = useReducer(playerReducer, initialState, initializePlayerState);
     const lastUpdateTimeRef = useRef<number>(0);
     const volumeSaveTimeoutRef = useRef<number | null>(null);
     const lastSavedVolumeRef = useRef<number | null>(null);
@@ -266,6 +280,21 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         const clamped = Math.max(0, Math.min(100, Math.round(parsedVolume)));
         dispatch({ type: 'SET_VOLUME', payload: clamped });
     }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        try {
+            window.localStorage.setItem(
+                MINI_PLAYER_MINIMIZED_STORAGE_KEY,
+                state.isMinimized ? '1' : '0'
+            );
+        } catch (error) {
+            logger.debug('[YouTube] Failed to persist mini-player minimized state', error);
+        }
+    }, [state.isMinimized]);
 
     useEffect(() => {
         if (!state.playerRef) {

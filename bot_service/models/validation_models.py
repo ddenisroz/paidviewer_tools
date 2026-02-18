@@ -457,44 +457,6 @@ class RewardCreateRequest(BaseValidationModel):
 
 
 # ============================================================================
-# SUPPORT MODELS
-# ============================================================================
-
-class SupportTicketRequest(BaseValidationModel):
-    """Request to create support ticket"""
-    subject: str = Field(
-        ...,
-        min_length=1,
-        max_length=100,
-        description="Ticket subject (1-100 characters)"
-    )
-    message: str = Field(
-        ...,
-        min_length=10,
-        max_length=2000,
-        description="Ticket message (10-2000 characters)"
-    )
-    priority: Optional[str] = Field(
-        'medium',
-        regex=r'^(low|medium|high)$',
-        description="Ticket priority"
-    )
-
-    @validator('subject', 'message')
-    def sanitize_text_fields(cls, v, field):
-        """Sanitize text fields"""
-        max_len = field.field_info.max_length
-        sanitized = sanitize_input(v, max_length=max_len)
-        if not sanitized:
-            raise ValueError(f'{field.name} cannot be empty')
-        if len(sanitized) < field.field_info.min_length:
-            raise ValueError(
-                f'{field.name} must be at least {field.field_info.min_length} characters'
-            )
-        return sanitized
-
-
-# ============================================================================
 # USER SETTINGS MODELS
 # ============================================================================
 

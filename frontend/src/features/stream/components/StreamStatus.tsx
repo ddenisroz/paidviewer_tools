@@ -36,6 +36,7 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     // Получаем данные о стримах
     const twitchStream = streamData?.twitch;
     const vkStream = streamData?.vk;
+    const STATUS_BADGE_BASE = 'inline-flex h-8 min-w-[132px] justify-center';
 
 
 
@@ -108,7 +109,7 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                             {twitchEnabled ? (
                                 twitchStream?.isLive ? (
                                     <div className="flex flex-col items-end gap-1">
-                                        <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
+                                        <Badge variant="secondary" className={`${STATUS_BADGE_BASE} bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1`}>
                                             <Wifi className="h-3 w-3" />
                                             <span>Live</span>
                                         </Badge>
@@ -119,14 +120,14 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-end gap-1">
-                                        <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
+                                        <Badge variant="outline" className={`${STATUS_BADGE_BASE} text-gray-400 border-white/10 flex items-center gap-1`}>
                                             <WifiOff className="h-3 w-3" />
                                             <span>Offline</span>
                                         </Badge>
                                     </div>
                                 )
                             ) : (
-                                <Badge variant="outline" className="text-gray-500 border-white/10">
+                                <Badge variant="outline" className={`${STATUS_BADGE_BASE} text-gray-500 border-white/10`}>
                                     Не подключено
                                 </Badge>
                             )}
@@ -155,7 +156,7 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                             {vkEnabled ? (
                                 vkStream?.isLive ? (
                                     <div className="flex flex-col items-end gap-1">
-                                        <Badge variant="secondary" className="bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1">
+                                        <Badge variant="secondary" className={`${STATUS_BADGE_BASE} bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1`}>
                                             <Wifi className="h-3 w-3" />
                                             <span>Live</span>
                                         </Badge>
@@ -166,14 +167,14 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-end gap-1">
-                                        <Badge variant="outline" className="text-gray-400 border-white/10 flex items-center gap-1">
+                                        <Badge variant="outline" className={`${STATUS_BADGE_BASE} text-gray-400 border-white/10 flex items-center gap-1`}>
                                             <WifiOff className="h-3 w-3" />
                                             <span>Offline</span>
                                         </Badge>
                                     </div>
                                 )
                             ) : (
-                                <Badge variant="outline" className="text-gray-500 border-white/10 self-center">
+                                <Badge variant="outline" className={`${STATUS_BADGE_BASE} text-gray-500 border-white/10 self-center`}>
                                     Не подключено
                                 </Badge>
                             )}

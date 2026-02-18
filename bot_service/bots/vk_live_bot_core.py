@@ -353,6 +353,7 @@ class VKLiveBotCore:
                     from core.database import SessionLocal
                     from repositories.user_repository import UserRepository
                     from repositories.tts_settings_repository import TTSSettingsRepository
+                    from services.memealerts_service import MemeAlertsService
                     
                     db = SessionLocal()
                     try:
@@ -362,7 +363,33 @@ class VKLiveBotCore:
                         channel_owner = user_repo.get_by_vk_channel_name(channel_id)
 
                         if channel_owner:
-                            tts_settings = tts_settings_repo.get_settings(channel_owner.id)
+                            tts_settings = tts_settings_repo.get_or_create(user_id=channel_owner.id)
+                            viewer_name = text.split('получает награду')[0].strip() if 'получает награду' in text else user
+                            reward_line_pattern = r'^.*?получает награду:\s*[^\n]+?\s*за\s*\d+\s*\n*'
+                            cleaned_text = re.sub(reward_line_pattern, '', text, flags=re.MULTILINE).strip()
+
+                            memealerts_service = MemeAlertsService(db)
+                            meme_reward_result = await memealerts_service.process_points_reward_redemption(
+                                user_id=channel_owner.id,
+                                platform='vk',
+                                channel_name=channel_id,
+                                redeemer_name=viewer_name,
+                                reward_input=cleaned_text,
+                                reward_title=reward_title,
+                            )
+                            if meme_reward_result.get('handled'):
+                                if meme_reward_result.get('success'):
+                                    await self.send_message(
+                                        channel_id,
+                                        f"@{viewer_name} выдано {meme_reward_result.get('amount')} мемкоинов "
+                                        f"пользователю {meme_reward_result.get('nickname')}"
+                                    )
+                                else:
+                                    await self.send_message(
+                                        channel_id,
+                                        f"@{viewer_name} {meme_reward_result.get('error', 'не удалось выдать мемкоины')}"
+                                    )
+                                return
 
                             # Если название награды содержит "TTS" - считаем что это TTS награда
                             if tts_settings and tts_settings.tts_reward_ids and 'tts' in reward_title.lower():
@@ -387,12 +414,7 @@ class VKLiveBotCore:
 
                             if vk_reward_enabled:
                                 if configured_reward and configured_reward.lower() == reward_title.lower():
-                                    import re
                                     from services.youtube.queue_service import QueueService
-
-                                    reward_pattern = r'^.*?получает награду:\s*[^\n]+?\s*за\s*\d+\s*\n*'
-                                    cleaned_text = re.sub(reward_pattern, '', text, flags=re.MULTILINE).strip()
-                                    viewer_name = text.split('получает награду')[0].strip() if 'получает награду' in text else 'viewer'
 
                                     if cleaned_text:
                                         queue_service = QueueService()

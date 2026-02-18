@@ -39,7 +39,7 @@ const routePreloaders: Record<string, () => void> = {
     '/dashboard/drops': createPreloadHandler(() => import('@/features/drops/pages/DropsMainPage'), 'drops'),
     '/dashboard/chat-analysis': createPreloadHandler(() => import('@/pages/AnalyticsPage'), 'analytics'),
     '/dashboard/commands': createPreloadHandler(() => import('@/pages/CommandsPage'), 'commands'),
-    '/dashboard/settings': createPreloadHandler(() => import('@/pages/SettingsPage'), 'settings'),
+    '/dashboard/settings': createPreloadHandler(() => import('@/pages/SettingsMainPage'), 'settings'),
     '/dashboard/dolbaebadmintts': createPreloadHandler(() => import('@/features/admin/pages/AdminPage'), 'admin'),
 };
 
@@ -116,9 +116,9 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 onMouseLeave={() => setOpenSection(null)}
             >
                 <div
-                    className={`w-full px-4 py-2.5 text-lg font-semibold cursor-pointer transition-all relative ${isOpen
-                        ? 'bg-primary/20 text-primary'
-                        : 'text-muted-foreground group-hover:bg-muted/50 group-hover:text-foreground'
+                    className={`relative w-full cursor-pointer px-4 py-2.5 text-lg font-semibold transition-colors ${(isParentActive || isOpen)
+                        ? 'bg-blue-500/20 text-blue-200'
+                        : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
                         }`}
                     onClick={() => setOpenSection(isOpen ? null : item.label)}
                     onKeyDown={handleKeyDown}
@@ -129,7 +129,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 >
                     {/* Индикатор активной подстраницы - показываем только если меню закрыто */}
                     {isParentActive && !isOpen && (
-                        <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-full pointer-events-none" />
+                        <div className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-blue-300/95" />
                     )}
                     <div className="flex items-center justify-between gap-4 pointer-events-none">
                         <div className="flex items-center gap-4">
@@ -172,13 +172,16 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                                             const preloader = routePreloaders[subItem.to.split('?')[0]]; // Preload base route
                                             if (preloader) preloader();
                                         }}
-                                        className={() =>
-                                            `flex items-center gap-3 px-4 py-2.5 text-lg font-semibold whitespace-nowrap transition-colors ${isSubItemActive
-                                                ? 'bg-primary/10 text-primary'
-                                                : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                                    className={() =>
+                                            `group relative flex w-full items-center gap-3 whitespace-nowrap px-4 py-2.5 text-lg font-semibold transition-colors ${isSubItemActive
+                                                ? 'bg-blue-500/20 text-blue-200'
+                                                : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
                                             }`
                                         }
                                     >
+                                        {isSubItemActive && (
+                                            <span className="absolute inset-y-0 left-0 w-0.5 bg-blue-300/95" />
+                                        )}
                                         {subItem.icon && <subItem.icon className="h-4 w-4 flex-shrink-0" />}
                                         {subItem.label}
                                     </NavLink>
@@ -204,12 +207,13 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 }
             }}
             className={({ isActive }) =>
-                `w-full flex items-center gap-4 px-4 py-2.5 text-lg font-semibold transition-colors ${isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                `relative flex w-full items-center gap-4 px-4 py-2.5 text-lg font-semibold transition-colors ${isActive
+                    ? 'bg-blue-500/20 text-blue-200'
+                    : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
                 }`
             }
         >
+            <span className={`absolute inset-y-0 left-0 w-0.5 bg-blue-300/95 transition-opacity ${location.pathname === item.to ? 'opacity-100' : 'opacity-0'}`} />
             <item.icon className="h-5 w-5" />
             {item.label}
         </NavLink>
@@ -260,7 +264,7 @@ const Sidebar: React.FC = () => {
         <>
             {/* Мобильная кнопка меню */}
             <button
-                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-card/90 border border-border/70 hover:bg-accent rounded-lg transition-colors"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 aria-label="Открыть меню"
             >
@@ -281,7 +285,7 @@ const Sidebar: React.FC = () => {
 
             {/* Sidebar */}
             <div className={`
-                fixed md:relative h-full w-64 md:w-auto bg-background z-50 transform transition-transform duration-300 ease-in-out
+                fixed md:relative h-full w-64 md:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                 md:block
             `}>
@@ -294,7 +298,7 @@ const Sidebar: React.FC = () => {
                         </NavLink>
                     </div>
                     <div className="flex-1">
-                        <nav className="grid items-start text-sm font-medium">
+                        <nav className="grid w-full text-sm font-medium">
                             {navItems.map((item) => (
                                 <SidebarNavItem
                                     key={item.to || item.label}

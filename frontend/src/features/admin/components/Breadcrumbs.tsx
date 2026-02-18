@@ -1,5 +1,5 @@
 ﻿/**
- * Breadcrumbs Component - РЅР°РІРёРіР°С†РёРѕРЅРЅС‹Рµ С…Р»РµР±РЅС‹Рµ РєСЂРѕС€РєРё РґР»СЏ Р°РґРјРёРЅ РїР°РЅРµР»Рё
+ * Breadcrumbs Component - навигационные хлебные крошки для админ панели
  */
 
 import React from 'react';
@@ -19,24 +19,23 @@ interface BreadcrumbsProps {
   className?: string;
 }
 
-// Mapping РїСѓС‚РµР№ Рє РЅР°Р·РІР°РЅРёСЏРј
+// Mapping путей к названиям
 const pathToLabel: Record<string, string> = {
-  'dashboard': 'Р“Р»Р°РІРЅР°СЏ',
-  'dolbaebadmintts': 'РђРґРјРёРЅ РїР°РЅРµР»СЊ',
-  'users': 'РЈРїСЂР°РІР»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё',
-  'voices': 'РЈРїСЂР°РІР»РµРЅРёРµ РіРѕР»РѕСЃР°РјРё',
-  'monitoring': 'РњРѕРЅРёС‚РѕСЂРёРЅРі',
-  'support': 'РџРѕРґРґРµСЂР¶РєР°',
-  'bots': 'РЈРїСЂР°РІР»РµРЅРёРµ Р±РѕС‚Р°РјРё',
-  'settings': 'РќР°СЃС‚СЂРѕР№РєРё',
-  'logs': 'Р›РѕРіРё',
-  'analytics': 'РђРЅР°Р»РёС‚РёРєР°',
+  'dashboard': 'Главная',
+  'dolbaebadmintts': 'Админ панель',
+  'users': 'Управление пользователями',
+  'voices': 'Управление голосами',
+  'monitoring': 'Мониторинг',
+  'bots': 'Управление ботами',
+  'settings': 'Настройки',
+  'logs': 'Логи',
+  'analytics': 'Аналитика',
 };
 
 export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, className }) => {
   const location = useLocation();
 
-  // Р•СЃР»Рё items РЅРµ РїРµСЂРµРґР°РЅС‹, РіРµРЅРµСЂРёСЂСѓРµРј РёР· С‚РµРєСѓС‰РµРіРѕ РїСѓС‚Рё
+  // Если items не переданы, генерируем из текущего пути
   const breadcrumbItems = items || generateBreadcrumbs(location.pathname);
 
   if (breadcrumbItems.length === 0) {
@@ -49,7 +48,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, className }) =>
       <Link
         to="/dashboard"
         className="flex items-center transition-colors hover:text-foreground"
-        title="Р“Р»Р°РІРЅР°СЏ"
+        title="Главная"
       >
         <Home className="h-4 w-4" />
       </Link>
@@ -82,7 +81,7 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({ items, className }) =>
 };
 
 /**
- * Р“РµРЅРµСЂРёСЂСѓРµС‚ breadcrumbs РёР· pathname
+ * Генерирует breadcrumbs из pathname
  */
 function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   const segments = pathname.split('/').filter(Boolean);
@@ -92,14 +91,14 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
   segments.forEach((segment, index) => {
     currentPath += `/${segment}`;
     
-    // РџСЂРѕРїСѓСЃРєР°РµРј РїРµСЂРІС‹Р№ СЃРµРіРјРµРЅС‚ РµСЃР»Рё СЌС‚Рѕ 'dashboard'
+    // Пропускаем первый сегмент если это 'dashboard'
     if (index === 0 && segment === 'dashboard') {
       return;
     }
 
     const label = pathToLabel[segment] || segment;
     
-    // РџРѕСЃР»РµРґРЅРёР№ СЌР»РµРјРµРЅС‚ Р±РµР· СЃСЃС‹Р»РєРё
+    // Последний элемент без ссылки
     if (index === segments.length - 1) {
       breadcrumbs.push({ label });
     } else {
@@ -111,4 +110,3 @@ function generateBreadcrumbs(pathname: string): BreadcrumbItem[] {
 }
 
 export default Breadcrumbs;
-

@@ -31,13 +31,13 @@ const QueueList: React.FC<QueueListProps> = ({ queue, currentVideo, skipVotes, c
 
     return (
         <TooltipProvider>
-            <div className="flex flex-col h-full bg-background/50 backdrop-blur-sm rounded-xl border border-border/50 overflow-hidden">
+            <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card/90 backdrop-blur-sm">
                 {/* Header */}
                 <div
                     className={
                         compact
-                            ? "grid grid-cols-[28px_minmax(0,1fr)_minmax(0,0.8fr)_72px] items-center gap-3 px-3 py-2 border-b border-border/50 bg-muted/20 text-[10px] font-medium text-muted-foreground uppercase tracking-wider"
-                            : "grid grid-cols-[28px_minmax(0,1fr)_64px_72px] md:grid-cols-[28px_minmax(0,1fr)_120px_64px_72px] items-center gap-3 px-3 py-2 border-b border-border/50 bg-muted/20 text-[10px] font-medium text-muted-foreground uppercase tracking-wider"
+                            ? "grid grid-cols-[28px_minmax(0,1fr)_minmax(0,0.8fr)_72px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
+                            : "grid grid-cols-[28px_minmax(0,1fr)_64px_72px] md:grid-cols-[28px_minmax(0,1fr)_120px_64px_72px] items-center gap-3 border-b border-border/70 bg-card/90 px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground"
                     }
                 >
                     <div className="text-center">#</div>

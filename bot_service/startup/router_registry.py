@@ -53,7 +53,6 @@ ROUTER_CONFIGS = {
         RouterConfig("api.obs_integration_api"),
         RouterConfig("api.system_api"),
         RouterConfig("api.user_settings_api"),
-        RouterConfig("api.support_api"),
         RouterConfig("api.chatbox_api"),
         RouterConfig("api.errors_api"),
     ],

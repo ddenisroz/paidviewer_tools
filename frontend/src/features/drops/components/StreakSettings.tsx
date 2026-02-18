@@ -43,8 +43,7 @@ interface StreakSettingsFormData {
   streak_enabled_vk: boolean;
 }
 
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
-const STREAK_MESSAGES_PRESETS = [1, 3, 5, 10, 20];
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 
 const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasRewards = false, integrations }) => {
   const navigate = useNavigate();
@@ -67,7 +66,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   useEffect(() => {
     const handleDropsConfigChange = (event: CustomEvent) => {
       const { streak_enabled, channel, platform: eventPlatform, source } = event.detail;
-      // [OK] ИСПРАВЛЕНИЕ: Обновляем локальное состояние только если событие пришло от QuickActionsBar
+      // [OK] �?СПРАВЛЕН�?Е: Обновляем локальное состояние только если событие пришло от QuickActionsBar
       // Если событие пришло от useDropsConfig (наш собственный saveMutation), то состояние уже обновлено через setFormData
       if (channel === channelName && streak_enabled !== undefined && eventPlatform && source === 'QuickActionsBar') {
         if (eventPlatform === 'twitch') {
@@ -100,7 +99,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     };
   }, [config]);
 
-  // [OK] ИНИЦИАЛИЗАЦИЯ: Загружаем данные при первой загрузке
+  // [OK] �?Н�?Ц�?АЛ�?ЗАЦ�?Я: Загружаем данные при первой загрузке
   useEffect(() => {
     if (initialFormData && isInitialLoad) {
       setFormData(initialFormData);
@@ -108,7 +107,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     }
   }, [initialFormData, isInitialLoad, setIsInitialLoad]);
 
-  // [OK] СИНХРОНИЗАЦИЯ: Синхронизируем formData с config из React Query
+  // [OK] С�?НХРОН�?ЗАЦ�?Я: Синхронизируем formData с config из React Query
   // Обновляем все поля, включая streak_enabled (fallback если событие не было обработано)
   useEffect(() => {
     if (!isInitialLoad && config && initialFormData) {
@@ -179,7 +178,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     autoSave({ ...createPayload(), [platformKey]: enabled });
   };
 
-  // [OK] ИСПРАВЛЕНИЕ: Автосохранение только для настроек, НЕ для streak_enabled_twitch/vk
+  // [OK] �?СПРАВЛЕН�?Е: Автосохранение только для настроек, НЕ для streak_enabled_twitch/vk
   // streak_enabled_twitch/vk сохраняются отдельно через handlePlatformToggle
   // Это предотвращает повторное сохранение при обновлении из QuickActionsBar
   useEffect(() => {
@@ -203,7 +202,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     isInitialLoad,
     config,
     autoSave
-    // [OK] ИСКЛЮЧЕНО: formData.streak_enabled_twitch, formData.streak_enabled_vk
+    // [OK] �?СКЛЮЧЕНО: formData.streak_enabled_twitch, formData.streak_enabled_vk
     // Эти поля сохраняются отдельно через handlePlatformToggle
   ]);
 
@@ -229,7 +228,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       return;
     }
 
-    if (!confirm('Вы уверены, что хотите сбросить всю статистику стриков? Это действие необратимо!')) {
+    if (!confirm('Вы уверены, что хотите сбросить всю статистику серии? Это действие необратимо!')) {
       return;
     }
 
@@ -263,10 +262,10 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   if (!config && !isLoading) {
     return (
       <div className="space-y-4">
-        <Card className="border-l-4 border-l-red-500 border-red-500/40 bg-slate-950/80 backdrop-blur-sm shadow-md shadow-black/20">
+        <Card className="border-red-500/35 bg-red-500/10 backdrop-blur-sm shadow-sm shadow-black/20">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="p-1.5 rounded-lg bg-red-500/10 flex-shrink-0">
+              <div className="p-2 rounded-lg bg-red-500/15 border border-red-400/40 flex-shrink-0">
                 <AlertTriangle className="h-4 w-4 text-red-400" />
               </div>
               <div className="flex-1">
@@ -285,22 +284,22 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     <div className="space-y-4">
       {/* Предупреждение если нет наград */}
       {!hasRewards && (
-        <Card className="border-l-4 border-l-orange-500 border-orange-500/40 bg-slate-950/80 backdrop-blur-sm shadow-md shadow-black/20">
+        <Card className="border-amber-500/35 bg-amber-500/10 backdrop-blur-sm shadow-sm shadow-black/20">
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="p-1.5 rounded-lg bg-orange-500/10 flex-shrink-0">
-                  <AlertTriangle className="h-4 w-4 text-orange-400" />
+                <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-400/40 flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-amber-300" />
                 </div>
-                <p className="text-sm text-muted-foreground break-words">
-                  Сначала настройте содержимое сундуков на вкладке <strong className="text-foreground">"Награды"</strong>.
+                <p className="text-sm text-amber-100/90 break-words">
+                  Сначала настройте содержимое сундуков на вкладке <strong className="text-amber-50">"Награды"</strong>.
                 </p>
               </div>
               <Button
                 onClick={() => navigate('/dashboard/drops?tab=rewards')}
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs flex-shrink-0 border-slate-700 bg-slate-900/70 hover:bg-slate-800"
+                className="h-8 text-xs flex-shrink-0 border-amber-300/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
               >
                 <Package className="w-3.5 h-3.5 mr-1.5" />
                 Настроить
@@ -369,24 +368,6 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
                 max={maxMessagesRequired}
               />
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {STREAK_MESSAGES_PRESETS.filter((preset) => preset <= maxMessagesRequired).map((preset) => (
-                <Button
-                  key={preset}
-                  type="button"
-                  variant={messagesRequired === preset ? 'secondary' : 'outline'}
-                  size="sm"
-                  className={`h-7 px-2 text-xs ${
-                    messagesRequired === preset
-                      ? 'bg-slate-700 text-slate-100 border-slate-600'
-                      : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
-                  }`}
-                  onClick={() => handleMessagesRequiredChange(preset)}
-                >
-                  {preset}
-                </Button>
-              ))}
-            </div>
             <Slider
               value={formData.streak_messages_required}
               onValueChange={(value) => handleMessagesRequiredChange(value[0])}
@@ -394,14 +375,14 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
               max={maxMessagesRequired}
               step={1}
             />
-            <div className="flex items-center justify-between text-[11px] text-slate-400">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>Минимум: 1</span>
               <span>Максимум: {maxMessagesRequired}</span>
             </div>
           </div>
 
           {/* Сброс при пропуске */}
-          <div className="flex items-center justify-between p-3 border border-slate-800 bg-slate-950/50 rounded-lg">
+          <div className="flex items-center justify-between p-3 border border-border/70 bg-card/60 rounded-lg">
             <div>
               <Label className="text-sm font-medium">Сброс при пропуске</Label>
               <p className="text-xs text-muted-foreground">Обнулять стрик при неактивности во время стрима</p>

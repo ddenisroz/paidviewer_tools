@@ -59,6 +59,7 @@ from models import (
     DropsReward,
     UserStreak,
     DropsHistory,
+    MemeAlertsGrantHistory,
     MythicalDropsSession,
     StreamSession,
     # Геймификация
@@ -66,8 +67,6 @@ from models import (
     UserAchievement,
     DonationAlert,
     # Поддержка
-    SupportTicket,
-    TicketResponse,
     # Безопасность
     SecurityLog,
     SystemLog,
@@ -125,6 +124,7 @@ __all__ = [
     "DropsReward",
     "UserStreak",
     "DropsHistory",
+    "MemeAlertsGrantHistory",
     "MythicalDropsSession",
     "StreamSession",
     # Gamification
@@ -132,8 +132,6 @@ __all__ = [
     "UserAchievement",
     "DonationAlert",
     # Support
-    "SupportTicket",
-    "TicketResponse",
     # Security
     "SecurityLog",
     "SystemLog",

@@ -58,10 +58,11 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
 
   // [OK] НОВЫЙ КОД: Используем централизованный hook для режима TTS
   const { data: modeSettingsResponse, isLoading: isLoadingRewards, refetch: refetchModeSettings } = useTtsModeSettings({
-    enabled: !!user,
-    refetchOnMount: true,
-    refetchOnWindowFocus: true,
-    staleTime: 0, // Всегда считаем данные устаревшими для немедленного обновления
+    enabled: !!user && ttsMode === 'channel_points' && showRewards,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
+    retry: false,
   });
   const modeSettingsData = (modeSettingsResponse as { data?: { tts_reward_ids?: Record<string, string> } })?.data;
 

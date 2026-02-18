@@ -812,6 +812,26 @@ const VoiceManagementPageContent: React.FC = () => {
                 <div className="col-span-full text-center py-12">
                     <p className="text-muted-foreground">Загрузка голосов...</p>
                 </div>
+            ) : !whitelistStatus ? (
+                <div className="col-span-full">
+                    <div className="text-center py-12 card-glass rounded-lg">
+                        <AlertCircle className="h-16 w-16 mx-auto mb-4 text-slate-500" />
+                        <p className="text-slate-300 text-lg mb-2 font-semibold">Не удалось определить доступ</p>
+                        <p className="text-slate-400 text-sm mb-4">
+                            Повторите обновление страницы или проверьте подключение к серверу.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                queryClient.invalidateQueries({ queryKey: ['global-voices'] });
+                                queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+                            }}
+                        >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Обновить
+                        </Button>
+                    </div>
+                </div>
             ) : whitelistStatus && whitelistStatus.can_manage_voices === false ? (
                 <div className="col-span-full">
                     <div className="text-center py-12 card-glass rounded-lg">

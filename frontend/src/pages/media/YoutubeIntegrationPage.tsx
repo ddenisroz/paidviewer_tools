@@ -503,29 +503,6 @@ const YoutubeIntegrationPage: React.FC = () => {
                     </DialogHeader>
 
                     <div className="py-4 space-y-6">
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
-                            <div className="space-y-1">
-                                <Label className="text-base text-foreground">Приём заказов</Label>
-                                <p className="text-xs text-muted-foreground">Быстро закрыть или открыть все способы заказа</p>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    if (ordersClosed) {
-                                        setRequestsCommandEnabled(true);
-                                    } else {
-                                        setRequestsCommandEnabled(false);
-                                        setRequestsRewardTwitchEnabled(false);
-                                        setRequestsRewardVkEnabled(false);
-                                    }
-                                }}
-                                className="h-8"
-                            >
-                                {ordersClosed ? 'Открыть' : 'Закрыть'}
-                            </Button>
-                        </div>
-
                         {/* Command Section */}
                         <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border/50">
                             <div className="space-y-1">
@@ -698,7 +675,7 @@ const YoutubeIntegrationPage: React.FC = () => {
 
                                 <div className="w-full xl:flex-1 space-y-3 xl:ml-0">
                                     <div className="card-glass w-full rounded-xl p-3 space-y-3">
-                                        <div className="flex items-center justify-between gap-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
                                             <div className="flex items-center gap-2">
                                                 <Button
                                                     onClick={togglePlayPause}
@@ -722,7 +699,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     <SkipForward className="w-5 h-5" />
                                                 </Button>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                                                 <Button
                                                     variant="outline"
                                                     onClick={handleToggleOrders}
@@ -848,7 +825,7 @@ const YoutubeIntegrationPage: React.FC = () => {
 
                         <div className="h-full min-h-0 min-w-0 flex flex-col overflow-hidden gap-3">
                             <div className="card-glass rounded-xl p-3 space-y-2">
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">
                                         <Button
                                             variant="outline"
@@ -873,7 +850,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             <SkipForward className="w-5 h-5" />
                                         </Button>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                                         <Button
                                             variant="outline"
                                             onClick={handleToggleOrders}

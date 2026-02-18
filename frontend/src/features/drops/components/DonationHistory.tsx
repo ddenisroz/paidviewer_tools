@@ -15,7 +15,7 @@ interface DonationHistoryProps {
     channelName: string;
 }
 
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 
 const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, channelName }) => {
   const { data: historyData, isLoading: loading } = useDropsHistory(
@@ -68,7 +68,7 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
           {history.map((entry) => (
             <div 
               key={entry.id}
-              className="flex items-center justify-between p-2 border border-slate-800 rounded bg-slate-950/60 hover:bg-slate-900/80 transition-colors"
+              className="flex items-center justify-between p-2 border border-border/70 rounded bg-card/60 hover:bg-accent/60 transition-colors"
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <DollarSign className="w-4 h-4 text-green-400 flex-shrink-0" />
@@ -81,7 +81,7 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <Badge variant="outline" className="text-xs">
-                  {entry.donation_amount}₽
+                  {entry.donation_amount}в‚Ѕ
                 </Badge>
                 <span className="text-xs text-muted-foreground">
                   {formatDate(entry.created_at)}
@@ -96,5 +96,6 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
 };
 
 export default DonationHistory;
+
 
 

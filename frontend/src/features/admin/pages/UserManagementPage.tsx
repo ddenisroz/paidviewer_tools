@@ -328,7 +328,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'id',
             header: 'ID / Аккаунт',
-            width: '220px',
+            width: '180px',
             align: 'center',
             accessor: (user) => {
                 const sessionsArray = Array.isArray(sessionsData) ? sessionsData : [];
@@ -373,7 +373,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'integrations',
             header: 'Платформы',
-            width: '290px',
+            width: '220px',
             align: 'center',
             accessor: (user) => {
                 const twitchName = getTwitchName(user);
@@ -411,7 +411,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'whitelist',
             header: 'Whitelist',
-            width: '180px',
+            width: '130px',
             align: 'center',
             accessor: (user) => {
                 if (user.is_whitelisted && user.whitelisted_platforms && user.whitelisted_platforms.length > 0) {
@@ -441,7 +441,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'role',
             header: 'Роль',
-            width: '150px',
+            width: '120px',
             align: 'center',
             accessor: (user) => {
                 if (user.is_admin) {
@@ -463,7 +463,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'status',
             header: 'Статус',
-            width: '150px',
+            width: '120px',
             align: 'center',
             accessor: (user) => {
                 if (user.is_blocked) {
@@ -490,7 +490,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'created_at',
             header: 'Создан',
-            width: '180px',
+            width: '150px',
             align: 'center',
             accessor: (user) => (
                 <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -505,7 +505,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'actions',
             header: 'Действия',
-            width: '170px',
+            width: '150px',
             align: 'center',
             accessor: (user) => (
                 <div className="flex items-center justify-center gap-1 rounded-md border border-border/60 bg-card/50 p-1">
@@ -585,6 +585,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'role',
             label: 'Роль',
+            width: '140px',
             options: [
                 { value: 'all', label: 'Все' },
                 { value: 'admin', label: 'Админ' },
@@ -595,6 +596,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'status',
             label: 'Статус',
+            width: '140px',
             options: [
                 { value: 'all', label: 'Все' },
                 { value: 'active', label: 'Активен' },
@@ -605,6 +607,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'whitelist',
             label: 'Whitelist',
+            width: '140px',
             options: [
                 { value: 'all', label: 'Все' },
                 { value: 'whitelisted', label: 'В whitelist' },
@@ -615,6 +618,7 @@ const UserManagementPage: React.FC = () => {
         {
             key: 'integrations',
             label: 'Платформа',
+            width: '150px',
             options: [
                 { value: 'all', label: 'Все' },
                 { value: 'twitch', label: 'Twitch' },
@@ -700,7 +704,7 @@ const UserManagementPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto p-6 space-y-6">
+        <div className="container mx-auto max-w-[1200px] p-4 space-y-4">
             {/* Header */}
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -800,8 +804,8 @@ const UserManagementPage: React.FC = () => {
                 selectable
                 bulkActions={bulkActions}
                 pagination
-                pageSize={50}
-                pageSizeOptions={[10, 25, 50, 100]}
+                pageSize={25}
+                pageSizeOptions={[10, 25, 50]}
                 emptyMessage="Пользователи не найдены"
             />
 

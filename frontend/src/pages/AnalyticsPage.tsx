@@ -8,12 +8,12 @@ import { useIntegrations } from '@/context/IntegrationsContext';
 import { useCommands, useCreateCommandOverride } from '@/queries/commands/commandsQueries';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
 import { Switch } from '@/shared/components/ui/switch';
 
 import PageWrapper from '../shared/components/PageWrapper';
 
-const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 
 const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -82,7 +82,7 @@ const AnalyticsPage: React.FC = () => {
             <CardHeader className="pb-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Terminal className="h-3 w-3 text-primary" />
+                  <Terminal className="h-3 w-3 text-emerald-300" />
                   <code className="text-sm font-bold font-mono bg-muted px-2 py-1 rounded text-foreground">
                     !{effectiveCommandName}
                   </code>
@@ -105,7 +105,7 @@ const AnalyticsPage: React.FC = () => {
               </p>
 
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="text-xs px-1.5 py-0 bg-blue-500/10 text-blue-600 border-blue-500/20">
+                <Badge variant="outline" className="text-xs px-1.5 py-0 bg-emerald-500/10 text-emerald-300 border-emerald-500/30">
                   <MessageSquare className="h-3 w-3 mr-1" /> Аналитика
                 </Badge>
                 {!hasPlatforms && (

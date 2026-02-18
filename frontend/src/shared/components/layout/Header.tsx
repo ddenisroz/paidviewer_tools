@@ -145,15 +145,14 @@ const Header: React.FC = () => {
     };
 
     return (
-        <header className="relative flex h-14 items-center gap-2 sm:gap-4 px-3 sm:px-6 lg:h-16 bg-muted/40">
+        <header className="relative flex h-14 items-center gap-2 bg-transparent px-3 sm:gap-4 sm:px-6 lg:h-16">
             <div className="flex-1"></div>
 
             {pageTitle && (
-                <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl sm:text-3xl lg:text-4xl font-extrabold bg-gradient-to-r from-blue-400 via-emerald-400 to-green-500 bg-clip-text text-transparent tracking-wide drop-shadow-lg"
+                <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl sm:text-3xl lg:text-4xl font-extrabold text-cyan-300 tracking-wide"
                     style={{
                         fontFamily: "'Orbitron', 'Rajdhani', 'Exo 2', 'Inter', sans-serif",
-                        letterSpacing: '0.08em',
-                        textShadow: '0 0 20px rgba(16, 185, 129, 0.4)'
+                        letterSpacing: '0.08em'
                     }}>
                     {pageTitle}
                 </h1>
@@ -170,7 +169,7 @@ const Header: React.FC = () => {
                                     variant="outline"
                                     size="sm"
                                     onClick={resetLayout}
-                                    className="h-9 px-3 border-slate-600 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 hover:text-white"
+                                    className="h-9 px-3 border-border/70 bg-card/70 text-foreground hover:bg-accent"
                                 >
                                     <RotateCcw className="w-4 h-4 mr-2" />
                                     Сбросить позиционирование
@@ -182,7 +181,7 @@ const Header: React.FC = () => {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setLayoutBlocksMenuOpen((prev) => !prev)}
-                                        className="h-9 px-3 border-slate-600 bg-slate-800/50 text-slate-200 hover:bg-slate-700/50 hover:text-white"
+                                        className="h-9 px-3 border-border/70 bg-card/70 text-foreground hover:bg-accent"
                                     >
                                         Блоки
                                         <ChevronDown className={cn("ml-2 h-4 w-4 transition-transform", layoutBlocksMenuOpen && "rotate-180")} />
@@ -199,7 +198,7 @@ const Header: React.FC = () => {
                                                         key={widget.id}
                                                         type="button"
                                                         onClick={() => toggleWidgetVisibility(widget.id)}
-                                                        className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm text-slate-200 hover:bg-slate-800/50"
+                                                        className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm text-foreground hover:bg-accent"
                                                     >
                                                         <span>{widgetLabels[widget.id]}</span>
                                                         <span
@@ -207,7 +206,7 @@ const Header: React.FC = () => {
                                                                 "flex h-4 w-4 items-center justify-center rounded border",
                                                                 widget.isVisible
                                                                     ? "border-emerald-400 bg-emerald-500/20 text-emerald-300"
-                                                                    : "border-slate-500 bg-transparent text-transparent"
+                                                                    : "border-border/70 bg-transparent text-transparent"
                                                             )}
                                                         >
                                                             <Check className="h-3 w-3" />
@@ -226,7 +225,7 @@ const Header: React.FC = () => {
                             onClick={toggleEditMode}
                             variant={isEditMode ? "secondary" : "ghost"}
                             size="sm"
-                            className={cn("flex items-center gap-2 transition-all", isEditMode && "bg-green-500/20 text-green-400 hover:bg-green-500/30")}
+                            className={cn("h-10 flex items-center gap-2 border-none bg-transparent px-4 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400", isEditMode && "text-green-400 hover:text-green-300")}
                         >
                             {isEditMode ? <Check className="w-4 h-4" /> : <Settings2 className="w-4 h-4" />}
                             {isEditMode ? "Сохранить макет" : "Настроить макет"}
@@ -238,7 +237,7 @@ const Header: React.FC = () => {
                     <div className="relative integrations-menu">
                         <Button
                             variant="outline"
-                            className="flex items-center gap-2 h-10 px-4 bg-slate-800/50 border-slate-600 hover:bg-slate-700/50 hover:border-slate-500 text-slate-200 hover:text-white transition-colors duration-200 active:scale-100 active:transform-none"
+                            className="flex h-10 items-center gap-2 border-none bg-transparent px-4 text-foreground shadow-none transition-colors duration-200 hover:bg-transparent hover:text-blue-400 active:scale-100 active:transform-none"
                             onClick={() => setIntegrationsOpen(!integrationsOpen)}
                         >
                             <Settings className="h-4 w-4" />
@@ -248,7 +247,7 @@ const Header: React.FC = () => {
 
                         {integrationsOpen && (
                             <div
-                                className="absolute right-0 top-12 w-64 bg-popover border border-border rounded-md shadow-lg z-50"
+                                className="absolute right-0 top-12 z-50 w-64 rounded-md border border-border/60 bg-card shadow-md backdrop-blur-sm"
                             >
                                 <div className="p-4 space-y-3">
                                     <h3 className="text-sm font-semibold text-muted-foreground">Интеграции</h3>
@@ -315,10 +314,10 @@ const Header: React.FC = () => {
                         onClick={logout}
                         variant="ghost"
                         size="icon"
-                        className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg border border-transparent hover:border-red-500/30 hover:bg-red-500/10 transition-colors duration-200"
+                        className="group h-10 w-10 rounded-lg hover:bg-transparent transition-colors duration-200"
                         title="Выйти"
                     >
-                        <LogOut className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 hover:text-red-400 transition-colors" />
+                        <LogOut className="h-5 w-5 text-foreground transition-colors duration-200 group-hover:text-red-300" />
                     </Button>
                 )}
             </div>

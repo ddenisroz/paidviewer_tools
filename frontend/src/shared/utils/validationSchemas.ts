@@ -130,19 +130,6 @@ export const commandSchema = z.object({
   is_enabled: z.boolean().optional().default(true),
 });
 
-// Support ticket validation
-export const supportTicketSchema = z.object({
-  subject: z.string()
-    .min(1, 'Тема обязательна')
-    .max(100, 'Максимум 100 символов')
-    .trim(),
-  message: z.string()
-    .min(10, 'Минимум 10 символов')
-    .max(2000, 'Максимум 2000 символов')
-    .trim(),
-  priority: z.enum(['low', 'medium', 'high']).optional().default('medium'),
-});
-
 // Guest mode validation
 export const guestModeSchema = z.object({
   channel_name: z.string()
@@ -373,5 +360,6 @@ export const safeParse = <T>(
   });
   return { success: false, errors };
 };
+
 
 

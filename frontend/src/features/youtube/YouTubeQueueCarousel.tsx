@@ -334,7 +334,7 @@ const YouTubeQueueCarousel: React.FC = () => {
                   {/* Points badge if paid */}
                   {video.is_paid && video.points_cost && (
                     <div className="flex-shrink-0">
-                      <span className="px-2 py-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded text-[10px] font-medium">
+                      <span className="px-2 py-1 bg-emerald-600 text-white rounded text-[10px] font-medium">
                         {video.points_cost} pts
                       </span>
                     </div>

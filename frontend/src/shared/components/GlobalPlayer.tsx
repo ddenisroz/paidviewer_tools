@@ -126,7 +126,7 @@ const GlobalPlayer: React.FC = () => {
     };
 
     const handleClearQueue = async (): Promise<void> => {
-        const confirmed = window.confirm('Очистить очередь видео?');
+        const confirmed = window.confirm('Очистить очередь треков?');
         if (!confirmed) return;
         try {
             await youtubeService.clearQueue();
@@ -336,7 +336,7 @@ const GlobalPlayer: React.FC = () => {
                                     onClick={() => {
                                         maximizePlayer();
                                     }}
-                                    className="h-12 w-12 rounded-full bg-red-600 hover:bg-red-500 shadow-lg ring-2 ring-red-500/50 transition-all hover:scale-105"
+                                    className="h-12 w-12 rounded-full bg-red-600 hover:bg-red-500 shadow-lg ring-2 ring-red-500/50 transition-colors"
                                 >
                                     <div className="relative">
                                         <Youtube className="h-6 w-6 text-white" />

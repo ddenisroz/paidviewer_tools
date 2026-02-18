@@ -29,11 +29,13 @@ const TtsPlayerPage: React.FC = () => {
         isPlaying,
         isPaused,
         isPrimaryPlayerTab,
+        isAudioUnlocked,
         clearQueue,
         skipCurrent,
         playFromQueue,
         togglePause,
-        requestPrimaryPlayerTab
+        requestPrimaryPlayerTab,
+        unlockAudio
     } = useTtsPlayer();
 
     const { data: audioSettingsResponse } = useTtsAudioSettings();
@@ -97,9 +99,32 @@ const TtsPlayerPage: React.FC = () => {
     }, [currentItem, queue.length]);
 
     const canControlPlayback = Boolean(currentItem) && listeningMode === 'website' && isPrimaryPlayerTab;
+    const showUnlockOverlay = listeningMode === 'website' && !isAudioUnlocked;
 
     return (
-        <div className="min-h-screen bg-background p-4 sm:p-6">
+        <div className="relative min-h-screen bg-background p-4 sm:p-6">
+            {showUnlockOverlay && (
+                <div
+                    className="fixed inset-0 z-[70] flex items-center justify-center bg-background/88 backdrop-blur-sm"
+                    onPointerDown={() => void unlockAudio()}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            void unlockAudio();
+                        }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Активировать звук TTS плеера"
+                >
+                    <div className="mx-4 w-full max-w-md rounded-xl border border-border/80 bg-card/95 p-5 text-center shadow-xl">
+                        <p className="text-base font-semibold text-foreground">Активируйте звук</p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            Нажмите в любом месте, чтобы разрешить воспроизведение TTS в браузере.
+                        </p>
+                    </div>
+                </div>
+            )}
             <div className="mx-auto w-full max-w-5xl">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
                     <Card className="card-glass lg:col-span-2 lg:min-h-[520px]">

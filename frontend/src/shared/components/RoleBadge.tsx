@@ -1,6 +1,6 @@
 ﻿import React from 'react';
 
-import { Crown, Shield, Star, User } from 'lucide-react';
+import { Crown, ShieldCheck, Star, User } from 'lucide-react';
 
 interface VkRoleBadgeProps {
     role?: string | null;
@@ -26,7 +26,7 @@ const VK_ROLE_MAP: Record<string, { label: string; color: string; bg: string; Ic
         label: 'Moderator',
         color: '#22C55E',
         bg: 'rgba(34, 197, 94, 0.18)',
-        Icon: Shield
+        Icon: ShieldCheck
     },
     vip: {
         label: 'vip',
@@ -42,11 +42,21 @@ const VK_ROLE_MAP: Record<string, { label: string; color: string; bg: string; Ic
     }
 };
 
+const VK_ROLE_ALIASES: Record<string, string> = {
+    mod: 'moderator',
+    channel_moderator: 'moderator',
+    channelmod: 'moderator',
+    streamer: 'broadcaster',
+    creator: 'broadcaster',
+    channel_owner: 'owner',
+};
+
 export const VkRoleBadge: React.FC<VkRoleBadgeProps> = ({ role, size = 14, className, style }) => {
     if (!role) return null;
 
     const normalized = role.toLowerCase();
-    const config = VK_ROLE_MAP[normalized];
+    const resolvedRole = VK_ROLE_ALIASES[normalized] || normalized;
+    const config = VK_ROLE_MAP[resolvedRole];
 
     if (!config) {
         return (

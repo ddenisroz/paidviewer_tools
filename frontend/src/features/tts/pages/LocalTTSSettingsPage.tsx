@@ -101,6 +101,9 @@ interface NewVoice {
     description: string;
 }
 
+const TAB_TRIGGER_CLASS =
+    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-400 data-[state=active]:shadow-none';
+
 const LocalTTSSettingsPage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
@@ -302,7 +305,7 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     // Using TanStack Query mutation instead of direct axios
     const deleteVoice = (voiceId: number): void => {
-        if (!confirm('Удалить голос со всеми сэмплами?')) return;
+        if (!confirm('Удалить голос со всеми данными?')) return;
         deleteVoiceMutation.mutate(voiceId);
     };
 
@@ -381,23 +384,29 @@ const LocalTTSSettingsPage: React.FC = () => {
     return (
         <div className="container mx-auto max-w-5xl space-y-6">
             <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 bg-gray-800/50">
-                    <TabsTrigger value="connection" className="flex items-center gap-2">
+                <TabsList className="h-auto w-full justify-start rounded-none bg-transparent p-0 border-b border-border">
+                    <TabsTrigger value="connection" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`}>
                         <Server className="w-4 h-4" />
                         Подключение
                     </TabsTrigger>
-                    <TabsTrigger value="voices" className="flex items-center gap-2" disabled={!testResult?.success}>
+                    <TabsTrigger value="voices" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`} disabled={!testResult?.success}>
                         <Mic className="w-4 h-4" />
                         Управление голосами
                     </TabsTrigger>
                 </TabsList>
+
+                {!testResult?.success && (
+                    <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                        Управление голосами станет доступно после успешного теста подключения.
+                    </div>
+                )}
 
                 <TabsContent value="connection" className="space-y-4 mt-4">
                     <Card className="card-glass border-blue-500/20">
                         <CardHeader>
                             <CardTitle className="text-blue-400 flex items-center gap-2">
                                 <ExternalLink className="w-5 h-5" />
-                                Как запустить локальный TTS сервер?
+                                Как запустить локальный TTS движок?
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -417,7 +426,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <div>
                                         <p className="font-medium">Установите зависимости:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            python install.py
+                                            py -3.12 -m pip install -r requirements.txt
                                         </code>
                                     </div>
                                 </div>
@@ -427,8 +436,8 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <div>
                                         <p className="font-medium">Запустите сервер:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            start.bat  # Windows<br />
-                                            ./start.sh # Linux/Mac
+                                            py -3.12 run.py  # Windows<br />
+                                            python3.12 run.py # Linux/Mac
                                         </code>
                                     </div>
                                 </div>
@@ -449,7 +458,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="text-sm text-yellow-200">
                                     <p className="font-medium">Системные требования:</p>
                                     <ul className="list-disc list-inside mt-1 space-y-1 text-xs text-yellow-200/80">
-                                        <li>Python 3.8+</li>
+                                        <li>Python 3.12+</li>
                                         <li>NVIDIA GPU с VRAM ≥ 6GB (рекомендуется)</li>
                                         <li>8GB RAM (16GB рекомендуется)</li>
                                     </ul>

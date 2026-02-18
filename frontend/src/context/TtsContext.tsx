@@ -76,6 +76,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
 
     const ttsRelatedPaths = ['/dashboard/tts', '/tts'];
     const isTtsPage = ttsRelatedPaths.some(path => location.pathname.startsWith(path));
+    const isVoiceManagementPage = location.pathname.startsWith('/dashboard/tts/voices');
     const ttsStatusInterval = isTtsPage ? 30 * 1000 : 120 * 1000;
 
     const channelName = null;
@@ -180,7 +181,9 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     }, [isCheckingHealth, engineStatus.loaded, shouldCheckF5Health]);
 
     const { data: voicesData } = useGlobalVoices({
-        enabled: !!user && engineStatus.loaded,
+        enabled: !!user && engineStatus.loaded && isVoiceManagementPage,
+        retry: false,
+        refetchOnWindowFocus: false,
     });
 
     // React Query v5: onSuccess moved to useEffect

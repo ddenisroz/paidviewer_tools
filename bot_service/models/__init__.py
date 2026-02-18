@@ -78,6 +78,7 @@ from models.drops import (
     DropsReward,
     UserStreak,
     DropsHistory,
+    MemeAlertsGrantHistory,
     MythicalDropsSession,
     StreamSession,
 )
@@ -87,12 +88,6 @@ from models.gamification import (
     Achievement,
     UserAchievement,
     DonationAlert,
-)
-
-# Поддержка
-from models.support import (
-    SupportTicket,
-    TicketResponse,
 )
 
 # Безопасность и логи
@@ -153,15 +148,13 @@ __all__ = [
     "DropsReward",
     "UserStreak",
     "DropsHistory",
+    "MemeAlertsGrantHistory",
     "MythicalDropsSession",
     "StreamSession",
     # Gamification
     "Achievement",
     "UserAchievement",
     "DonationAlert",
-    # Support
-    "SupportTicket",
-    "TicketResponse",
     # Security
     "SecurityLog",
     "SystemLog",

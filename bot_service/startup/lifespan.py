@@ -46,7 +46,12 @@ async def _startup_commands() -> None:
             BotCommand.user_id.is_(None),
             BotCommand.command_name == 'memegrant'
         ).first()
-        if not has_global or not has_memegrant:
+        has_givema = db.query(BotCommand).filter(
+            BotCommand.command_type == 'global',
+            BotCommand.user_id.is_(None),
+            BotCommand.command_name == 'givema'
+        ).first()
+        if not has_global or not has_memegrant or not has_givema:
             logger.info("[STARTUP] Seeding/refreshing global bot commands")
             from init_global_commands import init_global_commands
             init_global_commands()

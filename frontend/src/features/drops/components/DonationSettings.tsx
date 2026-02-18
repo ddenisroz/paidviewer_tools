@@ -44,7 +44,7 @@ interface DonationSettingsFormData {
   mythical_donation_amount: number[];
 }
 
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 const MYTHICAL_MIN_INTERVAL_PRESETS = [1, 3, 6, 12, 24];
 const MYTHICAL_MAX_INTERVAL_PRESETS = [6, 12, 24, 48, 72];
 const MYTHICAL_WINDOW_PRESETS = [5, 10, 15, 30, 60];
@@ -99,7 +99,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     // Если интеграция не подключена, принудительно ставим false
     const donationEnabled = currentDonationalertsConnected ? donationEnabledFromServer : false;
 
-    // ✅ МИФИЧЕСКИЙ DROPS ДОСТУПЕН ТОЛЬКО С DONATIONALERTS
+    // ✅ М�?Ф�?ЧЕСК�?Й DROPS ДОСТУПЕН ТОЛЬКО С DONATIONALERTS
     // Мифический drops работает на основе донатов, поэтому требует подключения DonationAlerts
     const mythicalEnabledFromServer = typedConfig.mythical_enabled ?? false;
     const mythicalEnabled = currentDonationalertsConnected ? mythicalEnabledFromServer : false;
@@ -125,12 +125,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     }
   }, [initialFormData, isInitialLoad, setIsInitialLoad]);
 
-  // ✅ ИСПРАВЛЕНИЕ: Используем функциональное обновление и удаляем formData из зависимостей
+  // ✅ �?СПРАВЛЕН�?Е: �?спользуем функциональное обновление и удаляем formData из зависимостей
   // чтобы избежать бесконечного цикла. Проверяем текущие значения через ref или функциональное обновление.
   useEffect(() => {
     if (!donationalertsConnected) {
       // Отключаем donation и mythical drops если DonationAlerts отключен
-      // ✅ Используем функциональное обновление для чтения актуальных значений без добавления в зависимости
+      // ✅ �?спользуем функциональное обновление для чтения актуальных значений без добавления в зависимости
       setFormData(prev => {
         // ✅ Проверяем текущие значения и обновляем только если они true
         if (prev.donation_enabled || prev.mythical_enabled) {
@@ -284,21 +284,21 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     <div className="space-y-4">
       {/* Предупреждение если нет наград */}
       {!hasRewards && (
-        <Card className="border-l-4 border-l-orange-500 border-orange-500/40 bg-slate-950/80 backdrop-blur-sm shadow-md shadow-black/20">
+        <Card className="border-amber-500/35 bg-amber-500/10 backdrop-blur-sm shadow-sm shadow-black/20">
           <CardContent className="p-4">
             <div className="flex items-start gap-3">
-              <div className="p-1.5 rounded-lg bg-orange-500/10 flex-shrink-0">
-                <AlertTriangle className="h-4 w-4 text-orange-400" />
+              <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-400/40 flex-shrink-0">
+                <AlertTriangle className="h-4 w-4 text-amber-300" />
               </div>
               <div className="flex-1 space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  Сначала добавьте награды на вкладке <strong className="text-foreground">"Награды"</strong>.
+                <p className="text-sm text-amber-100/90">
+                  Сначала добавьте награды на вкладке <strong className="text-amber-50">"Награды"</strong>.
                 </p>
                 <Button
                   onClick={() => navigate('/dashboard/drops?tab=rewards')}
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs border-slate-700 bg-slate-900/70 hover:bg-slate-800"
+                  className="h-8 text-xs border-amber-300/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
                 >
                   <Package className="w-3.5 h-3.5 mr-1.5" />
                   Настроить награды
@@ -354,7 +354,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         </CardContent>
       </Card>
 
-      {/* Инструкция и цветовая схема */}
+      {/* �?нструкция и цветовая схема */}
       {donationEnabledDisplay && (
         <Card className={SURFACE_CARD_CLASS}>
           <CardContent className="pt-4 pb-4 space-y-3">
@@ -465,12 +465,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       size="sm"
                       className={`h-7 px-2 text-xs ${
                         formData.mythical_min_interval_hours[0] === preset
-                          ? 'bg-slate-700 text-slate-100 border-slate-600'
-                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                          ? 'bg-accent text-foreground border-border/70'
+                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
                       }`}
                       onClick={() => setMythicalMinInterval(preset)}
                     >
-                      {preset}ч
+                      {preset}С‡
                     </Button>
                   ))}
                 </div>
@@ -504,12 +504,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       size="sm"
                       className={`h-7 px-2 text-xs ${
                         formData.mythical_max_interval_hours[0] === preset
-                          ? 'bg-slate-700 text-slate-100 border-slate-600'
-                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                          ? 'bg-accent text-foreground border-border/70'
+                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
                       }`}
                       onClick={() => setMythicalMaxInterval(preset)}
                     >
-                      {preset}ч
+                      {preset}С‡
                     </Button>
                   ))}
                 </div>
@@ -543,12 +543,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       size="sm"
                       className={`h-7 px-2 text-xs ${
                         formData.mythical_window_duration_minutes[0] === preset
-                          ? 'bg-slate-700 text-slate-100 border-slate-600'
-                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                          ? 'bg-accent text-foreground border-border/70'
+                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
                       }`}
                       onClick={() => setMythicalWindowDuration(preset)}
                     >
-                      {preset}м
+                      {preset}Рј
                     </Button>
                   ))}
                 </div>
@@ -583,12 +583,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       size="sm"
                       className={`h-7 px-2 text-xs ${
                         formData.mythical_donation_amount[0] === preset
-                          ? 'bg-slate-700 text-slate-100 border-slate-600'
-                          : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                          ? 'bg-accent text-foreground border-border/70'
+                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
                       }`}
                       onClick={() => setMythicalDonationAmount(preset)}
                     >
-                      {preset}₽
+                      {preset}в‚Ѕ
                     </Button>
                   ))}
                 </div>
@@ -598,7 +598,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         )}
       </Card>
 
-      {/* История донатов */}
+      {/* �?стория донатов */}
       <DonationHistory user={user} platform={platform} channelName={channelName} />
 
       {/* ✅ Убрали кнопку "Сохранить" - автосохранение работает автоматически */}
@@ -607,3 +607,4 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
 };
 
 export default DonationSettings;
+

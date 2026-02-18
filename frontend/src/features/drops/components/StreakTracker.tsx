@@ -19,7 +19,7 @@ interface StreakTrackerProps {
   channelName: string;
 }
 
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 
 const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
   const [streaks, setStreaks] = useState<Streak[]>([]);
@@ -143,7 +143,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
         </div>
 
         {/* Таблица стриков */}
-        <div className="border border-slate-800 rounded-lg overflow-hidden bg-slate-950/60">
+        <div className="border border-border/70 rounded-lg overflow-hidden bg-card/60">
           {filteredStreaks.length === 0 && !loading ? (
             <div className="text-center py-12 text-muted-foreground">
               <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -153,7 +153,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-900/80">
+                <thead className="bg-card/70">
                   <tr>
                     <th className="text-left p-3 font-medium text-sm">#</th>
                     <th className="text-left p-3 font-medium text-sm">Зритель</th>
@@ -169,7 +169,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
                     const colorClass = getStreakColor(streak.current_streak);
 
                     return (
-                        <tr key={`${streak.viewer_name}-${streak.current_streak}`} className="hover:bg-slate-900/80 transition-colors">
+                        <tr key={`${streak.viewer_name}-${streak.current_streak}`} className="hover:bg-card/70 transition-colors">
                         <td className="p-3 text-sm text-muted-foreground">
                           {index + 1}
                         </td>
@@ -235,3 +235,4 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
 };
 
 export default StreakTracker;
+

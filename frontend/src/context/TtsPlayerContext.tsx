@@ -23,12 +23,14 @@ interface TtsPlayerContextValue {
     isPlaying: boolean;
     isPaused: boolean;
     isPrimaryPlayerTab: boolean;
+    isAudioUnlocked: boolean;
     addToQueue: (item: Omit<TtsQueueItem, 'id' | 'timestamp'>) => void;
     clearQueue: () => void;
     skipCurrent: () => void;
     playFromQueue: (index: number) => void;
     togglePause: () => void;
     requestPrimaryPlayerTab: () => void;
+    unlockAudio: () => Promise<void>;
 }
 
 const TtsPlayerContext = createContext<TtsPlayerContextValue | undefined>(undefined);
@@ -41,6 +43,7 @@ const TTS_PLAYER_ROUTE = '/tts-player';
 const TTS_PLAYER_LOCK_KEY = 'tts_player_active_tab';
 const TTS_PLAYER_LOCK_HEARTBEAT_MS = 2000;
 const TTS_PLAYER_LOCK_TTL_MS = 6500;
+const TTS_PLAYER_AUDIO_UNLOCKED_KEY = 'tts_player_audio_unlocked';
 
 const getStoredListeningMode = (): 'website' | 'obs' => {
     if (typeof window === 'undefined') return 'website';
@@ -55,6 +58,11 @@ const getStoredTtsEnabled = (): boolean => {
     return stored === 'true';
 };
 
+const getStoredAudioUnlocked = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(TTS_PLAYER_AUDIO_UNLOCKED_KEY) === 'true';
+};
+
 
 export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }) => {
     const location = useLocation();
@@ -65,11 +73,14 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     const [listeningMode, setListeningMode] = useState<'website' | 'obs'>(getStoredListeningMode);
     const [isPrimaryPlayerTab, setIsPrimaryPlayerTab] = useState<boolean>(false);
     const [ttsEnabled, setTtsEnabled] = useState<boolean>(getStoredTtsEnabled);
+    const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(getStoredAudioUnlocked);
 
     const audioContext = useRef<AudioContext | null>(null);
     const currentSource = useRef<AudioBufferSourceNode | null>(null);
     const audioElement = useRef<HTMLAudioElement | null>(null);
     const queueRef = useRef<TtsQueueItem[]>([]);
+    const isStartingPlaybackRef = useRef<boolean>(false);
+    const playbackRequestIdRef = useRef<number>(0);
     const listeningModeRef = useRef<'website' | 'obs'>(listeningMode);
     const isPrimaryPlayerTabRef = useRef<boolean>(isPrimaryPlayerTab);
     const ttsEnabledRef = useRef<boolean>(ttsEnabled);
@@ -82,6 +93,68 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     const MAX_RETRIES = 3;
     const { isAuthenticated, user } = useAuth();
     const isPlayerRoute = location.pathname === TTS_PLAYER_ROUTE;
+
+    const invalidatePlaybackRequests = useCallback(() => {
+        playbackRequestIdRef.current += 1;
+        isStartingPlaybackRef.current = false;
+    }, []);
+
+    const stopActivePlayback = useCallback(() => {
+        if (currentSource.current) {
+            try {
+                currentSource.current.onended = null;
+                currentSource.current.stop();
+            } catch {
+                // no-op: source could already be stopped
+            }
+            currentSource.current = null;
+        }
+        if (audioElement.current) {
+            try {
+                audioElement.current.onended = null;
+                audioElement.current.onerror = null;
+                audioElement.current.pause();
+                audioElement.current.currentTime = 0;
+            } catch {
+                // no-op: element could already be detached
+            }
+            audioElement.current = null;
+        }
+    }, []);
+
+    const unlockAudio = useCallback(async (): Promise<void> => {
+        const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        if (!AudioContextClass) {
+            return;
+        }
+
+        if (!audioContext.current || audioContext.current.state === 'closed') {
+            audioContext.current = new AudioContextClass();
+            logger.info('[AUDIO] [TTS Player] AudioContext created');
+        }
+
+        try {
+            if (audioContext.current.state === 'suspended') {
+                await audioContext.current.resume();
+            }
+
+            // Silent short pulse to reliably unlock output path after user gesture.
+            const osc = audioContext.current.createOscillator();
+            const gain = audioContext.current.createGain();
+            gain.gain.value = 0.00001;
+            osc.frequency.value = 220;
+            osc.connect(gain);
+            gain.connect(audioContext.current.destination);
+            osc.start();
+            osc.stop(audioContext.current.currentTime + 0.01);
+
+            setIsAudioUnlocked(true);
+            window.localStorage.setItem(TTS_PLAYER_AUDIO_UNLOCKED_KEY, 'true');
+            logger.info('[AUDIO] [TTS Player] Audio unlocked');
+        } catch (error) {
+            logger.debug('[AUDIO] [TTS Player] Audio unlock deferred until user gesture: %s', error);
+        }
+    }, []);
 
     const resolveAudioUrl = useCallback((rawAudioUrl: string): string => {
         let audioUrl = rawAudioUrl;
@@ -431,56 +504,44 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             return;
         }
 
-        const initAudioContext = async (tryResume: boolean) => {
-            if (!audioContext.current || audioContext.current.state === 'closed') {
-                const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-                if (AudioContextClass) {
-                    audioContext.current = new AudioContextClass();
-                    logger.info('[AUDIO] [TTS Player] AudioContext created');
-                }
-            }
-
-            if (tryResume && audioContext.current && audioContext.current.state === 'suspended') {
-                try {
-                    await audioContext.current.resume();
-                    logger.info('[AUDIO] [TTS Player] AudioContext resumed');
-                } catch (error) {
-                    logger.debug('[AUDIO] [TTS Player] AudioContext resume deferred until user gesture: %s', error);
-                }
-            }
+        const tryUnlock = () => {
+            void unlockAudio();
         };
 
-        void initAudioContext(true);
+        // Try once immediately (may fail silently until first gesture).
+        tryUnlock();
 
-        const handleUserInteraction = () => {
-            void initAudioContext(true);
-            document.removeEventListener('click', handleUserInteraction);
-            document.removeEventListener('keydown', handleUserInteraction);
-            document.removeEventListener('pointerdown', handleUserInteraction);
-        };
-
-        document.addEventListener('click', handleUserInteraction);
-        document.addEventListener('keydown', handleUserInteraction);
-        document.addEventListener('pointerdown', handleUserInteraction);
+        if (!isAudioUnlocked) {
+            document.addEventListener('click', tryUnlock);
+            document.addEventListener('keydown', tryUnlock);
+            document.addEventListener('pointerdown', tryUnlock);
+        }
 
         return () => {
-            document.removeEventListener('click', handleUserInteraction);
-            document.removeEventListener('keydown', handleUserInteraction);
-            document.removeEventListener('pointerdown', handleUserInteraction);
+            document.removeEventListener('click', tryUnlock);
+            document.removeEventListener('keydown', tryUnlock);
+            document.removeEventListener('pointerdown', tryUnlock);
 
             if (audioContext.current && audioContext.current.state !== 'closed') {
                 audioContext.current.close();
             }
         };
-    }, [isAuthenticated, listeningMode, isPlayerRoute, isPrimaryPlayerTab]);
+    }, [isAuthenticated, listeningMode, isPlayerRoute, isPrimaryPlayerTab, isAudioUnlocked, unlockAudio]);
 
 
     const playNext = useCallback(async () => {
+        if (isStartingPlaybackRef.current) {
+            return;
+        }
+        isStartingPlaybackRef.current = true;
+        const requestId = ++playbackRequestIdRef.current;
+
         if (!ttsEnabledRef.current) {
             setQueue([]);
             setCurrentItem(null);
             setIsPlaying(false);
             setIsPaused(false);
+            isStartingPlaybackRef.current = false;
             return;
         }
 
@@ -489,6 +550,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             setCurrentItem(null);
             setIsPlaying(false);
             setIsPaused(false);
+            isStartingPlaybackRef.current = false;
             return;
         }
 
@@ -497,6 +559,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             setCurrentItem(null);
             setIsPlaying(false);
             setIsPaused(false);
+            isStartingPlaybackRef.current = false;
             return;
         }
 
@@ -506,6 +569,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             setCurrentItem(null);
             setIsPlaying(false);
             setIsPaused(false);
+            isStartingPlaybackRef.current = false;
             return;
         }
 
@@ -531,11 +595,19 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await audioContext.current.decodeAudioData(arrayBuffer);
 
+                if (requestId !== playbackRequestIdRef.current) {
+                    isStartingPlaybackRef.current = false;
+                    return;
+                }
+
                 if (listeningModeRef.current !== 'website' || !isPlayerRouteRef.current) {
                     setIsPlaying(false);
                     setCurrentItem(null);
+                    isStartingPlaybackRef.current = false;
                     return;
                 }
+
+                stopActivePlayback();
 
                 const source = audioContext.current.createBufferSource();
                 const gainNode = audioContext.current.createGain();
@@ -547,6 +619,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 gainNode.connect(audioContext.current.destination);
 
                 source.onended = () => {
+                    if (requestId !== playbackRequestIdRef.current) return;
                     logger.debug('[AUDIO] [TTS Player] Audio finished');
                     retryCount.current = 0;
                     currentSource.current = null;
@@ -559,6 +632,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 currentSource.current = source;
                 source.start(0);
                 logger.info('[OK] [TTS Player] Playing TTS via Web Audio API');
+                isStartingPlaybackRef.current = false;
             } else {
                 throw new Error('AudioContext not available');
             }
@@ -566,16 +640,25 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
             logger.warn('[TTS Player] Web Audio API failed, falling back to Audio element:', errorMessage);
 
+            if (requestId !== playbackRequestIdRef.current) {
+                isStartingPlaybackRef.current = false;
+                return;
+            }
+
             if (listeningModeRef.current !== 'website' || !isPlayerRouteRef.current) {
                 setIsPlaying(false);
                 setCurrentItem(null);
+                isStartingPlaybackRef.current = false;
                 return;
             }
+
+            stopActivePlayback();
 
             const audio = new Audio(nextItem.audioUrl);
             audio.volume = nextItem.volume / 100;
 
             audio.onended = () => {
+                if (requestId !== playbackRequestIdRef.current) return;
                 logger.debug('[AUDIO] [TTS Player] Audio finished (fallback)');
                 retryCount.current = 0;
                 audioElement.current = null;
@@ -586,6 +669,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             };
 
             audio.onerror = () => {
+                if (requestId !== playbackRequestIdRef.current) return;
                 logger.error('[TTS Player] Audio playback error');
                 audioElement.current = null;
                 setIsPlaying(false);
@@ -608,8 +692,18 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
 
             try {
                 await audio.play();
+                if (requestId !== playbackRequestIdRef.current) {
+                    try {
+                        audio.pause();
+                    } catch {
+                        // no-op
+                    }
+                    isStartingPlaybackRef.current = false;
+                    return;
+                }
                 retryCount.current = 0;
                 logger.info('[OK] [TTS Player] Playing TTS via Audio element');
+                isStartingPlaybackRef.current = false;
             } catch (playErr) {
                 logger.error('[TTS Player] Failed to play audio:', playErr);
                 audioElement.current = null;
@@ -627,26 +721,21 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                     retryCount.current = 0;
                     setTimeout(() => playNext(), 100);
                 }
+                isStartingPlaybackRef.current = false;
             }
         }
-    }, []);
+    }, [stopActivePlayback]);
 
     const clearQueue = useCallback(() => {
-        if (currentSource.current) {
-            currentSource.current.stop();
-            currentSource.current = null;
-        }
-        if (audioElement.current) {
-            audioElement.current.pause();
-            audioElement.current = null;
-        }
+        invalidatePlaybackRequests();
+        stopActivePlayback();
 
         setQueue([]);
         setCurrentItem(null);
         setIsPlaying(false);
         setIsPaused(false);
         logger.info('[DELETE] [TTS Player] Queue cleared');
-    }, []);
+    }, [invalidatePlaybackRequests, stopActivePlayback]);
 
     useEffect(() => {
         if (!ttsEnabled) {
@@ -704,21 +793,15 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     }, []);
 
     const skipCurrent = useCallback(() => {
-        if (currentSource.current) {
-            currentSource.current.stop();
-            currentSource.current = null;
-        }
-        if (audioElement.current) {
-            audioElement.current.pause();
-            audioElement.current = null;
-        }
+        invalidatePlaybackRequests();
+        stopActivePlayback();
 
         setCurrentItem(null);
         setIsPlaying(false);
         setIsPaused(false);
         setTimeout(() => playNext(), 100);
         logger.info('[SKIP] [TTS Player] Skipped current item');
-    }, [playNext]);
+    }, [invalidatePlaybackRequests, stopActivePlayback, playNext]);
 
     const playFromQueue = useCallback((index: number) => {
         const currentQueue = queueRef.current;
@@ -730,14 +813,8 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         queueRef.current = newQueue;
         setQueue(newQueue);
 
-        if (currentSource.current) {
-            currentSource.current.stop();
-            currentSource.current = null;
-        }
-        if (audioElement.current) {
-            audioElement.current.pause();
-            audioElement.current = null;
-        }
+        invalidatePlaybackRequests();
+        stopActivePlayback();
 
         setCurrentItem(null);
         setIsPlaying(false);
@@ -745,7 +822,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
 
         setTimeout(() => playNext(), 100);
         logger.info(`[QUEUE] [TTS Player] Jumped to item #${index + 1}`);
-    }, [playNext]);
+    }, [invalidatePlaybackRequests, stopActivePlayback, playNext]);
 
     const togglePause = useCallback(() => {
         if (!currentItem) return;
@@ -791,12 +868,14 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         isPlaying,
         isPaused,
         isPrimaryPlayerTab,
+        isAudioUnlocked,
         addToQueue,
         clearQueue,
         skipCurrent,
         playFromQueue,
         togglePause,
-        requestPrimaryPlayerTab
+        requestPrimaryPlayerTab,
+        unlockAudio
     };
 
     return (

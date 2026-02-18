@@ -207,6 +207,7 @@ class Bot(TwitchBotCore):
                 from core.database import SessionLocal
                 from repositories.user_repository import UserRepository
                 from repositories.tts_settings_repository import TTSSettingsRepository
+                from services.memealerts_service import MemeAlertsService
                 
                 db = SessionLocal()
                 try:
@@ -214,6 +215,27 @@ class Bot(TwitchBotCore):
                     user = user_repo.get_by_twitch_username(message.channel.name)
                     
                     if user:
+                        memealerts_service = MemeAlertsService(db)
+                        meme_reward_result = await memealerts_service.process_points_reward_redemption(
+                            user_id=user.id,
+                            platform="twitch",
+                            channel_name=message.channel.name,
+                            redeemer_name=message.author.name,
+                            reward_input=message.content.strip(),
+                            reward_id=reward_id,
+                        )
+                        if meme_reward_result.get("handled"):
+                            if meme_reward_result.get("success"):
+                                await message.channel.send(
+                                    f"@{message.author.name}, выдано {meme_reward_result.get('amount')} "
+                                    f"мемкоинов пользователю {meme_reward_result.get('nickname')}"
+                                )
+                            else:
+                                await message.channel.send(
+                                    f"@{message.author.name}, {meme_reward_result.get('error', 'не удалось выдать мемкоины')}"
+                                )
+                            return
+
                         tts_repo = TTSSettingsRepository(db)
                         tts_settings = tts_repo.get_or_create(user_id=user.id)
                         yt_settings = getattr(tts_settings, 'youtube_settings', {}) or {}

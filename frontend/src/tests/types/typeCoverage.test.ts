@@ -26,9 +26,6 @@ import type {
   AdminLog,
   LogStats,
   LogsResponse,
-  SupportTicket,
-  TicketResponse,
-  TicketsResponse,
   UserSession,
   Integration,
   UsersResponse,
@@ -103,23 +100,6 @@ function isAdminLog(value: unknown): value is AdminLog {
     'status' in value &&
     typeof (value as AdminLog).id === 'number' &&
     ['success', 'failed', 'warning'].includes((value as AdminLog).status)
-  );
-}
-
-/**
- * Type guard to check if a value conforms to SupportTicket structure
- */
-function isSupportTicket(value: unknown): value is SupportTicket {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'id' in value &&
-    'subject' in value &&
-    'message' in value &&
-    'status' in value &&
-    typeof (value as SupportTicket).id === 'number' &&
-    typeof (value as SupportTicket).subject === 'string' &&
-    ['open', 'in_progress', 'closed'].includes((value as SupportTicket).status)
   );
 }
 
@@ -246,28 +226,6 @@ describe('Type Coverage Completeness', () => {
       );
     });
 
-    // Feature: frontend-typescript-linting, Property 2: Type Coverage Completeness
-    // Validates: Requirements 4.1, 5.1
-    it('should validate SupportTicket structure for any ticket data', () => {
-      fc.assert(
-        fc.property(
-          fc.record({
-            id: fc.integer({ min: 1 }),
-            subject: fc.string({ minLength: 1 }),
-            message: fc.string(),
-            user_name: fc.string(),
-            status: fc.constantFrom('open', 'in_progress', 'closed'),
-            created_at: fc.string(),
-            updated_at: fc.string(),
-            is_archived: fc.option(fc.boolean(), { nil: undefined }),
-          }),
-          (ticket) => {
-            return isSupportTicket(ticket);
-          }
-        ),
-        { numRuns: 100 }
-      );
-    });
   });
 
   describe('Drops Types', () => {
@@ -339,9 +297,6 @@ describe('Type Coverage Completeness', () => {
         AdminLog: true,
         LogStats: true,
         LogsResponse: true,
-        SupportTicket: true,
-        TicketResponse: true,
-        TicketsResponse: true,
         UserSession: true,
         Integration: true,
         UsersResponse: true,

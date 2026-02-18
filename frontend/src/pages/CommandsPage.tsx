@@ -110,7 +110,7 @@ const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
 const CONTROL_TRIGGER_CLASS = 'h-9 w-full border-border/70 bg-background/80 shadow-none';
 const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const TAB_TRIGGER_CLASS =
-    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none';
+    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-400 data-[state=active]:shadow-none';
 
 const hasBrokenSymbols = (text: string): boolean => {
     const normalized = text.trim();
@@ -214,15 +214,10 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                         </code>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2">
-                            <Badge variant={command.enabled ? "default" : "secondary"}>
-                                {command.enabled ? 'Включена' : 'Отключена'}
-                            </Badge>
-                            <Switch
-                                checked={command.enabled}
-                                onCheckedChange={(checked) => onToggle(command.name, { is_enabled: checked }, command.id)}
-                            />
-                        </div>
+                        <Switch
+                            checked={command.enabled}
+                            onCheckedChange={(checked) => onToggle(command.name, { is_enabled: checked }, command.id)}
+                        />
                         {type === 'custom' && (
                             <Badge variant="outline">Кастомная</Badge>
                         )}
@@ -288,10 +283,10 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
 
                 <div className="flex gap-2 pt-2 border-t border-border/30">
                     <Button
-                        variant="outline"
+                        variant="default"
                         size="sm"
                         onClick={() => onEdit(command)}
-                        className="flex-1 h-8 text-xs"
+                        className="flex-1 h-8 text-xs bg-none bg-primary hover:bg-primary/90"
                     >
                         <Edit2 className="h-3 w-3 mr-1" />
                         Настроить
@@ -432,8 +427,7 @@ const CommandsPage: React.FC = () => {
         return tagConfig[tag] || { icon: Tag, color: 'bg-muted/60 text-muted-foreground border-border' };
     };
 
-    const availablePlatforms = platformOptions.filter(opt => opt.enabled);
-    const platformsToShow = availablePlatforms.length > 0 ? availablePlatforms : platformOptions;
+    const platformsToShow = platformOptions;
 
     const getPlatformLabel = (platforms: string): string => {
         if (platforms === 'twitch,vk' || platforms === 'all') return 'Все платформы';
@@ -565,12 +559,18 @@ const CommandsPage: React.FC = () => {
         setEditingCommand(command);
         const platform = command.platform || 'all';
         const user_level = command.user_level || 'everyone';
+        const roleMap: Record<string, string> = {
+            everyone: 'all',
+            subscriber: 'vip',
+            moderator: 'moderator',
+            broadcaster: 'broadcaster',
+        };
         // Get extra_settings from command if available
         const cmdExtraSettings = (command as unknown as { extra_settings?: Record<string, unknown> }).extra_settings || {};
         setEditForm({
             is_enabled: command.enabled ?? true,
             platforms: platform === 'all' ? 'twitch,vk' : platform,
-            allowed_roles: user_level,
+            allowed_roles: roleMap[user_level] || user_level,
             cooldown_seconds: command.cooldown || 0,
             response_text: command.response || '',
             extra_settings: cmdExtraSettings
@@ -610,7 +610,7 @@ const CommandsPage: React.FC = () => {
                     <Card className={SURFACE_CARD_CLASS}>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between mb-4" />
-                            <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,1fr)_200px_230px] gap-3 mb-6 items-center">
+                            <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_170px_190px] gap-2 mb-4 items-center">
                                 <div className="flex-1">
                                     <div className="relative">
                                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -733,7 +733,7 @@ const CommandsPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {getFilteredBasicCommands().map((command: ChatCommand) => (
                                     <div key={command.id || command.name}>
                                         <CommandCard
@@ -861,6 +861,7 @@ const CommandsPage: React.FC = () => {
                                                     ...prev,
                                                     cooldown_seconds: parseInt(e.target.value) || 0
                                                 }))}
+                                                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     </div>
@@ -880,7 +881,7 @@ const CommandsPage: React.FC = () => {
                             {customCommands.length > 0 && (
                                 <>
                                     <div className="flex items-center justify-between mb-4" />
-                                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,1fr)_200px_230px] gap-3 mb-6 items-center">
+                                    <div className="grid grid-cols-1 lg:grid-cols-[minmax(280px,1fr)_170px_190px] gap-2 mb-4 items-center">
                                         <div className="flex-1">
                                             <div className="relative">
                                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
@@ -936,7 +937,7 @@ const CommandsPage: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                                     {getFilteredCustomCommands().map((command: ChatCommand) => (
                                         <div key={command.id || command.name}>
                                             <CommandCard
@@ -964,17 +965,6 @@ const CommandsPage: React.FC = () => {
                     </DialogHeader>
                     {editingCommand && (
                         <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <Label>Включена</Label>
-                                <Switch
-                                    checked={editForm.is_enabled}
-                                    onCheckedChange={(checked) => setEditForm(prev => ({
-                                        ...prev,
-                                        is_enabled: checked
-                                    }))}
-                                />
-                            </div>
-
                             {editingCommand.command_type === 'custom' && (
                                 <div>
                                     <Label htmlFor="edit_response">Ответ команды</Label>
@@ -1051,6 +1041,7 @@ const CommandsPage: React.FC = () => {
                                         ...prev,
                                         cooldown_seconds: parseInt(e.target.value) || 0
                                     }))}
+                                    className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
 
@@ -1074,7 +1065,7 @@ const CommandsPage: React.FC = () => {
                                                 skip_votes_required: parseInt(e.target.value) || 1
                                             }
                                         }))}
-                                        className="w-24"
+                                        className="w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                 </div>
                             )}

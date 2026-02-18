@@ -11,7 +11,7 @@ import {
     loadChatBadges,
     loadCompleteChatHistory
 } from '@/features/chat/utils/chatHistoryHelpers';
-import { clearEmotesCache, getAllEmotesForChannel } from '@/features/chat/utils/emotes';
+import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
 import { filterMessagesByPlatform } from '@/features/chat/utils/messageFilterHelpers';
 import {
     autoScrollIfAtBottom,
@@ -263,7 +263,6 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                 const username = user?.twitch_username;
                 const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
                 if (username) {
-                    clearEmotesCache();
                     const emotesData = await getAllEmotesForChannel(username, twitchUserId);
                     setEmotes(emotesData);
                 } else {
@@ -282,15 +281,8 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
         if (lastEmotesKeyRef.current === key) return;
         lastEmotesKeyRef.current = key;
 
-        clearEmotesCache();
         void loadEmotes();
         logger.debug(`[CHAT] Emotes reload key: ${key}`);
-
-        const timer = setTimeout(() => {
-            void loadEmotes();
-        }, CHAT_CONSTANTS.EMOJI_LOAD_DELAY);
-
-        return () => clearTimeout(timer);
     }, [user?.twitch_username, user?.integrations?.twitch]);
 
     // Scroll management

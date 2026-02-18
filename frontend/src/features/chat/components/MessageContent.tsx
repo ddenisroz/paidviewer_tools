@@ -158,6 +158,13 @@ const renderMessageWithEmotes = (
                         className={className}
                         title={title}
                         loading="lazy"
+                        onError={(e) => {
+                            const target = e.currentTarget;
+                            const fallback = document.createElement('span');
+                            fallback.textContent = `:${alt}:`;
+                            fallback.className = 'text-xs opacity-80';
+                            target.replaceWith(fallback);
+                        }}
                     />
                 );
             }

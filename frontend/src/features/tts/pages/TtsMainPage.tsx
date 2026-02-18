@@ -242,28 +242,6 @@ const TtsMainPageContent: React.FC = () => {
         version: 1,
     });
 
-    const { data: ttsStatus } = useTtsStatus();
-
-    // Синхронизация состояния TTS с бэкендом при загрузке
-    useEffect(() => {
-        const statusData = ttsStatus?.data;
-        if (statusData?.enabled !== undefined) {
-            const engineType = statusData.engine_type || 'gtts';
-            const isF5 = engineType === 'cloud' || engineType === 'local';
-            const isGcloud = engineType === 'gcloud';
-            setBasicTtsEnabled(statusData.enabled && engineType === 'gtts');
-            setAiTtsEnabled(statusData.enabled && isF5);
-            setGcloudTtsEnabled(statusData.enabled && isGcloud);
-
-            if (statusData.engine_type) {
-                setTtsEngine(statusData.engine_type as 'cloud' | 'local' | 'gtts' | 'gcloud');
-                if (isF5) {
-                    setF5Mode(statusData.engine_type as 'cloud' | 'local');
-                }
-            }
-        }
-    }, [ttsStatus]);
-
     const [_localTtsConfig, _setLocalTtsConfig] = useState<unknown>(null);
     const [isSavingMode, setIsSavingMode] = useState<boolean>(false);
     const [isRegeneratingUrl, setIsRegeneratingUrl] = useState<boolean>(false);
@@ -273,6 +251,7 @@ const TtsMainPageContent: React.FC = () => {
     const gcloudPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
     const gcloudSelectionInitializedRef = useRef<boolean>(false);
     const gcloudVoicesRequestStartedRef = useRef<boolean>(false);
+    const lastGcloudPreviewAtRef = useRef<number>(0);
 
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled;
@@ -340,8 +319,9 @@ const TtsMainPageContent: React.FC = () => {
         refetchIntervalInBackground: false,
         staleTime: 60000,
         gcTime: 5 * 60 * 1000,
-        refetchOnMount: 'always',
-        refetchOnWindowFocus: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        retry: false,
         initialData: () => getQueryCache(queryKeys.tts.status(null)) || undefined
     });
     const ttsStatusData = ttsStatusResponse?.data;
@@ -376,32 +356,36 @@ const TtsMainPageContent: React.FC = () => {
 
     const { data: ttsSettingsResponse } = useTtsSettings({
         enabled: !!isAuthenticated,
-        refetchOnMount: 'always',
-        refetchOnWindowFocus: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        retry: false,
         initialData: () => getQueryCache(['tts-settings']) || undefined
     });
     const ttsSettingsData = ttsSettingsResponse?.data;
 
     const { data: audioSettingsResponse } = useTtsAudioSettings({
         enabled: !!isAuthenticated,
-        refetchOnMount: 'always',
-        refetchOnWindowFocus: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        retry: false,
         initialData: () => getQueryCache(['tts-audio-settings']) || undefined
     });
     const audioSettingsData = audioSettingsResponse?.data;
 
     const { data: platformSettingsResponse } = useTtsPlatformSettings({
         enabled: !!isAuthenticated,
-        refetchOnMount: 'always',
-        refetchOnWindowFocus: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        retry: false,
         initialData: () => getQueryCache(['tts-platform-settings']) || undefined
     });
     const platformSettingsData = platformSettingsResponse?.data;
 
     const { data: modeSettingsResponse } = useTtsModeSettings({
         enabled: !!isAuthenticated,
-        refetchOnMount: 'always',
-        refetchOnWindowFocus: true,
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        retry: false,
         initialData: () => getQueryCache(['tts-mode-settings']) || undefined
     });
     const modeSettingsData = modeSettingsResponse?.data;
@@ -994,9 +978,6 @@ const TtsMainPageContent: React.FC = () => {
     const handleListeningModeChange = (mode: 'website' | 'obs'): void => {
         setListeningMode(mode);
         saveListeningModeMutation.mutate(mode);
-        if (mode === 'website') {
-            openPlayerTab();
-        }
     };
 
     const persistGcloudVoices = useCallback((voices: string[]): void => {
@@ -1060,6 +1041,12 @@ const TtsMainPageContent: React.FC = () => {
 
     const handleGcloudPreview = useCallback(async (voiceName: string): Promise<void> => {
         if (previewingGcloudVoice === voiceName) return;
+        const now = Date.now();
+        if (now - lastGcloudPreviewAtRef.current < 1500) {
+            toast.warning('Слишком часто. Подождите чуть-чуть перед следующим тестом.');
+            return;
+        }
+        lastGcloudPreviewAtRef.current = now;
 
         setPreviewingGcloudVoice(voiceName);
         try {
@@ -1152,7 +1139,7 @@ const TtsMainPageContent: React.FC = () => {
                 version: newSettings.version
             };
             saveTtsSettingsMutation.mutate(ttsSettingsPayload);
-        }, 200);
+        }, 450);
     }, [ttsSettings, saveTtsSettingsMutation]);
 
     const handlePlatformToggle = useCallback((platform: 'twitch' | 'vk'): void => {
@@ -1302,9 +1289,7 @@ const TtsMainPageContent: React.FC = () => {
                                     </div>
                                 </CardHeader>
                                 <CardContent className="space-y-4 flex-1 flex flex-col">
-                                    {/* Режим триггера */}
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-400 mb-2">Режим триггера</label>
                                         <TtsChannelPointsMode
                                             ttsMode={ttsTriggerMode}
                                             onModeChange={handleTtsModeChange}
@@ -1329,7 +1314,6 @@ const TtsMainPageContent: React.FC = () => {
                                             >
                                                 <div>
                                                     <div className="text-sm font-semibold text-white">Google TTS</div>
-                                                    <div className="text-xs text-gray-400">Базовый, бесплатно</div>
                                                 </div>
                                                 <Switch
                                                     checked={basicTtsEnabled && !aiTtsEnabled && !gcloudTtsEnabled}
@@ -1377,7 +1361,6 @@ const TtsMainPageContent: React.FC = () => {
                                             >
                                                 <div>
                                                     <div className="text-sm font-semibold text-white">Google Cloud TTS</div>
-                                                    <div className="text-xs text-gray-400">Качественный, облачный</div>
                                                 </div>
                                                 <Switch
                                                     checked={gcloudTtsEnabled}
@@ -1391,7 +1374,6 @@ const TtsMainPageContent: React.FC = () => {
                                                 <div className="rounded-lg border border-gray-700/40 bg-gray-900/40 p-3">
                                                     <div className="flex items-center justify-between">
                                                         <div>
-                                                            <div className="text-xs font-semibold text-gray-200">Голоса Google Cloud</div>
                                                             <div className="text-[10px] text-gray-500">Случайный голос из выбранных</div>
                                                         </div>
                                                         <div className="text-[10px] text-gray-500">
@@ -1519,11 +1501,6 @@ const TtsMainPageContent: React.FC = () => {
                                                     </div>
                                                 </div>
                                             )}
-                                            {!aiTtsEnabled && (
-                                                <p className="px-2 text-[11px] text-gray-500">
-                                                    Сначала включите F5 TTS, затем выберите метод озвучки.
-                                                </p>
-                                            )}
                                         </div>
                                     </div>
 
@@ -1536,7 +1513,7 @@ const TtsMainPageContent: React.FC = () => {
                                                     <button
                                                         onClick={() => handleListeningModeChange('website')}
                                                         className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
-                                                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                                                            ? 'bg-emerald-600 text-white'
                                                             : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
                                                             }`}
                                                     >
@@ -1545,7 +1522,7 @@ const TtsMainPageContent: React.FC = () => {
                                                     <button
                                                         onClick={() => handleListeningModeChange('obs')}
                                                         className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
-                                                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                                                            ? 'bg-emerald-600 text-white'
                                                             : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
                                                             }`}
                                                     >

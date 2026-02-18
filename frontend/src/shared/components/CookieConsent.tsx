@@ -21,7 +21,7 @@ const CookieConsent: React.FC = () => {
 
     return (
         <div className="fixed bottom-4 right-4 z-50 max-w-xs">
-            <div className="relative bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-xl p-3 shadow-2xl animate-in slide-in-from-left-4 duration-500">
+            <div className="relative bg-popover/95 backdrop-blur-sm border border-border/70 rounded-xl p-3 shadow-2xl animate-in slide-in-from-left-4 duration-500">
                 {/* Иконка печенья */}
                 <div className="absolute -top-5 -right-2">
                     <div className="bg-amber-500/20 rounded-full px-2 py-1 flex items-center justify-center border border-amber-500/30">
@@ -38,7 +38,7 @@ const CookieConsent: React.FC = () => {
                     {/* Кнопка */}
                     <button
                         onClick={handleAccept}
-                        className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white text-xs font-medium py-2 px-3 rounded-lg transition-all duration-200 hover:shadow-lg"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 px-3 rounded-lg transition-all duration-200 hover:shadow-lg"
                     >
                         Принять
                     </button>

@@ -1,6 +1,7 @@
 ﻿// src/components/chatbox/PreviewPanel.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
+import { API_BASE_URL } from '@/constants';
 import MessageContent from '@/features/chat/components/MessageContent';
 import { getGlobalEmotes } from '@/features/chat/utils/emotes';
 import { twitchBadgesService } from '@/services/twitchBadges';
@@ -69,7 +70,7 @@ interface EmoteData {
 const FALLBACK_7TV_EMOTE: EmoteData = {
     id: 'preview-7tv',
     name: 'JustAnotherDay',
-    url: 'https://cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp',
+    url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
     animated: false
 };
 
@@ -306,12 +307,29 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                             const previewText = isHorizontal
                                 ? truncateWords(messageText, 6)
                                 : messageText;
+                            const vkInlineEmotes = new Map<string, EmoteData>();
+                            if (msg.platform === 'vk' && Array.isArray(msg.emotes)) {
+                                msg.emotes.forEach((emote) => {
+                                    if (!emote?.name || !emote?.url) return;
+                                    const mapped: EmoteData = {
+                                        id: String(emote.id || emote.name),
+                                        name: emote.name,
+                                        url: emote.url,
+                                        animated: false
+                                    };
+                                    vkInlineEmotes.set(emote.name, mapped);
+                                    vkInlineEmotes.set(emote.name.toLowerCase(), mapped);
+                                });
+                            }
+                            const messageGlobalEmotes = settings.show_7tv_emotes
+                                ? new Map<string, EmoteData>([...effectiveGlobalEmotes, ...vkInlineEmotes])
+                                : vkInlineEmotes;
                             const displayMessage = (
                                 <MessageContent
                                     message={previewText}
                                     channelEmotes={settings.show_7tv_emotes ? new Map() : new Map()}
-                                    globalEmotes={settings.show_7tv_emotes ? effectiveGlobalEmotes : new Map()}
-                                    twitchEmotes={msg.emotes}
+                                    globalEmotes={messageGlobalEmotes}
+                                    twitchEmotes={msg.platform === 'twitch' ? msg.emotes : []}
                                     showLinks={settings.show_links}
                                     autoLoadImages={settings.auto_load_images ?? true}
                                 />
@@ -376,7 +394,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                                 src={badgeUrl}
                                                                 alt={badgeId}
                                                                 title={badgeId}
+                                                                loading="lazy"
                                                                 style={{ width: `${badgeSize}px`, height: `${badgeSize}px`, verticalAlign: 'text-bottom' }}
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                                }}
                                                             />
                                                         );
                                                     })}
@@ -389,10 +411,14 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                             key={`${msg.id}-${idx}`}
                                                             src={badge}
                                                             alt="badge"
+                                                            loading="lazy"
                                                             style={{
                                                                 width: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
                                                                 height: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
                                                                 verticalAlign: 'text-bottom'
+                                                            }}
+                                                            onError={(e) => {
+                                                                (e.target as HTMLImageElement).style.display = 'none';
                                                             }}
                                                         />
                                                     ))}
@@ -402,6 +428,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                 <img
                                                     src={msg.vk_role_icon_url}
                                                     alt={msg.role ? `${msg.role} badge` : 'VK role badge'}
+                                                    loading="lazy"
                                                     style={{
                                                         width: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
                                                         height: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
@@ -431,6 +458,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                             <img
                                                 src={msg.avatar_url}
                                                 alt={msg.author}
+                                                loading="lazy"
                                                 style={{
                                                     width: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
                                                     height: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
@@ -438,6 +466,9 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                     display: 'inline-block',
                                                     verticalAlign: 'text-bottom',
                                                     marginRight: '6px',
+                                                }}
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).style.display = 'none';
                                                 }}
                                             />
                                         )}

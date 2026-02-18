@@ -5,7 +5,7 @@ import { Check, Copy, Palette, RefreshCw, Settings2, Sparkles, X } from 'lucide-
 import ReactDOM from 'react-dom';
 
 import { useAuth } from '@/context/AuthContext';
-import ColorInput from '@/features/chatbox/components/ColorInput';
+import ColorInput from '@/features/chatbox/components/ColorInputModern';
 import PreviewPanel from '@/features/chatbox/components/PreviewPanel';
 import {
     extractSettingsFromResponse,
@@ -109,8 +109,8 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
         author: 'Viewer1',
         message: 'Это огонь :smile_32: и :smile_451:',
         time: '12:02',
-        role: 'Moderator',
-        badges: ['https://images.live.vkvideo.ru/smile/102/icon/size/small'],
+        role: 'moderator',
+        badges: [],
         emotes: [
             { id: '32', name: 'smile_32', url: 'https://images.live.vkvideo.ru/smile/32/icon/size/small', start: 10, end: 19 },
             { id: '451', name: 'smile_451', url: 'https://images.live.vkvideo.ru/smile/451/icon/size/small', start: 23, end: 33 }
@@ -596,15 +596,15 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                     {/* Footer */}
                     <div className="border-t border-[#1a2a3f] px-5 py-3 flex items-center justify-between gap-2 bg-[#0f1a2b]">
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" onClick={resetToDefaults} className="border-slate-700">
+                            <Button variant="outline" onClick={resetToDefaults} className="h-9 border-[#22324a] bg-[#14233a] text-slate-200 hover:bg-[#1b2f4a] hover:text-white">
                                 Сбросить
                             </Button>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" onClick={onClose} className="border-slate-700">
+                            <Button variant="outline" onClick={onClose} className="h-9 border-[#22324a] bg-[#14233a] text-slate-200 hover:bg-[#1b2f4a] hover:text-white">
                                 Отмена
                             </Button>
-                            <Button onClick={() => handleSave(false)} disabled={saving}>
+                            <Button onClick={() => handleSave(false)} disabled={saving} className="h-9 bg-none bg-primary hover:bg-primary/90">
                                 {saving ? 'Сохранение...' : 'Сохранить'}
                             </Button>
                         </div>

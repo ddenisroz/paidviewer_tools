@@ -58,6 +58,7 @@ const StreamCategoryCard: React.FC = () => {
 
     // Handle Toggle
     const handleToggleChange = async (value: boolean) => {
+        if (value === localCombineCategories) return;
         if (isSyncingRef.current) return;
         isSyncingRef.current = true;
         skipNextSyncRef.current = true;
@@ -81,30 +82,6 @@ const StreamCategoryCard: React.FC = () => {
         if (value && bothEnabled) {
             const combinedName = twitchName || vkName;
             setSearchTerms({ twitch: combinedName, vk: combinedName });
-            const masterCategory = twitchCat || vkCat;
-            if (masterCategory) {
-                const hasChange = masterCategory.id !== initialData.twitch?.category?.id || masterCategory.id !== initialData.vk?.category?.id;
-                setCurrentData(prev => ({
-                    ...prev,
-                    twitch: { ...prev.twitch, category: masterCategory },
-                    vk: { ...prev.vk, category: masterCategory },
-                }));
-                if (hasChange) {
-                    await saveChanges({
-                        twitch: { category_id: masterCategory.id },
-                        vk: {
-                            category: {
-                                id: masterCategory.id,
-                                name: masterCategory.name || masterCategory.title || "",
-                                title: masterCategory.name || masterCategory.title || "",
-                                type: masterCategory.type || "games",
-                                cover_url: masterCategory.box_art_url || masterCategory.cover_url || ""
-                            },
-                            category_id: masterCategory.id
-                        }
-                    }, 'saveCategory');
-                }
-            }
         } else {
             setSearchTerms({ twitch: twitchName, vk: vkName });
         }
@@ -224,6 +201,7 @@ const StreamCategoryCard: React.FC = () => {
     };
 
     const handleStreamCategorySelect = async (platform: string, category: StreamCategory) => {
+        setIsUserDirty(true);
         if (autoSaveTimerRef.current) {
             clearTimeout(autoSaveTimerRef.current);
             autoSaveTimerRef.current = null;
@@ -316,6 +294,7 @@ const StreamCategoryCard: React.FC = () => {
 
         if (Object.keys(payload).length > 0) {
             await saveChanges(payload, 'saveCategory');
+            setIsUserDirty(false);
         }
     };
 
@@ -328,17 +307,24 @@ const StreamCategoryCard: React.FC = () => {
     }, [initialData, currentData, twitchEnabled, vkEnabled]);
 
     const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
-    const twitchInputPadding = isLinked && bothEnabled ? 'pl-[4.5rem]' : 'pl-12';
-    const vkInputPadding = 'pl-12';
+    const twitchInputPadding = isLinked && bothEnabled ? 'pl-[4.1rem]' : 'pl-[3.15rem]';
+    const vkInputPadding = 'pl-[3.15rem]';
+    const STREAM_FIELD_CLASS = 'border-border/70 bg-background/60 text-foreground placeholder:text-muted-foreground';
     const isSaving = status.saveCategory === 'loading';
     const isSaved = status.saveCategory === 'success';
+    const showVkField = !(isLinked && bothEnabled);
+    const [isUserDirty, setIsUserDirty] = useState(false);
 
     const Footer = (
         <Button
             onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
-            disabled={isSaving || !isChanged}
+            disabled={isSaving || !isChanged || !isUserDirty}
             size="sm"
-            className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white h-7 text-sm font-medium shadow-sm transition-all duration-300"
+            className={`w-full flex items-center gap-2 h-7 text-sm font-medium shadow-sm transition-all duration-300 ${
+                isSaving || !isChanged || !isUserDirty
+                    ? 'bg-blue-900/35 text-blue-200/70'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+            }`}
         >
             {isSaving ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -372,14 +358,12 @@ const StreamCategoryCard: React.FC = () => {
                     {/* Twitch / General Field */}
                     <div className="space-y-4 relative">
                         <div className="relative">
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center gap-1 z-20">
-                                <TwitchIcon className="w-6 h-6 text-white/80" />
-                                <VKIcon
-                                    className={`w-6 h-6 text-white/80 transition-opacity duration-200 ${isLinked && bothEnabled ? 'opacity-100' : 'opacity-0'}`}
-                                />
+                            <div className={`absolute left-3 top-1/2 z-20 flex -translate-y-1/2 items-center pointer-events-none ${isLinked && bothEnabled ? 'w-[3.25rem] gap-1' : 'w-6'}`}>
+                                <TwitchIcon width={24} height={24} className="text-white/80 shrink-0" />
+                                {isLinked && bothEnabled && (
+                                    <VKIcon width={24} height={24} className="text-white/80 shrink-0" />
+                                )}
                             </div>
-
-
 
                             <Input
                                 ref={twitchInputRef}
@@ -418,7 +402,7 @@ const StreamCategoryCard: React.FC = () => {
                                 autoCapitalize="off"
                                 spellCheck={false}
                                 placeholder={isLinked ? "Поиск общей категории..." : (twitchEnabled ? "Поиск категории Twitch..." : "нет подключения")}
-                                className={`h-10 ${twitchInputPadding} pr-4 transition-[padding] duration-300 ease-in-out ${!twitchEnabled && !isLinked ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
+                                className={`h-10 ${twitchInputPadding} pr-4 ${STREAM_FIELD_CLASS} ${!twitchEnabled && !isLinked ? 'bg-muted/40 cursor-not-allowed opacity-60' : ''}`}
                                 disabled={!twitchEnabled && !isLinked}
                             />
 
@@ -434,66 +418,66 @@ const StreamCategoryCard: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* VK Field - Collapsible */}
-                    <div className={`grid transition-[grid-template-rows,opacity,transform] duration-300 ease-in-out ${isLinked && bothEnabled ? 'grid-rows-[0fr] opacity-0 pointer-events-none -translate-y-1' : 'grid-rows-[1fr] opacity-100 translate-y-0'}`}>
-                        <div className="overflow-hidden min-h-0">
-                            <div className="space-y-4 pt-0 relative mt-4 min-h-0">
-                                <div className="relative">
-                                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center z-20">
-                                        <VKIcon className="w-6 h-6 text-white/80" />
-                                    </div>
-
-
-
-                                    <Input
-                                        ref={vkInputRef}
-                                        id="stream-category-vk"
-                                        name="stream-category-vk"
-                                        value={searchTerms.vk}
-                                        onChange={(e) => handleSearchChange('vk', e.target.value)}
-                                        onFocus={() => {
-                                            isEditingRef.current = { ...isEditingRef.current, vk: true };
-                                            const currentValue = searchTerms.vk;
-                                            focusRestoreRef.current.vk = currentValue;
-                                            if (currentValue.trim() !== '') {
-                                                clearedOnFocusRef.current.vk = true;
-                                                setSearchTerms(prev => ({ ...prev, vk: '' }));
-                                            } else {
-                                                clearedOnFocusRef.current.vk = false;
-                                            }
-                                            if (vkEnabled) setShowDropdown({ twitch: false, vk: true });
-                                        }}
-                                        onBlur={() => {
-                                            isEditingRef.current = { ...isEditingRef.current, vk: false };
-                                            if (!showDropdown.vk) {
-                                                const vkName = getCategoryName(currentData.vk?.category as StreamCategory | undefined);
-                                                if (clearedOnFocusRef.current.vk && searchTerms.vk.trim() === '') {
-                                                    setSearchTerms(prev => ({ ...prev, vk: vkName || focusRestoreRef.current.vk }));
-                                                    clearedOnFocusRef.current.vk = false;
-                                                    return;
-                                                }
-                                                setSearchTerms(prev => ({ ...prev, vk: vkName }));
-                                            }
-                                        }}
-                                        autoComplete="off"
-                                        autoCorrect="off"
-                                        autoCapitalize="off"
-                                        spellCheck={false}
-                                        placeholder={vkEnabled ? "Поиск категории VK Live..." : "нет подключения"}
-                                        className={`h-10 ${vkInputPadding} pr-4 transition-[padding] duration-300 ease-in-out ${!vkEnabled ? 'bg-muted/50 cursor-not-allowed opacity-50' : 'bg-slate-900/50'}`}
-                                        disabled={!vkEnabled}
-                                    />
-
-                                    {showDropdown.vk && (
-                                        <StreamCategoryDropdown
-                                            platform="vk"
-                                            search={searchTerms.vk}
-                                            onSelect={handleStreamCategorySelect}
-                                            results={(categories as { vk?: StreamCategory[] })?.vk || []}
-                                            inputRef={vkInputRef.current}
-                                        />
-                                    )}
+                    <div
+                        className={`overflow-hidden transition-[max-height,opacity,margin] duration-200 ease-out ${showVkField ? 'mt-4 max-h-[20rem] opacity-100' : 'mt-0 max-h-0 opacity-0'}`}
+                        aria-hidden={!showVkField}
+                    >
+                        <div>
+                            <div className="relative">
+                                <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-100 flex items-center z-20">
+                                    <VKIcon className="w-6 h-6 text-white/80" />
                                 </div>
+
+                                <Input
+                                    ref={vkInputRef}
+                                    id="stream-category-vk"
+                                    name="stream-category-vk"
+                                    value={searchTerms.vk}
+                                    onChange={(e) => handleSearchChange('vk', e.target.value)}
+                                    onFocus={() => {
+                                        isEditingRef.current = { ...isEditingRef.current, vk: true };
+                                        const currentValue = searchTerms.vk;
+                                        focusRestoreRef.current.vk = currentValue;
+                                        if (currentValue.trim() !== '') {
+                                            clearedOnFocusRef.current.vk = true;
+                                            setSearchTerms(prev => ({ ...prev, vk: '' }));
+                                        } else {
+                                            clearedOnFocusRef.current.vk = false;
+                                        }
+                                        if (vkEnabled) {
+                                            setShowDropdown({ twitch: false, vk: true });
+                                        }
+                                    }}
+                                    onBlur={() => {
+                                        isEditingRef.current = { ...isEditingRef.current, vk: false };
+                                        if (!showDropdown.vk) {
+                                            const vkName = getCategoryName(currentData.vk?.category as StreamCategory | undefined);
+                                            if (clearedOnFocusRef.current.vk && searchTerms.vk.trim() === '') {
+                                                setSearchTerms(prev => ({ ...prev, vk: vkName || focusRestoreRef.current.vk }));
+                                                clearedOnFocusRef.current.vk = false;
+                                                return;
+                                            }
+                                            setSearchTerms(prev => ({ ...prev, vk: vkName }));
+                                        }
+                                    }}
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
+                                    placeholder={vkEnabled ? "Поиск категории VK Live..." : "нет подключения"}
+                                    className={`h-10 ${vkInputPadding} pr-4 ${STREAM_FIELD_CLASS} ${!vkEnabled ? 'bg-muted/40 cursor-not-allowed opacity-60' : ''}`}
+                                    disabled={!vkEnabled || !showVkField}
+                                />
+
+                                {showDropdown.vk && showVkField && (
+                                    <StreamCategoryDropdown
+                                        platform="vk"
+                                        search={searchTerms.vk}
+                                        onSelect={handleStreamCategorySelect}
+                                        results={(categories as { vk?: StreamCategory[] })?.vk || []}
+                                        inputRef={vkInputRef.current}
+                                    />
+                                )}
                             </div>
                         </div>
                     </div>

@@ -86,7 +86,6 @@ export const ADMIN_SECTION_COLORS = {
   voices: 'bg-purple-600',
   users: 'bg-blue-600',
   bots: 'bg-green-600',
-  tickets: 'bg-amber-600',
   storage: 'bg-cyan-600',
   logs: 'bg-slate-600',
   errors: 'bg-red-600',

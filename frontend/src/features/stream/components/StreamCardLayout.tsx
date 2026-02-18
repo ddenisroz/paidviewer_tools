@@ -49,10 +49,10 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
 
     return (
         <Card className={cn(
-            "flex flex-col overflow-hidden h-full card-glass transition-all duration-300",
+            "flex flex-col overflow-hidden h-full card-glass border-border/70 bg-card/80 backdrop-blur-sm shadow-sm shadow-black/10 transition-colors duration-200",
             className
         )}>
-            <CardHeader className="flex-shrink-0 pb-3 border-b border-white/5">
+            <CardHeader className="flex-shrink-0 pb-3 border-b border-border/50">
                 <CardTitle className="flex items-center gap-2 text-lg font-medium text-foreground">
                     {icon}
                     {title}
@@ -68,7 +68,7 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
                             className="flex items-center gap-2 cursor-pointer text-sm font-medium select-none text-muted-foreground hover:text-foreground transition-colors"
                         >
                             {isLinking ? (
-                                <Loader2 className="h-4 w-4 text-blue-400 animate-spin" />
+                                <Loader2 className="h-4 w-4 text-primary animate-spin" />
                             ) : isLinked ? (
                                 <Link className="h-4 w-4 text-green-500" />
                             ) : (

@@ -117,8 +117,8 @@ const AdminPage: React.FC = () => {
 
   return (
     <div className="p-4 space-y-4">
-      <div className="mx-auto w-full max-w-5xl border-b border-border">
-        <div className="flex flex-wrap justify-center">
+      <div className="mx-auto mb-4 w-full max-w-5xl border-b border-border">
+        <div className="flex justify-start overflow-x-auto overflow-y-hidden hide-scrollbar">
           {VISIBLE_TABS.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -128,9 +128,9 @@ const AdminPage: React.FC = () => {
                 type="button"
                 onClick={() => handleTabChange(tab.id)}
                 className={cn(
-                  'inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+                  'inline-flex items-center gap-2 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
                   isActive
-                    ? 'border-primary text-primary'
+                    ? 'border-emerald-500 text-emerald-400'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
                 )}
               >
@@ -143,7 +143,9 @@ const AdminPage: React.FC = () => {
       </div>
 
       <Suspense fallback={<TabSkeleton />}>
-        <TabContent activeTab={activeTab} />
+        <div className="mx-auto w-full max-w-5xl">
+          <TabContent activeTab={activeTab} />
+        </div>
       </Suspense>
     </div>
   );

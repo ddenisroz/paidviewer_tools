@@ -65,7 +65,7 @@ const ChatCardHeader: React.FC<ChatCardHeaderProps> = ({
                                 variant="outline"
                                 size="sm"
                                 onClick={onSettingsClick}
-                                className="h-8 px-2.5 gap-1.5 transition-colors bg-gradient-to-r from-purple-600/20 to-blue-600/20 border-purple-500/50 hover:from-purple-600/30 hover:to-blue-600/30 hover:border-purple-400 text-purple-200 hover:text-white"
+                                className="h-8 px-2.5 gap-1.5 border-none bg-transparent text-foreground/90 hover:bg-transparent hover:text-blue-400"
                             >
                                 <Settings className="h-3.5 w-3.5" />
                                 <span className="text-xs font-medium">OBS</span>
@@ -82,7 +82,7 @@ const ChatCardHeader: React.FC<ChatCardHeaderProps> = ({
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-8 w-8 p-0 transition-colors text-muted-foreground border-border hover:text-blue-400 hover:border-blue-600 hover:bg-blue-600/10"
+                                className="h-8 w-8 p-0 border-none bg-transparent text-muted-foreground hover:bg-transparent hover:text-blue-400"
                             >
                                 <Settings className="h-4 w-4" />
                             </Button>
@@ -157,7 +157,7 @@ const ChatCardHeader: React.FC<ChatCardHeaderProps> = ({
                                 variant="outline"
                                 size="sm"
                                 onClick={onOpenChatWindow}
-                                className="h-8 w-8 p-0 transition-colors text-gray-400 border-gray-600 hover:text-green-400 hover:border-green-600 hover:bg-green-600/10"
+                                className="h-8 w-8 p-0 border-none bg-transparent text-muted-foreground hover:bg-transparent hover:text-blue-400"
                             >
                                 <ExternalLink className="h-4 w-4" />
                             </Button>

@@ -66,7 +66,7 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                 )}
 
                 {/* Main Player Card */}
-                <div className="card-glass rounded-2xl shadow-2xl overflow-hidden">
+                <div className="relative overflow-hidden rounded-2xl bg-[#200b12] shadow-md shadow-black/45">
                     <div className="flex items-start p-3 gap-3">
                         {/* Album Art / Video Thumbnail */}
                         <ThumbnailSection
@@ -81,13 +81,13 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                             <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                     <h3
-                                        className="text-white font-medium text-sm leading-tight truncate"
+                                        className="text-foreground font-medium text-sm leading-tight truncate"
                                         title={displayVideo.title}
                                     >
                                         {displayVideo.title}
                                     </h3>
                                     <p
-                                        className="text-white/50 text-xs truncate"
+                                        className="text-muted-foreground text-xs truncate"
                                         title={String(displayVideo.requester_name || displayVideo.user_id || 'Unknown')}
                                     >
                                         {displayVideo.requester_name || displayVideo.user_id || 'Unknown'}
@@ -100,8 +100,8 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                                             size="sm"
                                             onClick={onToggleQueue}
                                             className={cn(
-                                                "h-8 w-8 p-0 rounded-full hover:bg-white/10 text-white/60 hover:text-white",
-                                                showQueue && "bg-white/10 text-white"
+                                                "h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground",
+                                                showQueue && "bg-accent/80 text-foreground"
                                             )}
                                             title={showQueue ? "Скрыть очередь" : "Показать очередь"}
                                         >
@@ -112,8 +112,8 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                                         variant="ghost"
                                         size="sm"
                                         onClick={onClose}
-                                        className="h-8 w-8 p-0 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
-                                        title="Скрыть плеер"
+                                        className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground"
+                                        title="Закрыть плеер"
                                     >
                                         <X className="w-4 h-4" />
                                     </Button>
@@ -145,8 +145,8 @@ interface QueuePanelProps {
 }
 
 const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onClose, onClearQueue, onSelectQueueItem }) => (
-    <div className="absolute bottom-full mb-2 left-0 right-0 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-2 fade-in duration-200">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/5">
+    <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl bg-[#200b12] shadow-2xl shadow-black/40 animate-in slide-in-from-bottom-2 fade-in duration-200">
+        <div className="flex items-center justify-between border-b border-border/60 bg-[#200b12] px-4 py-3">
             <span className="text-xs font-medium text-white/70 uppercase tracking-wider">Очередь</span>
             <div className="flex items-center gap-1">
                 {onClearQueue && (
@@ -154,35 +154,35 @@ const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onClose, onClearQueue, o
                         variant="ghost"
                         size="sm"
                         onClick={onClearQueue}
-                        className="h-6 w-6 p-0 hover:bg-white/10 rounded-full"
+                        className="h-6 w-6 rounded-full p-0 hover:bg-accent/80"
                         title="Очистить очередь"
                     >
-                        <Trash2 className="w-4 h-4 text-white/70" />
+                        <Trash2 className="w-4 h-4 text-muted-foreground" />
                     </Button>
                 )}
                 <Button
                     variant="ghost"
                     size="sm"
                     onClick={onClose}
-                    className="h-6 w-6 p-0 hover:bg-white/10 rounded-full"
+                    className="h-6 w-6 rounded-full p-0 hover:bg-accent/80"
                     title="Скрыть"
                 >
-                    <ChevronDown className="w-4 h-4 text-white/70" />
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </Button>
             </div>
         </div>
-        <div className="max-h-[220px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+        <div className="max-h-[220px] overflow-y-auto">
             {queue.map((video, index) => (
                 <button
                     key={video.id}
                     type="button"
-                    className="flex w-full items-center gap-2 px-3 py-2 border-b border-white/5 last:border-0 text-left hover:bg-white/5 transition-colors"
+                    className="flex w-full items-center gap-2 border-b border-border/60 px-3 py-2 text-left transition-colors hover:bg-accent/70 last:border-0"
                     onClick={() => onSelectQueueItem?.(video)}
                 >
-                    <span className="text-[10px] font-mono text-white/30 w-4 text-right">{index + 1}</span>
+                    <span className="w-4 text-right text-[10px] font-mono text-muted-foreground/60">{index + 1}</span>
                     <div className="min-w-0 flex-1">
-                        <p className="text-white/90 text-xs font-medium truncate">{video.title}</p>
-                        <p className="text-white/50 text-[10px] truncate">{video.requester_name || video.user_id || 'Unknown'}</p>
+                        <p className="truncate text-xs font-medium text-foreground">{video.title}</p>
+                        <p className="truncate text-[10px] text-muted-foreground">{video.requester_name || video.user_id || 'Unknown'}</p>
                     </div>
                 </button>
             ))}
@@ -203,7 +203,7 @@ const ThumbnailSection: React.FC<ThumbnailSectionProps> = ({
     isPlaying,
     onTogglePlayPause
 }) => (
-    <div className="group/thumb relative w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-black/50 shadow-inner">
+    <div className="group/thumb relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-slate-900/60 ring-1 ring-white/10 shadow-inner">
         {thumbnail ? (
             <img
                 src={thumbnail}
@@ -214,13 +214,13 @@ const ThumbnailSection: React.FC<ThumbnailSectionProps> = ({
                 )}
             />
         ) : (
-            <div className="w-full h-full flex items-center justify-center text-white/20">
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground/50">
                 <Volume2 className="w-6 h-6" />
             </div>
         )}
         {/* Overlay Play/Pause on hover */}
         <div
-            className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
+            className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover/thumb:opacity-100"
             onClick={onTogglePlayPause}
         >
             {isPlaying ? <Pause className="w-6 h-6 text-white fill-current" /> : <Play className="w-6 h-6 text-white fill-current" />}
@@ -249,8 +249,8 @@ const ControlsRow: React.FC<ControlsRowProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={onNextVideo}
-                className="h-8 w-8 p-0 rounded-full hover:bg-white/10 text-white/70 hover:text-white"
-                title="Следующее видео"
+                className="h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+                title="Следующий трек"
             >
                 <SkipForward className="w-5 h-5 fill-current" />
             </Button>
@@ -261,7 +261,7 @@ const ControlsRow: React.FC<ControlsRowProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={onToggleMute}
-                className="h-7 w-7 p-0 hover:bg-transparent text-white/50 hover:text-white/80"
+                className="h-7 w-7 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
                 title={isMuted ? "Включить звук" : "Выключить звук"}
             >
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}

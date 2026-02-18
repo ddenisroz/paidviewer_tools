@@ -4,6 +4,17 @@
 
 ---
 
+## [0.05-hotfix-4] - 2026-02-17
+
+- MemeAlerts tab: added automation settings API and UI (`/api/memealerts/settings`) for:
+  - channel-points reward auto grants on Twitch/VK,
+  - DonationAlerts auto-conversion to MemeCoins with configurable rate.
+- MemeAlerts tab: added reward creation endpoint/UI (`/api/memealerts/rewards/create`) that creates platform reward with mandatory supporter nickname input.
+- Twitch bot: reward redemptions now support MemeAlerts auto grants by configured reward id.
+- VK Live bot: reward notifications from ChatBot now support MemeAlerts auto grants by configured reward title.
+- DonationAlerts webhook: when auto-conversion is enabled and DonationAlerts token is connected, donations auto-grant MemeCoins to donor nickname.
+- Commands: added `!givema <nick> <amount>` as alias of `!memegrant` for Twitch/VK (`memealerts_handler_mixin` + global command seed/startup check).
+
 ## [0.05-hotfix-3] - 2026-02-03
 
 - Reduced background polling intervals for YouTube queue, TTS status, bot status, and stream info.

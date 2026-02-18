@@ -13,6 +13,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
+        request_path = request.url.path or ""
 
         # Генерируем nonce для inline скриптов (более безопасный подход)
         script_nonce = secrets.token_urlsafe(16)
@@ -35,11 +36,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             f"require-sri-for script style"
         )
 
-        response.headers["Content-Security-Policy"] = csp_policy
-        response.headers["Content-Security-Policy-Report-Only"] = (
-            f"script-src 'self' 'nonce-{script_nonce}'; "
-            f"report-uri /api/csp-report"
-        )
+        # MemeAlerts proxy serves third-party SPA with inline scripts/styles.
+        # Global strict CSP blocks it and causes a blank popup page.
+        if not request_path.startswith("/api/memealerts/proxy"):
+            response.headers["Content-Security-Policy"] = csp_policy
+            response.headers["Content-Security-Policy-Report-Only"] = (
+                f"script-src 'self' 'nonce-{script_nonce}'; "
+                f"report-uri /api/csp-report"
+            )
 
         # CORS headers (дополнение к CORS middleware)
         response.headers["Access-Control-Allow-Credentials"] = "true"

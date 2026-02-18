@@ -8,18 +8,18 @@
    HOVER STATES - All Interactive Elements
    ============================================ */
 
-/* Enhanced button hover states with scale and shadow */
+/* Neutral button hover states (no motion jump) */
 button:not(:disabled):hover,
 [role="button"]:not([aria-disabled="true"]):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.15s ease-out;
+  transform: none;
+  box-shadow: none;
+  transition: color 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out;
 }
 
 button:not(:disabled):active,
 [role="button"]:not([aria-disabled="true"]):active {
-  transform: translateY(0);
-  transition: all 0.1s ease-out;
+  transform: none;
+  transition: color 0.1s ease-out, background-color 0.1s ease-out, border-color 0.1s ease-out;
 }
 
 /* Link hover states */
@@ -31,17 +31,17 @@ a:hover {
 /* Card hover states */
 [class*="Card"]:hover,
 .card:hover {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
-  transition: all 0.2s ease-out;
+  box-shadow: none;
+  transform: none;
+  transition: border-color 0.2s ease-out, background-color 0.2s ease-out;
 }
 
 /* Input hover states */
 input:not(:disabled):hover,
 textarea:not(:disabled):hover,
 select:not(:disabled):hover {
-  border-color: hsl(var(--ring));
-  transition: border-color 0.15s ease-out;
+  border-color: inherit;
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
 }
 
 /* Switch/Toggle hover states */
@@ -93,21 +93,19 @@ input[type="radio"]:not(:disabled):hover {
 /* Enhanced focus for buttons */
 button:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px hsl(var(--ring) / 0.2);
-  transition: all 0.15s ease-out;
+  outline: none;
+  box-shadow: none;
+  transition: none;
 }
 
 /* Focus for inputs */
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 0;
-  border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 3px hsl(var(--ring) / 0.1);
-  transition: all 0.15s ease-out;
+  outline: none;
+  border-color: inherit;
+  box-shadow: none;
+  transition: none;
 }
 
 /* Focus for links */
@@ -128,10 +126,9 @@ a:focus-visible {
 
 /* Focus for switch/toggle */
 [role="switch"]:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px hsl(var(--ring) / 0.2);
-  transition: all 0.15s ease-out;
+  outline: none;
+  box-shadow: none;
+  transition: none;
 }
 
 /* Focus for dropdown items */

@@ -137,9 +137,9 @@ interface RewardsManagerProps {
   };
 }
 
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
-const CONTROL_TRIGGER_CLASS = 'h-9 border-slate-700 bg-slate-900/80 shadow-none';
-const CONTROL_CONTENT_CLASS = 'border-slate-700 bg-slate-950/95 backdrop-blur-sm';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
+const CONTROL_TRIGGER_CLASS = 'h-9 border-border/70 bg-card/70 shadow-none';
+const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const MAX_REWARD_WEIGHT = 2000;
 
 const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channelName, onRewardsCountChange, integrations }) => {
@@ -229,7 +229,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
 
   const handleEditReward = (reward: Reward) => {
     setEditingReward(reward);
-    // Используем реальный ID из БД
+    // �?спользуем реальный ID из БД
     const qualityId = typeof reward.quality === 'object'
       ? (reward.quality?.id || null)
       : (typeof reward.quality === 'number' ? reward.quality : null);
@@ -310,7 +310,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
           onClick={() => handleOpenRewardDialog(null)}
           variant="outline"
           size="default"
-          className="border-slate-700 bg-slate-900/70 hover:bg-slate-800 font-medium gap-2"
+          className="border-border/70 bg-card/70 hover:bg-accent font-medium gap-2"
         >
           <Plus className="w-4 h-4" />
           Создать награду
@@ -360,7 +360,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                     return (
                       <div
                         key={reward.id}
-                        className="relative flex flex-col p-2.5 border border-slate-800 bg-slate-900/60 rounded-lg hover:bg-slate-900/90 transition-colors group"
+                        className="relative flex flex-col p-2.5 border border-border/70 bg-card/70 rounded-lg hover:bg-accent/80 transition-colors group"
                       >
                         {/* Шанс */}
                         <div className="absolute top-2 right-2 z-10">
@@ -369,9 +369,9 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                           </Badge>
                         </div>
 
-                        {/* Изображение */}
+                        {/* �?зображение */}
                         {reward.image_url && (
-                          <div className="w-full aspect-square border border-slate-800 rounded overflow-hidden mb-1.5 bg-slate-950/80">
+                          <div className="w-full aspect-square border border-border/70 rounded overflow-hidden mb-1.5 bg-background/50">
                             <img
                               src={reward.image_url}
                               alt={reward.name}
@@ -403,7 +403,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                         </div>
 
                         {/* Кнопки действий */}
-                        <div className="flex gap-1 justify-end w-full pt-1.5 border-t border-slate-800 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex gap-1 justify-end w-full pt-1.5 border-t border-border/70 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -446,7 +446,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
 
       {/* Диалог создания/редактирования */}
       <Dialog open={rewardDialogOpen} onOpenChange={setRewardDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 border-slate-800 bg-slate-950/95 backdrop-blur-sm">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6 border-border/70 bg-popover/95 backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle>
               {editingReward ? 'Редактировать награду' : 'Создать награду'}
@@ -491,7 +491,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                   <SelectValue placeholder="Выберите качество" />
                 </SelectTrigger>
                 <SelectContent className={CONTROL_CONTENT_CLASS}>
-                  {/* Используем данные из БД если есть, иначе fallback на статические */}
+                  {/* �?спользуем данные из БД если есть, иначе fallback на статические */}
                   {qualitiesData.length > 0 ? (
                     (qualitiesData as unknown as QualityConfig[]).map((q) => {
                       const qName = typeof q.name === 'string' ? q.name : '';
@@ -551,7 +551,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
 
               {/* Кастомный вес */}
               <div className="space-y-2">
-                <Label htmlFor="reward_weight_custom">Или укажите свой вес (1-2000)</Label>
+                <Label htmlFor="reward_weight_custom">�?ли укажите свой вес (1-2000)</Label>
                 <Input
                   id="reward_weight_custom"
                   type="number"
@@ -570,7 +570,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
           </div>
 
           <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 pt-4 border-t">
-            <Button variant="outline" onClick={() => setRewardDialogOpen(false)} className="w-full sm:w-auto order-2 sm:order-1 border-slate-700 bg-slate-900/70 hover:bg-slate-800">
+            <Button variant="outline" onClick={() => setRewardDialogOpen(false)} className="w-full sm:w-auto order-2 sm:order-1 border-border/70 bg-card/70 hover:bg-accent">
               Отмена
             </Button>
             <Button

@@ -90,43 +90,14 @@ export interface LogsResponse {
 /**
  * Тикет поддержки
  */
-export interface SupportTicket {
-  id: number;
-  subject: string;
-  message: string;
-  user_name: string;
-  user_email?: string;
-  status: 'open' | 'in_progress' | 'closed';
-  created_at: string;
-  updated_at: string;
-  admin_notes?: string;
-  is_archived?: boolean;
-}
-
 /**
  * Ответ на тикет
  */
-export interface TicketResponse {
-  id: number;
-  message: string;
-  is_admin_response: boolean;
-  created_at: string;
-  is_read?: boolean;
-}
-
 /**
  * Ответ со списком тикетов
  */
-export interface TicketsResponse {
-  tickets: SupportTicket[];
-  pagination?: PaginationInfo;
-}
-
 /**
  * Ответ с деталями тикета
  */
-export interface TicketDetailResponse {
-  ticket: SupportTicket;
-  responses: TicketResponse[];
-}
+
 

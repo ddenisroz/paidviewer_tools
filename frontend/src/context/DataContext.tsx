@@ -211,6 +211,44 @@ function areStreamDataEqual(a: StreamData | null | undefined, b: StreamData | nu
     );
 }
 
+type StreamPlatform = 'twitch' | 'vk';
+
+const STREAM_PLATFORMS: StreamPlatform[] = ['twitch', 'vk'];
+
+function isStreamPlatform(value: unknown): value is StreamPlatform {
+    return value === 'twitch' || value === 'vk';
+}
+
+function cloneStreamData(data: StreamData): StreamData {
+    return {
+        twitch: { ...data.twitch },
+        vk: { ...data.vk },
+    };
+}
+
+function applyPayloadFieldsForPlatform(
+    target: StreamData,
+    source: StreamData,
+    payload: UpdateStreamPayload,
+    platform: StreamPlatform
+): void {
+    const platformPayload = payload[platform];
+    if (!platformPayload) {
+        return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(platformPayload, 'title')) {
+        target[platform].title = source[platform]?.title || '';
+    }
+
+    if (
+        Object.prototype.hasOwnProperty.call(platformPayload, 'category_id') ||
+        Object.prototype.hasOwnProperty.call(platformPayload, 'category')
+    ) {
+        target[platform].category = source[platform]?.category || null;
+    }
+}
+
 interface LoadingState {
     streamData: boolean;
     history: boolean;
@@ -233,7 +271,7 @@ interface DataContextValue {
     setCurrentData: React.Dispatch<React.SetStateAction<StreamData>>;
     loading: LoadingState;
     status: StatusState;
-    saveChanges: (customPayload?: UpdateStreamPayload | null, statusType?: 'saveTitle' | 'saveCategory') => void;
+    saveChanges: (customPayload?: UpdateStreamPayload | null, statusType?: 'saveTitle' | 'saveCategory') => Promise<boolean>;
     categories: CategoriesState;
     searchCategories: (platform: 'twitch' | 'vk', query: string) => Promise<StreamCategory[]>;
     streamHistory: StreamHistory | null;
@@ -459,7 +497,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
     }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, refetchTwitch, refetchVk]);
 
-    const saveChanges = useCallback((customPayload: UpdateStreamPayload | null = null, statusType: 'saveTitle' | 'saveCategory' = 'saveTitle'): void => {
+    const saveChanges = useCallback(async (
+        customPayload: UpdateStreamPayload | null = null,
+        statusType: 'saveTitle' | 'saveCategory' = 'saveTitle'
+    ): Promise<boolean> => {
         setStatus(prev => ({ ...prev, [statusType]: 'loading' }));
         let payload: UpdateStreamPayload | null = customPayload;
         let changesFound = false;
@@ -501,7 +542,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             if (!changesFound) {
                 setStatus(prev => ({ ...prev, [statusType]: 'idle' }));
                 addToast({ type: 'info', title: 'Информация', message: 'Нет изменений для сохранения.' });
-                return;
+                return false;
             }
         } else {
             changesFound = Object.keys(payload).length > 0;
@@ -510,47 +551,87 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         if (!changesFound) {
             setStatus(prev => ({ ...prev, [statusType]: 'idle' }));
             addToast({ type: 'info', title: 'Информация', message: 'Нет изменений для сохранения.' });
-            return;
+            return false;
         }
 
         logger.log('[SEND] [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
 
-        updateStreamMutation.mutate(payload as unknown as Record<string, unknown>, {
-            onSuccess: () => {
-                setStatus(prev => ({ ...prev, [statusType]: 'success' }));
-                const latest = currentDataRef.current;
-                setInitialData(latest);
-                setQueryCache(['stream-data', user?.id], latest);
-                setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
-            },
-            onError: (error: unknown) => {
-                setStatus(prev => ({ ...prev, [statusType]: 'error' }));
-                logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
+        try {
+            await updateStreamMutation.mutateAsync(payload as unknown as Record<string, unknown>);
 
-                const errorResponse = error as { response?: { status?: number; data?: { message?: string; detail?: string } } };
-                const backendMessage = errorResponse.response?.data?.message || errorResponse.response?.data?.detail;
-                if (errorResponse.response?.status === 401) {
-                    addToast({
-                        type: 'error',
-                        title: 'Токен истек',
-                        message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.'
-                    });
-                } else {
-                    addToast({
-                        type: 'error',
-                        title: 'Ошибка',
-                        message: backendMessage || 'Не удалось сохранить изменения. Данные откатываются...'
-                    });
+            const latest = currentDataRef.current;
+            const previousInitial = initialDataRef.current;
+            const nextInitial = cloneStreamData(previousInitial);
+            for (const platform of STREAM_PLATFORMS) {
+                applyPayloadFieldsForPlatform(nextInitial, latest, payload as UpdateStreamPayload, platform);
+            }
+
+            setStatus(prev => ({ ...prev, [statusType]: 'success' }));
+            setInitialData(nextInitial);
+            setQueryCache(['stream-data', user?.id], nextInitial);
+            setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
+            return true;
+        } catch (error: unknown) {
+            setStatus(prev => ({ ...prev, [statusType]: 'error' }));
+            logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
+
+            const errorResponse = error as { response?: { status?: number; data?: { message?: string; detail?: string } } };
+            const backendMessage = errorResponse.response?.data?.message || errorResponse.response?.data?.detail;
+            const rawUpdatedPlatforms =
+                (errorResponse.response?.data as { updated_platforms?: unknown[] } | undefined)?.updated_platforms || [];
+            const rawFailedPlatforms =
+                (errorResponse.response?.data as { failed_platforms?: unknown[] } | undefined)?.failed_platforms || [];
+            const updatedPlatforms = rawUpdatedPlatforms.filter(isStreamPlatform);
+            const failedPlatforms = rawFailedPlatforms.filter(isStreamPlatform);
+            const hasPartialSuccess = updatedPlatforms.length > 0;
+
+            if (errorResponse.response?.status === 401) {
+                addToast({
+                    type: 'error',
+                    title: 'Токен истек',
+                    message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.'
+                });
+            } else {
+                addToast({
+                    type: 'error',
+                    title: 'Ошибка',
+                    message: backendMessage || 'Не удалось сохранить изменения. Данные откатываются...'
+                });
+            }
+
+            if (hasPartialSuccess) {
+                logger.log('[PARTIAL] [DATA CONTEXT] Applying partial stream update result', {
+                    updatedPlatforms,
+                    failedPlatforms,
+                });
+
+                const latest = currentDataRef.current;
+                const previousInitial = initialDataRef.current;
+                const nextInitial = cloneStreamData(previousInitial);
+                const nextCurrent = cloneStreamData(latest);
+
+                for (const platform of updatedPlatforms) {
+                    applyPayloadFieldsForPlatform(nextInitial, latest, payload as UpdateStreamPayload, platform);
                 }
 
+                for (const platform of failedPlatforms) {
+                    applyPayloadFieldsForPlatform(nextCurrent, previousInitial, payload as UpdateStreamPayload, platform);
+                }
+
+                setInitialData(nextInitial);
+                setCurrentData(nextCurrent);
+                setQueryCache(['stream-data', user?.id], nextInitial);
+            } else {
                 logger.log('[REFRESH] [DATA CONTEXT] Rolling back to server data...');
                 const rollbackSnapshot = initialDataRef.current;
                 setCurrentData(rollbackSnapshot);
                 setQueryCache(['stream-data', user?.id], rollbackSnapshot);
-                loadStreamData(true);
-                setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
-            },
-        });
+            }
+
+            loadStreamData(true);
+            setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
+            return false;
+        }
     }, [initialData, currentData, integrations.twitch?.enabled, integrations.vk?.enabled, user?.id, loadStreamData, addToast, updateStreamMutation]);
 
     const searchCategories = useCallback(async (platform: 'twitch' | 'vk', query: string): Promise<StreamCategory[]> => {

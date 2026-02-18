@@ -35,7 +35,7 @@ interface TimingPreset {
   result: number;
 }
 
-const SURFACE_CARD_CLASS = 'border-slate-800 bg-slate-950/70 backdrop-blur-sm shadow-md shadow-black/20';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 const WIDGET_TIMING_PRESETS: TimingPreset[] = [
   { id: 'fast', label: 'Быстро', description: 'Короткая анимация', spinning: 900, opening: 700, result: 3200 },
   { id: 'balanced', label: 'Баланс', description: 'Оптимальный вариант', spinning: 1500, opening: 1000, result: 5500 },
@@ -202,13 +202,13 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   variant={isActive ? 'secondary' : 'outline'}
                   className={`h-auto min-h-14 flex-col items-start gap-0.5 py-2 px-3 text-left ${
                     isActive
-                      ? 'bg-slate-700 text-slate-100 border-slate-600'
-                      : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                      ? 'bg-accent text-foreground border-border/70'
+                      : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
                   }`}
                   onClick={() => applyTimingPreset(preset)}
                 >
                   <span className="text-xs font-semibold">{preset.label}</span>
-                  <span className="text-[11px] text-slate-400">{preset.description}</span>
+                  <span className="text-[11px] text-muted-foreground">{preset.description}</span>
                 </Button>
               );
             })}
@@ -317,7 +317,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   size="sm"
                   onClick={handleRegenerateWidgetUrl}
                   disabled={generateWidgetUrlMutation.isPending}
-                  className="gap-2 text-xs border-slate-700 bg-slate-900/70 hover:bg-slate-800"
+                  className="gap-2 text-xs border-border/70 bg-card/70 hover:bg-accent"
                 >
                   {generateWidgetUrlMutation.isPending ? (
                     <>
@@ -342,7 +342,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   variant="outline"
                   size="sm"
                   onClick={copyWidgetUrl}
-                  className="gap-2 border-slate-700 bg-slate-900/70 hover:bg-slate-800"
+                  className="gap-2 border-border/70 bg-card/70 hover:bg-accent"
                 >
                   <Copy className="w-4 h-4" />
                   Копировать
@@ -351,7 +351,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   variant="outline"
                   size="sm"
                   onClick={() => window.open(widgetUrl, '_blank')}
-                  className="gap-2 border-slate-700 bg-slate-900/70 hover:bg-slate-800"
+                  className="gap-2 border-border/70 bg-card/70 hover:bg-accent"
                 >
                   <ExternalLink className="w-4 h-4" />
                   Открыть виджет
@@ -359,7 +359,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
               </div>
             </div>
           ) : (
-            <div className="p-4 border border-slate-800 rounded-lg bg-slate-950/50">
+            <div className="p-4 border border-border/70 rounded-lg bg-card/60">
               <p className="text-sm text-muted-foreground">
                 URL виджета загружается...
               </p>
@@ -373,3 +373,4 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 };
 
 export default WidgetSettings;
+

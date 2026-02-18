@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 import { Minus, Plus } from 'lucide-react';
 
@@ -74,7 +74,7 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
           const maxValue = getMaxAmount(quality.id);
           
           return (
-            <div key={quality.id} className="space-y-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+            <div key={quality.id} className="space-y-3 rounded-xl border border-border/70 bg-card/60 p-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <img 
@@ -87,12 +87,12 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                     <p className="text-xs text-muted-foreground">От {value}₽</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 border border-slate-700 bg-slate-900/80 rounded-lg">
+                <div className="flex items-center gap-1 border border-border/70 bg-card/70 rounded-lg">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 hover:bg-slate-800"
+                    className="h-7 w-7 p-0 hover:bg-accent"
                     onClick={() => handleAmountChange(quality.id, -25)}
                   >
                     <Minus className="w-3 h-3" />
@@ -109,7 +109,7 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-7 w-7 p-0 hover:bg-slate-800"
+                    className="h-7 w-7 p-0 hover:bg-accent"
                     onClick={() => handleAmountChange(quality.id, 25)}
                   >
                     <Plus className="w-3 h-3" />
@@ -125,8 +125,8 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                     size="sm"
                     className={`h-7 px-2 text-xs ${
                       value === preset
-                        ? 'bg-slate-700 text-slate-100 border-slate-600'
-                        : 'border-slate-700 bg-slate-900/60 text-slate-300 hover:bg-slate-800'
+                        ? 'bg-accent text-foreground border-border/70'
+                        : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
                     }`}
                     onClick={() => setFormData({ ...formData, [fieldName]: [preset] })}
                   >

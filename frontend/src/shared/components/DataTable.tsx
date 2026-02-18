@@ -361,7 +361,7 @@ export function DataTable<T>({
 
       <div className="rounded-lg border border-border overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full table-fixed">
+          <table className="w-full table-auto">
             <thead className="bg-muted/40">
               <tr>
                 {selectable && (

@@ -232,6 +232,7 @@ async def donationalerts_webhook(
     """РћР±СЂР°Р±РѕС‚РєР° РІРµР±С…СѓРєР° РѕС‚ DonationAlerts РґР»СЏ Drops"""
     try:
         from services.drops.drops_service import DropsService
+        from services.memealerts_service import MemeAlertsService
 
         data = await request.json()
 
@@ -256,6 +257,8 @@ async def donationalerts_webhook(
             return {"success": False, "message": "User record not found"}
 
         channel_name = user.twitch_username or user.vk_channel_name or 'default'
+        result = None
+        memealerts_result = None
 
         try:
             # NOTE: with_for_update() requires database-level locking
@@ -289,11 +292,32 @@ async def donationalerts_webhook(
                 donation_amount=donation_amount
             )
 
+            memealerts_service = MemeAlertsService(db)
+            memealerts_result = await memealerts_service.process_donation_auto_grant(
+                user_id=user_token.user_id,
+                channel_name=channel_name,
+                donor_name=donor_name,
+                donation_amount=donation_amount,
+            )
+
             db.commit()
 
         except Exception as e:
             db.rollback()
             logger.error(f"[ERROR] Error processing donation {alert_id}: {e}", exc_info=True)
+
+        if memealerts_result and memealerts_result.get("handled"):
+            if memealerts_result.get("success"):
+                logger.info(
+                    "[MEMEALERTS] Donation auto-grant success: donor=%s, amount=%s",
+                    memealerts_result.get("nickname"),
+                    memealerts_result.get("amount"),
+                )
+            else:
+                logger.warning(
+                    "[MEMEALERTS] Donation auto-grant skipped/failed: %s",
+                    memealerts_result.get("error"),
+                )
 
         if result:
             logger.info(f"[REWARD] [DONATION DROPS] {donor_name} РїРѕР»СѓС‡РёР» {result['reward']} ({result['quality']})")
@@ -301,9 +325,15 @@ async def donationalerts_webhook(
             from utils.websocket_helper import broadcast_drops_event
             await broadcast_drops_event(result)
 
-            return {"success": True, "message": "Drops processed successfully", "data": result}
+            response_payload = {"success": True, "message": "Drops processed successfully", "data": result}
+            if memealerts_result and memealerts_result.get("handled"):
+                response_payload["memealerts"] = memealerts_result
+            return response_payload
         else:
-            return {"success": False, "message": "No drops available for this donation"}
+            response_payload = {"success": False, "message": "No drops available for this donation"}
+            if memealerts_result and memealerts_result.get("handled"):
+                response_payload["memealerts"] = memealerts_result
+            return response_payload
 
     except Exception as e:
         logger.error(f"Error processing DonationAlerts webhook: {e}")

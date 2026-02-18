@@ -18,6 +18,7 @@ from services.tts.tts_service import TTSService
 from services.user_service import UserService
 from services.platform_rewards_service import PlatformRewardsService
 from services.notification_service import notification_service
+from services.memory_websocket_manager import get_memory_websocket_manager
 
 # API (for specific legacy checks if needed)
 from api.moderation_api import is_user_blocked_from_tts
@@ -84,6 +85,11 @@ class TTSHandlerService:
                 
                 if user_data.get("error"):
                     return {"success": False, "error": user_data["error"]}
+
+                # 3.1 Sink guard: do not synthesize without an active playback sink.
+                sink_result = self._check_active_tts_sink(user_data, connection_manager, platform)
+                if sink_result:
+                    return sink_result
 
                 # 4. Filter Logic (Bots, Blocked, Shield)
                 filter_result = await self._process_filters(
@@ -160,6 +166,64 @@ class TTSHandlerService:
             "audio_settings": audio_settings_repo.get_or_create(user_id=user_id),
             "audio_settings_dict": audio_settings_repo.get_settings_dict(user_id)
         }
+
+    def _check_active_tts_sink(
+        self,
+        user_data: Dict[str, Any],
+        connection_manager: Any,
+        platform: str
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Ensure active sink exists before synthesis:
+        - website mode -> requires active `tts_player` websocket
+        - obs mode -> requires active OBS socket for user's obs_token
+        """
+        user = user_data["user"]
+        user_id = user_data["user_id"]
+        tts_settings = user_data["tts_settings"]
+        listening_mode = (
+            getattr(tts_settings, "listening_mode", None)
+            or getattr(user, "tts_listening_mode", "website")
+            or "website"
+        )
+
+        if listening_mode == "website":
+            has_player = get_memory_websocket_manager().has_user_connection_for_role(user_id, "tts_player")
+            if has_player:
+                return None
+
+            logger.info(
+                "[SKIP] [%s TTS] No active /tts-player sink for user %s in website mode",
+                platform.upper(),
+                user_id,
+            )
+            return {"success": False, "error": "No active TTS player sink"}
+
+        if listening_mode == "obs":
+            obs_token = getattr(user, "obs_token", None)
+            has_obs_sink = bool(
+                obs_token
+                and connection_manager
+                and getattr(connection_manager, "obs_connections", None)
+                and obs_token in connection_manager.obs_connections
+            )
+            if has_obs_sink:
+                return None
+
+            logger.info(
+                "[SKIP] [%s TTS] No active OBS sink for user %s in obs mode",
+                platform.upper(),
+                user_id,
+            )
+            return {"success": False, "error": "No active OBS sink"}
+
+        logger.info(
+            "[SKIP] [%s TTS] Unknown listening mode '%s' for user %s",
+            platform.upper(),
+            listening_mode,
+            user_id,
+        )
+        return {"success": False, "error": "Unsupported listening mode"}
 
     async def _process_filters(self, db, text, username, platform, is_reply, mentioned_users, reward_id, user_data):
         user_id = user_data["user_id"]

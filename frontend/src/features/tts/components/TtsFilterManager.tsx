@@ -60,6 +60,22 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
             setNewUsername('');
             const platformName = variables.platform === 'twitch' ? 'Twitch' : 'VK Live';
             toast.success(`Пользователь ${variables.username} заглушен на ${platformName}`);
+            queryClient.setQueryData(queryKeys.tts.blockedUsers(), (prev: unknown) => {
+                const prevList = Array.isArray(prev)
+                    ? prev as BlockedUser[]
+                    : ((prev as { data?: { blocked_users?: BlockedUser[] } } | undefined)?.data?.blocked_users ?? []);
+                const exists = prevList.some(
+                    item => item.username.toLowerCase() === variables.username.toLowerCase() && item.platform === variables.platform
+                );
+                if (exists) return prev;
+                const nextItem: BlockedUser = {
+                    username: variables.username,
+                    platform: variables.platform,
+                    channel_name: variables.channel_name,
+                };
+                if (Array.isArray(prev)) return [nextItem, ...prevList];
+                return { data: { blocked_users: [nextItem, ...prevList] } };
+            });
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.blockedUsers() });
         },
         onError: (error: unknown) => {
@@ -73,6 +89,16 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
     const unblockUserMutation = useUnblockUser({
         onSuccess: (response, variables) => {
             toast.success(`Пользователь ${variables.username} разблокирован`);
+            queryClient.setQueryData(queryKeys.tts.blockedUsers(), (prev: unknown) => {
+                const prevList = Array.isArray(prev)
+                    ? prev as BlockedUser[]
+                    : ((prev as { data?: { blocked_users?: BlockedUser[] } } | undefined)?.data?.blocked_users ?? []);
+                const nextList = prevList.filter(
+                    item => !(item.username === variables.username && item.platform === variables.platform)
+                );
+                if (Array.isArray(prev)) return nextList;
+                return { data: { blocked_users: nextList } };
+            });
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.blockedUsers() });
         },
         onError: (error: AxiosError) => {
@@ -207,7 +233,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
     return (
         <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${className || ''}`} data-testid="tts-filter-card">
             {/* ========== ЧЕРНЫЙ СПИСОК ========== */}
-            <Card className="card-glass flex flex-col h-full border-gray-800/60 transition-all duration-300 hover:border-gray-700/80">
+            <Card className="card-glass flex flex-col h-full border-gray-800/60">
                 <CardHeader className="pb-3 border-b border-white/5">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -234,7 +260,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                                 onChange={(e) => setNewUsername(e.target.value)}
                                 onKeyPress={(e) => e.key === 'Enter' && addToBlacklist()}
                                 disabled={addingUser || availablePlatforms.length === 0}
-                                className="w-full bg-gray-900/50 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm focus:border-red-500/50 focus:ring-red-500/20 transition-all pl-3"
+                                className="w-full bg-gray-900/50 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm pl-3"
                             />
                         </div>
                         {availablePlatforms.length > 0 && (
@@ -280,7 +306,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                             blacklist.map((blockedUser, index) => (
                                 <div
                                     key={`${blockedUser.username}-${blockedUser.platform}-${index}`}
-                                    className="group flex items-center justify-between py-2 px-3 bg-gray-800/40 hover:bg-red-500/5 rounded-lg border border-transparent hover:border-red-500/10 transition-all duration-200"
+                                    className="group flex items-center justify-between py-2 px-3 bg-gray-800/40 hover:bg-red-500/5 rounded-lg border border-transparent transition-colors duration-200"
                                 >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <div className={`w-5 h-5 rounded-full flex items-center justify-center ${blockedUser.platform === 'twitch' ? 'bg-purple-500/10' : 'bg-rose-500/10'}`}>
@@ -290,7 +316,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                                     </div>
                                     <button
                                         onClick={() => removeFromBlacklist(blockedUser)}
-                                        className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all duration-200 p-1 hover:bg-red-500/10 rounded"
+                                        className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-colors duration-200 p-1 hover:bg-red-500/10 rounded"
                                     >
                                         <X className="h-3.5 w-3.5" />
                                     </button>
@@ -306,7 +332,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
             </Card>
 
             {/* ========== ЗАПРЕЩЕННЫЕ СЛОВА ========== */}
-            <Card className="card-glass flex flex-col h-full border-gray-800/60 transition-all duration-300 hover:border-gray-700/80">
+            <Card className="card-glass flex flex-col h-full border-gray-800/60">
                 <CardHeader className="pb-3 border-b border-white/5">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -332,7 +358,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                             onChange={(e) => setNewWord(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && addWord()}
                             disabled={addingWord}
-                            className="flex-1 bg-gray-900/50 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm focus:border-indigo-500/50 focus:ring-indigo-500/20 transition-all"
+                            className="flex-1 bg-gray-900/50 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm"
                         />
                         <Button
                             onClick={addWord}
@@ -360,7 +386,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                             words.filter(word => word && (word.word || word.text)).map((word) => (
                                 <div
                                     key={word.id}
-                                    className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-800/40 hover:bg-indigo-500/10 border border-gray-700/50 hover:border-indigo-500/30 rounded-lg text-xs text-gray-200 transition-all duration-200 shadow-sm"
+                                    className="group inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-800/40 hover:bg-indigo-500/10 border border-gray-700/50 rounded-lg text-xs text-gray-200 transition-colors duration-200 shadow-sm"
                                 >
                                     <span className="max-w-[120px] truncate">{word.word || word.text}</span>
                                     <button

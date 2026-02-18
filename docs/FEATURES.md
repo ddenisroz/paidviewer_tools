@@ -40,6 +40,8 @@
 - VK Live: chat and rewards.
 - DonationAlerts: donation playback.
 - MemeAlerts: meme coin grants via dashboard and chat commands.
+- MemeAlerts grant resolves nickname via `user/find` and `user/find/streamer`; if API returns `401/403`, UI gets explicit error that target user is likely not present in channel supporters yet.
+- MemeAlerts history in dashboard uses local grant log (`memealerts_grant_history`) for `Выдачи` and MemeAlerts `POST /supporters` feed for `Покупки`.
 - Bot accounts (Twitch/VK) use OAuth tokens stored in DB with automatic refresh (configure via Admin Bot Connect tab or `/auth/{platform}/bot/login`).
 - VK bot chat polling uses dedicated bot OAuth token (no fallback to streamer user token), with `401` handling (dev->prod fallback, then OAuth refresh with cooldown) and manual refresh via `/api/admin/bot/vk/refresh-token`.
 

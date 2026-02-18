@@ -29,7 +29,7 @@ interface PageLoaderProps {
 export const PageLoader: React.FC<PageLoaderProps> = ({ message }) => (
     <div className="flex flex-col items-center justify-center p-8 text-center">
         <Loader className="h-8 w-8 animate-spin text-purple-400 mb-4" />
-        <p className="text-slate-400">{message || "Загрузка..."}</p>
+        <p className="text-muted-foreground">{message || "Загрузка..."}</p>
     </div>
 );
 
