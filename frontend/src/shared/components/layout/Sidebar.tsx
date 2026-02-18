@@ -227,8 +227,8 @@ const Sidebar: React.FC = () => {
     // Проверяем, является ли пользователь админом
     useEffect(() => {
         if (isAuthenticated && user) {
-            // Проверяем напрямую поле is_admin от сервера
-            const userIsAdmin = user.is_admin === true;
+            // role — источник истины, is_admin оставляем как legacy fallback
+            const userIsAdmin = user.role === 'admin' || user.is_admin === true;
             setIsAdmin(userIsAdmin);
         } else {
             setIsAdmin(false);

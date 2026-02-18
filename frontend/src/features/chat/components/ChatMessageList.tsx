@@ -6,6 +6,7 @@ import { ArrowDown, MessageSquare } from 'lucide-react';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { logger } from '@/shared/utils/prodLogger';
+import { formatLocalMessageTime } from '@/features/chat/utils/time';
 
 import MessageContent from './MessageContent';
 import SwipeableMessage from './SwipeableMessage';
@@ -55,7 +56,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
             <div
                 ref={setMessagesContainerRef}
                 onScroll={onScroll}
-                className="h-[min(400px,60vh)] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
+                className="h-full min-h-[280px] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
             >
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                     <MessageSquare className="h-12 w-12 mb-3 opacity-50" />
@@ -73,7 +74,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
             <div
                 ref={setMessagesContainerRef}
                 onScroll={onScroll}
-                className="h-[min(400px,60vh)] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
+                className="h-full min-h-[280px] border rounded-lg bg-gray-900/40 overflow-y-auto p-4"
             >
                 <div className="flex flex-col min-h-full">
                     <div className="flex-grow" />
@@ -88,7 +89,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                     className="p-1"
                                     onContextMenu={(e) => onContextMenu(e, msg)}
                                 >
-                                    <div className="text-sm leading-relaxed">
+                                    <div className="text-sm leading-[1.35]">
                                         {msg.platform === 'twitch' ? (
                                             <TwitchIcon
                                                 className="text-purple-400 inline-block align-text-bottom mr-1"
@@ -102,10 +103,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                         )}
 
                                         <span className="text-xs text-muted-foreground mr-1.5 timestamp">
-                                            {new Date(msg.timestamp).toLocaleTimeString('ru-RU', {
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            })}
+                                            {formatLocalMessageTime(msg.timestamp)}
                                         </span>
 
                                         {msg.platform === 'twitch' && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (

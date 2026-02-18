@@ -83,6 +83,7 @@ const AdminPage: React.FC = () => {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.is_admin === true;
 
   const initialTab = useMemo<TabId>(() => {
     const searchTab = searchParams.get('tab');
@@ -101,7 +102,7 @@ const AdminPage: React.FC = () => {
     navigate(`/dashboard/dolbaebadmintts?tab=${tabId}`, { replace: true });
   };
 
-  if (!user?.is_admin) {
+  if (!isAdmin) {
     return (
       <div className="min-h-screen p-4 flex items-center justify-center">
         <Card className="max-w-sm w-full">

@@ -91,13 +91,13 @@ class TtsSettingsRequest(BaseModel):
 
 
 class BlockUserRequest(BaseModel):
-    channel_name: str = Field(..., min_length=1, max_length=100)
+    channel_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     platform: str = Field(..., pattern="^(twitch|vk)$")
     username: str = Field(..., min_length=1, max_length=100)
 
 
 class UnblockUserRequest(BaseModel):
-    channel_name: str = Field(..., min_length=1, max_length=100)
+    channel_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     platform: str = Field(..., pattern="^(twitch|vk)$")
     username: str = Field(..., min_length=1, max_length=100)
 

@@ -680,7 +680,11 @@ export const useBlockUser = (options?: UseMutationOptions<ApiResponse<BlockedUse
     onError: (error: AxiosError) => {
       logger.error('Error blocking user:', error);
       if (!options?.onError) {
-        toast.error('Ошибка блокировки пользователя');
+        const message =
+          (error.response?.data as { detail?: string; message?: string } | undefined)?.detail ||
+          (error.response?.data as { detail?: string; message?: string } | undefined)?.message ||
+          'Ошибка блокировки пользователя';
+        toast.error(message);
       }
     },
     ...options,
@@ -705,7 +709,11 @@ export const useUnblockUser = (options?: UseMutationOptions<ApiResponse, AxiosEr
     onError: (error: AxiosError) => {
       logger.error('Error unblocking user:', error);
       if (!options?.onError) {
-        toast.error('Ошибка разблокировки пользователя');
+        const message =
+          (error.response?.data as { detail?: string; message?: string } | undefined)?.detail ||
+          (error.response?.data as { detail?: string; message?: string } | undefined)?.message ||
+          'Ошибка разблокировки пользователя';
+        toast.error(message);
       }
     },
     ...options,

@@ -62,6 +62,7 @@ const CONTROL_TRIGGER_CLASS = 'h-9 border-border/70 bg-background/80 shadow-none
 const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const TAB_BUTTON_BASE =
     'inline-flex items-center px-4 py-2 text-sm font-medium transition-colors border-b-2 border-transparent -mb-px';
+const TAB_ACTIVE_CLASS = 'border-emerald-500 text-emerald-400 shadow-[inset_0_-2px_0_0_rgba(16,185,129,1)]';
 
 const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRefresh }) => {
     const [deleting, setDeleting] = useState<boolean>(false);
@@ -1039,8 +1040,8 @@ const PointsManagementPage: React.FC = () => {
                         <button
                             onClick={() => setActiveTab('rewards')}
                             className={`${TAB_BUTTON_BASE} ${activeTab === 'rewards'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                                ? TAB_ACTIVE_CLASS
+                                : 'border-transparent text-muted-foreground hover:text-emerald-300'
                                 }`}
                         >
                             Награды
@@ -1048,8 +1049,8 @@ const PointsManagementPage: React.FC = () => {
                         <button
                             onClick={() => setActiveTab('queue')}
                             className={`${TAB_BUTTON_BASE} ${activeTab === 'queue'
-                                ? 'border-primary text-primary'
-                                : 'border-transparent text-muted-foreground hover:text-foreground'
+                                ? TAB_ACTIVE_CLASS
+                                : 'border-transparent text-muted-foreground hover:text-emerald-300'
                                 }`}
                         >
                             Очередь запросов

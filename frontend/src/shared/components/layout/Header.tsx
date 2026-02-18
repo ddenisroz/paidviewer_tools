@@ -1,18 +1,16 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
 /* eslint-disable no-alert */
-import { Check, ChevronDown, LogOut, RotateCcw, Settings, Settings2 } from 'lucide-react';
+import { ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
-import { cn } from '@/lib/utils';
 import { authService } from '@/services/api/services/authService';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { logger } from '@/shared/utils/prodLogger';
-import { useLayoutStore, type WidgetId } from '@/store/useLayoutStore';
 import { saveReturnUrl } from '@/utils/urlUtils';
 
 import { Button } from '../ui/button';
@@ -22,18 +20,6 @@ const Header: React.FC = () => {
     const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const location = useLocation();
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
-    const [layoutBlocksMenuOpen, setLayoutBlocksMenuOpen] = useState(false);
-
-    // Layout Store logic
-    const { isEditMode, toggleEditMode, resetLayout, toggleWidgetVisibility, widgets, draftWidgets } = useLayoutStore();
-    const isDashboard = location.pathname === '/dashboard';
-    const activeWidgets = isEditMode && draftWidgets ? draftWidgets : widgets;
-    const widgetLabels: Record<WidgetId, string> = useMemo(() => ({
-        'stream-status': 'Статус стрима',
-        'stream-management': 'Управление стримом',
-        'chat': 'Чат',
-        'quick-actions': 'Быстрые действия',
-    }), []);
 
     // Заголовки страниц
     const pageTitles = useMemo(() => ({
@@ -82,20 +68,11 @@ const Header: React.FC = () => {
             if (integrationsOpen && !(event.target as Element).closest('.integrations-menu')) {
                 setIntegrationsOpen(false);
             }
-            if (layoutBlocksMenuOpen && !(event.target as Element).closest('.layout-blocks-menu')) {
-                setLayoutBlocksMenuOpen(false);
-            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [integrationsOpen, layoutBlocksMenuOpen]);
-
-    useEffect(() => {
-        if (!isEditMode) {
-            setLayoutBlocksMenuOpen(false);
-        }
-    }, [isEditMode]);
+    }, [integrationsOpen]);
 
 
     const handleIntegrationToggle = async (platform: string) => {
@@ -159,80 +136,6 @@ const Header: React.FC = () => {
             )}
 
             <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
-                {/* Layout Config Button (Dashboard only) */}
-                {isAuthenticated && isDashboard && (
-                    <div className="hidden sm:flex items-center gap-2 mr-2">
-                        {isEditMode && (
-                            <>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={resetLayout}
-                                    className="h-9 px-3 border-border/70 bg-card/70 text-foreground hover:bg-accent"
-                                >
-                                    <RotateCcw className="w-4 h-4 mr-2" />
-                                    Сбросить позиционирование
-                                </Button>
-
-                                <div className="relative layout-blocks-menu">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setLayoutBlocksMenuOpen((prev) => !prev)}
-                                        className="h-9 px-3 border-border/70 bg-card/70 text-foreground hover:bg-accent"
-                                    >
-                                        Блоки
-                                        <ChevronDown className={cn("ml-2 h-4 w-4 transition-transform", layoutBlocksMenuOpen && "rotate-180")} />
-                                    </Button>
-
-                                    {layoutBlocksMenuOpen && (
-                                        <div className="absolute right-0 top-11 w-64 rounded-md border border-border bg-popover p-2 shadow-lg z-50">
-                                            <div className="px-2 py-1 text-xs font-semibold text-muted-foreground">
-                                                Показывать блоки
-                                            </div>
-                                            <div className="mt-1 space-y-1">
-                                                {activeWidgets.map((widget) => (
-                                                    <button
-                                                        key={widget.id}
-                                                        type="button"
-                                                        onClick={() => toggleWidgetVisibility(widget.id)}
-                                                        className="flex w-full items-center justify-between rounded-md px-2 py-2 text-sm text-foreground hover:bg-accent"
-                                                    >
-                                                        <span>{widgetLabels[widget.id]}</span>
-                                                        <span
-                                                            className={cn(
-                                                                "flex h-4 w-4 items-center justify-center rounded border",
-                                                                widget.isVisible
-                                                                    ? "border-emerald-400 bg-emerald-500/20 text-emerald-300"
-                                                                    : "border-border/70 bg-transparent text-transparent"
-                                                            )}
-                                                        >
-                                                            <Check className="h-3 w-3" />
-                                                        </span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </>
-                        )}
-
-                        <Button
-                            type="button"
-                            onClick={toggleEditMode}
-                            variant={isEditMode ? "secondary" : "ghost"}
-                            size="sm"
-                            className={cn("h-10 flex items-center gap-2 border-none bg-transparent px-4 text-foreground shadow-none transition-colors hover:bg-transparent hover:text-blue-400", isEditMode && "text-green-400 hover:text-green-300")}
-                        >
-                            {isEditMode ? <Check className="w-4 h-4" /> : <Settings2 className="w-4 h-4" />}
-                            {isEditMode ? "Сохранить макет" : "Настроить макет"}
-                        </Button>
-                    </div>
-                )}
-
                 {isAuthenticated && (
                     <div className="relative integrations-menu">
                         <Button

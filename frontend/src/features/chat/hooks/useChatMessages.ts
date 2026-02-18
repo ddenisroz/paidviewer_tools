@@ -18,6 +18,15 @@ const getMaxMessages = (): number => {
     return parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10);
 };
 
+const CHAT_MESSAGES_STORAGE_KEY = 'chat_messages';
+const CHAT_MESSAGES_STORAGE_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface ChatMessagesStoragePayload {
+    version: 1;
+    savedAt: number;
+    messages: ChatMessage[];
+}
+
 const messagesReducer = (state: ChatMessage[], action: MessagesAction): ChatMessage[] => {
     const maxMessages = getMaxMessages();
 
@@ -51,10 +60,26 @@ const messagesReducer = (state: ChatMessage[], action: MessagesAction): ChatMess
 const loadMessagesFromStorage = (): ChatMessage[] => {
     try {
         const maxMessages = getMaxMessages();
-        const stored = localStorage.getItem('chat_messages');
+        const stored = localStorage.getItem(CHAT_MESSAGES_STORAGE_KEY);
         if (stored) {
-            const parsed = JSON.parse(stored) as ChatMessage[];
-            return parsed.slice(-maxMessages);
+            const parsed = JSON.parse(stored) as ChatMessage[] | ChatMessagesStoragePayload;
+
+            // Backward compatibility: old format was raw ChatMessage[]
+            if (Array.isArray(parsed)) {
+                return parsed.slice(-maxMessages);
+            }
+
+            if (!Array.isArray(parsed.messages)) {
+                return [];
+            }
+
+            const age = Date.now() - (parsed.savedAt || 0);
+            if (age > CHAT_MESSAGES_STORAGE_TTL_MS) {
+                localStorage.removeItem(CHAT_MESSAGES_STORAGE_KEY);
+                return [];
+            }
+
+            return parsed.messages.slice(-maxMessages);
         }
     } catch (error) {
         logger.error('Error loading messages from storage:', error);
@@ -82,12 +107,20 @@ export function useChatMessages(): UseChatMessagesReturn {
 
     // Persist messages to localStorage
     useEffect(() => {
-        if (messages.length > 0) {
-            try {
-                localStorage.setItem('chat_messages', JSON.stringify(messages));
-            } catch (error) {
-                logger.error('Error saving messages to storage:', error);
+        try {
+            if (messages.length === 0) {
+                localStorage.removeItem(CHAT_MESSAGES_STORAGE_KEY);
+                return;
             }
+
+            const payload: ChatMessagesStoragePayload = {
+                version: 1,
+                savedAt: Date.now(),
+                messages: messages.slice(-getMaxMessages())
+            };
+            localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(payload));
+        } catch (error) {
+            logger.error('Error saving messages to storage:', error);
         }
     }, [messages]);
 

@@ -48,6 +48,7 @@ const StreamTitleCard: React.FC = () => {
     const normalizeTitle = (value?: string) => (value ?? '').trim();
     const focusRestoreRef = useRef<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
     const clearedOnFocusRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
+    const saveButtonRef = useRef<HTMLButtonElement | null>(null);
 
     useEffect(() => {
         if (Date.now() < suppressSyncUntilRef.current) {
@@ -176,24 +177,14 @@ const StreamTitleCard: React.FC = () => {
 
     const handleKeyPress = (e: React.KeyboardEvent, platform: 'twitch' | 'vk') => {
         if (e.key === 'Enter') {
-            (e.currentTarget as HTMLInputElement).blur();
-            handleSave(platform);
+            e.preventDefault();
+            isEditingRef.current = false;
+            void handleSave(platform);
         }
     };
 
-    // Helper for input blur
-    const restoreValueIfNeeded = (platform: 'twitch' | 'vk') => {
-        if (!clearedOnFocusRef.current[platform]) return false;
-        const currentValue = getTitleValue(platform);
-        if (currentValue.trim() !== '') {
-            clearedOnFocusRef.current[platform] = false;
-            return false;
-        }
+    const revertToFocusedValue = (platform: 'twitch' | 'vk') => {
         const restoreValue = focusRestoreRef.current[platform];
-        if (!restoreValue) {
-            clearedOnFocusRef.current[platform] = false;
-            return true;
-        }
         lastSyncedTitleRef.current = restoreValue;
         if (isLinked && bothEnabled) {
             setCurrentData(prev => ({
@@ -207,14 +198,18 @@ const StreamTitleCard: React.FC = () => {
             setCurrentData(prev => ({ ...prev, vk: { ...prev.vk!, title: restoreValue } }));
         }
         clearedOnFocusRef.current[platform] = false;
-        return true;
     };
 
-    const handleInputBlur = (platform: 'twitch' | 'vk') => {
+    const handleInputBlur = (platform: 'twitch' | 'vk', e: React.FocusEvent<HTMLInputElement>) => {
         isEditingRef.current = false;
-        const restored = restoreValueIfNeeded(platform);
-        if (restored) return;
-        handleSave(platform);
+
+        const nextFocused = e.relatedTarget as Node | null;
+        if (nextFocused && saveButtonRef.current?.contains(nextFocused)) {
+            return;
+        }
+
+        // Clicking outside input cancels edit and restores previous value.
+        revertToFocusedValue(platform);
     };
 
     const handleInputFocus = (platform: 'twitch' | 'vk', e: React.FocusEvent<HTMLInputElement>) => {
@@ -269,9 +264,10 @@ const StreamTitleCard: React.FC = () => {
 
     const footer = (
         <Button
+            ref={saveButtonRef}
             className={`w-full h-7 text-sm font-medium shadow-sm transition-all duration-300 ${
                 isSaving || !isChanged || !isUserDirty
-                    ? 'bg-blue-900/35 text-blue-200/70'
+                    ? 'bg-blue-600/35 text-blue-100/90 border border-blue-300/30'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
             onClick={() => void handleSaveAll()}
@@ -313,7 +309,7 @@ const StreamTitleCard: React.FC = () => {
                             value={currentData.twitch?.title || ''}
                             onChange={(e) => handleTitleChange('twitch', e.target.value)}
                             onKeyDown={(e) => handleKeyPress(e, 'twitch')}
-                            onBlur={() => handleInputBlur('twitch')}
+                            onBlur={(e) => handleInputBlur('twitch', e)}
                             onFocus={(e) => handleInputFocus('twitch', e)}
                             autoComplete="off"
                             autoCorrect="off"
@@ -341,7 +337,7 @@ const StreamTitleCard: React.FC = () => {
                                 value={currentData.vk?.title || ''}
                                 onChange={(e) => handleTitleChange('vk', e.target.value)}
                                 onKeyDown={(e) => handleKeyPress(e, 'vk')}
-                                onBlur={() => handleInputBlur('vk')}
+                                onBlur={(e) => handleInputBlur('vk', e)}
                                 onFocus={(e) => handleInputFocus('vk', e)}
                                 autoComplete="off"
                                 autoCorrect="off"

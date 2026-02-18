@@ -57,7 +57,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 window.history.replaceState({}, '', window.location.pathname);
             }
 
-            await checkAuth();
+            // Force initial server-side auth validation to avoid stale local cache access.
+            await checkAuth(true);
             setInitialCheckDone(true);
         };
 
@@ -81,7 +82,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const isWhitelisted = (platform: string, channel: string): boolean => {
         if (!user) return false;
-        if (user.is_admin) return true;
+        if (user.role === 'admin' || user.is_admin) return true;
 
         if (user.whitelisted_channels) {
             if (platform === 'twitch' && user.whitelisted_channels.twitch === channel) return true;
@@ -91,8 +92,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return false;
     };
 
-    const refreshAuthStatus = async (_force?: boolean) => {
-        await checkAuth();
+    const refreshAuthStatus = async (force = false) => {
+        await checkAuth(force);
     };
 
     const markIntegrationsRefreshed = () => {

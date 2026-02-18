@@ -9,21 +9,10 @@ const AuthGuard: React.FC = () => {
     const { isAuthenticated, isCheckingAuth } = useAuth();
     const location = useLocation();
 
-    // Пока проверяем авторизацию - показываем только фон без видимых элементов
+    // Во время проверки авторизации ничего не показываем,
+    // чтобы не мешать пользователю заметным preload-экраном.
     if (isCheckingAuth || isAuthenticated === null) {
-        return (
-            <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'hsl(260, 30%, 8%)',
-                zIndex: 9999
-            }}>
-                {/* Invisible loading - no spinners, no text */}
-            </div>
-        );
+        return null;
     }
 
     // Если не авторизован - перенаправляем на логин

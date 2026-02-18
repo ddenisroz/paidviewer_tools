@@ -27,6 +27,7 @@ import {
     isChatEnabled
 } from '@/shared/utils/platformHelpers';
 import { logger } from '@/shared/utils/prodLogger';
+import QuickActionsBar from '@/features/home/components/QuickActionsBar';
 
 import ChatCardFooter from './ChatCardFooter';
 import ChatCardHeader from './ChatCardHeader';
@@ -55,6 +56,7 @@ interface Integrations {
 interface ChatCardProps {
     integrations: Integrations;
     isOnHomePage?: boolean;
+    showQuickActionsInCard?: boolean;
 }
 
 interface ContextMenuState {
@@ -80,7 +82,7 @@ interface PrevIntegrationsRef {
     vk: boolean;
 }
 
-const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }) => {
+const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true, showQuickActionsInCard = false }) => {
     const { user } = useAuth();
     const { messages: chatMessages, isConnected, setMessages } = useChat();
 
@@ -409,7 +411,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                     onToggleChatVisibility={() => setChatMessagesVisible(!chatMessagesVisible)}
                 />
             </CardHeader>
-            <CardContent className="pt-0">
+            <CardContent className="pt-0 flex-1 min-h-0">
                 {chatMessagesVisible && (twitchChatEnabled || vkChatEnabled) && isOnHomePage ? (
                     <ChatMessageList
                         messages={filteredMessages}
@@ -445,6 +447,12 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true }
                     />
                 )}
             </CardContent>
+
+            {showQuickActionsInCard && (
+                <div className="px-4 pb-3 pt-3">
+                    <QuickActionsBar embedded={true} />
+                </div>
+            )}
 
             <ChatBoxSettingsModal
                 isOpen={showChatBoxModal}

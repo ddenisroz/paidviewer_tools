@@ -67,12 +67,26 @@ interface EmoteData {
     animated: boolean;
 }
 
-const FALLBACK_7TV_EMOTE: EmoteData = {
-    id: 'preview-7tv',
-    name: 'JustAnotherDay',
-    url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
-    animated: false
-};
+const PREVIEW_7TV_FALLBACKS: EmoteData[] = [
+    {
+        id: 'preview-7tv-justanotherday',
+        name: 'JustAnotherDay',
+        url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
+        animated: false
+    },
+    {
+        id: 'preview-7tv-em',
+        name: 'Em',
+        url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
+        animated: false
+    },
+    {
+        id: 'preview-7tv-based',
+        name: 'Based',
+        url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
+        animated: false
+    }
+];
 
 const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessage => ({
     ...message,
@@ -95,10 +109,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         const b = parseInt(hex.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     };
-    const panelBackground = hexToRgba(
-        settings.background_color || '#000000',
-        Math.min(0.92, Math.max(0.35, settings.background_opacity + 0.3))
-    );
+    const panelBackground = 'linear-gradient(180deg, rgba(6,10,24,0.95) 0%, rgba(5,8,18,0.98) 100%)';
 
     const getAnimationName = (type: string) => {
         switch (type) {
@@ -120,11 +131,12 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
 
     const effectiveGlobalEmotes = useMemo(() => {
         if (!settings.show_7tv_emotes) return new Map<string, EmoteData>();
-        if (globalEmotes.size > 0) return globalEmotes;
-        return new Map([
-            [FALLBACK_7TV_EMOTE.name, FALLBACK_7TV_EMOTE],
-            [FALLBACK_7TV_EMOTE.name.toLowerCase(), FALLBACK_7TV_EMOTE]
-        ]);
+        const base = new Map(globalEmotes);
+        PREVIEW_7TV_FALLBACKS.forEach((emote) => {
+            if (!base.has(emote.name)) base.set(emote.name, emote);
+            if (!base.has(emote.name.toLowerCase())) base.set(emote.name.toLowerCase(), emote);
+        });
+        return base;
     }, [globalEmotes, settings.show_7tv_emotes]);
 
     const truncateWords = (text: string, maxWords: number = 6): string => {
@@ -246,7 +258,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
             <div
                 className="flex-1 overflow-hidden border border-white/10 rounded-md"
                 style={{
-                    backgroundColor: panelBackground,
+                    background: panelBackground,
                     fontFamily: settings.font_family,
                     fontSize: `${settings.font_size}px`,
                     fontWeight: settings.font_weight || 'normal'
@@ -424,22 +436,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                     ))}
                                                 </>
                                             )}
-                                            {settings.show_badges && msg.platform === 'vk' && msg.vk_role_icon_url && (
-                                                <img
-                                                    src={msg.vk_role_icon_url}
-                                                    alt={msg.role ? `${msg.role} badge` : 'VK role badge'}
-                                                    loading="lazy"
-                                                    style={{
-                                                        width: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
-                                                        height: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
-                                                        verticalAlign: 'text-bottom'
-                                                    }}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).style.display = 'none';
-                                                    }}
-                                                />
-                                            )}
-                                            {settings.show_badges && msg.platform === 'vk' && !msg.vk_role_icon_url && msg.role && (
+                                            {settings.show_badges && msg.platform === 'vk' && msg.role && (
                                                 <VkRoleBadge
                                                     role={msg.role}
                                                     size={Math.max(12, Math.min(18, settings.font_size * 0.9))}

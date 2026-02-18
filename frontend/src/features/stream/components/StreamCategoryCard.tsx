@@ -322,7 +322,7 @@ const StreamCategoryCard: React.FC = () => {
             size="sm"
             className={`w-full flex items-center gap-2 h-7 text-sm font-medium shadow-sm transition-all duration-300 ${
                 isSaving || !isChanged || !isUserDirty
-                    ? 'bg-blue-900/35 text-blue-200/70'
+                    ? 'bg-blue-600/35 text-blue-100/90 border border-blue-300/30'
                     : 'bg-blue-600 hover:bg-blue-700 text-white'
             }`}
         >

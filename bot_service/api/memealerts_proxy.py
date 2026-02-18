@@ -370,6 +370,30 @@ def _build_upstream_auth_fallback_query(
     return normalized
 
 
+def _build_proxy_auth_fallback_query(
+    path: str,
+    query: list[tuple[str, str]] | None,
+    *,
+    proxy_return_url: str,
+) -> list[tuple[str, str]] | None:
+    if not path.startswith("api/auth/"):
+        return query
+
+    normalized: list[tuple[str, str]] = []
+    has_return_url = False
+    for key, value in (query or []):
+        if key == "return_url":
+            has_return_url = True
+            normalized.append((key, proxy_return_url))
+        else:
+            normalized.append((key, value))
+
+    if not has_return_url:
+        normalized.append(("return_url", proxy_return_url))
+
+    return normalized
+
+
 def _build_upstream_url(path: str) -> str:
     if path:
         return f"{MEMEALERTS_ORIGIN}/{path}"
@@ -528,6 +552,7 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
         logger.info("[PROXY] Client disconnected before request body was read")
         return Response(content=b"", status_code=499)
     query = list(request.query_params.multi_items()) if request.query_params else None
+    has_explicit_return_url = bool(request.query_params.get("return_url"))
     query = _normalize_query(path, query)
     proxy_return_url = f"{str(request.base_url).rstrip('/')}{PROXY_PREFIX}/auth/redirect"
     query = _normalize_auth_query(path, query, proxy_return_url=proxy_return_url)
@@ -541,18 +566,51 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
                 content=body if body else None,
                 params=query,
             )
-            if path.startswith("api/auth/") and upstream_resp.status_code >= 400:
-                fallback_query = _build_upstream_auth_fallback_query(path, query)
-                if fallback_query != query:
+            # Retry auth with proxy callback first, then with upstream callback.
+            # This keeps automatic token handoff working when possible and falls
+            # back to upstream redirect only as a last resort.
+            if (
+                path.startswith("api/auth/")
+                and upstream_resp.status_code >= 400
+            ):
+                retried_query = query
+                proxy_fallback_query = _build_proxy_auth_fallback_query(
+                    path,
+                    query,
+                    proxy_return_url=proxy_return_url,
+                )
+                if proxy_fallback_query != retried_query:
                     logger.warning(
-                        "[PROXY] Auth flow rejected proxy return_url, retrying with upstream return_url"
+                        "[PROXY] Auth flow rejected return_url (explicit=%s), retrying with proxy return_url",
+                        has_explicit_return_url,
                     )
                     upstream_resp = await client.request(
                         method=request.method,
                         url=upstream_url,
                         headers=fwd_headers,
                         content=body if body else None,
-                        params=fallback_query,
+                        params=proxy_fallback_query,
+                    )
+                    retried_query = proxy_fallback_query
+
+                if upstream_resp.status_code >= 400:
+                    upstream_fallback_query = _build_upstream_auth_fallback_query(path, retried_query)
+                    if upstream_fallback_query != retried_query:
+                        logger.warning(
+                            "[PROXY] Auth flow still rejected return_url, retrying with upstream return_url (explicit=%s)",
+                            has_explicit_return_url,
+                        )
+                        upstream_resp = await client.request(
+                            method=request.method,
+                            url=upstream_url,
+                            headers=fwd_headers,
+                            content=body if body else None,
+                            params=upstream_fallback_query,
+                        )
+                else:
+                    logger.info(
+                        "[PROXY] Auth flow accepted proxy return_url after fallback (explicit=%s)",
+                        has_explicit_return_url,
                     )
     except httpx.TimeoutException:
         logger.warning(f"[PROXY] MemeAlerts upstream timeout: {upstream_url}")

@@ -9,6 +9,7 @@ Current scripts:
 - `debug_vk.py`
 - `fix_encoding.py`
 - `list_users.py`
+- `setup_public_domain.ps1`
 - `test_memealerts_auth.py`
 - `verify_api.py`
 

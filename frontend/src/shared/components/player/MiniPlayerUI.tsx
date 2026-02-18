@@ -66,7 +66,7 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                 )}
 
                 {/* Main Player Card */}
-                <div className="relative overflow-hidden rounded-2xl bg-[#200b12] shadow-md shadow-black/45">
+                <div className="relative overflow-hidden rounded-2xl border border-white/12 bg-[#13060d] shadow-md shadow-black/55 ring-1 ring-white/5">
                     <div className="flex items-start p-3 gap-3">
                         {/* Album Art / Video Thumbnail */}
                         <ThumbnailSection
@@ -145,8 +145,8 @@ interface QueuePanelProps {
 }
 
 const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onClose, onClearQueue, onSelectQueueItem }) => (
-    <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl bg-[#200b12] shadow-2xl shadow-black/40 animate-in slide-in-from-bottom-2 fade-in duration-200">
-        <div className="flex items-center justify-between border-b border-border/60 bg-[#200b12] px-4 py-3">
+    <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl bg-[#13060d] shadow-2xl shadow-black/50 ring-1 ring-white/5 animate-in slide-in-from-bottom-2 fade-in duration-200">
+        <div className="flex items-center justify-between border-b border-border/50 bg-[#13060d] px-4 py-3">
             <span className="text-xs font-medium text-white/70 uppercase tracking-wider">Очередь</span>
             <div className="flex items-center gap-1">
                 {onClearQueue && (

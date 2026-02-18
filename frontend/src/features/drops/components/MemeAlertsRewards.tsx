@@ -3,7 +3,6 @@
 import { AlertCircle, Coins, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { API_BASE_URL } from '@/constants';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { cn } from '@/lib/utils';
 import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
@@ -399,25 +398,34 @@ export const MemeAlertsRewards: React.FC = () => {
         setRewardCoinsAmount(platformSettings.coins_amount || 10);
     }, [automationSettings.points_reward, selectedRewardPlatform]);
 
-    const handleConnect = useCallback(() => {
-        // Open direct Google OAuth through proxy and return back to frontend callback page.
-        // This keeps final token handoff on the same origin as dashboard.
-        const callbackUrl = `${window.location.origin}/memealerts/callback`;
-        const authUrl = `${API_BASE_URL}/api/memealerts/proxy/api/auth/google?return_url=${encodeURIComponent(callbackUrl)}&ts=${Date.now()}`;
-        const popup = window.open(authUrl, '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
-        if (!popup) {
-            toast.error("Не удалось открыть окно", {
-                description: "Разрешите всплывающие окна в настройках браузера"
+    const handleConnect = useCallback(async () => {
+        try {
+            setConnecting(true);
+            const response = await fetch(`${MEMEALERTS_API_BASE}/connect-url`);
+            const data = await response.json();
+            if (!response.ok || !data?.success || !data?.auth_url) {
+                throw new Error(data?.error || 'Не удалось получить ссылку подключения');
+            }
+
+            const popup = window.open(data.auth_url, '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
+            if (!popup) {
+                toast.error("Не удалось открыть окно", {
+                    description: "Разрешите всплывающие окна в настройках браузера"
+                });
+                setConnecting(false);
+                return;
+            }
+
+            popupRef.current = popup;
+            startPopupWatcher();
+            toast.info("Авторизуйтесь в MemeAlerts", {
+                description: "После входа окно закроется автоматически"
             });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Ошибка запуска авторизации';
+            toast.error(message);
             setConnecting(false);
-            return;
         }
-        popupRef.current = popup;
-        startPopupWatcher();
-        setConnecting(true);
-        toast.info("Авторизуйтесь в MemeAlerts", {
-            description: "После входа токен сохранится автоматически"
-        });
     }, [startPopupWatcher]);
 
     const handleDisconnect = async () => {
@@ -445,7 +453,7 @@ export const MemeAlertsRewards: React.FC = () => {
         const parsed = parseMemeAlertsTokenPayload(rawValue);
         if (!parsed.accessToken) {
             toast.error("Не найден access token", {
-                description: "Вставьте полную ссылку из окна MemeAlerts после Google-авторизации"
+                description: "Вставьте полную ссылку из окна MemeAlerts после авторизации"
             });
             return;
         }
@@ -551,7 +559,7 @@ export const MemeAlertsRewards: React.FC = () => {
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/70 px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-card/70 px-1 py-1">
                 <div className="flex items-center gap-2">
                     <MemeAlertsLogo className="h-10 w-auto" />
                 </div>
@@ -576,20 +584,17 @@ export const MemeAlertsRewards: React.FC = () => {
             </div>
 
             {!isConnected ? (
-                <Card className={SURFACE_CARD_CLASS}>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base">Подключение MemeAlerts</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
+                <div className={SURFACE_CARD_CLASS}>
+                    <div className="space-y-3 p-4">
                         <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-200">
                             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p>
-                                Нажмите «Подключить MemeAlerts», авторизуйтесь в popup-окне.
-                                Если окно зависло после Google, вставьте ссылку вручную ниже.
+                                Нажмите «Подключить MemeAlerts» и войдите в popup-окне.
+                                После успешного входа подключение завершится автоматически.
                             </p>
                         </div>
 
-                        <Button onClick={handleConnect} disabled={connecting} className="w-full h-9">
+                        <Button onClick={handleConnect} disabled={connecting} className="w-full h-9 bg-[#9146FF] hover:bg-[#7f3ee8] text-white">
                             {connecting ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -603,29 +608,26 @@ export const MemeAlertsRewards: React.FC = () => {
                             )}
                         </Button>
 
-                        <div className="space-y-2 rounded-md border border-border/70 bg-card/60 p-3">
-                            <Label className="text-xs text-muted-foreground">Ручное применение ссылки авторизации</Label>
-                            <Input
-                                ref={manualTokenInputRef}
-                                value={manualAuthUrl}
-                                onChange={(e) => setManualAuthUrl(e.target.value)}
-                                placeholder="https://memealerts.com/auth/redirect?accessToken=..."
-                                className={FIELD_CLASS}
-                            />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={handleManualTokenApply}
-                                disabled={manualSubmitLoading || !manualAuthUrl.trim()}
-                                className="w-full h-8 border-border/70 bg-card/70 hover:bg-accent"
-                            >
-                                {manualSubmitLoading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                                Применить ссылку вручную
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                        <Input
+                            ref={manualTokenInputRef}
+                            value={manualAuthUrl}
+                            onChange={(e) => setManualAuthUrl(e.target.value)}
+                            placeholder="https://memealerts.com/auth/redirect?accessToken=..."
+                            className={FIELD_CLASS}
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleManualTokenApply}
+                            disabled={manualSubmitLoading || !manualAuthUrl.trim()}
+                            className="w-full h-8 border-border/70 bg-card/70 hover:bg-accent"
+                        >
+                            {manualSubmitLoading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                            Применить ссылку вручную
+                        </Button>
+                    </div>
+                </div>
             ) : (
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
                     <div className="space-y-4">
@@ -926,4 +928,3 @@ export const MemeAlertsRewards: React.FC = () => {
         </div>
     );
 };
-

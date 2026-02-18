@@ -84,6 +84,20 @@ body {
   overflow-x: hidden;
 }
 
+/* Inline chat emotes: large visually, stable line-height footprint */
+.chat-inline-emote {
+  display: inline-block;
+  width: 1.55em;
+  height: 1.55em;
+  min-width: 1.55em;
+  min-height: 1.55em;
+  vertical-align: -0.28em;
+  object-fit: contain;
+  margin-inline: 0.2em;
+  margin-block: 0;
+  line-height: 1;
+}
+
 /* РљР°СЃС‚РѕРјРЅС‹Рµ Р°РЅРёРјР°С†РёРё РґР»СЏ Р°РІС‚РѕСЂРёР·Р°С†РёРё */
 @keyframes spin-slow {
   from {
@@ -559,7 +573,7 @@ body {
 
 .login-card {
   position: relative;
-  background: hsl(var(--card)) !important;
+  background: hsl(248 44% 7%) !important;
   border: 1px solid hsl(var(--border) / 0.75) !important;
   border-radius: 12px !important;
   backdrop-filter: none;

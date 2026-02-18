@@ -10,7 +10,11 @@ import { Card } from '@/shared/components/ui/card';
 import ActionButton from './quickactions/ActionButton';
 import { useQuickActionsHandlers } from './quickactions/useQuickActionsHandlers';
 
-const QuickActionsBar: React.FC = () => {
+interface QuickActionsBarProps {
+    embedded?: boolean;
+}
+
+const QuickActionsBar: React.FC<QuickActionsBarProps> = ({ embedded = false }) => {
     const logic = useQuickActionsLogic();
 
     const handlers = useQuickActionsHandlers({
@@ -43,34 +47,42 @@ const QuickActionsBar: React.FC = () => {
 
     if (!logic.isAuthenticated) return null;
 
+    const content = (
+        <div className={embedded ? "flex items-center justify-center gap-3 px-0 py-0" : "flex items-center justify-center gap-3 px-6 py-4"}>
+            <ActionButton
+                icon={logic.ttsState ? Volume2 : VolumeX}
+                label="TTS чата"
+                isActive={logic.ttsState}
+                onClick={handleTtsToggle}
+            />
+
+            {logic.isDropsEnabled && (
+                <ActionButton
+                    icon={Zap}
+                    label="Стрик drops"
+                    isActive={logic.streakEnabled}
+                    onClick={handlers.handleStreakToggle}
+                />
+            )}
+
+            {logic.isDropsEnabled && (
+                <ActionButton
+                    icon={DollarSign}
+                    label="Donate drops"
+                    isActive={logic.donationEnabled}
+                    onClick={handlers.handleDonationToggle}
+                />
+            )}
+        </div>
+    );
+
+    if (embedded) {
+        return content;
+    }
+
     return (
         <Card className="card-glass transition-all duration-300">
-            <div className="flex items-center justify-center gap-3 px-6 py-4">
-                <ActionButton
-                    icon={logic.ttsState ? Volume2 : VolumeX}
-                    label="TTS чата"
-                    isActive={logic.ttsState}
-                    onClick={handleTtsToggle}
-                />
-
-                {logic.isDropsEnabled && (
-                    <ActionButton
-                        icon={Zap}
-                        label="Стрик drops"
-                        isActive={logic.streakEnabled}
-                        onClick={handlers.handleStreakToggle}
-                    />
-                )}
-
-                {logic.isDropsEnabled && (
-                    <ActionButton
-                        icon={DollarSign}
-                        label="Donate drops"
-                        isActive={logic.donationEnabled}
-                        onClick={handlers.handleDonationToggle}
-                    />
-                )}
-            </div>
+            {content}
         </Card>
     );
 };

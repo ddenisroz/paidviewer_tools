@@ -30,6 +30,25 @@ interface MessageContentProps {
 // Regex для URL - создаем один раз
 const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
+const INLINE_EMOTE_CLASS = 'chat-inline-emote';
+
+const normalizeInlineEmoteUrl = (url: string): string => {
+    if (!url) return url;
+    // VK smiles often arrive as /size/small and look tiny in chat.
+    if (url.includes('images.live.vkvideo.ru') && url.includes('/size/small')) {
+        return url.replace('/size/small', '/size/large');
+    }
+    if (url.includes('static-cdn.jtvnw.net/emoticons/v2/')) {
+        return url.replace(/\/(?:1|2)\.0$/, '/3.0');
+    }
+    if (url.includes('cdn.7tv.app/emote/')) {
+        return url
+            .replace(/\/1x\.(avif|webp|gif)$/i, '/4x.$1')
+            .replace(/\/2x\.(avif|webp|gif)$/i, '/4x.$1')
+            .replace(/\/3x\.(avif|webp|gif)$/i, '/4x.$1');
+    }
+    return url;
+};
 
 // Проверка, является ли URL изображением
 const isImageUrl = (url: string): boolean => {
@@ -42,6 +61,10 @@ const isImageUrl = (url: string): boolean => {
 };
 
 const removeUrls = (text: string): string => text.replace(URL_REGEX, '').replace(/\s{2,}/g, ' ').trim();
+
+const TWITCH_TEXT_EMOTES: Record<string, { id: string; name: string }> = {
+    ':)': { id: '1', name: 'Smile' },
+};
 
 // Компонент для изображения с fallback на ссылку
 const ChatImage: React.FC<{ src: string }> = memo(({ src }) => (
@@ -99,15 +122,28 @@ const processTwitchEmotes = (text: string, emotes: ChatEmote[]): string => {
 
         if (start < 0 || end > processedText.length) continue;
 
-        const rawUrl = emote.url || `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`;
+        const rawUrl = normalizeInlineEmoteUrl(emote.url || `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`);
         const emoteUrl = encodeURI(rawUrl);
         const emoteName = emote.name || 'emote';
-        const imgTag = `<img src="${emoteUrl}" alt="${emoteName}" class="inline-block w-6 h-6 align-middle object-contain" title="${emoteName}" />`;
+        const imgTag = `<img src="${emoteUrl}" alt="${emoteName}" class="${INLINE_EMOTE_CLASS}" title="${emoteName}" />`;
 
         processedText = processedText.substring(0, start) + imgTag + processedText.substring(end);
     }
 
     return processedText;
+};
+
+const processTwitchTextEmotes = (text: string): string => {
+    let processed = text;
+    for (const [code, meta] of Object.entries(TWITCH_TEXT_EMOTES)) {
+        const escapedCode = code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(^|\\s)(${escapedCode})(?=\\s|$|[.,!?])`, 'g');
+        processed = processed.replace(regex, (_match, leading, matchedCode) => {
+            const emoteUrl = `https://static-cdn.jtvnw.net/emoticons/v2/${meta.id}/default/dark/3.0`;
+            return `${leading}<img src="${emoteUrl}" alt="${meta.name}" class="${INLINE_EMOTE_CLASS}" title="${matchedCode}" />`;
+        });
+    }
+    return processed;
 };
 
 // Рендер части сообщения (текст, ссылка или картинка)
@@ -227,6 +263,7 @@ const MessageContent: React.FC<MessageContentProps> = memo(({
         if (twitchEmotes && twitchEmotes.length > 0) {
             processedWithTwitch = processTwitchEmotes(message, twitchEmotes);
         }
+        processedWithTwitch = processTwitchTextEmotes(processedWithTwitch);
 
         // 2. Затем обрабатываем 7TV эмоты (заменяем текст на img)
         const withEmotes = processEmotes(

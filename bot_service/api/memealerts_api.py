@@ -1,13 +1,16 @@
 """MemeAlerts API endpoints for grants, settings, and automation."""
 from typing import Literal, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from core.database import get_db
 from auth.auth import get_current_user, get_current_user_optional
+from core.config import settings
 from repositories.user_token_repository import UserTokenRepository
 from services.memealerts_service import MemeAlertsService
+from core.token_encryption import encrypt_token, decrypt_token
 import logging
 import jwt
 
@@ -25,7 +28,7 @@ def decode_memealerts_token(token: str) -> dict:
     """
     try:
         return jwt.decode(token, options={"verify_signature": False})
-    except jwt.DecodeError as e:
+    except jwt.PyJWTError as e:
         logger.error(f"Failed to decode MemeAlerts token: {e}")
         raise ValueError("Invalid token format")
 
@@ -75,11 +78,21 @@ async def get_memealerts_status(
         if token and token.access_token:
             # Try to decode token to get streamer info
             try:
-                decoded = decode_memealerts_token(token.access_token)
+                access_token = decrypt_token(token.access_token)
+                decoded = decode_memealerts_token(access_token) if access_token else {}
+                streamer_id = (
+                    decoded.get("id")
+                    or decoded.get("tid")
+                    or decoded.get("streamer_id")
+                    or decoded.get("streamerId")
+                    or decoded.get("user_id")
+                    or decoded.get("sub")
+                    or token.platform_user_id
+                )
                 return {
                     "success": True, 
                     "connected": True,
-                    "streamer_id": decoded.get("id"),
+                    "streamer_id": streamer_id,
                     "platform_user_id": token.platform_user_id
                 }
             except ValueError:
@@ -89,6 +102,33 @@ async def get_memealerts_status(
         return {"success": True, "connected": False}
     except Exception as e:
         logger.error(f"Error getting MemeAlerts status: {e}")
+        return {"success": False, "error": "Internal server error"}
+
+
+@router.get("/connect-url")
+async def get_memealerts_connect_url(
+    user: dict = Depends(get_current_user),
+):
+    """
+    Build a single-click MemeAlerts OAuth URL.
+    Uses FRONTEND_URL as callback base to support public domain deployments.
+    """
+    try:
+        frontend_base = (settings.frontend_url or "http://localhost:5173").rstrip("/")
+        callback_url = f"{frontend_base}/memealerts/callback"
+        provider = "twitch"
+        auth_url = (
+            f"https://memealerts.com/api/auth/{provider}"
+            f"?return_url={quote(callback_url, safe='')}"
+        )
+        return {
+            "success": True,
+            "provider": provider,
+            "callback_url": callback_url,
+            "auth_url": auth_url,
+        }
+    except Exception as e:
+        logger.error(f"Error building MemeAlerts connect URL: {e}")
         return {"success": False, "error": "Internal server error"}
 
 
@@ -187,18 +227,34 @@ async def connect_memealerts(
         if not access_token:
             raise HTTPException(status_code=400, detail="access_token is required")
 
-        # Validate and decode token to extract streamer ID
+        # Decode token if possible and extract streamer identifier.
+        # MemeAlerts may return different claim names depending on flow/version.
+        decoded = {}
         try:
             decoded = decode_memealerts_token(access_token)
-            streamer_id = decoded.get("id")
-            token_scope = decoded.get("scope")
-            
-            if not streamer_id:
-                raise HTTPException(status_code=400, detail="Token does not contain streamer ID")
-            
-            logger.info(f"MemeAlerts token decoded: streamer_id={streamer_id}, scope={token_scope}")
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid token format")
+            logger.warning("MemeAlerts token is not a decodable JWT, proceeding with fallback platform_user_id")
+
+        streamer_id = (
+            decoded.get("id")
+            or decoded.get("tid")
+            or decoded.get("streamer_id")
+            or decoded.get("streamerId")
+            or decoded.get("user_id")
+            or decoded.get("sub")
+        )
+        token_scope = decoded.get("scope")
+
+        # platform_user_id is non-nullable in user_tokens; keep connect flow resilient.
+        if not streamer_id:
+            existing = UserTokenRepository(db).get_by_user_and_platform(user_id, "memealerts")
+            streamer_id = existing.platform_user_id if existing and existing.platform_user_id else f"user-{user_id}"
+            logger.warning(
+                "MemeAlerts token has no streamer id claim; using fallback platform_user_id=%s",
+                streamer_id,
+            )
+        else:
+            logger.info(f"MemeAlerts token decoded: streamer_id={streamer_id}, scope={token_scope}")
 
         # Optional: Validate token by making a test API call
         # This verifies the token is actually valid and not expired
@@ -216,9 +272,9 @@ async def connect_memealerts(
         token_repo.upsert(
             user_id=user_id,
             platform="memealerts",
-            access_token=access_token,
-            refresh_token=refresh_token,
-            platform_user_id=streamer_id
+            access_token=encrypt_token(access_token),
+            refresh_token=encrypt_token(refresh_token) if refresh_token else None,
+            platform_user_id=str(streamer_id),
         )
 
         logger.info(f"[OK] MemeAlerts connected for user {user_id}, streamer_id={streamer_id}")

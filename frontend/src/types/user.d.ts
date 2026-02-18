@@ -34,6 +34,7 @@ export interface User {
   id: number;
   username: string;
   email?: string;
+  role?: 'admin' | 'user' | string;
   twitch_username?: string;
   vk_username?: string;
   vk_channel_name?: string;

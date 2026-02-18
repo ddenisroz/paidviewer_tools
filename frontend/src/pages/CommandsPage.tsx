@@ -369,7 +369,8 @@ const CommandsPage: React.FC = () => {
             }
             return cmd.tags.map(tag => normalizeTag(typeof tag === 'string' ? tag : String(tag)));
         });
-        return [...new Set(normalizedTags)] as string[];
+        return [...new Set(normalizedTags)]
+            .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' })) as string[];
     }, [basicCommands]);
 
     if (!isAuthenticated) {

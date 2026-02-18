@@ -6,6 +6,7 @@ const SEVENTV_REST_API_BASE = 'https://api.7tv.app/v3';
 const REQUEST_TIMEOUT = 3500;
 const EMOTES_CACHE_TTL_MS = 15 * 60 * 1000;
 const EMPTY_CACHE_TTL_MS = 90 * 1000;
+const INLINE_EMOTE_CLASS = 'chat-inline-emote';
 
 interface EmoteData {
   id: string;
@@ -153,12 +154,16 @@ function buildEmoteMap(emotes: Array<Emote | Record<string, unknown>>): EmoteMap
     const hostUrl = normalizeHostUrl(host?.url);
     const files = host?.files || [];
     if (hostUrl && files.length > 0) {
-      const file = files.find((f) => f.name === '2x.webp')
+      const file = files.find((f) => f.name === '4x.avif')
+        || files.find((f) => f.name === '4x.webp')
+        || files.find((f) => f.name === '3x.avif')
+        || files.find((f) => f.name === '3x.webp')
+        || files.find((f) => f.name === '2x.webp')
         || files.find((f) => f.name === '2x.avif')
         || files.find((f) => f.name === '1x.webp')
         || files.find((f) => f.name === '1x.avif')
         || files[0];
-      const url = `${hostUrl}/${file?.name ?? '2x.webp'}`;
+      const url = `${hostUrl}/${file?.name ?? '4x.webp'}`;
       const emoteName = (emote as Emote).name || (emote as { name?: string }).name || '';
       if (!emoteName) return;
       const id = (emote as Emote).id || (emote as { id?: string }).id || '';
@@ -305,6 +310,23 @@ function escapeHtml(text: string): string {
   return div.innerHTML;
 }
 
+function normalizeInlineEmoteUrl(url: string): string {
+  if (!url) return url;
+  if (url.includes('images.live.vkvideo.ru') && url.includes('/size/small')) {
+    return url.replace('/size/small', '/size/large');
+  }
+  if (url.includes('static-cdn.jtvnw.net/emoticons/v2/')) {
+    return url.replace(/\/(?:1|2)\.0$/, '/3.0');
+  }
+  if (url.includes('cdn.7tv.app/emote/')) {
+    return url
+      .replace(/\/1x\.(avif|webp|gif)$/i, '/4x.$1')
+      .replace(/\/2x\.(avif|webp|gif)$/i, '/4x.$1')
+      .replace(/\/3x\.(avif|webp|gif)$/i, '/4x.$1');
+  }
+  return url;
+}
+
 export function processEmotes(message: string, channelEmotes: EmoteMap = new Map(), globalEmotes: EmoteMap = new Map()): string {
   if (!message || typeof message !== 'string') {
     return message;
@@ -326,9 +348,9 @@ export function processEmotes(message: string, channelEmotes: EmoteMap = new Map
     const emoteName = rawName.toLowerCase();
     const emote = allEmotes.get(emoteName) || allEmotes.get(rawName);
     if (emote) {
-      const safeUrl = escapeHtml(emote.url);
+      const safeUrl = escapeHtml(normalizeInlineEmoteUrl(emote.url));
       const safeName = escapeHtml(emote.name);
-      return `${leading}<img src="${safeUrl}" alt="${safeName}" class="inline-block w-6 h-6 align-middle object-contain" title="${safeName}" />`;
+      return `${leading}<img src="${safeUrl}" alt="${safeName}" class="${INLINE_EMOTE_CLASS}" title="${safeName}" />`;
     }
     return match;
   });

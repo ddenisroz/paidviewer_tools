@@ -179,7 +179,7 @@ const GlobalPlayer: React.FC = () => {
                 ref={playerRef}
                 src={youtubeUrl}
                 playing={isPlaying}
-                volume={(isMuted ? 0 : volume) / 100}
+                volume={volume / 100}
                 muted={isMuted}
                 width="100%"
                 height="100%"

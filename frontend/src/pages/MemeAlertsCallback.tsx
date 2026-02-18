@@ -15,6 +15,7 @@ const extractTokenFromUrl = (): { accessToken?: string; refreshToken?: string } 
       params.get('accessToken') ||
       params.get('token') ||
       params.get('auth_token') ||
+      params.get('jwt') ||
       undefined;
     const refreshToken = params.get('refresh_token') || params.get('refreshToken') || undefined;
 
@@ -26,6 +27,14 @@ const extractTokenFromUrl = (): { accessToken?: string; refreshToken?: string } 
 
   const fromHash = parseParams(window.location.hash || '');
   if (fromHash.accessToken) return fromHash;
+
+  // Some providers put query string inside hash payload.
+  const hash = (window.location.hash || '').replace(/^#/, '');
+  const hashQueryIndex = hash.indexOf('?');
+  if (hashQueryIndex >= 0) {
+    const fromHashQuery = parseParams(hash.slice(hashQueryIndex + 1));
+    if (fromHashQuery.accessToken) return fromHashQuery;
+  }
 
   return {};
 };
@@ -145,3 +154,4 @@ const MemeAlertsCallback = () => {
 };
 
 export default MemeAlertsCallback;
+

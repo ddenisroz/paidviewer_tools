@@ -202,11 +202,19 @@ class TTSService:
 
     # === Blocked Users ===
     
-    async def get_blocked_users(self, user_id: int) -> List[dict]:
-        return self.blocked_user_repo.get_blocked_list(user_id=user_id)
+    async def get_blocked_users(self, user_id: Optional[int] = None, session_id: Optional[str] = None) -> List[dict]:
+        return self.blocked_user_repo.get_blocked_list(user_id=user_id, session_id=session_id)
         
-    async def block_user(self, user_id: int, channel_name: str, platform: str, username: str) -> bool:
-        # Validate user existence on platform
+    async def block_user(
+        self,
+        user_id: Optional[int],
+        channel_name: str,
+        platform: str,
+        username: str,
+        session_id: Optional[str] = None,
+    ) -> bool:
+        # Validate user existence on platform (best-effort only).
+        # Blocking must still work even if upstream OAuth/token validation is temporarily broken.
         if platform.lower() == 'twitch':
             from startup.bot_registry import get_bot_registry
             registry = get_bot_registry()
@@ -215,27 +223,36 @@ class TTSService:
                     # Use TwitchIO's fetch_users to validate user existence
                     users = await registry.twitch_bot.fetch_users(names=[username])
                     if not users:
-                        logger.warning(f"Cannot block user {username}: user not found on Twitch")
-                        return False
+                        logger.warning(
+                            f"User {username} was not resolved via Twitch API, proceeding with local username block"
+                        )
                 except Exception as e:
-                    logger.error(f"Error validating user {username} on Twitch: {e}")
-                    # If validation fails due to error, we might want to fail safe or allow. 
-                    # For now, let's fail safe (don't block if we can't verify)
-                    return False
+                    logger.warning(
+                        f"Failed to validate user {username} on Twitch API, proceeding with local username block: {e}"
+                    )
 
         return self.blocked_user_repo.block_user(
             channel_name=channel_name, 
             platform=platform, 
             username=username, 
-            user_id=user_id
+            user_id=user_id,
+            session_id=session_id,
         ) is not None
         
-    async def unblock_user(self, user_id: int, channel_name: str, platform: str, username: str) -> bool:
+    async def unblock_user(
+        self,
+        user_id: Optional[int],
+        channel_name: str,
+        platform: str,
+        username: str,
+        session_id: Optional[str] = None,
+    ) -> bool:
         return self.blocked_user_repo.unblock_user(
             channel_name=channel_name, 
             platform=platform, 
             username=username, 
-            user_id=user_id
+            user_id=user_id,
+            session_id=session_id,
         )
 
     # === TTS Status ===

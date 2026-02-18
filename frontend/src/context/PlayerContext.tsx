@@ -248,6 +248,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const lastUpdateTimeRef = useRef<number>(0);
     const volumeSaveTimeoutRef = useRef<number | null>(null);
     const lastSavedVolumeRef = useRef<number | null>(null);
+    const lastNonZeroVolumeRef = useRef<number>(100);
     const playerSourceRef = useRef<PlayerSource | null>(null);
     const pauseReasonRef = useRef<'user' | null>(null);
     const [playerContainerRef, setPlayerContainer] = React.useState<HTMLDivElement | null>(null);
@@ -302,7 +303,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
         try {
             state.playerRef.setVolume(state.volume);
-            if (state.volume === 0) {
+            if (state.isMuted || state.volume === 0) {
                 state.playerRef.mute();
             } else {
                 state.playerRef.unMute();
@@ -310,7 +311,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         } catch (error) {
             logger.debug('[YouTube] Failed to sync player volume', error);
         }
-    }, [state.playerRef, state.volume]);
+    }, [state.playerRef, state.volume, state.isMuted]);
 
     const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: _queueError } = useYoutubeQueue({
         enabled: !!isAuthenticated,
@@ -445,6 +446,9 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const setVolume = (volume: number): void => {
         const normalizedVolume = Math.max(0, Math.min(100, Math.round(volume)));
         const nextMuted = normalizedVolume === 0;
+        if (normalizedVolume > 0) {
+            lastNonZeroVolumeRef.current = normalizedVolume;
+        }
         if (state.volume === normalizedVolume && state.isMuted === nextMuted) {
             return;
         }
@@ -466,17 +470,32 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     };
 
     const toggleMute = (): void => {
-        const newMuted = !state.isMuted;
-        dispatch({ type: 'SET_MUTED', payload: newMuted });
+        if (state.isMuted) {
+            const restoredVolume = state.volume > 0
+                ? state.volume
+                : Math.max(1, Math.min(100, Math.round(lastNonZeroVolumeRef.current || 50)));
+            dispatch({ type: 'SET_VOLUME', payload: restoredVolume });
+            dispatch({ type: 'SET_MUTED', payload: false });
+            if (state.playerRef) {
+                try {
+                    state.playerRef.setVolume(restoredVolume);
+                    state.playerRef.unMute();
+                    logger.debug('Mute toggled:', false);
+                } catch (error) {
+                    logger.warn('Error toggling mute:', error);
+                }
+            }
+            return;
+        }
 
+        if (state.volume > 0) {
+            lastNonZeroVolumeRef.current = state.volume;
+        }
+        dispatch({ type: 'SET_MUTED', payload: true });
         if (state.playerRef) {
             try {
-                if (newMuted) {
-                    state.playerRef.mute();
-                } else {
-                    state.playerRef.unMute();
-                }
-                logger.debug('Mute toggled:', newMuted);
+                state.playerRef.mute();
+                logger.debug('Mute toggled:', true);
             } catch (error) {
                 logger.warn('Error toggling mute:', error);
             }
@@ -567,7 +586,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 }
 
                 const playerVolume = state.playerRef.getVolume?.();
-                if (typeof playerVolume === 'number' && Math.abs(playerVolume - state.volume) > 1) {
+                if (!state.isMuted && typeof playerVolume === 'number' && Math.abs(playerVolume - state.volume) > 1) {
                     const clampedVolume = Math.max(0, Math.min(100, Math.round(playerVolume)));
                     dispatch({ type: 'SET_VOLUME', payload: clampedVolume });
                 }

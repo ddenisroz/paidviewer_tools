@@ -50,6 +50,8 @@ const ACTION_BUTTON_CLASS = 'h-9 border-border/70 hover:bg-muted/60 shadow-none'
 const TABLE_ICON_BUTTON_CLASS =
     'h-8 w-8 p-0 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground';
 
+const isAdminUser = (user: User): boolean => user.role === 'admin' || user.is_admin === true;
+
 const UserManagementPage: React.FC = () => {
     const queryClient = useQueryClient();
 
@@ -227,7 +229,7 @@ const UserManagementPage: React.FC = () => {
 
     const openEditDialog = (user: User): void => {
         setCurrentUser(user);
-        setEditForm({ is_admin: user.is_admin || false });
+        setEditForm({ is_admin: isAdminUser(user) });
         setEditDialogOpen(true);
     };
 
@@ -277,7 +279,7 @@ const UserManagementPage: React.FC = () => {
             'Twitch': user.twitch_username || '',
             'VK': user.vk_username || '',
             'VK Channel': user.vk_channel_name || '',
-            'Admin': user.is_admin ? 'Да' : 'Нет',
+            'Admin': isAdminUser(user) ? 'Да' : 'Нет',
             'Blocked': user.is_blocked ? 'Да' : 'Нет',
             'Whitelisted': user.is_whitelisted ? 'Да' : 'Нет',
             'Created': user.created_at || ''
@@ -444,7 +446,7 @@ const UserManagementPage: React.FC = () => {
             width: '120px',
             align: 'center',
             accessor: (user) => {
-                if (user.is_admin) {
+                if (isAdminUser(user)) {
                     return (
                         <Badge className="border-violet-500/40 bg-violet-500/10 text-xs text-violet-200">
                             <Shield className="w-3 h-3 mr-1" />
@@ -454,10 +456,10 @@ const UserManagementPage: React.FC = () => {
                 }
                 return <span className="text-xs text-muted-foreground">Пользователь</span>;
             },
-            filterValue: (user) => user.is_admin ? 'admin' : 'user',
-            sortValue: (user) => user.is_admin ? 1 : 0,
+            filterValue: (user) => isAdminUser(user) ? 'admin' : 'user',
+            sortValue: (user) => isAdminUser(user) ? 1 : 0,
             searchable: true,
-            searchValue: (user) => user.is_admin ? 'admin' : 'user',
+            searchValue: (user) => isAdminUser(user) ? 'admin' : 'user',
             sortable: true,
         },
         {

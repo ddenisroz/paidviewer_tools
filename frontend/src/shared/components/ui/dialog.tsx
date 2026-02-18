@@ -154,15 +154,6 @@ const DialogContent = React.forwardRef<
           isAnimating ? "scale-95 opacity-0" : "scale-100 opacity-100",
           className
         )}
-        onPointerDownOutside={(e) => {
-          // Проверяем, кликнули ли на overlay
-          if (closeOnOverlayClick && overlayRef.current && overlayRef.current.contains(e.target as Node)) {
-            // Клик на overlay - разрешаем закрытие
-            return;
-          }
-          // Клик вне overlay (например, на элементы вне диалога) - предотвращаем закрытие
-          e.preventDefault();
-        }}
         {...props}>
         {children}
         <DialogPrimitive.Close
@@ -230,4 +221,5 @@ export {
   DialogTitle,
   DialogDescription,
 }
+
 

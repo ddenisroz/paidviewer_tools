@@ -19,6 +19,7 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({
     fallback = null 
 }) => {
     const { isAuthenticated, user } = useAuth();
+    const isAdmin = user?.role === 'admin' || user?.is_admin === true;
 
     // Если требуется авторизация, но пользователь не авторизован
     if (requireAuth && !isAuthenticated) {
@@ -26,7 +27,7 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({
     }
 
     // Если требуется админ, но пользователь не админ
-    if (requireAdmin && (!user || !user.is_admin)) {
+    if (requireAdmin && (!user || !isAdmin)) {
         return <>{fallback}</>;
     }
 

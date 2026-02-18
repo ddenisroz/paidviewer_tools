@@ -147,6 +147,10 @@ const HomePage: React.FC = () => {
 
     const { widgets, draftWidgets, isEditMode, reorderWidgets } = useLayoutStore();
     const activeWidgets = isEditMode && draftWidgets ? draftWidgets : widgets;
+    const quickActionsWidget = activeWidgets.find((w) => w.id === 'quick-actions');
+    const chatWidget = activeWidgets.find((w) => w.id === 'chat');
+    const quickActionsVisible = !!quickActionsWidget?.isVisible;
+    const chatVisible = !!chatWidget?.isVisible;
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -185,6 +189,7 @@ const HomePage: React.FC = () => {
                     <ChatCard
                         integrations={integrations}
                         isOnHomePage={true}
+                        showQuickActionsInCard={!isEditMode && quickActionsVisible}
                     />
                 );
             case 'quick-actions':
@@ -202,12 +207,12 @@ const HomePage: React.FC = () => {
     };
 
     return (
-        <div className="space-y-4 pb-20 relative">
+        <div className="h-full min-h-0 relative">
             {/* Layout Controls */}
             {/* Layout Controls - Moved to Header */}
             {/* Keeping empty space if needed, or remove completely */}
 
-            <div className="space-y-6 max-w-6xl mx-auto overflow-visible">
+            <div className="h-full min-h-0 space-y-6 max-w-6xl mx-auto overflow-visible">
                 {!isAuthenticated ? (
                     <Card className="card-glass border-border">
                         <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
@@ -253,21 +258,53 @@ const HomePage: React.FC = () => {
                         collisionDetection={closestCenter}
                         onDragEnd={handleDragEnd}
                     >
-                        <SortableContext
-                            items={activeWidgets.map(w => w.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <div className="space-y-6 transition-all">
-                                {activeWidgets.map(w => (
-                                    <WidgetWrapper
-                                        key={w.id}
-                                        id={w.id}
-                                        title={widgetTitles[w.id]}
-                                    >
-                                        {renderWidget(w.id)}
-                                    </WidgetWrapper>
-                                ))}
-                            </div>
+                        <SortableContext items={activeWidgets.map(w => w.id)} strategy={verticalListSortingStrategy}>
+                            {isEditMode ? (
+                                <div className="space-y-6 transition-all">
+                                    {activeWidgets.map(w => (
+                                        <WidgetWrapper
+                                            key={w.id}
+                                            id={w.id}
+                                            title={widgetTitles[w.id]}
+                                        >
+                                            {renderWidget(w.id)}
+                                        </WidgetWrapper>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex h-full min-h-0 flex-col">
+                                    <div className="flex-1 min-h-0 space-y-6">
+                                        {activeWidgets
+                                            .filter((w) => w.id !== 'quick-actions')
+                                            .map((w) => (
+                                                <WidgetWrapper
+                                                    key={w.id}
+                                                    id={w.id}
+                                                    title={widgetTitles[w.id]}
+                                                    className={w.id === 'chat' ? 'flex-1 min-h-0' : undefined}
+                                                >
+                                                    {renderWidget(w.id)}
+                                                </WidgetWrapper>
+                                            ))}
+                                    </div>
+
+                                    {!chatVisible && quickActionsVisible && (
+                                        <div className="mt-6">
+                                            {activeWidgets
+                                                .filter((w) => w.id === 'quick-actions')
+                                                .map((w) => (
+                                                    <WidgetWrapper
+                                                        key={w.id}
+                                                        id={w.id}
+                                                        title={widgetTitles[w.id]}
+                                                    >
+                                                        {renderWidget(w.id)}
+                                                    </WidgetWrapper>
+                                                ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </SortableContext>
                     </DndContext>
                 )}

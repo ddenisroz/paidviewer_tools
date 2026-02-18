@@ -256,11 +256,18 @@ async def block_user(
     service: TTSService = Depends(get_tts_service)
 ):
     """Block user."""
+    channel_name = request.channel_name or (
+        (user.get('twitch_username') if request.platform == 'twitch' else user.get('vk_username') or user.get('vk_channel_name'))
+        or user.get('username')
+    )
+    if not channel_name:
+        raise HTTPException(status_code=400, detail="Failed to resolve channel_name")
+
     success = await service.block_user(
-        user['id'], request.channel_name, request.platform, request.username
+        user_id=user['id'], channel_name=channel_name, platform=request.platform, username=request.username
     )
     if not success:
-        return {"success": False, "message": "User already blocked"}
+        return {"success": True, "message": "User already blocked", "already_blocked": True}
     return {"success": True}
 
 @router.post("/blocked-users/unblock")
@@ -270,8 +277,15 @@ async def unblock_user(
     service: TTSService = Depends(get_tts_service)
 ):
     """Unblock user."""
+    channel_name = request.channel_name or (
+        (user.get('twitch_username') if request.platform == 'twitch' else user.get('vk_username') or user.get('vk_channel_name'))
+        or user.get('username')
+    )
+    if not channel_name:
+        raise HTTPException(status_code=400, detail="Failed to resolve channel_name")
+
     success = await service.unblock_user(
-         user['id'], request.channel_name, request.platform, request.username
+         user_id=user['id'], channel_name=channel_name, platform=request.platform, username=request.username
     )
     if not success:
          raise HTTPException(status_code=404, detail="User not found in blacklist")

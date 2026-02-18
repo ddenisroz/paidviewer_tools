@@ -4,6 +4,15 @@
 
 ---
 
+## [0.05-hotfix-5] - 2026-02-18
+
+- MemeAlerts connect flow: added direct provider OAuth buttons (`Twitch`, `VK`) in dashboard media tab.
+- MemeAlerts connect flow: OAuth popup now uses `return_url=/memealerts/callback` for automatic token handoff and auto-close after successful connect.
+- MemeAlerts callback page: fixed token parsing and restored readable status/error texts.
+- MemeAlerts connect flow: switched to single `Подключить MemeAlerts` button that requests backend-generated OAuth URL.
+- MemeAlerts API: added `GET /api/memealerts/connect-url` that builds callback from `FRONTEND_URL` (public-domain friendly).
+- Added helper script `scripts/dev/setup_public_domain.ps1` to update `.env` files and generate Cloudflared config template.
+
 ## [0.05-hotfix-4] - 2026-02-17
 
 - MemeAlerts tab: added automation settings API and UI (`/api/memealerts/settings`) for:

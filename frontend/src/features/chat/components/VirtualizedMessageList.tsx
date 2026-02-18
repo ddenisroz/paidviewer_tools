@@ -5,6 +5,7 @@ import { MessageSquare } from 'lucide-react';
 
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { formatLocalMessageTime } from '@/features/chat/utils/time';
 
 import SwipeableMessage from './SwipeableMessage';
 
@@ -142,7 +143,7 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = Rea
                   className="p-1"
                   onContextMenu={(e) => onContextMenu(e, msg)}
                 >
-                  <div className="text-sm leading-relaxed">
+                  <div className="text-sm leading-[1.35]">
                     {/* Platform icon */}
                     {msg.platform === 'twitch' ? (
                       <TwitchIcon 
@@ -158,10 +159,7 @@ export const VirtualizedMessageList: React.FC<VirtualizedMessageListProps> = Rea
                     
                     {/* Timestamp */}
                     <span className="text-xs text-muted-foreground mr-1.5 timestamp">
-                      {new Date(msg.timestamp).toLocaleTimeString('ru-RU', { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
+                      {formatLocalMessageTime(msg.timestamp)}
                     </span>
                     
                     {/* Badges */}

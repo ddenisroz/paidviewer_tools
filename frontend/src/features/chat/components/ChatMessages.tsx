@@ -7,6 +7,7 @@ import { twitchBadgesService } from '@/services/twitchBadges';
 import { VKIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { formatLocalMessageTime } from '@/features/chat/utils/time';
 
 import ChatContextMenu from './ChatContextMenu';
 import MessageContent from './MessageContent';
@@ -228,7 +229,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 
                                     {message.timestamp && (
                                         <div className="text-xs text-gray-500 mt-1">
-                                            {new Date(message.timestamp).toLocaleTimeString()}
+                                            {formatLocalMessageTime(message.timestamp)}
                                         </div>
                                     )}
                                 </div>
