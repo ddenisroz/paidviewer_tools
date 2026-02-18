@@ -110,6 +110,7 @@ class TwitchBotCore(commands.Bot):
             logger.debug(f"[ROLE] {message.author.name}: role={role}, badges={badges_list}")
 
             # Отправляем в chatbox
+            avatar_url = getattr(message.author, 'profile_image', None) or getattr(message.author, 'profile_image_url', None)
             await broadcast_chat_message(
                 username=message.author.name,
                 content=message.content,
@@ -117,7 +118,8 @@ class TwitchBotCore(commands.Bot):
                 channel=message.channel.name,
                 role=role,
                 badges=badges_list if badges_list else None,
-                emotes=emotes_list if emotes_list else None
+                emotes=emotes_list if emotes_list else None,
+                avatar_url=avatar_url
             )
 
             # [OK] НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)

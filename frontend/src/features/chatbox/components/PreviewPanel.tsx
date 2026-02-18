@@ -88,6 +88,29 @@ const PREVIEW_7TV_FALLBACKS: EmoteData[] = [
     }
 ];
 
+const tryVkAssetFallback = (img: HTMLImageElement): boolean => {
+    const src = img.src || '';
+    if (!src.includes('images.live.vkvideo.ru')) return false;
+
+    const hasLarge = src.includes('/size/large');
+    const hasMedium = src.includes('/size/medium');
+    const hasSmall = src.includes('/size/small');
+
+    if (hasLarge) {
+        img.src = src.replace('/size/large', '/size/medium');
+        return true;
+    }
+    if (hasMedium) {
+        img.src = src.replace('/size/medium', '/size/small');
+        return true;
+    }
+    if (!hasSmall) {
+        img.src = `${src.replace(/\/$/, '')}/size/small`;
+        return true;
+    }
+    return false;
+};
+
 const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessage => ({
     ...message,
     preview_key: `${message.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
@@ -102,6 +125,12 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
 
     const isHorizontal = settings.chat_direction === 'horizontal';
     const chatWidth = Math.max(20, Math.min(100, settings.chat_width || 100));
+    const previewLimit = useMemo(() => {
+        if (isHorizontal) return Math.max(1, settings.max_messages);
+        const estimatedLineHeight = settings.font_size * 1.35 + 8 + settings.message_spacing;
+        const fitByHeight = Math.max(3, Math.floor(300 / Math.max(estimatedLineHeight, 18)));
+        return Math.max(1, Math.min(settings.max_messages, fitByHeight));
+    }, [isHorizontal, settings.font_size, settings.max_messages, settings.message_spacing]);
 
     const hexToRgba = (hex: string, opacity: number): string => {
         const r = parseInt(hex.slice(1, 3), 16);
@@ -200,11 +229,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
     }, [settings.show_7tv_emotes]);
 
     useEffect(() => {
-        const limit = Math.max(1, settings.max_messages);
+        const limit = previewLimit;
         setSimulatedMessages(previewMessages.slice(-limit).map(toRenderedPreviewMessage));
         setLastAnimatedMessageKey(null);
         nextTemplateIndexRef.current = 0;
-    }, [previewMessages, settings.max_messages]);
+    }, [previewMessages, previewLimit]);
 
     useEffect(() => {
         if (settings.animation_type === 'none' || settings.animation_duration <= 0) return undefined;
@@ -215,14 +244,14 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
             nextTemplateIndexRef.current = (nextTemplateIndexRef.current + 1) % previewMessages.length;
 
             const nextMessage = toRenderedPreviewMessage(template);
-            const limit = Math.max(1, settings.max_messages);
+            const limit = previewLimit;
 
             setSimulatedMessages((prev) => [...prev, nextMessage].slice(-limit));
             setLastAnimatedMessageKey(nextMessage.preview_key);
         }, Math.max(1800, settings.animation_duration + 600));
 
         return () => clearInterval(interval);
-    }, [previewMessages, settings.animation_type, settings.animation_duration, settings.max_messages]);
+    }, [previewMessages, settings.animation_type, settings.animation_duration, previewLimit]);
 
     return (
         <div className="h-full flex flex-col">
@@ -274,7 +303,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                     }}
                 >
                     <div
-                        className={`${isHorizontal ? 'overflow-x-hidden' : 'overflow-y-auto'} chatbox-preview-scroll`}
+                        className={`${isHorizontal ? 'overflow-x-hidden' : 'overflow-hidden'} chatbox-preview-scroll`}
                         style={{
                             width: `${chatWidth}%`,
                             maxWidth: '100%',
@@ -430,7 +459,10 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                                 verticalAlign: 'text-bottom'
                                                             }}
                                                             onError={(e) => {
-                                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                                const target = e.target as HTMLImageElement;
+                                                                if (!tryVkAssetFallback(target)) {
+                                                                    target.style.display = 'none';
+                                                                }
                                                             }}
                                                         />
                                                     ))}

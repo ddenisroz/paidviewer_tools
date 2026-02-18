@@ -84,18 +84,37 @@ body {
   overflow-x: hidden;
 }
 
+/* Keep dark input styling when browser autofill is enabled */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: hsl(var(--foreground));
+  -webkit-box-shadow: 0 0 0px 1000px hsl(var(--background)) inset;
+  box-shadow: 0 0 0px 1000px hsl(var(--background)) inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
 /* Inline chat emotes: large visually, stable line-height footprint */
 .chat-inline-emote {
   display: inline-block;
-  width: 1.55em;
-  height: 1.55em;
-  min-width: 1.55em;
-  min-height: 1.55em;
-  vertical-align: -0.28em;
+  width: 1.35em;
+  height: 1.35em;
+  min-width: 1.35em;
+  min-height: 1.35em;
+  vertical-align: middle;
   object-fit: contain;
-  margin-inline: 0.2em;
+  margin-inline: 0.1em;
   margin-block: 0;
   line-height: 1;
+}
+
+.chat-message-content {
+  display: inline;
+  line-height: 1.25;
+  white-space: pre-wrap;
 }
 
 /* РљР°СЃС‚РѕРјРЅС‹Рµ Р°РЅРёРјР°С†РёРё РґР»СЏ Р°РІС‚РѕСЂРёР·Р°С†РёРё */

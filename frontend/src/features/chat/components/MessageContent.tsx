@@ -32,6 +32,21 @@ const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
 const INLINE_EMOTE_CLASS = 'chat-inline-emote';
 
+const tryVkAssetFallback = (img: HTMLImageElement): boolean => {
+    const src = img.src || '';
+    if (!src.includes('images.live.vkvideo.ru')) return false;
+
+    if (src.includes('/size/large')) {
+        img.src = src.replace('/size/large', '/size/medium');
+        return true;
+    }
+    if (src.includes('/size/medium')) {
+        img.src = src.replace('/size/medium', '/size/small');
+        return true;
+    }
+    return false;
+};
+
 const normalizeInlineEmoteUrl = (url: string): string => {
     if (!url) return url;
     // VK smiles often arrive as /size/small and look tiny in chat.
@@ -183,9 +198,11 @@ const renderMessageWithEmotes = (
     return parts.map((part, index) => {
         // Если это img тег (эмодзи)
         if (part.startsWith('<img') && part.endsWith('/>')) {
-            const imgMatch = part.match(/<img\s+src="([^"]*)"\s+alt="([^"]*)"[^>]*class="([^"]*)"[^>]*title="([^"]*)"[^>]*\/>/);
-            if (imgMatch) {
-                const [, src, alt, className, title] = imgMatch;
+            const src = part.match(/\bsrc="([^"]*)"/)?.[1];
+            const alt = part.match(/\balt="([^"]*)"/)?.[1] || 'emote';
+            const className = part.match(/\bclass="([^"]*)"/)?.[1] || INLINE_EMOTE_CLASS;
+            const title = part.match(/\btitle="([^"]*)"/)?.[1] || alt;
+            if (src) {
                 return (
                     <img
                         key={index}
@@ -193,11 +210,22 @@ const renderMessageWithEmotes = (
                         alt={alt}
                         className={className}
                         title={title}
+                        style={{
+                            width: '1.35em',
+                            height: '1.35em',
+                            minWidth: '1.35em',
+                            minHeight: '1.35em',
+                            display: 'inline-block',
+                            verticalAlign: 'middle',
+                            objectFit: 'contain',
+                            marginInline: '0.1em'
+                        }}
                         loading="lazy"
                         onError={(e) => {
                             const target = e.currentTarget;
+                            if (tryVkAssetFallback(target)) return;
                             const fallback = document.createElement('span');
-                            fallback.textContent = `:${alt}:`;
+                            fallback.textContent = '';
                             fallback.className = 'text-xs opacity-80';
                             target.replaceWith(fallback);
                         }}
@@ -275,7 +303,7 @@ const MessageContent: React.FC<MessageContentProps> = memo(({
         // Если есть эмодзи (img теги) - используем специальный рендерер
         if (withEmotes.includes('<img')) {
             return (
-                <span className="break-words">
+                <span className="chat-message-content break-words">
                     {renderMessageWithEmotes(withEmotes, showLinks, autoLoadImages)}
                 </span>
             );
@@ -290,7 +318,7 @@ const MessageContent: React.FC<MessageContentProps> = memo(({
         // Разбиваем на части и рендерим
         const parts = message.split(URL_REGEX);
         return (
-            <span className="break-words">
+            <span className="chat-message-content break-words">
                 {parts.map((part, index) => (
                     <span key={index} className="align-middle">
                         {renderPart(part, index, showLinks, autoLoadImages)}

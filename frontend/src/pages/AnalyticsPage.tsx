@@ -76,7 +76,7 @@ const AnalyticsPage: React.FC = () => {
 
   return (
     <PageWrapper title="Аналитика чата">
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="w-full">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <Card className={`h-full ${SURFACE_CARD_CLASS}`}>
             <CardHeader className="pb-1">

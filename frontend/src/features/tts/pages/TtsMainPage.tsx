@@ -1255,7 +1255,7 @@ const TtsMainPageContent: React.FC = () => {
 
     return (
         <PageWrapper title="Text to Speech">
-            <div className="space-y-4 max-w-5xl mx-auto">
+            <div className="space-y-4 w-full">
                 {/* Главный переключатель TTS */}
                 <div
                     className={`flex items-center justify-between p-4 rounded-xl card-glass ${isEngineActionPending ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}

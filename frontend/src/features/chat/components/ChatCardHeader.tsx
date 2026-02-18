@@ -53,7 +53,6 @@ const ChatCardHeader: React.FC<ChatCardHeaderProps> = ({
         <div className="flex items-center justify-between gap-2">
             <CardTitle className="flex items-center gap-2 text-base">
                 <MessageSquare className="h-5 w-5" />
-                ChatBox
             </CardTitle>
 
             <TooltipProvider>

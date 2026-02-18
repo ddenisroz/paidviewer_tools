@@ -224,6 +224,12 @@ class VKLiveBotCore:
             is_moderator = author.get("is_moderator", False)
             badges = message.get("badges")
             emotes = message.get("emotes")
+            avatar_url = (
+                author.get("avatar_url")
+                or author.get("avatar")
+                or author.get("photo")
+                or author.get("photo_url")
+            )
 
             # Определяем роль для VK Live
             role = None
@@ -232,11 +238,10 @@ class VKLiveBotCore:
             elif is_moderator:
                 role = 'moderator'
 
-            logger.info(f"[VK MSG] {channel_id} | {user} (owner={is_owner}, mod={is_moderator}, role={role}): {text[:50]}")
+            logger.debug(f"[VK MSG] {channel_id} | {user} (owner={is_owner}, mod={is_moderator}, role={role}): {text[:50]}")
 
             # 1. Отправляем сообщение в WebSocket для отображения в chatbox
             from utils.websocket_helper import broadcast_chat_message
-            logger.info("[REFRESH] [VK MSG] About to broadcast message...")
             await broadcast_chat_message(
                 username=user,
                 content=text,
@@ -244,9 +249,9 @@ class VKLiveBotCore:
                 channel=channel_id,
                 role=role,
                 badges=badges,
-                emotes=emotes
+                emotes=emotes,
+                avatar_url=avatar_url
             )
-            logger.info("[OK] [VK MSG] Broadcast completed, processing command checks...")
 
             # 1.5. [OK] НОВОЕ: Увеличиваем счетчик сообщений для стриков (только если стрик включен)
             try:

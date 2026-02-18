@@ -1,19 +1,17 @@
 ﻿// src/pages/HomePage.tsx
-// touched to force rebuild
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { closestCenter, DndContext, DragEndEvent, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { MessageCircle, Settings } from 'lucide-react';
+import { ExternalLink, MessageCircle, MonitorSmartphone, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 
+import ChatBoxSettingsModal from '@/components/ChatBoxSettingsModal';
 import { useAuth } from '@/context/AuthContext';
 import { useData } from '@/context/DataContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { useUserSettings } from '@/context/UserSettingsContext';
-import ChatCard from '@/features/chat/components/ChatCard';
-import QuickActionsBar from '@/features/home/components/QuickActionsBar';
 import WidgetWrapper from '@/features/home/components/WidgetWrapper';
 import StreamManagementCards from '@/features/stream/components/StreamManagementCards';
 import StreamStatus from '@/features/stream/components/StreamStatus';
@@ -147,10 +145,7 @@ const HomePage: React.FC = () => {
 
     const { widgets, draftWidgets, isEditMode, reorderWidgets } = useLayoutStore();
     const activeWidgets = isEditMode && draftWidgets ? draftWidgets : widgets;
-    const quickActionsWidget = activeWidgets.find((w) => w.id === 'quick-actions');
-    const chatWidget = activeWidgets.find((w) => w.id === 'chat');
-    const quickActionsVisible = !!quickActionsWidget?.isVisible;
-    const chatVisible = !!chatWidget?.isVisible;
+    const [showChatBoxModal, setShowChatBoxModal] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -172,6 +167,18 @@ const HomePage: React.FC = () => {
         }
     };
 
+    const handleOpenChatWindow = (): void => {
+        const width = 600;
+        const height = 800;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+        window.open(
+            '/chat-window',
+            'ChatWindow',
+            `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=no`
+        );
+    };
+
     const renderWidget = (id: string) => {
         switch (id) {
             case 'stream-status':
@@ -184,16 +191,6 @@ const HomePage: React.FC = () => {
                 );
             case 'stream-management':
                 return <StreamManagementCards />;
-            case 'chat':
-                return (
-                    <ChatCard
-                        integrations={integrations}
-                        isOnHomePage={true}
-                        showQuickActionsInCard={!isEditMode && quickActionsVisible}
-                    />
-                );
-            case 'quick-actions':
-                return <QuickActionsBar />;
             default:
                 return null;
         }
@@ -201,9 +198,7 @@ const HomePage: React.FC = () => {
 
     const widgetTitles: Record<string, string> = {
         'stream-status': 'Статус стрима',
-        'stream-management': 'Управление стримом',
-        'chat': 'Чат',
-        'quick-actions': 'Быстрые действия'
+        'stream-management': 'Управление стримом'
     };
 
     return (
@@ -212,7 +207,7 @@ const HomePage: React.FC = () => {
             {/* Layout Controls - Moved to Header */}
             {/* Keeping empty space if needed, or remove completely */}
 
-            <div className="h-full min-h-0 space-y-6 max-w-6xl mx-auto overflow-visible">
+            <div className="h-full min-h-0 w-full overflow-visible flex flex-col gap-6">
                 {!isAuthenticated ? (
                     <Card className="card-glass border-border">
                         <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
@@ -261,7 +256,9 @@ const HomePage: React.FC = () => {
                         <SortableContext items={activeWidgets.map(w => w.id)} strategy={verticalListSortingStrategy}>
                             {isEditMode ? (
                                 <div className="space-y-6 transition-all">
-                                    {activeWidgets.map(w => (
+                                    {activeWidgets
+                                        .filter((w) => w.id === 'stream-status' || w.id === 'stream-management')
+                                        .map(w => (
                                         <WidgetWrapper
                                             key={w.id}
                                             id={w.id}
@@ -272,43 +269,58 @@ const HomePage: React.FC = () => {
                                     ))}
                                 </div>
                             ) : (
-                                <div className="flex h-full min-h-0 flex-col">
-                                    <div className="flex-1 min-h-0 space-y-6">
-                                        {activeWidgets
-                                            .filter((w) => w.id !== 'quick-actions')
-                                            .map((w) => (
-                                                <WidgetWrapper
-                                                    key={w.id}
-                                                    id={w.id}
-                                                    title={widgetTitles[w.id]}
-                                                    className={w.id === 'chat' ? 'flex-1 min-h-0' : undefined}
-                                                >
-                                                    {renderWidget(w.id)}
-                                                </WidgetWrapper>
-                                            ))}
-                                    </div>
-
-                                    {!chatVisible && quickActionsVisible && (
-                                        <div className="mt-6">
-                                            {activeWidgets
-                                                .filter((w) => w.id === 'quick-actions')
-                                                .map((w) => (
-                                                    <WidgetWrapper
-                                                        key={w.id}
-                                                        id={w.id}
-                                                        title={widgetTitles[w.id]}
-                                                    >
-                                                        {renderWidget(w.id)}
-                                                    </WidgetWrapper>
-                                                ))}
-                                        </div>
-                                    )}
+                                <div className="space-y-6">
+                                    {activeWidgets
+                                        .filter((w) => w.id === 'stream-status' || w.id === 'stream-management')
+                                        .map((w) => (
+                                            <WidgetWrapper
+                                                key={w.id}
+                                                id={w.id}
+                                                title={widgetTitles[w.id]}
+                                            >
+                                                {renderWidget(w.id)}
+                                            </WidgetWrapper>
+                                        ))}
                                 </div>
                             )}
                         </SortableContext>
                     </DndContext>
                 )}
+
+                <Card className="card-glass border-border mt-auto flex-1 min-h-[220px]">
+                    <CardContent className="h-full p-1">
+                        <div className="w-full border-b border-border pb-1">
+                            <div className="flex items-start justify-center gap-1">
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setShowChatBoxModal(true)}
+                                    className="h-20 w-24 border-0 bg-transparent text-muted-foreground shadow-none hover:bg-transparent hover:text-blue-400 flex flex-col items-center justify-center gap-0.5"
+                                    title="OBS ChatOverlay"
+                                    aria-label="OBS ChatOverlay"
+                                >
+                                    <MonitorSmartphone className="h-6 w-6" strokeWidth={2.5} />
+                                    <span className="text-sm font-semibold leading-none">OBS Chat</span>
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    onClick={handleOpenChatWindow}
+                                    className="h-20 w-24 border-0 bg-transparent text-muted-foreground shadow-none hover:bg-transparent hover:text-blue-400 flex flex-col items-center justify-center gap-0.5"
+                                    title="Чат в отдельном окне"
+                                    aria-label="Чат в отдельном окне"
+                                >
+                                    <ExternalLink className="h-6 w-6" strokeWidth={2.5} />
+                                    <span className="text-sm font-semibold leading-none">Открыть чат</span>
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
+            <ChatBoxSettingsModal
+                isOpen={showChatBoxModal}
+                onClose={() => setShowChatBoxModal(false)}
+                onSave={() => {}}
+            />
         </div>
     );
 };

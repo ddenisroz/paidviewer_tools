@@ -10,6 +10,12 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+def _normalize_vk_asset_url(url: Optional[str]) -> Optional[str]:
+    if not url:
+        return url
+    return url
+
+
 def normalize_parts(parts: Optional[List[Dict[str, Any]]], data_blocks: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
     """
     Normalize VK message payloads into `parts` shape.
@@ -49,12 +55,18 @@ def extract_vk_badge_urls(author: Dict[str, Any]) -> Optional[List[str]]:
     urls: List[str] = []
     for badge in badges:
         if isinstance(badge, str):
-            urls.append(badge)
+            normalized = _normalize_vk_asset_url(badge)
+            if normalized:
+                urls.append(normalized)
             continue
         if not isinstance(badge, dict):
             continue
         url = (
-            badge.get("smallUrl")
+            badge.get("largeUrl")
+            or badge.get("large_url")
+            or badge.get("mediumUrl")
+            or badge.get("medium_url")
+            or badge.get("smallUrl")
             or badge.get("small_url")
             or badge.get("url")
             or badge.get("icon")
@@ -62,14 +74,20 @@ def extract_vk_badge_urls(author: Dict[str, Any]) -> Optional[List[str]]:
             or badge.get("image")
         )
         if url:
-            urls.append(url)
+            normalized = _normalize_vk_asset_url(url)
+            if normalized:
+                urls.append(normalized)
 
     return urls or None
 
 
 def extract_smile_url(smile: Dict[str, Any]) -> Optional[str]:
     url = (
-        smile.get("smallUrl")
+        smile.get("largeUrl")
+        or smile.get("large_url")
+        or smile.get("mediumUrl")
+        or smile.get("medium_url")
+        or smile.get("smallUrl")
         or smile.get("small_url")
         or smile.get("url")
         or smile.get("icon")
@@ -77,11 +95,11 @@ def extract_smile_url(smile: Dict[str, Any]) -> Optional[str]:
         or smile.get("src")
     )
     if url:
-        return url
+        return _normalize_vk_asset_url(url)
 
     smile_id = smile.get("id") or smile.get("smile_id") or smile.get("uuid")
     if smile_id:
-        return f"https://images.live.vkvideo.ru/smile/{smile_id}/icon/size/small"
+        return f"https://images.live.vkvideo.ru/smile/{smile_id}/icon/size/large"
     return None
 
 

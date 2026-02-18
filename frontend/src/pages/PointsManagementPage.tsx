@@ -1033,7 +1033,7 @@ const PointsManagementPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 max-w-5xl">
+        <div className="container mx-auto p-4 sm:p-6">
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex items-center justify-between border-b border-border">
                     <div className="flex">

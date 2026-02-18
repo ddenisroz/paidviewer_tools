@@ -22,8 +22,8 @@ interface BlockedUser {
 
 const BlacklistManager: React.FC = React.memo(() => {
     const [newUsername, setNewUsername] = useState('');
-    const [isBlacklistExpanded, setIsBlacklistExpanded] = useState(false);
-    const [selectedPlatform, setSelectedPlatform] = useState<string>('twitch'); // По умолчанию Twitch
+    const [isBlacklistExpanded, setIsBlacklistExpanded] = useState(true);
+    const [selectedPlatform, setSelectedPlatform] = useState<string>('all');
 
     // Используем useCallback для стабильной ссылки на функцию
     const toggleBlacklistExpanded = useCallback(() => {
@@ -70,7 +70,7 @@ const BlacklistManager: React.FC = React.memo(() => {
 
     const blacklist: BlockedUser[] = Array.isArray(blockedUsersData)
         ? blockedUsersData
-        : ((blockedUsersData as { data?: { blocked_users?: BlockedUser[] } } | undefined)?.data?.blocked_users ?? []);
+        : ((blockedUsersData as { data?: BlockedUser[] } | undefined)?.data ?? []);
     const adding = blockUserMutation.isPending;
 
     // Получаем доступные платформы из интеграций
@@ -90,11 +90,22 @@ const BlacklistManager: React.FC = React.memo(() => {
 
     // Добавление пользователя в черный список
     const addToBlacklist = () => {
-        if (!newUsername.trim()) {
+        const normalizedUsername = newUsername.trim().toLowerCase();
+        if (!normalizedUsername) {
             return;
         }
 
-        if (!selectedPlatform) {
+        if (!selectedPlatform || selectedPlatform === 'all') {
+            toast.error('Выберите конкретную платформу для блокировки');
+            return;
+        }
+
+        const isAlreadyBlocked = blacklist.some((blockedUser) =>
+            blockedUser.platform === selectedPlatform &&
+            blockedUser.username.trim().toLowerCase() === normalizedUsername
+        );
+        if (isAlreadyBlocked) {
+            toast.error('Пользователь уже находится в черном списке');
             return;
         }
 
@@ -108,12 +119,12 @@ const BlacklistManager: React.FC = React.memo(() => {
         blockUserMutation.mutate({
             channel_name: channelName,
             platform: selectedPlatform as 'youtube' | 'twitch' | 'vk',
-            username: newUsername.trim()
+            username: normalizedUsername
         });
     };
 
     // Удаление пользователя из черного списка
-    const removeFromBlacklist = (userId: number, username: string, platform: string) => {
+    const removeFromBlacklist = (username: string, platform: string) => {
         const channelName = getChannelName(platform);
 
         if (!channelName) {
@@ -196,18 +207,24 @@ const BlacklistManager: React.FC = React.memo(() => {
                                 value={newUsername}
                                 onChange={(e) => setNewUsername(e.target.value)}
                                 placeholder="Введите имя пользователя"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="none"
+                                spellCheck={false}
+                                name="tts_blacklist_username"
                                 onKeyPress={(e) => {
                                     if (e.key === 'Enter') {
                                         addToBlacklist();
                                     }
                                 }}
-                                className="flex-1"
+                                className="flex-1 bg-background text-foreground"
                             />
                             <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
                                 <SelectTrigger className="w-44">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="all">Все платформы</SelectItem>
                                     {availablePlatforms.includes('twitch') && (
                                         <SelectItem value="twitch">[TW] Twitch</SelectItem>
                                     )}
@@ -248,14 +265,14 @@ const BlacklistManager: React.FC = React.memo(() => {
                                         <span className={`px-2 py-0.5 rounded text-xs ${getPlatformColor(user.platform)} text-white`}>
                                             {getPlatformIcon(user.platform)}
                                         </span>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                                            onClick={() => removeFromBlacklist(user.id, user.username, user.platform)}
-                                        >
-                                            <X className="h-3 w-3" />
-                                        </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                        onClick={() => removeFromBlacklist(user.username, user.platform)}
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </Button>
                                     </Badge>
                                 ))}
                             </div>

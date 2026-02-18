@@ -110,7 +110,7 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
         message: 'Это огонь smile_32 и smile_451',
         time: '12:02',
         role: 'moderator',
-        badges: ['https://images.live.vkvideo.ru/smile/451/icon/size/large'],
+        badges: ['https://images.live.vkvideo.ru/smile/451/icon/size/small'],
         emotes: [
             { id: '32', name: 'smile_32', url: 'https://images.live.vkvideo.ru/smile/32/icon/size/small', start: 10, end: 19 },
             { id: '451', name: 'smile_451', url: 'https://images.live.vkvideo.ru/smile/451/icon/size/small', start: 23, end: 33 }
@@ -382,7 +382,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     onChange={(v) => handleChange('background_color', v)}
                                                 />
                                                 <div className="space-y-1.5">
-                                                    <span className="text-[11px] text-muted-foreground">Прозрачность</span>
+                                                    <span className="text-[11px] text-muted-foreground">Непрозрачность</span>
                                                     <SliderWithInput
                                                         value={Math.round(settings.background_opacity * 100)}
                                                         onChange={(v) => handleChange('background_opacity', v / 100)}

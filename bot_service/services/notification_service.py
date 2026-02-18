@@ -30,7 +30,8 @@ class NotificationService:
         message_id: Optional[str] = None,
         role: Optional[str] = None,
         badges: Optional[list] = None,
-        emotes: Optional[list] = None
+        emotes: Optional[list] = None,
+        avatar_url: Optional[str] = None,
     ) -> bool:
         """Broadcast chat message to all connected clients."""
         try:
@@ -50,6 +51,7 @@ class NotificationService:
                 "role": role,
                 "badges": badges,
                 "emotes": emotes,
+                "avatar_url": avatar_url,
                 "timestamp": int(datetime.now().timestamp() * 1000)
             }
 

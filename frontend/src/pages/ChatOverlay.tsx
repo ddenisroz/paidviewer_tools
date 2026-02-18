@@ -54,6 +54,11 @@ const clampNumber = (value: number, min: number, max: number): number => {
     return Math.min(Math.max(value, min), max);
 };
 
+const normalizeVkAssetUrl = (url?: string): string => {
+    if (!url) return '';
+    return url;
+};
+
 // Memoized message component to prevent unnecessary re-renders
 interface ChatMessageItemProps {
     msg: ChatMessage;
@@ -105,6 +110,9 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
         const messageBackground = (settings?.background_opacity ?? 0) > 0
             ? toRgba(settings?.background_color || '#000000', settings?.background_opacity ?? 0.5)
             : 'transparent';
+        const baseFontSize = settings?.font_size || 16;
+        const verticalPadding = settings.chat_direction === 'horizontal' ? 6 : 4;
+        const minMessageHeight = Math.round(baseFontSize * 1.35 + verticalPadding * 2);
         const baseStyle: React.CSSProperties = {
             fontFamily: resolvedFontFamily,
             borderRadius: `${settings?.border_radius ?? 8}px`,
@@ -118,7 +126,11 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
             maxWidth: settings.chat_direction === 'horizontal' ? '600px' : 'auto',
             padding: settings.chat_direction === 'horizontal' ? '6px 10px' : '4px 8px',
             backgroundColor: messageBackground,
-            lineHeight: 1.35,
+            lineHeight: 1.25,
+            display: settings.chat_direction === 'horizontal' ? 'block' : 'flex',
+            alignItems: settings.chat_direction === 'horizontal' ? 'initial' : 'center',
+            width: settings.chat_direction === 'horizontal' ? 'auto' : '100%',
+            minHeight: settings.chat_direction === 'horizontal' ? undefined : `${minMessageHeight}px`,
             marginTop: index > 0 && settings.chat_direction !== 'horizontal' ? `${settings?.message_spacing ?? 4}px` : '0'
         };
 
@@ -190,7 +202,7 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
 
                                 if (!badgeUrl) return null;
 
-                                const badgeSize = Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1));
+                                const badgeSize = Math.max(16, Math.min(32, (settings?.font_size || 16) * 1.2));
                                 return (
                                     <img
                                         key={idx}
@@ -217,11 +229,11 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                             {msg.badges.map((badge: string, idx: number) => (
                                 <img
                                     key={idx}
-                                    src={badge}
+                                    src={normalizeVkAssetUrl(badge)}
                                     alt="badge"
                                     style={{
-                                        width: `${Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1))}px`,
-                                        height: `${Math.max(14, Math.min(28, (settings?.font_size || 16) * 1.1))}px`,
+                                        width: `${Math.max(16, Math.min(32, (settings?.font_size || 16) * 1.2))}px`,
+                                        height: `${Math.max(16, Math.min(32, (settings?.font_size || 16) * 1.2))}px`,
                                         display: 'inline-block',
                                         verticalAlign: 'text-bottom'
                                     }}
@@ -251,6 +263,23 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
                 } : {}),
                 verticalAlign: 'baseline'
             }}>
+                {settings?.show_avatars && msg.avatar_url && (
+                    <img
+                        src={msg.avatar_url}
+                        alt={msg.author_name || msg.author || 'avatar'}
+                        style={{
+                            width: `${Math.max(14, Math.min(24, (settings?.font_size || 16) * 1.15))}px`,
+                            height: `${Math.max(14, Math.min(24, (settings?.font_size || 16) * 1.15))}px`,
+                            borderRadius: '999px',
+                            display: 'inline-block',
+                            verticalAlign: 'text-bottom',
+                            marginRight: '6px'
+                        }}
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                    />
+                )}
                 <span
                     onClick={(e) => onNicknameClick(e, msg.author_name || msg.author || 'Unknown', msg.platform)}
                     style={{
@@ -335,7 +364,6 @@ const ChatOverlay: React.FC = () => {
     const containerStyle = useMemo<React.CSSProperties>(() => {
         if (!settings) return {};
 
-        logger.log('[STYLES] Recalculating containerStyle with font_family:', settings?.font_family);
         const resolvedFontFamily = settings?.font_family
             ? (settings.font_family.includes(',')
                 ? settings.font_family
@@ -678,7 +706,6 @@ const ChatOverlay: React.FC = () => {
                         border_radius: borderRadius
                     };
 
-                    logger.log('[REFRESH] [CHATBOX] Settings updated:', updatedSettings);
                     return updatedSettings;
                 }
             );
@@ -693,7 +720,8 @@ const ChatOverlay: React.FC = () => {
         }
 
         if (data.type === 'message' || data.type === 'chat_message') {
-            const messageId = data.id || `${data.timestamp}-${data.author || data.author_name}-${data.message}`;
+            const payloadMessage = String(data.message ?? data.content ?? '');
+            const messageId = data.id || `${data.timestamp}-${data.platform || 'twitch'}-${data.author || data.author_name}-${payloadMessage}`;
             const inferredChannel = data.channel_name || data.channel;
             if (inferredChannel) {
                 setChannelName(prev => prev || inferredChannel);
@@ -713,7 +741,12 @@ const ChatOverlay: React.FC = () => {
             setMessages(prev => {
                 const isDuplicate = prev.some(msg =>
                     msg.id === data.id ||
-                    (msg.timestamp === String(data.timestamp) && (msg.author === data.author || msg.author_name === data.author_name) && (msg.message || msg.content) === data.message)
+                    (
+                        msg.timestamp === String(data.timestamp) &&
+                        msg.platform === (data.platform || 'twitch') &&
+                        (msg.author === data.author || msg.author_name === data.author_name) &&
+                        (msg.message || msg.content) === payloadMessage
+                    )
                 );
 
                 if (isDuplicate) return prev;
@@ -722,11 +755,12 @@ const ChatOverlay: React.FC = () => {
                     id: data.id || messageId,
                     author: data.author || data.author_name || 'Unknown',
                     author_name: data.author_name || data.author,
-                    message: data.message || '',
+                    message: payloadMessage,
                     timestamp: String(data.timestamp || Date.now()),
                     platform: data.platform || 'twitch',
                     badges: (data as WebSocketMessage & { badges?: string[] }).badges,
                     emotes: (data as WebSocketMessage & { emotes?: ChatMessage['emotes'] }).emotes,
+                    avatar_url: (data as WebSocketMessage & { avatar_url?: string }).avatar_url,
                     role: (data as WebSocketMessage & { role?: string }).role,
                     channel: (data as WebSocketMessage & { channel?: string }).channel,
                     channel_name: (data as WebSocketMessage & { channel_name?: string }).channel_name

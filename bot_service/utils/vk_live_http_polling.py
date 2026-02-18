@@ -370,7 +370,7 @@ class VKLiveHTTPPolling:
 
             # Отправляем в обработчик
             if self.message_handler:
-                logger.info(f"[MSG] [VK HTTP] {author_nick}: {message_text}")
+                logger.debug(f"[MSG] [VK HTTP] {author_nick}: {message_text}")
                 await self.message_handler(processed_message)
 
         except Exception as e:

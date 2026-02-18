@@ -654,7 +654,17 @@ export const useBlockedUsers = (options?: Omit<UseQueryOptions<BlockedUser[], Ax
     queryKey: queryKeys.tts.blockedUsers(),
     queryFn: async () => {
       const response = await unwrapResponse(ttsService.getBlockedUsers());
-      return (response as { data?: BlockedUser[] })?.data || [];
+      if (Array.isArray(response)) {
+        return response as BlockedUser[];
+      }
+      const nestedData = (response as { data?: BlockedUser[] | { blocked_users?: BlockedUser[] } })?.data;
+      if (Array.isArray(nestedData)) {
+        return nestedData;
+      }
+      if (nestedData && Array.isArray((nestedData as { blocked_users?: BlockedUser[] }).blocked_users)) {
+        return (nestedData as { blocked_users?: BlockedUser[] }).blocked_users || [];
+      }
+      return [];
     },
     staleTime: 30 * 1000, // 30 секунд
     gcTime: 5 * 60 * 1000, // 5 минут

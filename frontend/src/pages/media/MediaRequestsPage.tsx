@@ -35,7 +35,7 @@ const MediaRequestsPage: React.FC = () => {
 
     return (
         <PageWrapper title="Медиа запросы">
-            <div className="container mx-auto max-w-7xl">
+            <div className="w-full">
                 {renderContent()}
             </div>
         </PageWrapper>
