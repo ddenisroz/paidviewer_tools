@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/users", tags=["admin-users"])
 
 
+def _safe_user_error_message(message: str) -> str:
+    if message == "User not found":
+        return "User not found"
+    return "Invalid user management request"
+
+
 class UserBlockRequest(BaseModel):
     """Request model for blocking a user"""
     reason: str
@@ -62,8 +68,10 @@ async def get_all_users(
             "page": page,
             "pages": result["pagination"]["pages"]
         }
-    except Exception as e:
-        logger.error(f"Error getting users list: {e}", exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting users list")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -89,8 +97,8 @@ async def get_user_details(
         return {"success": True, **result}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting user details: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error getting user details")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -117,7 +125,7 @@ async def block_user(
         if "error" in result:
             if result["error"] == "User not found":
                 raise HTTPException(status_code=404, detail="User not found")
-            raise HTTPException(status_code=400, detail=result["error"])
+            raise HTTPException(status_code=400, detail=_safe_user_error_message(result["error"]))
         
         logger.info(f"User {user_id} blocked by admin {current_user.get('id')}: {request.reason}")
         
@@ -127,8 +135,8 @@ async def block_user(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error blocking user: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error blocking user")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -151,7 +159,7 @@ async def unblock_user(
         if "error" in result:
             if result["error"] == "User not found":
                 raise HTTPException(status_code=404, detail="User not found")
-            raise HTTPException(status_code=400, detail=result["error"])
+            raise HTTPException(status_code=400, detail=_safe_user_error_message(result["error"]))
         
         logger.info(f"User {user_id} unblocked by admin {current_user.get('id')}")
         
@@ -161,8 +169,8 @@ async def unblock_user(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error unblocking user: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error unblocking user")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -187,7 +195,7 @@ async def update_user(
         if "error" in result:
             if result["error"] == "User not found":
                 raise HTTPException(status_code=404, detail="User not found")
-            raise HTTPException(status_code=400, detail=result["error"])
+            raise HTTPException(status_code=400, detail=_safe_user_error_message(result["error"]))
         
         logger.info(f"User {user_id} updated by admin {current_user.get('id')}")
         
@@ -197,8 +205,8 @@ async def update_user(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating user: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error updating user")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -225,7 +233,7 @@ async def delete_user(
         if "error" in result:
             if result["error"] == "User not found":
                 raise HTTPException(status_code=404, detail="User not found")
-            raise HTTPException(status_code=400, detail=result["error"])
+            raise HTTPException(status_code=400, detail=_safe_user_error_message(result["error"]))
         
         logger.warning(f"User {user_id} deleted by admin {current_user.get('id')}")
         
@@ -235,8 +243,8 @@ async def delete_user(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting user: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error deleting user")
         db.rollback()
         raise HTTPException(status_code=500, detail="Internal server error")
 
@@ -279,6 +287,8 @@ async def get_stats_overview(
                 }
             }
         }
-    except Exception as e:
-        logger.error(f"Error getting stats overview: {e}", exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting stats overview")
         raise HTTPException(status_code=500, detail="Internal server error")

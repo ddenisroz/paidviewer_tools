@@ -12,6 +12,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
 
@@ -340,6 +341,8 @@ export const MemeAlertsRewards: React.FC = () => {
     // Listen for postMessage from the proxy popup with the extracted token.
     useEffect(() => {
         const handleMessage = async (event: MessageEvent) => {
+            if (event.origin !== window.location.origin) return;
+            if (popupRef.current && event.source !== popupRef.current) return;
             if (!event?.data || typeof event.data !== 'object') return;
 
             // Accept both old format and new typed format from the proxy script.
@@ -407,7 +410,12 @@ export const MemeAlertsRewards: React.FC = () => {
                 throw new Error(data?.error || 'Не удалось получить ссылку подключения');
             }
 
-            const popup = window.open(data.auth_url, '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes');
+            const safeUrl = getSafeNavigationUrl(data.auth_url);
+            if (!safeUrl) {
+                throw new Error('Небезопасный URL авторизации');
+            }
+
+            const popup = window.open(safeUrl, '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes,noopener,noreferrer');
             if (!popup) {
                 toast.error("Не удалось открыть окно", {
                     description: "Разрешите всплывающие окна в настройках браузера"

@@ -1,7 +1,6 @@
 import logging
 import json
 import hashlib
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -42,8 +41,8 @@ class VoicesService:
                                     "created_at": metadata.get('created_at'),
                                     "samples_count": len(list(voice_folder.glob('*.wav')))
                                 })
-                        except Exception as e:
-                            logger.error(f"Error loading voice metadata {voice_folder.name}: {e}")
+                        except Exception:
+                            logger.exception("Error loading voice metadata for %s", voice_folder.name)
         return voices
 
     @staticmethod
@@ -89,3 +88,4 @@ class VoicesService:
         if voice_folder.exists():
             return voice_folder
         return None
+

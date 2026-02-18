@@ -1,5 +1,4 @@
 import asyncio
-from celery import shared_task
 from celery.utils.log import get_task_logger
 import os
 from pathlib import Path
@@ -34,7 +33,7 @@ def generate_tts_task(self, text: str, voice: str, user_id: int, platform: str, 
         result = asyncio.run(_process_tts_async(text, voice, user_id, platform, channel, message_id))
         return result
     except Exception as e:
-        logger.error(f"TTS Task failed: {e}")
+        logger.exception("TTS Task failed")
         # Retry logic could be added here
         raise self.retry(exc=e, countdown=5, max_retries=3)
 
@@ -130,3 +129,4 @@ async def _process_tts_async(text: str, voice: str, user_id: int, platform: str,
     logger.info(f"Published result to {channel_key}")
     
     return result_payload
+

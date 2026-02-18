@@ -70,7 +70,7 @@ async def get_chat_config(
     # Если user_id передан, проверяем что это текущий пользователь или админ
     if user_id and current_user and str(current_user.id) != user_id:
         # Проверяем права администратора
-        if not getattr(current_user, 'is_admin', False):
+        if not ((getattr(current_user, "role", None) == "admin") or getattr(current_user, "is_admin", False)):
             raise HTTPException(status_code=403, detail="Access denied")
 
     if user_id and user_id in user_widget_configs and config_id in user_widget_configs[user_id]:

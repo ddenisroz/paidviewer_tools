@@ -58,8 +58,8 @@ class BackupManager:
             self.logger.info(f"TTS Database backup created: {backup_path}")
             return str(backup_path)
             
-        except Exception as e:
-            self.logger.error(f"Error creating TTS database backup: {e}")
+        except Exception:
+            self.logger.exception("Error creating TTS database backup")
             return None
     
     def create_config_backup(self, config_files: List[str]) -> str:
@@ -86,8 +86,8 @@ class BackupManager:
             self.logger.info(f"TTS Config backup created: {archive_path}")
             return archive_path
             
-        except Exception as e:
-            self.logger.error(f"Error creating TTS config backup: {e}")
+        except Exception:
+            self.logger.exception("Error creating TTS config backup")
             return None
     
     def create_logs_backup(self, logs_dir: str) -> str:
@@ -108,8 +108,8 @@ class BackupManager:
             self.logger.info(f"TTS Logs backup created: {archive_path}")
             return archive_path
             
-        except Exception as e:
-            self.logger.error(f"Error creating TTS logs backup: {e}")
+        except Exception:
+            self.logger.exception("Error creating TTS logs backup")
             return None
     
     def create_audio_backup(self, audio_dir: str) -> str:
@@ -130,8 +130,8 @@ class BackupManager:
             self.logger.info(f"TTS Audio backup created: {archive_path}")
             return archive_path
             
-        except Exception as e:
-            self.logger.error(f"Error creating TTS audio backup: {e}")
+        except Exception:
+            self.logger.exception("Error creating TTS audio backup")
             return None
     
     def create_models_backup(self, models_dir: str) -> str:
@@ -167,8 +167,8 @@ class BackupManager:
             self.logger.info(f"TTS Models metadata backup created: {archive_path}")
             return archive_path
             
-        except Exception as e:
-            self.logger.error(f"Error creating TTS models backup: {e}")
+        except Exception:
+            self.logger.exception("Error creating TTS models backup")
             return None
     
     def cleanup_old_backups(self):
@@ -193,8 +193,8 @@ class BackupManager:
             
             self.logger.info("TTS old backups cleanup completed")
             
-        except Exception as e:
-            self.logger.error(f"Error during TTS cleanup: {e}")
+        except Exception:
+            self.logger.exception("Error during TTS cleanup")
     
     def _cleanup_directory(self, directory: Path, max_days: int, now: datetime):
         """Очистка файлов в директории старше max_days дней"""
@@ -210,8 +210,8 @@ class BackupManager:
                     try:
                         file_path.unlink()
                         self.logger.info(f"Deleted old TTS backup: {file_path}")
-                    except Exception as e:
-                        self.logger.error(f"Error deleting {file_path}: {e}")
+                    except Exception:
+                        self.logger.exception("Error deleting {file_path}")
     
     def get_backup_info(self) -> dict:
         """Получение информации о бэкапах TTS"""
@@ -265,8 +265,8 @@ class BackupManager:
                 self.create_database_backup(db_path)
             
             self.logger.info("TTS Daily backup completed")
-        except Exception as e:
-            self.logger.error(f"Error in TTS daily backup: {e}")
+        except Exception:
+            self.logger.exception("Error in TTS daily backup")
     
     def _weekly_backup(self):
         """Еженедельный полный бэкап TTS"""
@@ -290,8 +290,8 @@ class BackupManager:
             self.create_models_backup("f5_tts_cache")
             
             self.logger.info("TTS Weekly backup completed")
-        except Exception as e:
-            self.logger.error(f"Error in TTS weekly backup: {e}")
+        except Exception:
+            self.logger.exception("Error in TTS weekly backup")
     
     def start_scheduler(self):
         """Запуск планировщика бэкапов TTS в отдельном потоке"""
@@ -306,3 +306,4 @@ class BackupManager:
 
 # Глобальный экземпляр
 tts_backup_manager = BackupManager("tts_service")
+

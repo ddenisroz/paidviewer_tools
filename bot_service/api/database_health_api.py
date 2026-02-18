@@ -8,7 +8,7 @@ query performance, and overall database health.
 import logging
 from core.datetime_utils import utcnow_naive
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -33,7 +33,7 @@ async def get_pool_status(current_user: dict = Depends(get_current_user)):
         - total: Total connections
         - utilization: Pool utilization percentage
     """
-    if not current_user.get("is_admin"):
+    if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -84,8 +84,10 @@ async def get_pool_status(current_user: dict = Depends(get_current_user)):
             "utilization_percent": round(utilization, 2),
             "timestamp": utcnow_naive().isoformat()
         }
-    except Exception as e:
-        logger.error(f"Error getting pool status: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting pool status")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -103,7 +105,7 @@ async def database_health_check(
         - Connection pool status
         - Active connections
     """
-    if not current_user.get("is_admin"):
+    if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     health_data = {
@@ -200,14 +202,14 @@ async def database_health_check(
 async def get_slow_queries(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    limit: int = 10
+    limit: int = Query(default=10, ge=1, le=100)
 ):
     """
     Get slow running queries (PostgreSQL specific).
     
     Helps identify N+1 query problems and performance issues.
     """
-    if not current_user.get("is_admin"):
+    if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -246,8 +248,10 @@ async def get_slow_queries(
             "count": len(queries),
             "timestamp": utcnow_naive().isoformat()
         }
-    except Exception as e:
-        logger.error(f"Error getting slow queries: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting slow queries")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -261,7 +265,7 @@ async def get_table_statistics(
     
     Useful for monitoring database growth and identifying large tables.
     """
-    if not current_user.get("is_admin"):
+    if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -291,8 +295,10 @@ async def get_table_statistics(
             "tables": tables,
             "timestamp": utcnow_naive().isoformat()
         }
-    except Exception as e:
-        logger.error(f"Error getting table stats: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting table stats")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -306,7 +312,7 @@ async def get_index_usage(
     
     Helps identify unused indexes (waste of space) and missing indexes.
     """
-    if not current_user.get("is_admin"):
+    if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -346,6 +352,8 @@ async def get_index_usage(
             "unused_count": sum(1 for idx in indexes if idx["is_unused"]),
             "timestamp": utcnow_naive().isoformat()
         }
-    except Exception as e:
-        logger.error(f"Error getting index usage: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting index usage")
         raise HTTPException(status_code=500, detail="Internal server error")

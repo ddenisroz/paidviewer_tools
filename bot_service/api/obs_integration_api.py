@@ -3,11 +3,10 @@
 
 Clean Architecture: uses UserRepository for data access.
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
 
-from core.database import get_db, User
+from core.database import get_db
 from auth.auth import get_current_user, create_jwt_token
 from core.security_modern import limiter
 from core.config import settings
@@ -24,16 +23,15 @@ def get_or_create_obs_token(db: Session, user_id: int, regenerate: bool = False)
     user_repo = UserRepository(db)
     user_record = user_repo.get_by_id(user_id)
 
+    if not user_record:
+        raise HTTPException(status_code=404, detail="User not found")
     
     if user_record and user_record.obs_token and not regenerate:
         return user_record.obs_token
     
     obs_token = create_jwt_token(user_id)
     
-    if user_record:
-        user_repo.update_obs_token(user_id, obs_token)
-    else:
-        user_repo.create_with_obs_token(user_id, obs_token)
+    user_repo.update_obs_token(user_id, obs_token)
     
     return obs_token
 
@@ -46,9 +44,11 @@ async def get_obs_url(request: Request, user: dict = Depends(get_current_user), 
         user_repo = UserRepository(db)
         user_record = user_repo.get_by_id(user['id'])
         return {"obs_token": user_record.obs_token if user_record else None}
-    except Exception as e:
-        logger.error(f"Error getting OBS URL: {e}")
-        return {"obs_token": None}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting OBS URL")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 
@@ -59,10 +59,12 @@ async def generate_obs_url(request: Request, user: dict = Depends(get_current_us
     try:
         obs_token = get_or_create_obs_token(db, user['id'])
         return {"obs_token": obs_token}
-    except Exception as e:
-        logger.error(f"Error generating OBS URL: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error generating OBS URL")
         db.rollback()
-        return {"obs_token": create_jwt_token(user['id'])}
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/youtube/generate-obs-url")
@@ -73,11 +75,12 @@ async def generate_youtube_obs_url(request: Request, user: dict = Depends(get_cu
         obs_token = get_or_create_obs_token(db, user['id'])
         frontend_url = settings.frontend_url
         return {"youtube_obs_url": f"{frontend_url}/youtube-obs/{obs_token}", "obs_token": obs_token}
-    except Exception as e:
-        logger.error(f"Error generating YouTube OBS URL: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error generating YouTube OBS URL")
         db.rollback()
-        obs_token = create_jwt_token(user['id'])
-        return {"youtube_obs_url": f"{settings.frontend_url}/youtube-obs/{obs_token}", "obs_token": obs_token}
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/tts/regenerate-obs-url")
@@ -87,21 +90,25 @@ async def regenerate_obs_url(request: Request, user: dict = Depends(get_current_
     try:
         obs_token = get_or_create_obs_token(db, user['id'], regenerate=True)
         return {"obs_token": obs_token}
-    except Exception as e:
-        logger.error(f"Error regenerating OBS URL: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error regenerating OBS URL")
         db.rollback()
-        return {"obs_token": create_jwt_token(user['id'])}
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/youtube/regenerate-obs-url")
-async def regenerate_youtube_obs_url(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+@limiter.limit("60/minute")
+async def regenerate_youtube_obs_url(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Перегенерировать URL для YouTube OBS WebSocket"""
     try:
         obs_token = get_or_create_obs_token(db, user['id'], regenerate=True)
         frontend_url = settings.frontend_url
         return {"youtube_obs_url": f"{frontend_url}/youtube-obs/{obs_token}", "obs_token": obs_token}
-    except Exception as e:
-        logger.error(f"Error regenerating YouTube OBS URL: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error regenerating YouTube OBS URL")
         db.rollback()
-        obs_token = create_jwt_token(user['id'])
-        return {"youtube_obs_url": f"{settings.frontend_url}/youtube-obs/{obs_token}", "obs_token": obs_token}
+        raise HTTPException(status_code=500, detail="Internal server error")

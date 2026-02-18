@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, UploadFile, File, Form, Query
+﻿from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, UploadFile, File, Form, Query
 import logging
 import os
 import shutil
 import tempfile
+import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from sqlalchemy.orm import Session
 from tts_service.database import get_db
@@ -13,16 +14,85 @@ from tts_service.config import config
 from tts_service.tts_engine import tts_engine_manager
 from tts_service.async_audio_converter import AsyncAudioConverter
 from tts_service.tts_limits_service import tts_limits_service
+from tts_service.auth import get_current_user_or_internal
 
 router = APIRouter(tags=["users"])
 logger = logging.getLogger(__name__)
 
+
+def _get_actor_user_id(current_user: Dict[str, Any]) -> int:
+    user_id = current_user.get("user_id", current_user.get("id"))
+    if not isinstance(user_id, int):
+        raise HTTPException(status_code=401, detail="Invalid authentication payload")
+    return user_id
+
+
+def _ensure_user_access(current_user: Dict[str, Any], target_user_id: int) -> None:
+    actor_user_id = _get_actor_user_id(current_user)
+    if current_user.get("role") == "admin" or current_user.get("is_admin"):
+        return
+    if actor_user_id != target_user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
+def _sanitize_voice_name(raw_name: str) -> str:
+    cleaned = re.sub(r"[^0-9A-Za-zРђ-РЇР°-СЏРЃС‘ _-]", "", raw_name or "").strip()
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="Invalid voice name")
+    if len(cleaned) > 80:
+        cleaned = cleaned[:80].rstrip()
+    return cleaned
+
+
+def _has_valid_audio_signature(file_path: str) -> bool:
+    """Best-effort magic header validation for common audio containers/codecs."""
+    try:
+        with open(file_path, "rb") as source:
+            header = source.read(16)
+    except OSError:
+        return False
+
+    if len(header) < 4:
+        return False
+
+    # WAV / RIFF
+    if header.startswith(b"RIFF") and len(header) >= 12 and header[8:12] == b"WAVE":
+        return True
+    # MP3 (ID3 tag) or MPEG frame sync
+    if header.startswith(b"ID3") or (header[0] == 0xFF and (header[1] & 0xE0) == 0xE0):
+        return True
+    # OGG
+    if header.startswith(b"OggS"):
+        return True
+    # FLAC
+    if header.startswith(b"fLaC"):
+        return True
+    # MP4/M4A family
+    if len(header) >= 12 and header[4:8] == b"ftyp":
+        return True
+    # WMA/ASF
+    if header.startswith(bytes.fromhex("3026B2758E66CF11")):
+        return True
+    # AIFF
+    if header.startswith(b"FORM") and len(header) >= 12 and header[8:12] in {b"AIFF", b"AIFC"}:
+        return True
+    # AU
+    if header.startswith(b".snd"):
+        return True
+
+    return False
+
 # --- VOICE MANAGEMENT ---
 
 @router.get("/user/voices/{user_id}")
-async def get_user_voices(user_id: int, db: Session = Depends(get_db)):
-    """Получить голоса пользователя"""
+async def get_user_voices(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
+):
+    """РџРѕР»СѓС‡РёС‚СЊ РіРѕР»РѕСЃР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
+        _ensure_user_access(current_user, user_id)
         voices = db.query(VoiceModel).filter(
             VoiceModel.owner_id == user_id,
             VoiceModel.is_active.is_(True)
@@ -41,9 +111,11 @@ async def get_user_voices(user_id: int, db: Session = Depends(get_db)):
             }
             for voice in voices
         ]
-    except Exception as e:
-        logger.error(f"Error getting user voices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting user voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/user/voices/upload")
 async def upload_user_voice(
@@ -51,41 +123,49 @@ async def upload_user_voice(
     file: UploadFile = File(...),
     voice_name: str = Form(...),
     user_id: int = Form(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
 ):
-    """Загрузить пользовательский голос с автоматической конвертацией и транскрибацией"""
+    """Р—Р°РіСЂСѓР·РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ РіРѕР»РѕСЃ СЃ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕР№ РєРѕРЅРІРµСЂС‚Р°С†РёРµР№ Рё С‚СЂР°РЅСЃРєСЂРёР±Р°С†РёРµР№"""
     temp_input_path = None
     temp_converted_path = None
     final_voice_path = None
     
     try:
-        # Проверка типа файла
+        _ensure_user_access(current_user, user_id)
+        voice_name = _sanitize_voice_name(voice_name)
+
+        # РџСЂРѕРІРµСЂРєР° С‚РёРїР° С„Р°Р№Р»Р°
         allowed_extensions = ['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma', '.aiff', '.au']
         file_extension = os.path.splitext(file.filename)[1].lower()
         
         if file_extension not in allowed_extensions:
             raise HTTPException(
                 status_code=400,
-                detail=f"Неподдерживаемый формат файла. Разрешены: {', '.join(allowed_extensions)}"
+                detail=f"РќРµРїРѕРґРґРµСЂР¶РёРІР°РµРјС‹Р№ С„РѕСЂРјР°С‚ С„Р°Р№Р»Р°. Р Р°Р·СЂРµС€РµРЅС‹: {', '.join(allowed_extensions)}"
             )
         
-        # Проверка дубликатов
+        # РџСЂРѕРІРµСЂРєР° РґСѓР±Р»РёРєР°С‚РѕРІ
         existing_voice = db.query(VoiceModel).filter(
             VoiceModel.name == voice_name,
             VoiceModel.owner_id == user_id
         ).first()
         if existing_voice:
-            raise HTTPException(status_code=400, detail=f"Голос с именем '{voice_name}' уже существует")
+            raise HTTPException(status_code=400, detail=f"Р“РѕР»РѕСЃ СЃ РёРјРµРЅРµРј '{voice_name}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
         
-        # Сохраняем загруженный файл во временную директорию
+        # РЎРѕС…СЂР°РЅСЏРµРј Р·Р°РіСЂСѓР¶РµРЅРЅС‹Р№ С„Р°Р№Р» РІРѕ РІСЂРµРјРµРЅРЅСѓСЋ РґРёСЂРµРєС‚РѕСЂРёСЋ
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
             shutil.copyfileobj(file.file, temp_file)
             temp_input_path = temp_file.name
+
+        if not _has_valid_audio_signature(temp_input_path):
+            raise HTTPException(status_code=400, detail="Invalid audio file signature")
         
         logger.info(f"[RECEIVE] User voice uploaded to temp: {temp_input_path}")
         
-        # Конвертируем в WAV с требованиями F5-TTS
-        temp_converted_path = tempfile.mktemp(suffix='.wav')
+        # РљРѕРЅРІРµСЂС‚РёСЂСѓРµРј РІ WAV СЃ С‚СЂРµР±РѕРІР°РЅРёСЏРјРё F5-TTS
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as temp_converted_file:
+            temp_converted_path = temp_converted_file.name
         
         converter = AsyncAudioConverter(max_workers=1)
         await converter.start_workers()
@@ -99,7 +179,7 @@ async def upload_user_voice(
         finally:
             await converter.stop_workers()
         
-        # Автоматическая транскрибация
+        # РђРІС‚РѕРјР°С‚РёС‡РµСЃРєР°СЏ С‚СЂР°РЅСЃРєСЂРёР±Р°С†РёСЏ
         reference_text = ""
         try:
             if tts_engine_manager.transcriber:
@@ -107,23 +187,23 @@ async def upload_user_voice(
                 logger.info(f"[OK] Audio transcribed: '{reference_text[:50]}...'")
             else:
                 logger.warning("[WARN] Transcriber not available, skipping transcription")
-        except Exception as e:
-            logger.warning(f"[WARN] Transcription failed: {e}, continuing without reference text")
+        except Exception:
+            logger.warning("[WARN] Transcription failed, continuing without reference text", exc_info=True)
         
-        # Сохраняем в финальную директорию
+        # РЎРѕС…СЂР°РЅСЏРµРј РІ С„РёРЅР°Р»СЊРЅСѓСЋ РґРёСЂРµРєС‚РѕСЂРёСЋ
         voices_dir = config.user_voices_path / str(user_id)
         voices_dir.mkdir(parents=True, exist_ok=True)
         
-        # ВСЕГДА сохраняем как WAV
+        # Р’РЎР•Р“Р”Рђ СЃРѕС…СЂР°РЅСЏРµРј РєР°Рє WAV
         safe_filename = f"{voice_name}.wav"
         final_voice_path = voices_dir / safe_filename
         
-        # Копируем конвертированный файл
+        # РљРѕРїРёСЂСѓРµРј РєРѕРЅРІРµСЂС‚РёСЂРѕРІР°РЅРЅС‹Р№ С„Р°Р№Р»
         shutil.copy2(temp_converted_path, final_voice_path)
         
         logger.info(f"[OK] User voice saved: {final_voice_path}")
         
-        # Создаём запись в БД
+        # РЎРѕР·РґР°С‘Рј Р·Р°РїРёСЃСЊ РІ Р‘Р”
         new_voice = VoiceModel(
             name=voice_name,
             voice_type='user',
@@ -143,7 +223,7 @@ async def upload_user_voice(
         
         return {
             "status": "success",
-            "message": f"Голос '{voice_name}' успешно загружен, конвертирован и транскрибирован",
+            "message": f"Р“РѕР»РѕСЃ '{voice_name}' СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅ, РєРѕРЅРІРµСЂС‚РёСЂРѕРІР°РЅ Рё С‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°РЅ",
             "voice": {
                 "id": new_voice.id,
                 "name": new_voice.name,
@@ -157,14 +237,14 @@ async def upload_user_voice(
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"User voice upload error: {e}")
+    except Exception:
+        logger.exception("User voice upload error")
         db.rollback()
         
         if final_voice_path and Path(final_voice_path).exists():
             Path(final_voice_path).unlink()
         
-        raise HTTPException(status_code=500, detail=f"Ошибка загрузки голоса: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
     
     finally:
         if temp_input_path and os.path.exists(temp_input_path):
@@ -183,10 +263,12 @@ async def upload_user_voice(
 async def delete_user_voice(
     voice_id: int,
     user_id: int = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
 ):
-    """Удалить пользовательский голос"""
+    """РЈРґР°Р»РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ РіРѕР»РѕСЃ"""
     try:
+        _ensure_user_access(current_user, user_id)
         voice = db.query(VoiceModel).filter(
             VoiceModel.id == voice_id,
             VoiceModel.owner_id == user_id,
@@ -203,8 +285,8 @@ async def delete_user_voice(
             try:
                 os.remove(voice.file_path)
                 logger.info(f"[OK] Deleted voice file: {voice.file_path}")
-            except Exception as e:
-                logger.warning(f"[WARN] Failed to delete voice file: {e}")
+            except Exception:
+                logger.warning("[WARN] Failed to delete voice file", exc_info=True)
         
         db.delete(voice)
         db.commit()
@@ -215,20 +297,23 @@ async def delete_user_voice(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting voice: {e}")
+    except Exception:
+        logger.exception("Error deleting voice")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.put("/user/voices/{voice_id}/rename")
 async def rename_user_voice(
     voice_id: int, 
     user_id: int = Query(..., description="User ID"),
     new_name: str = Form(...), 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
 ):
-    """Переименовать пользовательский голос"""
+    """РџРµСЂРµРёРјРµРЅРѕРІР°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ РіРѕР»РѕСЃ"""
     try:
+        _ensure_user_access(current_user, user_id)
+        new_name = _sanitize_voice_name(new_name)
         voice = db.query(VoiceModel).filter(
             VoiceModel.id == voice_id,
             VoiceModel.owner_id == user_id
@@ -252,14 +337,20 @@ async def rename_user_voice(
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Rename voice error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Rename voice error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/user/voices/{voice_id}/transcribe")
-async def transcribe_user_voice(voice_id: int, user_id: int, db: Session = Depends(get_db)):
-    """Транскрибировать пользовательский голос (обновить reference text)"""
+async def transcribe_user_voice(
+    voice_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
+):
+    """РўСЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёР№ РіРѕР»РѕСЃ (РѕР±РЅРѕРІРёС‚СЊ reference text)"""
     try:
+        _ensure_user_access(current_user, user_id)
         voice = db.query(VoiceModel).filter(
             VoiceModel.id == voice_id,
             VoiceModel.owner_id == user_id
@@ -280,9 +371,9 @@ async def transcribe_user_voice(voice_id: int, user_id: int, db: Session = Depen
                 logger.info(f"[OK] Transcribed: '{reference_text[:50]}...'")
             else:
                 raise Exception("Transcriber not available")
-        except Exception as e:
-            logger.error(f"[ERROR] Transcription failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Ошибка транскрибации: {str(e)}")
+        except Exception:
+            logger.exception("[ERROR] Transcription failed")
+            raise HTTPException(status_code=500, detail="Internal server error")
         
         voice.reference_text = reference_text
         db.commit()
@@ -296,14 +387,19 @@ async def transcribe_user_voice(voice_id: int, user_id: int, db: Session = Depen
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Transcribe voice error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Transcribe voice error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/user/voices/{voice_id}/retranscribe")
-async def retranscribe_user_voice(voice_id: int, user_id: int, db: Session = Depends(get_db)):
-    """Перетранскрибировать (алиас для transcribe)"""
-    return await transcribe_user_voice(voice_id, user_id, db)
+async def retranscribe_user_voice(
+    voice_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
+):
+    """РџРµСЂРµС‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°С‚СЊ (Р°Р»РёР°СЃ РґР»СЏ transcribe)"""
+    return await transcribe_user_voice(voice_id, user_id, db, current_user)
 
 @router.put("/user/voices/{voice_id}/settings")
 async def update_user_voice_settings(
@@ -311,9 +407,10 @@ async def update_user_voice_settings(
     settings: dict, # Expecting {cfg_strength, speed_preset} and maybe user_id in query or body? 
                     # Original endpoint had user_id in body for update_user_voice_settings_endpoint vs query for update_user_voice_settings
     user_id: Optional[int] = Query(None), # Trying to support both signatures if possible or stick to one
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
 ):
-    """Обновить настройки пользовательского голоса"""
+    """РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРѕРіРѕ РіРѕР»РѕСЃР°"""
     try:
         # Determine user_id: passed in query OR inside settings dict? 
         # Ideally it should be authenticated. The original code was messy:
@@ -328,8 +425,9 @@ async def update_user_voice_settings(
             raise HTTPException(status_code=404, detail="Voice not found")
             
         if target_user_id and voice.owner_id != int(target_user_id):
-             # Simple permission check if user_id is provided
-             raise HTTPException(status_code=403, detail="Access denied")
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        _ensure_user_access(current_user, voice.owner_id)
         
         if voice.is_global:
             raise HTTPException(
@@ -358,55 +456,84 @@ async def update_user_voice_settings(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating voice settings: {e}")
+    except Exception:
+        logger.exception("Error updating voice settings")
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # --- LIMITS & STATS ---
 
 from tts_service.models import UserTTSLimitsSchema
 
 @router.get("/user/tts-limits/{user_id}")
-async def get_user_tts_limits(user_id: int, db: Session = Depends(get_db)):
-    """Получить настройки и лимиты TTS пользователя"""
+async def get_user_tts_limits(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
+):
+    """РџРѕР»СѓС‡РёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё Рё Р»РёРјРёС‚С‹ TTS РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
+        _ensure_user_access(current_user, user_id)
         limits = tts_limits_service.get_user_limits(user_id, db)
         return limits
-    except Exception as e:
-        logger.error(f"Error getting TTS limits: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting TTS limits")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.put("/user/tts-limits/{user_id}")
 async def update_user_tts_limits(
     user_id: int, 
     limits: UserTTSLimitsSchema, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
 ):
-    """Обновить настройки и лимиты TTS пользователя"""
+    """РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё Рё Р»РёРјРёС‚С‹ TTS РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
     try:
+        _ensure_user_access(current_user, user_id)
         updated_limits = tts_limits_service.update_user_limits(user_id, limits, db)
         return updated_limits
-    except Exception as e:
-        logger.error(f"Error updating TTS limits: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating TTS limits")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/user/tts-stats/{user_id}")
-async def get_user_tts_stats(user_id: int, days: int = 7, db: Session = Depends(get_db)):
-    """Получить статистику использования TTS пользователем"""
+async def get_user_tts_stats(
+    user_id: int,
+    days: int = 7,
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
+):
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ TTS РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј"""
     try:
+        _ensure_user_access(current_user, user_id)
         stats = tts_limits_service.get_user_stats(user_id, days, db)
         return stats
-    except Exception as e:
-        logger.error(f"Error getting user TTS stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting user TTS stats")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/tts/stats/global")
-async def get_global_tts_stats(days: int = 7, db: Session = Depends(get_db)):
-    """Получить глобальную статистику TTS"""
+async def get_global_tts_stats(
+    days: int = 7,
+    db: Session = Depends(get_db),
+    current_user: Dict[str, Any] = Depends(get_current_user_or_internal),
+):
+    """РџРѕР»СѓС‡РёС‚СЊ РіР»РѕР±Р°Р»СЊРЅСѓСЋ СЃС‚Р°С‚РёСЃС‚РёРєСѓ TTS"""
     try:
+        if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
+            raise HTTPException(status_code=403, detail="Admin access required")
         stats = tts_limits_service.get_global_stats(days, db)
         return stats
-    except Exception as e:
-        logger.error(f"Error getting global TTS stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting global TTS stats")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+

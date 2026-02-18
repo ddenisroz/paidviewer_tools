@@ -78,8 +78,8 @@ class VKAuth(VKBase):
                         text = await response.text()
                         logger.error(f"[VK AUTH] Failed to get Service Token: {response.status} - {text}")
                         return None
-        except Exception as e:
-             logger.error(f"[VK AUTH] Error getting Service Token: {e}")
+        except Exception:
+             logger.exception("[VK AUTH] Error getting Service Token")
              return None
 
     def _get_user_token(self, user_id: str, session_id: Optional[str] = None) -> Optional[str]:
@@ -102,8 +102,8 @@ class VKAuth(VKBase):
                 session_id=session_id,
                 require_session_check=session_id is not None
             ))
-        except Exception as e:
-            logger.error(f"Error getting VK token for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error getting VK token for user %s", user_id)
             return None
 
     async def _refresh_user_token(self, user_id: int) -> Optional[str]:
@@ -194,8 +194,8 @@ class VKAuth(VKBase):
                         logger.error(f"VK token refresh failed: {response.status} - {error_text}")
                         return None
 
-        except Exception as e:
-            logger.error(f"Error refreshing VK token for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error refreshing VK token for user %s", user_id)
             return None
 
     async def _get_current_user_info(self, token: str) -> Optional[Dict[str, Any]]:
@@ -221,6 +221,7 @@ class VKAuth(VKBase):
                         return None
                     else:
                         logger.warning(f"Endpoint /v1/current_user returned {response.status}: {await response.text()}")
-        except Exception as e:
-            logger.error(f"VK Live API /v1/current_user request failed: {e}")
+        except Exception:
+            logger.exception("VK Live API /v1/current_user request failed")
         return None
+

@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.ext.declarative import declarative_base
 
 # Определяем путь к базе данных в bot_service
 # BASE_DIR -> tts_service -> parent -> bot_service -> data -> app_data.db
@@ -144,3 +143,4 @@ def init_db():
     """Инициализация базы данных"""
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
+

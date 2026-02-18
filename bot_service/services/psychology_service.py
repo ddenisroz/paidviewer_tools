@@ -74,8 +74,9 @@ class PsychologyService:
             min_messages = settings.chat_analysis_min_messages
 
             channel_messages, global_messages = self._get_user_messages(
-                target_username,
-                platform,
+                owner_user_id=analyzed_by_user_id,
+                username=target_username,
+                platform=platform,
                 channel_name=channel_name,
                 channel_limit=channel_limit,
                 global_limit=global_limit
@@ -127,13 +128,14 @@ class PsychologyService:
                 self.__class__._analysis_in_progress = False
                 return "[ERROR] Ошибка при анализе. Попробуйте позже."
 
-        except Exception as e:
-            logger.error(f"Error in analyze_user_psychology: {e}")
+        except Exception:
+            logger.exception("Error in analyze_user_psychology")
             self.__class__._analysis_in_progress = False
             return "[ERROR] Произошла ошибка при анализе"
 
     def _get_user_messages(
         self,
+        owner_user_id: int,
         username: str,
         platform: str,
         channel_name: str,
@@ -144,21 +146,23 @@ class PsychologyService:
         try:
             repo = ChatMessageRepository(self.db)
             channel_messages = repo.get_recent_by_author_in_channel(
-                username,
-                channel_name,
+                user_id=owner_user_id,
+                author_username=username,
+                channel_name=channel_name,
                 platform=platform,
                 limit=channel_limit
             )
             global_messages = repo.get_recent_by_author(
-                username,
+                user_id=owner_user_id,
+                author_username=username,
                 platform=platform,
                 limit=global_limit
             )
 
             return channel_messages, global_messages
 
-        except Exception as e:
-            logger.error(f"Error getting user messages: {e}")
+        except Exception:
+            logger.exception("Error getting user messages")
             return [], []
 
     def _check_database_health(self) -> bool:
@@ -185,8 +189,8 @@ class PsychologyService:
 
             return True
 
-        except Exception as e:
-            logger.error(f"Error checking database health: {e}")
+        except Exception:
+            logger.exception("Error checking database health")
             return True
 
     def _prepare_messages_for_analysis(self, messages: List[ChatMessage], max_chars: int = 2000) -> Tuple[str, int]:
@@ -209,8 +213,8 @@ class PsychologyService:
 
             return combined_text, len(message_texts)
 
-        except Exception as e:
-            logger.error(f"Error preparing messages: {e}")
+        except Exception:
+            logger.exception("Error preparing messages")
             return "", 0
 
     async def _call_deepseek(self, system_prompt: str, user_prompt: str, max_tokens: int) -> Optional[str]:
@@ -307,8 +311,8 @@ class PsychologyService:
 
             return analysis or None
 
-        except Exception as e:
-            logger.error(f"Error requesting AI analysis: {e}")
+        except Exception:
+            logger.exception("Error requesting AI analysis")
             return None
 
     def _save_analysis_result(self, target_username: str, platform: str,
@@ -339,8 +343,8 @@ class PsychologyService:
 
             logger.info(f"Psychology analysis saved for {target_username}")
 
-        except Exception as e:
-            logger.error(f"Error saving analysis result: {e}")
+        except Exception:
+            logger.exception("Error saving analysis result")
             # BaseRepository handles exception logging but here we suppress it?
             pass
 
@@ -357,7 +361,8 @@ class PsychologyService:
 
             return None
 
-        except Exception as e:
-            logger.error(f"Error getting recent analysis: {e}")
+        except Exception:
+            logger.exception("Error getting recent analysis")
             return None
+
 

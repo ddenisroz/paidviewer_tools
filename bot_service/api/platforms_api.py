@@ -1,7 +1,7 @@
 """
 API endpoints for platform configuration
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from platforms.registry import platform_registry
 import logging
 
@@ -20,11 +20,13 @@ async def get_platforms_config():
     """
     try:
         configs = platform_registry.get_configs()
-        logger.debug(f"Returning {len(configs)} platform configurations")
+        logger.debug("Returning %s platform configurations", len(configs))
         return {"platforms": configs}
-    except Exception as e:
-        logger.error(f"Error getting platform configs: {e}")
-        return {"platforms": []}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting platform configs")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/api/platforms/list")
@@ -38,8 +40,10 @@ async def list_platforms():
     try:
         platforms = platform_registry.get_all()
         platform_names = list(platforms.keys())
-        logger.debug(f"Available platforms: {platform_names}")
+        logger.debug("Available platforms: %s", platform_names)
         return {"platforms": platform_names}
-    except Exception as e:
-        logger.error(f"Error listing platforms: {e}")
-        return {"platforms": []}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error listing platforms")
+        raise HTTPException(status_code=500, detail="Internal server error")

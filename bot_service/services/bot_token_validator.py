@@ -36,8 +36,8 @@ class BotTokenValidator:
         """Validate Twitch bot token from DB."""
         try:
             bot_token = await twitch_bot_oauth_service.get_bot_token()
-        except Exception as e:
-            logger.error(f"[BOT TOKEN] Failed to get Twitch token from DB: {e}")
+        except Exception:
+            logger.exception("[BOT TOKEN] Failed to get Twitch token from DB")
             bot_token = None
 
         token_to_check = bot_token.get("access_token") if bot_token else None
@@ -113,8 +113,8 @@ class BotTokenValidator:
                 "status_code": response.status_code,
             }
 
-        except Exception as e:
-            logger.error(f"[ERROR] [BOT TOKEN] Failed to validate Twitch token: {e}")
+        except Exception:
+            logger.exception("[ERROR] [BOT TOKEN] Failed to validate Twitch token")
             return {"valid": False, "error": "Internal server error"}
 
     async def validate_vk_bot_token(self) -> Dict[str, Any]:
@@ -123,8 +123,8 @@ class BotTokenValidator:
 
         try:
             bot_token = await vk_bot_oauth_service.get_bot_token()
-        except Exception as e:
-            logger.error(f"[BOT TOKEN] Failed to get VK token from DB: {e}")
+        except Exception:
+            logger.exception("[BOT TOKEN] Failed to get VK token from DB")
             bot_token = None
 
         token_to_check = bot_token.get("access_token") if bot_token else None
@@ -189,8 +189,8 @@ class BotTokenValidator:
                 "status_code": response.status_code,
             }
 
-        except Exception as e:
-            logger.error(f"[ERROR] [BOT TOKEN] Failed to validate VK token: {e}")
+        except Exception:
+            logger.exception("[ERROR] [BOT TOKEN] Failed to validate VK token")
             return {"valid": False, "error": "Internal server error"}
 
     async def validate_all_tokens(self) -> Dict[str, Dict[str, Any]]:
@@ -245,8 +245,8 @@ class BotTokenValidator:
                     logger.warning("[ALERT] VK bot token is invalid.")
             except asyncio.CancelledError:
                 break
-            except Exception as e:
-                logger.error(f"[ERROR] Error in token monitoring loop: {e}")
+            except Exception:
+                logger.exception("[ERROR] Error in token monitoring loop")
 
     def get_status(self) -> Dict[str, Any]:
         """Return latest in-memory validation status."""
@@ -264,3 +264,4 @@ class BotTokenValidator:
 
 
 bot_token_validator = BotTokenValidator()
+

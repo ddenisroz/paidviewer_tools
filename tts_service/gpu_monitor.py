@@ -85,8 +85,8 @@ class GPUHealthMonitor:
             
             logger.info("GPU Health Monitor initialized successfully")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize GPU Health Monitor: {e}")
+        except Exception:
+            logger.exception("Failed to initialize GPU Health Monitor")
             raise
 
     async def start_monitoring(self):
@@ -139,8 +139,8 @@ class GPUHealthMonitor:
                 
                 await asyncio.sleep(self.monitoring_interval)
                 
-            except Exception as e:
-                logger.error(f"Error in GPU health monitoring: {e}")
+            except Exception:
+                logger.exception("Error in GPU health monitoring")
                 await asyncio.sleep(self.monitoring_interval)
 
     async def _get_gpu_worker_metrics(self) -> Optional[Dict[str, Any]]:
@@ -161,8 +161,8 @@ class GPUHealthMonitor:
             
             return None
             
-        except Exception as e:
-            logger.error(f"Error getting GPU worker metrics: {e}")
+        except Exception:
+            logger.exception("Error getting GPU worker metrics")
             return None
 
     async def _calculate_health_metrics(self, gpu_data: Dict[str, Any]) -> GPUHealthMetrics:
@@ -215,8 +215,8 @@ class GPUHealthMonitor:
                 health_score=health_score
             )
             
-        except Exception as e:
-            logger.error(f"Error calculating health metrics: {e}")
+        except Exception:
+            logger.exception("Error calculating health metrics")
             # Возвращаем дефолтные метрики при ошибке
             return GPUHealthMetrics(
                 timestamp=time.time(),
@@ -283,8 +283,8 @@ class GPUHealthMonitor:
             
             return max(0.0, min(100.0, score))
             
-        except Exception as e:
-            logger.error(f"Error calculating health score: {e}")
+        except Exception:
+            logger.exception("Error calculating health score")
             return 0.0
 
     def _add_to_history(self, metrics: GPUHealthMetrics):
@@ -377,8 +377,8 @@ class GPUHealthMonitor:
             for alert in alerts:
                 await self._send_alert(alert)
                 
-        except Exception as e:
-            logger.error(f"Error checking alerts: {e}")
+        except Exception:
+            logger.exception("Error checking alerts")
 
     async def _send_alert(self, alert: Dict[str, Any]):
         """Отправка алерта в систему мониторинга"""
@@ -399,8 +399,8 @@ class GPUHealthMonitor:
             
             self.stats['alerts_sent'] += 1
             
-        except Exception as e:
-            logger.error(f"Error sending alert: {e}")
+        except Exception:
+            logger.exception("Error sending alert")
 
     async def _send_metrics_to_monitoring(self, metrics: GPUHealthMetrics):
         """Отправка метрик в систему мониторинга"""
@@ -419,8 +419,8 @@ class GPUHealthMonitor:
             # Отправляем в Redis stream для мониторинга
             self.redis_client.xadd('monitoring_metrics', monitoring_data)
             
-        except Exception as e:
-            logger.error(f"Error sending metrics to monitoring: {e}")
+        except Exception:
+            logger.exception("Error sending metrics to monitoring")
 
     def _update_stats(self, metrics: GPUHealthMetrics):
         """Обновление статистики монитора"""
@@ -483,3 +483,4 @@ class GPUHealthMonitor:
 
 # Глобальный экземпляр
 gpu_health_monitor = GPUHealthMonitor()
+

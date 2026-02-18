@@ -53,9 +53,11 @@ async def check_username_availability(
 
         return {"available": True, "username": username}
 
-    except Exception as e:
-        logger.error(f"Error checking username availability: {e}")
-        raise HTTPException(status_code=500, detail="Error checking username availability")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error checking username availability")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/logout")
@@ -103,8 +105,8 @@ async def auth_status(request: Request, db: Session = Depends(get_db)):
                 "vk_channel_name": user.vk_channel_name,
                 "is_admin": bool(user.role == "admin" or user.is_admin)
             }
-    except Exception as e:
-        logger.error(f"[ERROR] Error getting user data: {e}")
+    except Exception:
+        logger.exception("[ERROR] Error getting user data")
         user_data = {
             "id": user_id,
             "twitch_username": None,
@@ -167,8 +169,8 @@ async def _get_user_integrations(user_id: int, user, repo: UserRepository) -> di
                 "username": username
             }
             
-    except Exception as e:
-        logger.error(f"[ERROR] Error fetching integrations: {e}")
+    except Exception:
+        logger.exception("[ERROR] Error fetching integrations")
     
     return integrations
 

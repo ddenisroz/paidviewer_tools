@@ -147,9 +147,11 @@ async def get_youtube_settings(
         settings = _get_youtube_settings_from_tts(tts_settings)
         return YouTubeSettingsResponse(**settings)
 
-    except Exception as e:
-        logger.error(f'Error getting YouTube settings: {e}', exc_info=True)
-        raise HTTPException(status_code=500, detail='Ошибка получения настроек YouTube')
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting YouTube settings")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @youtube_settings_router.post('/youtube-settings', response_model=YouTubeSettingsResponse)
@@ -196,7 +198,7 @@ async def save_youtube_settings(
         youtube_settings.update(_normalize_reward_settings(youtube_settings))
 
         repo.update_settings(tts_settings, {'youtube_settings': youtube_settings})
-        logger.info(f'YouTube settings saved for user {user_id}: {youtube_settings}')
+        logger.info("YouTube settings saved for user %s", user_id)
 
         return YouTubeSettingsResponse(
             playback_mode=youtube_settings.get('playback_mode', 'browser'),
@@ -211,10 +213,12 @@ async def save_youtube_settings(
             requests_reward_vk_id=youtube_settings.get('requests_reward_vk_id', None),
         )
 
-    except Exception as e:
+    except HTTPException:
+        raise
+    except Exception:
         db.rollback()
-        logger.error(f'Error saving YouTube settings: {e}', exc_info=True)
-        raise HTTPException(status_code=500, detail='Ошибка сохранения настроек YouTube')
+        logger.exception("Error saving YouTube settings")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @youtube_settings_router.get('/obs-url')
@@ -233,7 +237,7 @@ async def get_obs_url(
         user_record = repo.get_by_id(user_id)
 
         if not user_record:
-            raise HTTPException(status_code=404, detail='Пользователь не найден')
+            raise HTTPException(status_code=404, detail='Р В РЎСџР В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР Р‰ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦')
 
         return {
             'obs_token': user_record.obs_token,
@@ -242,6 +246,7 @@ async def get_obs_url(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f'Error getting OBS URL: {e}', exc_info=True)
-        raise HTTPException(status_code=500, detail='Ошибка получения OBS URL')
+    except Exception:
+        logger.exception("Error getting OBS URL")
+        raise HTTPException(status_code=500, detail="Internal server error")
+

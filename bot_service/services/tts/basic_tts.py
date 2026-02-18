@@ -213,13 +213,13 @@ class BasicTTS:
             # Удаляем временный MP3 файл
             try:
                 temp_mp3.unlink()
-            except Exception as e:
-                logger.warning(f"Не удалось удалить временный MP3: {e}")
+            except Exception:
+                logger.exception("Не удалось удалить временный MP3")
 
             return str(output_wav.resolve())
 
-        except Exception as e:
-            logger.error(f"[ERROR] Ошибка при генерации аудио через gTTS: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[ERROR] Ошибка при генерации аудио через gTTS")
             return None
 
     def cleanup_old_files(self, max_age_seconds: int = 3600):
@@ -243,8 +243,8 @@ class BasicTTS:
             if deleted_count > 0:
                 logger.info(f"[DELETE] Очищено {deleted_count} старых файлов базовой TTS")
 
-        except Exception as e:
-            logger.error(f"[ERROR] Ошибка при очистке временных файлов: {e}")
+        except Exception:
+            logger.exception("[ERROR] Ошибка при очистке временных файлов")
 
 
 # Глобальный экземпляр базовой TTS
@@ -256,4 +256,5 @@ def get_basic_tts() -> BasicTTS:
     if _basic_tts_instance is None:
         _basic_tts_instance = BasicTTS()
     return _basic_tts_instance
+
 

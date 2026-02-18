@@ -34,9 +34,9 @@ async def get_twitch_rewards(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"[ERROR] [TWITCH REWARDS] Error: {e}")
-        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РЅР°РіСЂР°Рґ Twitch: {str(e)}")
+    except Exception:
+        logger.exception("[ERROR] [TWITCH REWARDS] Error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.post("/rewards/twitch/create")
 @limiter.limit("10/minute")
@@ -60,9 +60,9 @@ async def create_twitch_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error creating Twitch reward: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"РќРµРѕР¶РёРґР°РЅРЅР°СЏ РѕС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё РЅР°РіСЂР°РґС‹ Twitch: {str(e)}")
+    except Exception:
+        logger.exception("Error creating Twitch reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.patch("/rewards/twitch/{reward_id}")
 async def update_twitch_reward(
@@ -85,9 +85,9 @@ async def update_twitch_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating Twitch reward: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"РќРµРѕР¶РёРґР°РЅРЅР°СЏ РѕС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РЅР°РіСЂР°РґС‹ Twitch: {str(e)}")
+    except Exception:
+        logger.exception("Error updating Twitch reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.delete("/rewards/twitch/{reward_id}")
 async def delete_twitch_reward(
@@ -107,9 +107,9 @@ async def delete_twitch_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting Twitch reward: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"РќРµРѕР¶РёРґР°РЅРЅР°СЏ РѕС€РёР±РєР° РїСЂРё СѓРґР°Р»РµРЅРёРё РЅР°РіСЂР°РґС‹ Twitch: {str(e)}")
+    except Exception:
+        logger.exception("Error deleting Twitch reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.get("/platform/rewards")
 async def get_platform_rewards(
@@ -129,9 +129,9 @@ async def get_platform_rewards(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting platform rewards: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РЅР°РіСЂР°Рґ: {str(e)}")
+    except Exception:
+        logger.exception("Error getting platform rewards")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.post("/platform/rewards/create")
 async def create_platform_reward(
@@ -154,8 +154,8 @@ async def create_platform_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error creating platform reward: {e}")
+    except Exception:
+        logger.exception("Error creating platform reward")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.delete("/platform/rewards/{reward_id}")
@@ -176,8 +176,8 @@ async def delete_platform_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting platform reward: {e}")
+    except Exception:
+        logger.exception("Error deleting platform reward")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.get("/platform/redemptions")
@@ -202,8 +202,8 @@ async def get_platform_redemptions(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting platform redemptions: {e}")
+    except Exception:
+        logger.exception("Error getting platform redemptions")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_twitch_router.patch("/platform/redemptions/{redemption_id}")
@@ -231,6 +231,6 @@ async def update_platform_redemption(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating platform redemption: {e}")
+    except Exception:
+        logger.exception("Error updating platform redemption")
         raise HTTPException(status_code=500, detail="Internal server error")

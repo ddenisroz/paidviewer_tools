@@ -88,8 +88,8 @@ class PointsService:
                 session_db.commit()
                 return points_record.points
                 
-            except Exception as e:
-                logger.error(f"Error adding points: {e}")
+            except Exception:
+                logger.exception("Error adding points")
                 session_db.rollback()
                 return 0
 
@@ -142,8 +142,8 @@ class PointsService:
                 session_db.commit()
                 return points_record.points
                 
-            except Exception as e:
-                logger.error(f"Error deducting points: {e}")
+            except Exception:
+                logger.exception("Error deducting points")
                 session_db.rollback()
                 return 0
 
@@ -217,8 +217,8 @@ class PointsService:
                 
                 return repo.add_reward(reward)
                 
-            except Exception as e:
-                logger.error(f"Error creating reward: {e}")
+            except Exception:
+                logger.exception("Error creating reward")
                 db.rollback()
                 return None
 
@@ -307,8 +307,8 @@ class PointsService:
                     "reward_title": reward.title
                 }
                 
-            except Exception as e:
-                logger.error(f"Error redeeming reward: {e}")
+            except Exception:
+                logger.exception("Error redeeming reward")
                 db.rollback()
                 return {"success": False, "error": "Internal error"}
 
@@ -400,8 +400,8 @@ class PointsService:
                 db.commit()
                 return True
                 
-            except Exception as e:
-                logger.error(f"Error processing reward: {e}")
+            except Exception:
+                logger.exception("Error processing reward")
                 db.rollback()
                 return False
 
@@ -445,8 +445,8 @@ class PointsService:
                 session_db.commit()
                 session_db.refresh(reward)
                 return reward
-            except Exception as e:
-                logger.error(f"Error updating reward: {e}")
+            except Exception:
+                logger.exception("Error updating reward")
                 session_db.rollback()
                 return None
 
@@ -472,8 +472,8 @@ class PointsService:
                     repo.delete_reward(reward)
                     return True
                 return False
-            except Exception as e:
-                logger.error(f"Error deleting reward: {e}")
+            except Exception:
+                logger.exception("Error deleting reward")
                 session_db.rollback()
                 return False
 
@@ -500,8 +500,8 @@ class PointsService:
                     session_db.commit()
                     return reward.is_enabled
                 return None
-            except Exception as e:
-                logger.error(f"Error toggling reward: {e}")
+            except Exception:
+                logger.exception("Error toggling reward")
                 session_db.rollback()
                 return None
 
@@ -510,3 +510,4 @@ class PointsService:
         
         with next(get_db()) as new_db:
             return _toggle(new_db)
+

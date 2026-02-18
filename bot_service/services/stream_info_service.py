@@ -126,8 +126,12 @@ class StreamInfoService:
                     if category_info and category_info.get('box_art_url'):
                         result['game_box_art_url'] = category_info['box_art_url']
                         logger.debug(f"[STREAM_INFO] Added box_art_url for game {game_id}")
-                except Exception as e:
-                    logger.debug(f"[STREAM_INFO] Could not fetch box_art_url for game {game_id}: {e}")
+                except Exception:
+                    logger.debug(
+                        "[STREAM_INFO] Could not fetch box_art_url for game %s",
+                        game_id,
+                        exc_info=True,
+                    )
         
         logger.info(f"[STREAM_INFO] Final result: title={result.get('title')}, game={result.get('game')}, is_live={result.get('is_live')}")
         return result

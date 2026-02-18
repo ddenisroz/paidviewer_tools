@@ -1,140 +1,121 @@
 # bot_service/api/bot_control_api.py
 """
-API endpoints для управления ботами.
+API endpoints for bot control.
 
 Refactored to use BotControlService and UserRepository.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-import logging
 
 from auth.auth import get_current_user
 from core.database import get_db
-from services.bot_control_service import BotControlService
 from repositories.user_repository import UserRepository
+from services.bot_control_service import BotControlService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["bot-control"])
 
-def get_bot_control_service():
+
+def get_bot_control_service() -> BotControlService:
     return BotControlService()
+
+
+def _get_user_or_404(db: Session, user: dict) -> tuple[int, object]:
+    user_id = user.get("id")
+    user_repo = UserRepository(db)
+    user_record = user_repo.get_by_id(user_id)
+    if not user_record:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user_id, user_record
+
 
 @router.get("/bot/status")
 async def get_bot_status(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    bot_service: BotControlService = Depends(get_bot_control_service)
+    bot_service: BotControlService = Depends(get_bot_control_service),
 ):
-    """Получить статус бота"""
+    """Get bot status."""
     try:
-        user_id = user.get("id")
-        user_repo = UserRepository(db)
-        user_record = user_repo.get_by_id(user_id)
-        
-        if not user_record:
-            raise HTTPException(status_code=404, detail="User not found")
-
+        user_id, user_record = _get_user_or_404(db, user)
         return bot_service.get_bot_status(user_id, user_record)
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting bot status: {e}")
-        return {"connected": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error getting bot status")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @router.post("/chat/connect")
 async def connect_chat(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    bot_service: BotControlService = Depends(get_bot_control_service)
+    bot_service: BotControlService = Depends(get_bot_control_service),
 ):
-    """Подключить чат-бота"""
+    """Connect chat bot."""
     try:
-        user_id = user.get("id")
-        logger.info(f"Chat connect requested by user {user_id}")
-        
-        user_repo = UserRepository(db)
-        user_record = user_repo.get_by_id(user_id)
-
-        if not user_record:
-            raise HTTPException(status_code=404, detail="User not found")
-
+        user_id, user_record = _get_user_or_404(db, user)
+        logger.info("Chat connect requested by user %s", user_id)
         return bot_service.connect_chat(user_id, user_record)
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error connecting chat: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error connecting chat")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @router.post("/chat/disconnect")
 async def disconnect_chat(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    bot_service: BotControlService = Depends(get_bot_control_service)
+    bot_service: BotControlService = Depends(get_bot_control_service),
 ):
-    """Отключить чат-бота"""
+    """Disconnect chat bot."""
     try:
-        user_id = user.get("id")
-        logger.info(f"Chat disconnect requested by user {user_id}")
-
-        user_repo = UserRepository(db)
-        user_record = user_repo.get_by_id(user_id)
-        
-        if not user_record:
-             raise HTTPException(status_code=404, detail="User not found")
-
+        user_id, user_record = _get_user_or_404(db, user)
+        logger.info("Chat disconnect requested by user %s", user_id)
         return bot_service.disconnect_chat(user_id, user_record)
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error disconnecting chat: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error disconnecting chat")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @router.get("/chat/status")
 async def get_chat_status(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    bot_service: BotControlService = Depends(get_bot_control_service)
+    bot_service: BotControlService = Depends(get_bot_control_service),
 ):
-    """Получить статус чата"""
+    """Get chat status."""
     try:
-        user_id = user.get("id")
-        
-        user_repo = UserRepository(db)
-        user_record = user_repo.get_by_id(user_id)
-        
-        if not user_record:
-            raise HTTPException(status_code=404, detail="User not found")
-
+        user_id, user_record = _get_user_or_404(db, user)
         return bot_service.get_chat_status(user_id, user_record)
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting chat status: {e}")
-        return {"connected": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error getting chat status")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @router.post("/chat/reconnect")
 async def reconnect_chat(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
-    bot_service: BotControlService = Depends(get_bot_control_service)
+    bot_service: BotControlService = Depends(get_bot_control_service),
 ):
-    """Переподключить чат-бота"""
+    """Reconnect chat bot."""
     try:
-        user_id = user.get("id")
-        logger.info(f"Chat reconnect requested by user {user_id}")
-        
-        user_repo = UserRepository(db)
-        user_record = user_repo.get_by_id(user_id)
-        
-        if not user_record:
-            raise HTTPException(status_code=404, detail="User not found")
-
+        user_id, user_record = _get_user_or_404(db, user)
+        logger.info("Chat reconnect requested by user %s", user_id)
         return bot_service.reconnect_chat(user_id, user_record)
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error reconnecting chat: {e}")
-        return {"success": False, "error": "Internal server error"}
-
+    except Exception:
+        logger.exception("Error reconnecting chat")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -483,7 +483,7 @@ class MemeAlertsService:
     def _decode_token(token: str) -> Dict[str, Any]:
         try:
             return jwt.decode(token, options={"verify_signature": False})
-        except jwt.DecodeError:
+        except jwt.PyJWTError:
             return {}
 
     @staticmethod
@@ -689,8 +689,8 @@ class MemeAlertsService:
 
             try:
                 response_payload = response.json()
-            except Exception as e:
-                logger.warning(f"MemeAlerts supporters scan JSON decode failed: {e}")
+            except Exception:
+                logger.exception("MemeAlerts supporters scan JSON decode failed")
                 return None
 
             supporters = self._extract_list(response_payload)
@@ -753,8 +753,8 @@ class MemeAlertsService:
                     json=payload,
                     client=client,
                 )
-            except Exception as e:
-                logger.warning(f"MemeAlerts streamer lookup failed: {e}")
+            except Exception:
+                logger.exception("MemeAlerts streamer lookup failed")
                 return None
 
             if response.status_code not in (200, 201):
@@ -774,8 +774,8 @@ class MemeAlertsService:
 
             try:
                 response_payload = response.json()
-            except Exception as e:
-                logger.warning(f"MemeAlerts streamer lookup JSON decode failed: {e}")
+            except Exception:
+                logger.exception("MemeAlerts streamer lookup JSON decode failed")
                 return None
 
             streamers = self._extract_list(response_payload)
@@ -879,9 +879,9 @@ class MemeAlertsService:
 
                     try:
                         response_payload = response.json()
-                    except Exception as e:
-                        logger.warning(
-                            f"MemeAlerts user lookup JSON decode failed: {e}"
+                    except Exception:
+                        logger.exception(
+                            "MemeAlerts user lookup JSON decode failed"
                         )
                         break
 
@@ -890,8 +890,8 @@ class MemeAlertsService:
                         return user_id
 
                     break
-                except Exception as e:
-                    logger.warning(f"MemeAlerts user lookup failed: {e}")
+                except Exception:
+                    logger.exception("MemeAlerts user lookup failed")
                     break
 
         streamer_lookup_id = await self._resolve_user_id_via_streamer_lookup(
@@ -920,7 +920,15 @@ class MemeAlertsService:
         except ValueError as exc:
             return {"success": False, "error": str(exc)}
         decoded = self._decode_token(access_token)
-        streamer_id = decoded.get("id") or platform_user_id
+        streamer_id = (
+            platform_user_id
+            or decoded.get("id")
+            or decoded.get("tid")
+            or decoded.get("streamer_id")
+            or decoded.get("streamerId")
+            or decoded.get("user_id")
+            or decoded.get("sub")
+        )
 
         if not streamer_id:
             return {"success": False, "error": "Streamer ID not found in token"}
@@ -1027,7 +1035,15 @@ class MemeAlertsService:
 
         grants = self._read_local_grants(user_id=user_id, limit=limit)
         decoded = self._decode_token(access_token)
-        streamer_id = decoded.get("id") or platform_user_id
+        streamer_id = (
+            platform_user_id
+            or decoded.get("id")
+            or decoded.get("tid")
+            or decoded.get("streamer_id")
+            or decoded.get("streamerId")
+            or decoded.get("user_id")
+            or decoded.get("sub")
+        )
         purchases: List[Dict[str, Any]] = []
 
         if not streamer_id:
@@ -1085,8 +1101,8 @@ class MemeAlertsService:
                         json=payload,
                         client=client,
                     )
-                except Exception as e:
-                    logger.warning(f"MemeAlerts supporters fetch failed: {e}")
+                except Exception:
+                    logger.exception("MemeAlerts supporters fetch failed")
                     response = None
                     break
 
@@ -1117,8 +1133,8 @@ class MemeAlertsService:
 
             try:
                 response_payload = response.json()
-            except Exception as e:
-                logger.warning(f"MemeAlerts supporters JSON decode failed: {e}")
+            except Exception:
+                logger.exception("MemeAlerts supporters JSON decode failed")
                 break
 
             page_items = self._extract_list(response_payload)
@@ -1249,3 +1265,4 @@ class MemeAlertsService:
                 }
             )
         return purchases
+

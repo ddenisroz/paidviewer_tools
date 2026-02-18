@@ -1,4 +1,4 @@
-# bot_service/api/tts/settings_routes.py
+﻿# bot_service/api/tts/settings_routes.py
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -49,6 +49,17 @@ class GcloudVoicePreviewRequest(BaseModel):
 
 def get_tts_service(db: Session = Depends(get_db)) -> TTSService:
     return TTSService(db)
+
+
+def _tts_auth_headers() -> dict:
+    headers: dict = {}
+    if settings.tts_internal_api_key:
+        headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
+    return headers
+
+
+def _is_admin(user: dict) -> bool:
+    return user.get("role") == "admin" or bool(user.get("is_admin", False))
 
 # ============================================================================
 # TTS SETTINGS
@@ -106,7 +117,7 @@ async def update_tts_settings(
     if not result.get("success"):
         if result.get("error") == "Version conflict":
              raise HTTPException(status_code=409, detail=result)
-        raise HTTPException(status_code=500, detail=result.get("error"))
+        raise HTTPException(status_code=500, detail="Internal server error")
     return result
 
 # ============================================================================
@@ -121,7 +132,7 @@ async def get_tts_status(
     """Get TTS Status (enabled/disabled)."""
     result = await service.get_tts_status(user_id=user['id'])
     if result.get('error'):
-        raise HTTPException(status_code=404, detail=result['error'])
+        raise HTTPException(status_code=404, detail="TTS status not found")
     return result
 
 @router.post("/engine")
@@ -152,7 +163,7 @@ async def set_tts_engine(
         use_local_tts=use_local_tts
     )
     if not result.get("success"):
-        raise HTTPException(status_code=500, detail=result.get("error") or "Failed to update engine")
+        raise HTTPException(status_code=500, detail="Failed to update engine")
 
     return {"success": True, "engine_type": engine_type}
 
@@ -222,7 +233,7 @@ async def add_filtered_word(
     """Add word to filter."""
     success = await service.add_filtered_word(user['id'], request.word, request.platform)
     if not success:
-        return {"success": False, "message": "Word already exists or error"}
+        raise HTTPException(status_code=409, detail="Word already exists or could not be added")
     return {"success": True}
 
 @router.delete("/filters/words/{word_id}")
@@ -302,14 +313,22 @@ async def get_global_voices(
     """Get global voices (Proxy)."""
     tts_url = settings.tts_service_url
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{tts_url}/api/tts/voices/global")
             if resp.status_code == 200:
                 return resp.json()
             return {"voices": []}
-    except Exception as e:
-        logger.error(f"Error fetching global voices: {e}")
-        return {"voices": []}
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        logger.warning("Timeout fetching global voices from TTS service")
+        raise HTTPException(status_code=504, detail="TTS service timeout")
+    except httpx.RequestError:
+        logger.exception("Upstream error fetching global voices")
+        raise HTTPException(status_code=502, detail="TTS service unavailable")
+    except Exception:
+        logger.exception("Error fetching global voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/user/voices/{target_user_id}")
 async def get_user_voices(
@@ -317,16 +336,30 @@ async def get_user_voices(
     user: dict = Depends(get_current_user)
 ):
     """Get user voices (Proxy)."""
+    actor_id = user.get("id", user.get("user_id"))
+    if actor_id != target_user_id and not _is_admin(user):
+        raise HTTPException(status_code=403, detail="Access denied")
     tts_url = settings.tts_service_url
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(f"{tts_url}/api/tts/user/voices/{target_user_id}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{tts_url}/api/tts/user/voices/{target_user_id}",
+                headers=_tts_auth_headers(),
+            )
             if resp.status_code == 200:
                 return resp.json()
             return {"voices": []}
-    except Exception as e:
-        logger.error(f"Error fetching user voices: {e}")
-        return {"voices": []}
+    except HTTPException:
+        raise
+    except httpx.TimeoutException:
+        logger.warning("Timeout fetching user voices from TTS service for user_id=%s", target_user_id)
+        raise HTTPException(status_code=504, detail="TTS service timeout")
+    except httpx.RequestError:
+        logger.exception("Upstream error fetching user voices for user_id=%s", target_user_id)
+        raise HTTPException(status_code=502, detail="TTS service unavailable")
+    except Exception:
+        logger.exception("Error fetching user voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 # ============================================================================
 # GOOGLE CLOUD TTS VOICES
@@ -374,7 +407,7 @@ async def set_gcloud_voices(
         raise HTTPException(status_code=400, detail="Select at least one Gemini or Chirp3-HD voice")
     result = await service.save_tts_settings(user_id=user['id'], gcloud_voices=voices)
     if not result.get("success"):
-        raise HTTPException(status_code=500, detail=result.get("error") or "Failed to save voices")
+        raise HTTPException(status_code=500, detail="Failed to save voices")
     return {"success": True, "voices": voices}
 
 
@@ -475,6 +508,9 @@ async def set_listening_mode(
 
     result = await service.save_tts_settings(user_id=user['id'], listening_mode=mode)
     if not result.get("success"):
-        raise HTTPException(status_code=500, detail=result.get("error") or "Failed to save listening mode")
+        raise HTTPException(status_code=500, detail="Failed to save listening mode")
 
     return {"success": True, "listening_mode": mode, "listeningMode": mode}
+
+
+

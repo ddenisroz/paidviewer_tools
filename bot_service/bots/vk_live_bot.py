@@ -1,10 +1,12 @@
 # bot_service/bots/vk_live_bot.py
 """Главный файл VK Live бота"""
 import logging
+import os
 from core.connection_manager import ConnectionManager
 from .vk_live_bot_core import VKLiveBotCore
 
 logger = logging.getLogger('bot_service')
+_VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 class VKLiveBot(VKLiveBotCore):
     """Главный класс VK Live бота"""
@@ -96,11 +98,13 @@ class VKLiveBot(VKLiveBotCore):
                 ]
             }
 
-            # SSL workaround for dev environment
+            # SSL config: secure by default, optional insecure dev fallback.
             import ssl
             ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            if _VK_INSECURE_SSL:
+                logger.warning("[VK BOT] SSL verification disabled via VK_INSECURE_SSL=true")
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
 
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.post(url, headers=headers, params=params, json=json_body) as response:

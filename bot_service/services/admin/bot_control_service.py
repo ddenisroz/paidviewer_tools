@@ -62,8 +62,8 @@ class BotControlService:
 
             return {"bots": bots}
 
-        except Exception as e:
-            logger.error(f"Error getting bots status: {e}")
+        except Exception:
+            logger.exception("Error getting bots status")
             return {
                 "bots": [
                     {
@@ -96,9 +96,9 @@ class BotControlService:
             else:
                 return {"error": f"Unknown bot: {bot_name}"}
 
-        except Exception as e:
-            logger.error(f"Error restarting bot {bot_name}: {e}")
-            return {"error": f"Failed to restart bot: {str(e)}"}
+        except Exception:
+            logger.exception("Error restarting bot {bot_name}")
+            return {"error": "Failed to restart bot"}
 
     async def _restart_twitch_bot(self, registry, connection_manager) -> dict:
         """Перезапустить Twitch бота."""
@@ -160,7 +160,10 @@ class BotControlService:
                 raise ValueError("TTS_SERVICE_URL is not configured")
 
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(f"{tts_service_url}/api/tts/restart")
+                headers = {}
+                if settings.tts_internal_api_key:
+                    headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
+                response = await client.post(f"{tts_service_url}/api/tts/restart", headers=headers)
 
                 if response.status_code == 200:
                     logger.info("[OK] TTS engine restart requested")
@@ -169,10 +172,11 @@ class BotControlService:
                     logger.error(f"[ERROR] TTS restart failed: {response.status_code}")
                     return {"error": f"TTS engine restart failed: {response.status_code}"}
 
-        except Exception as e:
-            logger.error(f"Error restarting TTS engine: {e}")
-            return {"error": f"Failed to restart TTS engine: {str(e)}"}
+        except Exception:
+            logger.exception("Error restarting TTS engine")
+            return {"error": "Failed to restart TTS engine"}
 
 
 # Singleton instance
 bot_control_service = BotControlService()
+

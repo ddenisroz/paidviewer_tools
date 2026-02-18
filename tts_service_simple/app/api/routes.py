@@ -1,11 +1,10 @@
-from datetime import datetime
-from typing import Dict, Any, List
+﻿from datetime import datetime
+from typing import Dict, Any
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.responses import JSONResponse, FileResponse
 import aiofiles
-import psutil
 
 from app.core.config import config
 from app.schemas import (
@@ -15,7 +14,6 @@ from app.schemas import (
 from app.services.engine import engine
 from app.services.monitor import get_system_stats
 from app.services.voices import VoicesService
-from app.services.audio import convert_audio_to_wav_48khz, transcribe_audio
 
 import logging
 
@@ -28,9 +26,9 @@ start_time = datetime.now()
 
 @router.get("/", response_class=JSONResponse)
 async def root():
-    """Главная страница"""
+    """Р“Р»Р°РІРЅР°СЏ СЃС‚СЂР°РЅРёС†Р°"""
     return {
-        "message": "TTS F5 Simple - Упрощенный микросервис для локального TTS F5",
+        "message": "TTS F5 Simple - РЈРїСЂРѕС‰РµРЅРЅС‹Р№ РјРёРєСЂРѕСЃРµСЂРІРёСЃ РґР»СЏ Р»РѕРєР°Р»СЊРЅРѕРіРѕ TTS F5",
         "version": config.get('version'),
         "status": "running",
         "docs": "/docs",
@@ -39,7 +37,7 @@ async def root():
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Проверка здоровья сервиса"""
+    """РџСЂРѕРІРµСЂРєР° Р·РґРѕСЂРѕРІСЊСЏ СЃРµСЂРІРёСЃР°"""
     uptime = (datetime.now() - start_time).total_seconds()
     stats = get_system_stats()
     
@@ -53,7 +51,7 @@ async def health_check():
 
 @router.get("/api/status")
 async def get_status():
-    """Получить статус системы"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ СЃРёСЃС‚РµРјС‹"""
     return {
         "tts_engine": {
             "status": engine.status,
@@ -72,7 +70,7 @@ async def get_status():
 
 @router.get("/api/metrics")
 async def get_metrics():
-    """Получить метрики для Prometheus"""
+    """РџРѕР»СѓС‡РёС‚СЊ РјРµС‚СЂРёРєРё РґР»СЏ Prometheus"""
     return {
         "tts_requests_total": engine.processing_stats["total_requests"],
         "tts_requests_successful": engine.processing_stats["successful_requests"],
@@ -84,26 +82,26 @@ async def get_metrics():
 
 @router.post("/api/tts/synthesize", response_model=TTSResponse)
 async def synthesize_tts(request: TTSRequest, background_tasks: BackgroundTasks):
-    """Синтез речи"""
+    """РЎРёРЅС‚РµР· СЂРµС‡Рё"""
     try:
         response = await engine.synthesize(request.text, request.voice, request.user_id)
         return TTSResponse(**response)
-    except Exception as e:
-        logger.error(f"Ошибка синтеза TTS: {e}")
-        return TTSResponse(success=False, error=str(e))
+    except Exception:
+        logger.exception("РћС€РёР±РєР° СЃРёРЅС‚РµР·Р° TTS")
+        return TTSResponse(success=False, error="Internal server error")
 
 @router.post("/api/tts/synthesize-channel", response_model=ChannelTTSResponse)
 async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: BackgroundTasks):
-    """Синтезировать аудио для канала"""
+    """РЎРёРЅС‚РµР·РёСЂРѕРІР°С‚СЊ Р°СѓРґРёРѕ РґР»СЏ РєР°РЅР°Р»Р°"""
     try:
         if engine.status != "ready":
-            raise HTTPException(status_code=503, detail="TTS движок не готов")
+            raise HTTPException(status_code=503, detail="TTS РґРІРёР¶РѕРє РЅРµ РіРѕС‚РѕРІ")
         
-        # 1. Проверка блокировки
+        # 1. РџСЂРѕРІРµСЂРєР° Р±Р»РѕРєРёСЂРѕРІРєРё
         if request.blocked_users and request.author.lower() in [u.lower() for u in request.blocked_users]:
             return ChannelTTSResponse(success=False, error=f"User {request.author} is blocked")
         
-        # 2. Фильтр слов
+        # 2. Р¤РёР»СЊС‚СЂ СЃР»РѕРІ
         filtered_text = request.text
         if request.word_filter:
             for word in request.word_filter:
@@ -111,7 +109,7 @@ async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: B
                     import re
                     filtered_text = re.sub(re.escape(word), "***", filtered_text, flags=re.IGNORECASE)
         
-        # 3. Настройки
+        # 3. РќР°СЃС‚СЂРѕР№РєРё
         tts_settings = request.tts_settings or TTSSettingsData()
         max_length = tts_settings.maxLength or 200
         if len(filtered_text) > max_length:
@@ -120,7 +118,7 @@ async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: B
         if tts_settings.skipCommands and filtered_text.strip().startswith("!"):
             return ChannelTTSResponse(success=False, error="Command messages are skipped")
 
-        # 4. Синтез
+        # 4. РЎРёРЅС‚РµР·
         response = await engine.synthesize_channel(
             text=filtered_text,
             voice="default", # TODO: user voice
@@ -140,70 +138,64 @@ async def synthesize_channel_tts(request: ChannelTTSRequest, background_tasks: B
             author=request.author
         )
         
-    except Exception as e:
-        logger.error(f"Error in synthesize_channel: {e}")
-        return ChannelTTSResponse(success=False, error=str(e))
+    except Exception:
+        logger.exception("Error in synthesize_channel")
+        return ChannelTTSResponse(success=False, error="Internal server error")
 
 @router.get("/api/audio/{filename}")
 async def get_audio_file(filename: str):
-    """Получить сгенерированный аудио файл"""
-    audio_path = config.generated_audio_dir / filename
-    # Also check base dir for compatibility
-    if not audio_path.exists():
-         audio_path = Path("generated_audio") / filename
-         
-    if audio_path.exists():
-        return FileResponse(audio_path)
-    else:
-        # Create dummy file if not exists for testing
-        if "generated_" in filename or "channel_" in filename:
-             # Create dummy wav
-             import wave
-             audio_path.parent.mkdir(exist_ok=True)
-             with wave.open(str(audio_path), 'wb') as wf:
-                 wf.setnchannels(1)
-                 wf.setsampwidth(2)
-                 wf.setframerate(44100)
-                 wf.writeframes(b'\x00' * 44100) # 1 sec silence
-             return FileResponse(audio_path)
-             
-        raise HTTPException(status_code=404, detail="Аудио файл не найден")
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРіРµРЅРµСЂРёСЂРѕРІР°РЅРЅС‹Р№ Р°СѓРґРёРѕ С„Р°Р№Р»"""
+    safe_name = Path(filename).name
+    if safe_name != filename or not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    candidates = [
+        (config.generated_audio_dir / safe_name).resolve(),
+        (Path("generated_audio") / safe_name).resolve(),
+    ]
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return FileResponse(candidate)
+
+    raise HTTPException(status_code=404, detail="РђСѓРґРёРѕ С„Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ")
 
 # ===== Settings Endpoints =====
 
 @router.get("/api/settings")
 async def get_settings():
-    """Получить настройки"""
+    """РџРѕР»СѓС‡РёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё"""
     return config.config
 
 @router.post("/api/settings")
 async def update_settings(settings: Dict[str, Any]):
-    """Обновить настройки"""
+    """РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё"""
     try:
         config.update(settings)
-        return {"success": True, "message": "Настройки обновлены"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        return {"success": True, "message": "РќР°СЃС‚СЂРѕР№РєРё РѕР±РЅРѕРІР»РµРЅС‹"}
+    except Exception:
+        logger.exception("Error updating settings")
+        raise HTTPException(status_code=400, detail="Invalid settings payload")
 
 # ===== Voice Management Endpoints =====
 
 @router.get("/api/voices")
 async def get_available_voices():
-    """Получить список доступных голосов (engine only)"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РґРѕСЃС‚СѓРїРЅС‹С… РіРѕР»РѕСЃРѕРІ (engine only)"""
     if engine.status != "ready":
-         raise HTTPException(status_code=503, detail="TTS движок не готов")
+         raise HTTPException(status_code=503, detail="TTS РґРІРёР¶РѕРє РЅРµ РіРѕС‚РѕРІ")
     return {"voices": engine.voices}
 
 @router.get("/api/voices/list")
 async def list_voices():
-    """Получить полный список голосов"""
+    """РџРѕР»СѓС‡РёС‚СЊ РїРѕР»РЅС‹Р№ СЃРїРёСЃРѕРє РіРѕР»РѕСЃРѕРІ"""
     try:
         voices = VoicesService.get_base_voices()
         voices.extend(VoicesService.get_custom_voices())
         return {"success": True, "voices": voices}
-    except Exception as e:
-        logger.error(f"Error listing voices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error listing voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/api/voices/create")
 async def create_voice(
@@ -211,15 +203,15 @@ async def create_voice(
     language: str = Form("ru"),
     description: str = Form("")
 ):
-    """Создать новый голос"""
+    """РЎРѕР·РґР°С‚СЊ РЅРѕРІС‹Р№ РіРѕР»РѕСЃ"""
     try:
         result = VoicesService.create_custom_voice(name, language, description)
         return {"success": True, **result}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Error creating voice: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid voice parameters")
+    except Exception:
+        logger.exception("Error creating voice")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/api/voices/{voice_id}/upload")
 async def upload_voice_sample(
@@ -227,36 +219,46 @@ async def upload_voice_sample(
     file: UploadFile = File(...),
     sample_text: str = Form(None)
 ):
-    """Загрузить сэмпл"""
+    """Р—Р°РіСЂСѓР·РёС‚СЊ СЃСЌРјРїР»"""
+    temp_input_path: str | None = None
     try:
         voice_folder = VoicesService.get_voice_folder(voice_id)
         if not voice_folder:
-            raise HTTPException(status_code=404, detail="Голос не найден")
-        
+            raise HTTPException(status_code=404, detail="Р“РѕР»РѕСЃ РЅРµ РЅР°Р№РґРµРЅ")
+
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="РРјСЏ С„Р°Р№Р»Р° РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚")
+
         allowed_extensions = ['.wav', '.mp3', '.flac', '.ogg', '.m4a', '.aac', '.wma', '.aiff', '.au']
         file_ext = Path(file.filename).suffix.lower()
         if file_ext not in allowed_extensions:
-            raise HTTPException(status_code=400, detail="Неподдерживаемый формат")
+            raise HTTPException(status_code=400, detail="РќРµРїРѕРґРґРµСЂР¶РёРІР°РµРјС‹Р№ С„РѕСЂРјР°С‚")
 
         import tempfile
         import os
         fd, temp_input_path = tempfile.mkstemp(suffix=file_ext)
         os.close(fd)
-        
+
         async with aiofiles.open(temp_input_path, 'wb') as out_file:
             content = await file.read()
             await out_file.write(content)
-            
+
         # Convert logic
         logger.info(f"Sample uploaded: {temp_input_path}")
-        
+
         # Here we would call audio.convert_audio_to_wav_48khz
         # but for simplicity in this refactor step we just acknowledge receipt
-        
-        return {"success": True, "message": "Сэмпл загружен"}
-        
+
+        return {"success": True, "message": "РЎСЌРјРїР» Р·Р°РіСЂСѓР¶РµРЅ"}
+
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error uploading sample: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error uploading sample")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        if temp_input_path:
+            try:
+                Path(temp_input_path).unlink(missing_ok=True)
+            except Exception:
+                logger.exception("Failed to cleanup temp voice sample: %s", temp_input_path)

@@ -51,7 +51,7 @@ async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
             messages.sort(key=lambda x: x.timestamp)
             return messages
         except Exception as e:
-            logger.error(f"Error querying chat history: {e}")
+            logger.exception("Error querying chat history")
             return []
         finally:
             db.close()
@@ -111,7 +111,7 @@ async def _send_chat_history(websocket: WebSocket, user_id: int) -> None:
         logger.info(f"[HISTORY] Sent {len(history_data)} messages")
         
     except Exception as e:
-        logger.debug(f"[WARN] Error loading chat history: {e}")
+        logger.exception("[WARN] Error loading chat history")
 
 
 @router.websocket("/ws/chat/{user_id}")
@@ -246,5 +246,6 @@ async def websocket_test(websocket: WebSocket):
             logger.info(f"[WS] Test received: {data}")
             await websocket.send_text(f"Echo: {data}")
     except Exception as e:
-        logger.error(f"[ERROR] Test WebSocket error: {e}")
+        logger.exception("[ERROR] Test WebSocket error")
         await websocket.close()
+

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, Request, Response
@@ -46,6 +47,7 @@ _HOP_BY_HOP = frozenset(
 )
 
 _TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+_MAX_PROXY_REQUEST_BODY_BYTES = 2 * 1024 * 1024
 
 _INJECTED_SCRIPT = """
 <script data-ma-proxy="1">
@@ -57,7 +59,7 @@ _INJECTED_SCRIPT = """
     try {
       var data = payload || {};
       data.type = type;
-      window.opener.postMessage(data, "*");
+      window.opener.postMessage(data, window.location.origin);
     } catch (e) {}
   }
 
@@ -333,12 +335,38 @@ def _normalize_auth_query(
 
     normalized: list[tuple[str, str]] = []
     has_return_url = False
+    proxy_origin = f"{urlparse(proxy_return_url).scheme}://{urlparse(proxy_return_url).netloc}"
+
+    def _normalize_safe_return_url(raw_value: str) -> str | None:
+        if not raw_value:
+            return None
+
+        parsed = urlparse(raw_value)
+        scheme = (parsed.scheme or "").lower()
+
+        # Relative path: keep on our origin only.
+        if not scheme and not parsed.netloc:
+            if raw_value.startswith("/") and not raw_value.startswith("//"):
+                return f"{proxy_origin}{raw_value}"
+            return None
+
+        # Absolute URL: allow only same-origin callback.
+        if scheme in {"http", "https"}:
+            candidate_origin = f"{parsed.scheme}://{parsed.netloc}"
+            if candidate_origin == proxy_origin:
+                return raw_value
+
+        return None
+
     for key, value in query:
         if key == "return_url":
             has_return_url = True
-            # Respect explicit callback URL from caller. This allows frontend-owned
-            # callback pages (same-origin with opener) for automatic token handoff.
-            normalized.append((key, value))
+            safe_value = _normalize_safe_return_url(value)
+            if safe_value:
+                normalized.append((key, safe_value))
+            else:
+                logger.warning("[PROXY] Rejected unsafe return_url, forcing proxy callback")
+                normalized.append((key, proxy_return_url))
         else:
             normalized.append((key, value))
 
@@ -398,6 +426,17 @@ def _build_upstream_url(path: str) -> str:
     if path:
         return f"{MEMEALERTS_ORIGIN}/{path}"
     return f"{MEMEALERTS_ORIGIN}/"
+
+
+async def _read_proxy_body_limited(request: Request, max_bytes: int) -> bytes:
+    data = bytearray()
+    async for chunk in request.stream():
+        if not chunk:
+            continue
+        data.extend(chunk)
+        if len(data) > max_bytes:
+            raise ValueError("payload_too_large")
+    return bytes(data)
 
 
 def _rewrite_body(body: bytes, content_type: str, proxy_prefix: str) -> bytes:
@@ -500,6 +539,84 @@ def _filter_headers(headers: httpx.Headers, *, is_response: bool = False) -> dic
     return out
 
 
+def _looks_like_access_token(value: str) -> bool:
+    token = (value or "").strip()
+    if not token or any(ch in token for ch in ("\r", "\n", "\t", " ")):
+        return False
+    # JWT-like or opaque long token.
+    return token.count(".") == 2 or len(token) >= 24
+
+
+def _resolve_proxy_access_token(raw_stored_token: str | None) -> str | None:
+    raw_value = (raw_stored_token or "").strip()
+    if not raw_value:
+        return None
+
+    try:
+        decrypted = (decrypt_token(raw_value) or "").strip()
+    except Exception:
+        # Legacy/plain tokens may still exist in DB; use only if token-like.
+        if _looks_like_access_token(raw_value):
+            logger.warning("[PROXY] Using legacy plain MemeAlerts token from storage")
+            return raw_value
+        logger.warning("[PROXY] Failed to decrypt MemeAlerts token; skipping auth header")
+        return None
+
+    if _looks_like_access_token(decrypted):
+        return decrypted
+    if decrypted:
+        logger.warning("[PROXY] Decrypted MemeAlerts token has invalid format; skipping auth header")
+        return None
+    if _looks_like_access_token(raw_value):
+        logger.warning("[PROXY] Empty decrypted token; using legacy plain token")
+        return raw_value
+    return None
+
+
+def _sanitize_redirect_location(location: str, proxy_prefix: str) -> str:
+    """Normalize upstream redirect targets to safe proxy-local locations."""
+    if not location:
+        return proxy_prefix
+    if any(ch in location for ch in ("\r", "\n", "\t")):
+        return proxy_prefix
+    location = location.strip()
+    if not location:
+        return proxy_prefix
+
+    # Always keep redirects inside proxy for upstream MemeAlerts domains.
+    if location.startswith(f"{MEMEALERTS_ORIGIN}/"):
+        return location.replace(f"{MEMEALERTS_ORIGIN}/", f"{proxy_prefix}/")
+    if location.startswith(MEMEALERTS_ORIGIN):
+        return location.replace(MEMEALERTS_ORIGIN, proxy_prefix)
+    if location.startswith(f"{MEMEALERTS_WWW_ORIGIN}/"):
+        return location.replace(f"{MEMEALERTS_WWW_ORIGIN}/", f"{proxy_prefix}/")
+    if location.startswith(MEMEALERTS_WWW_ORIGIN):
+        return location.replace(MEMEALERTS_WWW_ORIGIN, proxy_prefix)
+    if location.startswith("/"):
+        return f"{proxy_prefix}{location}"
+
+    parsed = urlparse(location)
+    scheme = (parsed.scheme or "").lower()
+
+    # Block script/data redirects from upstream.
+    if scheme in {"javascript", "data"}:
+        return proxy_prefix
+
+    # Keep relative paths inside proxy.
+    if not scheme and not parsed.netloc:
+        return f"{proxy_prefix}/{location.lstrip('./')}"
+
+    # Allow only absolute redirects to upstream MemeAlerts hosts.
+    if scheme in {"http", "https"} and parsed.netloc.lower() in {"memealerts.com", "www.memealerts.com"}:
+        path = parsed.path or "/"
+        query = f"?{parsed.query}" if parsed.query else ""
+        fragment = f"#{parsed.fragment}" if parsed.fragment else ""
+        return f"{proxy_prefix}{path}{query}{fragment}"
+
+    # Any other absolute external target is treated as unsafe for proxy redirects.
+    return proxy_prefix
+
+
 @router.get("/", response_class=HTMLResponse)
 async def proxy_root(
     request: Request,
@@ -537,17 +654,20 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
         if not has_auth_header:
             user_id = (user or {}).get("id") if isinstance(user, dict) else None
             if user_id:
-                token_repo = UserTokenRepository(db)
-                token = token_repo.get_by_user_and_platform(user_id, "memealerts")
-                if token and token.access_token:
-                    try:
-                        access_token = decrypt_token(token.access_token)
-                    except Exception:
-                        access_token = token.access_token
-                    fwd_headers["authorization"] = f"Bearer {access_token}"
+                try:
+                    token_repo = UserTokenRepository(db)
+                    token = token_repo.get_by_user_and_platform(user_id, "memealerts")
+                    if token and token.access_token:
+                        access_token = _resolve_proxy_access_token(token.access_token)
+                        if access_token:
+                            fwd_headers["authorization"] = f"Bearer {access_token}"
+                except Exception:
+                    logger.exception("[PROXY] Failed to resolve stored MemeAlerts token for user_id=%s", user_id)
 
     try:
-        body = await request.body()
+        body = await _read_proxy_body_limited(request, _MAX_PROXY_REQUEST_BODY_BYTES)
+    except ValueError:
+        return Response(content="Payload Too Large", status_code=413)
     except ClientDisconnect:
         logger.info("[PROXY] Client disconnected before request body was read")
         return Response(content=b"", status_code=499)
@@ -615,24 +735,13 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
     except httpx.TimeoutException:
         logger.warning(f"[PROXY] MemeAlerts upstream timeout: {upstream_url}")
         return Response(content="Gateway Timeout", status_code=504)
-    except httpx.RequestError as exc:
-        logger.error(f"[PROXY] MemeAlerts upstream error: {exc}")
+    except httpx.RequestError:
+        logger.exception("[PROXY] MemeAlerts upstream error")
         return Response(content="Bad Gateway", status_code=502)
 
     if upstream_resp.is_redirect:
         location = upstream_resp.headers.get("location", "")
-        if location.startswith(f"{MEMEALERTS_ORIGIN}/"):
-            location = location.replace(f"{MEMEALERTS_ORIGIN}/", f"{proxy_prefix}/")
-        elif location.startswith(MEMEALERTS_ORIGIN):
-            location = location.replace(MEMEALERTS_ORIGIN, proxy_prefix)
-        elif location.startswith(f"{MEMEALERTS_WWW_ORIGIN}/"):
-            location = location.replace(f"{MEMEALERTS_WWW_ORIGIN}/", f"{proxy_prefix}/")
-        elif location.startswith(MEMEALERTS_WWW_ORIGIN):
-            location = location.replace(MEMEALERTS_WWW_ORIGIN, proxy_prefix)
-        elif location.startswith("/"):
-            location = f"{proxy_prefix}{location}"
-        elif location and not location.startswith(("http://", "https://", "data:", "javascript:")):
-            location = f"{proxy_prefix}/{location.lstrip('./')}"
+        location = _sanitize_redirect_location(location, proxy_prefix)
 
         upstream_set_cookies = upstream_resp.headers.get_list("set-cookie")
         resp_headers = _filter_headers(upstream_resp.headers, is_response=True)

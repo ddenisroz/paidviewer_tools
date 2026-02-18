@@ -67,8 +67,8 @@ def create_app() -> FastAPI:
             
             logger.info("[SUCCESS] TTS Service startup complete!")
             
-        except Exception as e:
-            logger.error(f"[ERROR] Error during startup: {e}")
+        except Exception:
+            logger.exception("[ERROR] Error during startup")
             raise
         
         yield
@@ -91,8 +91,8 @@ def create_app() -> FastAPI:
             
             logger.info("[SUCCESS] TTS Service shutdown complete!")
             
-        except Exception as e:
-            logger.error(f"[ERROR] Error during shutdown: {e}")
+        except Exception:
+            logger.exception("[ERROR] Error during shutdown")
 
     # Создаем приложение
     app = FastAPI(
@@ -103,10 +103,18 @@ def create_app() -> FastAPI:
     )
 
     # Настройка CORS
+    from tts_service.config import config
+    allowed_origins = [origin.strip() for origin in config.cors_origins.split(",") if origin.strip()]
+    if not allowed_origins:
+        allowed_origins = ["http://localhost:5173"]
+    allow_credentials = "*" not in allowed_origins
+    if not allow_credentials:
+        logger.warning("CORS wildcard origin configured; credentials are disabled for safety")
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # В production указать конкретные домены
-        allow_credentials=True,
+        allow_origins=allowed_origins,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -137,3 +145,7 @@ def create_app() -> FastAPI:
     app.mount("/audio", StaticFiles(directory=str(config.audio_path)), name="audio")
     
     return app
+
+
+
+

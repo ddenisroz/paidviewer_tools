@@ -10,7 +10,7 @@ import aiohttp
 from core.database import SessionLocal
 from .vk_auth import VKAuth
 from .vk_base import VK_API_TIMEOUT
-from utils.vk_channel_url import normalize_vk_channel_url, get_vk_channel_candidates
+from utils.vk_channel_url import get_vk_channel_candidates
 
 logger = logging.getLogger(__name__)
 
@@ -33,8 +33,8 @@ class VKStream(VKAuth):
                 return None
             finally:
                 db.close()
-        except Exception as e:
-            logger.error(f"Error getting channel URL from DB for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error getting channel URL from DB for user %s", user_id)
             return None
 
     async def search_categories(self, query: str, user_id: Optional[str], session_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -86,8 +86,8 @@ class VKStream(VKAuth):
                                 "viewers": item.get("viewers", 0),
                                 "box_art_url": item.get("coverUrl") or item.get("cover_url")
                             })
-        except Exception as e:
-            logger.error(f"[VK SEARCH] Prod category search error: {e}")
+        except Exception:
+            logger.exception("[VK SEARCH] Prod category search error")
             return []
 
         logger.info(f"[VK SEARCH] Found {len(categories)} categories via prod search")
@@ -126,8 +126,8 @@ class VKStream(VKAuth):
                         text = await response.text()
                         logger.warning(f"[VK API] Body: {text[:200]}")
 
-        except Exception as e:
-            logger.error(f"[VK API] Error fetching online_categories: {e}")
+        except Exception:
+            logger.exception("[VK API] Error fetching online_categories")
             
         return categories
 
@@ -225,8 +225,8 @@ class VKStream(VKAuth):
                     logger.warning(f"No 'stream' object in channel data for '{channel_url}'.")
                     return default_offline
 
-        except Exception as e:
-            logger.error(f"Error getting VK stream info for {user_id}: {e}")
+        except Exception:
+            logger.exception("Error getting VK stream info for %s", user_id)
             return default_offline
 
     async def _update_stream(self, user_id: str, payload: Dict[str, Any], session_id: Optional[str] = None) -> bool:
@@ -375,8 +375,8 @@ class VKStream(VKAuth):
                 logger.error("[ERROR] [VK API] Stream edit failed: all channel_url candidates returned 404")
                 return False
 
-        except Exception as e:
-            logger.error(f"[ERROR] [VK API] Error updating stream for user {user_id}: {e}")
+        except Exception:
+            logger.exception("[ERROR] [VK API] Error updating stream for user %s", user_id)
             return False
 
     async def update_stream_title(self, user_id: str, title: str, session_id: Optional[str] = None) -> bool:
@@ -425,3 +425,4 @@ class VKStream(VKAuth):
         if stream_info and stream_info.get("online"):
             return int(stream_info.get("viewer_count", 0))
         return 0
+

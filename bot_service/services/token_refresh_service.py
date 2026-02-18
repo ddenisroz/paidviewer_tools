@@ -85,8 +85,8 @@ class TokenRefreshService:
             
         try:
             return await handler(token, db)
-        except Exception as e:
-            logger.error(f"Error refreshing {token.platform} token: {e}")
+        except Exception:
+            logger.exception("Error refreshing {token.platform} token")
             return False
 
     async def _make_refresh_request(self, url: str, data: dict, headers: dict = None) -> Optional[dict]:
@@ -99,8 +99,8 @@ class TokenRefreshService:
 
         try:
             return await retry_async(_do_refresh, max_attempts=3, initial_delay=1.0)
-        except Exception as e:
-            logger.error(f"Refresh request failed: {e}")
+        except Exception:
+            logger.exception("Refresh request failed")
             return None
 
     def _update_token_from_response(self, token: UserToken, data: dict, db: Session) -> None:
@@ -200,3 +200,4 @@ class TokenRefreshService:
 
 # Глобальный экземпляр сервиса
 token_refresh_service = TokenRefreshService()
+

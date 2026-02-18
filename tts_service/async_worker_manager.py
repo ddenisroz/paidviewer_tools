@@ -3,18 +3,16 @@ import asyncio
 import logging
 import time
 import json
-import os
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
 import redis
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
 # Analysis logging for LLM feature verification
 from analysis_logging import (
-    log_tts_generation, log_gpu_worker, log_error, 
+    log_tts_generation, log_error, 
     set_correlation_id, clear_correlation_id
 )
 
@@ -120,8 +118,8 @@ class AsyncWorkerManager:
             self.running = True
             logger.info(f"AsyncWorkerManager initialized with {self.max_workers} workers")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize AsyncWorkerManager: {e}")
+        except Exception:
+            logger.exception("Failed to initialize AsyncWorkerManager")
             raise
 
     async def _connect_redis(self):
@@ -146,8 +144,8 @@ class AsyncWorkerManager:
             
             logger.info(f"Connected to Redis: {self.redis_url}")
             
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e}")
+        except Exception:
+            logger.exception("Failed to connect to Redis")
             raise
 
     async def _initialize_components(self):
@@ -167,11 +165,11 @@ class AsyncWorkerManager:
                     logger.info("GPU Worker Pool available")
                 else:
                     logger.info("GPU Worker Pool not available, using CPU only")
-            except Exception as e:
-                logger.warning(f"GPU Worker Pool not available: {e}")
+            except Exception:
+                logger.exception("GPU Worker Pool not available")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize components: {e}")
+        except Exception:
+            logger.exception("Failed to initialize components")
             raise
 
     async def _start_workers(self):
@@ -210,8 +208,8 @@ class AsyncWorkerManager:
                 
                 await asyncio.sleep(self.poll_interval)
                 
-            except Exception as e:
-                logger.error(f"Error in task dispatcher: {e}")
+            except Exception:
+                logger.exception("Error in task dispatcher")
                 await asyncio.sleep(1)
 
     async def _get_tasks_from_redis(self) -> List[WorkerTask]:
@@ -247,8 +245,8 @@ class AsyncWorkerManager:
                     
                     tasks.append(task)
                     
-                except Exception as e:
-                    logger.error(f"Error parsing task {stream_id}: {e}")
+                except Exception:
+                    logger.exception("Error parsing task {stream_id}")
                     # Подтверждаем сообщение даже при ошибке
                     try:
                         self.redis_client.xack(self.input_stream, self.consumer_group, stream_id)
@@ -257,8 +255,8 @@ class AsyncWorkerManager:
             
             return tasks
             
-        except Exception as e:
-            logger.error(f"Error getting tasks from Redis: {e}")
+        except Exception:
+            logger.exception("Error getting tasks from Redis")
             return []
 
     def _read_redis_stream(self) -> List[Tuple[str, Dict[str, str]]]:
@@ -272,8 +270,8 @@ class AsyncWorkerManager:
                 block=100  # 100ms блокировка
             )
             return messages[0][1] if messages else []
-        except Exception as e:
-            logger.error(f"Error reading Redis stream: {e}")
+        except Exception:
+            logger.exception("Error reading Redis stream")
             return []
 
     async def _should_use_gpu(self, task_data: Dict[str, Any]) -> bool:
@@ -300,8 +298,8 @@ class AsyncWorkerManager:
             
             return True
             
-        except Exception as e:
-            logger.error(f"Error checking GPU availability: {e}")
+        except Exception:
+            logger.exception("Error checking GPU availability")
             return False
 
     async def _worker_loop(self, worker_id: str):
@@ -358,8 +356,8 @@ class AsyncWorkerManager:
                                     db=db
                                 )
                                 db.close()
-                            except Exception as e:
-                                logger.error(f"Error logging user usage: {e}")
+                            except Exception:
+                                logger.exception("Error logging user usage")
                     else:
                         stats.tasks_failed += 1
                         self.global_stats['failed_tasks'] += 1
@@ -389,8 +387,8 @@ class AsyncWorkerManager:
                                     db=db
                                 )
                                 db.close()
-                            except Exception as e:
-                                logger.error(f"Error logging failed user usage: {e}")
+                            except Exception:
+                                logger.exception("Error logging failed user usage")
                     
                     # Обновляем среднее время обработки
                     total_tasks = stats.tasks_processed + stats.tasks_failed
@@ -411,7 +409,7 @@ class AsyncWorkerManager:
                     await asyncio.sleep(self.poll_interval)
                     
             except Exception as e:
-                logger.error(f"Error in worker {worker_id}: {e}")
+                logger.exception("Error in worker {worker_id}")
                 log_error(feature='tts_worker', error=e, context=f"worker_{worker_id}")
                 stats.is_active = False
                 stats.current_task = None
@@ -456,7 +454,7 @@ class AsyncWorkerManager:
                 return False
                 
         except Exception as e:
-            logger.error(f"Error processing task {task.task_id}: {e}")
+            logger.exception("Error processing task {task.task_id}")
             await self._handle_task_error(task, str(e))
             return False
 
@@ -486,8 +484,8 @@ class AsyncWorkerManager:
             logger.error(f"GPU task {gpu_task_id} timed out")
             return None
             
-        except Exception as e:
-            logger.error(f"Error processing GPU task: {e}")
+        except Exception:
+            logger.exception("Error processing GPU task")
             return None
 
     async def _process_cpu_task(self, task: WorkerTask) -> Optional[str]:
@@ -506,8 +504,8 @@ class AsyncWorkerManager:
             
             return result_path
             
-        except Exception as e:
-            logger.error(f"Error processing CPU task: {e}")
+        except Exception:
+            logger.exception("Error processing CPU task")
             return None
 
     async def _send_result(self, task: WorkerTask, result_path: str, error: Optional[str]):
@@ -525,8 +523,8 @@ class AsyncWorkerManager:
             
             self.redis_client.xadd(self.output_stream, result_data)
             
-        except Exception as e:
-            logger.error(f"Error sending result: {e}")
+        except Exception:
+            logger.exception("Error sending result")
 
     async def _handle_task_error(self, task: WorkerTask, error: str):
         """Обработка ошибки задачи"""
@@ -541,12 +539,12 @@ class AsyncWorkerManager:
                 await self.priority_queues[task.priority].put(task)
             else:
                 # Максимальное количество попыток исчерпано
-                logger.error(f"Task {task.task_id} failed after {task.max_retries} attempts: {error}")
+                logger.exception("Task {task.task_id} failed after {task.max_retries} attempts")
                 await self._send_result(task, None, error)
                 self.redis_client.xack(self.input_stream, self.consumer_group, task.stream_id)
                 
-        except Exception as e:
-            logger.error(f"Error handling task error: {e}")
+        except Exception:
+            logger.exception("Error handling task error")
 
     async def _update_queue_stats(self):
         """Обновление статистики очередей"""
@@ -603,3 +601,4 @@ class AsyncWorkerManager:
 
 # Глобальный экземпляр
 async_worker_manager = AsyncWorkerManager()
+

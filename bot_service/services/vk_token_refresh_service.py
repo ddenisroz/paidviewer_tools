@@ -270,3 +270,4 @@ class VKTokenRefreshService:
 
 # Глобальный экземпляр сервиса
 vk_token_refresh_service = VKTokenRefreshService()
+

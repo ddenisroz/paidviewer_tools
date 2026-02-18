@@ -6,7 +6,6 @@ import time
 from typing import Dict, Optional, Any, List
 from dataclasses import dataclass
 import redis
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +63,8 @@ class GPUIntegrationService:
             self.running = True
             logger.info("GPU Integration Service initialized successfully")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize GPU Integration Service: {e}")
+        except Exception:
+            logger.exception("Failed to initialize GPU Integration Service")
             raise
 
     async def _connect_redis(self):
@@ -75,8 +74,8 @@ class GPUIntegrationService:
             await asyncio.get_event_loop().run_in_executor(None, self.redis_client.ping)
             logger.info(f"Connected to Redis: {self.config.redis_url}")
             
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e}")
+        except Exception:
+            logger.exception("Failed to connect to Redis")
             raise
 
     async def _setup_consumer_groups(self):
@@ -103,8 +102,8 @@ class GPUIntegrationService:
             
             logger.info("Consumer groups setup completed")
             
-        except Exception as e:
-            logger.error(f"Failed to setup consumer groups: {e}")
+        except Exception:
+            logger.exception("Failed to setup consumer groups")
             raise
 
     async def _start_workers(self):
@@ -139,8 +138,8 @@ class GPUIntegrationService:
                 for stream_id, fields in messages:
                     await self._process_input_task(stream_id, fields)
                     
-            except Exception as e:
-                logger.error(f"Error in input worker: {e}")
+            except Exception:
+                logger.exception("Error in input worker")
                 await asyncio.sleep(5)
 
     def _get_input_tasks(self):
@@ -154,8 +153,8 @@ class GPUIntegrationService:
                 block=1000
             )
             return messages[0][1] if messages else []
-        except Exception as e:
-            logger.error(f"Error reading input tasks: {e}")
+        except Exception:
+            logger.exception("Error reading input tasks")
             return []
 
     async def _process_input_task(self, stream_id: str, fields: Dict[str, str]):
@@ -180,8 +179,8 @@ class GPUIntegrationService:
             self.stats['tasks_processed'] += 1
             self.stats['last_activity'] = time.time()
             
-        except Exception as e:
-            logger.error(f"Error processing input task {stream_id}: {e}")
+        except Exception:
+            logger.exception("Error processing input task {stream_id}")
             # Подтверждаем сообщение даже при ошибке
             try:
                 self.redis_client.xack(self.config.input_stream, self.config.consumer_group, stream_id)
@@ -214,8 +213,8 @@ class GPUIntegrationService:
             
             return True
             
-        except Exception as e:
-            logger.error(f"Error checking GPU availability: {e}")
+        except Exception:
+            logger.exception("Error checking GPU availability")
             return False
 
     async def _forward_to_gpu(self, task_id: str, task_data: Dict[str, Any], stream_id: str):
@@ -240,8 +239,8 @@ class GPUIntegrationService:
             self.stats['tasks_forwarded_to_gpu'] += 1
             logger.info(f"Task {task_id} forwarded to GPU")
             
-        except Exception as e:
-            logger.error(f"Error forwarding task to GPU: {e}")
+        except Exception:
+            logger.exception("Error forwarding task to GPU")
             raise
 
     async def _process_on_cpu(self, task_id: str, task_data: Dict[str, Any], stream_id: str):
@@ -273,7 +272,7 @@ class GPUIntegrationService:
             logger.info(f"Task {task_id} processed on CPU")
             
         except Exception as e:
-            logger.error(f"Error processing task on CPU: {e}")
+            logger.exception("Error processing task on CPU")
             # Отправляем ошибку
             await self._send_result(task_id, None, str(e), stream_id)
             # Подтверждаем обработку
@@ -299,8 +298,8 @@ class GPUIntegrationService:
                 for stream_id, fields in messages:
                     await self._process_gpu_result(stream_id, fields)
                     
-            except Exception as e:
-                logger.error(f"Error in result worker: {e}")
+            except Exception:
+                logger.exception("Error in result worker")
                 await asyncio.sleep(5)
 
     def _get_gpu_results(self):
@@ -314,8 +313,8 @@ class GPUIntegrationService:
                 block=1000
             )
             return messages[0][1] if messages else []
-        except Exception as e:
-            logger.error(f"Error reading GPU results: {e}")
+        except Exception:
+            logger.exception("Error reading GPU results")
             return []
 
     async def _process_gpu_result(self, stream_id: str, fields: Dict[str, str]):
@@ -357,8 +356,8 @@ class GPUIntegrationService:
             # Подтверждаем обработку результата
             self.redis_client.xack(self.config.gpu_results_stream, self.config.consumer_group, stream_id)
             
-        except Exception as e:
-            logger.error(f"Error processing GPU result: {e}")
+        except Exception:
+            logger.exception("Error processing GPU result")
             # Подтверждаем сообщение даже при ошибке
             try:
                 self.redis_client.xack(self.config.gpu_results_stream, self.config.consumer_group, stream_id)
@@ -382,8 +381,8 @@ class GPUIntegrationService:
             
             logger.info(f"Result sent for task {task_id}")
             
-        except Exception as e:
-            logger.error(f"Error sending result: {e}")
+        except Exception:
+            logger.exception("Error sending result")
 
     async def stop(self):
         """Остановка сервиса интеграции"""
@@ -426,3 +425,4 @@ class GPUIntegrationService:
 
 # Глобальный экземпляр
 gpu_integration_service = GPUIntegrationService()
+

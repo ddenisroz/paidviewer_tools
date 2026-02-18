@@ -32,8 +32,8 @@ class VoiceManagementService:
                 else:
                     logger.error(f"Failed to fetch global voices: {response.status_code}")
                     return []
-        except Exception as e:
-            logger.error(f"Error fetching global voices: {e}")
+        except Exception:
+            logger.exception("Error fetching global voices")
             return []
 
     async def get_user_custom_voices(self, user_id: int) -> List[Dict[str, Any]]:
@@ -50,8 +50,8 @@ class VoiceManagementService:
                     logger.error(f"Failed to fetch user voices: {response.status_code}")
                     # Don't fail completely, just return empty list
                     return []
-        except Exception as e:
-            logger.error(f"Error fetching user voices: {e}")
+        except Exception:
+            logger.exception("Error fetching user voices")
             return []
 
     async def get_voice_info(self, voice_id: int) -> Optional[Dict[str, Any]]:
@@ -62,8 +62,8 @@ class VoiceManagementService:
                 if response.status_code == 200:
                     return response.json()
                 return None
-        except Exception as e:
-            logger.error(f"Error checking voice existence: {e}")
+        except Exception:
+            logger.exception("Error checking voice existence")
             return None
 
     async def update_user_voice_settings(
@@ -152,8 +152,8 @@ class VoiceManagementService:
                         raise HTTPException(status_code=response.status_code, detail=error_detail)
             except HTTPException:
                 raise
-            except Exception as e:
-                logger.error(f"Error updating custom voice settings: {e}")
+            except Exception:
+                logger.exception("Error updating custom voice settings")
                 raise HTTPException(status_code=500, detail="Internal server error")
     async def upload_user_voice(self, user_id: int, name: str, filename: str, content: bytes, content_type: str) -> Dict[str, Any]:
         """
@@ -195,7 +195,7 @@ class VoiceManagementService:
                 )
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Invalid file content: {error}. File may be malicious or corrupted."
+                    detail="Invalid file content. File may be malicious or corrupted."
                 )
             
             logger.info(f"[OK] [SECURITY] Voice file validated: user={user_id}, filename={filename}")
@@ -214,19 +214,26 @@ class VoiceManagementService:
             if response.status_code == 200:
                 return response.json()
             else:
-                 # Try to parse error details
-                detail = "Error uploading voice"
-                try:
-                    detail = response.json().get('detail', detail)
-                except Exception:
-                    pass
+                logger.warning(
+                    "Voice upload upstream failed: status=%s body=%s",
+                    response.status_code,
+                    (response.text or "")[:500],
+                )
+                if response.status_code == 400:
+                    detail = "Invalid voice upload request"
+                elif response.status_code in (401, 403):
+                    detail = "Voice service authorization failed"
+                elif response.status_code == 404:
+                    detail = "Voice endpoint not found"
+                else:
+                    detail = "Voice upload failed"
                 raise HTTPException(status_code=response.status_code, detail=detail)
 
         except HTTPException:
             raise
-        except Exception as e:
-            logger.error(f"Error uploading voice: {e}")
-            raise HTTPException(status_code=500, detail=f"Internal error uploading voice: {str(e)}")
+        except Exception:
+            logger.exception("Error uploading voice")
+            raise HTTPException(status_code=500, detail="Internal server error")
         finally:
             # Cleanup temp file
             if temp_file_path and os.path.exists(temp_file_path):
@@ -253,8 +260,8 @@ class VoiceManagementService:
             return False
         except HTTPException:
             raise
-        except Exception as e:
-            logger.error(f"Error deleting custom voice: {e}")
+        except Exception:
+            logger.exception("Error deleting custom voice")
             raise HTTPException(status_code=500, detail="Failed to delete voice")
 
     async def admin_get_global_voices(self) -> List[Dict[str, Any]]:
@@ -268,8 +275,8 @@ class VoiceManagementService:
                 if response.status_code == 200:
                     return response.json()
                 return []
-        except Exception as e:
-            logger.error(f"Error fetching admin global voices: {e}")
+        except Exception:
+            logger.exception("Error fetching admin global voices")
             return []
 
     async def admin_update_global_voice(self, voice_id: int, settings_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -285,8 +292,8 @@ class VoiceManagementService:
                 raise HTTPException(status_code=response.status_code, detail="Failed to update voice")
         except HTTPException:
             raise
-        except Exception as e:
-            logger.error(f"Error updating global voice: {e}")
+        except Exception:
+            logger.exception("Error updating global voice")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     async def admin_delete_global_voice(self, voice_id: int) -> bool:
@@ -301,8 +308,8 @@ class VoiceManagementService:
                 raise HTTPException(status_code=response.status_code, detail="Failed to delete voice")
         except HTTPException:
             raise
-        except Exception as e:
-            logger.error(f"Error deleting global voice: {e}")
+        except Exception:
+            logger.exception("Error deleting global voice")
             raise HTTPException(status_code=500, detail="Internal server error")
 
     async def admin_rename_global_voice(self, voice_id: int, new_name: str) -> bool:
@@ -318,6 +325,7 @@ class VoiceManagementService:
                 raise HTTPException(status_code=response.status_code, detail="Failed to rename voice")
         except HTTPException:
             raise
-        except Exception as e:
-            logger.error(f"Error renaming global voice: {e}")
+        except Exception:
+            logger.exception("Error renaming global voice")
             raise HTTPException(status_code=500, detail="Internal server error")
+

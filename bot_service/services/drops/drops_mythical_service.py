@@ -159,8 +159,8 @@ class DropsMythicalMixin:
                         return connection_manager.is_channel_active(user.vk_channel_name)
 
             return False
-        except Exception as e:
-            logger.error(f"Error checking stream online status: {e}")
+        except Exception:
+            logger.exception("Error checking stream online status")
             return False
 
     def start_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> Optional[MythicalDropsSession]:
@@ -208,8 +208,8 @@ class DropsMythicalMixin:
 
         try:
             self.db.commit() # config update
-        except Exception as e:
-            logger.error(f"[ERROR] Error starting mythical drops for {channel_name}: {e}")
+        except Exception:
+            logger.exception("[ERROR] Error starting mythical drops for {channel_name}")
             self.db.rollback()
             return None
 
@@ -270,3 +270,4 @@ class DropsMythicalMixin:
             "sound_volume": reward.sound_volume,
             "donation_amount": amount
         }
+

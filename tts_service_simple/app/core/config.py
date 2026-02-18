@@ -137,7 +137,7 @@ class TTSConfig:
                 logger.warning("NVIDIA GPU не найдена!")
                 return {"name": "No GPU", "memory_total": 0}
         except Exception as e:
-            logger.error(f"Ошибка определения GPU: {e}")
+            logger.exception("Ошибка определения GPU")
             return {"name": "Unknown", "memory_total": 0}
     
     def _find_free_port(self, start_port: int = 8001) -> int:
@@ -168,7 +168,7 @@ class TTSConfig:
                 json.dump(config, f, indent=2, ensure_ascii=False)
             logger.info("Конфигурация сохранена")
         except Exception as e:
-            logger.error(f"Ошибка сохранения конфигурации: {e}")
+            logger.exception("Ошибка сохранения конфигурации")
     
     def get(self, key: str, default=None):
         """Получает значение из конфигурации"""
@@ -182,3 +182,4 @@ class TTSConfig:
 
 # Глобальная конфигурация
 config = TTSConfig()
+

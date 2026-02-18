@@ -2,7 +2,6 @@
 """Универсальный обработчик команд для Twitch и VK Live"""
 import logging
 from typing import Optional, Any, Dict
-from datetime import datetime
 from services.command_service import CommandService
 from core.database import get_db, BotCommand
 from utils.platform_role_checker import PlatformRoleChecker
@@ -194,6 +193,8 @@ class UniversalCommandHandler(
                     db=db
                 )
 
+                author_id = str(message_data.get('author_id', ''))
+
                 if not command:
                     self.logger.debug(f"Command not found: !{command_name}")
                     fallback_core_commands_vk = {'sr', 'queue', 'wronglink', 'skip', 'clear'}
@@ -214,7 +215,6 @@ class UniversalCommandHandler(
                     return
 
                 # Проверяем кулдаун
-                author_id = str(message_data.get('author_id', ''))
                 if not is_broadcaster:
                     if not self.command_service.check_cooldown(command, author_id):
                         await vk_bot.send_message(channel_name,

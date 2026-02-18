@@ -3,12 +3,14 @@ import asyncio
 import json
 import aiohttp
 import websockets
+import os
 from typing import Dict, Optional, Callable
 import structlog
 
 from utils.vk_chat_parser import build_message_text_and_emotes, extract_vk_badge_urls, normalize_parts
 
 logger = structlog.get_logger(__name__)
+_VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 class VKLiveWebSocketClient:
     """
@@ -133,11 +135,13 @@ class VKLiveWebSocketClient:
                 "Content-Type": "application/json"
             }
 
-            # SSL context с отключенной верификацией для dev API
+            # SSL config: secure by default, optional insecure dev fallback.
             import ssl
             ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            if _VK_INSECURE_SSL:
+                logger.warning("vk_websocket_ssl_insecure_mode_enabled")
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
 
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 for url in endpoints:

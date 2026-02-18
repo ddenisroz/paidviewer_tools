@@ -114,7 +114,7 @@ class TTSManager:
             return None
 
         except Exception as e:
-            logger.error(f"Error getting user TTS endpoint: {e}")
+            logger.exception("Error getting user TTS endpoint")
             return None
 
     async def check_tts_service_health(self, force_check: bool = False) -> bool:
@@ -176,7 +176,7 @@ class TTSManager:
         except Exception as e:
             # РќРµ Р»РѕРіРёСЂСѓРµРј РѕС€РёР±РєСѓ РїСЂРё РїСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕР№ РїСЂРѕРІРµСЂРєРµ РёР· Р°РґРјРёРЅРєРё
             if not force_check:
-                logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё TTS Service: {e}")
+                logger.exception("[ERROR] РћС€РёР±РєР° РїСЂРѕРІРµСЂРєРё TTS Service")
             self._tts_service_available = False
             self._last_health_check = current_time
             return False
@@ -263,7 +263,7 @@ class TTSManager:
                             delay = base_retry_delay * (2 ** (attempt - 1))
                             await asyncio.sleep(delay)
                     except Exception as e:
-                        logger.error(f"[ERROR] РћС€РёР±РєР° AI TTS (РїРѕРїС‹С‚РєР° {attempt}/{max_retries}): {e}")
+                        logger.exception("[ERROR] РћС€РёР±РєР° AI TTS (РїРѕРїС‹С‚РєР° {attempt}/{max_retries})")
                         if attempt < max_retries:
                             delay = base_retry_delay * (2 ** (attempt - 1))
                             await asyncio.sleep(delay)
@@ -287,7 +287,7 @@ class TTSManager:
                     return result
                 logger.warning(f"[WARN] Google Cloud TTS failed: {result.get('error')}, fallback to gTTS")
             except Exception as e:
-                logger.error(f"[ERROR] Google Cloud TTS error: {e}")
+                logger.exception("[ERROR] Google Cloud TTS error")
 
         if final_use_basic_tts:
             logger.info("[MIC] [PRIORITY 2] Using basic TTS (gTTS) - ALWAYS AVAILABLE AS FALLBACK")
@@ -301,7 +301,7 @@ class TTSManager:
                     logger.error(f"[ERROR] Р‘Р°Р·РѕРІР°СЏ TTS (gTTS) СЃРёРЅС‚РµР· РЅРµ СѓРґР°Р»СЃСЏ: {result.get('error')}")
                     return {"success": False, "error": "Basic TTS synthesis failed"}
             except Exception as e:
-                logger.error(f"[ERROR] РћС€РёР±РєР° Р±Р°Р·РѕРІРѕР№ TTS (gTTS): {e}")
+                logger.exception("[ERROR] РћС€РёР±РєР° Р±Р°Р·РѕРІРѕР№ TTS (gTTS)")
                 return {"success": False, "error": f"Basic TTS error: {e}"}
 
         # Р•СЃР»Рё РЅРёС‡РµРіРѕ РЅРµ СЃСЂР°Р±РѕС‚Р°Р»Рѕ (РїРѕС‡С‚Рё РЅРµРІРѕР·РјРѕР¶РЅРѕ)
@@ -407,10 +407,10 @@ class TTSManager:
             logger.error("[ERROR] TTS Service request timed out")
             return {"success": False, "error": "Request timeout"}
         except aiohttp.ClientError as e:
-            logger.error(f"[ERROR] TTS Service connection error: {e}")
+            logger.exception("[ERROR] TTS Service connection error")
             return {"success": False, "error": f"Connection error: {str(e)}"}
         except Exception as e:
-            logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРё Р·Р°РїСЂРѕСЃРµ Рє TTS Service: {e}")
+            logger.exception("[ERROR] РћС€РёР±РєР° РїСЂРё Р·Р°РїСЂРѕСЃРµ Рє TTS Service")
             return {"success": False, "error": "Internal server error"}
 
     async def _synthesize_via_basic_tts(
@@ -453,7 +453,7 @@ class TTSManager:
                 return {"success": False, "error": "Basic TTS synthesis failed"}
 
         except Exception as e:
-            logger.error(f"[ERROR] [BASIC TTS] Error: {e}")
+            logger.exception("[ERROR] [BASIC TTS] Error")
             return {"success": False, "error": "Internal server error"}
 
     async def _synthesize_via_google_cloud_tts(
@@ -538,7 +538,7 @@ class TTSManager:
             }
 
         except Exception as e:
-            logger.error(f"[ERROR] Google Cloud TTS error: {e}")
+            logger.exception("[ERROR] Google Cloud TTS error")
             return {"success": False, "error": "Internal server error"}
 
     async def _upload_to_tts_service(self, audio_path: str) -> Optional[str]:
@@ -570,7 +570,7 @@ class TTSManager:
                         return None
 
         except Exception as e:
-            logger.error(f"[ERROR] РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё РІ TTS СЃРµСЂРІРёСЃ: {e}")
+            logger.exception("[ERROR] РћС€РёР±РєР° Р·Р°РіСЂСѓР·РєРё РІ TTS СЃРµСЂРІРёСЃ")
             return None
 
     def cleanup_old_files(self):
@@ -578,7 +578,7 @@ class TTSManager:
         try:
             self.basic_tts.cleanup_old_files()
         except Exception as e:
-            logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРё РѕС‡РёСЃС‚РєРµ С„Р°Р№Р»РѕРІ: {e}")
+            logger.exception("[ERROR] РћС€РёР±РєР° РїСЂРё РѕС‡РёСЃС‚РєРµ С„Р°Р№Р»РѕРІ")
 
     def cleanup_old_files_if_needed(self):
         """РћС‡РёСЃС‚РєР° СЃС‚Р°СЂС‹С… С„Р°Р№Р»РѕРІ РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё (РєР°Р¶РґС‹Рµ 10 СЃРёРЅС‚РµР·РѕРІ)"""
@@ -593,7 +593,7 @@ class TTSManager:
                 self.cleanup_old_files()
                 logger.info(f"[CLEAN] РџРµСЂРёРѕРґРёС‡РµСЃРєР°СЏ РѕС‡РёСЃС‚РєР° TTS С„Р°Р№Р»РѕРІ (СЃРёРЅС‚РµР· #{self._synthesis_count})")
             except Exception as e:
-                logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРё РїРµСЂРёРѕРґРёС‡РµСЃРєРѕР№ РѕС‡РёСЃС‚РєРµ: {e}")
+                logger.exception("[ERROR] РћС€РёР±РєР° РїСЂРё РїРµСЂРёРѕРґРёС‡РµСЃРєРѕР№ РѕС‡РёСЃС‚РєРµ")
 
 
 # Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ СЌРєР·РµРјРїР»СЏСЂ TTS Manager
@@ -605,4 +605,5 @@ def get_tts_manager() -> TTSManager:
     if _tts_manager_instance is None:
         _tts_manager_instance = TTSManager()
     return _tts_manager_instance
+
 

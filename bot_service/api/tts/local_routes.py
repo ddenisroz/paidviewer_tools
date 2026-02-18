@@ -29,6 +29,8 @@ async def get_local_tts_config(
 ):
     """Получить конфигурацию локального TTS"""
     try:
+        if not user:
+            raise HTTPException(status_code=401, detail="Authentication required")
         user_id = user.get('id')
         if not user_id or user_id <= 0:
             raise HTTPException(status_code=401, detail="Authentication required")
@@ -61,9 +63,9 @@ async def get_local_tts_config(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting local TTS config: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения конфигурации")
+    except Exception:
+        logger.exception("Error getting local TTS config")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @local_tts_router.post("/config")
@@ -74,6 +76,8 @@ async def save_local_tts_config(
 ):
     """Сохранить конфигурацию локального TTS"""
     try:
+        if not user:
+            raise HTTPException(status_code=401, detail="Authentication required")
         user_id = user.get('id')
         if not user_id or user_id <= 0:
             raise HTTPException(status_code=401, detail="Authentication required")
@@ -97,9 +101,9 @@ async def save_local_tts_config(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error saving local TTS config: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка сохранения конфигурации")
+    except Exception:
+        logger.exception("Error saving local TTS config")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -136,7 +140,10 @@ async def toggle_local_tts(
             health_status = await check_local_tts_health(config.endpoint_url, config.api_key)
             if not health_status['healthy']:
                 repo.disable_local(config)
-                return {"success": False, "message": "Локальный TTS недоступен. Проверьте подключение.", "use_local": False}
+                raise HTTPException(
+                    status_code=503,
+                    detail="Локальный TTS недоступен. Проверьте подключение."
+                )
         
         return {
             "success": True,
@@ -145,9 +152,9 @@ async def toggle_local_tts(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error toggling local TTS: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка переключения локального TTS")
+    except Exception:
+        logger.exception("Error toggling local TTS")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -170,7 +177,7 @@ async def test_local_tts_connection(
             health_response = await client.get(f"{request.endpoint_url}/health", headers=headers)
             
             if health_response.status_code != 200:
-                return {"success": False, "error": f"Сервер вернул код {health_response.status_code}"}
+                raise HTTPException(status_code=502, detail=f"Сервер вернул код {health_response.status_code}")
             
             health_data = health_response.json()
             
@@ -182,12 +189,14 @@ async def test_local_tts_connection(
             
             return {"success": True, "message": "Подключение установлено", "health_data": health_data, "status_data": status_data}
     except httpx.TimeoutException:
-        return {"success": False, "error": "Timeout: сервис не отвечает."}
+        raise HTTPException(status_code=504, detail="Timeout: сервис не отвечает.")
     except httpx.ConnectError:
-        return {"success": False, "error": "Не удалось подключиться. Проверьте URL."}
-    except Exception as e:
-        logger.error(f"Error testing connection: {e}")
-        return {"success": False, "error": f"Ошибка: {str(e)}"}
+        raise HTTPException(status_code=502, detail="Не удалось подключиться. Проверьте URL.")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error testing connection")
+        raise HTTPException(status_code=500, detail="Connection check failed")
 
 
 @local_tts_router.post("/sync-global-voices")
@@ -219,12 +228,13 @@ async def sync_global_voices_to_local(
                 data = response.json()
                 local_voices = data.get('voices', [])
         except httpx.RequestError as e:
-            raise HTTPException(status_code=500, detail=f"Ошибка подключения: {str(e)}")
+            raise HTTPException(status_code=500, detail="Internal server error")
         
         return {"success": True, "message": f"Обнаружено голосов: {len(local_voices)}", "voices": local_voices}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error syncing voices: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
+    except Exception:
+        logger.exception("Error syncing voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 

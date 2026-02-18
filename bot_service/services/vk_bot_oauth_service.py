@@ -122,7 +122,7 @@ class VkBotOAuthService:
                            'display_name': user.get('nick')
                       }
             except Exception as e:
-                 logger.warning(f"Dev API check failed: {e}")
+                 logger.exception("Dev API check failed")
 
             # Try Prod API fallback
             try:
@@ -139,7 +139,7 @@ class VkBotOAuthService:
                            'display_name': user.get('nick')
                       }
             except Exception as e:
-                 logger.warning(f"Prod API check failed: {e}")
+                 logger.exception("Prod API check failed")
 
             raise Exception("Failed to get VK user info")
     
@@ -192,7 +192,7 @@ class VkBotOAuthService:
                 return True
                 
             except Exception as e:
-                logger.error(f"Error saving VK bot token: {e}")
+                logger.exception("Error saving VK bot token")
                 session_db.rollback()
                 return False
         
@@ -364,7 +364,7 @@ class VkBotOAuthService:
                 return False
 
             except Exception as e:
-                logger.error(f"Error refreshing VK bot token: {e}")
+                logger.exception("Error refreshing VK bot token")
                 session_db.rollback()
                 return False
 
@@ -408,9 +408,10 @@ class VkBotOAuthService:
                 return await _check_and_refresh(new_db)
                 
         except Exception as e:
-            logger.error(f"Error checking bot token expiration: {e}")
+            logger.exception("Error checking bot token expiration")
             return False
 
 
 # Глобальный экземпляр
 vk_bot_oauth_service = VkBotOAuthService()
+

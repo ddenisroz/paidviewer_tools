@@ -51,8 +51,8 @@ class FileManager:
                 file_path.unlink()
                 logger.info(f"Deleted voice file: {file_path}")
                 return True
-            except Exception as e:
-                logger.error(f"Error deleting voice file {file_path}: {e}")
+            except Exception:
+                logger.exception("Error deleting voice file {file_path}")
                 return False
         return False
 
@@ -87,8 +87,8 @@ class FileManager:
                 logger.error(f"Failed to convert voice file: {voice_name}")
                 return None
                 
-        except Exception as e:
-            logger.error(f"Error saving voice file {voice_name}: {e}")
+        except Exception:
+            logger.exception("Error saving voice file {voice_name}")
             return None
 
     def cleanup_temp_file(self, file_path: Path):
@@ -97,8 +97,8 @@ class FileManager:
             if file_path.exists():
                 file_path.unlink()
                 logger.info(f"Cleaned up temp file: {file_path}")
-        except Exception as e:
-            logger.error(f"Error cleaning up temp file {file_path}: {e}")
+        except Exception:
+            logger.exception("Error cleaning up temp file {file_path}")
 
     def cleanup_old_files(self, max_age_hours: int = 24):
         """Очистить старые файлы"""
@@ -117,8 +117,8 @@ class FileManager:
                             file_path.unlink()
                             logger.info(f"Cleaned up old file: {file_path}")
                             
-        except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
+        except Exception:
+            logger.exception("Error during cleanup")
 
     def get_file_size(self, file_path: Path) -> int:
         """Получить размер файла"""
@@ -131,8 +131,8 @@ class FileManager:
         """Проверить валидность аудиофайла"""
         try:
             return validate_audio_for_f5tts(file_path)
-        except Exception as e:
-            logger.error(f"Error validating audio file {file_path}: {e}")
+        except Exception:
+            logger.exception("Error validating audio file {file_path}")
             return False
 
     def list_voice_files(self, user_id: Optional[str] = None) -> List[Path]:
@@ -152,3 +152,4 @@ class FileManager:
 
 # Глобальный экземпляр
 file_manager = FileManager()
+

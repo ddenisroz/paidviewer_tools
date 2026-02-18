@@ -6,6 +6,7 @@ Clean Architecture: uses DropsRewardRepository for data access.
 import logging
 import re
 import time
+from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
@@ -25,7 +26,7 @@ DROPS_REWARDS_CACHE_TTL = 60
 # === PYDANTIC MODELS ===
 
 class DropsRewardCreate(BaseModel):
-    """Создание награды в Drops"""
+    """Р В Р Р‹Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРІР‚в„– Р В Р вЂ  Drops"""
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     quality_id: int = Field(..., ge=1)
@@ -38,7 +39,7 @@ class DropsRewardCreate(BaseModel):
 
 
 class DropsRewardUpdate(BaseModel):
-    """Обновление награды в Drops"""
+    """Р В РЎвЂєР В Р’В±Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРІР‚в„– Р В Р вЂ  Drops"""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     quality_id: Optional[int] = Field(None, ge=1)
@@ -53,7 +54,7 @@ class DropsRewardUpdate(BaseModel):
 # === UTILITY FUNCTIONS ===
 
 def sanitize_html(text: str) -> str:
-    """Очищает HTML теги из текста"""
+    """Р В РЎвЂєР РЋРІР‚РЋР В РЎвЂР РЋРІР‚В°Р В Р’В°Р В Р’ВµР РЋРІР‚С™ HTML Р РЋРІР‚С™Р В Р’ВµР В РЎвЂ“Р В РЎвЂ Р В РЎвЂР В Р’В· Р РЋРІР‚С™Р В Р’ВµР В РЎвЂќР РЋР С“Р РЋРІР‚С™Р В Р’В°"""
     if not text:
         return text
     clean = re.compile('<.*?>')
@@ -90,9 +91,9 @@ async def get_drops_rewards(
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Получает награды лутбоксов для канала
+    """Р В РЎСџР В РЎвЂўР В Р’В»Р РЋРЎвЂњР РЋРІР‚РЋР В Р’В°Р В Р’ВµР РЋРІР‚С™ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРІР‚в„– Р В Р’В»Р РЋРЎвЂњР РЋРІР‚С™Р В Р’В±Р В РЎвЂўР В РЎвЂќР РЋР С“Р В РЎвЂўР В Р вЂ  Р В РўвЂР В Р’В»Р РЋР РЏ Р В РЎвЂќР В Р’В°Р В Р вЂ¦Р В Р’В°Р В Р’В»Р В Р’В°
 
-    ВАЖНО: Награды ОБЩИЕ для всех платформ! Параметр platform игнорируется.
+    Р В РІР‚в„ўР В РЎвЂ™Р В РІР‚вЂњР В РЎСљР В РЎвЂє: Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРІР‚в„– Р В РЎвЂєР В РІР‚ВР В Р’В©Р В Р’ВР В РІР‚Сћ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р РЋР С“Р В Р’ВµР РЋРІР‚В¦ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р РЋРІР‚С™Р РЋРІР‚С›Р В РЎвЂўР РЋР вЂљР В РЎВ! Р В РЎСџР В Р’В°Р РЋР вЂљР В Р’В°Р В РЎВР В Р’ВµР РЋРІР‚С™Р РЋР вЂљ platform Р В РЎвЂР В РЎвЂ“Р В Р вЂ¦Р В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР вЂљР РЋРЎвЂњР В Р’ВµР РЋРІР‚С™Р РЋР С“Р РЋР РЏ.
     """
     try:
         repo = DropsRewardRepository(db)
@@ -138,9 +139,9 @@ async def get_drops_rewards(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting drops rewards: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения наград лутбоксов")
+    except Exception:
+        logger.exception("Error getting drops rewards")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/{channel_name}")
@@ -151,9 +152,9 @@ async def create_drops_reward(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создает новую награду в лутбоксе
+    """Р В Р Р‹Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р’ВµР РЋРІР‚С™ Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р РЋРЎвЂњР РЋР вЂ№ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРЎвЂњ Р В Р вЂ  Р В Р’В»Р РЋРЎвЂњР РЋРІР‚С™Р В Р’В±Р В РЎвЂўР В РЎвЂќР РЋР С“Р В Р’Вµ
 
-    ВАЖНО: Награда будет ОБЩЕЙ для всех платформ.
+    Р В РІР‚в„ўР В РЎвЂ™Р В РІР‚вЂњР В РЎСљР В РЎвЂє: Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р В Р’В±Р РЋРЎвЂњР В РўвЂР В Р’ВµР РЋРІР‚С™ Р В РЎвЂєР В РІР‚ВР В Р’В©Р В РІР‚СћР В РІвЂћСћ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ Р РЋР С“Р В Р’ВµР РЋРІР‚В¦ Р В РЎвЂ”Р В Р’В»Р В Р’В°Р РЋРІР‚С™Р РЋРІР‚С›Р В РЎвЂўР РЋР вЂљР В РЎВ.
     """
     try:
         repo = DropsRewardRepository(db)
@@ -163,7 +164,7 @@ async def create_drops_reward(
             available_qualities = repo.get_all_qualities()
             available_ids = [q.id for q in available_qualities]
             logger.warning(f"Quality with id {reward_data.quality_id} not found. Available: {available_ids}")
-            raise HTTPException(status_code=400, detail=f"Качество с ID {reward_data.quality_id} не найдено")
+            raise HTTPException(status_code=400, detail=f"Р В РЎв„ўР В Р’В°Р РЋРІР‚РЋР В Р’ВµР РЋР С“Р РЋРІР‚С™Р В Р вЂ Р В РЎвЂў Р РЋР С“ ID {reward_data.quality_id} Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В РЎвЂў")
 
         reward = repo.create(
             user_id=current_user["id"],
@@ -198,7 +199,7 @@ async def create_drops_reward(
 
         return {
             "success": True,
-            "message": "Награда создана",
+            "message": "Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р РЋР С“Р В РЎвЂўР В Р’В·Р В РўвЂР В Р’В°Р В Р вЂ¦Р В Р’В°",
             "data": {
                 "id": reward.id,
                 "name": reward.name,
@@ -210,9 +211,9 @@ async def create_drops_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error creating drops reward: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка создания награды")
+    except Exception:
+        logger.exception("Error creating drops reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/rewards/{reward_id}")
@@ -222,13 +223,13 @@ async def update_drops_reward(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновляет награду в лутбоксе"""
+    """Р В РЎвЂєР В Р’В±Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р РЋР РЏР В Р’ВµР РЋРІР‚С™ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРЎвЂњ Р В Р вЂ  Р В Р’В»Р РЋРЎвЂњР РЋРІР‚С™Р В Р’В±Р В РЎвЂўР В РЎвЂќР РЋР С“Р В Р’Вµ"""
     try:
         repo = DropsRewardRepository(db)
         reward = repo.get_by_id_and_user(reward_id, current_user["id"])
 
         if not reward:
-            raise HTTPException(status_code=404, detail="Награда не найдена")
+            raise HTTPException(status_code=404, detail="Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В Р’В°")
 
         # Sanitize HTML in text fields
         update_data = reward_data.model_dump(exclude_unset=True)
@@ -257,7 +258,7 @@ async def update_drops_reward(
 
         return {
             "success": True,
-            "message": "Награда обновлена",
+            "message": "Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р В РЎвЂўР В Р’В±Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р’В°",
             "data": {
                 "id": reward.id,
                 "name": reward.name,
@@ -267,9 +268,9 @@ async def update_drops_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating drops reward: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обновления награды")
+    except Exception:
+        logger.exception("Error updating drops reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/rewards/{reward_id}")
@@ -278,13 +279,13 @@ async def delete_drops_reward(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удаляет награду из лутбокса"""
+    """Р В Р в‚¬Р В РўвЂР В Р’В°Р В Р’В»Р РЋР РЏР В Р’ВµР РЋРІР‚С™ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРЎвЂњ Р В РЎвЂР В Р’В· Р В Р’В»Р РЋРЎвЂњР РЋРІР‚С™Р В Р’В±Р В РЎвЂўР В РЎвЂќР РЋР С“Р В Р’В°"""
     try:
         repo = DropsRewardRepository(db)
         reward = repo.get_by_id_and_user(reward_id, current_user["id"])
 
         if not reward:
-            raise HTTPException(status_code=404, detail="Награда не найдена")
+            raise HTTPException(status_code=404, detail="Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В Р’В°")
 
         channel_name = repo.delete(reward)
 
@@ -306,14 +307,14 @@ async def delete_drops_reward(
 
         return {
             "success": True,
-            "message": "Награда удалена"
+            "message": "Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р РЋРЎвЂњР В РўвЂР В Р’В°Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р’В°"
         }
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting drops reward: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка удаления награды")
+    except Exception:
+        logger.exception("Error deleting drops reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/{reward_id}/image")
@@ -323,7 +324,7 @@ async def upload_reward_image(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Загружает изображение для награды"""
+    """Р В РІР‚вЂќР В Р’В°Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’В°Р В Р’ВµР РЋРІР‚С™ Р В РЎвЂР В Р’В·Р В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРІР‚в„–"""
     try:
         import os
 
@@ -331,20 +332,27 @@ async def upload_reward_image(
         reward = repo.get_by_id_and_user(reward_id, current_user["id"])
 
         if not reward:
-            raise HTTPException(status_code=404, detail="Награда не найдена")
+            raise HTTPException(status_code=404, detail="Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В Р’В°")
 
         if not image_file.content_type or not image_file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="Файл должен быть изображением")
+            raise HTTPException(status_code=400, detail="Р В Р’В¤Р В Р’В°Р В РІвЂћвЂ“Р В Р’В» Р В РўвЂР В РЎвЂўР В Р’В»Р В Р’В¶Р В Р’ВµР В Р вЂ¦ Р В Р’В±Р РЋРІР‚в„–Р РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂР В Р’В·Р В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’ВµР В РЎВ")
 
         upload_dir = f"uploads/drops/{current_user['id']}/images"
         os.makedirs(upload_dir, exist_ok=True)
 
-        file_extension = os.path.splitext(image_file.filename)[1] or '.png'
+        safe_source_name = Path(image_file.filename or "").name
+        file_extension = Path(safe_source_name).suffix.lower() or ".png"
+        allowed_image_extensions = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+        if file_extension not in allowed_image_extensions:
+            raise HTTPException(status_code=400, detail="Unsupported image format")
+
         filename = f"reward_{reward_id}_{int(time.time())}{file_extension}"
         file_path = os.path.join(upload_dir, filename)
 
         with open(file_path, "wb") as buffer:
             content = await image_file.read()
+            if len(content) > 5 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="Image is too large")
             buffer.write(content)
 
         image_url = f"/static/uploads/drops/{current_user['id']}/images/{filename}"
@@ -353,7 +361,7 @@ async def upload_reward_image(
 
         return {
             "success": True,
-            "message": "Изображение загружено",
+            "message": "Р В Р’ВР В Р’В·Р В РЎвЂўР В Р’В±Р РЋР вЂљР В Р’В°Р В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂР В Р’Вµ Р В Р’В·Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’ВµР В Р вЂ¦Р В РЎвЂў",
             "data": {
                 "image_url": image_url,
                 "filename": filename
@@ -362,9 +370,9 @@ async def upload_reward_image(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error uploading reward image: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка загрузки изображения")
+    except Exception:
+        logger.exception("Error uploading reward image")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/{reward_id}/sound")
@@ -374,7 +382,7 @@ async def upload_reward_sound(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Загружает звук для награды"""
+    """Р В РІР‚вЂќР В Р’В°Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’В°Р В Р’ВµР РЋРІР‚С™ Р В Р’В·Р В Р вЂ Р РЋРЎвЂњР В РЎвЂќ Р В РўвЂР В Р’В»Р РЋР РЏ Р В Р вЂ¦Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР РЋРІР‚в„–"""
     try:
         import os
 
@@ -382,7 +390,7 @@ async def upload_reward_sound(
         reward = repo.get_by_id_and_user(reward_id, current_user["id"])
 
         if not reward:
-            raise HTTPException(status_code=404, detail="Награда не найдена")
+            raise HTTPException(status_code=404, detail="Р В РЎСљР В Р’В°Р В РЎвЂ“Р РЋР вЂљР В Р’В°Р В РўвЂР В Р’В° Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦Р В Р’В°")
 
         from validators.file_validators import validate_sound_file
         validate_sound_file(sound_file)
@@ -390,11 +398,15 @@ async def upload_reward_sound(
         upload_dir = f"uploads/sounds/{current_user['id']}"
         os.makedirs(upload_dir, exist_ok=True)
 
-        filename = f"reward_{reward_id}_{sound_file.filename}"
+        safe_source_name = Path(sound_file.filename or "").name
+        file_extension = Path(safe_source_name).suffix.lower() or ".wav"
+        filename = f"reward_{reward_id}_{int(time.time())}{file_extension}"
         file_path = os.path.join(upload_dir, filename)
 
         with open(file_path, "wb") as buffer:
             content = await sound_file.read()
+            if len(content) > 10 * 1024 * 1024:
+                raise HTTPException(status_code=400, detail="Sound file is too large")
             buffer.write(content)
 
         repo.update_sound(reward, file_path)
@@ -402,7 +414,7 @@ async def upload_reward_sound(
 
         return {
             "success": True,
-            "message": "Звук загружен",
+            "message": "Р В РІР‚вЂќР В Р вЂ Р РЋРЎвЂњР В РЎвЂќ Р В Р’В·Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’ВµР В Р вЂ¦",
             "data": {
                 "sound_file": file_path,
                 "filename": filename
@@ -411,7 +423,8 @@ async def upload_reward_sound(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error uploading reward sound: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка загрузки звука")
+    except Exception:
+        logger.exception("Error uploading reward sound")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 

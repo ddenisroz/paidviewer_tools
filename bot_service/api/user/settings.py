@@ -1,4 +1,4 @@
-# bot_service/api/user/settings.py
+﻿# bot_service/api/user/settings.py
 """
 User-specific settings endpoints.
 
@@ -95,8 +95,10 @@ async def get_my_settings(
             "tts_settings": tts_settings,
             "audio_settings": audio_settings
         }
-    except Exception as e:
-        logger.error(f"Error getting user settings: {e}", exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting user settings")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -119,8 +121,8 @@ async def update_my_settings(
         return result
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid settings data")
-    except Exception as e:
-        logger.error(f"Error updating user settings: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error updating user settings")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -172,7 +174,7 @@ async def update_my_tts_settings(
         result = await tts_service.save_tts_settings(**save_payload)
         
         if not result.get("success"):
-            raise HTTPException(status_code=400, detail=result.get("error", "Failed to update TTS settings"))
+            raise HTTPException(status_code=400, detail="Failed to update TTS settings")
         
         return {
             "success": True,
@@ -180,8 +182,8 @@ async def update_my_tts_settings(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating TTS settings: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error updating TTS settings")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -227,8 +229,8 @@ async def update_my_audio_settings(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating audio settings: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error updating audio settings")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -261,7 +263,11 @@ async def get_user_settings(
             "tts_settings": tts_settings,
             "audio_settings": audio_settings
         }
-    except Exception as e:
-        logger.error(f"Error getting user settings: {e}", exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting user settings")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
 

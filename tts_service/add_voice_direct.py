@@ -54,7 +54,7 @@ def add_voice_direct(voice_name: str, file_path: str):
         print(f"[OK] Голос '{voice_name}' успешно добавлен")
         print(f"   ID: {voice_id}")
         print(f"   Путь: {file_path}")
-        print(f"   Тип: global")
+        print("   Тип: global")
         
         conn.close()
         return True
@@ -82,3 +82,4 @@ if __name__ == "__main__":
     else:
         print("\n[ERROR] Не удалось добавить голос.")
         exit(1)
+

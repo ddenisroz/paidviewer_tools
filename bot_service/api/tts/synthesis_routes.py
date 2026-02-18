@@ -1,4 +1,4 @@
-# bot_service/api/tts/synthesis_routes.py
+﻿# bot_service/api/tts/synthesis_routes.py
 import logging
 from pathlib import Path
 
@@ -65,16 +65,18 @@ async def synthesize_text(
         if not result.get("success"):
             # Check for specific errors like Rate Limit
             if "Rate limit" in result.get("error", ""):
-                 raise HTTPException(status_code=429, detail=result.get("error"))
-            raise HTTPException(status_code=500, detail=result.get("error"))
+                 raise HTTPException(status_code=429, detail="Rate limit exceeded")
+            raise HTTPException(status_code=500, detail="Internal server error")
 
         return result
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Synthesis error: {e}")
+    except Exception:
+        logger.exception("Synthesis error")
         import traceback
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
 

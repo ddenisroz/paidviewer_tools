@@ -68,7 +68,7 @@ async def analyze_chat_user(
     )
 
     if not result:
-        return {"success": False, "error": "Analysis failed"}
+        raise HTTPException(status_code=500, detail="Analysis failed")
 
     logger.info(f"[CHAT-ANALYSIS] Completed for {payload.username} ({platform})")
     return {

@@ -354,8 +354,8 @@ class PlatformRewardsService:
                     if demand_ids:
                         await vk_api.reject_reward_demands(channel_name, access_token, demand_ids)
                         await asyncio.sleep(0.5)
-        except Exception as e:
-            logger.warning(f"Error handling demands during delete: {e}")
+        except Exception:
+            logger.exception("Error handling demands during delete")
             await asyncio.sleep(0.3)
 
         # 2. Disable if enabled
@@ -433,6 +433,7 @@ class PlatformRewardsService:
         else:
             # Check status code in Base Exception
             if e.status_code:
-                raise HTTPException(status_code=e.status_code, detail=f"Integration Error: {e.message}")
-            raise HTTPException(status_code=500, detail=f"Platform API Error: {e.message}")
+                raise HTTPException(status_code=e.status_code, detail="Integration request failed")
+            raise HTTPException(status_code=500, detail="Platform API request failed")
+
 

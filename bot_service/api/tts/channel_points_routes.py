@@ -28,7 +28,7 @@ async def get_tts_mode_settings(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить настройки режима TTS (все сообщения / за баллы)"""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р в„–Р С”Р С‘ РЎР‚Р ВµР В¶Р С‘Р СР В° TTS (Р Р†РЎРѓР Вµ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘РЎРЏ / Р В·Р В° Р В±Р В°Р В»Р В»РЎвЂ№)"""
     try:
         repo = TTSSettingsRepository(db)
         settings = repo.get_or_create(user_id=user['id'])
@@ -53,9 +53,11 @@ async def get_tts_mode_settings(
             "tts_reward_ids": tts_reward_ids,
             "platforms": platforms
         }
-    except Exception as e:
-        logger.error(f"Error getting TTS mode settings: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения настроек режима TTS")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting TTS mode settings")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @channel_points_router.post("/mode-settings")
@@ -64,7 +66,7 @@ async def update_tts_mode_settings(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить режим TTS"""
+    """Р С›Р В±Р Р…Р С•Р Р†Р С‘РЎвЂљРЎРЉ РЎР‚Р ВµР В¶Р С‘Р С TTS"""
     try:
         if request.tts_mode not in ['all_messages', 'channel_points']:
             raise HTTPException(status_code=400, detail="Invalid TTS mode")
@@ -77,10 +79,10 @@ async def update_tts_mode_settings(
         return {"success": True, "tts_mode": request.tts_mode}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating TTS mode: {e}")
+    except Exception:
+        logger.exception("Error updating TTS mode")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка обновления режима TTS")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ============================================================================
@@ -94,7 +96,7 @@ async def create_tts_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать награду TTS для платформы"""
+    """Р РЋР С•Р В·Р Т‘Р В°РЎвЂљРЎРЉ Р Р…Р В°Р С–РЎР‚Р В°Р Т‘РЎС“ TTS Р Т‘Р В»РЎРЏ Р С—Р В»Р В°РЎвЂљРЎвЂћР С•РЎР‚Р СРЎвЂ№"""
     try:
         from platforms.registry import platform_registry
         
@@ -118,7 +120,7 @@ async def create_tts_reward(
                 "title": request.title,
                 "cost": request.cost,
                 "is_user_input_required": True,
-                "prompt": "Введите сообщение для озвучки TTS",
+                "prompt": "Р вЂ™Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘Р Вµ Р Т‘Р В»РЎРЏ Р С•Р В·Р Р†РЎС“РЎвЂЎР С”Р С‘ TTS",
                 "global_cooldown_seconds": request.cooldown
             }
             reward_id = await platform.create_reward(user['id'], reward_data)
@@ -140,10 +142,10 @@ async def create_tts_reward(
         return {"success": True, "reward_id": reward_id, "platform": request.platform}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error creating TTS reward: {e}")
+    except Exception:
+        logger.exception("Error creating TTS reward")
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка создания награды: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @channel_points_router.delete("/rewards/{platform}")
@@ -152,7 +154,7 @@ async def delete_tts_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить TTS награду для платформы"""
+    """Р Р€Р Т‘Р В°Р В»Р С‘РЎвЂљРЎРЉ TTS Р Р…Р В°Р С–РЎР‚Р В°Р Т‘РЎС“ Р Т‘Р В»РЎРЏ Р С—Р В»Р В°РЎвЂљРЎвЂћР С•РЎР‚Р СРЎвЂ№"""
     try:
         from platforms.registry import platform_registry
         
@@ -183,7 +185,9 @@ async def delete_tts_reward(
         return {"success": True, "platform": platform}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting TTS reward: {e}")
+    except Exception:
+        logger.exception("Error deleting TTS reward")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка удаления награды")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+

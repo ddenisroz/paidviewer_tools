@@ -6,12 +6,16 @@ from typing import Optional
 from tts_service.tts_engine import tts_engine_manager
 from tts_service.async_tts_engine import async_tts_engine
 from tts_service.gpu_worker_pool import gpu_worker_pool
+from tts_service.auth import get_current_user_or_internal
 
 router = APIRouter(tags=["synthesis"])
 logger = logging.getLogger(__name__)
 
 @router.post("/synthesize-channel")
-async def synthesize_channel(request: dict):
+async def synthesize_channel(
+    request: dict,
+    current_user: dict = Depends(get_current_user_or_internal),
+):
     """
     Синтезировать аудио для канала с учетом всех настроек пользователя.
     Вызывается из bot_service для обработки сообщений в чате.
@@ -93,12 +97,18 @@ async def synthesize_channel(request: dict):
             
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"[ERROR] [CHANNEL TTS] Ошибка: {e}")
-        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+    except Exception:
+        logger.exception("[ERROR] [CHANNEL TTS] Ошибка")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/gpu/submit")
-async def submit_gpu_task(text: str, voice: str = "female_1", user_id: Optional[int] = None, priority: int = 0):
+async def submit_gpu_task(
+    text: str,
+    voice: str = "female_1",
+    user_id: Optional[int] = None,
+    priority: int = 0,
+    current_user: dict = Depends(get_current_user_or_internal),
+):
     """Отправить задачу напрямую в GPU Worker Pool"""
     try:
         if not hasattr(gpu_worker_pool, 'running') or not gpu_worker_pool.running:
@@ -113,12 +123,17 @@ async def submit_gpu_task(text: str, voice: str = "female_1", user_id: Optional[
             "timestamp": time.time()
         }
         
-    except Exception as e:
-        logger.error(f"Error submitting GPU task: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to submit GPU task: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error submitting GPU task")
+        raise HTTPException(status_code=500, detail="Failed to submit GPU task")
 
 @router.get("/gpu/task/{task_id}")
-async def get_gpu_task_result(task_id: str):
+async def get_gpu_task_result(
+    task_id: str,
+    current_user: dict = Depends(get_current_user_or_internal),
+):
     """Получить результат задачи из GPU Worker Pool"""
     try:
         if not hasattr(gpu_worker_pool, 'running') or not gpu_worker_pool.running:
@@ -137,12 +152,15 @@ async def get_gpu_task_result(task_id: str):
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting GPU task result: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get task result: {str(e)}")
+    except Exception:
+        logger.exception("Error getting GPU task result")
+        raise HTTPException(status_code=500, detail="Failed to get task result")
 
 @router.get("/task/{task_id}")
-async def get_task_result(task_id: str):
+async def get_task_result(
+    task_id: str,
+    current_user: dict = Depends(get_current_user_or_internal),
+):
     """Получить результат асинхронной задачи (AsyncTTSEngine)"""
     try:
         status = await async_tts_engine.get_task_status(task_id)
@@ -153,6 +171,8 @@ async def get_task_result(task_id: str):
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting task result: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error getting task result")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+

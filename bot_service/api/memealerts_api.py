@@ -1,6 +1,6 @@
 """MemeAlerts API endpoints for grants, settings, and automation."""
 from typing import Literal, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from pydantic import BaseModel, Field
@@ -19,17 +19,46 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/memealerts", tags=["memealerts"])
 
 MEMEALERTS_API_BASE = "https://memealerts.com/api"
+_MEMEALERTS_ALLOWED_AUTH_HOSTS = {"memealerts.com", "www.memealerts.com"}
+
+
+def _is_safe_absolute_callback_url(url: str) -> bool:
+    if not isinstance(url, str):
+        return False
+    if any(ch in url for ch in ("\r", "\n", "\t")):
+        return False
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    return bool(parsed.netloc)
+
+
+def _is_safe_memealerts_auth_url(url: str) -> bool:
+    if not isinstance(url, str):
+        return False
+    if any(ch in url for ch in ("\r", "\n", "\t")):
+        return False
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme != "https":
+        return False
+    return (parsed.netloc or "").lower() in _MEMEALERTS_ALLOWED_AUTH_HOSTS
 
 
 def decode_memealerts_token(token: str) -> dict:
     """
-    Decode MemeAlerts JWT token without verification.
-    Returns payload with 'id' (streamer ID), 'scope', 'tid', etc.
+    Decode MemeAlerts JWT token without signature verification.
+    Use claims only as fallback hints, never as an authorization source.
     """
     try:
         return jwt.decode(token, options={"verify_signature": False})
-    except jwt.PyJWTError as e:
-        logger.error(f"Failed to decode MemeAlerts token: {e}")
+    except jwt.PyJWTError:
+        logger.exception("Failed to decode MemeAlerts token")
         raise ValueError("Invalid token format")
 
 
@@ -59,6 +88,17 @@ class CreatePointsRewardRequest(BaseModel):
     cost: int = Field(default=500, ge=1, le=1_000_000)
     coins_amount: int = Field(default=10, ge=1, le=1_000_000)
     cooldown_seconds: int = Field(default=0, ge=0, le=86_400)
+
+
+class ConnectMemeAlertsRequest(BaseModel):
+    access_token: str = Field(min_length=16, max_length=8192)
+    refresh_token: Optional[str] = Field(default=None, min_length=1, max_length=8192)
+
+
+class GrantCoinsRequest(BaseModel):
+    userId: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    nickname: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    value: int = Field(ge=1, le=1_000_000)
 
 
 @router.get("/status")
@@ -100,9 +140,9 @@ async def get_memealerts_status(
                 return {"success": True, "connected": True}
         
         return {"success": True, "connected": False}
-    except Exception as e:
-        logger.error(f"Error getting MemeAlerts status: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error getting MemeAlerts status")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/connect-url")
@@ -115,21 +155,30 @@ async def get_memealerts_connect_url(
     """
     try:
         frontend_base = (settings.frontend_url or "http://localhost:5173").rstrip("/")
+        if not _is_safe_absolute_callback_url(frontend_base):
+            logger.error("Unsafe FRONTEND_URL for MemeAlerts callback: %r", frontend_base)
+            raise HTTPException(status_code=503, detail="MemeAlerts integration is misconfigured")
+
         callback_url = f"{frontend_base}/memealerts/callback"
         provider = "twitch"
         auth_url = (
             f"https://memealerts.com/api/auth/{provider}"
             f"?return_url={quote(callback_url, safe='')}"
         )
+        if not _is_safe_memealerts_auth_url(auth_url):
+            logger.error("Unsafe MemeAlerts auth URL generated")
+            raise HTTPException(status_code=500, detail="Failed to generate secure auth URL")
         return {
             "success": True,
             "provider": provider,
             "callback_url": callback_url,
             "auth_url": auth_url,
         }
-    except Exception as e:
-        logger.error(f"Error building MemeAlerts connect URL: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error building MemeAlerts connect URL")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/settings")
@@ -143,9 +192,9 @@ async def get_memealerts_settings(
         service = MemeAlertsService(db)
         settings = service.get_settings(user_id)
         return {"success": True, "settings": settings}
-    except Exception as e:
-        logger.error(f"Error getting MemeAlerts settings: {e}", exc_info=True)
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error getting MemeAlerts settings")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/settings")
@@ -172,13 +221,13 @@ async def save_memealerts_settings(
 
         settings = service.save_settings(user_id, patch)
         return {"success": True, "settings": settings}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid settings payload")
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error saving MemeAlerts settings: {e}", exc_info=True)
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error saving MemeAlerts settings")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/rewards/create")
@@ -200,18 +249,18 @@ async def create_memealerts_points_reward(
             cooldown_seconds=payload.cooldown_seconds,
         )
         return {"success": True, "data": result}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid reward parameters")
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error creating MemeAlerts points reward: {e}", exc_info=True)
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error creating MemeAlerts points reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/connect")
 async def connect_memealerts(
-    token_data: dict = Body(...),
+    token_data: ConnectMemeAlertsRequest = Body(...),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -221,13 +270,20 @@ async def connect_memealerts(
     """
     try:
         user_id = user.get('id')
-        access_token = token_data.get("access_token")
-        refresh_token = token_data.get("refresh_token")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
+        access_token = token_data.access_token
+        refresh_token = token_data.refresh_token
 
         if not access_token:
             raise HTTPException(status_code=400, detail="access_token is required")
 
-        # Decode token if possible and extract streamer identifier.
+        # Keep existing DB streamer_id as trusted source when present.
+        existing = UserTokenRepository(db).get_by_user_and_platform(user_id, "memealerts")
+        trusted_streamer_id = existing.platform_user_id if existing and existing.platform_user_id else None
+
+        # Decode token without signature verification only for fallback claim extraction.
         # MemeAlerts may return different claim names depending on flow/version.
         decoded = {}
         try:
@@ -235,7 +291,7 @@ async def connect_memealerts(
         except ValueError:
             logger.warning("MemeAlerts token is not a decodable JWT, proceeding with fallback platform_user_id")
 
-        streamer_id = (
+        claimed_streamer_id = (
             decoded.get("id")
             or decoded.get("tid")
             or decoded.get("streamer_id")
@@ -243,18 +299,20 @@ async def connect_memealerts(
             or decoded.get("user_id")
             or decoded.get("sub")
         )
+        streamer_id = trusted_streamer_id or claimed_streamer_id
         token_scope = decoded.get("scope")
 
         # platform_user_id is non-nullable in user_tokens; keep connect flow resilient.
         if not streamer_id:
-            existing = UserTokenRepository(db).get_by_user_and_platform(user_id, "memealerts")
-            streamer_id = existing.platform_user_id if existing and existing.platform_user_id else f"user-{user_id}"
+            streamer_id = f"user-{user_id}"
             logger.warning(
                 "MemeAlerts token has no streamer id claim; using fallback platform_user_id=%s",
                 streamer_id,
             )
+        elif trusted_streamer_id:
+            logger.info("MemeAlerts connect: preserving existing trusted streamer_id for user %s", user_id)
         else:
-            logger.info(f"MemeAlerts token decoded: streamer_id={streamer_id}, scope={token_scope}")
+            logger.info(f"MemeAlerts token decoded (unverified claims): streamer_id={streamer_id}, scope={token_scope}")
 
         # Optional: Validate token by making a test API call
         # This verifies the token is actually valid and not expired
@@ -282,9 +340,9 @@ async def connect_memealerts(
     
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error connecting MemeAlerts: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error connecting MemeAlerts")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/disconnect")
@@ -295,19 +353,23 @@ async def disconnect_memealerts(
     """Remove MemeAlerts token"""
     try:
         user_id = user.get('id')
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
         token_repo = UserTokenRepository(db)
         token_repo.delete_by_user_and_platform(user_id, "memealerts")
         
         logger.info(f"[OK] MemeAlerts disconnected for user {user_id}")
         return {"success": True, "connected": False}
-    except Exception as e:
-        logger.error(f"Error disconnecting MemeAlerts: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error disconnecting MemeAlerts")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/grant")
 async def grant_coins(
-    grant_data: dict = Body(...),
+    grant_data: GrantCoinsRequest = Body(...),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -317,19 +379,13 @@ async def grant_coins(
     """
     try:
         user_id = user.get('id')
-        target_user_id = (grant_data.get("userId") or "").strip()
-        nickname = (grant_data.get("nickname") or "").strip()
-        value = grant_data.get("value")
-
-        if value is None:
-            raise HTTPException(status_code=400, detail="value is required")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        target_user_id = (grant_data.userId or "").strip()
+        nickname = (grant_data.nickname or "").strip()
+        amount = grant_data.value
         if not target_user_id and not nickname:
             raise HTTPException(status_code=400, detail="userId or nickname is required")
-
-        try:
-            amount = int(value)
-        except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="value must be an integer")
 
         service = MemeAlertsService(db)
         result = await service.grant_coins(
@@ -343,16 +399,16 @@ async def grant_coins(
         )
 
         if not result.get("success"):
-            return {"success": False, "error": result.get("error"), "detail": result.get("detail")}
+            raise HTTPException(status_code=400, detail="MemeAlerts grant failed")
 
         logger.info(f"[OK] MemeAlerts grant successful: {result}")
         return {"success": True, "data": result}
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error granting coins: {e}", exc_info=True)
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error granting coins")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/history")
@@ -364,10 +420,14 @@ async def get_memealerts_history(
     """Get MemeAlerts grant/purchase history from MemeAlerts API."""
     try:
         user_id = user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
         service = MemeAlertsService(db)
         result = await service.fetch_history(user_id=user_id, limit=limit)
         return result
-    except Exception as e:
-        logger.error(f"Error loading MemeAlerts history: {e}", exc_info=True)
-        return {"success": False, "error": "Internal server error", "grants": [], "purchases": [], "unknown": []}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error loading MemeAlerts history")
+        raise HTTPException(status_code=500, detail="Internal server error")
 

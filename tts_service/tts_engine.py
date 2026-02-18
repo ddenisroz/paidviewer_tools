@@ -57,8 +57,8 @@ class TTSEngineManager:
                             download_root=str(cache_dir)
                         )
                         logger.info("Faster-Whisper turbo transcriber downloaded and loaded")
-                except Exception as e:
-                    logger.warning(f"Failed to load Faster-Whisper turbo model, trying base: {e}")
+                except Exception:
+                    logger.warning("Failed to load Faster-Whisper turbo model, trying base", exc_info=True)
                     try:
                         # Fallback на base модель если turbo не загрузится
                         cache_dir = Path(__file__).parent / "f5_tts_cache"
@@ -81,8 +81,8 @@ class TTSEngineManager:
                                 download_root=str(cache_dir)
                             )
                             logger.info("Faster-Whisper base transcriber downloaded and loaded")
-                    except Exception as e2:
-                        logger.warning(f"Failed to load Faster-Whisper, disabling transcription: {e2}")
+                    except Exception:
+                        logger.warning("Failed to load Faster-Whisper, disabling transcription", exc_info=True)
                         # Транскрипция не критична для TTS, можно работать без неё
                         self.transcriber = None
                         logger.info("TTS will work without transcription support")
@@ -90,8 +90,8 @@ class TTSEngineManager:
             self.is_initialized = True
             logger.info("TTS engine initialized successfully")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize TTS engine: {e}")
+        except Exception:
+            logger.exception("Failed to initialize TTS engine")
             self.is_initialized = False
             raise
 
@@ -110,8 +110,8 @@ class TTSEngineManager:
             self.is_initialized = False
             logger.info("TTS engine shutdown completed")
             
-        except Exception as e:
-            logger.error(f"Error during TTS engine shutdown: {e}")
+        except Exception:
+            logger.exception("Error during TTS engine shutdown")
 
     def is_ready(self) -> bool:
         """Проверка готовности движка"""
@@ -133,8 +133,8 @@ class TTSEngineManager:
         
         try:
             return await self.tts_engine.synthesize(text, voice_name, output_path, **kwargs)
-        except Exception as e:
-            logger.error(f"Error during synthesis: {e}")
+        except Exception:
+            logger.exception("Error during synthesis")
             raise
     
     async def synthesize_speech_async(
@@ -284,9 +284,9 @@ class TTSEngineManager:
                 logger.error("[ERROR] TTS synthesis failed: no audio file generated")
                 return {"success": False, "error": "No audio file generated"}
                 
-        except Exception as e:
-            logger.error(f"[ERROR] TTS synthesis error: {e}", exc_info=True)
-            return {"success": False, "error": str(e)}
+        except Exception:
+            logger.exception("[ERROR] TTS synthesis error")
+            return {"success": False, "error": "Synthesis failed"}
     
     async def synthesize_with_conversion_async(
         self, 
@@ -369,14 +369,14 @@ class TTSEngineManager:
                 if original_path.exists():
                     original_path.unlink()
                     logger.info(f"Removed original file after conversion: {original_path}")
-            except Exception as e:
-                logger.warning(f"Failed to remove original file: {e}")
+            except Exception:
+                logger.warning("Failed to remove original file", exc_info=True)
             
             logger.info(f"Speech synthesized and converted successfully: {conversion_result}")
             return conversion_result
             
-        except Exception as e:
-            logger.error(f"Async synthesis with conversion error: {e}")
+        except Exception:
+            logger.exception("Async synthesis with conversion error")
             return None
 
     def transcribe(self, audio_path: str) -> str:
@@ -439,9 +439,10 @@ class TTSEngineManager:
             logger.info(f"Transcription completed: {len(text)} characters")
             return text
             
-        except Exception as e:
-            logger.error(f"Error during transcription: {e}")
+        except Exception:
+            logger.exception("Error during transcription")
             raise
 
 # Глобальный экземпляр
 tts_engine_manager = TTSEngineManager()
+

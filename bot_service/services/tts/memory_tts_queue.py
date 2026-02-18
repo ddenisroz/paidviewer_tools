@@ -196,8 +196,8 @@ class MemoryTTSQueue:
 
         except asyncio.TimeoutError:
             return None
-        except Exception as e:
-            logger.error(f"Error getting next task: {e}")
+        except Exception:
+            logger.exception("Error getting next task")
             return None
 
     async def complete_task(self, task_id: str, result: Dict[str, Any]):
@@ -242,7 +242,7 @@ class MemoryTTSQueue:
         # Перемещаем в завершенные
         self.completed_tasks[task_id] = task
 
-        logger.error(f"TTS task failed: {task_id} - {error}")
+        logger.error("TTS task failed: %s - %s", task_id, error)
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -338,8 +338,8 @@ class MemoryTTSQueue:
             conn_mgr = get_memory_websocket_manager()
             return user_id in conn_mgr.user_connections and \
                    len(conn_mgr.user_connections[user_id]) > 0
-        except Exception as e:
-            logger.error(f"Error checking user connection: {e}")
+        except Exception:
+            logger.exception("Error checking user connection")
             # В случае ошибки разрешаем генерацию (fail-open)
             return True
 
@@ -396,4 +396,5 @@ def get_memory_tts_queue() -> MemoryTTSQueue:
     if _memory_tts_queue is None:
         _memory_tts_queue = MemoryTTSQueue()
     return _memory_tts_queue
+
 

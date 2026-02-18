@@ -2,15 +2,12 @@
 import asyncio
 import logging
 import time
-import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
-import threading
 from dataclasses import dataclass
 
 from tts_service.TTS_rus_engine.russian_tts import RussianTTS
-from tts_service.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -78,8 +75,8 @@ class AsyncTTSEngine:
             # Запускаем worker'ы
             await self.start_workers()
             
-        except Exception as e:
-            logger.error(f"Failed to initialize Async TTS Engine: {e}")
+        except Exception:
+            logger.exception("Failed to initialize Async TTS Engine")
             raise
     
     def _init_tts_engine(self) -> RussianTTS:
@@ -88,8 +85,8 @@ class AsyncTTSEngine:
             engine = RussianTTS()
             logger.info("TTS engine initialized in background thread")
             return engine
-        except Exception as e:
-            logger.error(f"Failed to initialize TTS engine: {e}")
+        except Exception:
+            logger.exception("Failed to initialize TTS engine")
             raise
     
     async def start_workers(self):
@@ -144,8 +141,8 @@ class AsyncTTSEngine:
             except asyncio.TimeoutError:
                 # Нормальный timeout, продолжаем
                 continue
-            except Exception as e:
-                logger.error(f"Worker {worker_name} error: {e}")
+            except Exception:
+                logger.exception("Worker {worker_name} error")
                 await asyncio.sleep(1)
         
         logger.info(f"TTS worker {worker_name} stopped")
@@ -196,7 +193,7 @@ class AsyncTTSEngine:
             self.stats['active_tasks'] = len(self.active_tasks)
             
         except Exception as e:
-            logger.error(f"Worker {worker_name} error processing task {task.task_id}: {e}")
+            logger.exception("Worker {worker_name} error processing task {task.task_id}")
             task.status = "failed"
             task.error = str(e)
             self.stats['failed_tasks'] += 1
@@ -209,8 +206,8 @@ class AsyncTTSEngine:
                 return None
             
             return self.tts_engine.synthesize(text, voice)
-        except Exception as e:
-            logger.error(f"Sync synthesis error: {e}")
+        except Exception:
+            logger.exception("Sync synthesis error")
             return None
     
     def _update_stats(self, processing_time: float):
@@ -322,11 +319,12 @@ class AsyncTTSEngine:
                 try:
                     Path(task.result).unlink()
                     logger.info(f"Cleaned up old task file: {task.result}")
-                except Exception as e:
-                    logger.error(f"Error cleaning up task file {task.result}: {e}")
+                except Exception:
+                    logger.exception("Error cleaning up task file {task.result}")
         
         if tasks_to_remove:
             logger.info(f"Cleaned up {len(tasks_to_remove)} old tasks")
 
 # Глобальный экземпляр
 async_tts_engine = AsyncTTSEngine()
+

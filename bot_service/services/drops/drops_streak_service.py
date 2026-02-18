@@ -142,8 +142,8 @@ class DropsStreakMixin:
 
         try:
             repo.update_streak(streak)
-        except Exception as e:
-            logger.error(f"[ERROR] Error updating streak for {viewer_name}: {e}")
+        except Exception:
+            logger.exception("[ERROR] Error updating streak for {viewer_name}")
             self.db.rollback()
             raise
 
@@ -281,3 +281,4 @@ class DropsStreakMixin:
         elif amount >= config.donation_amount_common:
             return "Common"
         return None
+

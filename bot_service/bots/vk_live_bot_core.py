@@ -2,12 +2,14 @@
 """Основной класс VK Live бота"""
 import asyncio
 import logging
+import os
 from typing import List, Dict, Any, Optional
 from core.connection_manager import ConnectionManager
 from utils.vk_live_websocket import VKLiveWebSocketClient
 from utils.vk_channel_url import normalize_vk_channel_url
 
 logger = logging.getLogger('bot_service')
+_VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 class VKLiveBotCore:
     """Основной класс VK Live бота
@@ -134,11 +136,13 @@ class VKLiveBotCore:
                 "channel_url": normalize_vk_channel_url(channel_url)
             }
 
-            # SSL context с отключенной верификацией для dev API
+            # SSL config: secure by default, optional insecure dev fallback.
             import ssl
             ssl_context = ssl.create_default_context()
-            ssl_context.check_hostname = False
-            ssl_context.verify_mode = ssl.CERT_NONE
+            if _VK_INSECURE_SSL:
+                logger.warning("[VK BOT] SSL verification disabled via VK_INSECURE_SSL=true")
+                ssl_context.check_hostname = False
+                ssl_context.verify_mode = ssl.CERT_NONE
 
             async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ssl_context)) as session:
                 async with session.get(url, headers=headers, params=params) as response:

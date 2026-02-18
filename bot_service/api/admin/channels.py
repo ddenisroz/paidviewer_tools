@@ -38,7 +38,7 @@ async def get_blocked_channels(
 ):
     """Получить список заблокированных каналов"""
     try:
-        if not user.get('is_admin', False):
+        if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         repo = BlockedChannelRepository(db)
@@ -56,8 +56,8 @@ async def get_blocked_channels(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting blocked channels: {e}")
+    except Exception:
+        logger.exception("Error getting blocked channels")
         raise HTTPException(status_code=500, detail="Ошибка получения заблокированных каналов")
 
 
@@ -70,7 +70,7 @@ async def block_channel(
 ):
     """Заблокировать канал"""
     try:
-        if not user.get('is_admin', False):
+        if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         # Валидация
@@ -89,7 +89,7 @@ async def block_channel(
             blocked_by=user.get('username')
         )
         
-        logger.info(f"[BLOCKED] Blocked channel: {channel_name} by {user.get('username')} (reason: {reason})")
+        logger.info("[BLOCKED] Blocked channel: %s by %s (reason: %s)", channel_name, user.get("username"), reason)
         
         return {
             "success": True,
@@ -98,8 +98,8 @@ async def block_channel(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error blocking channel: {e}")
+    except Exception:
+        logger.exception("Error blocking channel")
         raise HTTPException(status_code=500, detail="Ошибка блокировки канала")
 
 
@@ -112,7 +112,7 @@ async def update_blocked_channel(
 ):
     """Обновить информацию о заблокированном канале"""
     try:
-        if not user.get('is_admin', False):
+        if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         repo = BlockedChannelRepository(db)
@@ -122,7 +122,7 @@ async def update_blocked_channel(
             if not channel:
                 raise HTTPException(status_code=404, detail="Blocked channel not found")
             
-            logger.info(f"[ADMIN] Updated blocked channel: {channel.channel_name}")
+            logger.info("[ADMIN] Updated blocked channel: %s", channel.channel_name)
         
         return {
             "success": True,
@@ -130,8 +130,8 @@ async def update_blocked_channel(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating blocked channel: {e}")
+    except Exception:
+        logger.exception("Error updating blocked channel")
         raise HTTPException(status_code=500, detail="Ошибка обновления заблокированного канала")
 
 
@@ -143,7 +143,7 @@ async def unblock_channel(
 ):
     """Разблокировать канал (мягкое удаление)"""
     try:
-        if not user.get('is_admin', False):
+        if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         repo = BlockedChannelRepository(db)
@@ -152,7 +152,7 @@ async def unblock_channel(
         if not channel:
             raise HTTPException(status_code=404, detail="Blocked channel not found")
         
-        logger.info(f"[OK] Unblocked channel: {channel.channel_name} by {user.get('username')}")
+        logger.info("[OK] Unblocked channel: %s by %s", channel.channel_name, user.get("username"))
         
         return {
             "success": True,
@@ -160,7 +160,7 @@ async def unblock_channel(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error unblocking channel: {e}")
+    except Exception:
+        logger.exception("Error unblocking channel")
         raise HTTPException(status_code=500, detail="Ошибка разблокировки канала")
 

@@ -48,7 +48,7 @@ class TTSInstaller:
             print("[DOCS] Документация: http://localhost:8001/docs")
             
         except Exception as e:
-            logger.error(f"Ошибка установки: {e}")
+            logger.exception("Ошибка установки")
             print(f"\n[ERROR] Ошибка установки: {e}")
             return False
         
@@ -290,3 +290,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

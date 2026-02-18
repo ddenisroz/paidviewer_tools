@@ -7,7 +7,6 @@ import React, { memo, useMemo } from 'react';
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { processEmotes } from '@/features/chat/utils/emotes';
-import { sanitizeHtml } from '@/shared/utils/sanitize';
 
 import type { ChatEmote } from '@/types/chat';
 
@@ -31,6 +30,13 @@ interface MessageContentProps {
 const URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
 const INLINE_EMOTE_CLASS = 'chat-inline-emote';
+const escapeHtmlAttr = (value: string): string =>
+    value
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/'/g, '&#39;');
 
 const tryVkAssetFallback = (img: HTMLImageElement): boolean => {
     const src = img.src || '';
@@ -139,7 +145,7 @@ const processTwitchEmotes = (text: string, emotes: ChatEmote[]): string => {
 
         const rawUrl = normalizeInlineEmoteUrl(emote.url || `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`);
         const emoteUrl = encodeURI(rawUrl);
-        const emoteName = emote.name || 'emote';
+        const emoteName = escapeHtmlAttr(emote.name || 'emote');
         const imgTag = `<img src="${emoteUrl}" alt="${emoteName}" class="${INLINE_EMOTE_CLASS}" title="${emoteName}" />`;
 
         processedText = processedText.substring(0, start) + imgTag + processedText.substring(end);
@@ -155,7 +161,7 @@ const processTwitchTextEmotes = (text: string): string => {
         const regex = new RegExp(`(^|\\s)(${escapedCode})(?=\\s|$|[.,!?])`, 'g');
         processed = processed.replace(regex, (_match, leading, matchedCode) => {
             const emoteUrl = `https://static-cdn.jtvnw.net/emoticons/v2/${meta.id}/default/dark/3.0`;
-            return `${leading}<img src="${emoteUrl}" alt="${meta.name}" class="${INLINE_EMOTE_CLASS}" title="${matchedCode}" />`;
+            return `${leading}<img src="${emoteUrl}" alt="${escapeHtmlAttr(meta.name)}" class="${INLINE_EMOTE_CLASS}" title="${escapeHtmlAttr(matchedCode)}" />`;
         });
     }
     return processed;
@@ -240,12 +246,10 @@ const renderMessageWithEmotes = (
 
             if (!showLinks) {
                 const removedText = removeUrls(part);
-                return removedText ? <span key={index} dangerouslySetInnerHTML={{ __html: sanitizeHtml(removedText) }} /> : null;
+                return removedText ? <span key={index}>{removedText}</span> : null;
             }
 
-            // Здесь сложность: мы не можем вернуть компонент ChatImage из dangerouslySetInnerHTML
-            // Поэтому, если часть содержит URL, нам нужно её еще раз разбить или использовать renderPart
-            // Но renderPart возвращает ReactNode, а мы внутри map.
+            // Если часть содержит URL внутри текста, разбиваем её дополнительно.
 
             // Упрощение: если часть - это чистый URL
             if (part.match(URL_REGEX) && part.match(URL_REGEX)![0] === part) {
@@ -264,12 +268,12 @@ const renderMessageWithEmotes = (
                     if (autoLoadImages && isImageUrl(subPart)) return <ChatImage key={`${index}-${subIndex}`} src={subPart} />;
                     return <ChatLink key={`${index}-${subIndex}`} href={subPart} />;
                 }
-                return <span key={`${index}-${subIndex}`} dangerouslySetInnerHTML={{ __html: sanitizeHtml(subPart) }} />;
+                return <span key={`${index}-${subIndex}`}>{subPart}</span>;
             });
         }
 
-        // Обычный текст с sanitize
-        return <span key={index} dangerouslySetInnerHTML={{ __html: sanitizeHtml(part) }} />;
+        // Обычный текст рендерим как text node (React экранирует сам)
+        return <span key={index}>{part}</span>;
     });
 };
 

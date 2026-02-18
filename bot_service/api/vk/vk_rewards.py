@@ -42,8 +42,8 @@ class VKRewards(VKAuth):
                         logger.error(f"VK channel points balance error: {response.status} - {response_text}")
                         return None
 
-        except Exception as e:
-            logger.error(f"Error getting VK channel points balance: {e}")
+        except Exception:
+            logger.exception("Error getting VK channel points balance")
             return None
 
     async def get_channel_rewards(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
@@ -54,9 +54,9 @@ class VKRewards(VKAuth):
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
             }
-            for candidate in get_vk_channel_candidates(channel_url):
-                params = {"channel_url": candidate}
-                async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
+            async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
+                for candidate in get_vk_channel_candidates(channel_url):
+                    params = {"channel_url": candidate}
                     async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
                         if response.status == 200:
                             data = await response.json()
@@ -64,8 +64,8 @@ class VKRewards(VKAuth):
                         response_text = await response.text()
                         logger.error(f"VK channel rewards error ({candidate}): {response.status} - {response_text}")
 
-        except Exception as e:
-            logger.error(f"Error getting VK channel rewards: {e}")
+        except Exception:
+            logger.exception("Error getting VK channel rewards")
             return None
 
     async def create_channel_reward(self, channel_url: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -92,8 +92,8 @@ class VKRewards(VKAuth):
                         logger.error(f"VK create reward error: {response.status} - {response_text}")
                         return None
 
-        except Exception as e:
-            logger.error(f"Error creating VK channel reward: {e}")
+        except Exception:
+            logger.exception("Error creating VK channel reward")
             return None
     
     async def get_rewards_manage_info(self, channel_url: str, access_token: str) -> Optional[List[Dict[str, Any]]]:
@@ -104,17 +104,17 @@ class VKRewards(VKAuth):
                 "Authorization": f"Bearer {access_token}",
                 "Content-Type": "application/json"
             }
-            for candidate in get_vk_channel_candidates(channel_url):
-                params = {"channel_url": candidate}
-                async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
+            async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
+                for candidate in get_vk_channel_candidates(channel_url):
+                    params = {"channel_url": candidate}
                     async with session.get(url, headers=headers, params=params, ssl=self.ssl_context) as response:
                         if response.status == 200:
                             data = await response.json()
                             return cast(Optional[List[Dict[str, Any]]], data.get("data", {}).get("rewards", []))
                         response_text = await response.text()
                         logger.error(f"VK rewards manage info error ({candidate}): {response.status} - {response_text}")
-        except Exception as e:
-             logger.error(f"Error getting VK rewards manage info: {e}")
+        except Exception:
+             logger.exception("Error getting VK rewards manage info")
              return None
 
     async def get_reward_demands(self, channel_url: str, access_token: str, limit: int = 20, offset: int = 0) -> Optional[Dict[str, Any]]:
@@ -141,8 +141,8 @@ class VKRewards(VKAuth):
                         response_text = await response.text()
                         logger.error(f"VK reward demands error: {response.status} - {response_text}")
                         return None
-        except Exception as e:
-            logger.error(f"Error getting VK reward demands: {e}")
+        except Exception:
+            logger.exception("Error getting VK reward demands")
             return None
 
     async def accept_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
@@ -166,8 +166,8 @@ class VKRewards(VKAuth):
                         response_text = await response.text()
                         logger.error(f"VK accept demands error: {response.status} - {response_text}")
                         return False
-        except Exception as e:
-            logger.error(f"Error accepting VK reward demands: {e}")
+        except Exception:
+            logger.exception("Error accepting VK reward demands")
             return False
 
     async def reject_reward_demands(self, channel_url: str, access_token: str, demand_ids: List[int]) -> bool:
@@ -191,8 +191,8 @@ class VKRewards(VKAuth):
                         response_text = await response.text()
                         logger.error(f"VK reject demands error: {response.status} - {response_text}")
                         return False
-        except Exception as e:
-            logger.error(f"Error rejecting VK reward demands: {e}")
+        except Exception:
+            logger.exception("Error rejecting VK reward demands")
             return False
 
     async def delete_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
@@ -218,8 +218,8 @@ class VKRewards(VKAuth):
                         response_text = await response.text()
                         logger.error(f"VK delete reward error: {response.status} - {response_text}")
                         return False
-        except Exception as e:
-            logger.error(f"Error deleting VK channel reward: {e}")
+        except Exception:
+            logger.exception("Error deleting VK channel reward")
             return False
 
     async def update_channel_reward(self, channel_url: str, reward_id: str, access_token: str, reward_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -247,8 +247,8 @@ class VKRewards(VKAuth):
                         response_text = await response.text()
                         logger.error(f"VK update reward error: {response.status} - {response_text}")
                         return None
-        except Exception as e:
-            logger.error(f"Error updating VK channel reward: {e}")
+        except Exception:
+            logger.exception("Error updating VK channel reward")
             return None
 
     async def enable_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
@@ -274,8 +274,8 @@ class VKRewards(VKAuth):
                         response_text = await response.text()
                         logger.error(f"VK enable reward error: {response.status} - {response_text}")
                         return False
-        except Exception as e:
-            logger.error(f"Error enabling VK channel reward: {e}")
+        except Exception:
+            logger.exception("Error enabling VK channel reward")
             return False
 
     async def disable_channel_reward(self, channel_url: str, reward_id: str, access_token: str) -> bool:
@@ -300,6 +300,7 @@ class VKRewards(VKAuth):
                     else:
                         logger.error(f"VK disable reward error: {response.status} - {await response.text()}")
                         return False
-        except Exception as e:
-            logger.error(f"Error disabling VK channel reward: {e}")
+        except Exception:
+            logger.exception("Error disabling VK channel reward")
             return False
+

@@ -53,8 +53,21 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
                                 alt={cat.name}
                                 className="w-8 h-10 rounded object-cover border border-white/10"
                                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                    (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="w-8 h-10 bg-muted/50 rounded flex items-center justify-center border border-border/50"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-muted-foreground"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l5 5a2 2 0 0 0 2.828 0l7-7a2 2 0 0 0 0-2.828l-5-5a2 2 0 0 0-1.414-.586z"/><path d="M7 7h.01"/></svg></div>';
+                                    const img = e.currentTarget;
+                                    const parent = img.parentElement;
+                                    if (!parent) return;
+
+                                    img.remove();
+
+                                    const fallback = document.createElement('div');
+                                    fallback.className = 'w-8 h-10 bg-muted/50 rounded flex items-center justify-center border border-border/50';
+
+                                    const icon = document.createElement('span');
+                                    icon.className = 'w-4 h-4 text-muted-foreground text-xs';
+                                    icon.textContent = '#';
+                                    fallback.appendChild(icon);
+
+                                    parent.appendChild(fallback);
                                 }}
                             />
                         ) : (

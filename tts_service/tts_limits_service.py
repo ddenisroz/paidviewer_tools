@@ -49,8 +49,8 @@ class TTSLimitsService:
                 'priority_level': user.tts_priority_level or self.global_priority_level,
                 'tts_enabled': user.tts_enabled if user.tts_enabled is not None else True
             }
-        except Exception as e:
-            logger.error(f"Error getting user limits for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error getting user limits for user {user_id}")
             return {
                 'max_text_length': self.global_max_text_length,
                 'daily_limit': self.global_daily_limit,
@@ -86,8 +86,8 @@ class TTSLimitsService:
             logger.info(f"Updated TTS limits for user {user_id}: {limits}")
             return True
             
-        except Exception as e:
-            logger.error(f"Error updating user limits for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error updating user limits for user {user_id}")
             db.rollback()
             return False
     
@@ -118,9 +118,9 @@ class TTSLimitsService:
             
             return True, "Request allowed", limits
             
-        except Exception as e:
-            logger.error(f"Error validating request for user {user_id}: {e}")
-            return False, f"Validation error: {str(e)}", {}
+        except Exception:
+            logger.exception("Error validating request for user {user_id}")
+            return False, "Validation error", {}
     
     def get_daily_usage(self, user_id: int, date: datetime.date, db: Session) -> Dict[str, Any]:
         """Получить использование за день"""
@@ -167,8 +167,8 @@ class TTSLimitsService:
                 'low_requests': usage.low_requests
             }
             
-        except Exception as e:
-            logger.error(f"Error getting daily usage for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error getting daily usage for user {user_id}")
             return {}
     
     def log_request(self, user_id: int, text: str, processing_time: float, 
@@ -230,8 +230,8 @@ class TTSLimitsService:
             
             return True
             
-        except Exception as e:
-            logger.error(f"Error logging request for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error logging request for user {user_id}")
             db.rollback()
             return False
     
@@ -291,8 +291,8 @@ class TTSLimitsService:
                 'avg_processing_time': round(avg_processing_time, 2)
             }
             
-        except Exception as e:
-            logger.error(f"Error getting user stats for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error getting user stats for user {user_id}")
             return {}
     
     def get_global_stats(self, days: int = 7, db: Session = None) -> Dict[str, Any]:
@@ -347,9 +347,10 @@ class TTSLimitsService:
                 'avg_requests_per_user': round(avg_requests_per_user, 2)
             }
             
-        except Exception as e:
-            logger.error(f"Error getting global stats: {e}")
+        except Exception:
+            logger.exception("Error getting global stats")
             return {}
 
 # Глобальный экземпляр
 tts_limits_service = TTSLimitsService()
+

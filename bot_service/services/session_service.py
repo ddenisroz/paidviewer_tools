@@ -48,8 +48,8 @@ class SessionService:
                     'connected_at': None,  # CM currently doesn't track this publicly active_sessions
                 })
             return channels
-        except Exception as e:
-            logger.error(f"Error getting active channels: {e}")
+        except Exception:
+            logger.exception("Error getting active channels")
             raise
 
     def get_active_sessions_details(self) -> List[Dict[str, Any]]:
@@ -70,8 +70,8 @@ class SessionService:
                     'session_ids': list(session_ids)
                 })
             return sessions
-        except Exception as e:
-            logger.error(f"Error getting active sessions details: {e}")
+        except Exception:
+            logger.exception("Error getting active sessions details")
             raise
 
     def disconnect_channel(self, channel_name: str, admin_id: int) -> bool:
@@ -81,8 +81,8 @@ class SessionService:
             if success:
                 logger.info(f"Admin {admin_id} disconnected channel {channel_name}")
             return success
-        except Exception as e:
-            logger.error(f"Error disconnecting channel {channel_name}: {e}")
+        except Exception:
+            logger.exception("Error disconnecting channel {channel_name}")
             raise
 
     def clear_legacy_sessions(self) -> List[str]:
@@ -96,8 +96,8 @@ class SessionService:
             
             logger.info(f"Cleared legacy sessions: {cleared}")
             return cleared
-        except Exception as e:
-            logger.error(f"Error clearing legacy sessions: {e}")
+        except Exception:
+            logger.exception("Error clearing legacy sessions")
             raise
 
     # === Token Management ===
@@ -107,8 +107,8 @@ class SessionService:
         try:
             tokens = self.token_repo.get_all_by_user(user_id)
             return [self._format_token(t) for t in tokens]
-        except Exception as e:
-            logger.error(f"Error getting tokens for user {user_id}: {e}")
+        except Exception:
+            logger.exception("Error getting tokens for user {user_id}")
             raise
 
     def refresh_token(self, token_id: int, user_id: int) -> bool:
@@ -143,9 +143,9 @@ class SessionService:
             return True
         except ValueError:
             raise
-        except Exception as e:
+        except Exception:
             self.db.rollback()
-            logger.error(f"Error refreshing token {token_id}: {e}")
+            logger.exception("Error refreshing token {token_id}")
             raise
 
     def get_token_owner(self, token_id: int) -> Optional[int]:
@@ -165,3 +165,4 @@ class SessionService:
             'expires_at': token.expires_at.isoformat() if token.expires_at else None,
             'is_active': getattr(token, 'is_active', True)
         }
+

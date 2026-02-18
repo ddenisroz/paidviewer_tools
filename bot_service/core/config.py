@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     backend_url: str = Field(default="http://localhost:8000", description="Backend URL")
     frontend_url: str = Field(default="http://localhost:5173", description="Frontend URL")
     tts_service_url: str = Field(default="http://localhost:8001", description="TTS service URL")
+    tts_internal_api_key: Optional[str] = Field(
+        default=None,
+        description="Shared internal API key for bot_service -> tts_service admin calls",
+    )
     cors_origins: str = Field(
         default="http://localhost:5173,http://localhost:3000",
         description="CORS allowed origins (comma-separated)"

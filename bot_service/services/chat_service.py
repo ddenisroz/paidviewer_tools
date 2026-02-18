@@ -88,8 +88,8 @@ class ChatService:
                 "total": len(messages_data)
             }
 
-        except Exception as e:
-            logger.error(f"[ERROR] [CHAT HISTORY] Error: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[ERROR] [CHAT HISTORY] Error")
             return {
                 "success": False,
                 "messages": [],
@@ -127,8 +127,8 @@ class ChatService:
             # We can rely on API layer to validate permissions usually.
             
             return chat_repo.soft_delete(message_id)
-        except Exception as e:
-            logger.error(f"Error deleting message: {e}")
+        except Exception:
+            logger.exception("Error deleting message")
             self.db.rollback()
             return False
 
@@ -137,7 +137,8 @@ class ChatService:
         try:
             from bot_service.repositories.chat_message_repository import ChatMessageRepository
             return ChatMessageRepository(self.db).delete_by_user(user_id)
-        except Exception as e:
-            logger.error(f"Error deleting user messages: {e}")
+        except Exception:
+            logger.exception("Error deleting user messages")
             self.db.rollback()
             return 0
+

@@ -146,8 +146,10 @@ async def get_commands(
         result = service.get_all_commands_for_user(user_id, db)
         log_response("/api/commands", 200, result)
         return result
-    except Exception as exc:
-        commands_logger.error("[X] Error getting commands: %s", exc, exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        commands_logger.exception("[X] Error getting commands")
         log_response("/api/commands", 500, {"error": "Internal server error"})
         raise HTTPException(status_code=500, detail="Failed to load commands")
 
@@ -183,8 +185,10 @@ async def create_command(
         return result
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid command data")
-    except Exception as exc:
-        logger.error("Error creating command: %s", exc)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating command")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create command")
 
@@ -211,8 +215,10 @@ async def update_command(
         error_text = str(exc)
         status_code = 404 if _is_not_found_error(error_text) else 403 if _is_forbidden_error(error_text) else 400
         raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
-    except Exception as exc:
-        logger.error("Error updating command: %s", exc)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating command")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to update command")
 
@@ -242,8 +248,10 @@ async def create_command_override(
     except ValueError as exc:
         status_code = 404 if _is_not_found_error(str(exc)) else 400
         raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
-    except Exception as exc:
-        logger.error("Error creating override: %s", exc, exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error creating override")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to create command override")
 
@@ -267,7 +275,10 @@ async def delete_command(
     except ValueError as exc:
         status_code = 404 if _is_not_found_error(str(exc)) else 403
         raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
-    except Exception as exc:
-        logger.error("Error deleting command: %s", exc)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting command")
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to delete command")
+

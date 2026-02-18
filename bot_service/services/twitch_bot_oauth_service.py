@@ -171,7 +171,7 @@ class TwitchBotOAuthService:
                 return True
                 
             except Exception as e:
-                logger.error(f"Error saving bot token: {e}")
+                logger.exception("Error saving bot token")
                 session_db.rollback()
                 return False
         
@@ -347,7 +347,7 @@ class TwitchBotOAuthService:
                 return False
 
             except Exception as e:
-                logger.error(f"Error refreshing bot token: {e}")
+                logger.exception("Error refreshing bot token")
                 session_db.rollback()
                 return False
 
@@ -391,9 +391,10 @@ class TwitchBotOAuthService:
                 return await _check_and_refresh(new_db)
                 
         except Exception as e:
-            logger.error(f"Error checking bot token expiration: {e}")
+            logger.exception("Error checking bot token expiration")
             return False
 
 
 # Глобальный экземпляр
 twitch_bot_oauth_service = TwitchBotOAuthService()
+

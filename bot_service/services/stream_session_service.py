@@ -213,8 +213,8 @@ class StreamSessionService:
                     self.streak_repo.update_streak(streak)
                     logger.debug(f"[OK] [STREAM SESSION] Marked viewer {viewer_id} attended stream session {active_session.id}")
                     return True
-                except Exception as e:
-                    logger.error(f"[ERROR] Error marking viewer attended stream: {e}")
+                except Exception:
+                    logger.exception("[ERROR] Error marking viewer attended stream")
                     self.db.rollback()
                     return False
 
@@ -263,3 +263,4 @@ class StreamSessionService:
 
         # Проверяем, совпадает ли last_stream_session_id с последней сессией
         return streak.last_stream_session_id == last_session.id
+

@@ -70,8 +70,8 @@ class IntegrationService:
             
             return integrations
             
-        except Exception as e:
-            logger.error(f"Error getting integrations: {e}")
+        except Exception:
+            logger.exception("Error getting integrations")
             return {}
 
     def _get_username_for_platform(self, platform: str, user: Optional[User]) -> Optional[str]:
@@ -130,8 +130,8 @@ class IntegrationService:
             logger.info(f"[OK] Integration {platform} disconnected for user {user_id}")
             return {"success": True, "message": f"{platform} bot disconnected"}
 
-        except Exception as e:
-            logger.error(f"Error disconnecting {platform}: {e}")
+        except Exception:
+            logger.exception("Error disconnecting {platform}")
             return {"success": False, "error": "Internal server error"}
 
     async def remove_integration(
@@ -167,8 +167,8 @@ class IntegrationService:
                 "message": f"{platform} integration fully removed. Re-authorization required."
             }
 
-        except Exception as e:
-            logger.error(f"Error removing {platform} integration: {e}")
+        except Exception:
+            logger.exception("Error removing {platform} integration")
             return {"success": False, "error": "Internal server error"}
 
     async def _disconnect_twitch_bot(self, channel_name: str) -> None:
@@ -179,8 +179,8 @@ class IntegrationService:
             if bot_instance:
                 await bot_instance.part_channels([channel_name])
                 logger.info(f"[OK] Twitch bot left channel: {channel_name}")
-        except Exception as e:
-            logger.error(f"Error disconnecting Twitch bot: {e}")
+        except Exception:
+            logger.exception("Error disconnecting Twitch bot")
             raise
 
     async def _disconnect_vk_bot(self, channel_name: str) -> None:
@@ -190,6 +190,7 @@ class IntegrationService:
             if main.vk_live_bot_instance:
                 await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
                 logger.info(f"[OK] Disconnected VK bot from {channel_name}")
-        except Exception as e:
-            logger.error(f"Error disconnecting VK bot: {e}")
+        except Exception:
+            logger.exception("Error disconnecting VK bot")
             raise
+

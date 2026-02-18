@@ -69,8 +69,8 @@ class CommandService:
             
             return command
 
-        except Exception as e:
-            self.logger.error(f"Error finding command: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error finding command")
             return None
 
     def get_all_commands_for_user(
@@ -138,8 +138,8 @@ class CommandService:
                 "custom_commands": custom_commands_data
             }
             
-        except Exception as e:
-            self.logger.error(f"Error getting commands: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error getting commands")
             raise
 
     def _command_to_dict(self, cmd: BotCommand) -> Dict[str, Any]:
@@ -466,8 +466,8 @@ class CommandService:
 
             return has_permission
 
-        except Exception as e:
-            self.logger.error(f"Error checking permission: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error checking permission")
             return False
 
     def check_cooldown(self, command: BotCommand, user_id: str) -> bool:
@@ -488,8 +488,8 @@ class CommandService:
             
             return utcnow_naive() >= cooldown_expires
 
-        except Exception as e:
-            self.logger.error(f"Error checking cooldown: {e}")
+        except Exception:
+            self.logger.exception("Error checking cooldown")
             return True
 
     def update_cooldown(self, command: BotCommand, user_id: str):
@@ -504,9 +504,10 @@ class CommandService:
             
             self._cooldowns[command_id][user_id] = utcnow_naive()
 
-        except Exception as e:
-            self.logger.error(f"Error updating cooldown: {e}")
+        except Exception:
+            self.logger.exception("Error updating cooldown")
 
     def get_command_response(self, command: BotCommand) -> str:
         """Получить текст ответа."""
         return command.response_text or ""
+

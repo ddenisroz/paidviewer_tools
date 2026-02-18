@@ -340,6 +340,9 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
 
 ChatMessageItem.displayName = 'ChatMessageItem';
 
+const sanitizeFontFamily = (fontFamily: string): string =>
+    fontFamily.replace(/[^a-zA-Z0-9,\s-]/g, '').trim();
+
  
 const ChatOverlay: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -364,10 +367,11 @@ const ChatOverlay: React.FC = () => {
     const containerStyle = useMemo<React.CSSProperties>(() => {
         if (!settings) return {};
 
-        const resolvedFontFamily = settings?.font_family
-            ? (settings.font_family.includes(',')
-                ? settings.font_family
-                : `${settings.font_family}, sans-serif`)
+        const safeFontFamily = settings?.font_family ? sanitizeFontFamily(settings.font_family) : '';
+        const resolvedFontFamily = safeFontFamily
+            ? (safeFontFamily.includes(',')
+                ? safeFontFamily
+                : `${safeFontFamily}, sans-serif`)
             : 'Inter, sans-serif';
 
         return {
@@ -387,7 +391,7 @@ const ChatOverlay: React.FC = () => {
 
     useEffect(() => {
         const style = document.createElement('style');
-        style.innerHTML = `
+        style.textContent = `
             .horizontal-chat-scroll::-webkit-scrollbar {
                 height: 8px;
             }
@@ -422,7 +426,8 @@ const ChatOverlay: React.FC = () => {
             'Arial Black', 'Impact', 'Inter', 'sans-serif', 'serif', 'monospace'
         ];
 
-        const fontFamily = settings.font_family;
+        const fontFamily = sanitizeFontFamily(settings.font_family);
+        if (!fontFamily) return;
         const isSystemFont = systemFonts.some(sf => fontFamily.includes(sf));
 
         if (isSystemFont) {
@@ -430,7 +435,9 @@ const ChatOverlay: React.FC = () => {
             return;
         }
 
-        const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/\s+/g, '+')}"]`);
+        const fontQuery = encodeURIComponent(fontFamily).replace(/%20/g, '+');
+        const existingLink = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+            .some((link) => link.href.includes(`family=${fontQuery}`));
         if (existingLink) {
             logger.log(`[FONT] Font already loaded: ${fontFamily}`);
             return;
@@ -438,7 +445,7 @@ const ChatOverlay: React.FC = () => {
 
         const link = document.createElement('link');
         link.rel = 'stylesheet';
-        link.href = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/\s+/g, '+')}:wght@400;500;600;700&display=swap`;
+        link.href = `https://fonts.googleapis.com/css2?family=${fontQuery}:wght@400;500;600;700&display=swap`;
 
         logger.log(`[FONT] Loading Google Font: ${fontFamily}`);
         logger.log(`[LINK] [FONT] URL: ${link.href}`);

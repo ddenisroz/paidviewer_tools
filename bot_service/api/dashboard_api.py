@@ -40,10 +40,9 @@ async def get_dashboard_init(
         
         return JSONResponse(content=data)
         
-    except Exception as e:
-        logger.error(f"[ERROR] [DASHBOARD] Error loading init data: {e}", exc_info=True)
-        return JSONResponse(
-            content={"success": False, "error": "Internal server error"},
-            status_code=500
-        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[ERROR] [DASHBOARD] Error loading init data")
+        raise HTTPException(status_code=500, detail="Internal server error")
 

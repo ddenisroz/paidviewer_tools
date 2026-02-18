@@ -7,16 +7,13 @@ Asynchronous version of audio converter with worker pool
 
 import asyncio
 import logging
-import tempfile
 import os
 import uuid
-from pathlib import Path
 from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 import soundfile as sf
 import numpy as np
 import librosa
-from pydub import AudioSegment
 
 logger = logging.getLogger(__name__)
 
@@ -143,8 +140,8 @@ class AsyncAudioConverter:
             logger.info(f"Audio conversion successful: {output_path}")
             return True
             
-        except Exception as e:
-            logger.error(f"Audio conversion failed: {e}")
+        except Exception:
+            logger.exception("Audio conversion failed")
             return False
             
     async def _handle_conversion_result(self, future, task_id: str):
@@ -156,7 +153,7 @@ class AsyncAudioConverter:
         except Exception as e:
             self._conversion_tasks[task_id]['status'] = 'failed'
             self._conversion_tasks[task_id]['error'] = str(e)
-            logger.error(f"Conversion task {task_id} failed: {e}")
+            logger.exception("Conversion task {task_id} failed")
             
     async def get_conversion_result(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -223,9 +220,10 @@ class AsyncAudioConverter:
                 
             return True
             
-        except Exception as e:
-            logger.error(f"Audio validation failed: {e}")
+        except Exception:
+            logger.exception("Audio validation failed")
             return False
 
 # Глобальный экземпляр
 async_audio_converter = AsyncAudioConverter(max_workers=2)
+

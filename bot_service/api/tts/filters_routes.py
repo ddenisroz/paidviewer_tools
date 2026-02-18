@@ -23,14 +23,16 @@ async def get_filtered_words(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список отфильтрованных слов"""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓР С—Р С‘РЎРѓР С•Р С” Р С•РЎвЂљРЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р С•Р Р†Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦ РЎРѓР В»Р С•Р Р†"""
     try:
         tts_service = TTSService(db)
         words = await tts_service.get_filtered_words(current_user['id'])
         return {"success": True, "data": words}
-    except Exception as e:
-        logger.error(f"Error getting filtered words: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения списка слов")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting filtered words")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @filters_router.post("/filtered-words")
@@ -39,7 +41,7 @@ async def add_filtered_word(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Добавить слово в фильтр"""
+    """Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚"""
     try:
         tts_service = TTSService(db)
         success = await tts_service.add_filtered_word(
@@ -49,13 +51,15 @@ async def add_filtered_word(
         )
 
         if success:
-            return {"success": True, "message": f"Слово '{request.word}' добавлено в фильтр"}
+            return {"success": True, "message": f"Р РЋР В»Р С•Р Р†Р С• '{request.word}' Р Т‘Р С•Р В±Р В°Р Р†Р В»Р ВµР Р…Р С• Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚"}
         else:
-            raise HTTPException(status_code=400, detail="Слово уже существует в фильтре")
+            raise HTTPException(status_code=400, detail="Р РЋР В»Р С•Р Р†Р С• РЎС“Р В¶Р Вµ РЎРѓРЎС“РЎвЂ°Р ВµРЎРѓРЎвЂљР Р†РЎС“Р ВµРЎвЂљ Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р Вµ")
 
-    except Exception as e:
-        logger.error(f"Error adding filtered word: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка добавления слова")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error adding filtered word")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @filters_router.delete("/filtered-words/{word_id}")
@@ -64,19 +68,21 @@ async def delete_filtered_word(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить слово из фильтра"""
+    """Р Р€Р Т‘Р В°Р В»Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р С‘Р В· РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В°"""
     try:
         tts_service = TTSService(db)
         success = await tts_service.remove_filtered_word(current_user['id'], word_id)
 
         if success:
-            return {"success": True, "message": "Слово удалено из фильтра"}
+            return {"success": True, "message": "Р РЋР В»Р С•Р Р†Р С• РЎС“Р Т‘Р В°Р В»Р ВµР Р…Р С• Р С‘Р В· РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В°"}
         else:
-            raise HTTPException(status_code=404, detail="Слово не найдено")
+            raise HTTPException(status_code=404, detail="Р РЋР В»Р С•Р Р†Р С• Р Р…Р Вµ Р Р…Р В°Р в„–Р Т‘Р ВµР Р…Р С•")
 
-    except Exception as e:
-        logger.error(f"Error deleting filtered word: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка удаления слова")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting filtered word")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @filters_router.get("/filters")
@@ -84,14 +90,16 @@ async def get_filters_list(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список всех фильтров пользователя (alias)"""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓР С—Р С‘РЎРѓР С•Р С” Р Р†РЎРѓР ВµРЎвЂ¦ РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р С•Р Р† Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЏ (alias)"""
     try:
         tts_service = TTSService(db)
         words = await tts_service.get_filtered_words(current_user['id'])
         return {"success": True, "filters": words}
-    except Exception as e:
-        logger.error(f"Error getting filters: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения фильтров")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting filters")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @filters_router.post("/filters")
@@ -100,7 +108,7 @@ async def add_filter(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Добавить слово в фильтр (alias)"""
+    """Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚ (alias)"""
     return await add_filtered_word(request, current_user, db)
 
 
@@ -110,5 +118,6 @@ async def remove_filter(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить слово из фильтра (alias)"""
+    """Р Р€Р Т‘Р В°Р В»Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р С‘Р В· РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В° (alias)"""
     return await delete_filtered_word(filter_id, current_user, db)
+

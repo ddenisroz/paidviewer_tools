@@ -242,7 +242,7 @@ class AuthHandlers:
             logger.error(f"Error in Twitch callback: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
+            raise HTTPException(status_code=500, detail="Authentication failed")
 
     # VK OAuth С‚РµРїРµСЂСЊ РїРѕР»РЅРѕСЃС‚СЊСЋ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚СЃСЏ С‡РµСЂРµР· auth/vk_auth.py СЂРѕСѓС‚РµСЂ
     # РњРµС‚РѕРґС‹ vk_login() Рё vk_callback() СѓРґР°Р»РµРЅС‹

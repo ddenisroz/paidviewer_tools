@@ -1,4 +1,4 @@
-# bot_service/api/session_api.py
+﻿# bot_service/api/session_api.py
 """
 API РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ СЃРµСЃСЃРёСЏРјРё.
 Refactored to use SessionService (Clean Architecture).
@@ -16,22 +16,39 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
+def _is_admin(user: dict) -> bool:
+    """Role-based admin check with legacy compatibility."""
+    return user.get("role") == "admin" or bool(user.get("is_admin", False))
+
+
 @router.post("/clear-legacy")
-async def clear_legacy_sessions(db: Session = Depends(get_db)):
+async def clear_legacy_sessions(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """РћС‡РёСЃС‚РёС‚СЊ legacy СЃРµСЃСЃРёРё (test_channel, СЃС‚Р°СЂС‹Рµ VK ID)"""
     try:
+        if not _is_admin(user):
+            raise HTTPException(status_code=403, detail="Admin access required")
         service = SessionService(db)
         cleared = service.clear_legacy_sessions()
         return {"success": True, "cleared": cleared}
-    except Exception as e:
-        logger.error(f"Error clearing legacy sessions: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error clearing legacy sessions")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/active-channels")
-async def get_active_channels(db: Session = Depends(get_db)):
+async def get_active_channels(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р°РєС‚РёРІРЅС‹С… РєР°РЅР°Р»РѕРІ"""
     try:
+        if not _is_admin(user):
+            raise HTTPException(status_code=403, detail="Admin access required")
         service = SessionService(db)
         channels = service.get_active_channels()
         
@@ -40,15 +57,22 @@ async def get_active_channels(db: Session = Depends(get_db)):
             "channels": channels,
             "total": len(channels)
         }
-    except Exception as e:
-        logger.error(f"Error getting active channels: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting active channels")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/active-sessions")
-async def get_active_sessions(db: Session = Depends(get_db)):
+async def get_active_sessions(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """РџРѕР»СѓС‡РёС‚СЊ РґРµС‚Р°Р»СЊРЅСѓСЋ РёРЅС„РѕСЂРјР°С†РёСЋ РѕР± Р°РєС‚РёРІРЅС‹С… СЃРµСЃСЃРёСЏС…"""
     try:
+        if not _is_admin(user):
+            raise HTTPException(status_code=403, detail="Admin access required")
         service = SessionService(db)
         sessions = service.get_active_sessions_details()
 
@@ -57,9 +81,11 @@ async def get_active_sessions(db: Session = Depends(get_db)):
             "sessions": sessions,
             "total_channels": len(sessions)
         }
-    except Exception as e:
-        logger.error(f"Error getting active sessions: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting active sessions")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/disconnect/{channel_name}")
@@ -71,7 +97,7 @@ async def disconnect_channel(
     """РџСЂРёРЅСѓРґРёС‚РµР»СЊРЅРѕ РѕС‚РєР»СЋС‡РёС‚СЊ РєР°РЅР°Р»"""
     try:
         # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹)
-        if not user.get('is_admin', False):
+        if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
 
         service = SessionService(db)
@@ -80,13 +106,13 @@ async def disconnect_channel(
         if success:
             return {"success": True, "message": f"Channel {channel_name} disconnected"}
         else:
-            return {"success": False, "message": f"Channel {channel_name} not found"}
+            raise HTTPException(status_code=404, detail=f"Channel {channel_name} not found")
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error disconnecting channel {channel_name}: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error disconnecting channel %s", channel_name)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/user-tokens")
@@ -102,7 +128,7 @@ async def get_user_tokens(
             user_id = user['id']
 
         # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР°
-        if not user.get('is_admin', False) and user['id'] != user_id:
+        if not _is_admin(user) and user['id'] != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
         service = SessionService(db)
@@ -116,9 +142,9 @@ async def get_user_tokens(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting user tokens: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error getting user tokens")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/refresh-token/{token_id}")
@@ -136,17 +162,17 @@ async def refresh_token(
         if not token_owner_id:
              raise HTTPException(status_code=404, detail="Token not found")
              
-        if not user.get('is_admin', False) and user['id'] != token_owner_id:
+        if not _is_admin(user) and user['id'] != token_owner_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
         # Р’С‹РїРѕР»РЅСЏРµРј РѕР±РЅРѕРІР»РµРЅРёРµ
         # (РїРµСЂРµРґР°РµРј user_id РґР»СЏ РґРѕРї. РїСЂРѕРІРµСЂРєРё РІРЅСѓС‚СЂРё СЃРµСЂРІРёСЃР°, С…РѕС‚СЏ РјС‹ СѓР¶Рµ РїСЂРѕРІРµСЂРёР»Рё)
-        success = service.refresh_token(token_id, token_owner_id)
+        service.refresh_token(token_id, token_owner_id)
 
         return {"success": True, "message": "Token refreshed successfully"}
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error refreshing token {token_id}: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error refreshing token %s", token_id)
+        raise HTTPException(status_code=500, detail="Internal server error")

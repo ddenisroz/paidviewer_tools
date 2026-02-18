@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -88,9 +88,11 @@ async def get_twitch_stream_info(
         set_cached_stream_info(user_id, "twitch", info)
         
         return JSONResponse(content={"data": info})
-    except Exception as e:
-        logger.error(f"Error getting Twitch stream info: {e}")
-        return JSONResponse(content={"data": service._empty_info()}, status_code=500)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting Twitch stream info")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/vk/stream-info")
 async def get_vk_stream_info(
@@ -115,9 +117,11 @@ async def get_vk_stream_info(
         # But VK platform get_stream_info usually includes everything.
 
         return JSONResponse(content={"data": info})
-    except Exception as e:
-        logger.error(f"Error getting VK stream info: {e}")
-        return JSONResponse(content={"data": service._empty_info()}, status_code=500)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting VK stream info")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/stream/update")
 async def update_stream(
@@ -140,8 +144,8 @@ async def update_stream(
                 info = await service.get_stream_info(user_id, platform_name, session_id)
                 set_cached_stream_info(user_id, platform_name, info)
                 await broadcast_stream_info_change(user_id, platform_name, info)
-            except Exception as broadcast_error:
-                logger.warning(f"[STREAM_INFO] Broadcast failed for {platform_name}: {broadcast_error}")
+            except Exception:
+                logger.exception("[STREAM_INFO] Broadcast failed for %s", platform_name)
 
         # Update Twitch
         if request.twitch:
@@ -155,7 +159,7 @@ async def update_stream(
                     await _broadcast_stream_info("twitch")
                 else:
                     failures.append("Twitch")
-                    logger.error(f"Failed to update Twitch for user {user_id}")
+                    logger.error("Failed to update Twitch for user %s", user_id)
 
         # Update VK
         if request.vk:
@@ -169,17 +173,15 @@ async def update_stream(
                     await _broadcast_stream_info("vk")
                 else:
                     failures.append("VK")
-                    logger.error(f"Failed to update VK for user {user_id}")
+                    logger.error("Failed to update VK for user %s", user_id)
 
         if not results and not failures:
             return JSONResponse(content={"success": True, "message": "No changes or updates needed"})
 
         if failures:
-            # Use conflict status for platform-level update failures instead of generic 500.
-            status_code = 409
-            return JSONResponse(
-                content={
-                    "success": False,
+            raise HTTPException(
+                status_code=409,
+                detail={
                     "message": (
                         f"Updated: {', '.join(results)}. Failed: {', '.join(failures)}"
                         if results
@@ -188,7 +190,6 @@ async def update_stream(
                     "updated_platforms": [item.replace(" updated", "").lower() for item in results],
                     "failed_platforms": [item.lower() for item in failures],
                 },
-                status_code=status_code,
             )
 
         return JSONResponse(
@@ -200,9 +201,11 @@ async def update_stream(
             }
         )
 
-    except Exception as e:
-        logger.error(f"Error in stream update: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error in stream update")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/twitch/categories")
 async def search_twitch_categories(
@@ -236,17 +239,23 @@ async def update_platform_stream(
     service: StreamInfoService = Depends(get_stream_service)
 ):
     """Generic endpoint to update stream info for any platform"""
-    user_id = user.get("id")
-    session_id = user.get("session_id")
-    success = await service.update_stream(user_id, platform_name, title, category_id)
-    
-    if success:
+    try:
+        user_id = user.get("id")
+        session_id = user.get("session_id")
+        success = await service.update_stream(user_id, platform_name, title, category_id)
+
+        if not success:
+            raise HTTPException(status_code=409, detail=f"Failed to update {platform_name}")
+
         try:
             info = await service.get_stream_info(user_id, platform_name, session_id)
             set_cached_stream_info(user_id, platform_name, info)
             await broadcast_stream_info_change(user_id, platform_name, info)
-        except Exception as broadcast_error:
-            logger.warning(f"[STREAM_INFO] Broadcast failed for {platform_name}: {broadcast_error}")
+        except Exception:
+            logger.exception("[STREAM_INFO] Broadcast failed for %s", platform_name)
         return JSONResponse(content={"success": True, "message": f"{platform_name} updated"})
-    else:
-        return JSONResponse(content={"success": False, "error": f"Failed to update {platform_name}"}, status_code=400)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating %s stream info", platform_name)
+        raise HTTPException(status_code=500, detail="Internal server error")

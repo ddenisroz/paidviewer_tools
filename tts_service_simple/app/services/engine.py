@@ -38,7 +38,7 @@ class TTSEngine:
             asyncio.create_task(self.process_queue())
             
         except Exception as e:
-            logger.error(f"[ERROR] Ошибка инициализации TTS движка: {e}")
+            logger.exception("[ERROR] Ошибка инициализации TTS движка")
             self.status = "error"
             self.error = str(e)
 
@@ -57,7 +57,7 @@ class TTSEngine:
                 self.request_queue.task_done()
                 
             except Exception as e:
-                logger.error(f"Ошибка обработки TTS запроса в очереди: {e}")
+                logger.exception("Ошибка обработки TTS запроса в очереди")
 
     async def process_request(self, request_data: Dict[str, Any]):
         """Обрабатывает один TTS запрос"""
@@ -81,7 +81,7 @@ class TTSEngine:
             
         except Exception as e:
             self.processing_stats["failed_requests"] += 1
-            logger.error(f"[ERROR] Ошибка обработки TTS запроса: {e}")
+            logger.exception("[ERROR] Ошибка обработки TTS запроса")
 
     async def synthesize(self, text: str, voice: str, user_id: int = None) -> Dict[str, Any]:
         """Добавить запрос на синтез в очередь"""
@@ -130,3 +130,4 @@ class TTSEngine:
 
 # Global instance
 engine = TTSEngine()
+

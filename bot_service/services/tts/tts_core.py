@@ -209,8 +209,8 @@ class TTSAPI:
 
             return result
 
-        except Exception as e:
-            logger.error(f"[ERROR] РћС€РёР±РєР° РїСЂРё РѕС‚РїСЂР°РІРєРµ TTS Р·Р°РїСЂРѕСЃР°: {e}")
+        except Exception:
+            logger.exception("[ERROR] РћС€РёР±РєР° РїСЂРё РѕС‚РїСЂР°РІРєРµ TTS Р·Р°РїСЂРѕСЃР°")
             return {"success": False, "error": "Internal server error"}
 
 
@@ -270,4 +270,5 @@ async def check_local_tts_health(endpoint_url: str, api_key: Optional[str] = Non
 
 # Global instance
 tts_api_instance = TTSAPI()
+
 

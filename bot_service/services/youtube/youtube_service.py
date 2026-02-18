@@ -1,4 +1,5 @@
-﻿# bot_service/services/youtube/youtube_service.py
+# bot_service/services/youtube/youtube_service.py
+# -*- coding: utf-8 -*-
 import re
 import aiohttp
 import logging
@@ -73,8 +74,8 @@ class YouTubeService:
                 logger.error(f"YouTube API error: {status} - {data}")
                 return await self._get_video_info_fallback(video_id, video_url)
 
-        except Exception as e:
-            logger.error(f"Error getting video info: {e}")
+        except Exception:
+            logger.exception("Error getting video info")
             try:
                 video_id = self._extract_video_id(video_url)
                 if video_id:
@@ -104,8 +105,8 @@ class YouTubeService:
 
             return None
 
-        except Exception as e:
-            logger.error(f"Error extracting video ID: {e}")
+        except Exception:
+            logger.exception("Error extracting video ID")
             return None
 
     async def _get_video_info_fallback(self, video_id: str, video_url: str) -> Dict[str, Any]:
@@ -149,8 +150,8 @@ class YouTubeService:
                     'is_fallback': True
                 }
 
-        except Exception as e:
-            logger.error(f"Error in fallback method: {e}")
+        except Exception:
+            logger.exception("Error in fallback method")
             return None
 
     def _parse_video_data(self, video_data: Dict[str, Any], video_url: str) -> Dict[str, Any]:
@@ -178,8 +179,8 @@ class YouTubeService:
                 'is_fallback': False
             }
 
-        except Exception as e:
-            logger.error(f"Error parsing video data: {e}")
+        except Exception:
+            logger.exception("Error parsing video data")
             return self._get_video_info_fallback(video_data.get('id', ''), video_url)
 
     def _parse_duration(self, duration_iso: str) -> str:
@@ -207,8 +208,8 @@ class YouTubeService:
             else:
                 return f"{minutes}:{seconds:02d}"
 
-        except Exception as e:
-            logger.error(f"Error parsing duration: {e}")
+        except Exception:
+            logger.exception("Error parsing duration")
             return "Unknown"
 
     def _format_duration_seconds(self, duration: Optional[int]) -> str:
@@ -222,8 +223,8 @@ class YouTubeService:
             if hours > 0:
                 return f"{hours}:{minutes:02d}:{seconds:02d}"
             return f"{minutes}:{seconds:02d}"
-        except Exception as e:
-            logger.error(f"Error formatting duration: {e}")
+        except Exception:
+            logger.exception("Error formatting duration")
             return "0:00"
 
     async def _get_video_info_yt_dlp(self, video_url: str) -> Optional[Dict[str, Any]]:
@@ -259,8 +260,8 @@ class YouTubeService:
                 'url': video_url,
                 'is_fallback': True
             }
-        except Exception as e:
-            logger.warning(f"yt-dlp info fallback failed: {e}")
+        except Exception:
+            logger.exception("yt-dlp info fallback failed")
             return None
 
     async def _search_videos_yt_dlp(self, query: str, max_results: int = 5) -> list:
@@ -294,8 +295,8 @@ class YouTubeService:
                     'channel_title': entry.get('uploader', 'Unknown')
                 })
             return results
-        except Exception as e:
-            logger.warning(f"yt-dlp search fallback failed: {e}")
+        except Exception:
+            logger.exception("yt-dlp search fallback failed")
             return []
 
     def is_valid_youtube_url(self, url: str) -> bool:
@@ -349,7 +350,8 @@ class YouTubeService:
                         logger.error(f"YouTube search API error: {response.status}")
                         return await self._search_videos_yt_dlp(query, max_results)
 
-        except Exception as e:
-            logger.error(f"Error searching videos: {e}")
+        except Exception:
+            logger.exception("Error searching videos")
             return await self._search_videos_yt_dlp(query, max_results)
+
 

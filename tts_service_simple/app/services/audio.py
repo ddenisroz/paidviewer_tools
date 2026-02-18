@@ -27,8 +27,8 @@ def convert_audio_to_wav_48khz(input_path: str, output_path: str) -> bool:
         logger.info(f"[OK] Audio converted successfully to WAV 48kHz Mono 16-bit")
         return True
         
-    except Exception as e:
-        logger.error(f"[ERROR] Audio conversion failed: {e}")
+    except Exception:
+        logger.exception("[ERROR] Audio conversion failed")
         return False
 
 def transcribe_audio(audio_path: str) -> str:
@@ -59,6 +59,7 @@ def transcribe_audio(audio_path: str) -> str:
             logger.warning("whisper not available, skipping transcription")
             return ""
             
-    except Exception as e:
-        logger.error(f"[ERROR] Transcription failed: {e}")
+    except Exception:
+        logger.exception("[ERROR] Transcription failed")
         return ""
+

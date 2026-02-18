@@ -1,9 +1,10 @@
-# bot_service/core/app_config.py
+﻿# bot_service/core/app_config.py
 """Конфигурация приложения FastAPI"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from core.config import settings
+import logging
 
 # Импорты перенесены внутрь функций для избежания циклических импортов
 
@@ -22,6 +23,8 @@ def setup_logging():
     return logger
 
 from typing import Optional, Callable
+
+logger = logging.getLogger(__name__)
 
 def create_app(lifespan: Optional[Callable] = None) -> FastAPI:
     """Создание и настройка FastAPI приложения"""
@@ -48,11 +51,15 @@ def create_app(lifespan: Optional[Callable] = None) -> FastAPI:
     cors_origins_list = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
     
     allowed_origins = cors_origins_list
+    allow_credentials = True
+    if "*" in allowed_origins:
+        allow_credentials = False
+        logger.warning("CORS wildcard origin detected: forcing allow_credentials=False for security")
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_credentials=True,
+        allow_credentials=allow_credentials,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
         max_age=3600,  # Кэшировать preflight запросы на 1 час

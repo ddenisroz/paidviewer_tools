@@ -63,10 +63,49 @@ export const saveReturnUrl = (): void => {
  * Get and clear return URL.
  */
 export const getAndClearReturnUrl = (): string | null => {
-    const url = localStorage.getItem('returnUrl');
-    if (url) {
-        localStorage.removeItem('returnUrl');
+    const primaryKey = 'returnUrl';
+    const legacyKey = 'oauth_return_url';
+    const legacyTimestampKey = 'oauth_return_timestamp';
+
+    const rawPrimary = localStorage.getItem(primaryKey);
+    const rawLegacy = localStorage.getItem(legacyKey);
+    const legacyTimestamp = localStorage.getItem(legacyTimestampKey);
+
+    localStorage.removeItem(primaryKey);
+    localStorage.removeItem(legacyKey);
+    localStorage.removeItem(legacyTimestampKey);
+
+    const raw = rawPrimary || rawLegacy;
+    if (!raw) {
+        return null;
     }
+
+    const url = raw.trim();
+
+    // Keep compatibility with older OAuth return URL storage (5 minutes max age).
+    if (!rawPrimary && legacyTimestamp) {
+        const ageMs = Date.now() - Number.parseInt(legacyTimestamp, 10);
+        if (!Number.isFinite(ageMs) || ageMs > 5 * 60 * 1000) {
+            return null;
+        }
+    }
+
+    // Allow only app-internal relative routes.
+    if (!url.startsWith('/') || url.startsWith('//') || /[\r\n]/.test(url)) {
+        return null;
+    }
+
+    // Block common external/protocol-style payloads just in case.
+    const lower = url.toLowerCase();
+    if (lower.startsWith('/http:') || lower.startsWith('/https:') || lower.startsWith('/javascript:') || lower.startsWith('/data:')) {
+        return null;
+    }
+
+    // Avoid redirect loops/no-op redirects.
+    if (url === '/' || url === '/dashboard' || url.startsWith('/dashboard?') || url.startsWith('/login')) {
+        return null;
+    }
+
     return url;
 };
 

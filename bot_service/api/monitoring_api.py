@@ -2,7 +2,7 @@
 """
 API endpoints для мониторинга системы
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from auth.auth import get_current_user
 import logging
 
@@ -44,11 +44,8 @@ async def clear_cache(user: dict = Depends(get_current_user)):
     
     Требует admin прав.
     """
-    if not user.get("is_admin"):
-        return {
-            "success": False,
-            "error": "Admin access required"
-        }
+    if not (user.get("role") == "admin" or user.get("is_admin")):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     from core.token_validation_cache import token_validation_cache
 
@@ -69,11 +66,8 @@ async def cleanup_expired_cache(user: dict = Depends(get_current_user)):
     
     Обычно выполняется автоматически, но можно вызвать вручную.
     """
-    if not user.get("is_admin"):
-        return {
-            "success": False,
-            "error": "Admin access required"
-        }
+    if not (user.get("role") == "admin" or user.get("is_admin")):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     from core.token_validation_cache import token_validation_cache
 

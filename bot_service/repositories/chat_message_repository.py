@@ -68,6 +68,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
 
     def get_recent_by_author(
         self,
+        user_id: int,
         author_username: str,
         platform: Optional[str] = None,
         limit: int = 200
@@ -76,6 +77,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         if not author_username:
             return []
         query = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
             ChatMessage.is_deleted.is_(False),
             func.lower(ChatMessage.author_username) == author_username.lower(),
         )
@@ -85,6 +87,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
 
     def get_recent_by_author_in_channel(
         self,
+        user_id: int,
         author_username: str,
         channel_name: str,
         platform: Optional[str] = None,
@@ -94,6 +97,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         if not author_username or not channel_name:
             return []
         query = self.db.query(ChatMessage).filter(
+            ChatMessage.user_id == user_id,
             ChatMessage.is_deleted.is_(False),
             func.lower(ChatMessage.author_username) == author_username.lower(),
             func.lower(ChatMessage.channel_name) == channel_name.lower(),
@@ -156,13 +160,14 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
     
     def get_paginated(
         self,
+        user_id: int,
         channel_name: Optional[str] = None,
         platform: Optional[str] = None,
         page: int = 1,
         limit: int = 100
     ) -> tuple:
         """Get paginated chat messages."""
-        query = self.db.query(ChatMessage)
+        query = self.db.query(ChatMessage).filter(ChatMessage.user_id == user_id)
         if channel_name:
             query = query.filter(ChatMessage.channel_name == channel_name)
         if platform:
@@ -173,12 +178,12 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         messages = query.order_by(ChatMessage.timestamp.desc()).offset(offset).limit(limit).all()
         return messages, total
     
-    def get_stats(self, channel_name: Optional[str] = None, platform: Optional[str] = None) -> dict:
+    def get_stats(self, user_id: int, channel_name: Optional[str] = None, platform: Optional[str] = None) -> dict:
         """Get statistics for chat messages."""
         from datetime import timedelta
         from core.datetime_utils import utcnow_naive
         
-        query = self.db.query(ChatMessage)
+        query = self.db.query(ChatMessage).filter(ChatMessage.user_id == user_id)
         if channel_name:
             query = query.filter(ChatMessage.channel_name == channel_name)
         if platform:

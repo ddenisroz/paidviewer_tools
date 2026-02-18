@@ -63,7 +63,7 @@ class TTSWorker:
                 await self._process_task(task)
 
             except Exception as e:
-                logger.error(f"Error in TTS Worker loop: {e}")
+                logger.exception("Error in TTS Worker loop")
                 await asyncio.sleep(1.0) # Prevent tight loop on error
 
     async def _process_task(self, task: TTSTask):
@@ -147,9 +147,10 @@ class TTSWorker:
                 db.close()
                 
         except Exception as e:
-            logger.error(f"Failed to process task {task.task_id}: {e}")
+            logger.exception("Failed to process task {task.task_id}")
             logger.error(traceback.format_exc())
             await get_memory_tts_queue().fail_task(task.task_id, str(e))
 
 # Global instance
 tts_worker = TTSWorker()
+

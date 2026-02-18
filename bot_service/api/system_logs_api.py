@@ -38,7 +38,7 @@ async def get_system_logs(
 ):
     """РџРѕР»СѓС‡РёС‚СЊ Р»РѕРіРё РґРµР№СЃС‚РІРёР№ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРІ СЃ С„РёР»СЊС‚СЂР°С†РёРµР№"""
     try:
-        if not current_user.get("is_admin"):
+        if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
 
         repo = SystemLogRepository(db)
@@ -98,8 +98,8 @@ async def get_system_logs(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting system logs: {e}")
+    except Exception:
+        logger.exception("Error getting system logs")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -111,7 +111,7 @@ async def get_logs_statistics(
 ):
     """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РїРѕ Р»РѕРіР°Рј (РєРѕР»РёС‡РµСЃС‚РІРѕ РґРµР№СЃС‚РІРёР№ РїРѕ С‚РёРїР°Рј)"""
     try:
-        if not current_user.get("is_admin"):
+        if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
 
         repo = SystemLogRepository(db)
@@ -155,8 +155,8 @@ async def get_logs_statistics(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting logs statistics: {e}")
+    except Exception:
+        logger.exception("Error getting logs statistics")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -167,7 +167,7 @@ async def get_available_actions(
 ):
     """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РґРѕСЃС‚СѓРїРЅС‹С… С‚РёРїРѕРІ РґРµР№СЃС‚РІРёР№"""
     try:
-        if not current_user.get("is_admin"):
+        if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
 
         repo = SystemLogRepository(db)
@@ -181,8 +181,8 @@ async def get_available_actions(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting available actions: {e}")
+    except Exception:
+        logger.exception("Error getting available actions")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

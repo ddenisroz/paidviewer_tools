@@ -73,8 +73,8 @@ class DatabaseCleanupCore:
 
             return cleanup_stats
 
-        except Exception as e:
-            logger.error(f"[ERROR] Error cleaning up old data: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[ERROR] Error cleaning up old data")
             self.db.rollback()
             return {'messages_deleted': 0, 'old_messages_deleted': 0, 'limit_based_deleted': 0, 'users_cleaned': 0, 'error': "Internal server error"}
 
@@ -101,8 +101,8 @@ class DatabaseCleanupCore:
 
             return total_deleted
 
-        except Exception as e:
-            logger.error(f"Error cleaning up user message limits: {e}")
+        except Exception:
+            logger.exception("Error cleaning up user message limits")
             return 0
 
     def cleanup_user_data(self, username: str, platform: str, keep_days: int = 30) -> int:
@@ -128,8 +128,8 @@ class DatabaseCleanupCore:
 
             return count
 
-        except Exception as e:
-            logger.error(f"Error cleaning user data: {e}")
+        except Exception:
+            logger.exception("Error cleaning user data")
             self.db.rollback()
             return 0
 
@@ -158,10 +158,10 @@ class DatabaseCleanupCore:
                                 freed_space += cache_file.stat().st_size
                                 cache_file.unlink()
                                 deleted_files += 1
-                            except Exception as e:
-                                logger.warning(f"Could not delete cache file {cache_file}: {e}")
-                except Exception as e:
-                    logger.warning(f"Error cleaning cache directory {cache_dir}: {e}")
+                            except Exception:
+                                logger.exception("Could not delete cache file %s", cache_file)
+                except Exception:
+                    logger.exception("Error cleaning cache directory %s", cache_dir)
 
             logger.info(f"[DB] Cache cleaned: {deleted_files} files removed, freed {freed_space / (1024*1024):.2f} MB")
             return {
@@ -169,14 +169,15 @@ class DatabaseCleanupCore:
                 'freed_space_bytes': freed_space
             }
 
-        except Exception as e:
-            logger.error(f"Error cleaning cache: {e}")
+        except Exception:
+            logger.exception("Error cleaning cache")
             return {'deleted_files': 0, 'freed_space_bytes': 0, 'error': "Internal server error"}
 
     def sync_user_message_counts(self) -> Dict[str, int]:
         """Sync user message counters with actual DB data."""
         try:
-            from core.database import UserProgression, ChatMessage
+            from core.database import UserProgression
+            from repositories.chat_message_repository import ChatMessageRepository
 
             sync_stats = {
                 'users_updated': 0,
@@ -209,8 +210,8 @@ class DatabaseCleanupCore:
 
             return sync_stats
 
-        except Exception as e:
-            logger.error(f"Error syncing user message counts: {e}")
+        except Exception:
+            logger.exception("Error syncing user message counts")
             self.db.rollback()
             return {}
 
@@ -228,6 +229,6 @@ class DatabaseCleanupCore:
             msg_repo = ChatMessageRepository(self.db)
             return msg_repo.count_by_user_platform(user.id, platform)
 
-        except Exception as e:
-            logger.error(f"Error getting user message count: {e}")
+        except Exception:
+            logger.exception("Error getting user message count")
             return 0

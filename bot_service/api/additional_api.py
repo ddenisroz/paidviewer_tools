@@ -88,9 +88,11 @@ async def get_integrations(
         
         return JSONResponse(content={"integrations": result})
         
-    except Exception as e:
-        logger.error(f"Error getting integrations: {e}")
-        return JSONResponse(content={"integrations": {}}, status_code=500)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting integrations")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/integrations/{platform}/disconnect")
@@ -116,8 +118,10 @@ async def disconnect_integration(
         })
     except ValueError:
         raise HTTPException(status_code=404, detail="Resource not found")
-    except Exception as e:
-        logger.error(f"Error disconnecting {platform}: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error disconnecting %s", platform)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -145,12 +149,11 @@ async def remove_integration(
         })
     except ValueError:
         raise HTTPException(status_code=404, detail="Resource not found")
-    except Exception as e:
-        logger.error(f"Error removing {platform}: {e}")
-        return JSONResponse(
-            content={"success": False, "error": "Internal server error"}, 
-            status_code=500
-        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error removing %s", platform)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== Chat History Endpoints ====================
@@ -185,12 +188,11 @@ async def get_chat_history(
             "total": len(messages_data)
         })
         
-    except Exception as e:
-        logger.error(f"[CHAT] Error: {e}", exc_info=True)
-        return JSONResponse(
-            content={"success": False, "messages": [], "error": "Internal server error"},
-            status_code=500
-        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[CHAT] Error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ==================== Account Deletion Endpoints ====================
@@ -207,7 +209,7 @@ async def permanently_delete_user(
     Р’РќРРњРђРќРР•: Р­С‚Рѕ РґРµР№СЃС‚РІРёРµ РќР•РћР‘Р РђРўРРњРћ!
     """
     # РџСЂРѕРІРµСЂРєР° РїСЂР°РІ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР°
-    if not current_user.get('is_admin', False):
+    if not (current_user.get('role') == 'admin' or current_user.get('is_admin', False)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
@@ -220,8 +222,10 @@ async def permanently_delete_user(
         })
     except ValueError:
         raise HTTPException(status_code=404, detail="Resource not found")
-    except Exception as e:
-        logger.error(f"[ADMIN] Error deleting user: {e}", exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[ADMIN] Error deleting user")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -256,7 +260,9 @@ async def delete_user_account(
         
     except ValueError:
         raise HTTPException(status_code=404, detail="Resource not found")
-    except Exception as e:
-        logger.error(f"[ACCOUNT] Error deleting account: {e}", exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[ACCOUNT] Error deleting account")
         raise HTTPException(status_code=500, detail="Internal server error")
 

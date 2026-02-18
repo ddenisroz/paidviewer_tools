@@ -4,7 +4,6 @@
 """
 import sys
 from pathlib import Path
-from sqlalchemy.orm import Session
 
 # Добавляем путь к tts_service
 sys.path.insert(0, str(Path(__file__).parent))
@@ -83,3 +82,4 @@ if __name__ == "__main__":
     else:
         print("\n[ERROR] Не удалось добавить голос.")
         sys.exit(1)
+

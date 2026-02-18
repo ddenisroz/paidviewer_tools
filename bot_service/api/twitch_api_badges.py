@@ -83,8 +83,8 @@ async def get_twitch_global_badges() -> JSONResponse:
         return JSONResponse(content={"success": True, "badges": badges})
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"[ERROR] Error fetching global badges: {e}")
+    except Exception:
+        logger.exception("[ERROR] Error fetching global badges")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -142,8 +142,9 @@ async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
             return JSONResponse(content={"success": True, "badges": badges})
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"[ERROR] Error fetching channel badges: {e}", exc_info=True)
+    except Exception:
+        logger.exception("[ERROR] Error fetching channel badges")
         # Р’РѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚С‹Рµ badges РІРјРµСЃС‚Рѕ РѕС€РёР±РєРё, С‡С‚РѕР±С‹ РЅРµ Р»РѕРјР°С‚СЊ РёРЅС‚РµСЂС„РµР№СЃ
         return JSONResponse(content={"success": True, "badges": {}})
+
 

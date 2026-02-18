@@ -23,8 +23,8 @@ async def monitor_system():
             # Ждем 30 секунд
             await asyncio.sleep(30)
             
-        except Exception as e:
-            logger.error(f"Ошибка мониторинга: {e}")
+        except Exception:
+            logger.exception("Ошибка мониторинга")
             await asyncio.sleep(60)
 
 def get_system_stats() -> Dict[str, Any]:
@@ -51,9 +51,10 @@ def get_system_stats() -> Dict[str, Any]:
                 "load": gpu.load * 100
             }
     except Exception:
-        pass
+        logger.exception("Failed to read GPU stats")
         
     return {
         "memory_usage": memory_usage,
         "gpu_info": gpu_info
     }
+

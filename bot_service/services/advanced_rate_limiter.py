@@ -59,8 +59,8 @@ class AdvancedRateLimiter:
                 logger.warning(f"Rate limit exceeded for {identifier}, action '{action}'")
                 return False
 
-        except Exception as e:
-            logger.error(f"Rate limit check failed: {e}")
+        except Exception:
+            logger.exception("Rate limit check failed")
             return True  # Р’ СЃР»СѓС‡Р°Рµ РѕС€РёР±РєРё СЂР°Р·СЂРµС€Р°РµРј
 
     def get_remaining_requests(self, identifier: str, action: str = "default") -> int:
@@ -80,8 +80,8 @@ class AdvancedRateLimiter:
                 return remaining
             return 0
 
-        except Exception as e:
-            logger.error(f"Failed to get remaining requests: {e}")
+        except Exception:
+            logger.exception("Failed to get remaining requests")
             return 0
 
     def reset_rate_limit(self, identifier: str, action: str = "default") -> bool:
@@ -91,8 +91,8 @@ class AdvancedRateLimiter:
             # Р­С‚Рѕ СЃР±СЂРѕСЃРёС‚ Р’РЎР• Р»РёРјРёС‚С‹, С‡С‚Рѕ РјРѕР¶РµС‚ Р±С‹С‚СЊ РёР·Р±С‹С‚РѕС‡РЅРѕ
             logger.warning(f"Reset rate limit for {identifier}, action '{action}' (limited functionality)")
             return True
-        except Exception as e:
-            logger.error(f"Failed to reset rate limit: {e}")
+        except Exception:
+            logger.exception("Failed to reset rate limit")
             return False
 
     def get_stats(self) -> Dict[str, Any]:
@@ -105,8 +105,8 @@ class AdvancedRateLimiter:
                 "library": "limits",
                 "version": "advanced"
             }
-        except Exception as e:
-            logger.error(f"Failed to get rate limiter stats: {e}")
+        except Exception:
+            logger.exception("Failed to get rate limiter stats")
             return {"error": "Internal server error"}
 
     # РњРµС‚РѕРґС‹ РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё СЃ СЃС‚Р°СЂС‹Рј API
@@ -155,3 +155,4 @@ def is_login_blocked(identifier: str) -> bool:
 def clear_failed_logins(identifier: str):
     """РћС‡РёСЃС‚РєР° РЅРµСѓРґР°С‡РЅС‹С… РїРѕРїС‹С‚РѕРє РІС…РѕРґР° (СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ)"""
     advanced_rate_limiter.reset_rate_limit(identifier, "login")
+

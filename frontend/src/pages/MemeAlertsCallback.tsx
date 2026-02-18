@@ -42,7 +42,7 @@ const extractTokenFromUrl = (): { accessToken?: string; refreshToken?: string } 
 const notifyOpener = (data: Record<string, unknown>) => {
   if (!window.opener) return;
   try {
-    window.opener.postMessage(data, '*');
+    window.opener.postMessage(data, window.location.origin);
   } catch {
     // no-op
   }

@@ -1,10 +1,10 @@
 """
 Twitch Interactive Features API (Hype Train, Clips)
 
-Автор: AI Assistant
-Дата: 27 декабря 2025
+РђРІС‚РѕСЂ: AI Assistant
+Р”Р°С‚Р°: 27 РґРµРєР°Р±СЂСЏ 2025
 
-Документация:
+Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ:
 - Hype Train: https://dev.twitch.tv/docs/api/reference#get-hype-train-events
 - Clips: https://dev.twitch.tv/docs/api/reference#create-clip
 """
@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/twitch/interactive", tags=["twitch-interactive"]
 # === Helper Functions ===
 
 async def get_twitch_token(user: User) -> str:
-    """Получить Twitch OAuth токен пользователя через репозиторий"""
+    """РџРѕР»СѓС‡РёС‚СЊ Twitch OAuth С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№"""
     from core.database import get_db
     from core.token_encryption import decrypt_token, is_token_encrypted
     from repositories.user_token_repository import UserTokenRepository
@@ -42,7 +42,7 @@ async def get_twitch_token(user: User) -> str:
             )
             raise HTTPException(
                 status_code=400,
-                detail="Twitch OAuth токен не найден"
+                detail="Twitch OAuth С‚РѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ"
             )
         
         token = user_token.access_token
@@ -62,7 +62,7 @@ async def make_twitch_api_request(
     json_data: Optional[dict] = None,
     params: Optional[dict] = None
 ) -> dict:
-    """Выполнить запрос к Twitch API"""
+    """Р’С‹РїРѕР»РЅРёС‚СЊ Р·Р°РїСЂРѕСЃ Рє Twitch API"""
     url = f"https://api.twitch.tv/helix{endpoint}"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -107,7 +107,7 @@ async def make_twitch_api_request(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка подключения к Twitch API: {str(e)}"
+            detail=f"РћС€РёР±РєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє Twitch API"
         )
 
 
@@ -115,19 +115,19 @@ async def make_twitch_api_request(
 
 @router.get("/hype-train", response_model=dict)
 async def get_hype_train_events(
-    first: int = Query(default=1, ge=1, le=100, description="Количество событий (1-100)"),
+    first: int = Query(default=1, ge=1, le=100, description="РљРѕР»РёС‡РµСЃС‚РІРѕ СЃРѕР±С‹С‚РёР№ (1-100)"),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Получить информацию о Hype Train событиях
+    РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ Hype Train СЃРѕР±С‹С‚РёСЏС…
     
-    Hype Train - это событие когда зрители массово подписываются,
-    дарят подписки или используют Bits.
+    Hype Train - СЌС‚Рѕ СЃРѕР±С‹С‚РёРµ РєРѕРіРґР° Р·СЂРёС‚РµР»Рё РјР°СЃСЃРѕРІРѕ РїРѕРґРїРёСЃС‹РІР°СЋС‚СЃСЏ,
+    РґР°СЂСЏС‚ РїРѕРґРїРёСЃРєРё РёР»Рё РёСЃРїРѕР»СЊР·СѓСЋС‚ Bits.
     
-    Требования:
+    РўСЂРµР±РѕРІР°РЅРёСЏ:
     - Scope: channel:read:hype_train
     
-    Документация: https://dev.twitch.tv/docs/api/reference#get-hype-train-events
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#get-hype-train-events
     """
     try:
         token = await get_twitch_token(current_user)
@@ -167,7 +167,7 @@ async def get_hype_train_events(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка получения Hype Train: {str(e)}"
+            detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ Hype Train"
         )
 
 
@@ -176,11 +176,11 @@ async def get_current_hype_train(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Получить информацию о текущем активном Hype Train
+    РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ С‚РµРєСѓС‰РµРј Р°РєС‚РёРІРЅРѕРј Hype Train
     
-    Возвращает информацию только если Hype Train активен в данный момент.
+    Р’РѕР·РІСЂР°С‰Р°РµС‚ РёРЅС„РѕСЂРјР°С†РёСЋ С‚РѕР»СЊРєРѕ РµСЃР»Рё Hype Train Р°РєС‚РёРІРµРЅ РІ РґР°РЅРЅС‹Р№ РјРѕРјРµРЅС‚.
     
-    Требования:
+    РўСЂРµР±РѕРІР°РЅРёСЏ:
     - Scope: channel:read:hype_train
     """
     try:
@@ -198,11 +198,11 @@ async def get_current_hype_train(
         
         events = response.get("data", [])
         
-        # Проверяем есть ли активный Hype Train
+        # РџСЂРѕРІРµСЂСЏРµРј РµСЃС‚СЊ Р»Рё Р°РєС‚РёРІРЅС‹Р№ Hype Train
         active_event = None
         if events:
             event = events[0]
-            # Hype Train активен если event_data.ended_at is None
+            # Hype Train Р°РєС‚РёРІРµРЅ РµСЃР»Рё event_data.ended_at is None
             if not event.get("event_data", {}).get("ended_at"):
                 active_event = event
         
@@ -235,7 +235,7 @@ async def get_current_hype_train(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка получения текущего Hype Train: {str(e)}"
+            detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ С‚РµРєСѓС‰РµРіРѕ Hype Train"
         )
 
 
@@ -245,24 +245,24 @@ async def get_current_hype_train(
 async def create_clip(
     has_delay: bool = Query(
         default=False,
-        description="Добавить задержку перед созданием клипа (для синхронизации со стримом)"
+        description="Р”РѕР±Р°РІРёС‚СЊ Р·Р°РґРµСЂР¶РєСѓ РїРµСЂРµРґ СЃРѕР·РґР°РЅРёРµРј РєР»РёРїР° (РґР»СЏ СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё СЃРѕ СЃС‚СЂРёРјРѕРј)"
     ),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Создать клип из текущего стрима
+    РЎРѕР·РґР°С‚СЊ РєР»РёРї РёР· С‚РµРєСѓС‰РµРіРѕ СЃС‚СЂРёРјР°
     
-    Создает 30-секундный клип из текущего момента стрима.
-    Стрим должен быть онлайн.
+    РЎРѕР·РґР°РµС‚ 30-СЃРµРєСѓРЅРґРЅС‹Р№ РєР»РёРї РёР· С‚РµРєСѓС‰РµРіРѕ РјРѕРјРµРЅС‚Р° СЃС‚СЂРёРјР°.
+    РЎС‚СЂРёРј РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕРЅР»Р°Р№РЅ.
     
-    Требования:
+    РўСЂРµР±РѕРІР°РЅРёСЏ:
     - Scope: clips:edit
-    - Стрим должен быть онлайн
+    - РЎС‚СЂРёРј РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕРЅР»Р°Р№РЅ
     
-    Примечание: API возвращает URL для редактирования клипа,
-    но сам клип создается асинхронно и может быть недоступен сразу.
+    РџСЂРёРјРµС‡Р°РЅРёРµ: API РІРѕР·РІСЂР°С‰Р°РµС‚ URL РґР»СЏ СЂРµРґР°РєС‚РёСЂРѕРІР°РЅРёСЏ РєР»РёРїР°,
+    РЅРѕ СЃР°Рј РєР»РёРї СЃРѕР·РґР°РµС‚СЃСЏ Р°СЃРёРЅС…СЂРѕРЅРЅРѕ Рё РјРѕР¶РµС‚ Р±С‹С‚СЊ РЅРµРґРѕСЃС‚СѓРїРµРЅ СЃСЂР°Р·Сѓ.
     
-    Документация: https://dev.twitch.tv/docs/api/reference#create-clip
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#create-clip
     """
     try:
         token = await get_twitch_token(current_user)
@@ -299,7 +299,7 @@ async def create_clip(
         return {
             "success": True,
             "clip": clip_data,
-            "message": "Клип создается. Он будет доступен через несколько секунд."
+            "message": "РљР»РёРї СЃРѕР·РґР°РµС‚СЃСЏ. РћРЅ Р±СѓРґРµС‚ РґРѕСЃС‚СѓРїРµРЅ С‡РµСЂРµР· РЅРµСЃРєРѕР»СЊРєРѕ СЃРµРєСѓРЅРґ."
         }
         
     except HTTPException:
@@ -312,33 +312,33 @@ async def create_clip(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка создания клипа: {str(e)}"
+            detail=f"РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РєР»РёРїР°"
         )
 
 
 @router.get("/clips", response_model=dict)
 async def get_clips(
-    first: int = Query(default=20, ge=1, le=100, description="Количество клипов (1-100)"),
+    first: int = Query(default=20, ge=1, le=100, description="РљРѕР»РёС‡РµСЃС‚РІРѕ РєР»РёРїРѕРІ (1-100)"),
     started_at: Optional[str] = Query(
         default=None,
-        description="Начало периода (RFC3339 format)"
+        description="РќР°С‡Р°Р»Рѕ РїРµСЂРёРѕРґР° (RFC3339 format)"
     ),
     ended_at: Optional[str] = Query(
         default=None,
-        description="Конец периода (RFC3339 format)"
+        description="РљРѕРЅРµС† РїРµСЂРёРѕРґР° (RFC3339 format)"
     ),
     current_user: User = Depends(get_current_user)
 ):
     """
-    Получить клипы канала
+    РџРѕР»СѓС‡РёС‚СЊ РєР»РёРїС‹ РєР°РЅР°Р»Р°
     
-    Возвращает список клипов созданных на канале.
-    Можно фильтровать по периоду времени.
+    Р’РѕР·РІСЂР°С‰Р°РµС‚ СЃРїРёСЃРѕРє РєР»РёРїРѕРІ СЃРѕР·РґР°РЅРЅС‹С… РЅР° РєР°РЅР°Р»Рµ.
+    РњРѕР¶РЅРѕ С„РёР»СЊС‚СЂРѕРІР°С‚СЊ РїРѕ РїРµСЂРёРѕРґСѓ РІСЂРµРјРµРЅРё.
     
-    Требования:
-    - Scope: Не требуется (публичные данные)
+    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    - Scope: РќРµ С‚СЂРµР±СѓРµС‚СЃСЏ (РїСѓР±Р»РёС‡РЅС‹Рµ РґР°РЅРЅС‹Рµ)
     
-    Документация: https://dev.twitch.tv/docs/api/reference#get-clips
+    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#get-clips
     """
     try:
         token = await get_twitch_token(current_user)
@@ -385,5 +385,6 @@ async def get_clips(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка получения клипов: {str(e)}"
+            detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РєР»РёРїРѕРІ"
         )
+

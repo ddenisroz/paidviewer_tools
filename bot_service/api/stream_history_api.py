@@ -3,7 +3,7 @@
 API РґР»СЏ РёСЃС‚РѕСЂРёРё СЃС‚СЂРёРјРѕРІ.
 Clean Architecture: uses ChatMessageRepository for data access.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db
 from auth.auth import get_current_user
@@ -31,8 +31,8 @@ def _message_to_dict(msg) -> dict:
 
 @router.get("/history")
 async def get_stream_history(
-    page: int = 1,
-    limit: int = 100,
+    page: int = Query(default=1, ge=1, le=10_000),
+    limit: int = Query(default=100, ge=1, le=500),
     channel_name: str = None,
     platform: str = None,
     user: dict = Depends(get_current_user),
@@ -40,18 +40,23 @@ async def get_stream_history(
 ):
     """РџРѕР»СѓС‡РёС‚СЊ РёСЃС‚РѕСЂРёСЋ СЃС‚СЂРёРјРѕРІ/СЃРѕРѕР±С‰РµРЅРёР№"""
     try:
+        user_id = user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
         repo = ChatMessageRepository(db)
         
         try:
             messages, total_messages = repo.get_paginated(
+                user_id=user_id,
                 channel_name=channel_name,
                 platform=platform,
                 page=page,
                 limit=limit
             )
-        except Exception as db_error:
-            logger.warning(f"[WARN] Database error: {db_error}")
-            return {"success": False, "error": "Database error"}
+        except Exception:
+            logger.exception("[WARN] Database error")
+            raise HTTPException(status_code=500, detail="Database error")
 
         return {
             "success": True,
@@ -63,9 +68,11 @@ async def get_stream_history(
                 "pages": (total_messages + limit - 1) // limit
             }
         }
-    except Exception as e:
-        logger.error(f"Error getting stream history: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting stream history")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/stats")
@@ -77,14 +84,20 @@ async def get_stream_stats(
 ):
     """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ СЃС‚СЂРёРјР°"""
     try:
+        user_id = user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
         repo = ChatMessageRepository(db)
-        stats = repo.get_stats(channel_name=channel_name, platform=platform)
+        stats = repo.get_stats(user_id=user_id, channel_name=channel_name, platform=platform)
         
         return {
             "success": True,
             "stats": stats
         }
-    except Exception as e:
-        logger.error(f"Error getting stream stats: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting stream stats")
+        raise HTTPException(status_code=500, detail="Internal server error")
 

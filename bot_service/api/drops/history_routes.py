@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/drops", tags=["drops"])
 # === PYDANTIC MODELS ===
 
 class DropsOpenRequest(BaseModel):
-    """Р—Р°РїСЂРѕСЃ РЅР° РїРѕР»СѓС‡РµРЅРёРµ Drops"""
+    """Р В Р’В Р Р†Р вЂљРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р’В Р РЋРІР‚вЂќР В Р Р‹Р В РІР‚С™Р В Р’В Р РЋРІР‚СћР В Р Р‹Р В РЎвЂњ Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В° Р В Р’В Р РЋРІР‚вЂќР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’ВµР В Р’В Р В РІР‚В¦Р В Р’В Р РЋРІР‚ВР В Р’В Р вЂ™Р’Вµ Drops"""
     drops_type: str = Field(..., pattern="^(streak|donation|mythical)$")
     viewer_id: str = Field(..., min_length=1, max_length=100)
     viewer_name: str = Field(..., min_length=1, max_length=100)
@@ -34,7 +34,7 @@ class DropsOpenRequest(BaseModel):
 # === UTILITY FUNCTIONS ===
 
 def get_user_id(current_user: dict) -> int:
-    """Р’РѕР·РІСЂР°С‰Р°РµС‚ user_id РґР»СЏ С‚РµРєСѓС‰РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
+    """Р В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В·Р В Р’В Р В РІР‚В Р В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљР’В°Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРЎв„ў user_id Р В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р РЏ Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’ВµР В Р’В Р РЋРІР‚СњР В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљР’В°Р В Р’В Р вЂ™Р’ВµР В Р’В Р РЋРІР‚вЂњР В Р’В Р РЋРІР‚Сћ Р В Р’В Р РЋРІР‚вЂќР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р вЂ°Р В Р’В Р вЂ™Р’В·Р В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’ВµР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р РЏ"""
     if not current_user:
         return None
     user_id = current_user.get('id')
@@ -53,14 +53,16 @@ def get_drops_service(db: Session):
 
 @router.get("/qualities")
 async def get_drops_qualities(db: Session = Depends(get_db)):
-    """РџРѕР»СѓС‡Р°РµС‚ СЃРїРёСЃРѕРє РєР°С‡РµСЃС‚РІ Р»СѓС‚Р±РѕРєСЃРѕРІ"""
+    """Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРЎв„ў Р В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚вЂќР В Р’В Р РЋРІР‚ВР В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚Сњ Р В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р В РІР‚В  Р В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В±Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚СњР В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В """
     try:
         service = get_drops_service(db)
         qualities = service.get_all_qualities()
         return {"success": True, "data": qualities}
-    except Exception as e:
-        logger.error(f"Error getting drops qualities: {e}")
-        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РєР°С‡РµСЃС‚РІ Р»СѓС‚Р±РѕРєСЃРѕРІ")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting drops qualities")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/history/{channel_name}")
@@ -72,7 +74,7 @@ async def get_drops_history(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡Р°РµС‚ РёСЃС‚РѕСЂРёСЋ Р»СѓС‚Р±РѕРєСЃРѕРІ РґР»СЏ РєР°РЅР°Р»Р°"""
+    """Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРЎв„ў Р В Р’В Р РЋРІР‚ВР В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚СћР В Р Р‹Р В РІР‚С™Р В Р’В Р РЋРІР‚ВР В Р Р‹Р В РІР‚в„– Р В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В±Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚СњР В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В  Р В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р РЏ Р В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’В°"""
     try:
         service = get_drops_service(db)
         
@@ -106,9 +108,11 @@ async def get_drops_history(
                 for entry in history
             ]
         }
-    except Exception as e:
-        logger.error(f"Error getting drops history: {e}")
-        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РёСЃС‚РѕСЂРёРё Р»СѓС‚Р±РѕРєСЃРѕРІ")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting drops history")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/open")
@@ -129,7 +133,7 @@ async def open_drops(
         
         config = drops_service.get_config_by_user_id(current_user["id"])
         if not config:
-            raise HTTPException(status_code=404, detail="РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ Drops РЅРµ РЅР°Р№РґРµРЅР°")
+            raise HTTPException(status_code=404, detail="Р В Р’В Р РЋРІвЂћСћР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В¦Р В Р Р‹Р Р†Р вЂљРЎвЂєР В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚вЂњР В Р Р‹Р РЋРІР‚СљР В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљР’В Р В Р’В Р РЋРІР‚ВР В Р Р‹Р В Р РЏ Drops Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’Вµ Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°Р В Р’В Р Р†РІР‚С›РІР‚вЂњР В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’ВµР В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°")
         
         quality_name = None
         
@@ -144,7 +148,7 @@ async def open_drops(
             if not streak or streak.current_streak < config.streak_days_common:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅС‹Р№ СЃС‚СЂРёРє. РўСЂРµР±СѓРµС‚СЃСЏ РјРёРЅРёРјСѓРј {config.streak_days_common} РґРЅРµР№"
+                    detail=f"Insufficient streak for drop. Required at least {config.streak_days_common} days."
                 )
             
             if streak.current_streak >= config.streak_days_legendary:
@@ -158,7 +162,7 @@ async def open_drops(
                 
         elif request.drops_type == "donation":
             if not request.donation_amount:
-                raise HTTPException(status_code=400, detail="РЎСѓРјРјР° РґРѕРЅР°С‚Р° РЅРµ СѓРєР°Р·Р°РЅР°")
+                raise HTTPException(status_code=400, detail="Р В Р’В Р В Р вЂ№Р В Р Р‹Р РЋРІР‚СљР В Р’В Р РЋР’ВР В Р’В Р РЋР’ВР В Р’В Р вЂ™Р’В° Р В Р’В Р СћРІР‚ВР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В° Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’Вµ Р В Р Р‹Р РЋРІР‚СљР В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’В·Р В Р’В Р вЂ™Р’В°Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°")
             
             if request.donation_amount >= config.donation_amount_legendary:
                 quality_name = "Legendary"
@@ -171,15 +175,15 @@ async def open_drops(
             else:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅР°СЏ СЃСѓРјРјР° РґРѕРЅР°С‚Р°. РњРёРЅРёРјСѓРј {config.donation_amount_common}"
+                    detail=f"Donation amount is too low for drop. Minimum required: {config.donation_amount_common}."
                 )
                 
         elif request.drops_type == "mythical":
             quality_name = "Mythical"
             if not drops_service._can_activate_mythical(config):
-                raise HTTPException(status_code=400, detail="РњРёС„РёС‡РµСЃРєРёР№ Р»СѓС‚Р±РѕРєСЃ РµС‰Рµ РЅРµ РґРѕСЃС‚СѓРїРµРЅ")
+                raise HTTPException(status_code=400, detail="Р В Р’В Р РЋРЎв„ўР В Р’В Р РЋРІР‚ВР В Р Р‹Р Р†Р вЂљРЎвЂєР В Р’В Р РЋРІР‚ВР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚СњР В Р’В Р РЋРІР‚ВР В Р’В Р Р†РІР‚С›РІР‚вЂњ Р В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В±Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚СњР В Р Р‹Р В РЎвЂњ Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљР’В°Р В Р’В Р вЂ™Р’Вµ Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’Вµ Р В Р’В Р СћРІР‚ВР В Р’В Р РЋРІР‚СћР В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р Р‹Р РЋРІР‚СљР В Р’В Р РЋРІР‚вЂќР В Р’В Р вЂ™Р’ВµР В Р’В Р В РІР‚В¦")
         else:
-            raise HTTPException(status_code=400, detail="РќРµРёР·РІРµСЃС‚РЅС‹Р№ С‚РёРї Р»СѓС‚Р±РѕРєСЃР°")
+            raise HTTPException(status_code=400, detail="Р В Р’В Р РЋРЎС™Р В Р’В Р вЂ™Р’ВµР В Р’В Р РЋРІР‚ВР В Р’В Р вЂ™Р’В·Р В Р’В Р В РІР‚В Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р В РІР‚В¦Р В Р Р‹Р Р†Р вЂљРІвЂћвЂ“Р В Р’В Р Р†РІР‚С›РІР‚вЂњ Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚вЂќ Р В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В±Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚СњР В Р Р‹Р В РЎвЂњР В Р’В Р вЂ™Р’В°")
         
         try:
             drop_result = calc_service.calculate_drop(
@@ -189,7 +193,7 @@ async def open_drops(
                 quality_name=quality_name
             )
         except ValueError as e:
-            logger.error(f"[ERROR] [DROPS] Failed to calculate drop: {e}")
+            logger.exception("[ERROR] [DROPS] Failed to calculate drop")
             raise HTTPException(status_code=500, detail="Internal server error")
         
         quality = drops_service.get_quality_by_name(quality_name)
@@ -245,9 +249,9 @@ async def open_drops(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error opening drops: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕС‚РєСЂС‹С‚РёСЏ Р»СѓС‚Р±РѕРєСЃР°")
+    except Exception:
+        logger.exception("Error opening drops")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/stats/{channel_name}")
@@ -257,7 +261,7 @@ async def get_drops_stats(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡Р°РµС‚ СЃС‚Р°С‚РёСЃС‚РёРєСѓ Drops РґР»СЏ РєР°РЅР°Р»Р°"""
+    """Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРЎв„ў Р В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚СњР В Р Р‹Р РЋРІР‚Сљ Drops Р В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р РЏ Р В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’В°"""
     try:
         service = get_drops_service(db)
         stats = service.get_full_channel_stats(
@@ -266,9 +270,11 @@ async def get_drops_stats(
             platform=platform
         )
         return {"success": True, "data": stats}
-    except Exception as e:
-        logger.error(f"Error getting drops stats: {e}")
-        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ СЃС‚Р°С‚РёСЃС‚РёРєРё Drops")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting drops stats")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/streaks/{channel_name}")
@@ -280,7 +286,7 @@ async def get_user_streaks(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡Р°РµС‚ СЃРїРёСЃРѕРє СЃС‚СЂРёРєРѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№"""
+    """Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРЎв„ў Р В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚вЂќР В Р’В Р РЋРІР‚ВР В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚Сњ Р В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р Р‹Р В РІР‚С™Р В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚СњР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В  Р В Р’В Р РЋРІР‚вЂќР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р вЂ°Р В Р’В Р вЂ™Р’В·Р В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’ВµР В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’ВµР В Р’В Р Р†РІР‚С›РІР‚вЂњ"""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
@@ -313,9 +319,9 @@ async def get_user_streaks(
         return {"success": True, "data": streaks}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting user streaks: {e}")
-        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ СЃС‚СЂРёРєРѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№")
+    except Exception:
+        logger.exception("Error getting user streaks")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/streak/reset/{channel_name}")
@@ -324,7 +330,7 @@ async def reset_streak_statistics(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РЎР±СЂР°СЃС‹РІР°РµС‚ РІСЃСЋ СЃС‚Р°С‚РёСЃС‚РёРєСѓ СЃС‚СЂРёРєРѕРІ РґР»СЏ РєР°РЅР°Р»Р°"""
+    """Р В Р’В Р В Р вЂ№Р В Р’В Р вЂ™Р’В±Р В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРІвЂћвЂ“Р В Р’В Р В РІР‚В Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРЎв„ў Р В Р’В Р В РІР‚В Р В Р Р‹Р В РЎвЂњР В Р Р‹Р В РІР‚в„– Р В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚СњР В Р Р‹Р РЋРІР‚Сљ Р В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р Р‹Р В РІР‚С™Р В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚СњР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В  Р В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р РЏ Р В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’В°"""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
@@ -340,23 +346,23 @@ async def reset_streak_statistics(
         )
         
         if not config:
-            raise HTTPException(status_code=404, detail="РљРѕРЅС„РёРіСѓСЂР°С†РёСЏ РЅРµ РЅР°Р№РґРµРЅР°")
+            raise HTTPException(status_code=404, detail="Р В Р’В Р РЋРІвЂћСћР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В¦Р В Р Р‹Р Р†Р вЂљРЎвЂєР В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚вЂњР В Р Р‹Р РЋРІР‚СљР В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљР’В Р В Р’В Р РЋРІР‚ВР В Р Р‹Р В Р РЏ Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’Вµ Р В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°Р В Р’В Р Р†РІР‚С›РІР‚вЂњР В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’ВµР В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°")
         
         deleted_count = service.reset_channel_streaks(user_id=user_id, channel_name=channel_name)
         
-        drops_logger.info(f"[DELETE] [STREAK RESET] РЈРґР°Р»РµРЅРѕ {deleted_count} Р·Р°РїРёСЃРµР№ РґР»СЏ {channel_name}")
+        drops_logger.info(f"[DELETE] [STREAK RESET] Р В Р’В Р В РІвЂљВ¬Р В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’ВµР В Р’В Р В РІР‚В¦Р В Р’В Р РЋРІР‚Сћ {deleted_count} Р В Р’В Р вЂ™Р’В·Р В Р’В Р вЂ™Р’В°Р В Р’В Р РЋРІР‚вЂќР В Р’В Р РЋРІР‚ВР В Р Р‹Р В РЎвЂњР В Р’В Р вЂ™Р’ВµР В Р’В Р Р†РІР‚С›РІР‚вЂњ Р В Р’В Р СћРІР‚ВР В Р’В Р вЂ™Р’В»Р В Р Р‹Р В Р РЏ {channel_name}")
         
         return {
             "success": True,
-            "message": "РЎС‚Р°С‚РёСЃС‚РёРєР° СЃС‚СЂРёРєРѕРІ СЃР±СЂРѕС€РµРЅР°",
+            "message": "Р В Р’В Р В Р вЂ№Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В° Р В Р Р‹Р В РЎвЂњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р Р‹Р В РІР‚С™Р В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚СњР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В  Р В Р Р‹Р В РЎвЂњР В Р’В Р вЂ™Р’В±Р В Р Р‹Р В РІР‚С™Р В Р’В Р РЋРІР‚СћР В Р Р‹Р Р†РІР‚С™Р’В¬Р В Р’В Р вЂ™Р’ВµР В Р’В Р В РІР‚В¦Р В Р’В Р вЂ™Р’В°",
             "data": {"channel_name": channel_name, "platform": "all", "deleted_count": deleted_count}
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error resetting streak statistics: {e}")
+    except Exception:
+        logger.exception("Error resetting streak statistics")
         db.rollback()
-        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СЃР±СЂРѕСЃР° СЃС‚Р°С‚РёСЃС‚РёРєРё СЃС‚СЂРёРєРѕРІ")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/mythical-session/{channel_name}")
@@ -366,7 +372,7 @@ async def get_active_mythical_session(
     current_user: Optional[dict] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ Р°РєС‚РёРІРЅСѓСЋ СЃРµСЃСЃРёСЋ РјРёС„РёС‡РµСЃРєРѕРіРѕ СЃСѓРЅРґСѓРєР°"""
+    """Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚СћР В Р’В Р вЂ™Р’В»Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р РЋРІР‚ВР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р Р‹Р В Р вЂ° Р В Р’В Р вЂ™Р’В°Р В Р’В Р РЋРІР‚СњР В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р РЋРІР‚ВР В Р’В Р В РІР‚В Р В Р’В Р В РІР‚В¦Р В Р Р‹Р РЋРІР‚СљР В Р Р‹Р В РІР‚в„– Р В Р Р‹Р В РЎвЂњР В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РЎвЂњР В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚ВР В Р Р‹Р В РІР‚в„– Р В Р’В Р РЋР’ВР В Р’В Р РЋРІР‚ВР В Р Р‹Р Р†Р вЂљРЎвЂєР В Р’В Р РЋРІР‚ВР В Р Р‹Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РЎвЂњР В Р’В Р РЋРІР‚СњР В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚вЂњР В Р’В Р РЋРІР‚Сћ Р В Р Р‹Р В РЎвЂњР В Р Р‹Р РЋРІР‚СљР В Р’В Р В РІР‚В¦Р В Р’В Р СћРІР‚ВР В Р Р‹Р РЋРІР‚СљР В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°"""
     try:
         service = get_drops_service(db)
         
@@ -391,6 +397,7 @@ async def get_active_mythical_session(
         return {"success": True, "data": session_data}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting active mythical session: {e}")
-        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё")
+    except Exception:
+        logger.exception("Error getting active mythical session")
+        raise HTTPException(status_code=500, detail="Internal server error")
+

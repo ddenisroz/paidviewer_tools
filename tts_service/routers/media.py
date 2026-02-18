@@ -2,24 +2,47 @@ from fastapi import APIRouter, HTTPException, Depends
 import logging
 import os
 from pathlib import Path
+import re
 from sqlalchemy.orm import Session
 from tts_service.database import get_db
 from tts_service.config import config
 from tts_service.database import Voice as VoiceModel
+from tts_service.auth import get_admin_user
 
 router = APIRouter(tags=["media"])
 logger = logging.getLogger(__name__)
+
+
+VOICE_NAME_RE = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+
+
+def _sanitize_voice_name(value: str) -> str:
+    normalized = (value or "").strip()
+    if not VOICE_NAME_RE.fullmatch(normalized):
+        raise HTTPException(status_code=400, detail="Invalid voice name")
+    return normalized
+
+
+def _resolve_under_base(base_dir: Path, relative_name: str) -> Path:
+    candidate = (base_dir / relative_name).resolve()
+    base_resolved = base_dir.resolve()
+    try:
+        candidate.relative_to(base_resolved)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    return candidate
 
 @router.get("/audio/{voice_name}")
 async def get_audio_file(voice_name: str):
     """Получить аудио файл голоса (для предпрослушивания)"""
     try:
+        safe_voice_name = _sanitize_voice_name(voice_name)
         # Проверяем существование файла в voices
         # Это для старой логики, где voice_name мог быть именем файла
-        voice_path = config.voices_path / f"{voice_name}.wav"
+        voice_path = _resolve_under_base(config.voices_path, f"{safe_voice_name}.wav")
         if not voice_path.exists():
             # Пробуем найти как mp3
-            voice_path = config.voices_path / f"{voice_name}.mp3"
+            voice_path = _resolve_under_base(config.voices_path, f"{safe_voice_name}.mp3")
             
         if not voice_path.exists():
              raise HTTPException(status_code=404, detail="Audio file not found")
@@ -29,22 +52,29 @@ async def get_audio_file(voice_name: str):
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error serving audio file: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error serving audio file")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.delete("/audio/{voice_name}")
-async def delete_audio_file(voice_name: str):
+async def delete_audio_file(
+    voice_name: str,
+    current_user: dict = Depends(get_admin_user),
+):
     """Удалить аудио файл (для тестовых файлов)"""
     # Ограничить использование только для админов или тестов
     try:
-        voice_path = config.audio_path / voice_name
+        safe_voice_name = _sanitize_voice_name(voice_name)
+        voice_path = _resolve_under_base(config.audio_path, safe_voice_name)
         if voice_path.exists():
             os.remove(voice_path)
             return {"status": "success", "message": "File deleted"}
-        return {"status": "error", "message": "File not found"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=404, detail="File not found")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error deleting audio file")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/voices/global")
 async def get_global_voices(db: Session = Depends(get_db)):
@@ -69,12 +99,16 @@ async def get_global_voices(db: Session = Depends(get_db)):
             }
             for voice in voices
         ]
-    except Exception as e:
-        logger.error(f"Error getting global voices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error getting global voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/voices/{voice_id}")
-async def get_voice_by_id(voice_id: int, db: Session = Depends(get_db)):
+async def get_voice_by_id(
+    voice_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_admin_user),
+):
     """Получить информацию о голосе по ID"""
     try:
         voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
@@ -96,12 +130,15 @@ async def get_voice_by_id(voice_id: int, db: Session = Depends(get_db)):
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error fetching voice: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error fetching voice")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/voices")
-async def get_all_voices(db: Session = Depends(get_db)):
+async def get_all_voices(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_admin_user),
+):
     """Получить все голоса (для админки)"""
     try:
         voices = db.query(VoiceModel).all()
@@ -119,6 +156,7 @@ async def get_all_voices(db: Session = Depends(get_db)):
             }
             for voice in voices
         ]
-    except Exception as e:
-        logger.error(f"Error getting all voices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Error getting all voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
+

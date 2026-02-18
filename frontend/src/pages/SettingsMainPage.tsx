@@ -15,6 +15,8 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Label } from '@/shared/components/ui/label';
 import { Switch } from '@/shared/components/ui/switch';
+import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
+import { logger } from '@/shared/utils/prodLogger';
 
 const SettingsMainPage: React.FC = () => {
     const navigate = useNavigate();
@@ -29,7 +31,12 @@ const SettingsMainPage: React.FC = () => {
     const vkLabel = integrations.vk?.username || user?.vk_channel_name || user?.vk_username;
 
     const handlePlatformConnect = (platform: 'twitch' | 'vk'): void => {
-        window.location.href = `${API_BASE_URL}/auth/${platform}/login`;
+        const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, `/auth/${platform}/login`);
+        if (!safeUrl) {
+            logger.error('[SETTINGS] Blocked unsafe platform auth redirect URL', { platform, API_BASE_URL });
+            return;
+        }
+        window.location.href = safeUrl;
     };
 
     const handleTwitchToggle = (checked: boolean): void => {

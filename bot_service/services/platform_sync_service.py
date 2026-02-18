@@ -34,8 +34,8 @@ class PlatformSyncService:
             else:
                 self.logger.warning(f"Unknown platform: {platform}")
                 return False
-        except Exception as e:
-            self.logger.error(f"Error syncing roles for user {user.id} on {platform}: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error syncing roles for user {user.id} on {platform}")
             return False
 
     async def _sync_twitch_roles(self, user: User, db: Session) -> bool:
@@ -80,14 +80,14 @@ class PlatformSyncService:
 
                 self.logger.info(f"Synced Twitch roles for user {user.id}: broadcaster={user.twitch_is_broadcaster}")
 
-            except Exception as e:
-                self.logger.error(f"Error fetching Twitch user info: {e}")
+            except Exception:
+                self.logger.exception("Error fetching Twitch user info")
 
             db.commit()
             return True
 
-        except Exception as e:
-            self.logger.error(f"Error syncing Twitch roles: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error syncing Twitch roles")
             db.rollback()
             return False
 
@@ -132,16 +132,16 @@ class PlatformSyncService:
                 user_info = await vk_client.get_current_user(token_info)
                 if user_info:
                     self.logger.info(f"Synced VK user {user.vk_username} (ID: {user_info.get('id')})")
-            except Exception as e:
-                self.logger.error(f"Error fetching VK user info: {e}")
+            except Exception:
+                self.logger.exception("Error fetching VK user info")
 
             self.logger.info(f"Synced VK roles for user {user.id}: owner={user.vk_is_owner}")
 
             db.commit()
             return True
 
-        except Exception as e:
-            self.logger.error(f"Error syncing VK roles: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error syncing VK roles")
             db.rollback()
             return False
 
@@ -215,12 +215,12 @@ class PlatformSyncService:
                 self.logger.info(f"Synced {len(rewards)} VK channel rewards for user {user.id}")
                 return True
 
-            except Exception as e:
-                self.logger.error(f"Error fetching VK rewards: {e}")
+            except Exception:
+                self.logger.exception("Error fetching VK rewards")
                 return False
 
-        except Exception as e:
-            self.logger.error(f"Error syncing VK channel points: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error syncing VK channel points")
             return False
 
     async def sync_channel_points(self, user: User, platform: str, db: Session) -> bool:
@@ -233,8 +233,8 @@ class PlatformSyncService:
             else:
                 self.logger.warning(f"Unknown platform: {platform}")
                 return False
-        except Exception as e:
-            self.logger.error(f"Error syncing channel points for user {user.id} on {platform}: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error syncing channel points for user {user.id} on {platform}")
             return False
 
     async def _sync_twitch_channel_points(self, user: User, db: Session) -> bool:
@@ -321,12 +321,12 @@ class PlatformSyncService:
                 self.logger.info(f"Synced {len(rewards)} Twitch channel rewards for user {user.id}")
                 return True
 
-            except Exception as e:
-                self.logger.error(f"Error fetching Twitch rewards: {e}")
+            except Exception:
+                self.logger.exception("Error fetching Twitch rewards")
                 return False
 
-        except Exception as e:
-            self.logger.error(f"Error syncing Twitch channel points: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error syncing Twitch channel points")
             db.rollback()
             return False
 
@@ -350,8 +350,8 @@ class PlatformSyncService:
                 'success': roles_synced  # At minimum, roles should sync
             }
 
-        except Exception as e:
-            self.logger.error(f"Error during login sync: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error during login sync")
             return {
                 'roles_synced': False,
                 'channel_points_synced': False,
@@ -406,8 +406,8 @@ class PlatformSyncService:
                 'failed_count': failed_count
             }
 
-        except Exception as e:
-            self.logger.error(f"Error during bulk sync: {e}", exc_info=True)
+        except Exception:
+            self.logger.exception("Error during bulk sync")
             return {
                 'total_users': 0,
                 'success_count': 0,
@@ -418,3 +418,4 @@ class PlatformSyncService:
 
 # Global instance
 platform_sync_service = PlatformSyncService()
+

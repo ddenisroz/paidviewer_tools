@@ -3,7 +3,7 @@
 API РґР»СЏ Р°РєС‚РёРІРЅС‹С… РєР°РЅР°Р»РѕРІ.
 Clean Architecture: uses UserSettingsRepository for data access.
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db
 from auth.auth import get_current_user
@@ -51,7 +51,9 @@ async def get_active_channels(
             "channels": channels_data,
             "total": len(channels_data)
         }
-    except Exception as e:
-        logger.error(f"Error getting active channels: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting active channels")
+        raise HTTPException(status_code=500, detail="Internal server error")
 

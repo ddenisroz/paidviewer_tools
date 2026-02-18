@@ -2,6 +2,8 @@
  * Auth Service - инкапсуляция всех Auth API вызовов
  */
 import { API_BASE_URL } from '@/constants';
+import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { apiClient } from '../client';
 
@@ -40,14 +42,24 @@ export const authService = {
    * Войти через Twitch (редирект на полную OAuth авторизацию)
    */
   loginWithTwitch(): void {
-    window.location.href = `${API_BASE_URL}/auth/twitch/login`;
+    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/twitch/login');
+    if (!safeUrl) {
+      logger.error('Blocked unsafe Twitch auth redirect URL', { API_BASE_URL });
+      return;
+    }
+    window.location.href = safeUrl;
   },
 
   /**
    * Войти через VK (редирект на полную OAuth авторизацию)
    */
   loginWithVk(): void {
-    window.location.href = `${API_BASE_URL}/auth/vk/login`;
+    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/vk/login');
+    if (!safeUrl) {
+      logger.error('Blocked unsafe VK auth redirect URL', { API_BASE_URL });
+      return;
+    }
+    window.location.href = safeUrl;
   },
 
   /**

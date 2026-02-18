@@ -160,8 +160,8 @@ class AdminStatsService:
             disk_usage = shutil.disk_usage(logs_path if os.path.exists(logs_path) else os.getcwd())
             storage_total_gb = round(disk_usage.total / (1024 ** 3), 2)
             
-        except Exception as e:
-            logger.warning(f"Could not calculate storage usage: {e}")
+        except Exception:
+            logger.exception("Could not calculate storage usage")
         
         return {
             "used_gb": storage_used_gb,
@@ -425,3 +425,4 @@ class AdminStatsService:
 # Dependency injection helper
 def get_admin_stats_service(db: Session) -> AdminStatsService:
     return AdminStatsService(db)
+

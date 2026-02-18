@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+﻿from fastapi import APIRouter, Depends, HTTPException
 from starlette.requests import Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -50,13 +50,13 @@ class CreateRewardRequest(BaseModel):
     prompt: Optional[str] = None
     reward_type: Optional[str] = "custom"
 
-    # VK Live специфичные поля (приоритет над generic полями)
+    # VK Live СЃРїРµС†РёС„РёС‡РЅС‹Рµ РїРѕР»СЏ (РїСЂРёРѕСЂРёС‚РµС‚ РЅР°Рґ generic РїРѕР»СЏРјРё)
     repair_timeout: Optional[int] = None
     max_uses_count: Optional[int] = None
     max_uses_count_per_user: Optional[int] = None
     is_message_required: Optional[bool] = None
 
-    # Twitch специфичные поля
+    # Twitch СЃРїРµС†РёС„РёС‡РЅС‹Рµ РїРѕР»СЏ
     global_cooldown_seconds: Optional[int] = None
     is_enabled: Optional[bool] = True
     should_redemptions_skip_request_queue: Optional[bool] = False
@@ -64,19 +64,19 @@ class CreateRewardRequest(BaseModel):
     @field_validator('title')
     @classmethod
     def sanitize_title(cls, v):
-        """Санитизация названия награды"""
+        """РЎР°РЅРёС‚РёР·Р°С†РёСЏ РЅР°Р·РІР°РЅРёСЏ РЅР°РіСЂР°РґС‹"""
         return sanitize_input(v, max_length=45)
 
     @field_validator('description')
     @classmethod
     def sanitize_description(cls, v):
-        """Санитизация описания награды"""
+        """РЎР°РЅРёС‚РёР·Р°С†РёСЏ РѕРїРёСЃР°РЅРёСЏ РЅР°РіСЂР°РґС‹"""
         return sanitize_input(v, max_length=200)
 
     @field_validator('prompt')
     @classmethod
     def sanitize_prompt(cls, v):
-        """Санитизация подсказки"""
+        """РЎР°РЅРёС‚РёР·Р°С†РёСЏ РїРѕРґСЃРєР°Р·РєРё"""
         if v is not None:
             return sanitize_input(v, max_length=100)
         return v
@@ -123,7 +123,7 @@ async def get_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение наград канала"""
+    """РџРѕР»СѓС‡РµРЅРёРµ РЅР°РіСЂР°Рґ РєР°РЅР°Р»Р°"""
     try:
         rewards = points_service.get_channel_rewards(user["id"], platform, db)
 
@@ -131,10 +131,11 @@ async def get_rewards(
             "success": True,
             "rewards": rewards
         }
-
-    except Exception as e:
-        logger.error(f"Error getting rewards: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения наград")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting rewards")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РЅР°РіСЂР°Рґ")
 
 @points_core_router.post("/rewards/redeem")
 async def redeem_reward(
@@ -142,7 +143,7 @@ async def redeem_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обмен награды за баллы"""
+    """РћР±РјРµРЅ РЅР°РіСЂР°РґС‹ Р·Р° Р±Р°Р»Р»С‹"""
     try:
         result = points_service.redeem_reward(
             user["id"],
@@ -157,13 +158,13 @@ async def redeem_reward(
         if result["success"]:
             return result
         else:
-            raise HTTPException(status_code=400, detail=result["error"])
+            raise HTTPException(status_code=400, detail="Reward operation failed")
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error redeeming reward: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обмена награды")
+    except Exception:
+        logger.exception("Error redeeming reward")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РјРµРЅР° РЅР°РіСЂР°РґС‹")
 
 @points_core_router.get("/rewards/queue")
 async def get_reward_queue(
@@ -171,7 +172,7 @@ async def get_reward_queue(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение очереди наград"""
+    """РџРѕР»СѓС‡РµРЅРёРµ РѕС‡РµСЂРµРґРё РЅР°РіСЂР°Рґ"""
     try:
         queue = points_service.get_reward_queue(user["id"], status, db)
 
@@ -179,10 +180,11 @@ async def get_reward_queue(
             "success": True,
             "queue": queue
         }
-
-    except Exception as e:
-        logger.error(f"Error getting reward queue: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения очереди наград")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting reward queue")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РѕС‡РµСЂРµРґРё РЅР°РіСЂР°Рґ")
 
 @points_core_router.post("/rewards/process")
 async def process_reward(
@@ -190,7 +192,7 @@ async def process_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обработка награды модератором"""
+    """РћР±СЂР°Р±РѕС‚РєР° РЅР°РіСЂР°РґС‹ РјРѕРґРµСЂР°С‚РѕСЂРѕРј"""
     try:
         result = points_service.process_reward(
             user["id"],
@@ -202,13 +204,13 @@ async def process_reward(
         if result["success"]:
             return result
         else:
-            raise HTTPException(status_code=400, detail=result["error"])
+            raise HTTPException(status_code=400, detail="Reward operation failed")
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error processing reward: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обработки награды")
+    except Exception:
+        logger.exception("Error processing reward")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±СЂР°Р±РѕС‚РєРё РЅР°РіСЂР°РґС‹")
 
 @points_core_router.get("/stats")
 async def get_channel_stats(
@@ -216,7 +218,7 @@ async def get_channel_stats(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получение статистики канала"""
+    """РџРѕР»СѓС‡РµРЅРёРµ СЃС‚Р°С‚РёСЃС‚РёРєРё РєР°РЅР°Р»Р°"""
     try:
         stats = points_service.get_channel_stats(user["id"], channel_name, db)
 
@@ -225,10 +227,11 @@ async def get_channel_stats(
             "stats": stats,
             "channel_name": channel_name
         }
-
-    except Exception as e:
-        logger.error(f"Error getting channel stats: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения статистики")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting channel stats")
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ СЃС‚Р°С‚РёСЃС‚РёРєРё")
 
 @points_core_router.put("/rewards/{reward_id}")
 @limiter.limit("30/minute")
@@ -239,7 +242,7 @@ async def update_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновление награды"""
+    """РћР±РЅРѕРІР»РµРЅРёРµ РЅР°РіСЂР°РґС‹"""
     try:
         result = points_service.update_reward(
             user["id"],
@@ -251,13 +254,13 @@ async def update_reward(
         if result["success"]:
             return result
         else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Ошибка обновления награды"))
+            raise HTTPException(status_code=400, detail="Reward update failed")
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating reward {reward_id}: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка обновления награды")
+    except Exception:
+        logger.exception("Error updating reward %s", reward_id)
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РЅР°РіСЂР°РґС‹")
 
 @points_core_router.delete("/rewards/{reward_id}")
 @limiter.limit("20/minute")
@@ -267,20 +270,20 @@ async def delete_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удаление награды"""
+    """РЈРґР°Р»РµРЅРёРµ РЅР°РіСЂР°РґС‹"""
     try:
         result = points_service.delete_reward(user["id"], reward_id, db)
 
         if result["success"]:
             return result
         else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Ошибка удаления награды"))
+            raise HTTPException(status_code=400, detail="Reward deletion failed")
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting reward {reward_id}: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка удаления награды")
+    except Exception:
+        logger.exception("Error deleting reward %s", reward_id)
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ РЅР°РіСЂР°РґС‹")
 
 @points_core_router.patch("/rewards/{reward_id}/toggle")
 async def toggle_reward(
@@ -288,17 +291,18 @@ async def toggle_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Переключение статуса награды (enabled/disabled)"""
+    """РџРµСЂРµРєР»СЋС‡РµРЅРёРµ СЃС‚Р°С‚СѓСЃР° РЅР°РіСЂР°РґС‹ (enabled/disabled)"""
     try:
         result = points_service.toggle_reward(user["id"], reward_id, db)
 
         if result["success"]:
             return result
         else:
-            raise HTTPException(status_code=400, detail=result.get("error", "Ошибка переключения награды"))
+            raise HTTPException(status_code=400, detail="Reward toggle failed")
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error toggling reward {reward_id}: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка переключения награды")
+    except Exception:
+        logger.exception("Error toggling reward %s", reward_id)
+        raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РїРµСЂРµРєР»СЋС‡РµРЅРёСЏ РЅР°РіСЂР°РґС‹")
+

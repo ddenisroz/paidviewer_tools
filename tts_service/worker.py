@@ -26,8 +26,7 @@ if str(project_root) not in sys.path:
 
 # Импорты TTS сервиса
 from tts_service.tts_engine import tts_engine_manager
-from tts_service.file_manager import file_manager
-from tts_service.database import get_db, init_db
+from tts_service.database import init_db
 
 # Настройка логирования
 logging.basicConfig(
@@ -73,8 +72,8 @@ class TTSWorker:
             # Создаем consumer group если не существует
             await self._ensure_consumer_group()
             
-        except Exception as e:
-            logger.error(f"Worker {self.worker_id} failed to connect to Redis: {e}")
+        except Exception:
+            logger.exception("Worker {self.worker_id} failed to connect to Redis")
             raise
     
     async def _ensure_consumer_group(self):
@@ -93,7 +92,7 @@ class TTSWorker:
             if "BUSYGROUP" in str(e):
                 logger.info(f"Worker {self.worker_id} consumer group already exists")
             else:
-                logger.error(f"Worker {self.worker_id} error creating consumer group: {e}")
+                logger.exception("Worker {self.worker_id} error creating consumer group")
                 raise
     
     async def start(self):
@@ -112,8 +111,8 @@ class TTSWorker:
             # Основной цикл обработки
             await self._process_loop()
             
-        except Exception as e:
-            logger.error(f"Worker {self.worker_id} failed to start: {e}")
+        except Exception:
+            logger.exception("Worker {self.worker_id} failed to start")
             raise
         finally:
             await self.stop()
@@ -132,8 +131,8 @@ class TTSWorker:
                     None,
                     self.redis_client.close
                 )
-            except Exception as e:
-                logger.error(f"Error closing Redis connection: {e}")
+            except Exception:
+                logger.exception("Error closing Redis connection")
         
         logger.info(f"TTS Worker {self.worker_id} stopped. Processed: {self.processed_tasks}, Failed: {self.failed_tasks}")
     
@@ -148,8 +147,8 @@ class TTSWorker:
             
             logger.info(f"Worker {self.worker_id} TTS engine initialized successfully")
             
-        except Exception as e:
-            logger.error(f"Worker {self.worker_id} failed to initialize TTS engine: {e}")
+        except Exception:
+            logger.exception("Worker {self.worker_id} failed to initialize TTS engine")
             raise
     
     async def _process_loop(self):
@@ -166,8 +165,8 @@ class TTSWorker:
                     # Если нет задач, ждем немного
                     await asyncio.sleep(0.1)
                     
-            except Exception as e:
-                logger.error(f"Worker {self.worker_id} error in process loop: {e}")
+            except Exception:
+                logger.exception("Worker {self.worker_id} error in process loop")
                 await asyncio.sleep(1)
     
     async def _get_tasks(self) -> list:
@@ -199,7 +198,7 @@ class TTSWorker:
                 await self._ensure_consumer_group()
                 return []
             else:
-                logger.error(f"Worker {self.worker_id} error reading tasks: {e}")
+                logger.exception("Worker {self.worker_id} error reading tasks")
                 return []
     
     async def _process_task(self, task: Dict[str, Any]):
@@ -257,8 +256,8 @@ class TTSWorker:
                 self.failed_tasks += 1
                 self.stats['failed'] = self.failed_tasks
                 
-        except Exception as e:
-            logger.error(f"Worker {self.worker_id} error processing task {message_id}: {e}")
+        except Exception:
+            logger.exception("Worker {self.worker_id} error processing task {message_id}")
             self.failed_tasks += 1
             self.stats['failed'] = self.failed_tasks
     
@@ -330,19 +329,19 @@ class TTSWorker:
                 if original_path.exists() and conversion_result != synthesis_result:
                     original_path.unlink()
                     logger.info(f"Removed original file after conversion: {original_path}")
-            except Exception as e:
-                logger.warning(f"Failed to remove original file: {e}")
+            except Exception:
+                logger.exception("Failed to remove original file")
             
             if conversion_result and os.path.exists(conversion_result):
                 # Формируем URL для аудио файла
                 audio_url = f"{os.getenv('TTS_SERVICE_URL', 'http://localhost:8001')}/audio/{os.path.basename(conversion_result)}"
                 return audio_url
             else:
-                logger.error(f"TTS synthesis failed: no audio file generated")
+                logger.error("TTS synthesis failed: no audio file generated")
                 return None
                 
-        except Exception as e:
-            logger.error(f"TTS synthesis error: {e}")
+        except Exception:
+            logger.exception("TTS synthesis error")
             return None
     
     async def _publish_result(self, channel: str, result: Dict[str, Any]):
@@ -360,8 +359,8 @@ class TTSWorker:
             
             logger.debug(f"Worker {self.worker_id} published result to {channel_key}")
             
-        except Exception as e:
-            logger.error(f"Worker {self.worker_id} failed to publish result: {e}")
+        except Exception:
+            logger.exception("Worker {self.worker_id} failed to publish result")
     
     async def _acknowledge_task(self, message_id: str):
         """Подтверждение обработки задачи"""
@@ -376,8 +375,8 @@ class TTSWorker:
             
             logger.debug(f"Worker {self.worker_id} acknowledged task {message_id}: {result}")
             
-        except Exception as e:
-            logger.error(f"Worker {self.worker_id} failed to acknowledge task {message_id}: {e}")
+        except Exception:
+            logger.exception("Worker {self.worker_id} failed to acknowledge task {message_id}")
     
     def get_stats(self) -> Dict[str, Any]:
         """Получить статистику worker'а"""
@@ -407,11 +406,12 @@ async def main():
         await worker.start()
     except KeyboardInterrupt:
         logger.info(f"Worker {worker_id} interrupted by user")
-    except Exception as e:
-        logger.error(f"Worker {worker_id} failed: {e}")
+    except Exception:
+        logger.exception("Worker {worker_id} failed")
         sys.exit(1)
     finally:
         await worker.stop()
 
 if __name__ == "__main__":
     asyncio.run(main())
+

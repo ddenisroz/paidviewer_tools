@@ -64,8 +64,8 @@ def convert_audio_for_f5tts(input_path: str, output_path: str) -> bool:
                 mono=False,
                 res_type='soxr_vhq'  # Максимальное качество без потерь
             )
-        except Exception as e:
-            logger.error(f"Failed to load audio file {input_path}: {e}")
+        except Exception:
+            logger.exception("Failed to load audio file {input_path}")
             return False
         
         # Convert to mono if stereo
@@ -134,8 +134,8 @@ def convert_audio_for_f5tts(input_path: str, output_path: str) -> bool:
         logger.info(f"Successfully converted audio to F5-TTS format: {output_path}")
         return True
         
-    except Exception as e:
-        logger.error(f"Error converting audio: {e}", exc_info=True)
+    except Exception:
+        logger.exception("Error converting audio")
         return False
 
 def validate_audio_for_f5tts(file_path: str) -> tuple[bool, str]:
@@ -173,8 +173,9 @@ def validate_audio_for_f5tts(file_path: str) -> tuple[bool, str]:
         
         return True, "Audio meets F5-TTS requirements"
         
-    except Exception as e:
-        return False, f"Error validating audio: {str(e)}"
+    except Exception:
+        logger.exception("Error validating audio")
+        return False, "Error validating audio"
 
 def get_audio_info(file_path: str) -> dict:
     """
@@ -198,8 +199,8 @@ def get_audio_info(file_path: str) -> dict:
             "rms": float(np.sqrt(np.mean(audio_data**2))),
             "is_mono": len(audio_data.shape) == 1 or audio_data.shape[0] == 1
         }
-    except Exception as e:
-        logger.error(f"Error getting audio info: {e}")
+    except Exception:
+        logger.exception("Error getting audio info")
         return {}
 if __name__ == "__main__":
     # Test the converter

@@ -7,6 +7,7 @@ import { API_BASE_URL } from '@/constants';
 import { useAuth } from '@/context/AuthContext';
 import CookieConsent from '@/shared/components/CookieConsent';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
+import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
 interface TwitchIconProps {
@@ -86,7 +87,12 @@ const LoginPage: React.FC = () => {
 
     const handleLogin = (platform: 'twitch' | 'vk'): void => {
         logger.log(`[LOGIN] Redirecting to ${platform} OAuth`);
-        const authUrl = `${API_BASE_URL}/auth/${platform}/login`;
+        const authPath = `/auth/${platform}/login`;
+        const authUrl = getSafeBackendAuthUrl(API_BASE_URL, authPath);
+        if (!authUrl) {
+            logger.error('[LOGIN] Blocked unsafe OAuth redirect URL', { platform, API_BASE_URL });
+            return;
+        }
         window.location.href = authUrl;
     };
 

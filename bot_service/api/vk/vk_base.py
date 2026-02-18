@@ -6,12 +6,15 @@ import ssl
 import time
 import asyncio
 import logging
+import os
 import urllib3
 import aiohttp
 from dataclasses import dataclass
 
-# Disable warnings for dev API (internal)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+_VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
+if _VK_INSECURE_SSL:
+    # Only suppress warnings in explicitly insecure dev mode.
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +47,11 @@ class VKBase:
     def __init__(self) -> None:
         self.rate_limiter = RateLimiter()
         
-        # SSL context configuration
-        # NOTE: Only for dev API, production should verify SSL
+        # SSL context configuration; secure by default.
         self.ssl_context = ssl.create_default_context()
-        self.ssl_context.check_hostname = False
-        self.ssl_context.verify_mode = ssl.CERT_NONE
+        if _VK_INSECURE_SSL:
+            logger.warning("VK API SSL verification is disabled via VK_INSECURE_SSL=true")
+            self.ssl_context.check_hostname = False
+            self.ssl_context.verify_mode = ssl.CERT_NONE
 
 

@@ -54,8 +54,8 @@ async def get_global_badges(client_id: str, access_token: str) -> Dict:
                 else:
                     logger.error(f"[ERROR] Failed to fetch global badges: {response.status}")
                     return {}
-    except Exception as e:
-        logger.error(f"[ERROR] Error fetching global badges: {e}")
+    except Exception:
+        logger.exception("[ERROR] Error fetching global badges")
         return {}
 
 
@@ -113,8 +113,8 @@ async def get_channel_badges(broadcaster_id: str, client_id: str, access_token: 
                     logger.error(f"[ERROR] Failed to fetch channel badges: {response.status} - {error_text}")
                     # Не кэшируем ошибки, чтобы можно было повторить попытку
                     return {}
-    except Exception as e:
-        logger.error(f"[ERROR] Error fetching channel badges: {e}", exc_info=True)
+    except Exception:
+        logger.exception("[ERROR] Error fetching channel badges")
         return {}
 
 
@@ -141,4 +141,5 @@ def get_badge_url(badge_id: str, version: str, global_badges: Dict, channel_badg
         return global_badges[badge_id][version].get(f'image_url_{size}')
 
     return None
+
 

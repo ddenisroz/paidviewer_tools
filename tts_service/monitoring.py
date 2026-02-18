@@ -79,9 +79,9 @@ class SystemMonitor:
                 # GPU информация (для TTS)
                 "gpu": gpu_info
             }
-        except Exception as e:
-            logger.error(f"Error getting system info: {e}")
-            return {"error": str(e)}
+        except Exception:
+            logger.exception("Error getting system info")
+            return {"error": "Internal server error"}
     
     def _get_gpu_info(self) -> Dict[str, Any]:
         """Получение информации о GPU"""
@@ -99,8 +99,8 @@ class SystemMonitor:
                     "gpu_memory_total_mb": int(gpu_data[2]) if gpu_data[2] != 'N/A' else 0,
                     "gpu_temperature_c": int(gpu_data[3]) if gpu_data[3] != 'N/A' else 0
                 }
-        except Exception as e:
-            logger.debug(f"GPU info not available: {e}")
+        except Exception:
+            logger.exception("GPU info not available")
         
         return {
             "gpu_utilization_percent": 0,
@@ -141,8 +141,8 @@ class SystemMonitor:
                     
                     logger.debug(f"TTS Monitoring data collected: CPU {data['process']['cpu_percent']}%, Memory {data['process']['memory_mb']}MB, GPU {data['gpu']['gpu_utilization_percent']}%")
                     
-                except Exception as e:
-                    logger.error(f"Error in TTS monitoring loop: {e}")
+                except Exception:
+                    logger.exception("Error in TTS monitoring loop")
                 
                 time.sleep(interval)
         
@@ -168,8 +168,8 @@ class SystemMonitor:
                 json.dump(self.monitoring_data, f, indent=2, ensure_ascii=False)
             
             logger.debug(f"TTS Monitoring data saved to {filename}")
-        except Exception as e:
-            logger.error(f"Error saving TTS monitoring data: {e}")
+        except Exception:
+            logger.exception("Error saving TTS monitoring data")
     
     def get_current_stats(self) -> Dict[str, Any]:
         """Получение текущей статистики"""
@@ -233,3 +233,4 @@ class SystemMonitor:
 
 # Глобальный экземпляр
 tts_monitor = SystemMonitor("tts_service")
+

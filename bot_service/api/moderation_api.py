@@ -51,9 +51,11 @@ async def toggle_mute_user(
         
         return MuteStatusResponse(**result)
 
-    except Exception as e:
-        logger.error(f"[MODERATION] Error toggling mute: {e}")
-        raise HTTPException(status_code=500, detail=f"Error toggling mute: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[MODERATION] Error toggling mute")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/muted-users")
 async def get_muted_users(
@@ -83,8 +85,10 @@ async def get_muted_users(
             ]
         }
 
-    except Exception as e:
-        logger.error(f"Error getting muted users: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting muted users")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 # Helper function exposed for other modules if needed (e.g. TTS engine)

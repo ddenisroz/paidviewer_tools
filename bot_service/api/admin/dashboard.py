@@ -6,7 +6,6 @@ Clean Architecture: endpoints delegate to AdminStatsService and BotControlServic
 No direct DB queries in this file.
 """
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 import logging
 import os
@@ -26,7 +25,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 def require_admin(user: dict):
     """Check if user is admin."""
-    if not user.get('is_admin', False):
+    if not (user.get('role') == 'admin' or user.get('is_admin', False)):
         raise HTTPException(status_code=403, detail="Admin access required")
 
 
@@ -36,13 +35,13 @@ async def get_dashboard_stats(
     db: Session = Depends(get_db)
 ):
     """
-    РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РґР»СЏ Dashboard Р°РґРјРёРЅ-РїР°РЅРµР»Рё.
+    Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓРЎвЂљР В°РЎвЂљР С‘РЎРѓРЎвЂљР С‘Р С”РЎС“ Р Т‘Р В»РЎРЏ Dashboard Р В°Р Т‘Р СР С‘Р Р…-Р С—Р В°Р Р…Р ВµР В»Р С‘.
     
     Returns:
-        - users: СЃС‚Р°С‚РёСЃС‚РёРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
-        - tts: СЃС‚Р°С‚РёСЃС‚РёРєР° TTS
-        - bots: СЃС‚Р°С‚СѓСЃ Р±РѕС‚РѕРІ
-        - system: СЃРёСЃС‚РµРјРЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР°
+        - users: РЎРѓРЎвЂљР В°РЎвЂљР С‘РЎРѓРЎвЂљР С‘Р С”Р В° Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»Р ВµР в„–
+        - tts: РЎРѓРЎвЂљР В°РЎвЂљР С‘РЎРѓРЎвЂљР С‘Р С”Р В° TTS
+        - bots: РЎРѓРЎвЂљР В°РЎвЂљРЎС“РЎРѓ Р В±Р С•РЎвЂљР С•Р Р†
+        - system: РЎРѓР С‘РЎРѓРЎвЂљР ВµР СР Р…Р В°РЎРЏ РЎРѓРЎвЂљР В°РЎвЂљР С‘РЎРѓРЎвЂљР С‘Р С”Р В°
     """
     try:
         require_admin(user)
@@ -72,8 +71,8 @@ async def get_dashboard_stats(
             if vk_bot:
                 vk_online = vk_bot.is_running if hasattr(vk_bot, 'is_running') else False
                 vk_connections = len(vk_bot.connected_channels) if hasattr(vk_bot, 'connected_channels') else 0
-        except Exception as e:
-            logger.error(f"Error getting bot status for dashboard: {e}")
+        except Exception:
+            logger.exception("Error getting bot status for dashboard")
             twitch_online = False
             vk_online = False
             twitch_connections = 0
@@ -83,8 +82,8 @@ async def get_dashboard_stats(
         try:
             ws_stats = get_memory_websocket_manager().get_connection_stats()
             total_connections = ws_stats.get('active_connections', 0)
-        except Exception as e:
-            logger.error(f"Error getting websocket stats for dashboard: {e}")
+        except Exception:
+            logger.exception("Error getting websocket stats for dashboard")
             total_connections = 0
         
         return {
@@ -102,9 +101,9 @@ async def get_dashboard_stats(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting dashboard stats: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except Exception:
+        logger.exception("Error getting dashboard stats")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/list")
@@ -112,7 +111,7 @@ async def get_admin_list(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РґР»СЏ Р°РґРјРёРЅ-РїР°РЅРµР»Рё."""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓР С—Р С‘РЎРѓР С•Р С” Р Т‘Р В»РЎРЏ Р В°Р Т‘Р СР С‘Р Р…-Р С—Р В°Р Р…Р ВµР В»Р С‘."""
     try:
         require_admin(user)
         
@@ -122,16 +121,16 @@ async def get_admin_list(
         return {"success": True, **result}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting admin list: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except Exception:
+        logger.exception("Error getting admin list")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/bots/status")
 async def get_bots_status(
     user: dict = Depends(get_current_user)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ РІСЃРµС… Р±РѕС‚РѕРІ."""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓРЎвЂљР В°РЎвЂљРЎС“РЎРѓ Р Р†РЎРѓР ВµРЎвЂ¦ Р В±Р С•РЎвЂљР С•Р Р†."""
     try:
         require_admin(user)
         
@@ -165,16 +164,16 @@ async def get_bots_status(
         }
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting bots status: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except Exception:
+        logger.exception("Error getting bots status")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/tts/status")
 async def get_tts_status(
     user: dict = Depends(get_current_user)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ TTS СЃРµСЂРІРёСЃР°."""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓРЎвЂљР В°РЎвЂљРЎС“РЎРѓ TTS РЎРѓР ВµРЎР‚Р Р†Р С‘РЎРѓР В°."""
     try:
         require_admin(user)
         
@@ -198,6 +197,7 @@ async def get_tts_status(
                 }
             }
         except Exception:
+            logger.exception("TTS health check failed in admin dashboard")
             return {
                 "success": True,
                 "tts_service": {
@@ -211,9 +211,9 @@ async def get_tts_status(
             
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting TTS status: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except Exception:
+        logger.exception("Error getting TTS status")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/monitoring/metrics")
@@ -221,7 +221,7 @@ async def get_monitoring_metrics(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ РјРµС‚СЂРёРєРё РјРѕРЅРёС‚РѕСЂРёРЅРіР°."""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ Р СР ВµРЎвЂљРЎР‚Р С‘Р С”Р С‘ Р СР С•Р Р…Р С‘РЎвЂљР С•РЎР‚Р С‘Р Р…Р С–Р В°."""
     try:
         require_admin(user)
         
@@ -250,9 +250,9 @@ async def get_monitoring_metrics(
         return {"success": True, "metrics": metrics}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting monitoring metrics: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except Exception:
+        logger.exception("Error getting monitoring metrics")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/analytics")
@@ -260,7 +260,7 @@ async def get_analytics(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ Р°РЅР°Р»РёС‚РёРєСѓ СЃРёСЃС‚РµРјС‹."""
+    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ Р В°Р Р…Р В°Р В»Р С‘РЎвЂљР С‘Р С”РЎС“ РЎРѓР С‘РЎРѓРЎвЂљР ВµР СРЎвЂ№."""
     try:
         logger.info(f"[STATS] [ANALYTICS] Request from user {user.get('id')}")
         require_admin(user)
@@ -275,8 +275,8 @@ async def get_analytics(
             memory_usage = memory_info.percent
             current_process = psutil.Process(os.getpid())
             process_memory_mb = current_process.memory_info().rss / 1024 / 1024
-        except Exception as e:
-            logger.warning(f"[WARN] [ANALYTICS] Could not get system metrics: {e}")
+        except Exception:
+            logger.warning("[WARN] [ANALYTICS] Could not get system metrics")
             cpu_usage = 0
             memory_usage = 0
             process_memory_mb = 0
@@ -295,8 +295,6 @@ async def get_analytics(
         
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"[ERROR] [ANALYTICS] Error getting analytics: {e}")
-        import traceback
-        logger.error(f"[ERROR] [ANALYTICS] Traceback: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ Р°РЅР°Р»РёС‚РёРєРё: {str(e)}")
+    except Exception:
+        logger.exception("[ERROR] [ANALYTICS] Error getting analytics")
+        raise HTTPException(status_code=500, detail="Internal server error")

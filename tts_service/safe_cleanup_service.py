@@ -70,8 +70,8 @@ class SafeCleanupService:
             logger.info(f"  Safe to clean: {[str(p) for p in self.safe_cleanup_paths]}")
             logger.info(f"  Voice paths (protected): {[str(p) for p in self.voice_paths]}")
             
-        except Exception as e:
-            logger.error(f"[ERROR] Error setting up cleanup paths: {e}")
+        except Exception:
+            logger.exception("[ERROR] Error setting up cleanup paths")
     
     def is_voice_file(self, file_path: Path) -> bool:
         """Проверяет, является ли файл файлом голоса (НЕ УДАЛЯТЬ!)"""
@@ -88,8 +88,8 @@ class SafeCleanupService:
                 
             return False
             
-        except Exception as e:
-            logger.warning(f"Error checking if file is voice: {e}")
+        except Exception:
+            logger.exception("Error checking if file is voice")
             return True  # В случае сомнений - НЕ удаляем!
     
     def cleanup_old_files(self) -> Dict[str, Any]:
@@ -143,13 +143,13 @@ class SafeCleanupService:
                             
                             logger.info(f"[DELETE] Deleted: {file_path} (age: {file_age/3600:.1f}h)")
                             
-                    except Exception as e:
+                    except Exception:
                         cleanup_stats['errors'] += 1
-                        logger.error(f"[ERROR] Error deleting {file_path}: {e}")
+                        logger.exception("[ERROR] Error deleting {file_path}")
                         
-            except Exception as e:
+            except Exception:
                 cleanup_stats['errors'] += 1
-                logger.error(f"[ERROR] Error cleaning {cleanup_path}: {e}")
+                logger.exception("[ERROR] Error cleaning {cleanup_path}")
         
         # Логируем результаты
         if cleanup_stats['files_deleted'] > 0:
@@ -207,8 +207,8 @@ class SafeCleanupService:
                     
                     oldest_age = max(oldest_age, file_age_hours)
                     
-                except Exception as e:
-                    logger.warning(f"Error getting stats for {file_path}: {e}")
+                except Exception:
+                    logger.exception("Error getting stats for %s", file_path)
         
         stats['oldest_file_age_hours'] = oldest_age
         stats['total_size_mb'] = stats['total_size_bytes'] / (1024 * 1024)
@@ -218,3 +218,4 @@ class SafeCleanupService:
 
 # Глобальный экземпляр
 safe_cleanup_service = SafeCleanupService()
+

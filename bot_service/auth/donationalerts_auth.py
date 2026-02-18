@@ -113,7 +113,7 @@ async def donationalerts_callback(
                 logger.error(f"DonationAlerts token exchange failed: {token_response.status_code} - {error_data}")
                 raise HTTPException(
                     status_code=token_response.status_code,
-                    detail=f"Failed to get access token: {error_data}"
+                    detail="Failed to get access token"
                 )
 
             token_data = token_response.json()
@@ -187,5 +187,5 @@ async def donationalerts_callback(
         raise
     except Exception as e:
         logger.error(f"Error in DonationAlerts callback: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Authentication failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
 

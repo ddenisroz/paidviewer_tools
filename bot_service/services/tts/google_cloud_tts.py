@@ -368,8 +368,8 @@ class GoogleCloudTTS:
 
         try:
             token = await asyncio.to_thread(_refresh_token)
-        except Exception as exc:
-            logger.warning("[WARN] Failed to refresh Google ADC token: %s", exc)
+        except Exception:
+            logger.exception("[WARN] Failed to refresh Google ADC token")
             return None
 
         if not token:
@@ -622,7 +622,7 @@ class GoogleCloudTTS:
             }
 
         except Exception as exc:
-            logger.error("[ERROR] Google TTS synthesis failed: %s", exc, exc_info=True)
+            logger.exception("[ERROR] Google TTS synthesis failed")
             return {
                 "success": False,
                 "error": str(exc),
@@ -685,7 +685,7 @@ class GoogleCloudTTS:
             _VOICES_CACHE[cache_key] = (now + _VOICES_CACHE_TTL, voices)
             return {"success": True, "voices": voices, "cached": False, "auth_mode": auth_mode}
         except Exception as exc:
-            logger.error("[ERROR] Google TTS voices fetch failed: %s", exc, exc_info=True)
+            logger.exception("[ERROR] Google TTS voices fetch failed")
             return {
                 "success": False,
                 "error": str(exc),
@@ -705,3 +705,4 @@ def get_google_cloud_tts() -> GoogleCloudTTS:
     if _google_cloud_tts_instance is None:
         _google_cloud_tts_instance = GoogleCloudTTS()
     return _google_cloud_tts_instance
+

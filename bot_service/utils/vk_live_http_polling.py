@@ -6,12 +6,14 @@ import asyncio
 import aiohttp
 import logging
 import time
+import os
 from typing import Optional, Callable, Dict, Set
 
 from utils.vk_channel_url import extract_vk_channel_slug
 from utils.vk_chat_parser import build_message_text_and_emotes, extract_vk_badge_urls, normalize_parts
 
 logger = logging.getLogger(__name__)
+_VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 
 class VKLiveHTTPPolling:
@@ -64,9 +66,10 @@ class VKLiveHTTPPolling:
         return slug or channel_url
 
     def _get_connector(self) -> aiohttp.TCPConnector:
-        if 'apidev.' in self.api_base_url:
+        if 'apidev.' in self.api_base_url and _VK_INSECURE_SSL:
             import ssl
             ssl_context = ssl.create_default_context()
+            logger.warning("VK HTTP polling SSL verification disabled via VK_INSECURE_SSL=true")
             ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
             return aiohttp.TCPConnector(ssl=ssl_context)

@@ -176,8 +176,8 @@ class UserSettingsService:
                 await get_memory_websocket_manager().send_to_user(user_id, cache_invalidation_event)
                 logger.debug(f"[REFRESH] [USER_SETTINGS] Sent cache invalidation to user {user_id}")
                 
-        except Exception as e:
-            logger.error(f"Error sending cache invalidation: {e}")
+        except Exception:
+            logger.exception("Error sending cache invalidation")
 
     def _map_to_dict(self, settings: UserSettings) -> Dict[str, Any]:
         """Map UserSettings model to dictionary."""
@@ -218,3 +218,4 @@ class UserSettingsService:
             "combine_titles": settings.combine_titles,
             "combine_categories": settings.combine_categories,
         }
+

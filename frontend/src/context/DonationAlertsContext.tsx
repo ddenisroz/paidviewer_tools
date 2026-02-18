@@ -5,6 +5,7 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 import { API_BASE_URL } from '@/constants';
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
 import { logger } from '@/shared/utils/prodLogger';
+import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 
 import { useAuth } from './AuthContext';
 
@@ -95,8 +96,12 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             const data = await response.json();
 
             if (data.auth_url) {
+                const safeUrl = getSafeNavigationUrl(data.auth_url);
+                if (!safeUrl) {
+                    throw new Error('Небезопасный URL авторизации');
+                }
                 saveReturnUrl();
-                window.location.href = data.auth_url;
+                window.location.href = safeUrl;
                 return true;
             } else {
                 throw new Error('URL авторизации не получен');

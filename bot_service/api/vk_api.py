@@ -1,4 +1,4 @@
-"""
+﻿"""
 VK Live API Integration (Refactored)
 Facade class inheriting from modular components.
 """
@@ -68,13 +68,15 @@ async def update_vk_category(
         result = await vk_api.update_stream_category(user_id, category_id, session_id)
 
         if result:
-            return JSONResponse(content={"success": True, "message": "РљР°С‚РµРіРѕСЂРёСЏ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅР°"})
+            return JSONResponse(content={"success": True, "message": "Р В РЎв„ўР В Р’В°Р РЋРІР‚С™Р В Р’ВµР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР РЏ Р РЋРЎвЂњР РЋР С“Р В РЎвЂ”Р В Р’ВµР РЋРІвЂљВ¬Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂўР В Р’В±Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В Р’В°"})
         else:
-            raise HTTPException(status_code=400, detail="РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ")
+            raise HTTPException(status_code=400, detail="Р В РЎСљР В Р’Вµ Р РЋРЎвЂњР В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР Р‰ Р В РЎвЂўР В Р’В±Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В РЎвЂќР В Р’В°Р РЋРІР‚С™Р В Р’ВµР В РЎвЂ“Р В РЎвЂўР РЋР вЂљР В РЎвЂР РЋР вЂ№")
 
-    except Exception as e:
-        logger.error(f"Error updating VK category: {e}")
-        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РєР°С‚РµРіРѕСЂРёРё: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating VK category")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/update-title")
 async def update_vk_title(
@@ -93,13 +95,15 @@ async def update_vk_title(
         result = await vk_api.update_stream_title(user_id, title, session_id)
 
         if result:
-            return JSONResponse(content={"success": True, "message": "РќР°Р·РІР°РЅРёРµ СѓСЃРїРµС€РЅРѕ РѕР±РЅРѕРІР»РµРЅРѕ"})
+            return JSONResponse(content={"success": True, "message": "Р В РЎСљР В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ Р РЋРЎвЂњР РЋР С“Р В РЎвЂ”Р В Р’ВµР РЋРІвЂљВ¬Р В Р вЂ¦Р В РЎвЂў Р В РЎвЂўР В Р’В±Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р’В»Р В Р’ВµР В Р вЂ¦Р В РЎвЂў"})
         else:
-            raise HTTPException(status_code=400, detail="РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РЅР°Р·РІР°РЅРёРµ")
+            raise HTTPException(status_code=400, detail="Р В РЎСљР В Р’Вµ Р РЋРЎвЂњР В РўвЂР В Р’В°Р В Р’В»Р В РЎвЂўР РЋР С“Р РЋР Р‰ Р В РЎвЂўР В Р’В±Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В РЎвЂР РЋРІР‚С™Р РЋР Р‰ Р В Р вЂ¦Р В Р’В°Р В Р’В·Р В Р вЂ Р В Р’В°Р В Р вЂ¦Р В РЎвЂР В Р’Вµ")
 
-    except Exception as e:
-        logger.error(f"Error updating VK title: {e}")
-        raise HTTPException(status_code=500, detail=f"РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ РЅР°Р·РІР°РЅРёСЏ: {str(e)}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating VK title")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/categories")
 async def get_vk_categories(
@@ -129,10 +133,7 @@ async def get_vk_categories(
 
         if not user_token or not user_token.access_token:
             logger.warning("[ERROR] [VK CATEGORIES] No VK token available")
-            return JSONResponse(
-                content={"success": False, "categories": [], "error": "No VK token found"},
-                status_code=200
-            )
+            raise HTTPException(status_code=503, detail="No VK token found")
             
         # If we are using a random token, we pass user_id as that token's owner ID to refresh it if needed
         token_owner_id = str(user_token.user_id)
@@ -147,12 +148,11 @@ async def get_vk_categories(
             status_code=200
         )
 
-    except Exception as e:
-        logger.error(f"[ERROR] [VK CATEGORIES] Error: {e}")
-        return JSONResponse(
-            content={"success": False, "categories": [], "error": "Internal server error"},
-            status_code=500
-        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("[ERROR] [VK CATEGORIES] Error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/stream-info")
 async def get_vk_stream_info(
@@ -168,9 +168,11 @@ async def get_vk_stream_info(
 
         if stream_info:
             return JSONResponse(content=stream_info)
-        else:
-            return JSONResponse(content={"success": False, "message": "РЎС‚СЂРёРј РЅРµ РЅР°Р№РґРµРЅ"})
+        raise HTTPException(status_code=404, detail="VK stream info not found")
 
-    except Exception as e:
-        logger.error(f"Error getting VK stream info: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting VK stream info")
+        raise HTTPException(status_code=500, detail="Internal server error")
+

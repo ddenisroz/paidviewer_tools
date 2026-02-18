@@ -35,8 +35,8 @@ class QueueService:
             return
         try:
             await broadcast_youtube_queue_update(user_id)
-        except Exception as e:
-            logger.debug(f"[QUEUE] Failed to broadcast queue update: {e}")
+        except Exception:
+            logger.exception("[QUEUE] Failed to broadcast queue update")
 
     def _broadcast_queue_update_sync(self, user_id: int | None) -> None:
         if not user_id:
@@ -216,8 +216,8 @@ class QueueService:
                             action="queue_update",
                             data={"queue_length": max_position + 1}
                         )
-                except Exception as e:
-                    logger.error(f"Error sending YouTube OBS command: {e}")
+                except Exception:
+                    logger.exception("Error sending YouTube OBS command")
 
             await self._broadcast_queue_update(user_id)
 
@@ -235,9 +235,9 @@ class QueueService:
                 }
             }
 
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error adding video to queue: {e}")
+            logger.exception("Error adding video to queue")
             return {
                 'success': False,
                 'error': 'Ошибка добавления видео в очередь'
@@ -322,9 +322,9 @@ class QueueService:
             logger.info(f"Deducted {cost} points from {viewer_name} for {reason}")
             return {'success': True}
 
-        except Exception as e:
+        except Exception:
             db.rollback()  # [OK] Rollback при ошибке
-            logger.error(f"Error deducting points: {e}", exc_info=True)
+            logger.exception("Error deducting points")
             return {
                 'success': False,
                 'error': 'Ошибка списания баллов'
@@ -363,8 +363,8 @@ class QueueService:
 
             return result
 
-        except Exception as e:
-            logger.error(f"Error getting queue: {e}")
+        except Exception:
+            logger.exception("Error getting queue")
             return []
         finally:
             if should_close:
@@ -404,9 +404,9 @@ class QueueService:
             self._broadcast_queue_update_sync(user_id)
             return True
 
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error removing from queue: {e}")
+            logger.exception("Error removing from queue")
             return False
         finally:
             if should_close:
@@ -445,9 +445,9 @@ class QueueService:
             logger.info(f"Banned video {video_id} for user {user_id} (count={banned_count})")
             self._broadcast_queue_update_sync(user_id)
             return {"success": True, "video_id": video_id, "banned_count": banned_count}
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error banning video: {e}")
+            logger.exception("Error banning video")
             return {"success": False, "error": "Failed to ban video"}
         finally:
             if should_close:
@@ -518,10 +518,10 @@ class QueueService:
                 "points_refunded": last_video.points_cost if last_video.is_paid else 0
             }
 
-        except Exception as e:
+        except Exception:
             if db:
                 db.rollback()
-            logger.error(f"[WRONGLINK] Error removing last user video: {e}")
+            logger.exception("[WRONGLINK] Error removing last user video")
             return {
                 "success": False,
                 "error": f"@{requester_name}, ошибка удаления видео"
@@ -584,8 +584,8 @@ class QueueService:
 
                 db.add(transaction)
 
-        except Exception as e:
-            logger.error(f"Error refunding points: {e}")
+        except Exception:
+            logger.exception("Error refunding points")
 
     def _rebuild_positions(self, user_id: int, db: Session):
         """Перестройка позиций в очереди"""
@@ -596,8 +596,8 @@ class QueueService:
             for i, item in enumerate(queue_items):
                 item.position = i + 1
 
-        except Exception as e:
-            logger.error(f"Error rebuilding positions: {e}")
+        except Exception:
+            logger.exception("Error rebuilding positions")
 
     def clear_queue(self, user_id: int, db: Session = None) -> int:
         """Очистка всей очереди"""
@@ -630,9 +630,9 @@ class QueueService:
             self._broadcast_queue_update_sync(user_id)
             return count
 
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error clearing queue: {e}")
+            logger.exception("Error clearing queue")
             return 0
         finally:
             if should_close:
@@ -665,8 +665,8 @@ class QueueService:
                 'embed_url': self.youtube_service.get_embed_url(next_item.video_id)
             }
 
-        except Exception as e:
-            logger.error(f"Error getting next video: {e}")
+        except Exception:
+            logger.exception("Error getting next video")
             return None
         finally:
             if should_close:
@@ -700,9 +700,9 @@ class QueueService:
             self._broadcast_queue_update_sync(user_id)
             return True
 
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error marking video as played: {e}")
+            logger.exception("Error marking video as played")
             return False
         finally:
             if should_close:
@@ -735,9 +735,9 @@ class QueueService:
             logger.info(f"Moved queue item to top: {selected.title}")
             self._broadcast_queue_update_sync(user_id)
             return True
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error moving queue item to top: {e}")
+            logger.exception("Error moving queue item to top")
             return False
         finally:
             if should_close:
@@ -774,9 +774,9 @@ class QueueService:
             logger.info(f"Cut queue to item: {remaining[0].title}")
             self._broadcast_queue_update_sync(user_id)
             return True
-        except Exception as e:
+        except Exception:
             db.rollback()
-            logger.error(f"Error cutting queue to item: {e}")
+            logger.exception("Error cutting queue to item")
             return False
         finally:
             if should_close:
@@ -833,8 +833,8 @@ class QueueService:
                 "message": "Видео пропущено"
             }
 
-        except Exception as e:
-            logger.error(f"Error skipping current video: {e}")
+        except Exception:
+            logger.exception("Error skipping current video")
             return {
                 "success": False,
                 "error": "Ошибка пропуска видео"
@@ -842,4 +842,5 @@ class QueueService:
         finally:
             if should_close:
                 db.close()
+
 

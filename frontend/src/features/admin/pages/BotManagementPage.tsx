@@ -17,6 +17,7 @@ import { adminService } from '@/services/api/services/adminService';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
@@ -160,7 +161,13 @@ const BotManagementPage: React.FC = () => {
     });
 
   const handleAuthorize = (platform: Platform) => {
-    window.location.href = `${API_BASE_URL}/auth/${platform}/bot/login`;
+    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, `/auth/${platform}/bot/login`);
+    if (!safeUrl) {
+      logger.error('Blocked unsafe bot OAuth redirect URL', { platform, API_BASE_URL });
+      toast.error('Некорректный URL авторизации бота');
+      return;
+    }
+    window.location.href = safeUrl;
   };
 
   const handleCreateLink = (platform: Platform) =>

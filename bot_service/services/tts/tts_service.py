@@ -127,7 +127,7 @@ class TTSService:
             }
 
         except Exception as e:
-            logger.error(f"Error in synthesize: {e}")
+            logger.exception("Error in synthesize")
             return {"success": False, "error": "Internal server error"}
 
     # === Settings Management ===
@@ -142,7 +142,7 @@ class TTSService:
             self.audio_repo.update(settings, {"website_volume": website_volume})
             return True
         except Exception as e:
-            logger.error(f"Error saving audio settings: {e}")
+            logger.exception("Error saving audio settings")
             return False
 
     async def get_tts_settings(self, user_id: int = None, session_id: str = None) -> dict:
@@ -185,7 +185,7 @@ class TTSService:
             return {"success": True, "version": getattr(updated_settings, 'version', 1)}
         
         except Exception as e:
-            logger.error(f"Error saving TTS settings: {e}")
+            logger.exception("Error saving TTS settings")
             return {"success": False, "error": "Internal server error"}
 
     # === Filter Management ===
@@ -282,14 +282,14 @@ class TTSService:
             local_repo = LocalTTSRepository(self.db)
             local_config = local_repo.get_active(user_id=user_id)
             has_local_setup = bool(local_config and local_config.is_healthy)
-        except Exception as exc:
-            logger.warning("Failed to resolve local TTS status for user %s: %s", user_id, exc)
+        except Exception as e:
+            logger.exception("Failed to resolve local TTS status for user %s", user_id)
 
         try:
             from utils.whitelist_cache import is_user_whitelisted_cached
             is_whitelisted = bool(is_user_whitelisted_cached(user, self.db))
-        except Exception as exc:
-            logger.warning("Failed to resolve whitelist status for user %s: %s", user_id, exc)
+        except Exception as e:
+            logger.exception("Failed to resolve whitelist status for user %s", user_id)
 
         return {
             "enabled": enabled,
@@ -310,7 +310,7 @@ class TTSService:
             self.settings_repo.update_settings(settings, {"enabled_platforms": enabled_platforms})
             return True
         except Exception as e:
-            logger.error(f"Error setting platform settings: {e}")
+            logger.exception("Error setting platform settings")
             return False
 
     # === Status Management (Enable/Disable) ===
@@ -344,7 +344,7 @@ class TTSService:
             
             return True
         except Exception as e:
-            logger.error(f"Error enabling TTS: {e}")
+            logger.exception("Error enabling TTS")
             return False
 
     async def disable_tts(self, user_id: int = None, session_id: str = None) -> bool:
@@ -374,7 +374,7 @@ class TTSService:
 
             return True
         except Exception as e:
-             logger.error(f"Error disabling TTS: {e}")
+             logger.exception("Error disabling TTS")
              return False
 
 
@@ -400,7 +400,7 @@ class TTSService:
             return True
             
         except Exception as e:
-            logger.error(f"Error setting voice: {e}")
+            logger.exception("Error setting voice")
             return False
 
     async def set_random_voice(self, user_id: int, db: Session = None) -> Optional[str]:
@@ -425,7 +425,7 @@ class TTSService:
             return voice_name
             
         except Exception as e:
-            logger.error(f"Error setting random voice: {e}")
+            logger.exception("Error setting random voice")
             return None
 
     async def set_volume(self, user_id: int, volume: int, db: Session = None) -> bool:
@@ -433,5 +433,6 @@ class TTSService:
         try:
             return await self.save_audio_settings(website_volume=volume, user_id=user_id)
         except Exception as e:
-            logger.error(f"Error setting volume: {e}")
+            logger.exception("Error setting volume")
             return False
+

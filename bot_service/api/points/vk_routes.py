@@ -33,9 +33,9 @@ async def get_vk_rewards(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"[ERROR] [VK REWARDS] Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения наград VK: {str(e)}")
+    except Exception:
+        logger.exception("[ERROR] [VK REWARDS] Error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_vk_router.post("/rewards/vk/create")
 @limiter.limit("10/minute")
@@ -59,9 +59,9 @@ async def create_vk_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error creating VK reward: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка создания награды VK: {str(e)}")
+    except Exception:
+        logger.exception("Error creating VK reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_vk_router.patch("/rewards/vk/{reward_id}")
 async def update_vk_reward(
@@ -84,9 +84,9 @@ async def update_vk_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error updating VK reward: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка обновления награды VK: {str(e)}")
+    except Exception:
+        logger.exception("Error updating VK reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_vk_router.delete("/rewards/vk/{reward_id}")
 @limiter.limit("20/minute")
@@ -108,9 +108,9 @@ async def delete_vk_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error deleting VK reward: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка удаления награды VK: {str(e)}")
+    except Exception:
+        logger.exception("Error deleting VK reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_vk_router.patch("/rewards/vk/{reward_id}/toggle")
 async def toggle_vk_reward(
@@ -137,9 +137,9 @@ async def toggle_vk_reward(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error toggling VK reward: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка переключения награды VK: {str(e)}")
+    except Exception:
+        logger.exception("Error toggling VK reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_vk_router.get("/rewards/vk/demands")
 async def get_vk_reward_demands(
@@ -158,9 +158,9 @@ async def get_vk_reward_demands(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting VK reward demands: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка получения запросов наград VK: {str(e)}")
+    except Exception:
+        logger.exception("Error getting VK reward demands")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @points_vk_router.post("/rewards/vk/demands/process")
 async def process_vk_reward_demands(
@@ -187,6 +187,6 @@ async def process_vk_reward_demands(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error processing VK reward demands: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка обработки запросов наград VK: {str(e)}")
+    except Exception:
+        logger.exception("Error processing VK reward demands")
+        raise HTTPException(status_code=500, detail="Internal server error")

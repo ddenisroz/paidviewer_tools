@@ -10,6 +10,7 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { useAutoSave } from '@/shared/hooks/useAutoSave';
+import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { toast } from '@/utils/toastManager';
 
 
@@ -350,7 +351,14 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(widgetUrl, '_blank')}
+                  onClick={() => {
+                    const safeUrl = getSafeNavigationUrl(widgetUrl);
+                    if (!safeUrl) {
+                      toast.error('Некорректный URL виджета');
+                      return;
+                    }
+                    window.open(safeUrl, '_blank', 'noopener,noreferrer');
+                  }}
                   className="gap-2 border-border/70 bg-card/70 hover:bg-accent"
                 >
                   <ExternalLink className="w-4 h-4" />
@@ -373,4 +381,3 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 };
 
 export default WidgetSettings;
-

@@ -52,8 +52,8 @@ class DatabaseCleanupService:
                 'optimization_date': utcnow_naive().isoformat()
             }
 
-        except Exception as e:
-            logger.error(f"Error optimizing database: {e}")
+        except Exception:
+            logger.exception("Error optimizing database")
             return {}
 
     def create_backup(self) -> Dict[str, Any]:

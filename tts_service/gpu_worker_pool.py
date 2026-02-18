@@ -3,14 +3,12 @@ import asyncio
 import logging
 import time
 import torch
-import psutil
 from typing import Dict, Optional, Any, List
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 import json
 import redis
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +51,7 @@ class GPUWorkerPool:
     
     def __init__(
         self,
-        config: Optional['GPUConfig'] = None,
+        config: Optional[Any] = None,
         redis_url: str = "redis://localhost:6379/0",
         stream_name: str = "gpu_tts_requests",
         consumer_group: str = "gpu_workers",
@@ -143,8 +141,8 @@ class GPUWorkerPool:
             self.running = True
             logger.info("GPUWorkerPool initialized successfully")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize GPUWorkerPool: {e}")
+        except Exception:
+            logger.exception("Failed to initialize GPUWorkerPool")
             raise
 
     async def _connect_redis(self):
@@ -169,14 +167,13 @@ class GPUWorkerPool:
             
             logger.info(f"Connected to Redis: {self.redis_url}")
             
-        except Exception as e:
-            logger.error(f"Failed to connect to Redis: {e}")
+        except Exception:
+            logger.exception("Failed to connect to Redis")
             raise
 
     async def _initialize_tts_model(self):
         """Инициализация TTS модели"""
         try:
-            from tts_service.TTS_rus_engine.russian_tts import RussianTTS
             
             # Инициализируем модель в отдельном потоке
             loop = asyncio.get_event_loop()
@@ -187,12 +184,13 @@ class GPUWorkerPool:
             
             logger.info("TTS model loaded successfully")
             
-        except Exception as e:
-            logger.error(f"Failed to initialize TTS model: {e}")
+        except Exception:
+            logger.exception("Failed to initialize TTS model")
             raise
 
     def _load_tts_model(self):
         """Загрузка TTS модели в отдельном потоке"""
+        from tts_service.TTS_rus_engine.russian_tts import RussianTTS
         return RussianTTS()
 
     async def _start_gpu_monitoring(self):
@@ -227,8 +225,8 @@ class GPUWorkerPool:
                 
                 await asyncio.sleep(self.monitoring_interval)
                 
-            except Exception as e:
-                logger.error(f"Error in GPU monitoring: {e}")
+            except Exception:
+                logger.exception("Error in GPU monitoring")
                 await asyncio.sleep(self.monitoring_interval)
 
     async def _get_gpu_metrics(self) -> GPUMetrics:
@@ -289,8 +287,8 @@ class GPUWorkerPool:
                 timestamp=time.time()
             )
             
-        except Exception as e:
-            logger.error(f"Error getting GPU metrics: {e}")
+        except Exception:
+            logger.exception("Error getting GPU metrics")
             return GPUMetrics(
                 memory_allocated=0,
                 memory_reserved=0,
@@ -371,8 +369,8 @@ class GPUWorkerPool:
                 for stream_id, fields in messages:
                     await self._process_task(stream_id, fields, worker_name)
                     
-            except Exception as e:
-                logger.error(f"Error in GPU worker {worker_name}: {e}")
+            except Exception:
+                logger.exception("Error in GPU worker {worker_name}")
                 await asyncio.sleep(5)
 
     def _get_next_task(self, worker_name: str):
@@ -387,8 +385,8 @@ class GPUWorkerPool:
                 block=1000
             )
             return messages[0][1] if messages else []
-        except Exception as e:
-            logger.error(f"Error reading from Redis stream: {e}")
+        except Exception:
+            logger.exception("Error reading from Redis stream")
             return []
 
     async def _process_task(self, stream_id: str, fields: Dict[str, str], worker_name: str):
@@ -432,8 +430,8 @@ class GPUWorkerPool:
                 # Подтверждаем обработку сообщения
                 self.redis_client.xack(self.stream_name, self.consumer_group, stream_id)
                 
-        except Exception as e:
-            logger.error(f"Error processing task {stream_id}: {e}")
+        except Exception:
+            logger.exception("Error processing task {stream_id}")
             # Подтверждаем сообщение даже при ошибке, чтобы избежать зацикливания
             try:
                 self.redis_client.xack(self.stream_name, self.consumer_group, stream_id)
@@ -454,8 +452,8 @@ class GPUWorkerPool:
             
             return result_path
             
-        except Exception as e:
-            logger.error(f"Error in speech synthesis: {e}")
+        except Exception:
+            logger.exception("Error in speech synthesis")
             return None
 
     def _do_tts_synthesis(self, text: str, voice: str) -> Optional[str]:
@@ -474,8 +472,8 @@ class GPUWorkerPool:
                 logger.error("TTS synthesis failed: no output file")
                 return None
                 
-        except Exception as e:
-            logger.error(f"TTS synthesis error: {e}")
+        except Exception:
+            logger.exception("TTS synthesis error")
             return None
 
     async def _send_result(self, task: SynthesisTask):
@@ -496,8 +494,8 @@ class GPUWorkerPool:
                 result_data
             )
             
-        except Exception as e:
-            logger.error(f"Error sending result: {e}")
+        except Exception:
+            logger.exception("Error sending result")
 
     async def submit_task(self, text: str, voice: str, user_id: Optional[int] = None, priority: int = 0) -> str:
         """Отправка задачи в очередь"""
@@ -523,8 +521,8 @@ class GPUWorkerPool:
             
             return task_id
             
-        except Exception as e:
-            logger.error(f"Error submitting task: {e}")
+        except Exception:
+            logger.exception("Error submitting task")
             raise
 
     async def get_task_result(self, task_id: str) -> Optional[Dict[str, Any]]:
@@ -589,3 +587,4 @@ try:
 except ImportError:
     # Fallback если конфигурация недоступна
     gpu_worker_pool = GPUWorkerPool()
+

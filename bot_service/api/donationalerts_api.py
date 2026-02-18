@@ -1,7 +1,8 @@
 # bot_service/api/donationalerts_api.py
 """API РґР»СЏ DonationAlerts - Clean Architecture РІРµСЂСЃРёСЏ"""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from urllib.parse import urlencode, urlparse
 from core.database import get_db
 from auth.auth import get_current_user, get_current_user_optional
 from core.config import settings
@@ -12,6 +13,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/donationalerts", tags=["donationalerts"])
+_DONATIONALERTS_ALLOWED_AUTH_HOSTS = {"www.donationalerts.com", "donationalerts.com"}
+
+
+def _is_safe_donationalerts_auth_url(url: str) -> bool:
+    if not isinstance(url, str):
+        return False
+    if any(ch in url for ch in ("\r", "\n", "\t")):
+        return False
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme != "https":
+        return False
+    return (parsed.netloc or "").lower() in _DONATIONALERTS_ALLOWED_AUTH_HOSTS
 
 
 @router.get("/status")
@@ -49,9 +65,11 @@ async def get_donationalerts_status(
                 "connected": False,
                 "user_info": None
             }
-    except Exception as e:
-        logger.error(f"Error getting DonationAlerts status: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting DonationAlerts status")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/connect")
@@ -66,7 +84,7 @@ async def connect_donationalerts(
         # Assuming we only want real users now
         if not user or not user.get('id') or user.get('id') <= 0:
             logger.error("User not authenticated")
-            return {"success": False, "error": "Not authenticated"}
+            raise HTTPException(status_code=401, detail="Not authenticated")
             
         user_id = user.get('id')
 
@@ -77,10 +95,9 @@ async def connect_donationalerts(
         # РџСЂРѕРІРµСЂСЏРµРј РЅР°СЃС‚СЂРѕР№РєРё
         if not client_id:
             logger.error("DONATIONALERTS_CLIENT_ID not set in environment variables")
-            return {"success": False, "error": "DonationAlerts integration is not configured"}
+            raise HTTPException(status_code=503, detail="DonationAlerts integration is not configured")
 
         # Р¤РѕСЂРјРёСЂСѓРµРј URL Р°РІС‚РѕСЂРёР·Р°С†РёРё
-        from urllib.parse import urlencode
         params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
@@ -89,16 +106,22 @@ async def connect_donationalerts(
         }
         auth_url = f"https://www.donationalerts.com/oauth/authorize?{urlencode(params)}"
 
-        logger.info(f"DonationAlerts auth URL generated for user {user_id}: {auth_url}")
+        if not _is_safe_donationalerts_auth_url(auth_url):
+            logger.error("Unsafe DonationAlerts auth URL generated for user %s", user_id)
+            raise HTTPException(status_code=500, detail="Failed to generate secure auth URL")
+
+        logger.info("DonationAlerts auth URL generated for user %s", user_id)
 
         return {
             "success": True,
             "message": "DonationAlerts connection initiated",
             "auth_url": auth_url
         }
-    except Exception as e:
-        logger.error(f"Error connecting DonationAlerts: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error connecting DonationAlerts")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/disconnect")
@@ -109,7 +132,7 @@ async def disconnect_donationalerts(
     """РћС‚РєР»СЋС‡РёС‚СЊ DonationAlerts"""
     try:
         if not user or not user.get('id') or user.get('id') <= 0:
-            return {"success": False, "error": "Not authenticated"}
+            raise HTTPException(status_code=401, detail="Not authenticated")
             
         user_id = user.get('id')
 
@@ -122,10 +145,12 @@ async def disconnect_donationalerts(
             "success": True,
             "message": "DonationAlerts disconnected successfully"
         }
-    except Exception as e:
-        logger.error(f"Error disconnecting DonationAlerts: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error disconnecting DonationAlerts")
         db.rollback()
-        return {"success": False, "error": "Internal server error"}
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/donations")
@@ -166,9 +191,11 @@ async def get_donations_history(
                 "pages": (total + limit - 1) // limit if limit > 0 else 0
             }
         }
-    except Exception as e:
-        logger.error(f"Error getting donations: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting donations")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/donations/stats")
@@ -210,6 +237,8 @@ async def get_donations_stats(
                 "week_amount": round(week_amount, 2)
             }
         }
-    except Exception as e:
-        logger.error(f"Error getting donations stats: {e}")
-        return {"success": False, "error": "Internal server error"}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting donations stats")
+        raise HTTPException(status_code=500, detail="Internal server error")

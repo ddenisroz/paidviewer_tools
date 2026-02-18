@@ -124,7 +124,7 @@ class TTSHandlerService:
                 clear_correlation_id()
 
         except Exception as e:
-            logger.error(f"[ERROR] [{platform.upper()} TTS] Error processing TTS: {e}", exc_info=True)
+            logger.exception("[ERROR] [{platform.upper()} TTS] Error processing TTS")
             log_analysis_error(feature='tts_handler', error=e, context=f"process_message_{platform}")
             return {"success": False, "error": "Internal server error"}
 
@@ -488,6 +488,7 @@ class TTSHandlerService:
                        logger.debug(f"[DEBUG] [TWITCH TTS] No unfulfilled redemptions found for reward {reward_id}")
 
         except Exception as e:
-             logger.warning(f"[WARN] Error auto-accepting reward: {e}")
+             logger.exception("[WARN] Error auto-accepting reward")
 
 tts_handler_service = TTSHandlerService()
+

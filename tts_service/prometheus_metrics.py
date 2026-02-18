@@ -256,8 +256,8 @@ class TTSPrometheusMetrics:
                 # Обновляем Redis метрики
                 self._update_redis_metrics()
                 
-            except Exception as e:
-                logger.error(f"Error in Prometheus monitoring loop: {e}")
+            except Exception:
+                logger.exception("Error in Prometheus monitoring loop")
             
             time.sleep(interval)
     
@@ -276,8 +276,8 @@ class TTSPrometheusMetrics:
                 try:
                     gpu_usage = torch.cuda.utilization(device_id)
                     self.gpu_usage.labels(device_id=device_id).set(gpu_usage)
-                except Exception as e:
-                    logger.debug(f"Could not get GPU utilization for device {device_id}: {e}")
+                except Exception:
+                    logger.exception("Could not get GPU utilization for device %s", device_id)
                 
                 # GPU память
                 try:
@@ -290,8 +290,8 @@ class TTSPrometheusMetrics:
                     self.gpu_memory_total.labels(device_id=device_id).set(memory_total)
                     self.gpu_memory_percent.labels(device_id=device_id).set(memory_percent)
                     
-                except Exception as e:
-                    logger.debug(f"Could not get GPU memory info for device {device_id}: {e}")
+                except Exception:
+                    logger.exception("Could not get GPU memory info for device %s", device_id)
                 
                 # GPU температура и мощность (если доступно)
                 try:
@@ -316,11 +316,11 @@ class TTSPrometheusMetrics:
                 except ImportError:
                     # pynvml не установлен
                     pass
-                except Exception as e:
-                    logger.debug(f"Could not get GPU temperature/power for device {device_id}: {e}")
+                except Exception:
+                    logger.exception("Could not get GPU temperature/power for device %s", device_id)
                 
-        except Exception as e:
-            logger.error(f"Error updating GPU metrics: {e}")
+        except Exception:
+            logger.exception("Error updating GPU metrics")
     
     def _update_system_metrics(self):
         """Обновление системных метрик"""
@@ -341,8 +341,8 @@ class TTSPrometheusMetrics:
             self.process_cpu_usage.set(process_cpu)
             self.process_memory_usage.set(process_memory.rss)
             
-        except Exception as e:
-            logger.error(f"Error updating system metrics: {e}")
+        except Exception:
+            logger.exception("Error updating system metrics")
     
     def _update_worker_metrics(self):
         """Обновление метрик воркеров"""
@@ -353,8 +353,8 @@ class TTSPrometheusMetrics:
                 if hasattr(gpu_worker_pool, 'running') and gpu_worker_pool.running:
                     stats = gpu_worker_pool.get_stats()
                     self.gpu_workers_concurrent.set(stats.get('current_concurrent', 0))
-            except Exception as e:
-                logger.debug(f"Could not get GPU worker pool stats: {e}")
+            except Exception:
+                logger.exception("Could not get GPU worker pool stats")
             
             # Async Workers метрики
             try:
@@ -369,11 +369,11 @@ class TTSPrometheusMetrics:
                     for priority, size in queue_sizes.items():
                         self.async_queue_size.labels(priority=priority).set(size)
                         
-            except Exception as e:
-                logger.debug(f"Could not get async worker manager stats: {e}")
+            except Exception:
+                logger.exception("Could not get async worker manager stats")
                 
-        except Exception as e:
-            logger.error(f"Error updating worker metrics: {e}")
+        except Exception:
+            logger.exception("Error updating worker metrics")
     
     def _update_redis_metrics(self):
         """Обновление Redis метрик"""
@@ -402,11 +402,11 @@ class TTSPrometheusMetrics:
                 gpu_results_length = redis_client.xlen('gpu_tts_results')
                 self.redis_queue_length.labels(queue_name='gpu_tts_results').set(gpu_results_length)
                 
-            except Exception as e:
-                logger.debug(f"Could not get Redis queue lengths: {e}")
+            except Exception:
+                logger.exception("Could not get Redis queue lengths")
                 
-        except Exception as e:
-            logger.debug(f"Could not connect to Redis: {e}")
+        except Exception:
+            logger.exception("Could not connect to Redis")
             self.redis_connections.set(0)
     
     # === TTS Методы ===
@@ -486,3 +486,4 @@ class TTSPrometheusMetrics:
 
 # Глобальный экземпляр
 tts_prometheus_metrics = TTSPrometheusMetrics()
+

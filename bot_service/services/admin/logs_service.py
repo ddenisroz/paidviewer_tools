@@ -121,11 +121,11 @@ class LogsService:
                                 # Попытка 4: Latin-1 (читает всё, но могут быть кракозябры)
                                 with open(log_file, "r", encoding="latin1") as f:
                                     lines = f.readlines()
-                            except Exception as e:
-                                logger.error(f"Failed to read log file '{log_file}': {e}")
+                            except Exception:
+                                logger.exception("Failed to read log file '{log_file}'")
                                 continue
-                except Exception as e:
-                    logger.error(f"Error opening log file '{log_file}': {e}")
+                except Exception:
+                    logger.exception("Error opening log file '{log_file}'")
                     continue
 
                 for line in lines:
@@ -136,8 +136,8 @@ class LogsService:
             # Сортируем по времени (новые сверху)
             logs.sort(key=lambda x: x["timestamp"], reverse=True)
 
-        except Exception as e:
-            logger.error(f"Error reading system logs: {e}")
+        except Exception:
+            logger.exception("Error reading system logs")
             logs = []
 
         # Фильтрация по уровню
@@ -205,3 +205,4 @@ class LogsService:
 
 # Singleton instance
 logs_service = LogsService()
+

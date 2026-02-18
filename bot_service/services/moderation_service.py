@@ -112,8 +112,8 @@ class ModerationService:
                                     logger.error("Could not determine broadcaster ID for moderation")
                             else:
                                 logger.warning(f"Target user {username} not found on Twitch")
-                    except Exception as e:
-                        logger.error(f"[TWITCH] Error removing timeout: {e}")
+                    except Exception:
+                        logger.exception("[TWITCH] Error removing timeout")
 
                 return {
                     "success": True,
@@ -190,8 +190,8 @@ class ModerationService:
                                     logger.error("Could not determine broadcaster ID for moderation")
                             else:
                                 logger.warning(f"Target user {username} not found on Twitch")
-                    except Exception as e:
-                        logger.error(f"[ERR] [TWITCH] Error applying timeout: {e}")
+                    except Exception:
+                        logger.exception("[ERR] [TWITCH] Error applying timeout")
                 
                 elif platform == 'vk':
                     logger.info("[INFO] [VK LIVE] Platform timeout not available, only internal TTS mute applied")
@@ -224,3 +224,4 @@ class ModerationService:
 
 # Global instance
 moderation_service = ModerationService()
+

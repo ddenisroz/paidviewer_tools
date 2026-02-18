@@ -157,8 +157,8 @@ class AccountDeletionService:
                     await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
                 connection_manager.disable_tts_for_channel(channel_name.lower())
                 logger.info(f"[ACCOUNT] Disconnected VK bot from {channel_name}")
-            except Exception as e:
-                logger.error(f"[ACCOUNT] Error disconnecting VK bot: {e}")
+            except Exception:
+                logger.exception("[ACCOUNT] Error disconnecting VK bot")
     
     def _delete_related_data(
         self, 
@@ -218,3 +218,4 @@ class AccountDeletionService:
 
 # Singleton instance
 account_deletion_service = AccountDeletionService()
+

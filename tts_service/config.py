@@ -1,82 +1,120 @@
 import os
 from pathlib import Path
-from pydantic import BaseModel, Field
 from typing import Optional
-from dotenv import load_dotenv
 
-# Загружаем переменные окружения из .env файла
+from dotenv import load_dotenv
+from pydantic import BaseModel, Field
+
+# Load environment variables from .env
 load_dotenv()
 
+
+def _env_str(name: str, default: str) -> str:
+    value = os.getenv(name)
+    return value if value is not None else default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = str(raw).strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 class AppConfig(BaseModel):
-    # --- Общие настройки ---
-    host: str = Field(default="0.0.0.0", env="TTS_HOST")
-    port: int = Field(default=8001, env="TTS_PORT")
-    debug: bool = Field(default=True, env="TTS_DEBUG")
-    
-    # --- Настройки путей ---
+    # General settings
+    host: str = Field(default_factory=lambda: _env_str("TTS_HOST", "0.0.0.0"))
+    port: int = Field(default_factory=lambda: _env_int("TTS_PORT", 8001))
+    debug: bool = Field(default_factory=lambda: _env_bool("TTS_DEBUG", True))
+
+    # Paths
     base_dir: Path = Path(__file__).resolve().parent
-    
-    # Единая структура аудио файлов (внутри tts_service)
+
     @property
     def audio_path(self) -> Path:
         return self.base_dir / "audio"
-    
-    # Голоса (референсные файлы)
+
     @property
     def voices_path(self) -> Path:
         return self.audio_path / "voices"
-        
+
     @property
     def global_voices_path(self) -> Path:
         return self.voices_path / "global"
-        
+
     @property
     def user_voices_path(self) -> Path:
         return self.voices_path / "user"
-    
-    # Временные файлы (автоудаление через 5 минут)
+
     @property
     def temp_audio_path(self) -> Path:
         return self.audio_path / "temp"
-        
-    # Тестовые аудио файлы
+
     @property
     def test_audio_path(self) -> Path:
         return self.audio_path / "test"
-        
-    # Продакшн аудио файлы
+
     @property
     def production_audio_path(self) -> Path:
         return self.audio_path / "production"
-        
-    # Кеш для F5-TTS
+
     @property
     def cache_audio_path(self) -> Path:
         return self.audio_path / "cache"
-        
+
     @property
     def user_configs_path(self) -> Path:
         return self.base_dir / "user_configs"
 
-    # --- Логирование ---
-    log_level: str = Field(default="INFO", env="TTS_LOG_LEVEL")
-    cors_origins: str = Field(default="http://localhost:5173,http://localhost:3000,http://localhost:8000", env="CORS_ORIGINS")
-    log_file: Optional[str] = Field(default=None, env="TTS_LOG_FILE")
-    
-    # --- F5-TTS настройки ---
-    # Настраиваемые параметры (рекомендации из официального репозитория)
-    cfg_strength: float = Field(default=2.5, env="TTS_CFG_STRENGTH")  # Рекомендуемое: 2.0-5.0
-    
-    # Фиксированные параметры (хардкод)
-    target_rms: float = 0.1  # Фиксированная громкость для всех голосов
+    # Logging and CORS
+    log_level: str = Field(default_factory=lambda: _env_str("TTS_LOG_LEVEL", "INFO"))
+    cors_origins: str = Field(
+        default_factory=lambda: _env_str(
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://localhost:3000,http://localhost:8000",
+        )
+    )
+    log_file: Optional[str] = Field(default_factory=lambda: os.getenv("TTS_LOG_FILE"))
+
+    # F5-TTS tunables
+    cfg_strength: float = Field(default_factory=lambda: _env_float("TTS_CFG_STRENGTH", 2.5))
+
+    # Fixed parameters
+    target_rms: float = 0.1
     cross_fade_duration: float = 0.15
     silence_duration_ms: int = 100
     sway_sampling_coef: float = -1.0
 
-# Создаем единственный экземпляр конфига
+
+# Singleton config
 config = AppConfig()
 
-# Создаем папки при импорте, если их нет
+# Ensure directories exist at import time
 config.voices_path.mkdir(exist_ok=True)
 config.global_voices_path.mkdir(exist_ok=True)
 config.user_voices_path.mkdir(exist_ok=True)

@@ -39,8 +39,8 @@ def get_enabled_voices_for_user(user_id: int, db: Session) -> List[VoiceModel]:
             logger.info(f"No voice preferences found for user {user_id}, returning all {len(voices)} active voices")
             return voices
             
-    except Exception as e:
-        logger.error(f"Error getting enabled voices for user {user_id}: {e}")
+    except Exception:
+        logger.exception("Error getting enabled voices for user {user_id}")
         # В случае ошибки возвращаем все активные голоса
         return db.query(VoiceModel).filter(VoiceModel.is_active.is_(True)).all()
 
@@ -63,8 +63,8 @@ def select_random_voice_from_pool(user_id: int, db: Session) -> Optional[str]:
         
         return selected_voice.name
         
-    except Exception as e:
-        logger.error(f"Error selecting random voice for user {user_id}: {e}")
+    except Exception:
+        logger.exception("Error selecting random voice for user {user_id}")
         return None
 
 
@@ -109,8 +109,9 @@ def get_voice_or_random_from_pool(
         logger.info(f"Using requested voice '{voice_name}' for user {user_id}")
         return voice_name
         
-    except Exception as e:
-        logger.error(f"Error in get_voice_or_random_from_pool for user {user_id}: {e}")
+    except Exception:
+        logger.exception("Error in get_voice_or_random_from_pool for user {user_id}")
         # В случае ошибки пытаемся вернуть запрошенный голос или дефолтный
         return voice_name if voice_name else 'female_1'
+
 

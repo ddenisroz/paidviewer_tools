@@ -17,6 +17,7 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { PageLoader } from '@/shared/components/ui/loader';
+import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
 interface Metrics {
@@ -56,6 +57,15 @@ const ACTION_BUTTON_CLASS = 'h-9 border-border/70 hover:bg-muted/60 shadow-none'
 
 const MonitoringPage: React.FC = () => {
   const queryClient = useQueryClient();
+  const handleOpenPrometheus = (): void => {
+    const metricsUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/metrics`;
+    const safeUrl = getSafeNavigationUrl(metricsUrl);
+    if (!safeUrl) {
+      logger.warn('Blocked unsafe Prometheus URL', { metricsUrl });
+      return;
+    }
+    window.open(safeUrl, '_blank', 'noopener,noreferrer');
+  };
 
   const { data: metricsData, isLoading: metricsLoading, error: metricsError } = useQuery<Metrics | null>({
     queryKey: ['monitoring-metrics'],
@@ -125,7 +135,7 @@ const MonitoringPage: React.FC = () => {
             Обновить
           </Button>
           <Button
-            onClick={() => window.open(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/metrics`, '_blank')}
+            onClick={handleOpenPrometheus}
             variant="outline"
             size="sm"
             className={ACTION_BUTTON_CLASS}

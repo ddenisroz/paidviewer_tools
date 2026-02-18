@@ -2,6 +2,8 @@
  * Integrations Service - инкапсуляция всех Integrations API вызовов
  */
 import { API_BASE_URL } from '@/constants';
+import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { apiClient } from '../client';
 
@@ -32,21 +34,36 @@ export const integrationsService = {
    * Подключить Twitch интеграцию (редирект)
    */
   connectTwitch(): void {
-    window.location.href = `${API_BASE_URL}/auth/twitch/login`;
+    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/twitch/login');
+    if (!safeUrl) {
+      logger.error('Blocked unsafe Twitch integration redirect URL', { API_BASE_URL });
+      return;
+    }
+    window.location.href = safeUrl;
   },
 
   /**
    * Подключить VK интеграцию (редирект)
    */
   connectVk(): void {
-    window.location.href = `${API_BASE_URL}/auth/vk/login`;
+    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/vk/login');
+    if (!safeUrl) {
+      logger.error('Blocked unsafe VK integration redirect URL', { API_BASE_URL });
+      return;
+    }
+    window.location.href = safeUrl;
   },
 
   /**
    * Подключить DonationAlerts (редирект)
    */
   connectDonationAlertsRedirect(): void {
-    window.location.href = `${API_BASE_URL}/auth/donationalerts/login`;
+    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/donationalerts/login');
+    if (!safeUrl) {
+      logger.error('Blocked unsafe DonationAlerts integration redirect URL', { API_BASE_URL });
+      return;
+    }
+    window.location.href = safeUrl;
   },
 
   /**

@@ -71,8 +71,8 @@ class NotificationService:
             logger.info(f"[SEND] {platform.upper()} message sent to {sent_count}/{len(connections)} connections")
             return sent_count > 0
 
-        except Exception as e:
-            logger.error(f"[ERROR] WebSocket broadcast error for {platform}: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[ERROR] WebSocket broadcast error for {platform}")
             return False
 
     async def broadcast_tts_audio(
@@ -129,8 +129,8 @@ class NotificationService:
             )
             return sent_count > 0
 
-        except Exception as e:
-            logger.error(f"[ERROR] WebSocket TTS audio broadcast error: {e}")
+        except Exception:
+            logger.exception("[ERROR] WebSocket TTS audio broadcast error")
             return False
 
     async def broadcast_drops_event(self, drops_data: Dict[str, Any]) -> bool:
@@ -145,8 +145,8 @@ class NotificationService:
             await get_memory_websocket_manager().broadcast_to_all(json.dumps(event_data))
             logger.info("[REWARD] [DROPS] Broadcasted drops event")
             return True
-        except Exception as e:
-            logger.error(f"Error broadcasting drops event: {e}")
+        except Exception:
+            logger.exception("Error broadcasting drops event")
             return False
 
     async def _broadcast_to_connections(self, connections, message_json: str) -> int:
@@ -204,8 +204,8 @@ class NotificationService:
                     role=role,
                     badges=json.dumps(badges) if badges else None # create expects string for badges
                 )
-        except Exception as e:
-            logger.error(f"Failed to save message to DB: {e}")
+        except Exception:
+            logger.exception("Failed to save message to DB")
         finally:
             db.close()
 
@@ -229,10 +229,11 @@ class NotificationService:
 
             listening_mode = getattr(user, "tts_listening_mode", "website") or "website"
             return user.id, listening_mode
-        except Exception as error:
-            logger.error("Failed to resolve TTS owner for %s:%s: %s", platform, channel_name, error)
+        except Exception as e:
+            logger.error("Failed to resolve TTS owner for %s:%s: %s", platform, channel_name, e)
             return None, "website"
         finally:
             db.close()
 
 notification_service = NotificationService()
+

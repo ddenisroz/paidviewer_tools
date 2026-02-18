@@ -1,4 +1,4 @@
-# services/database_maintenance/database_backup_service.py
+﻿# services/database_maintenance/database_backup_service.py
 import logging
 import os
 import pathlib
@@ -58,16 +58,16 @@ class DatabaseBackupService:
                         'type': 'postgresql'
                     }
                 else:
-                    logger.error(f"pg_dump error: {result.stderr}")
-                    return {'success': False, 'error': f'pg_dump failed: {result.stderr}'}
+                    logger.error("pg_dump failed with returncode=%s stderr=%s", result.returncode, (result.stderr or "")[:500])
+                    return {'success': False, 'error': 'pg_dump failed'}
             except FileNotFoundError:
                 return {'success': False, 'error': 'pg_dump not found. Install PostgreSQL client tools.'}
-            except Exception as e:
-                logger.error(f"PostgreSQL backup error: {e}")
+            except Exception:
+                logger.exception("PostgreSQL backup error")
                 return {'success': False, 'error': "Internal server error"}
 
-        except Exception as e:
-            logger.error(f"Error creating backup: {e}")
+        except Exception:
+            logger.exception("Error creating backup")
             return {'success': False, 'error': "Internal server error"}
 
     def restore_from_backup(self) -> Dict[str, Any]:
@@ -94,26 +94,30 @@ class DatabaseBackupService:
             
             return self.restore_from_backup_file(latest_backup.name)
 
-        except Exception as e:
-            logger.error(f"Error restoring backup: {e}")
+        except Exception:
+            logger.exception("Error restoring backup")
             return {'success': False, 'error': "Internal server error"}
 
     def restore_from_backup_file(self, filename: str) -> Dict[str, Any]:
         """Р’РѕСЃСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ Р‘Р” РёР· РєРѕРЅРєСЂРµС‚РЅРѕР№ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё (PostgreSQL)"""
         try:
             backup_dir = os.path.join(os.getcwd(), 'backups')
-            backup_file = os.path.join(backup_dir, filename)
+            backup_dir_path = pathlib.Path(backup_dir).resolve()
 
             # PostgreSQL: РїСЂРѕРІРµСЂСЏРµРј СЂР°СЃС€РёСЂРµРЅРёРµ .sql
             if not filename.startswith('backup_') or not filename.endswith('.sql'):
                 return {'success': False, 'error': 'Invalid PostgreSQL backup filename (must be .sql)'}
-
-            if not os.path.exists(backup_file):
-                return {'success': False, 'error': 'Backup file not found'}
-
-            # РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РїСѓС‚СЊ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅ
-            if os.path.abspath(backup_file) != backup_file or '..' in filename:
+            if '/' in filename or '\\' in filename or '..' in filename:
                 return {'success': False, 'error': 'Invalid file path'}
+
+            backup_file_path = (backup_dir_path / filename).resolve()
+            try:
+                backup_file_path.relative_to(backup_dir_path)
+            except ValueError:
+                return {'success': False, 'error': 'Invalid file path'}
+
+            if not backup_file_path.exists():
+                return {'success': False, 'error': 'Backup file not found'}
 
             from core.config import settings
             database_url = settings.database_url
@@ -130,7 +134,7 @@ class DatabaseBackupService:
                     '-p', str(parsed.port or 5432),
                     '-U', parsed.username,
                     '-d', parsed.path[1:] if parsed.path else '',
-                    '-f', backup_file
+                    '-f', str(backup_file_path)
                 ]
 
                 env = os.environ.copy()
@@ -148,15 +152,15 @@ class DatabaseBackupService:
                         'message': f'PostgreSQL database restored from {filename}'
                     }
                 else:
-                    logger.error(f"psql restore error: {result.stderr}")
-                    return {'success': False, 'error': f'Restore failed: {result.stderr}'}
+                    logger.error("psql restore failed with returncode=%s stderr=%s", result.returncode, (result.stderr or "")[:500])
+                    return {'success': False, 'error': 'Restore failed'}
             except FileNotFoundError:
                 return {'success': False, 'error': 'psql not found. Install PostgreSQL client tools.'}
-            except Exception as e:
-                logger.error(f"PostgreSQL restore error: {e}")
+            except Exception:
+                logger.exception("PostgreSQL restore error")
                 return {'success': False, 'error': "Internal server error"}
-        except Exception as e:
-            logger.error(f"Error restoring from {filename}: {e}")
+        except Exception:
+            logger.exception("Error restoring from %s", filename)
             return {'success': False, 'error': "Internal server error"}
 
     def list_backups(self) -> Dict[str, Any]:
@@ -187,26 +191,30 @@ class DatabaseBackupService:
                 'total': len(backups),
                 'total_size_bytes': sum(b['size_bytes'] for b in backups)
             }
-        except Exception as e:
-            logger.error(f"Error listing backups: {e}")
+        except Exception:
+            logger.exception("Error listing backups")
             return {'success': False, 'error': "Internal server error", 'backups': []}
 
     def delete_backup(self, filename: str) -> Dict[str, Any]:
         """РЈРґР°Р»СЏРµС‚ РєРѕРЅРєСЂРµС‚РЅСѓСЋ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ"""
         try:
             backup_dir = os.path.join(os.getcwd(), 'backups')
-            file_path = os.path.join(backup_dir, filename)
+            backup_dir_path = pathlib.Path(backup_dir).resolve()
 
-            # Р‘РµР·РѕРїР°СЃРЅРѕСЃС‚СЊ: РїСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ С„Р°Р№Р» РЅР°С…РѕРґРёС‚СЃСЏ РІ backup_dir Рё РёРјРµРµС‚ РїСЂР°РІРёР»СЊРЅРѕРµ РёРјСЏ
+            # ????????????: ????????? ??? ???? ????????? ? backup_dir ? ????? ?????????? ???
             if not filename.startswith('backup_') or not (filename.endswith('.db') or filename.endswith('.sql')):
                 return {'success': False, 'error': 'Invalid backup filename'}
+            if '/' in filename or '\\' in filename or '..' in filename:
+                return {'success': False, 'error': 'Invalid file path'}
+
+            file_path = (backup_dir_path / filename).resolve()
+            try:
+                file_path.relative_to(backup_dir_path)
+            except ValueError:
+                return {'success': False, 'error': 'Invalid file path'}
 
             if not os.path.exists(file_path):
                 return {'success': False, 'error': 'Backup file not found'}
-
-            # РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РїСѓС‚СЊ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅ (Р·Р°С‰РёС‚Р° РѕС‚ path traversal)
-            if os.path.abspath(file_path) != file_path or '..' in filename:
-                return {'success': False, 'error': 'Invalid file path'}
 
             file_size = os.path.getsize(file_path)
             os.remove(file_path)
@@ -217,6 +225,6 @@ class DatabaseBackupService:
                 'deleted_file': filename,
                 'freed_bytes': file_size
             }
-        except Exception as e:
-            logger.error(f"Error deleting backup: {e}")
+        except Exception:
+            logger.exception("Error deleting backup")
             return {'success': False, 'error': "Internal server error"}

@@ -30,9 +30,9 @@ class StatsService:
                 return component.get_stats()
             else:
                 return {"error": f"Component {component_name} has no get_stats method"}
-        except Exception as e:
-            logger.error(f"Error getting stats for {component_name}: {e}")
-            return {"error": str(e)}
+        except Exception:
+            logger.exception("Error getting stats for {component_name}")
+            return {"error": "Internal server error"}
     
     def get_all_stats(self) -> Dict[str, Any]:
         """Получить статистику всех зарегистрированных компонентов"""
@@ -44,9 +44,9 @@ class StatsService:
                     stats[name] = component.get_stats()
                 else:
                     stats[name] = {"error": "No get_stats method"}
-            except Exception as e:
-                logger.error(f"Error getting stats for {name}: {e}")
-                stats[name] = {"error": str(e)}
+            except Exception:
+                logger.exception("Error getting stats for {name}")
+                stats[name] = {"error": "Internal server error"}
         
         return stats
     
@@ -101,12 +101,12 @@ class StatsService:
             
             return overview
             
-        except Exception as e:
-            logger.error(f"Error getting system overview: {e}")
+        except Exception:
+            logger.exception("Error getting system overview")
             return {
                 "timestamp": datetime.now().isoformat(),
                 "system_status": "error",
-                "error": str(e)
+                "error": "Internal server error"
             }
     
     def get_health_summary(self) -> Dict[str, Any]:
@@ -126,13 +126,14 @@ class StatsService:
             
             return health_summary
             
-        except Exception as e:
-            logger.error(f"Error getting health summary: {e}")
+        except Exception:
+            logger.exception("Error getting health summary")
             return {
                 "status": "error",
                 "timestamp": datetime.now().isoformat(),
-                "error": str(e)
+                "error": "Internal server error"
             }
 
 # Глобальный экземпляр
 stats_service = StatsService()
+

@@ -11,6 +11,7 @@ import { authService } from '@/services/api/services/authService';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { logger } from '@/shared/utils/prodLogger';
+import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { saveReturnUrl } from '@/utils/urlUtils';
 
 import { Button } from '../ui/button';
@@ -103,8 +104,12 @@ const Header: React.FC = () => {
                         const responseData = response.data as { data?: { success?: boolean; auth_url?: string }; success?: boolean; auth_url?: string };
                         const data = responseData.data || responseData;
                         if (data.success && data.auth_url) {
+                            const safeUrl = getSafeNavigationUrl(data.auth_url);
+                            if (!safeUrl) {
+                                throw new Error('Небезопасный URL авторизации DonationAlerts');
+                            }
                             saveReturnUrl();
-                            window.location.href = data.auth_url;
+                            window.location.href = safeUrl;
                         } else {
                             logger.error('URL авторизации DonationAlerts не получен:', data);
                             alert('Ошибка: URL авторизации DonationAlerts не получен');

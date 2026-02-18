@@ -165,6 +165,7 @@ class UserIdentityService:
                     return False
 
             return True
-        except Exception as e:
-            logger.error(f"User data validation failed: {e}")
+        except Exception:
+            logger.exception("User data validation failed")
             return False
+

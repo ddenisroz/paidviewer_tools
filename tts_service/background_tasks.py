@@ -55,8 +55,8 @@ class BackgroundTaskManager:
                 # Ждем 6 часов до следующей очистки
                 await asyncio.sleep(21600)
                 
-            except Exception as e:
-                logger.error(f"[ERROR] Error in TTS Service file cleanup: {e}")
+            except Exception:
+                logger.exception("[ERROR] Error in TTS Service file cleanup")
                 await asyncio.sleep(3600)  # Ждем 1 час при ошибке
 
     async def cleanup_temp_file_delayed(self, file_path: Path, delay_seconds: int = 300):
@@ -76,3 +76,4 @@ class BackgroundTaskManager:
 
 # Глобальный экземпляр
 background_task_manager = BackgroundTaskManager()
+

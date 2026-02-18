@@ -85,8 +85,8 @@ class DashboardService:
             logger.info(f"[DASHBOARD] Init data loaded for user {user_id}")
             return response
 
-        except Exception as e:
-            logger.error(f"[ERROR] [DASHBOARD] Error loading init data: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[ERROR] [DASHBOARD] Error loading init data")
             # Re-raise or return error dict? API usually handles exceptions.
             # But here we want to return a structured error response if possible, 
             # or strictly raise exception for API layer to catch.
@@ -122,8 +122,8 @@ class DashboardService:
                             "platform_user_id": token.platform_user_id,
                             "avatar_url": token.avatar_url
                         }
-        except Exception as e:
-            logger.error(f"[ERROR] [DASHBOARD] Error getting integrations: {e}")
+        except Exception:
+            logger.exception("[ERROR] [DASHBOARD] Error getting integrations")
         
         return integrations
 
@@ -152,8 +152,8 @@ class DashboardService:
                 "volume": volume,
                 "voice_id": tts_settings.voice_id if hasattr(tts_settings, 'voice_id') else None
             }
-        except Exception as e:
-            logger.error(f"[ERROR] [DASHBOARD] Error getting TTS settings: {e}")
+        except Exception:
+            logger.exception("[ERROR] [DASHBOARD] Error getting TTS settings")
             return None
 
     def _get_chat_history(self, user_id: int, db_user: User, limit: int = 50) -> List[Dict[str, Any]]:
@@ -200,6 +200,6 @@ class DashboardService:
                 })
             
             return messages_data
-        except Exception as e:
-            logger.error(f"[ERROR] [DASHBOARD] Error getting chat history: {e}")
+        except Exception:
+            logger.exception("[ERROR] [DASHBOARD] Error getting chat history")
             return []

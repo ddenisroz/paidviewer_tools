@@ -165,8 +165,8 @@ class IntegrationManagementService:
                 logger.info(f"[INTEGRATION] Twitch bot left channel: {channel_name}")
             
             connection_manager.disable_tts_for_channel(channel_name.lower())
-        except Exception as e:
-            logger.error(f"[INTEGRATION] Error disconnecting Twitch bot: {e}")
+        except Exception:
+            logger.exception("[INTEGRATION] Error disconnecting Twitch bot")
             raise
     
     async def _disconnect_vk_bot(self, user: User, connection_manager) -> None:
@@ -182,8 +182,8 @@ class IntegrationManagementService:
                 logger.info(f"[INTEGRATION] VK bot disconnected from {channel_name}")
             
             connection_manager.disable_tts_for_channel(channel_name.lower())
-        except Exception as e:
-            logger.error(f"[INTEGRATION] Error disconnecting VK bot: {e}")
+        except Exception:
+            logger.exception("[INTEGRATION] Error disconnecting VK bot")
             raise
     
     async def remove_integration(
@@ -232,3 +232,4 @@ class IntegrationManagementService:
 
 # Singleton instance
 integration_management_service = IntegrationManagementService()
+

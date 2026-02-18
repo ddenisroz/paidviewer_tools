@@ -157,7 +157,7 @@ class NumberToWordsConverter:
             return " ".join(reversed(result))
             
         except (ValueError, TypeError) as e:
-            logger.error(f"Ошибка конвертации числа {number}: {e}")
+            logger.exception("Ошибка конвертации числа {number}")
             return str(number)
     
     def convert_time(self, time_str: str) -> str:
@@ -212,7 +212,7 @@ class NumberToWordsConverter:
             return " ".join(result)
             
         except (ValueError, IndexError) as e:
-            logger.error(f"Ошибка конвертации времени {time_str}: {e}")
+            logger.exception("Ошибка конвертации времени {time_str}")
             return time_str
     
     def convert_date(self, date_str: str) -> str:
@@ -327,7 +327,7 @@ class NumberToWordsConverter:
             return " ".join(result)
             
         except (ValueError, IndexError) as e:
-            logger.error(f"Ошибка конвертации даты {date_str}: {e}")
+            logger.exception("Ошибка конвертации даты {date_str}")
             return date_str
     
     def convert_money(self, amount_str: str) -> str:
@@ -398,7 +398,7 @@ class NumberToWordsConverter:
             return " ".join(result)
             
         except (ValueError, AttributeError) as e:
-            logger.error(f"Ошибка конвертации денежной суммы {amount_str}: {e}")
+            logger.exception("Ошибка конвертации денежной суммы {amount_str}")
             return amount_str
 
 # Глобальный экземпляр конвертера
@@ -438,8 +438,8 @@ def convert_numbers_in_text(text: str) -> str:
         
         return result
         
-    except Exception as e:
-        logger.error(f"Ошибка конвертации чисел в тексте: {e}")
+    except Exception:
+        logger.exception("Ошибка конвертации чисел в тексте")
         return text
 
 if __name__ == "__main__":
@@ -460,3 +460,4 @@ if __name__ == "__main__":
     for test in test_cases:
         result = convert_numbers_in_text(test)
         logger.info(f"Number conversion: '{test}' -> '{result}'")
+

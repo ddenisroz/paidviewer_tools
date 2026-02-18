@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 def require_admin(user: dict):
     """Check if user is admin."""
-    if not user.get('is_admin', False):
+    if not (user.get('role') == 'admin' or user.get('is_admin', False)):
         raise HTTPException(status_code=403, detail="Admin access required")
 
 
@@ -45,9 +45,9 @@ async def get_admin_users(
         return {"success": True, **result}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting admin users: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except Exception:
+        logger.exception("Error getting admin users")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/users/{user_id}/block")
@@ -74,7 +74,7 @@ async def block_user(
         )
         
         if "error" in result:
-            raise HTTPException(status_code=404, detail=result["error"])
+            raise HTTPException(status_code=404, detail="User not found")
         
         # Disconnect bots (runtime operation, stays in controller)
         from startup.bot_registry import get_bot_registry
@@ -91,15 +91,15 @@ async def block_user(
                 try:
                     await registry.twitch_bot.part_channels([target_user.twitch_username])
                     disconnected.append(f"Twitch: {target_user.twitch_username}")
-                except Exception as e:
-                    logger.error(f"Error disconnecting Twitch bot: {e}")
+                except Exception:
+                    logger.exception("Error disconnecting Twitch bot")
             
             if target_user.vk_channel_name and registry.vk_bot:
                 try:
                     await registry.vk_bot.disconnect_from_channel(target_user.vk_channel_name)
                     disconnected.append(f"VK: {target_user.vk_channel_name}")
-                except Exception as e:
-                    logger.error(f"Error disconnecting VK bot: {e}")
+                except Exception:
+                    logger.exception("Error disconnecting VK bot")
         
         return JSONResponse(content={
             "success": True,
@@ -112,10 +112,10 @@ async def block_user(
         })
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error blocking user: {e}")
+    except Exception:
+        logger.exception("Error blocking user")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/users/{user_id}/unblock")
@@ -131,7 +131,7 @@ async def unblock_user(
         result = await user_management_service.unblock_user(user_id, db)
         
         if "error" in result:
-            raise HTTPException(status_code=404, detail=result["error"])
+            raise HTTPException(status_code=404, detail="User not found")
         
         return JSONResponse(content={
             "success": True,
@@ -140,10 +140,10 @@ async def unblock_user(
         })
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error unblocking user: {e}")
+    except Exception:
+        logger.exception("Error unblocking user")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/sessions")
@@ -164,9 +164,9 @@ async def get_sessions(
         return {"success": True, **result}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting sessions: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except Exception:
+        logger.exception("Error getting sessions")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/whitelist/add")
@@ -200,15 +200,15 @@ async def add_to_whitelist(
         result = await whitelist_service.add_to_whitelist(request_data, db)
         
         if "error" in result:
-            return JSONResponse(content={"success": False, "error": result["error"]}, status_code=400)
+            raise HTTPException(status_code=400, detail=result["error"])
         
         return JSONResponse(content={"success": True, "message": f"User {username} added to whitelist"})
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error adding to whitelist: {e}")
+    except Exception:
+        logger.exception("Error adding to whitelist")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/whitelist")
@@ -239,9 +239,9 @@ async def get_whitelist(
         })
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error getting whitelist: {e}")
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+    except Exception:
+        logger.exception("Error getting whitelist")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/whitelist/{username}")
@@ -260,7 +260,7 @@ async def remove_from_whitelist(
         if platform:
             platform = platform.lower().strip()
             if platform not in ("twitch", "vk"):
-                return JSONResponse(content={"success": False, "error": "Invalid platform"}, status_code=400)
+                raise HTTPException(status_code=400, detail="Invalid platform")
         else:
             platform = "twitch"  # Default
         
@@ -270,12 +270,12 @@ async def remove_from_whitelist(
         result = await whitelist_service.remove_from_whitelist(request_data, db)
         
         if "error" in result:
-            return JSONResponse(content={"success": False, "error": result["error"]}, status_code=404)
+            raise HTTPException(status_code=404, detail=result["error"])
         
         return JSONResponse(content={"success": True, "message": f"User {username} removed from whitelist"})
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f"Error removing from whitelist: {e}")
+    except Exception:
+        logger.exception("Error removing from whitelist")
         db.rollback()
-        return JSONResponse(content={"success": False, "error": "Internal server error"}, status_code=500)
+        raise HTTPException(status_code=500, detail="Internal server error")

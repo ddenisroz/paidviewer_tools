@@ -1,16 +1,18 @@
 # api/user_settings_api.py
 """
-API для управления пользовательскими настройками интерфейса.
-Following Clean Architecture - only routing, no business logic.
+API for user interface settings management.
+Following Clean Architecture: routing only, no business logic.
 """
+
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
 
-from core.database import get_db
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
 from auth.auth import get_current_user
+from core.database import get_db
 from services.user_settings_service import UserSettingsService
 
 logger = logging.getLogger(__name__)
@@ -18,11 +20,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/user-settings", tags=["user-settings"])
 
 
-# === Pydantic Models ===
-
 class UserSettingsUpdate(BaseModel):
-    """Модель для обновления пользовательских настроек интерфейса"""
-    # Настройки чата
+    """Model for updating user interface settings."""
+
     chat_enabled: Optional[bool] = None
     chat_max_messages: Optional[int] = Field(None, ge=1, le=1000)
     chat_show_timestamps: Optional[bool] = None
@@ -31,7 +31,6 @@ class UserSettingsUpdate(BaseModel):
     chat_animation_duration: Optional[int] = Field(None, ge=100, le=5000)
     chat_animation_type: Optional[str] = Field(None, pattern="^(slide|fade|none)$")
 
-    # Настройки OBS чата
     obs_width: Optional[int] = Field(None, ge=100, le=2000)
     obs_height: Optional[int] = Field(None, ge=100, le=2000)
     obs_font_size: Optional[int] = Field(None, ge=8, le=72)
@@ -48,94 +47,93 @@ class UserSettingsUpdate(BaseModel):
     obs_message_margin: Optional[int] = Field(None, ge=0, le=20)
     obs_message_padding: Optional[int] = Field(None, ge=0, le=50)
 
-    # Цвета ролей для OBS
     obs_moderator_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
     obs_vip_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
     obs_subscriber_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
     obs_normal_color: Optional[str] = Field(None, pattern="^#[0-9a-fA-F]{6}$")
 
-    # Настройки объединения полей (только UI настройки)
     combine_titles: Optional[bool] = None
     combine_categories: Optional[bool] = None
 
-
-# === Dependency ===
 
 def get_settings_service() -> UserSettingsService:
     """Get UserSettingsService instance."""
     return UserSettingsService()
 
 
-# === API Endpoints ===
-
 @router.get("/")
 async def get_user_settings(
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Получить все настройки пользователя"""
+    """Get all user settings."""
     try:
         service = get_settings_service()
-        settings_response = service.get_settings(current_user, db)
-        logger.info(f"[API] get_user_settings returning: {settings_response}")
-        return settings_response
+        return service.get_settings(current_user, db)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid settings data")
-    except Exception as e:
-        logger.error(f"Error getting user settings: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения настроек пользователя")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting user settings")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/")
 async def update_user_settings(
     settings_update: UserSettingsUpdate,
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Обновить настройки пользователя"""
+    """Update user settings."""
     try:
         service = get_settings_service()
         return await service.update_settings(
             user=current_user,
             update_data=settings_update.model_dump(exclude_unset=True),
-            db=db
+            db=db,
         )
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid settings data")
-    except Exception as e:
-        logger.error(f"Error updating user settings: {e}")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error updating user settings")
         db.rollback()
-        raise HTTPException(status_code=500, detail="Ошибка сохранения настроек пользователя")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/chat")
 async def get_chat_settings(
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Получить настройки чата"""
+    """Get chat settings."""
     try:
         service = get_settings_service()
         return service.get_chat_settings(current_user, db)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid settings data")
-    except Exception as e:
-        logger.error(f"Error getting chat settings: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения настроек чата")
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting chat settings")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/obs")
 async def get_obs_settings(
     current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Получить настройки OBS"""
+    """Get OBS settings."""
     try:
         service = get_settings_service()
         return service.get_obs_settings(current_user, db)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid settings data")
-    except Exception as e:
-        logger.error(f"Error getting OBS settings: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка получения настроек OBS")
-
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting OBS settings")
+        raise HTTPException(status_code=500, detail="Internal server error")

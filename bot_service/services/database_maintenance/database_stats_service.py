@@ -89,8 +89,8 @@ class DatabaseStatsService:
 
             return stats
 
-        except Exception as e:
-            logger.error(f"Error getting database stats: {e}", exc_info=True)
+        except Exception:
+            logger.exception("Error getting database stats")
             return {}
 
     def _get_voices_size(self) -> int:
@@ -105,8 +105,8 @@ class DatabaseStatsService:
                     file_path = os.path.join(root, file)
                     total_size += os.path.getsize(file_path)
             return total_size
-        except Exception as e:
-            logger.error(f"Error getting voices size: {e}")
+        except Exception:
+            logger.exception("Error getting voices size")
             return 0
 
     def _count_voice_files(self) -> int:
@@ -116,8 +116,8 @@ class DatabaseStatsService:
             if not os.path.exists(voices_dir):
                 return 0
             return len([f for f in os.listdir(voices_dir) if f.endswith('.wav')])
-        except Exception as e:
-            logger.error(f"Error counting voice files: {e}")
+        except Exception:
+            logger.exception("Error counting voice files")
             return 0
 
     def _get_cache_size(self) -> int:
@@ -137,8 +137,8 @@ class DatabaseStatsService:
                         file_path = os.path.join(root, file)
                         total_size += os.path.getsize(file_path)
             return total_size
-        except Exception as e:
-            logger.error(f"Error getting cache size: {e}")
+        except Exception:
+            logger.exception("Error getting cache size")
             return 0
 
     def _count_cache_files(self) -> int:
@@ -155,8 +155,8 @@ class DatabaseStatsService:
                     continue
                 total_count += sum(len(files) for _, _, files in os.walk(cache_dir))
             return total_count
-        except Exception as e:
-            logger.error(f"Error counting cache files: {e}")
+        except Exception:
+            logger.exception("Error counting cache files")
             return 0
 
     def _get_latest_backup_size(self) -> int:
@@ -170,8 +170,8 @@ class DatabaseStatsService:
                 return 0
             latest_backup = sorted(files, key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)))[-1]
             return os.path.getsize(os.path.join(backup_dir, latest_backup))
-        except Exception as e:
-            logger.error(f"Error getting latest backup size: {e}")
+        except Exception:
+            logger.exception("Error getting latest backup size")
             return 0
 
     def _get_latest_backup_time(self) -> str:
@@ -187,6 +187,6 @@ class DatabaseStatsService:
             latest_backup = sorted(files, key=lambda x: os.path.getmtime(os.path.join(backup_dir, x)))[-1]
             timestamp = os.path.getmtime(os.path.join(backup_dir, latest_backup))
             return datetime.fromtimestamp(timestamp).isoformat()
-        except Exception as e:
-            logger.error(f"Error getting latest backup time: {e}")
+        except Exception:
+            logger.exception("Error getting latest backup time")
             return None

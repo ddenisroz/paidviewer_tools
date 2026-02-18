@@ -65,11 +65,13 @@ from middleware.logging_middleware import (  # noqa: E402
     ErrorLoggingMiddleware
 )
 from middleware.rate_limit_middleware import RateLimitMiddleware  # noqa: E402
+from middleware.csrf_protection import CSRFProtectionMiddleware  # noqa: E402
 
 app.add_middleware(ErrorLoggingMiddleware)
 app.add_middleware(PerformanceLoggingMiddleware, slow_threshold_ms=1000)
 app.add_middleware(StructuredLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(CSRFProtectionMiddleware, secret_key=settings.secret_key)
 
 # Existing middleware
 app.add_middleware(SecurityHeadersMiddleware)

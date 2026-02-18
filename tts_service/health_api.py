@@ -1,6 +1,7 @@
 # tts_service/health_api.py
 """API для проверки здоровья TTS Service"""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from tts_service.database import get_db
 from tts_service.tts_engine import tts_engine_manager
@@ -19,8 +20,8 @@ async def health_check():
     # [OK] Проверяем готовность движка
     try:
         tts_engine_loaded = tts_engine_manager.is_ready()
-    except Exception as e:
-        logger.warning(f"Error checking TTS engine readiness: {e}")
+    except Exception:
+        logger.exception("Error checking TTS engine readiness")
         # Fallback: проверяем базовую инициализацию
         tts_engine_loaded = getattr(tts_engine_manager, 'is_initialized', False) and tts_engine_manager.tts_engine is not None
     
@@ -46,9 +47,10 @@ async def detailed_health_check(db: Session = Depends(get_db)):
         # Проверяем базу данных
         db_status = "healthy"
         try:
-            db.execute("SELECT 1")
-        except Exception as e:
-            db_status = f"error: {str(e)}"
+            db.execute(text("SELECT 1"))
+        except Exception:
+            logger.exception("Database health check failed")
+            db_status = "error"
         
         # Проверяем TTS движок
         tts_status = "healthy" if tts_engine_manager.is_initialized() else "not_initialized"
@@ -72,12 +74,9 @@ async def detailed_health_check(db: Session = Depends(get_db)):
             },
             "metrics": metrics
         }
-    except Exception as e:
-        logger.error(f"Health check error: {e}")
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+    except Exception:
+        logger.exception("Health check error")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @health_router.get("/metrics")
 async def get_metrics():
@@ -88,9 +87,7 @@ async def get_metrics():
             "status": "success",
             "metrics": metrics
         }
-    except Exception as e:
-        logger.error(f"Metrics error: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+    except Exception:
+        logger.exception("Metrics error")
+        raise HTTPException(status_code=500, detail="Internal server error")
+

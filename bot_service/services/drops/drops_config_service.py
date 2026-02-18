@@ -141,8 +141,8 @@ class DropsConfigMixin:
         try:
             self.db.commit()
             self.db.refresh(config)
-        except Exception as e:
-            logger.error(f"[ERROR] Error saving drops config for {channel_name}: {e}")
+        except Exception:
+            logger.exception("[ERROR] Error saving drops config for {channel_name}")
             self.db.rollback()
             raise
 
@@ -211,3 +211,4 @@ class DropsConfigMixin:
 
         self.db.add(history_entry)
         self.db.commit()
+

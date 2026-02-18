@@ -1,4 +1,4 @@
-﻿"""
+"""
 TTS Blocked Users Router
 Handles: block/unblock users from TTS
 """
@@ -67,8 +67,8 @@ async def get_blocked_users(
         return {'success': True, 'data': blocked_users}
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f'Error getting blocked users: {e}')
+    except Exception:
+        logger.exception("Error getting blocked users")
         raise HTTPException(status_code=500, detail='Failed to load blocked users')
 
 
@@ -117,8 +117,8 @@ async def block_user(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f'Error blocking user: {e}')
+    except Exception:
+        logger.exception("Error blocking user")
         raise HTTPException(status_code=500, detail='Failed to block user')
 
 
@@ -153,8 +153,8 @@ async def unblock_user(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f'Error unblocking user: {e}')
+    except Exception:
+        logger.exception("Error unblocking user")
         raise HTTPException(status_code=500, detail='Failed to unblock user')
 
 
@@ -201,6 +201,7 @@ async def remove_blocked_user(
 
     except HTTPException:
         raise
-    except Exception as e:
-        logger.error(f'Error removing blocked user: {e}')
+    except Exception:
+        logger.exception("Error removing blocked user")
         raise HTTPException(status_code=500, detail='Failed to remove blocked user')
+

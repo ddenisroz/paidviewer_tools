@@ -50,8 +50,8 @@ def main():
             log_config=None  # Отключаем стандартную конфигурацию логирования uvicorn
         )
         
-    except Exception as e:
-        logger.error(f"[ERROR] Failed to start TTS Service: {e}")
+    except Exception:
+        logger.exception("[ERROR] Failed to start TTS Service")
         raise
 
 if __name__ == "__main__":

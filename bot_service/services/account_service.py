@@ -74,8 +74,8 @@ class AccountService:
                 "deleted_data": deleted_counts
             }
 
-        except Exception as e:
-            logger.error(f"[ERROR] [DELETE ACCOUNT] Error: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[ERROR] [DELETE ACCOUNT] Error")
             self.db.rollback()
             return {"success": False, "error": "Internal server error"}
 
@@ -127,8 +127,8 @@ class AccountService:
                 }
             }
 
-        except Exception as e:
-            logger.error(f"[ERROR] [ADMIN DELETE] Error: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[ERROR] [ADMIN DELETE] Error")
             self.db.rollback()
             return {"success": False, "error": "Internal server error"}
 
@@ -147,8 +147,8 @@ class AccountService:
                         await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
                     connection_manager.disable_tts_for_channel(channel_name.lower())
                     logger.info(f"[DELETE] Disconnected VK bot from {channel_name}")
-                except Exception as e:
-                    logger.error(f"Error disconnecting VK bot: {e}")
+                except Exception:
+                    logger.exception("Error disconnecting VK bot")
 
     async def _delete_user_related_data(
         self, 
@@ -219,3 +219,4 @@ class AccountService:
         deleted_counts['admin'] = admin_repo.delete_by_platform_user_ids(ids)
 
         return deleted_counts
+
