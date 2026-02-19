@@ -2,9 +2,9 @@
 Twitch Predictions API
 
 РђРІС‚РѕСЂ: AI Assistant
-Р”Р°С‚Р°: 27 РґРµРєР°Р±СЂСЏ 2025
+Дата: 27 декабря 2025
 
-Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#create-prediction
+Документация: https://dev.twitch.tv/docs/api/reference#create-prediction
 """
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,66 +24,66 @@ router = APIRouter(prefix="/api/twitch/predictions", tags=["twitch-predictions"]
 # === Pydantic Models ===
 
 class PredictionOutcome(BaseModel):
-    """Р’Р°СЂРёР°РЅС‚ РёСЃС…РѕРґР° РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ"""
-    title: str = Field(..., min_length=1, max_length=25, description="РќР°Р·РІР°РЅРёРµ РёСЃС…РѕРґР°")
+    """Вариант исхода предсказания"""
+    title: str = Field(..., min_length=1, max_length=25, description="Название исхода")
 
 
 class PredictionCreate(BaseModel):
-    """РЎРѕР·РґР°РЅРёРµ РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ"""
+    """Создание предсказания"""
     title: str = Field(
         ..., 
         min_length=1, 
         max_length=45, 
-        description="Р—Р°РіРѕР»РѕРІРѕРє РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ"
+        description="Заголовок предсказания"
     )
     outcomes: List[PredictionOutcome] = Field(
         ..., 
         min_length=2, 
         max_length=10,
-        description="Р’Р°СЂРёР°РЅС‚С‹ РёСЃС…РѕРґРѕРІ (2-10)"
+        description="Варианты исходов (2-10)"
     )
     prediction_window: int = Field(
         ..., 
         ge=30, 
         le=1800,
-        description="Р’СЂРµРјСЏ РґР»СЏ СЃС‚Р°РІРѕРє РІ СЃРµРєСѓРЅРґР°С… (30-1800)"
+        description="Время для ставок в секундах (30-1800)"
     )
     
     @field_validator('outcomes')
     @classmethod
     def validate_outcomes(cls, v: List[PredictionOutcome]) -> List[PredictionOutcome]:
-        """Р’Р°Р»РёРґР°С†РёСЏ СѓРЅРёРєР°Р»СЊРЅРѕСЃС‚Рё РЅР°Р·РІР°РЅРёР№ РёСЃС…РѕРґРѕРІ"""
+        """Валидация уникальности названий исходов"""
         titles = [outcome.title for outcome in v]
         if len(titles) != len(set(titles)):
-            raise ValueError("РќР°Р·РІР°РЅРёСЏ РёСЃС…РѕРґРѕРІ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ СѓРЅРёРєР°Р»СЊРЅС‹РјРё")
+            raise ValueError("Названия исходов должны быть уникальными")
         return v
 
 
 class PredictionEnd(BaseModel):
-    """Р—Р°РІРµСЂС€РµРЅРёРµ РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ"""
+    """Завершение предсказания"""
     status: Literal["RESOLVED", "CANCELED"] = Field(
         ...,
-        description="РЎС‚Р°С‚СѓСЃ Р·Р°РІРµСЂС€РµРЅРёСЏ (RESOLVED - СЃ РїРѕР±РµРґРёС‚РµР»РµРј, CANCELED - РѕС‚РјРµРЅР°)"
+        description="Статус завершения (RESOLVED - с победителем, CANCELED - отмена)"
     )
     winning_outcome_id: Optional[str] = Field(
         None,
-        description="ID РїРѕР±РµРґРёРІС€РµРіРѕ РёСЃС…РѕРґР° (РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ РґР»СЏ RESOLVED)"
+        description="ID победившего исхода (обязательно для RESOLVED)"
     )
     
     @field_validator('winning_outcome_id')
     @classmethod
     def validate_winning_outcome(cls, v: Optional[str], info) -> Optional[str]:
-        """Р’Р°Р»РёРґР°С†РёСЏ winning_outcome_id РґР»СЏ RESOLVED СЃС‚Р°С‚СѓСЃР°"""
+        """Валидация winning_outcome_id для RESOLVED статуса"""
         status = info.data.get('status')
         if status == 'RESOLVED' and not v:
-            raise ValueError("winning_outcome_id РѕР±СЏР·Р°С‚РµР»РµРЅ РґР»СЏ СЃС‚Р°С‚СѓСЃР° RESOLVED")
+            raise ValueError("winning_outcome_id обязателен для статуса RESOLVED")
         if status == 'CANCELED' and v:
-            raise ValueError("winning_outcome_id РЅРµ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СѓРєР°Р·Р°РЅ РґР»СЏ СЃС‚Р°С‚СѓСЃР° CANCELED")
+            raise ValueError("winning_outcome_id не должен быть указан для статуса CANCELED")
         return v
 
 
 class PredictionResponse(BaseModel):
-    """РћС‚РІРµС‚ СЃ РёРЅС„РѕСЂРјР°С†РёРµР№ Рѕ РїСЂРµРґСЃРєР°Р·Р°РЅРёРё"""
+    """Ответ с информацией о предсказании"""
     id: str
     broadcaster_id: str
     broadcaster_name: str
@@ -102,16 +102,16 @@ class PredictionResponse(BaseModel):
 
 async def get_twitch_token(user: User) -> str:
     """
-    РџРѕР»СѓС‡РёС‚СЊ Twitch OAuth С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№
+    Получить Twitch OAuth токен пользователя через репозиторий
     
     Args:
-        user: РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РёР· Р±Р°Р·С‹ РґР°РЅРЅС‹С…
+        user: Пользователь из базы данных
         
     Returns:
         str: OAuth С‚РѕРєРµРЅ
         
     Raises:
-        HTTPException: Р•СЃР»Рё С‚РѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ
+        HTTPException: Если токен не найден
     """
     from core.database import get_db
     from core.token_encryption import decrypt_token, is_token_encrypted
@@ -129,10 +129,10 @@ async def get_twitch_token(user: User) -> str:
             )
             raise HTTPException(
                 status_code=400,
-                detail="Twitch OAuth С‚РѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ. РџРѕР¶Р°Р»СѓР№СЃС‚Р°, РїРѕРґРєР»СЋС‡РёС‚Рµ Twitch Р°РєРєР°СѓРЅС‚."
+                detail="Twitch OAuth токен не найден. Пожалуйста, подключите Twitch аккаунт."
             )
         
-        # Р Р°СЃС€РёС„СЂРѕРІС‹РІР°РµРј С‚РѕРєРµРЅ РµСЃР»Рё РЅСѓР¶РЅРѕ
+        # Расшифровываем токен если нужно
         token = user_token.access_token
         if is_token_encrypted(token):
             token = decrypt_token(token)
@@ -151,20 +151,20 @@ async def make_twitch_api_request(
     params: Optional[dict] = None
 ) -> dict:
     """
-    Р’С‹РїРѕР»РЅРёС‚СЊ Р·Р°РїСЂРѕСЃ Рє Twitch API
+    Выполнить запрос к Twitch API
     
     Args:
         method: HTTP РјРµС‚РѕРґ (GET, POST, PATCH)
         endpoint: API endpoint
         token: OAuth С‚РѕРєРµРЅ
-        json_data: JSON РґР°РЅРЅС‹Рµ РґР»СЏ POST/PATCH
-        params: Query РїР°СЂР°РјРµС‚СЂС‹
+        json_data: JSON данные для POST/PATCH
+        params: Query параметры
         
     Returns:
-        dict: РћС‚РІРµС‚ API
+        dict: Ответ API
         
     Raises:
-        HTTPException: РџСЂРё РѕС€РёР±РєРµ API
+        HTTPException: При ошибке API
     """
     url = f"https://api.twitch.tv/helix{endpoint}"
     headers = {
@@ -210,7 +210,7 @@ async def make_twitch_api_request(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє Twitch API"
+            detail=f"Ошибка подключения к Twitch API"
         )
 
 
@@ -222,20 +222,20 @@ async def create_prediction(
     current_user: User = Depends(get_current_user)
 ):
     """
-    РЎРѕР·РґР°С‚СЊ РїСЂРµРґСЃРєР°Р·Р°РЅРёРµ СЃ Channel Points
+    Создать предсказание с Channel Points
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    Требования:
     - Scope: channel:manage:predictions
-    - Broadcaster РёР»Рё Editor
-    - РЎС‚СЂРёРј РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РѕРЅР»Р°Р№РЅ
+    - Broadcaster или Editor
+    - Стрим должен быть онлайн
     
-    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#create-prediction
+    Документация: https://dev.twitch.tv/docs/api/reference#create-prediction
     """
     try:
-        # РџРѕР»СѓС‡Р°РµРј С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        # Получаем токен пользователя
         token = await get_twitch_token(current_user)
         
-        # Р¤РѕСЂРјРёСЂСѓРµРј РґР°РЅРЅС‹Рµ РґР»СЏ API
+        # Формируем данные для API
         data = {
             "broadcaster_id": current_user.twitch_user_id,
             "title": prediction.title,
@@ -250,7 +250,7 @@ async def create_prediction(
             outcomes_count=len(prediction.outcomes)
         )
         
-        # РЎРѕР·РґР°РµРј РїСЂРµРґСЃРєР°Р·Р°РЅРёРµ
+        # Создаем предсказание
         response = await make_twitch_api_request(
             method="POST",
             endpoint="/predictions",
@@ -282,7 +282,7 @@ async def create_prediction(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ"
+            detail=f"Ошибка создания предсказания"
         )
 
 
@@ -293,23 +293,23 @@ async def end_prediction(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Р—Р°РІРµСЂС€РёС‚СЊ РїСЂРµРґСЃРєР°Р·Р°РЅРёРµ
+    Завершить предсказание
     
-    РЎС‚Р°С‚СѓСЃС‹:
-    - RESOLVED: Р—Р°РІРµСЂС€РёС‚СЊ СЃ РїРѕР±РµРґРёС‚РµР»РµРј (С‚СЂРµР±СѓРµС‚СЃСЏ winning_outcome_id)
-    - CANCELED: РћС‚РјРµРЅРёС‚СЊ РїСЂРµРґСЃРєР°Р·Р°РЅРёРµ (Р±Р°Р»Р»С‹ РІРѕР·РІСЂР°С‰Р°СЋС‚СЃСЏ)
+    Статусы:
+    - RESOLVED: Завершить с победителем (требуется winning_outcome_id)
+    - CANCELED: Отменить предсказание (баллы возвращаются)
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    Требования:
     - Scope: channel:manage:predictions
-    - Broadcaster РёР»Рё Editor
+    - Broadcaster или Editor
     
-    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#end-prediction
+    Документация: https://dev.twitch.tv/docs/api/reference#end-prediction
     """
     try:
-        # РџРѕР»СѓС‡Р°РµРј С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        # Получаем токен пользователя
         token = await get_twitch_token(current_user)
         
-        # Р¤РѕСЂРјРёСЂСѓРµРј РґР°РЅРЅС‹Рµ РґР»СЏ API
+        # Формируем данные для API
         data = {
             "broadcaster_id": current_user.twitch_user_id,
             "id": prediction_id,
@@ -326,7 +326,7 @@ async def end_prediction(
             status=end_data.status
         )
         
-        # Р—Р°РІРµСЂС€Р°РµРј РїСЂРµРґСЃРєР°Р·Р°РЅРёРµ
+        # Завершаем предсказание
         response = await make_twitch_api_request(
             method="PATCH",
             endpoint="/predictions",
@@ -359,7 +359,7 @@ async def end_prediction(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° Р·Р°РІРµСЂС€РµРЅРёСЏ РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ"
+            detail=f"Ошибка завершения предсказания"
         )
 
 
@@ -368,18 +368,18 @@ async def get_active_predictions(
     current_user: User = Depends(get_current_user)
 ):
     """
-    РџРѕР»СѓС‡РёС‚СЊ Р°РєС‚РёРІРЅС‹Рµ РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ
+    Получить активные предсказания
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
-    - Scope: channel:read:predictions РёР»Рё channel:manage:predictions
+    Требования:
+    - Scope: channel:read:predictions или channel:manage:predictions
     
-    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#get-predictions
+    Документация: https://dev.twitch.tv/docs/api/reference#get-predictions
     """
     try:
-        # РџРѕР»СѓС‡Р°РµРј С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        # Получаем токен пользователя
         token = await get_twitch_token(current_user)
         
-        # РџРѕР»СѓС‡Р°РµРј РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ
+        # Получаем предсказания
         response = await make_twitch_api_request(
             method="GET",
             endpoint="/predictions",
@@ -410,7 +410,7 @@ async def get_active_predictions(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РїСЂРµРґСЃРєР°Р·Р°РЅРёР№"
+            detail=f"Ошибка получения предсказаний"
         )
 
 
@@ -420,16 +420,16 @@ async def get_prediction(
     current_user: User = Depends(get_current_user)
 ):
     """
-    РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РєРѕРЅРєСЂРµС‚РЅРѕРј РїСЂРµРґСЃРєР°Р·Р°РЅРёРё
+    Получить информацию о конкретном предсказании
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
-    - Scope: channel:read:predictions РёР»Рё channel:manage:predictions
+    Требования:
+    - Scope: channel:read:predictions или channel:manage:predictions
     """
     try:
-        # РџРѕР»СѓС‡Р°РµРј С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        # Получаем токен пользователя
         token = await get_twitch_token(current_user)
         
-        # РџРѕР»СѓС‡Р°РµРј РїСЂРµРґСЃРєР°Р·Р°РЅРёРµ
+        # Получаем предсказание
         response = await make_twitch_api_request(
             method="GET",
             endpoint="/predictions",
@@ -445,7 +445,7 @@ async def get_prediction(
         if not predictions:
             raise HTTPException(
                 status_code=404,
-                detail="РџСЂРµРґСЃРєР°Р·Р°РЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ"
+                detail="Предсказание не найдено"
             )
         
         return {
@@ -464,6 +464,6 @@ async def get_prediction(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РїСЂРµРґСЃРєР°Р·Р°РЅРёСЏ"
+            detail=f"Ошибка получения предсказания"
         )
 

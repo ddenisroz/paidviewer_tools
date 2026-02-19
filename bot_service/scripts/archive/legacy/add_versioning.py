@@ -6,7 +6,7 @@ This handles the encoding issues with direct file editing.
 import os
 import sys
 
-# РџСѓС‚СЊ Рє С„Р°Р№Р»Сѓ database.py
+# cleaned: removed corrupted comment
 db_file = os.path.join(os.path.dirname(__file__), '..', 'core', 'database.py')
 
 print("Adding versioning to " + db_file + "...")

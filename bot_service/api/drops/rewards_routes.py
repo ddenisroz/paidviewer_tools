@@ -414,7 +414,7 @@ async def upload_reward_sound(
 
         return {
             "success": True,
-            "message": "Р В РІР‚вЂќР В Р вЂ Р РЋРЎвЂњР В РЎвЂќ Р В Р’В·Р В Р’В°Р В РЎвЂ“Р РЋР вЂљР РЋРЎвЂњР В Р’В¶Р В Р’ВµР В Р вЂ¦",
+            "message": "Звук загружен",
             "data": {
                 "sound_file": file_path,
                 "filename": filename

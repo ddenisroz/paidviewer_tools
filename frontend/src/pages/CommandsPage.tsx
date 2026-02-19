@@ -122,7 +122,7 @@ const hasBrokenSymbols = (text: string): boolean => {
         return true;
     }
 
-    // Common mojibake pattern (UTF-8 text decoded as cp1251): "РџСЂРёРІРµС‚"
+    // Common mojibake pattern (UTF-8 text decoded as cp1251): "Привет"
     const mojibakePairs = (normalized.match(/[РС][^\s]/g) || []).length;
     return mojibakePairs >= 3 && (mojibakePairs * 2) / compactText.length > 0.3;
 };

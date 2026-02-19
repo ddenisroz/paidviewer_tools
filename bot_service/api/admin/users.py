@@ -35,7 +35,7 @@ async def get_admin_users(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РґР»СЏ Р°РґРјРёРЅРєРё."""
+    """Получить список пользователей для админки."""
     try:
         require_admin(user)
         
@@ -58,10 +58,10 @@ async def block_user(
     db: Session = Depends(get_db)
 ):
     """
-    РљРѕРјРїР»РµРєСЃРЅР°СЏ Р±Р»РѕРєРёСЂРѕРІРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ:
-    1. Р‘Р»РѕРєРёСЂСѓРµС‚ РґРѕСЃС‚СѓРї С‡РµСЂРµР· OAuth (User.is_blocked)
-    2. Р‘Р»РѕРєРёСЂСѓРµС‚ РІСЃРµ РµРіРѕ РєР°РЅР°Р»С‹ РІ РіРѕСЃС‚РµРІРѕРј СЂРµР¶РёРјРµ (BlockedChannel)
-    3. РћС‚РєР»СЋС‡Р°РµС‚ Р±РѕС‚Р° РѕС‚ РІСЃРµС… РєР°РЅР°Р»РѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+    Комплексная блокировка пользователя:
+    1. Блокирует доступ через OAuth (User.is_blocked)
+    2. Блокирует все его каналы в гостевом режиме (BlockedChannel)
+    3. Отключает бота от всех каналов пользователя
     """
     try:
         require_admin(user)
@@ -124,7 +124,7 @@ async def unblock_user(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РљРѕРјРїР»РµРєСЃРЅР°СЏ СЂР°Р·Р±Р»РѕРєРёСЂРѕРІРєР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ."""
+    """Комплексная разблокировка пользователя."""
     try:
         require_admin(user)
         
@@ -154,7 +154,7 @@ async def get_sessions(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє Р°РєС‚РёРІРЅС‹С… СЃРµСЃСЃРёР№."""
+    """Получить список активных сессий."""
     try:
         require_admin(user)
         
@@ -175,7 +175,7 @@ async def add_to_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р”РѕР±Р°РІРёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ whitelist."""
+    """Добавить пользователя в whitelist."""
     try:
         require_admin(user)
         
@@ -216,7 +216,7 @@ async def get_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РІ whitelist."""
+    """Получить список пользователей в whitelist."""
     try:
         require_admin(user)
         
@@ -251,7 +251,7 @@ async def remove_from_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РЈРґР°Р»РёС‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РёР· whitelist."""
+    """Удалить пользователя из whitelist."""
     try:
         require_admin(user)
         

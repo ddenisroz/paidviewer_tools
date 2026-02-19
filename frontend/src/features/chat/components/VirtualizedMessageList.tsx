@@ -3,9 +3,9 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { MessageSquare } from 'lucide-react';
 
+import { formatLocalMessageTime } from '@/features/chat/utils/time';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
-import { formatLocalMessageTime } from '@/features/chat/utils/time';
 
 import SwipeableMessage from './SwipeableMessage';
 

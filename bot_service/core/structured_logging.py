@@ -270,15 +270,24 @@ def setup_log_rotation():
     file_log_level = _resolve_log_level(getattr(settings, "log_file_level", "WARNING"), logging.WARNING)
 
     # Single rotating file handler with configurable level
-    handler = RotatingFileHandler(
-        log_file,
-        maxBytes=5 * 1024 * 1024,  # 5 MB max
-        backupCount=5,  # Keep 5 files = 25 MB total max
-        encoding="utf-8",
-    )
+    try:
+        handler = RotatingFileHandler(
+            log_file,
+            maxBytes=5 * 1024 * 1024,  # 5 MB max
+            backupCount=5,  # Keep 5 files = 25 MB total max
+            encoding="utf-8",
+        )
+    except (PermissionError, OSError) as exc:
+        module_logger.warning(
+            "Log rotation disabled for '%s': %s",
+            log_file,
+            exc,
+        )
+        return
+
     handler.setFormatter(formatter)
     handler.setLevel(file_log_level)
-    
+
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
 

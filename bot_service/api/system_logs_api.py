@@ -1,5 +1,5 @@
 """
-API РґР»СЏ СЃРёСЃС‚РµРјРЅС‹С… Р»РѕРіРѕРІ Рё РёСЃС‚РѕСЂРёРё РґРµР№СЃС‚РІРёР№ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРІ.
+API для системных логов и истории действий администраторов.
 Clean Architecture: uses SystemLogRepository for data access.
 """
 from fastapi import APIRouter, Depends, HTTPException
@@ -36,7 +36,7 @@ async def get_system_logs(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ Р»РѕРіРё РґРµР№СЃС‚РІРёР№ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂРѕРІ СЃ С„РёР»СЊС‚СЂР°С†РёРµР№"""
+    """Получить логи действий администраторов с фильтрацией"""
     try:
         if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -109,7 +109,7 @@ async def get_logs_statistics(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РїРѕ Р»РѕРіР°Рј (РєРѕР»РёС‡РµСЃС‚РІРѕ РґРµР№СЃС‚РІРёР№ РїРѕ С‚РёРїР°Рј)"""
+    """Получить статистику по логам (количество действий по типам)"""
     try:
         if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -165,7 +165,7 @@ async def get_available_actions(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РґРѕСЃС‚СѓРїРЅС‹С… С‚РёРїРѕРІ РґРµР№СЃС‚РІРёР№"""
+    """Получить список доступных типов действий"""
     try:
         if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")

@@ -159,7 +159,7 @@ class CreateTtsRewardRequest(BaseModel):
 
 
 # ============================================================================
-# TTS API CLASS (РґР»СЏ СЂР°Р±РѕС‚С‹ СЃ TTS Manager)
+# TTS API CLASS (для работы с TTS Manager)
 # ============================================================================
 
 class TTSAPI:
@@ -184,7 +184,7 @@ class TTSAPI:
         word_filter: list = None,
         blocked_users: list = None
     ) -> dict:
-        """РћС‚РїСЂР°РІРёС‚СЊ Р·Р°РїСЂРѕСЃ РЅР° РѕР·РІСѓС‡РєСѓ С‡РµСЂРµР· TTS Manager"""
+        """Отправить запрос на озвучку через TTS Manager"""
         try:
             result = await self.tts_manager.synthesize_tts(
                 channel_name=channel_name,
@@ -203,14 +203,14 @@ class TTSAPI:
             if result.get("success"):
                 tts_type = result.get("tts_type", "unknown")
                 voice = result.get("voice", "unknown")
-                logger.info(f"[OK] TTS СЃРёРЅС‚РµР· СѓСЃРїРµС€РµРЅ: type={tts_type}, voice={voice}, channel={channel_name}")
+                logger.info(f"[OK] TTS синтез успешен: type={tts_type}, voice={voice}, channel={channel_name}")
             else:
-                logger.error(f"[ERROR] TTS СЃРёРЅС‚РµР· РЅРµ СѓРґР°Р»СЃСЏ: {result.get('error')}")
+                logger.error(f"[ERROR] TTS синтез не удался: {result.get('error')}")
 
             return result
 
         except Exception:
-            logger.exception("[ERROR] РћС€РёР±РєР° РїСЂРё РѕС‚РїСЂР°РІРєРµ TTS Р·Р°РїСЂРѕСЃР°")
+            logger.exception("[ERROR] Ошибка при отправке TTS запроса")
             return {"success": False, "error": "Internal server error"}
 
 
@@ -219,7 +219,7 @@ class TTSAPI:
 # ============================================================================
 
 def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """РџСЂРѕРІРµСЂСЏРµС‚ whitelist РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ РіРѕР»РѕСЃР°РјРё (С‚РѕР»СЊРєРѕ РґР»СЏ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№)"""
+    """Проверяет whitelist для управления голосами (только для авторизованных пользователей)"""
     if not user or not user.get('id') or user.get('id') <= 0:
         raise HTTPException(
             status_code=401,
@@ -229,21 +229,21 @@ def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session =
     from repositories.user_repository import UserRepository
     db_user = UserRepository(db).get_by_id(user['id'])
     if not db_user:
-        raise HTTPException(status_code=404, detail="РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅРµ РЅР°Р№РґРµРЅ")
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    # РџСЂРѕРІРµСЂСЏРµРј whitelist СЃ РєРµС€РёСЂРѕРІР°РЅРёРµРј
+    # Проверяем whitelist с кешированием
     from utils.whitelist_cache import is_user_whitelisted_cached
     if is_user_whitelisted_cached(db_user, db):
         return user
 
     raise HTTPException(
         status_code=403,
-        detail="РЈ РІР°СЃ РЅРµС‚ РґРѕСЃС‚СѓРїР° Рє СѓРїСЂР°РІР»РµРЅРёСЋ РіРѕР»РѕСЃР°РјРё. РћР±СЂР°С‚РёС‚РµСЃСЊ Рє Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂСѓ."
+        detail="У вас нет доступа к управлению голосами. Обратитесь к администратору."
     )
 
 
 async def check_local_tts_health(endpoint_url: str, api_key: Optional[str] = None) -> dict:
-    """РџСЂРѕРІРµСЂРёС‚СЊ Р·РґРѕСЂРѕРІСЊРµ Р»РѕРєР°Р»СЊРЅРѕРіРѕ TTS СЃРµСЂРІРёСЃР°"""
+    """Проверить здоровье локального TTS сервиса"""
     try:
         headers = {}
         if api_key:
@@ -263,7 +263,7 @@ async def check_local_tts_health(endpoint_url: str, api_key: Optional[str] = Non
                 return {"healthy": False, "error": f"HTTP {response.status_code}"}
 
     except httpx.TimeoutException:
-        return {"healthy": False, "error": "Timeout: СЃРµСЂРІРёСЃ РЅРµ РѕС‚РІРµС‡Р°РµС‚"}
+        return {"healthy": False, "error": "Timeout: сервис не отвечает"}
     except Exception:
         return {"healthy": False, "error": "Internal server error"}
 

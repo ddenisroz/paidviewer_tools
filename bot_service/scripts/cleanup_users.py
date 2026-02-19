@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-РЎРєСЂРёРїС‚ РґР»СЏ РѕС‡РёСЃС‚РєРё Р±Р°Р·С‹ РґР°РЅРЅС‹С… РѕС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
+Скрипт для очистки базы данных от пользователей
 
 Р’РќРРњРђРќРР•: Р­С‚РѕС‚ СЃРєСЂРёРїС‚ СѓРґР°Р»СЏРµС‚ Р’РЎР• РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№!
 РСЃРїРѕР»СЊР·СѓР№С‚Рµ СЃ РѕСЃС‚РѕСЂРѕР¶РЅРѕСЃС‚СЊСЋ!
@@ -11,18 +11,18 @@ import os
 from datetime import datetime
 import shutil
 
-# Р”РѕР±Р°РІР»СЏРµРј РїСѓС‚СЊ Рє bot_service
+# Добавляем путь к bot_service
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from core.database import SessionLocal, User, UserToken, TTSUserSettings, AudioSettings, LocalTTSEndpoint, FilteredWord, TTSBlockedUser, UserSession
 
 def create_backup():
-    """РЎРѕР·РґР°РµС‚ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ Р±Р°Р·С‹ РґР°РЅРЅС‹С…"""
+    """Создает резервную копию базы данных"""
     db_path = os.path.join(os.path.dirname(__file__), '..', 'data', 'app_data.db')
 
     if not os.path.exists(db_path):
-        print(f"[WARN] Р‘Р°Р·Р° РґР°РЅРЅС‹С… РЅРµ РЅР°Р№РґРµРЅР°: {db_path}")
-        print(f"   РћР¶РёРґР°РµРјС‹Р№ РїСѓС‚СЊ: {os.path.abspath(db_path)}")
+        print(f"[WARN] База данных не найдена: {db_path}")
+        print(f"   Ожидаемый путь: {os.path.abspath(db_path)}")
         return None
 
     backup_dir = os.path.join(os.path.dirname(__file__), '..', 'backups', 'database')
@@ -34,34 +34,34 @@ def create_backup():
     try:
         shutil.copy2(db_path, backup_path)
         file_size = os.path.getsize(backup_path)
-        print(f"[OK] Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ СЃРѕР·РґР°РЅР°: {backup_path}")
-        print(f"   Р Р°Р·РјРµСЂ: {file_size / 1024:.2f} KB")
+        print(f"[OK] Резервная копия создана: {backup_path}")
+        print(f"   Размер: {file_size / 1024:.2f} KB")
         return backup_path
     except Exception as e:
-        print(f"[ERROR] РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё: {e}")
+        print(f"[ERROR] Ошибка создания резервной копии: {e}")
         return None
 
 def show_database_stats(db):
-    """РџРѕРєР°Р·С‹РІР°РµС‚ СЃС‚Р°С‚РёСЃС‚РёРєСѓ Р±Р°Р·С‹ РґР°РЅРЅС‹С…"""
+    """Показывает статистику базы данных"""
     print("\n" + "="*60)
     print("[STATS] РўР•РљРЈР©РђРЇ РЎРўРђРўРРЎРўРРљРђ Р‘РђР—Р« Р”РђРќРќР«РҐ")
     print("="*60)
 
     stats = {
-        "РџРѕР»СЊР·РѕРІР°С‚РµР»Рё (users)": db.query(User).count(),
-        "РўРѕРєРµРЅС‹ (user_tokens)": db.query(UserToken).count(),
-        "РќР°СЃС‚СЂРѕР№РєРё TTS (tts_user_settings)": db.query(TTSUserSettings).count(),
-        "РќР°СЃС‚СЂРѕР№РєРё Р°СѓРґРёРѕ (audio_settings)": db.query(AudioSettings).count(),
-        "Р›РѕРєР°Р»СЊРЅС‹Рµ TTS (local_tts_endpoints)": db.query(LocalTTSEndpoint).count(),
-        "Р¤РёР»СЊС‚СЂС‹ СЃР»РѕРІ (filtered_words)": db.query(FilteredWord).count(),
-        "Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅРЅС‹Рµ (tts_blocked_users)": db.query(TTSBlockedUser).count(),
-        "РЎРµСЃСЃРёРё (user_sessions)": db.query(UserSession).count(),
+        "Пользователи (users)": db.query(User).count(),
+        "Токены (user_tokens)": db.query(UserToken).count(),
+        "Настройки TTS (tts_user_settings)": db.query(TTSUserSettings).count(),
+        "Настройки аудио (audio_settings)": db.query(AudioSettings).count(),
+        "Локальные TTS (local_tts_endpoints)": db.query(LocalTTSEndpoint).count(),
+        "Фильтры слов (filtered_words)": db.query(FilteredWord).count(),
+        "Заблокированные (tts_blocked_users)": db.query(TTSBlockedUser).count(),
+        "Сессии (user_sessions)": db.query(UserSession).count(),
     }
 
     total = sum(stats.values())
 
     for table_name, count in stats.items():
-        print(f"  вЂў {table_name:<40} {count:>5} Р·Р°РїРёСЃРµР№")
+        print(f"  • {table_name:<40} {count:>5} записей")
 
     print("-"*60)
     print(f"  Р’РЎР•Р“Рћ Р—РђРџРРЎР•Р™: {total}")
@@ -70,68 +70,68 @@ def show_database_stats(db):
     return stats
 
 def cleanup_users(db, keep_admins=True):
-    """РЈРґР°Р»СЏРµС‚ РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ Рё СЃРІСЏР·Р°РЅРЅС‹Рµ РґР°РЅРЅС‹Рµ"""
+    """Удаляет всех пользователей и связанные данные"""
 
-    print("\n[DELETE]  РќР°С‡РёРЅР°РµРј РѕС‡РёСЃС‚РєСѓ...\n")
+    print("\n[DELETE]  Начинаем очистку...\n")
 
     deleted_counts = {}
 
-    # 1. РџРѕР»СѓС‡Р°РµРј СЃРїРёСЃРѕРє РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РґР»СЏ СѓРґР°Р»РµРЅРёСЏ
+    # 1. Получаем список пользователей для удаления
     if keep_admins:
         users_to_delete = db.query(User).filter(not User.is_admin).all()
-        print("[LIST] РЈРґР°Р»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ (СЃРѕС…СЂР°РЅСЏРµРј Р°РґРјРёРЅРѕРІ)...")
+        print("[LIST] Удаление пользователей (сохраняем админов)...")
     else:
         users_to_delete = db.query(User).all()
-        print("[LIST] РЈРґР°Р»РµРЅРёРµ Р’РЎР•РҐ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ (РІРєР»СЋС‡Р°СЏ Р°РґРјРёРЅРѕРІ)...")
+        print("[LIST] Удаление ВСЕХ пользователей (включая админов)...")
 
     user_ids = [user.id for user in users_to_delete]
 
     if not user_ids:
-        print("[INFO]  РќРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РґР»СЏ СѓРґР°Р»РµРЅРёСЏ")
+        print("[INFO]  Нет пользователей для удаления")
         return deleted_counts
 
-    print(f"   РќР°Р№РґРµРЅРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№: {len(user_ids)}")
+    print(f"   Найдено пользователей: {len(user_ids)}")
 
-    # 2. РЈРґР°Р»СЏРµРј СЃРІСЏР·Р°РЅРЅС‹Рµ РґР°РЅРЅС‹Рµ
-    print("\n[LINK] РЈРґР°Р»РµРЅРёРµ СЃРІСЏР·Р°РЅРЅС‹С… РґР°РЅРЅС‹С…...")
+    # 2. Удаляем связанные данные
+    print("\n[LINK] Удаление связанных данных...")
 
-    # РўРѕРєРµРЅС‹
+    # Токены
     deleted = db.query(UserToken).filter(UserToken.user_id.in_(user_ids)).delete(synchronize_session=False)
     deleted_counts['user_tokens'] = deleted
-    print(f"   вЂў РўРѕРєРµРЅС‹: {deleted}")
+    print(f"   • Токены: {deleted}")
 
-    # РќР°СЃС‚СЂРѕР№РєРё TTS
+    # Настройки TTS
     deleted = db.query(TTSUserSettings).filter(TTSUserSettings.user_id.in_(user_ids)).delete(synchronize_session=False)
     deleted_counts['tts_user_settings'] = deleted
-    print(f"   вЂў РќР°СЃС‚СЂРѕР№РєРё TTS: {deleted}")
+    print(f"   • Настройки TTS: {deleted}")
 
-    # РќР°СЃС‚СЂРѕР№РєРё Р°СѓРґРёРѕ
+    # Настройки аудио
     deleted = db.query(AudioSettings).filter(AudioSettings.user_id.in_(user_ids)).delete(synchronize_session=False)
     deleted_counts['audio_settings'] = deleted
-    print(f"   вЂў РќР°СЃС‚СЂРѕР№РєРё Р°СѓРґРёРѕ: {deleted}")
+    print(f"   • Настройки аудио: {deleted}")
 
-    # Р›РѕРєР°Р»СЊРЅС‹Рµ TTS endpoints
+    # Локальные TTS endpoints
     deleted = db.query(LocalTTSEndpoint).filter(LocalTTSEndpoint.user_id.in_(user_ids)).delete(synchronize_session=False)
     deleted_counts['local_tts_endpoints'] = deleted
-    print(f"   вЂў Р›РѕРєР°Р»СЊРЅС‹Рµ TTS: {deleted}")
+    print(f"   • Локальные TTS: {deleted}")
 
-    # Р¤РёР»СЊС‚СЂС‹ СЃР»РѕРІ
+    # Фильтры слов
     deleted = db.query(FilteredWord).filter(FilteredWord.user_id.in_(user_ids)).delete(synchronize_session=False)
     deleted_counts['filtered_words'] = deleted
-    print(f"   вЂў Р¤РёР»СЊС‚СЂС‹ СЃР»РѕРІ: {deleted}")
+    print(f"   • Фильтры слов: {deleted}")
 
-    # Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»Рё
+    # Заблокированные пользователи
     deleted = db.query(TTSBlockedUser).filter(TTSBlockedUser.user_id.in_(user_ids)).delete(synchronize_session=False)
     deleted_counts['tts_blocked_users'] = deleted
-    print(f"   вЂў Р—Р°Р±Р»РѕРєРёСЂРѕРІР°РЅРЅС‹Рµ: {deleted}")
+    print(f"   • Заблокированные: {deleted}")
 
-    # РЎРµСЃСЃРёРё
+    # Сессии
     deleted = db.query(UserSession).filter(UserSession.user_id.in_(user_ids)).delete(synchronize_session=False)
     deleted_counts['user_sessions'] = deleted
-    print(f"   вЂў РЎРµСЃСЃРёРё: {deleted}")
+    print(f"   • Сессии: {deleted}")
 
-    # 3. РЈРґР°Р»СЏРµРј СЃР°РјРёС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
-    print("\n РЈРґР°Р»РµРЅРёРµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№...")
+    # 3. Удаляем самих пользователей
+    print("\n Удаление пользователей...")
     for user in users_to_delete:
         display_name = user.twitch_username or user.vk_username or f'user_{user.id}'
         is_admin = " (ADMIN)" if user.is_admin else ""
@@ -140,9 +140,9 @@ def cleanup_users(db, keep_admins=True):
 
     deleted_counts['users'] = len(users_to_delete)
 
-    # 4. РЎРѕС…СЂР°РЅСЏРµРј РёР·РјРµРЅРµРЅРёСЏ
+    # 4. Сохраняем изменения
     db.commit()
-    print(f"\n[OK] РЈРґР°Р»РµРЅРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№: {len(users_to_delete)}")
+    print(f"\n[OK] Удалено пользователей: {len(users_to_delete)}")
 
     return deleted_counts
 
@@ -154,72 +154,72 @@ def main():
     db = SessionLocal()
 
     try:
-        # РџРѕРєР°Р·С‹РІР°РµРј СЃС‚Р°С‚РёСЃС‚РёРєСѓ Р”Рћ РѕС‡РёСЃС‚РєРё
+        # Показываем статистику ДО очистки
         stats_before = show_database_stats(db)
 
-        if stats_before['РџРѕР»СЊР·РѕРІР°С‚РµР»Рё (users)'] == 0:
-            print("\n[OK] Р‘Р°Р·Р° РґР°РЅРЅС‹С… СѓР¶Рµ РїСѓСЃС‚Р°!")
+        if stats_before['Пользователи (users)'] == 0:
+            print("\n[OK] База данных уже пуста!")
             return
 
-        # Р—Р°РїСЂР°С€РёРІР°РµРј РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ
+        # Запрашиваем подтверждение
         print("\n[WARN]  Р’РќРРњРђРќРР•! Р­С‚Р° РѕРїРµСЂР°С†РёСЏ СѓРґР°Р»РёС‚ Р’РЎР• РґР°РЅРЅС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№!")
-        print("    РџРµСЂРµРґ РѕС‡РёСЃС‚РєРѕР№ Р±СѓРґРµС‚ СЃРѕР·РґР°РЅР° СЂРµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ Р±Р°Р·С‹ РґР°РЅРЅС‹С….")
-        print("\nР’С‹Р±РµСЂРёС‚Рµ СЂРµР¶РёРј:")
+        print("    Перед очисткой будет создана резервная копия базы данных.")
+        print("\nВыберите режим:")
         print("  1. РЈРґР°Р»РёС‚СЊ РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РљР РћРњР• РђР”РњРРќРћР’ (СЂРµРєРѕРјРµРЅРґСѓРµС‚СЃСЏ)")
-        print("  2. РЈРґР°Р»РёС‚СЊ Р’РЎР•РҐ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ (РІРєР»СЋС‡Р°СЏ Р°РґРјРёРЅРѕРІ)")
-        print("  0. РћС‚РјРµРЅР°")
+        print("  2. Удалить ВСЕХ пользователей (включая админов)")
+        print("  0. Отмена")
 
-        choice = input("\nР’Р°С€ РІС‹Р±РѕСЂ (0/1/2): ").strip()
+        choice = input("\nВаш выбор (0/1/2): ").strip()
 
         if choice == '0':
-            print("\n[ERROR] РћРїРµСЂР°С†РёСЏ РѕС‚РјРµРЅРµРЅР° РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј")
+            print("\n[ERROR] Операция отменена пользователем")
             return
 
         if choice not in ['1', '2']:
-            print("\n[ERROR] РќРµРІРµСЂРЅС‹Р№ РІС‹Р±РѕСЂ!")
+            print("\n[ERROR] Неверный выбор!")
             return
 
         keep_admins = (choice == '1')
 
-        # РЎРѕР·РґР°РµРј СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ
-        print("\n[PACKAGE] РЎРѕР·РґР°РЅРёРµ СЂРµР·РµСЂРІРЅРѕР№ РєРѕРїРёРё...")
+        # Создаем резервную копию
+        print("\n[PACKAGE] Создание резервной копии...")
         backup_path = create_backup()
 
         if not backup_path:
-            print("[ERROR] РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ СЂРµР·РµСЂРІРЅСѓСЋ РєРѕРїРёСЋ. РћРїРµСЂР°С†РёСЏ РѕС‚РјРµРЅРµРЅР°.")
+            print("[ERROR] Не удалось создать резервную копию. Операция отменена.")
             return
 
-        # РџРѕСЃР»РµРґРЅРµРµ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёРµ
-        confirm = input("\n[WARN]  Р’С‹ СѓРІРµСЂРµРЅС‹? Р’РІРµРґРёС‚Рµ 'YES' РґР»СЏ РїРѕРґС‚РІРµСЂР¶РґРµРЅРёСЏ: ").strip()
+        # Последнее подтверждение
+        confirm = input("\n[WARN]  Вы уверены? Введите 'YES' для подтверждения: ").strip()
 
         if confirm != 'YES':
-            print("\n[ERROR] РћРїРµСЂР°С†РёСЏ РѕС‚РјРµРЅРµРЅР°")
+            print("\n[ERROR] Операция отменена")
             return
 
-        # Р’С‹РїРѕР»РЅСЏРµРј РѕС‡РёСЃС‚РєСѓ
+        # Выполняем очистку
         deleted_counts = cleanup_users(db, keep_admins=keep_admins)
 
-        # РџРѕРєР°Р·С‹РІР°РµРј СЃС‚Р°С‚РёСЃС‚РёРєСѓ РџРћРЎР›Р• РѕС‡РёСЃС‚РєРё
+        # Показываем статистику ПОСЛЕ очистки
         print("\n" + "="*60)
         print("[STATS] Р Р•Р—РЈР›Р¬РўРђРў РћР§РРЎРўРљР")
         print("="*60)
 
         total_deleted = sum(deleted_counts.values())
         for table_name, count in deleted_counts.items():
-            print(f"  вЂў {table_name:<40} {count:>5} СѓРґР°Р»РµРЅРѕ")
+            print(f"  • {table_name:<40} {count:>5} удалено")
 
         print("-"*60)
-        print(f"  Р’РЎР•Р“Рћ РЈР”РђР›Р•РќРћ: {total_deleted}")
+        print(f"  ВСЕГО УДАЛЕНО: {total_deleted}")
         print("="*60)
 
-        # Р¤РёРЅР°Р»СЊРЅР°СЏ СЃС‚Р°С‚РёСЃС‚РёРєР°
+        # Финальная статистика
         show_database_stats(db)
 
-        print("\n[OK] РћС‡РёСЃС‚РєР° Р·Р°РІРµСЂС€РµРЅР° СѓСЃРїРµС€РЅРѕ!")
-        print(f"[PACKAGE] Р РµР·РµСЂРІРЅР°СЏ РєРѕРїРёСЏ СЃРѕС…СЂР°РЅРµРЅР°: {backup_path}")
+        print("\n[OK] Очистка завершена успешно!")
+        print(f"[PACKAGE] Резервная копия сохранена: {backup_path}")
 
     except Exception as e:
-        print(f"\n[ERROR] РћС€РёР±РєР° РїСЂРё РѕС‡РёСЃС‚РєРµ Р±Р°Р·С‹ РґР°РЅРЅС‹С…: {e}")
+        print(f"\n[ERROR] Ошибка при очистке базы данных: {e}")
         db.rollback()
         import traceback
         traceback.print_exc()

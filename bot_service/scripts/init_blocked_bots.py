@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ СЃРїРёСЃРєР° Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅРЅС‹С… Р±РѕС‚РѕРІ
-Р­С‚Рё Р±РѕС‚С‹ РЅРµ Р±СѓРґСѓС‚ РѕР·РІСѓС‡РёРІР°С‚СЊСЃСЏ С‡РµСЂРµР· TTS
+Эти боты не будут озвучиваться через TTS
 """
 import sys
 import os
 
-# Р”РѕР±Р°РІР»СЏРµРј РїСѓС‚СЊ Рє bot_service РІ PYTHONPATH
+# Добавляем путь к bot_service в PYTHONPATH
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.database import SessionLocal, BlockedBot
@@ -20,27 +20,27 @@ def init_blocked_bots():
     db = SessionLocal()
 
     try:
-        # РЎРїРёСЃРѕРє Р±РѕС‚РѕРІ РґР»СЏ Р±Р»РѕРєРёСЂРѕРІРєРё (РЅР°С€ Р±РѕС‚ + РїРѕРїСѓР»СЏСЂРЅС‹Рµ Р±РѕС‚С‹)
+        # Список ботов для блокировки (наш бот + популярные боты)
         bots_to_block = [
-            "payedviewer",      # в­ђ РќРђРЁ Р‘РћРў - РЅРµ РѕР·РІСѓС‡РёРІР°С‚СЊ РµРіРѕ СЃРѕРѕР±С‰РµРЅРёСЏ
-            "streamelements",   # РђР»РµСЂС‚С‹ Рё СЃРѕР±С‹С‚РёСЏ
-            "nightbot",         # РњРѕРґРµСЂР°С†РёСЏ
-            "streamlabs",       # Р”РѕРЅР°С‚С‹ Рё Р°Р»РµСЂС‚С‹
-            "moobot",           # РњРѕРґРµСЂР°С†РёСЏ
-            "twirapp",          # РўСѓСЂРЅРёСЂС‹
-            "fossabot",         # РњРѕРґРµСЂР°С†РёСЏ
-            "streamlabs",       # Р”РѕРЅР°С‚С‹
-            "wizebot",          # РњРѕРґРµСЂР°С†РёСЏ
-            "botrix",           # РњРѕРґРµСЂР°С†РёСЏ
-            "coebot",           # РњРѕРґРµСЂР°С†РёСЏ
-            "ankhbot",          # РњРѕРґРµСЂР°С†РёСЏ
-            "deepbot",          # РњРѕРґРµСЂР°С†РёСЏ
-            "xanbot",           # РњРѕРґРµСЂР°С†РёСЏ
-            "vivbot",           # РњРѕРґРµСЂР°С†РёСЏ
-            "ohbot",            # РњРѕРґРµСЂР°С†РёСЏ
-            "scorpstradamus",   # РњРѕРґРµСЂР°С†РёСЏ
+            "payedviewer",      # ⭐ НАШ БОТ - не озвучивать его сообщения
+            "streamelements",   # Алерты и события
+            "nightbot",         # Модерация
+            "streamlabs",       # Донаты и алерты
+            "moobot",           # Модерация
+            "twirapp",          # Турниры
+            "fossabot",         # Модерация
+            "streamlabs",       # Донаты
+            "wizebot",          # Модерация
+            "botrix",           # Модерация
+            "coebot",           # Модерация
+            "ankhbot",          # Модерация
+            "deepbot",          # Модерация
+            "xanbot",           # Модерация
+            "vivbot",           # Модерация
+            "ohbot",            # Модерация
+            "scorpstradamus",   # Модерация
             "sery_bot",         # VK Р±РѕС‚
-            "chatbot",          # VK Live СЃРёСЃС‚РµРјРЅС‹Р№ Р±РѕС‚ (РЅР°РіСЂР°РґС‹)
+            "chatbot",          # VK Live системный бот (награды)
         ]
 
         added_count = 0
@@ -49,7 +49,7 @@ def init_blocked_bots():
         for bot_name in bots_to_block:
             bot_name_lower = bot_name.lower()
 
-            # РџСЂРѕРІРµСЂСЏРµРј, РЅРµ РґРѕР±Р°РІР»РµРЅ Р»Рё СѓР¶Рµ
+            # Проверяем, не добавлен ли уже
             existing = db.query(BlockedBot).filter(
                 BlockedBot.bot_name == bot_name_lower
             ).first()
@@ -59,7 +59,7 @@ def init_blocked_bots():
                 skipped_count += 1
                 continue
 
-            # Р”РѕР±Р°РІР»СЏРµРј Р±РѕС‚Р°
+            # Добавляем бота
             blocked_bot = BlockedBot(bot_name=bot_name_lower)
             db.add(blocked_bot)
             logger.info(f"[OK] Added bot '{bot_name_lower}' to blocked list")
@@ -74,7 +74,7 @@ def init_blocked_bots():
         print(f"   Total blocked bots: {added_count + skipped_count}")
         print("=" * 70)
 
-        # РџРѕРєР°Р·С‹РІР°РµРј РїРѕР»РЅС‹Р№ СЃРїРёСЃРѕРє
+        # Показываем полный список
         all_blocked = db.query(BlockedBot).order_by(BlockedBot.bot_name).all()
         print("\n[LIST] Current blocked bots list:")
         for bot in all_blocked:

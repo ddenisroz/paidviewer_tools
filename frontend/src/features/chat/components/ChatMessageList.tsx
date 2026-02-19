@@ -3,10 +3,10 @@ import React, { useRef } from 'react';
 
 import { ArrowDown, MessageSquare } from 'lucide-react';
 
+import { formatLocalMessageTime } from '@/features/chat/utils/time';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { logger } from '@/shared/utils/prodLogger';
-import { formatLocalMessageTime } from '@/features/chat/utils/time';
 
 import MessageContent from './MessageContent';
 import SwipeableMessage from './SwipeableMessage';

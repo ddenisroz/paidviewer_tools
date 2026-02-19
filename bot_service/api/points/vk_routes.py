@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 import logging
 
 from core.database import get_db
-from services.platform_rewards_service import PlatformRewardsService
+from services.platform_rewards_service import get_platform_rewards_service
 from auth.auth import get_current_user
 from core.security_modern import limiter
 # [Modified Import] Relative import or direct from api.points
@@ -14,7 +14,6 @@ from api.points.routes import CreateRewardRequest, ToggleRewardRequest, ProcessV
 logger = logging.getLogger('bot_service')
 
 points_vk_router = APIRouter(tags=["points_vk"])
-platform_service = PlatformRewardsService()
 
 @points_vk_router.get("/rewards/vk")
 async def get_vk_rewards(
@@ -23,7 +22,7 @@ async def get_vk_rewards(
 ):
     """Получить награды VK канала"""
     try:
-        rewards = await platform_service.get_rewards(user['id'], 'vk', db)
+        rewards = await get_platform_rewards_service().get_rewards(user['id'], 'vk', db)
 
         return JSONResponse(content={
             "success": True,
@@ -47,7 +46,7 @@ async def create_vk_reward(
 ):
     """Создать награду на VK Live"""
     try:
-        result = await platform_service.create_reward(
+        result = await get_platform_rewards_service().create_reward(
             user['id'], 'vk', reward_data.dict(), db
         )
 
@@ -72,7 +71,7 @@ async def update_vk_reward(
 ):
     """Обновить награду на VK Live"""
     try:
-        result = await platform_service.update_reward(
+        result = await get_platform_rewards_service().update_reward(
             user['id'], 'vk', reward_id, reward_data.dict(), db
         )
 
@@ -98,7 +97,7 @@ async def delete_vk_reward(
 ):
     """Удалить награду на VK Live"""
     try:
-        await platform_service.delete_reward(user['id'], 'vk', reward_id, db)
+        await get_platform_rewards_service().delete_reward(user['id'], 'vk', reward_id, db)
 
         return JSONResponse(content={
             "success": True,
@@ -121,7 +120,7 @@ async def toggle_vk_reward(
 ):
     """Включить/выключить награду на VK Live"""
     try:
-        success = await platform_service.toggle_reward(
+        success = await get_platform_rewards_service().toggle_reward(
             user['id'], 'vk', reward_id, request.is_enabled, db
         )
 
@@ -148,7 +147,7 @@ async def get_vk_reward_demands(
 ):
     """Получить список запросов наград VK Live"""
     try:
-        demands = await platform_service.get_demands(user['id'], 'vk', db)
+        demands = await get_platform_rewards_service().get_demands(user['id'], 'vk', db)
 
         return JSONResponse(content={
             "success": True,
@@ -170,7 +169,7 @@ async def process_vk_reward_demands(
 ):
     """Обработать запросы наград VK Live (принять/отклонить)"""
     try:
-        result = await platform_service.process_demands(
+        result = await get_platform_rewards_service().process_demands(
             user['id'], 'vk', request_data.demand_ids, request_data.action, db
         )
 

@@ -1,5 +1,5 @@
 # bot_service/api/donationalerts_api.py
-"""API РґР»СЏ DonationAlerts - Clean Architecture РІРµСЂСЃРёСЏ"""
+"""API для DonationAlerts - Clean Architecture версия"""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode, urlparse
@@ -35,7 +35,7 @@ async def get_donationalerts_status(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ DonationAlerts"""
+    """Получить статус DonationAlerts"""
     try:
         # Extract user_id from user dict
         user_id = user.get('id') if user else None
@@ -47,7 +47,7 @@ async def get_donationalerts_status(
                 "user_info": None
             }
 
-        # РџСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ С‚РѕРєРµРЅР° DonationAlerts С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№
+        # Проверяем наличие токена DonationAlerts через репозиторий
         token_repo = UserTokenRepository(db)
         token = token_repo.get_by_user_and_platform(user_id, "donationalerts")
 
@@ -77,9 +77,9 @@ async def connect_donationalerts(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """РџРѕРґРєР»СЋС‡РёС‚СЊ DonationAlerts"""
+    """Подключить DonationAlerts"""
     try:
-        # РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ Р°РІС‚РѕСЂРёР·РѕРІР°РЅ
+        # Проверяем что пользователь авторизован
         # NOTE: get_current_user_optional might return None or a guest user dict?
         # Assuming we only want real users now
         if not user or not user.get('id') or user.get('id') <= 0:
@@ -88,16 +88,16 @@ async def connect_donationalerts(
             
         user_id = user.get('id')
 
-        # РџРѕР»СѓС‡Р°РµРј РЅР°СЃС‚СЂРѕР№РєРё
+        # Получаем настройки
         client_id = settings.donationalerts_client_id
         redirect_uri = settings.donationalerts_redirect_uri
 
-        # РџСЂРѕРІРµСЂСЏРµРј РЅР°СЃС‚СЂРѕР№РєРё
+        # Проверяем настройки
         if not client_id:
             logger.error("DONATIONALERTS_CLIENT_ID not set in environment variables")
             raise HTTPException(status_code=503, detail="DonationAlerts integration is not configured")
 
-        # Р¤РѕСЂРјРёСЂСѓРµРј URL Р°РІС‚РѕСЂРёР·Р°С†РёРё
+        # Формируем URL авторизации
         params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
@@ -129,14 +129,14 @@ async def disconnect_donationalerts(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """РћС‚РєР»СЋС‡РёС‚СЊ DonationAlerts"""
+    """Отключить DonationAlerts"""
     try:
         if not user or not user.get('id') or user.get('id') <= 0:
             raise HTTPException(status_code=401, detail="Not authenticated")
             
         user_id = user.get('id')
 
-        # РЈРґР°Р»СЏРµРј С‚РѕРєРµРЅ DonationAlerts С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№
+        # Удаляем токен DonationAlerts через репозиторий
         token_repo = UserTokenRepository(db)
         token_repo.delete_by_user_and_platform(user_id, "donationalerts")
 
@@ -160,12 +160,12 @@ async def get_donations_history(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ РёСЃС‚РѕСЂРёСЋ РґРѕРЅР°С‚РѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
+    """Получить историю донатов пользователя"""
     try:
         user_id = user.get('id')
         donation_repo = DonationAlertRepository(db)
 
-        # РџРѕР»СѓС‡Р°РµРј РґР°РЅРЅС‹Рµ С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№
+        # Получаем данные через репозиторий
         total = donation_repo.count_by_user_id(user_id)
         donations = donation_repo.get_by_user_id(user_id, limit=limit, offset=offset)
 
@@ -203,7 +203,7 @@ async def get_donations_stats(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РїРѕ РґРѕРЅР°С‚Р°Рј"""
+    """Получить статистику по донатам"""
     try:
         from datetime import timedelta
         from datetime import datetime as dt
@@ -211,16 +211,16 @@ async def get_donations_stats(
         user_id = user.get('id')
         donation_repo = DonationAlertRepository(db)
 
-        # Р—Р° РІСЃС‘ РІСЂРµРјСЏ
+        # За всё время
         total_donations = donation_repo.count_by_user_id(user_id)
         total_amount = donation_repo.sum_amount_by_user(user_id)
 
-        # Р—Р° РїРѕСЃР»РµРґРЅРёР№ РјРµСЃСЏС†
+        # За последний месяц
         one_month_ago = dt.utcnow() - timedelta(days=30)
         month_donations = donation_repo.count_by_user_since(user_id, one_month_ago)
         month_amount = donation_repo.sum_amount_by_user_since(user_id, one_month_ago)
 
-        # Р—Р° РїРѕСЃР»РµРґРЅСЋСЋ РЅРµРґРµР»СЋ
+        # За последнюю неделю
         one_week_ago = dt.utcnow() - timedelta(days=7)
         week_donations = donation_repo.count_by_user_since(user_id, one_week_ago)
         week_amount = donation_repo.sum_amount_by_user_since(user_id, one_week_ago)

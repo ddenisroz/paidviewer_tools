@@ -8,7 +8,7 @@
 import sys
 import os
 
-# Р”РѕР±Р°РІР»СЏРµРј РєРѕСЂРЅРµРІСѓСЋ РґРёСЂРµРєС‚РѕСЂРёСЋ РІ РїСѓС‚СЊ
+# Добавляем корневую директорию в путь
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
@@ -21,12 +21,12 @@ def main():
     print("\n" + "="*60)
     print("DATABASE CONSOLE")
     print("="*60)
-    print("\nРџРѕРґРєР»СЋС‡РµРЅРёРµ Рє Р±Р°Р·Рµ РґР°РЅРЅС‹С…...")
+    print("\nПодключение к базе данных...")
     
     with db_session() as db:
-        print(" РџРѕРґРєР»СЋС‡РµРЅРѕ!\n")
+        print(" Подключено!\n")
         
-        # РџРѕРєР°Р·С‹РІР°РµРј СЃРїРёСЃРѕРє С‚Р°Р±Р»РёС†
+        # Показываем список таблиц
         result = db.execute(text("""
             SELECT table_name 
             FROM information_schema.tables 
@@ -36,13 +36,13 @@ def main():
         
         tables = [row[0] for row in result]
         
-        print(f" Р”РѕСЃС‚СѓРїРЅС‹Рµ С‚Р°Р±Р»РёС†С‹ ({len(tables)}):")
+        print(f" Доступные таблицы ({len(tables)}):")
         for table in tables:
             print(f"  вЂў {table}")
         
         print("\n" + "="*60)
-        print("Р’РІРµРґРёС‚Рµ SQL Р·Р°РїСЂРѕСЃ (РёР»Рё 'exit' РґР»СЏ РІС‹С…РѕРґР°)")
-        print("РџСЂРёРјРµСЂС‹:")
+        print("Введите SQL запрос (или 'exit' для выхода)")
+        print("Примеры:")
         print("  SELECT * FROM users LIMIT 5;")
         print("  SELECT * FROM bot_tokens;")
         print("  SELECT COUNT(*) FROM chat_messages;")
@@ -53,43 +53,43 @@ def main():
                 query = input("SQL> ").strip()
                 
                 if query.lower() in ['exit', 'quit', 'q']:
-                    print("\n Р”Рѕ СЃРІРёРґР°РЅРёСЏ!")
+                    print("\n До свидания!")
                     break
                 
                 if not query:
                     continue
                 
-                # Р’С‹РїРѕР»РЅСЏРµРј Р·Р°РїСЂРѕСЃ
+                # Выполняем запрос
                 result = db.execute(text(query))
                 
-                # Р•СЃР»Рё СЌС‚Рѕ SELECT - РїРѕРєР°Р·С‹РІР°РµРј СЂРµР·СѓР»СЊС‚Р°С‚С‹
+                # Если это SELECT - показываем результаты
                 if query.lower().startswith('select'):
                     rows = result.fetchall()
                     
                     if not rows:
-                        print("  (РЅРµС‚ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ)\n")
+                        print("  (нет результатов)\n")
                         continue
                     
-                    # РџРѕРєР°Р·С‹РІР°РµРј Р·Р°РіРѕР»РѕРІРєРё
+                    # Показываем заголовки
                     headers = result.keys()
                     print("\n" + " | ".join(headers))
                     print("-" * 60)
                     
-                    # РџРѕРєР°Р·С‹РІР°РµРј РґР°РЅРЅС‹Рµ
+                    # Показываем данные
                     for row in rows:
                         print(" | ".join(str(val) for val in row))
                     
-                    print(f"\n РќР°Р№РґРµРЅРѕ СЃС‚СЂРѕРє: {len(rows)}\n")
+                    print(f"\n Найдено строк: {len(rows)}\n")
                 else:
                     # Р”Р»СЏ INSERT/UPDATE/DELETE
                     db.commit()
-                    print(" Р—Р°РїСЂРѕСЃ РІС‹РїРѕР»РЅРµРЅ СѓСЃРїРµС€РЅРѕ\n")
+                    print(" Запрос выполнен успешно\n")
                 
             except KeyboardInterrupt:
-                print("\n\n Р”Рѕ СЃРІРёРґР°РЅРёСЏ!")
+                print("\n\n До свидания!")
                 break
             except Exception as e:
-                print(f"[ERROR] РћС€РёР±РєР°: {e}\n")
+                print(f"[ERROR] Ошибка: {e}\n")
 
 
 if __name__ == "__main__":

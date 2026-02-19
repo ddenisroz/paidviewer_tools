@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-"""
-РЎРєСЂРёРїС‚ РґР»СЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРіРѕ СѓРґР°Р»РµРЅРёСЏ РіРѕСЃС‚РµРІРѕРіРѕ СЂРµР¶РёРјР° РёР· РєРѕРґРѕРІРѕР№ Р±Р°Р·С‹.
-Р—Р°РјРµРЅСЏРµС‚ РїР°С‚С‚РµСЂРЅС‹ РіРѕСЃС‚РµРІРѕР№ Р»РѕРіРёРєРё РЅР° СѓРїСЂРѕС‰РµРЅРЅС‹Рµ РІРµСЂСЃРёРё С‚РѕР»СЊРєРѕ РґР»СЏ Р°РІС‚РѕСЂРёР·РѕРІР°РЅРЅС‹С… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№.
-"""
+"""module: cleaned corrupted docstring."""
 
 import re
 from pathlib import Path
 
-# РџР°С‚С‚РµСЂРЅС‹ РґР»СЏ Р·Р°РјРµРЅС‹
+# cleaned: removed corrupted comment
 REPLACEMENTS = [
-    # РЈРґР°Р»РµРЅРёРµ is_guest РїСЂРѕРІРµСЂРѕРє
+    # cleaned: removed corrupted comment
     (
         r'is_guest\s*=\s*\(not user or user\.get\([\'"]id[\'"]\)\s*==\s*-1\)',
         '# Guest mode removed - all users must be authenticated'
@@ -23,13 +20,13 @@ REPLACEMENTS = [
         'if False:  # Guest mode removed'
     ),
     
-    # РЈРїСЂРѕС‰РµРЅРёРµ user_id РїРѕР»СѓС‡РµРЅРёСЏ
+    # cleaned: removed corrupted comment
     (
         r'user_id\s*=\s*user\.get\([\'"]id[\'"]\)\s*if\s+user\s+and\s+user\.get\([\'"]id[\'"]\)\s*!=\s*-1\s+else\s+None',
         'user_id = user.get("id") if user and user.get("id") and user.get("id") > 0 else None'
     ),
     
-    # РЈРґР°Р»РµРЅРёРµ РєРѕРјРјРµРЅС‚Р°СЂРёРµРІ РїСЂРѕ РіРѕСЃС‚РµР№
+    # cleaned: removed corrupted comment
     (
         r'#.*[Р“Рі]РѕСЃС‚.*',
         ''
@@ -62,7 +59,7 @@ def main():
     """Р“Р»Р°РІРЅР°СЏ С„СѓРЅРєС†РёСЏ"""
     bot_service = Path(__file__).parent.parent
     
-    # Р¤Р°Р№Р»С‹ РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё
+    # cleaned: removed corrupted comment
     files_to_process = [
         bot_service / "features" / "tts" / "tts_api.py",
         bot_service / "features" / "youtube" / "youtube_api.py",

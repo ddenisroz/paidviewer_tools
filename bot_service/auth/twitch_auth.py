@@ -1,5 +1,5 @@
 """
-Twitch OAuth Р°РІС‚РѕСЂРёР·Р°С†РёСЏ
+Twitch OAuth авторизация
 """
 import httpx
 import logging
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Twitch OAuth РЅР°СЃС‚СЂРѕР№РєРё РёР· С†РµРЅС‚СЂР°Р»РёР·РѕРІР°РЅРЅРѕР№ РєРѕРЅС„РёРіСѓСЂР°С†РёРё
+# Twitch OAuth настройки из централизованной конфигурации
 TWITCH_CLIENT_ID = settings.twitch_client_id
 TWITCH_CLIENT_SECRET = settings.twitch_client_secret
 BACKEND_URL = settings.backend_url
@@ -43,7 +43,7 @@ async def login_twitch(request: Request):
 
         redirect_uri = f"{BACKEND_URL}/auth/twitch/callback"
 
-        # Р“РµРЅРµСЂРёСЂСѓРµРј state РґР»СЏ Р·Р°С‰РёС‚С‹ РѕС‚ CSRF
+        # Генерируем state для защиты от CSRF
         import secrets
         state = secrets.token_urlsafe(16)
 
@@ -86,16 +86,16 @@ async def twitch_callback(
     error_description: str = None,
     current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
 ):
-    """РћР±СЂР°Р±РѕС‚РєР° Twitch OAuth callback"""
+    """Обработка Twitch OAuth callback"""
 
     logger.info(f"Twitch callback received. Query params: {dict(request.query_params)}")
 
-    # РћР±СЂР°Р±РѕС‚РєР° РѕС‚РјРµРЅС‹ Р°РІС‚РѕСЂРёР·Р°С†РёРё
+    # Обработка отмены авторизации
     if error:
         logger.warning(f"Twitch OAuth cancelled: {error} - {error_description}")
         return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?auth_error=cancelled")
 
-    # РџСЂРѕРІРµСЂСЏРµРј РЅР°Р»РёС‡РёРµ РєРѕРґР° Р°РІС‚РѕСЂРёР·Р°С†РёРё
+    # Проверяем наличие кода авторизации
     if not code:
         logger.error("No authorization code received from Twitch")
         raise HTTPException(status_code=400, detail="No authorization code received from Twitch")
@@ -113,7 +113,7 @@ async def twitch_callback(
     logger.info(f"Authorization code received: {code[:10]}...")
 
     try:
-        # 1. РћР±РјРµРЅ РєРѕРґР° РЅР° С‚РѕРєРµРЅ
+        # 1. Обмен кода на токен
         redirect_uri = f"{BACKEND_URL}/auth/twitch/callback"
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -143,7 +143,7 @@ async def twitch_callback(
             refresh_token = token_data.get("refresh_token")
             expires_in = token_data.get("expires_in", 3600)
 
-            # Р›РѕРіРёСЂСѓРµРј СЂРµР°Р»СЊРЅРѕРµ РІСЂРµРјСЏ Р¶РёР·РЅРё С‚РѕРєРµРЅР°
+            # Логируем реальное время жизни токена
             logger.info(f"[TWITCH AUTH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
 
             expires_at = utcnow_naive() + timedelta(seconds=expires_in)
@@ -151,7 +151,7 @@ async def twitch_callback(
 
             logger.info(f"Token exchange successful. Scopes: {scopes}")
 
-            # 2. РџРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ
+            # 2. Получаем информацию о пользователе
             headers = {
                 "Authorization": f"Bearer {access_token}",
                 "Client-ID": TWITCH_CLIENT_ID
@@ -207,7 +207,7 @@ async def twitch_callback(
                     auto_connect_bot=True
                 )
 
-                # РЎРѕР·РґР°РµРј РѕС‚РІРµС‚ СЃ СЂРµРґРёСЂРµРєС‚РѕРј
+                # Создаем ответ с редиректом
                 return oauth_handler.create_oauth_response(oauth_result)
 
     except HTTPException:

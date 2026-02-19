@@ -19,6 +19,7 @@ import {
     scrollToBottom,
     scrollToBottomInitial
 } from '@/features/chat/utils/scrollHelpers';
+import QuickActionsBar from '@/features/home/components/QuickActionsBar';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
 import {
@@ -27,7 +28,6 @@ import {
     isChatEnabled
 } from '@/shared/utils/platformHelpers';
 import { logger } from '@/shared/utils/prodLogger';
-import QuickActionsBar from '@/features/home/components/QuickActionsBar';
 
 import ChatCardFooter from './ChatCardFooter';
 import ChatCardHeader from './ChatCardHeader';

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-РЎРєСЂРёРїС‚ РґР»СЏ РїСЂРѕРІРµСЂРєРё whitelist СЃС‚Р°С‚СѓСЃР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+Скрипт для проверки whitelist статуса пользователя
 """
 import sys
 import os
@@ -11,10 +11,10 @@ from core.database import User, WhitelistedChannel, get_db
 from utils.whitelist_cache import is_user_whitelisted_cached, invalidate_whitelist_cache
 
 def check_user_whitelist(user_id: int):
-    """РџСЂРѕРІРµСЂСЏРµС‚ whitelist СЃС‚Р°С‚СѓСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
+    """Проверяет whitelist статус пользователя"""
     db = next(get_db())
     try:
-        # РџРѕР»СѓС‡Р°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        # Получаем пользователя
         user = db.query(User).filter(User.id == user_id).first()
         
         if not user:
@@ -28,7 +28,7 @@ def check_user_whitelist(user_id: int):
         print(f"is_admin: {user.is_admin}")
         print(f"is_active: {user.is_active}")
         
-        # РџСЂРѕРІРµСЂСЏРµРј whitelist РЅР°РїСЂСЏРјСѓСЋ РёР· Р‘Р”
+        # Проверяем whitelist напрямую из БД
         print(f"\n=== Whitelist Check in DB ===")
         
         twitch_in_whitelist = False
@@ -56,13 +56,13 @@ def check_user_whitelist(user_id: int):
             if vk_whitelisted:
                 print(f"  Record ID: {vk_whitelisted.id}, created: {vk_whitelisted.created_at}")
         
-        # РџСЂРѕРІРµСЂСЏРµРј С‡РµСЂРµР· РєРµС€РёСЂРѕРІР°РЅРЅСѓСЋ С„СѓРЅРєС†РёСЋ
+        # Проверяем через кешированную функцию
         print(f"\n=== Check via cached function ===")
         is_whitelisted = is_user_whitelisted_cached(user, db)
         status = "IN whitelist" if is_whitelisted else "NOT in whitelist"
         print(f"Result: {status}")
         
-        # РџРѕРєР°Р·С‹РІР°РµРј РІСЃРµ Р·Р°РїРёСЃРё РІ whitelist РґР»СЏ РѕС‚Р»Р°РґРєРё
+        # Показываем все записи в whitelist для отладки
         print(f"\n=== All whitelist entries ===")
         all_whitelist = db.query(WhitelistedChannel).all()
         if all_whitelist:
@@ -71,7 +71,7 @@ def check_user_whitelist(user_id: int):
         else:
             print("  Whitelist is empty")
         
-        # Р’С‹РІРѕРґ РёС‚РѕРіРѕРІРѕРіРѕ СЃС‚Р°С‚СѓСЃР°
+        # Вывод итогового статуса
         print(f"\n{'='*60}")
         if is_whitelisted:
             print(f"[OK] User ID {user_id} IS IN WHITELIST")
@@ -100,7 +100,7 @@ if __name__ == "__main__":
         try:
             user_id = int(sys.argv[1])
         except ValueError:
-            print(f"[ERROR] РќРµРІРµСЂРЅС‹Р№ ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ: {sys.argv[1]}")
+            print(f"[ERROR] Неверный ID пользователя: {sys.argv[1]}")
             sys.exit(1)
     
     check_user_whitelist(user_id)

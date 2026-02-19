@@ -6,7 +6,7 @@ import logging
 from typing import Optional
 
 from core.database import get_db
-from services.platform_rewards_service import PlatformRewardsService
+from services.platform_rewards_service import get_platform_rewards_service
 from auth.auth import get_current_user
 from core.security_modern import limiter
 # [Modified Import] Relative import or direct from api.points
@@ -15,16 +15,15 @@ from api.points.routes import CreateRewardRequest
 logger = logging.getLogger('bot_service')
 
 points_twitch_router = APIRouter(tags=["points_twitch"])
-platform_service = PlatformRewardsService()
 
 @points_twitch_router.get("/rewards/twitch")
 async def get_twitch_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ РЅР°РіСЂР°РґС‹ Twitch РєР°РЅР°Р»Р°"""
+    """Получить награды Twitch канала"""
     try:
-        rewards = await platform_service.get_rewards(user['id'], 'twitch', db)
+        rewards = await get_platform_rewards_service().get_rewards(user['id'], 'twitch', db)
         
         return JSONResponse(content={
             "success": True,
@@ -46,9 +45,9 @@ async def create_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РЎРѕР·РґР°С‚СЊ РЅР°РіСЂР°РґСѓ РЅР° Twitch"""
+    """Создать награду на Twitch"""
     try:
-        result = await platform_service.create_reward(
+        result = await get_platform_rewards_service().create_reward(
             user['id'], 'twitch', reward_data.dict(), db
         )
         
@@ -71,9 +70,9 @@ async def update_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РћР±РЅРѕРІРёС‚СЊ РЅР°РіСЂР°РґСѓ РЅР° Twitch"""
+    """Обновить награду на Twitch"""
     try:
-        result = await platform_service.update_reward(
+        result = await get_platform_rewards_service().update_reward(
             user['id'], 'twitch', reward_id, reward_data.dict(), db
         )
 
@@ -95,14 +94,14 @@ async def delete_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РЈРґР°Р»РёС‚СЊ РЅР°РіСЂР°РґСѓ РЅР° Twitch"""
+    """Удалить награду на Twitch"""
     try:
-        await platform_service.delete_reward(user['id'], 'twitch', reward_id, db)
+        await get_platform_rewards_service().delete_reward(user['id'], 'twitch', reward_id, db)
 
         return JSONResponse(content={
             "success": True,
             "platform": "twitch",
-            "message": "РќР°РіСЂР°РґР° СѓРґР°Р»РµРЅР°"
+            "message": "Награда удалена"
         })
 
     except HTTPException:
@@ -117,9 +116,9 @@ async def get_platform_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ РЅР°РіСЂР°РґС‹ РЅР°РїСЂСЏРјСѓСЋ СЃ РїР»Р°С‚С„РѕСЂРјС‹ (Twitch РёР»Рё VK Live) - СѓРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ СЌРЅРґРїРѕРёРЅС‚"""
+    """Получить награды напрямую с платформы (Twitch или VK Live) - универсальный эндпоинт"""
     try:
-        rewards = await platform_service.get_rewards(user['id'], platform, db)
+        rewards = await get_platform_rewards_service().get_rewards(user['id'], platform, db)
 
         return {
             "success": True,
@@ -140,9 +139,9 @@ async def create_platform_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РЎРѕР·РґР°С‚СЊ РЅР°РіСЂР°РґСѓ РЅР° РїР»Р°С‚С„РѕСЂРјРµ (Twitch РёР»Рё VK Live) - СѓРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ СЌРЅРґРїРѕРёРЅС‚"""
+    """Создать награду на платформе (Twitch или VK Live) - универсальный эндпоинт"""
     try:
-        result = await platform_service.create_reward(
+        result = await get_platform_rewards_service().create_reward(
             user['id'], platform, reward_data, db
         )
 
@@ -165,13 +164,13 @@ async def delete_platform_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РЈРґР°Р»РёС‚СЊ РЅР°РіСЂР°РґСѓ РЅР° РїР»Р°С‚С„РѕСЂРјРµ - СѓРЅРёРІРµСЂСЃР°Р»СЊРЅС‹Р№ СЌРЅРґРїРѕРёРЅС‚"""
+    """Удалить награду на платформе - универсальный эндпоинт"""
     try:
-        await platform_service.delete_reward(user['id'], platform, reward_id, db)
+        await get_platform_rewards_service().delete_reward(user['id'], platform, reward_id, db)
 
         return {
             "success": True,
-            "message": "РќР°РіСЂР°РґР° СѓРґР°Р»РµРЅР°"
+            "message": "Награда удалена"
         }
 
     except HTTPException:
@@ -188,9 +187,9 @@ async def get_platform_redemptions(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РёСЃРїРѕР»СЊР·РѕРІР°РЅРёР№ РЅР°РіСЂР°РґС‹ СЃ РїР»Р°С‚С„РѕСЂРјС‹"""
+    """Получить список использований награды с платформы"""
     try:
-        redemptions = await platform_service.get_redemptions(
+        redemptions = await get_platform_rewards_service().get_redemptions(
             user['id'], platform, reward_id, status, db
         )
 
@@ -215,18 +214,18 @@ async def update_platform_redemption(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РћР±РЅРѕРІРёС‚СЊ СЃС‚Р°С‚СѓСЃ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ РЅР°РіСЂР°РґС‹ (РѕРґРѕР±СЂРёС‚СЊ/РѕС‚РєР»РѕРЅРёС‚СЊ)"""
+    """Обновить статус использования награды (одобрить/отклонить)"""
     try:
-        success = await platform_service.update_redemption_status(
+        success = await get_platform_rewards_service().update_redemption_status(
             user['id'], platform, reward_id, redemption_id, status, db
         )
 
         if not success:
-             raise HTTPException(status_code=500, detail="РћС€РёР±РєР° РѕР±РЅРѕРІР»РµРЅРёСЏ СЃС‚Р°С‚СѓСЃР°")
+             raise HTTPException(status_code=500, detail="Ошибка обновления статуса")
              
         return {
             "success": True,
-            "message": f"РЎС‚Р°С‚СѓСЃ РѕР±РЅРѕРІР»РµРЅ: {status}"
+            "message": f"Статус обновлен: {status}"
         }
 
     except HTTPException:

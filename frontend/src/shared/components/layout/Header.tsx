@@ -10,8 +10,8 @@ import { useIntegrations } from '@/context/IntegrationsContext';
 import { authService } from '@/services/api/services/authService';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
-import { logger } from '@/shared/utils/prodLogger';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
+import { logger } from '@/shared/utils/prodLogger';
 import { saveReturnUrl } from '@/utils/urlUtils';
 
 import { Button } from '../ui/button';

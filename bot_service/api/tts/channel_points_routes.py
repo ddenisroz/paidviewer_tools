@@ -120,7 +120,7 @@ async def create_tts_reward(
                 "title": request.title,
                 "cost": request.cost,
                 "is_user_input_required": True,
-                "prompt": "Р вЂ™Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ РЎРѓР С•Р С•Р В±РЎвЂ°Р ВµР Р…Р С‘Р Вµ Р Т‘Р В»РЎРЏ Р С•Р В·Р Р†РЎС“РЎвЂЎР С”Р С‘ TTS",
+                "prompt": "Введите сообщение для озвучки TTS",
                 "global_cooldown_seconds": request.cooldown
             }
             reward_id = await platform.create_reward(user['id'], reward_data)

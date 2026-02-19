@@ -1,5 +1,5 @@
 # bot_service/core/auth_handlers.py
-"""РћР±СЂР°Р±РѕС‚С‡РёРєРё Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёРё"""
+"""Обработчики аутентификации"""
 from __future__ import annotations
 import logging
 from fastapi import HTTPException, Depends, Request
@@ -12,7 +12,7 @@ from services.user_identity_service import UserIdentityService, UserType
 logger = logging.getLogger(__name__)
 
 class AuthHandlers:
-    """РљР»Р°СЃСЃ РґР»СЏ РѕР±СЂР°Р±РѕС‚РєРё Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёРё"""
+    """Класс для обработки аутентификации"""
 
     def __init__(self):
         # We don't need TwitchAPI here anymore.
@@ -29,7 +29,7 @@ class AuthHandlers:
         return RedirectResponse(url=auth_url)
 
     async def api_twitch_login(self):
-        """API endpoint РґР»СЏ Twitch login"""
+        """API endpoint для Twitch login"""
         from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f"{settings.backend_url}/auth/twitch/callback"
@@ -39,7 +39,7 @@ class AuthHandlers:
         return {"auth_url": auth_url}
 
     async def api_twitch_auth(self):
-        """API endpoint РґР»СЏ Twitch auth"""
+        """API endpoint для Twitch auth"""
         from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f"{settings.backend_url}/auth/twitch/callback"
@@ -53,7 +53,7 @@ class AuthHandlers:
         try:
             logger.info(f"Twitch callback - code: {code[:10]}...")
 
-            # РџРѕР»СѓС‡Р°РµРј С‚РµРєСѓС‰СѓСЋ СЃРµСЃСЃРёСЋ (РµСЃР»Рё РµСЃС‚СЊ)
+            # Получаем текущую сессию (если есть)
             session_id = request.cookies.get("session_id")
             current_user_from_session = None
             if session_id:
@@ -70,7 +70,7 @@ class AuthHandlers:
             if not twitch_platform:
                  raise HTTPException(status_code=500, detail="Twitch platform not initialized")
 
-            # РџРѕР»СѓС‡Р°РµРј С‚РѕРєРµРЅ РґРѕСЃС‚СѓРїР°
+            # Получаем токен доступа
             logger.info("Getting access token from Twitch...")
             token_data = await twitch_platform.authenticate(code)
 
@@ -90,7 +90,7 @@ class AuthHandlers:
             if not access_token:
                 raise HTTPException(status_code=400, detail="Failed to get access token")
 
-            # РџРѕР»СѓС‡Р°РµРј РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РїРѕР»СЊР·РѕРІР°С‚РµР»Рµ
+            # Получаем информацию о пользователе
             logger.info("Getting user data from Twitch...")
             user_data = await twitch_platform.get_user_info(access_token)
 
@@ -110,17 +110,17 @@ class AuthHandlers:
             # РСЃРїРѕР»СЊР·СѓРµРј С†РµРЅС‚СЂР°Р»РёР·РѕРІР°РЅРЅС‹Р№ СЃРµСЂРІРёСЃ СЃРѕР·РґР°РЅРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
             from core.user_creation_service import user_creation_service
 
-            # РћРїСЂРµРґРµР»СЏРµРј, СЌС‚Рѕ РїСЂРёРІСЏР·РєР° РёРЅС‚РµРіСЂР°С†РёРё РёР»Рё РЅРѕРІС‹Р№ РІС…РѕРґ
+            # Определяем, это привязка интеграции или новый вход
             is_linking_integration = False
             current_user_id = None
             if current_user_from_session:
                 existing_user_id = current_user_from_session.get('user_id')
-                if existing_user_id and existing_user_id > 0:  # РќРµ РіРѕСЃС‚РµРІР°СЏ СЃРµСЃСЃРёСЏ
+                if existing_user_id and existing_user_id > 0:  # Не гостевая сессия
                     is_linking_integration = True
                     current_user_id = existing_user_id
                     logger.info(f"[LINK] Linking Twitch account to existing user_id: {existing_user_id}")
 
-            # РЎРѕР·РґР°РµРј РёР»Рё РЅР°С…РѕРґРёРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РІРєР»СЋС‡РµРЅРёРµРј scopes
+            # Создаем или находим пользователя с включением scopes
             user = await user_creation_service.find_or_create_user(
                 db=db,
                 platform="twitch",
@@ -152,13 +152,13 @@ class AuthHandlers:
                 db.commit()
                 logger.info(f"[OK] UserSettings created for {twitch_username}")
 
-                # РџРѕРґРєР»СЋС‡Р°РµРј Р±РѕС‚Р° Рє РєР°РЅР°Р»Сѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+                # Подключаем бота к каналу пользователя
                 try:
                     from startup.bot_registry import get_bot_registry
                     bot_instance = get_bot_registry().twitch_bot
                     if bot_instance:
                         import asyncio
-                        # РџСЂРѕРІРµСЂСЏРµРј С‡С‚Рѕ Р±РѕС‚ РЅРµ СѓР¶Рµ РїРѕРґРєР»СЋС‡РµРЅ Рє СЌС‚РѕРјСѓ РєР°РЅР°Р»Сѓ
+                        # Проверяем что бот не уже подключен к этому каналу
                         if not bot_instance.is_connected_to_channel(twitch_username.lower()):
                             asyncio.create_task(bot_instance.join_channel(twitch_username.lower()))
                             logger.info(f"[BOT] Bot joining channel: {twitch_username.lower()}")
@@ -167,15 +167,15 @@ class AuthHandlers:
                 except Exception as e:
                     logger.warning(f"Could not connect bot to channel on login: {e}")
 
-            # РЈРїСЂР°РІР»РµРЅРёРµ СЃРµСЃСЃРёСЏРјРё
+            # Управление сессиями
             from core.session_manager import session_manager
 
             if is_linking_integration:
-                # Р•СЃР»Рё СЌС‚Рѕ РїСЂРёРІСЏР·РєР° РІС‚РѕСЂРѕР№ РїР»Р°С‚С„РѕСЂРјС‹ - РќР• Р·Р°РІРµСЂС€Р°РµРј СЃС‚Р°СЂС‹Рµ СЃРµСЃСЃРёРё, РёСЃРїРѕР»СЊР·СѓРµРј С‚РµРєСѓС‰СѓСЋ
+                # Если это привязка второй платформы - НЕ завершаем старые сессии, используем текущую
                 logger.info("[LINK] Integration linking - using current session")
                 session_id = request.cookies.get("session_id")
                 if not session_id:
-                     # Р•СЃР»Рё РїРѕ РєР°РєРѕР№-С‚Рѕ РїСЂРёС‡РёРЅРµ cookie РЅРµС‚ - СЃРѕР·РґР°РµРј РЅРѕРІСѓСЋ СЃРµСЃСЃРёСЋ
+                     # Если по какой-то причине cookie нет - создаем новую сессию
                     logger.warning("No session cookie found during integration linking, creating new session")
                     device_info = {
                         "user_agent": request.headers.get("user-agent"),
@@ -185,7 +185,7 @@ class AuthHandlers:
                     }
                     session_id = session_manager.create_session(user_id, device_info=device_info)
 
-                    # РЈРІРµРґРѕРјР»СЏРµРј connection_manager Рѕ РЅРѕРІРѕР№ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё
+                    # Уведомляем connection_manager о новой активной сессии
                     try:
                         from core.connection_manager import get_connection_manager
                         connection_manager = get_connection_manager()
@@ -194,12 +194,12 @@ class AuthHandlers:
                     except Exception as e:
                         logger.error(f"Error notifying connection_manager: {e}")
             else:
-                # Р•СЃР»Рё СЌС‚Рѕ РЅРѕРІС‹Р№ РІС…РѕРґ - Р·Р°РІРµСЂС€Р°РµРј Р’РЎР• СЃС‚Р°СЂС‹Рµ СЃРµСЃСЃРёРё (РїСЂРёРЅС†РёРї РѕРґРЅРѕР№ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё)
+                # Если это новый вход - завершаем ВСЕ старые сессии (принцип одной активной сессии)
                 logger.info(f"[SECURITY] New login detected for user {user_id}. Terminating ALL old sessions...")
                 session_manager.terminate_user_sessions(user_id, "new_login", db)
                 logger.info("[OK] All old sessions terminated. Creating new session...")
 
-                # РЎРѕР·РґР°РµРј РЅРѕРІСѓСЋ СЃРµСЃСЃРёСЋ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ СЃ РїСЂР°РІРёР»СЊРЅС‹Рј device_info
+                # Создаем новую сессию для пользователя с правильным device_info
                 device_info = {
                     "user_agent": request.headers.get("user-agent"),
                     "ip": getattr(request.client, 'host', 'unknown'),
@@ -209,7 +209,7 @@ class AuthHandlers:
                 session_id = session_manager.create_session(user_id, device_info=device_info)
                 logger.info(f"[OK] New session created: {session_id}")
 
-                # РЈРІРµРґРѕРјР»СЏРµРј connection_manager Рѕ РЅРѕРІРѕР№ Р°РєС‚РёРІРЅРѕР№ СЃРµСЃСЃРёРё
+                # Уведомляем connection_manager о новой активной сессии
                 try:
                     from core.connection_manager import get_connection_manager
                     connection_manager = get_connection_manager()
@@ -218,17 +218,17 @@ class AuthHandlers:
                 except Exception as e:
                     logger.error(f"Error notifying connection_manager: {e}")
 
-            # РЎРѕР·РґР°РµРј РѕС‚РІРµС‚ СЃ httpOnly cookie
+            # Создаем ответ с httpOnly cookie
             from fastapi.responses import RedirectResponse
             from core.config import settings
 
             # РСЃРїРѕР»СЊР·СѓРµРј 302 РІРјРµСЃС‚Рѕ 307 РґР»СЏ Р»СѓС‡С€РµР№ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё СЃ cookies
             response = RedirectResponse(url=f"{settings.frontend_url}/dashboard", status_code=302)
 
-            # РЇРІРЅРѕ СѓРґР°Р»СЏРµРј СЃС‚Р°СЂСѓСЋ cookie РїРµСЂРµРґ СѓСЃС‚Р°РЅРѕРІРєРѕР№ РЅРѕРІРѕР№
+            # Явно удаляем старую cookie перед установкой новой
             response.delete_cookie(key="session_id", path="/")
 
-            # РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј РЅРѕРІСѓСЋ cookie
+            # Устанавливаем новую cookie
             from core.cookie_config import get_session_cookie_settings
             cookie_settings = get_session_cookie_settings(session_id)
             response.set_cookie(**cookie_settings)
@@ -244,8 +244,8 @@ class AuthHandlers:
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise HTTPException(status_code=500, detail="Authentication failed")
 
-    # VK OAuth С‚РµРїРµСЂСЊ РїРѕР»РЅРѕСЃС‚СЊСЋ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚СЃСЏ С‡РµСЂРµР· auth/vk_auth.py СЂРѕСѓС‚РµСЂ
-    # РњРµС‚РѕРґС‹ vk_login() Рё vk_callback() СѓРґР°Р»РµРЅС‹
+    # VK OAuth теперь полностью обрабатывается через auth/vk_auth.py роутер
+    # Методы vk_login() и vk_callback() удалены
 
     async def logout(
         self,
@@ -334,5 +334,5 @@ class AuthHandlers:
         logger.info(f"[LOGOUT] User {user_id} logged out successfully")
         return response
 
-# РЎРѕР·РґР°РµРј СЌРєР·РµРјРїР»СЏСЂ РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ
+# Создаем экземпляр для использования
 auth_handlers = AuthHandlers()

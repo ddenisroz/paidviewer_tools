@@ -14,6 +14,18 @@ from integrations.base import TokenInfo, IntegrationError, TokenExpiredError, Ra
 
 logger = logging.getLogger('bot_service')
 
+
+_platform_rewards_service_singleton: "PlatformRewardsService | None" = None
+
+
+def get_platform_rewards_service() -> "PlatformRewardsService":
+    """Lazy singleton to avoid heavy/strict initialization during module import."""
+    global _platform_rewards_service_singleton
+    if _platform_rewards_service_singleton is None:
+        _platform_rewards_service_singleton = PlatformRewardsService()
+    return _platform_rewards_service_singleton
+
+
 class PlatformRewardsService:
     """
     Service for managing rewards on external platforms (Twitch, VK).

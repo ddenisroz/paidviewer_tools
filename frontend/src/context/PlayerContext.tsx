@@ -594,7 +594,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 // Игнорируем ошибки
             }
         }
-    }, [state.playerRef, state.volume]);
+    }, [state.isMuted, state.playerRef, state.volume]);
 
     const handlePlayerReady = (event: unknown): void => {
         const playerEvent = event as { target: YouTubePlayer };

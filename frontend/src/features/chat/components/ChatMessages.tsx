@@ -3,11 +3,11 @@ import React, { useEffect, useRef } from 'react';
 
 import { MessageCircle, MessageSquare, Twitch } from 'lucide-react';
 
+import { formatLocalMessageTime } from '@/features/chat/utils/time';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { VKIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { formatLocalMessageTime } from '@/features/chat/utils/time';
 
 import ChatContextMenu from './ChatContextMenu';
 import MessageContent from './MessageContent';

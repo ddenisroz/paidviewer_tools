@@ -122,7 +122,7 @@ async def restart_bot_service(
         
         return {
             "success": True,
-            "message": "Р СџР ВµРЎР‚Р ВµР В·Р В°Р С—РЎС“РЎРѓР С” Р В·Р В°Р Р†Р ВµРЎР‚РЎв‚¬Р ВµР Р…",
+            "message": "Перезапуск завершен",
             "results": restart_results
         }
         
@@ -198,7 +198,7 @@ async def restart_tts_system(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р СџР ВµРЎР‚Р ВµР В·Р В°Р С—РЎС“РЎРѓРЎвЂљР С‘РЎвЂљРЎРЉ TTS Service (Р С—РЎР‚Р С•Р С”РЎРѓР С‘ Р С” TTS Service РЎРѓ Р С—РЎР‚Р С•Р Р†Р ВµРЎР‚Р С”Р С•Р в„– Р С—РЎР‚Р В°Р Р†)"""
+    """Перезапустить TTS Service (прокси к TTS Service с проверкой прав)"""
     try:
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")

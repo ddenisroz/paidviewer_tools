@@ -1,83 +1,111 @@
 # models/base.py
 """
-Базовая конфигурация SQLAlchemy: engine, SessionLocal, Base.
+SQLAlchemy base configuration: engine, SessionLocal, Base.
 """
+
 import logging
 import os
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import declarative_base, sessionmaker
+
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Определяем URL базы данных из настроек
-DATABASE_URL = settings.database_url
+DEV_SQLITE_FALLBACK_URL = "sqlite:///./data/bot_service.db"
+PLACEHOLDER_POSTGRES_URLS = {
+    "postgresql://user:password@127.0.0.1:5432/database",
+    "postgresql://user:password@localhost:5432/database",
+    "postgresql://user:password@localhost:5432/bot_service_db",
+}
+
+
+# Resolve database URL from settings
+DATABASE_URL = (settings.database_url or "").strip().strip('"').strip("'")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required. Please set it in .env file.")
 
-# Определяем, используется ли PostgreSQL
+# Determine environment flags
+IS_TESTING = os.getenv("TESTING", "false").lower() == "true" or getattr(settings, "testing", False)
 IS_POSTGRESQL = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")
 
-# Allow SQLite for testing
-IS_TESTING = os.getenv("TESTING", "false").lower() == "true" or getattr(settings, 'testing', False)
+if settings.is_development and DATABASE_URL in PLACEHOLDER_POSTGRES_URLS:
+    logger.warning("[WARN] Placeholder DATABASE_URL detected in development. Falling back to local SQLite database.")
+    DATABASE_URL = DEV_SQLITE_FALLBACK_URL
+    IS_POSTGRESQL = False
 
-if not IS_POSTGRESQL and not IS_TESTING:
-     # Relaxed check: Allow SQLite in development if explicitly not strictly enforcing
-     if settings.is_development:
-         logger.warning("[WARN] Using SQLite in Development. Some PostgreSQL-specific features (JSONB) may fail.")
-     else:
+if not IS_POSTGRESQL and not IS_TESTING and not DATABASE_URL.startswith("sqlite"):
+    if settings.is_development:
+        logger.warning("[WARN] Non-PostgreSQL DATABASE_URL detected in development.")
+    else:
         raise ValueError(f"Only PostgreSQL is supported. Current DATABASE_URL: {DATABASE_URL[:50]}...")
 
-# Создаем движок SQLAlchemy
-# Оптимизированный connection pooling для PostgreSQL
-if IS_TESTING:
-    # SQLite для тестов (in-memory)
-    from sqlalchemy.pool import StaticPool
-    engine = create_engine(
-        DATABASE_URL,
+
+def _create_sqlite_engine(db_url: str):
+    if IS_TESTING:
+        from sqlalchemy.pool import StaticPool
+
+        return create_engine(
+            db_url,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+            echo=False,
+        )
+
+    return create_engine(
+        db_url,
         connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-        echo=False
+        echo=False,
     )
-else:
-    # PostgreSQL для production
-    engine = create_engine(
-        DATABASE_URL,
+
+
+def _create_postgres_engine(db_url: str):
+    return create_engine(
+        db_url,
         pool_size=20,
         max_overflow=40,
         pool_pre_ping=True,
         pool_recycle=3600,
-        pool_reset_on_return='commit',
+        pool_reset_on_return="commit",
         echo=False,
         connect_args={
             "connect_timeout": 10,
             "application_name": "bot_service",
-            "options": "-c statement_timeout=30000"
-        }
+            "options": "-c statement_timeout=30000",
+        },
     )
 
-# Создаем сессию для взаимодействия с БД
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Базовый класс для моделей
+if IS_TESTING or DATABASE_URL.startswith("sqlite"):
+    engine = _create_sqlite_engine(DATABASE_URL)
+else:
+    engine = _create_postgres_engine(DATABASE_URL)
+
+    # In local development, fallback to SQLite if PostgreSQL is unavailable
+    # (including Windows-specific psycopg2 UnicodeDecodeError on failed connect).
+    if settings.is_development:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+        except Exception as exc:
+            logger.warning(
+                "[WARN] PostgreSQL connection failed in development (%s). Falling back to SQLite.",
+                exc,
+            )
+            DATABASE_URL = DEV_SQLITE_FALLBACK_URL
+            IS_POSTGRESQL = False
+            engine = _create_sqlite_engine(DATABASE_URL)
+
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
 @contextmanager
 def db_session():
-    """
-    Контекстный менеджер для работы с БД.
-    Автоматически управляет commit/rollback/close.
-    
-    Использование:
-        with db_session() as db:
-            user = db.query(User).filter_by(id=1).first()
-            user.name = "New Name"
-        # commit происходит автоматически при выходе из блока
-        # rollback происходит автоматически при исключении
-    """
+    """Context manager for DB session with automatic commit/rollback/close."""
     db = SessionLocal()
     try:
         yield db
@@ -90,41 +118,37 @@ def db_session():
 
 
 def init_db():
-    """Инициализирует базу данных и создает таблицы, если их нет."""
-    from models.moderation import BlockedBot
-    from models.drops import DropsQuality
+    """Initialize DB schema and seed baseline data."""
     from constants import DEFAULT_BLOCKED_BOTS
-    
+    from models.drops import DropsQuality
+    from models.moderation import BlockedBot
+
     if engine is None:
-        logger.error("[ERROR] База данных не сконфигурирована")
+        logger.error("[ERROR] Database engine is not configured")
         return
 
-    # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
 
-    # Seeding: blocked bots + lootbox qualities in one session
-    DEFAULT_QUALITIES = [
+    default_qualities = [
         {"name": "Common", "color": "#9ca3af", "weight": 100},
         {"name": "Rare", "color": "#3b82f6", "weight": 50},
         {"name": "Epic", "color": "#a855f7", "weight": 20},
         {"name": "Legendary", "color": "#eab308", "weight": 5},
-        {"name": "Mythical", "color": "#ef4444", "weight": 1}
+        {"name": "Mythical", "color": "#ef4444", "weight": 1},
     ]
 
     db = SessionLocal()
     try:
-        # Blocked bots (normalize to lowercase for consistent matching)
         existing_bots = {bot.bot_name.lower() for bot in db.query(BlockedBot).all()}
         for bot_name in DEFAULT_BLOCKED_BOTS:
             if bot_name.lower() not in existing_bots:
                 db.add(BlockedBot(bot_name=bot_name.lower()))
-        
-        # Lootbox qualities
+
         existing_qualities = {q.name for q in db.query(DropsQuality).all()}
-        for quality_data in DEFAULT_QUALITIES:
+        for quality_data in default_qualities:
             if quality_data["name"] not in existing_qualities:
                 db.add(DropsQuality(**quality_data))
-        
+
         db.commit()
         logger.info("[DB] Database seeding complete (blocked bots + lootbox qualities)")
     except Exception as e:
@@ -133,4 +157,4 @@ def init_db():
     finally:
         db.close()
 
-    logger.info("База данных инициализирована")
+    logger.info("Database initialized")

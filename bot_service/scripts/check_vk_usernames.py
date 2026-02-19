@@ -1,15 +1,15 @@
 """
-РЎРєСЂРёРїС‚ РґР»СЏ РїСЂРѕРІРµСЂРєРё VK username Сѓ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№.
-РџРѕРєР°Р·С‹РІР°РµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ VK С‚РѕРєРµРЅР°РјРё Рё РёС… С‚РµРєСѓС‰РёРµ username.
+Скрипт для проверки VK username у существующих пользователей.
+Показывает пользователей с VK токенами и их текущие username.
 
 [WARN] Р’РќРРњРђРќРР•: Р­С‚РѕС‚ СЃРєСЂРёРїС‚ Р±РѕР»СЊС€Рµ РќР• СѓСЃС‚Р°РЅР°РІР»РёРІР°РµС‚ fallback username!
-VK Live API РІРѕР·РІСЂР°С‰Р°РµС‚ РїСЂР°РІРёР»СЊРЅС‹Р№ username РІ РїРѕР»Рµ "nick".
+VK Live API возвращает правильный username в поле "nick".
 Р•СЃР»Рё Сѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ username = 'vk{id}', РµРјСѓ РЅСѓР¶РЅРѕ РџР•Р Р•РђР’РўРћР РР—РћР’РђРўР¬РЎРЇ С‡РµСЂРµР· VK Live.
 """
 import sys
 from pathlib import Path
 
-# Р”РѕР±Р°РІР»СЏРµРј РєРѕСЂРµРЅСЊ РїСЂРѕРµРєС‚Р° РІ PYTHONPATH
+# Добавляем корень проекта в PYTHONPATH
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -21,11 +21,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def check_vk_usernames():
-    """РџСЂРѕРІРµСЂСЏРµС‚ vk_username РґР»СЏ РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ VK С‚РѕРєРµРЅР°РјРё"""
+    """Проверяет vk_username для всех пользователей с VK токенами"""
     db: Session = next(get_db())
     
     try:
-        # РќР°Р№С‚Рё РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СЃ VK С‚РѕРєРµРЅР°РјРё
+        # Найти всех пользователей с VK токенами
         vk_tokens = db.query(UserToken).filter(
             UserToken.platform == 'vk',
             UserToken.access_token.isnot(None)
@@ -33,7 +33,7 @@ def check_vk_usernames():
         
         logger.info(f"[DEBUG] Found {len(vk_tokens)} VK tokens")
         
-        # [OK] PERFORMANCE: Р—Р°РіСЂСѓР¶Р°РµРј РІСЃРµС… РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РѕРґРЅРёРј Р·Р°РїСЂРѕСЃРѕРј (РёР·Р±РµРіР°РµРј N+1)
+        # [OK] PERFORMANCE: Загружаем всех пользователей одним запросом (избегаем N+1)
         user_ids = [token.user_id for token in vk_tokens]
         users = db.query(User).filter(User.id.in_(user_ids)).all()
         users_dict = {user.id: user for user in users}

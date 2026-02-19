@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-РЎРєСЂРёРїС‚ РґР»СЏ РїСЂРѕРІРµСЂРєРё С‚РѕРєРµРЅРѕРІ РІ Р‘Р”
+Скрипт для проверки токенов в БД
 """
 import sys
 import os
@@ -13,7 +13,7 @@ from core.datetime_utils import utcnow_naive
 
 def check_tokens():
     print("=" * 80)
-    print("[DEBUG] РџР РћР’Р•Р РљРђ РўРћРљР•РќРћР’ Р’ Р‘Р”")
+    print("[DEBUG] ПРОВЕРКА ТОКЕНОВ В БД")
     print("=" * 80)
     print()
     
@@ -22,22 +22,22 @@ def check_tokens():
         tokens = db.query(UserToken).all()
         
         if not tokens:
-            print("[ERROR] Р’ Р±Р°Р·Рµ РґР°РЅРЅС‹С… РЅРµС‚ С‚РѕРєРµРЅРѕРІ!")
+            print("[ERROR] В базе данных нет токенов!")
             print()
-            print("Р§С‚Рѕ РґРµР»Р°С‚СЊ:")
-            print("1. РћС‚РєСЂРѕР№С‚Рµ http://localhost:5173")
+            print("Что делать:")
+            print("1. Откройте http://localhost:5173")
             print("2. РџРµСЂРµР№РґРёС‚Рµ РІ РќР°СЃС‚СЂРѕР№РєРё в†’ РРЅС‚РµРіСЂР°С†РёРё")
-            print("3. РџРѕРґРєР»СЋС‡РёС‚Рµ РїР»Р°С‚С„РѕСЂРјС‹ (Twitch, VK Live, DonationAlerts)")
+            print("3. Подключите платформы (Twitch, VK Live, DonationAlerts)")
             print()
             return
         
-        print(f"РќР°Р№РґРµРЅРѕ С‚РѕРєРµРЅРѕРІ: {len(tokens)}")
+        print(f"Найдено токенов: {len(tokens)}")
         print()
         
         now = utcnow_naive()
         
         for token in tokens:
-            print(f"[LIST] РџР»Р°С‚С„РѕСЂРјР°: {token.platform.upper()}")
+            print(f"[LIST] Платформа: {token.platform.upper()}")
             print(f"   User ID: {token.user_id}")
             print(f"   Platform User ID: {token.platform_user_id}")
             print(f"   Platform Username: {token.platform_username or 'N/A'}")
@@ -46,44 +46,44 @@ def check_tokens():
             
             if token.expires_at:
                 expires_in = token.expires_at - now
-                expires_str = f"{expires_in.days} РґРЅРµР№ {expires_in.seconds // 3600} С‡Р°СЃРѕРІ"
+                expires_str = f"{expires_in.days} дней {expires_in.seconds // 3600} часов"
                 
                 if expires_in.total_seconds() > 0:
                     print(f"   Expires at: {token.expires_at} (С‡РµСЂРµР· {expires_str})")
-                    print(f"   РЎС‚Р°С‚СѓСЃ: [OK] Р”РµР№СЃС‚РІРёС‚РµР»РµРЅ")
+                    print(f"   Статус: [OK] Действителен")
                 else:
-                    print(f"   Expires at: {token.expires_at} (РёСЃС‚РµРє {expires_str} РЅР°Р·Р°Рґ)")
+                    print(f"   Expires at: {token.expires_at} (истек {expires_str} назад)")
                     print(f"   РЎС‚Р°С‚СѓСЃ: [WARN] РРЎРўР•Рљ")
                     if token.refresh_token:
-                        print(f"   Refresh: [OK] РњРѕР¶РЅРѕ РѕР±РЅРѕРІРёС‚СЊ")
+                        print(f"   Refresh: [OK] Можно обновить")
                     else:
-                        print(f"   Refresh: [X] РќСѓР¶РЅР° РїРѕРІС‚РѕСЂРЅР°СЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ")
+                        print(f"   Refresh: [X] Нужна повторная авторизация")
             else:
                 print(f"   Expires at: N/A")
-                print(f"   РЎС‚Р°С‚СѓСЃ: [WARN] Р‘РµСЃСЃСЂРѕС‡РЅС‹Р№ (РёР»Рё РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅ)")
+                print(f"   Статус: [WARN] Бессрочный (или не установлен)")
             
             print()
         
         print("=" * 80)
         print()
         
-        # РџСЂРѕРІРµСЂРєР° VK Live С‚РѕРєРµРЅР°
+        # Проверка VK Live токена
         vk_tokens = [t for t in tokens if t.platform == 'vk']
         if vk_tokens:
-            print("[OK] VK Live С‚РѕРєРµРЅ РЅР°Р№РґРµРЅ РІ Р‘Р”")
+            print("[OK] VK Live токен найден в БД")
             vk_token = vk_tokens[0]
             if vk_token.refresh_token:
-                print("[OK] Refresh token РґРѕСЃС‚СѓРїРµРЅ - Р°РІС‚РѕРѕР±РЅРѕРІР»РµРЅРёРµ СЂР°Р±РѕС‚Р°РµС‚!")
+                print("[OK] Refresh token доступен - автообновление работает!")
             else:
-                print("[WARN] Refresh token РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚ - РЅСѓР¶РЅР° РїРѕРІС‚РѕСЂРЅР°СЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ")
+                print("[WARN] Refresh token отсутствует - нужна повторная авторизация")
         else:
-            print("[ERROR] VK Live С‚РѕРєРµРЅ РќР• РЅР°Р№РґРµРЅ РІ Р‘Р”")
-            print("   в†’ РџРѕРґРєР»СЋС‡РёС‚Рµ VK Live С‡РµСЂРµР· РёРЅС‚РµСЂС„РµР№СЃ!")
+            print("[ERROR] VK Live токен НЕ найден в БД")
+            print("   → Подключите VK Live через интерфейс!")
         
         print()
         
     except Exception as e:
-        print(f"[ERROR] РћС€РёР±РєР°: {e}")
+        print(f"[ERROR] Ошибка: {e}")
         import traceback
         traceback.print_exc()
     finally:

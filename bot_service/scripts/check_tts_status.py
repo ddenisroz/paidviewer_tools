@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-"""РџСЂРѕРІРµСЂРєР° TTS СЃС‚Р°С‚СѓСЃР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
+"""Проверка TTS статуса пользователя"""
 import sys
 import os
 
-# Р”РѕР±Р°РІР»СЏРµРј РєРѕСЂРЅРµРІСѓСЋ РґРёСЂРµРєС‚РѕСЂРёСЋ РІ РїСѓС‚СЊ
+# Добавляем корневую директорию в путь
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Р—Р°РіСЂСѓР¶Р°РµРј РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ
+# Загружаем переменные окружения
 from dotenv import load_dotenv
 load_dotenv()
 
 from core.database import SessionLocal, User, TTSUserSettings, WhitelistedChannel
 
 def check_tts_status(user_id: int):
-    """РџСЂРѕРІРµСЂРёС‚СЊ TTS СЃС‚Р°С‚СѓСЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
+    """Проверить TTS статус пользователя"""
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.id == user_id).first()
@@ -27,7 +27,7 @@ def check_tts_status(user_id: int):
         print(f"VK channel: {user.vk_channel_name}")
         print(f"TTS Enabled (global): {user.tts_enabled}")
         
-        # РџСЂРѕРІРµСЂСЏРµРј TTS РЅР°СЃС‚СЂРѕР№РєРё
+        # Проверяем TTS настройки
         tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == user_id).first()
         if tts_settings:
             print(f"\n=== TTS Settings ===")
@@ -38,7 +38,7 @@ def check_tts_status(user_id: int):
         else:
             print(f"\nвљ пёЏ No TTS settings found (will use defaults)")
         
-        # РџСЂРѕРІРµСЂСЏРµРј whitelist
+        # Проверяем whitelist
         print(f"\n=== Whitelist Status ===")
         is_whitelisted = False
         

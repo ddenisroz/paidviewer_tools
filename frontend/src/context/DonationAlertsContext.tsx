@@ -4,8 +4,8 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 /* eslint-disable react-refresh/only-export-components */
 import { API_BASE_URL } from '@/constants';
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
-import { logger } from '@/shared/utils/prodLogger';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
+import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
 

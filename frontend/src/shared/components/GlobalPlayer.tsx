@@ -126,6 +126,7 @@ const GlobalPlayer: React.FC = () => {
     };
 
     const handleClearQueue = async (): Promise<void> => {
+        // eslint-disable-next-line no-alert
         const confirmed = window.confirm('Очистить очередь треков?');
         if (!confirmed) return;
         try {

@@ -1,6 +1,6 @@
 # bot_service/api/stream_history_api.py
 """
-API РґР»СЏ РёСЃС‚РѕСЂРёРё СЃС‚СЂРёРјРѕРІ.
+API для истории стримов.
 Clean Architecture: uses ChatMessageRepository for data access.
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -38,7 +38,7 @@ async def get_stream_history(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ РёСЃС‚РѕСЂРёСЋ СЃС‚СЂРёРјРѕРІ/СЃРѕРѕР±С‰РµРЅРёР№"""
+    """Получить историю стримов/сообщений"""
     try:
         user_id = user.get("id")
         if not user_id:
@@ -82,7 +82,7 @@ async def get_stream_stats(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ СЃС‚СЂРёРјР°"""
+    """Получить статистику стрима"""
     try:
         user_id = user.get("id")
         if not user_id:

@@ -157,7 +157,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     }, []);
 
     const resolveAudioUrl = useCallback((rawAudioUrl: string): string => {
-        let audioUrl = rawAudioUrl;
+        const audioUrl = rawAudioUrl;
         if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
             return audioUrl;
         }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-РџСЂРѕРІРµСЂРєР° РЅР°Р»РёС‡РёСЏ admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ СЃРёСЃС‚РµРјРµ.
+Проверка наличия admin пользователя в системе.
 """
 
 import sys
@@ -19,26 +19,26 @@ from core.database import SessionLocal, User  # noqa: E402
 
 
 def check_admin():
-    """РџСЂРѕРІРµСЂРёС‚СЊ РЅР°Р»РёС‡РёРµ admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ."""
+    """Проверить наличие admin пользователя."""
     db = SessionLocal()
     try:
         # РС‰РµРј admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
         admin = db.query(User).filter((User.role == 'admin') | (User.is_admin.is_(True))).first()
         
         if admin:
-            print(" Admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РЅР°Р№РґРµРЅ:")
+            print(" Admin пользователь найден:")
             print(f"   ID: {admin.id}")
-            print(f"   Twitch: {admin.twitch_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
-            print(f"   VK: {admin.vk_username or 'РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'}")
+            print(f"   Twitch: {admin.twitch_username or 'не настроен'}")
+            print(f"   VK: {admin.vk_username or 'не настроен'}")
             print(f"   Role: {admin.role}")
             print(f"   Admin: {admin.role == 'admin' or admin.is_admin}")
             return True
         else:
-            print("[ERROR] Admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РќР• РЅР°Р№РґРµРЅ")
-            print("\nР”Р»СЏ РґРѕСЃС‚СѓРїР° Рє OAuth Р°РІС‚РѕСЂРёР·Р°С†РёРё Р±РѕС‚Р° РЅСѓР¶РЅС‹ admin РїСЂР°РІР°.")
-            print("\nР’Р°СЂРёР°РЅС‚С‹:")
-            print("1. Р’РѕР№РґРёС‚Рµ С‡РµСЂРµР· OAuth (Twitch РёР»Рё VK)")
-            print("2. РЎРґРµР»Р°Р№С‚Рµ РІР°С€РµРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р°РґРјРёРЅРѕРј:")
+            print("[ERROR] Admin пользователь НЕ найден")
+            print("\nДля доступа к OAuth авторизации бота нужны admin права.")
+            print("\nВарианты:")
+            print("1. Войдите через OAuth (Twitch или VK)")
+            print("2. Сделайте вашего пользователя админом:")
             print("   UPDATE users SET role = 'admin', is_admin = true WHERE id = YOUR_USER_ID;")
             return False
             

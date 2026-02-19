@@ -23,7 +23,7 @@ async def get_filtered_words(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓР С—Р С‘РЎРѓР С•Р С” Р С•РЎвЂљРЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р С•Р Р†Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦ РЎРѓР В»Р С•Р Р†"""
+    """Получить список отфильтрованных слов"""
     try:
         tts_service = TTSService(db)
         words = await tts_service.get_filtered_words(current_user['id'])
@@ -41,7 +41,7 @@ async def add_filtered_word(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚"""
+    """Добавить слово в фильтр"""
     try:
         tts_service = TTSService(db)
         success = await tts_service.add_filtered_word(
@@ -51,9 +51,9 @@ async def add_filtered_word(
         )
 
         if success:
-            return {"success": True, "message": f"Р РЋР В»Р С•Р Р†Р С• '{request.word}' Р Т‘Р С•Р В±Р В°Р Р†Р В»Р ВµР Р…Р С• Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚"}
+            return {"success": True, "message": f"Слово '{request.word}' добавлено в фильтр"}
         else:
-            raise HTTPException(status_code=400, detail="Р РЋР В»Р С•Р Р†Р С• РЎС“Р В¶Р Вµ РЎРѓРЎС“РЎвЂ°Р ВµРЎРѓРЎвЂљР Р†РЎС“Р ВµРЎвЂљ Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р Вµ")
+            raise HTTPException(status_code=400, detail="Слово уже существует в фильтре")
 
     except HTTPException:
         raise
@@ -68,13 +68,13 @@ async def delete_filtered_word(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р Р€Р Т‘Р В°Р В»Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р С‘Р В· РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В°"""
+    """Удалить слово из фильтра"""
     try:
         tts_service = TTSService(db)
         success = await tts_service.remove_filtered_word(current_user['id'], word_id)
 
         if success:
-            return {"success": True, "message": "Р РЋР В»Р С•Р Р†Р С• РЎС“Р Т‘Р В°Р В»Р ВµР Р…Р С• Р С‘Р В· РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В°"}
+            return {"success": True, "message": "Слово удалено из фильтра"}
         else:
             raise HTTPException(status_code=404, detail="Р РЋР В»Р С•Р Р†Р С• Р Р…Р Вµ Р Р…Р В°Р в„–Р Т‘Р ВµР Р…Р С•")
 
@@ -90,7 +90,7 @@ async def get_filters_list(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р СџР С•Р В»РЎС“РЎвЂЎР С‘РЎвЂљРЎРЉ РЎРѓР С—Р С‘РЎРѓР С•Р С” Р Р†РЎРѓР ВµРЎвЂ¦ РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р С•Р Р† Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЏ (alias)"""
+    """Получить список всех фильтров пользователя (alias)"""
     try:
         tts_service = TTSService(db)
         words = await tts_service.get_filtered_words(current_user['id'])
@@ -108,7 +108,7 @@ async def add_filter(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р вЂќР С•Р В±Р В°Р Р†Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р Р† РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚ (alias)"""
+    """Добавить слово в фильтр (alias)"""
     return await add_filtered_word(request, current_user, db)
 
 
@@ -118,6 +118,6 @@ async def remove_filter(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Р Р€Р Т‘Р В°Р В»Р С‘РЎвЂљРЎРЉ РЎРѓР В»Р С•Р Р†Р С• Р С‘Р В· РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚Р В° (alias)"""
+    """Удалить слово из фильтра (alias)"""
     return await delete_filtered_word(filter_id, current_user, db)
 

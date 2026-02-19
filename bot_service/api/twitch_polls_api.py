@@ -2,9 +2,9 @@
 Twitch Polls API
 
 РђРІС‚РѕСЂ: AI Assistant
-Р”Р°С‚Р°: 27 РґРµРєР°Р±СЂСЏ 2025
+Дата: 27 декабря 2025
 
-Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#create-poll
+Документация: https://dev.twitch.tv/docs/api/reference#create-poll
 """
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
@@ -24,78 +24,78 @@ router = APIRouter(prefix="/api/twitch/polls", tags=["twitch-polls"])
 # === Pydantic Models ===
 
 class PollChoice(BaseModel):
-    """Р’Р°СЂРёР°РЅС‚ РѕС‚РІРµС‚Р° РІ РіРѕР»РѕСЃРѕРІР°РЅРёРё"""
-    title: str = Field(..., min_length=1, max_length=25, description="РўРµРєСЃС‚ РІР°СЂРёР°РЅС‚Р°")
+    """Вариант ответа в голосовании"""
+    title: str = Field(..., min_length=1, max_length=25, description="Текст варианта")
 
 
 class PollCreate(BaseModel):
-    """РЎРѕР·РґР°РЅРёРµ РіРѕР»РѕСЃРѕРІР°РЅРёСЏ"""
+    """Создание голосования"""
     title: str = Field(
         ..., 
         min_length=1, 
         max_length=60,
-        description="Р’РѕРїСЂРѕСЃ РіРѕР»РѕСЃРѕРІР°РЅРёСЏ"
+        description="Вопрос голосования"
     )
     choices: List[PollChoice] = Field(
         ..., 
         min_length=2, 
         max_length=5,
-        description="Р’Р°СЂРёР°РЅС‚С‹ РѕС‚РІРµС‚РѕРІ (2-5)"
+        description="Варианты ответов (2-5)"
     )
     duration: int = Field(
         ..., 
         ge=15, 
         le=1800,
-        description="Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ РІ СЃРµРєСѓРЅРґР°С… (15-1800)"
+        description="Длительность в секундах (15-1800)"
     )
     channel_points_voting_enabled: bool = Field(
         default=False,
-        description="Р Р°Р·СЂРµС€РёС‚СЊ РіРѕР»РѕСЃРѕРІР°РЅРёРµ Р·Р° Channel Points"
+        description="Разрешить голосование за Channel Points"
     )
     channel_points_per_vote: Optional[int] = Field(
         default=None,
         ge=1,
         le=1000000,
-        description="РЎС‚РѕРёРјРѕСЃС‚СЊ РіРѕР»РѕСЃР° РІ Channel Points (1-1000000)"
+        description="Стоимость голоса в Channel Points (1-1000000)"
     )
     
     @field_validator('choices')
     @classmethod
     def validate_choices(cls, v: List[PollChoice]) -> List[PollChoice]:
-        """Р’Р°Р»РёРґР°С†РёСЏ СѓРЅРёРєР°Р»СЊРЅРѕСЃС‚Рё РІР°СЂРёР°РЅС‚РѕРІ"""
+        """Валидация уникальности вариантов"""
         titles = [choice.title for choice in v]
         if len(titles) != len(set(titles)):
-            raise ValueError("Р’Р°СЂРёР°РЅС‚С‹ РѕС‚РІРµС‚РѕРІ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ СѓРЅРёРєР°Р»СЊРЅС‹РјРё")
+            raise ValueError("Варианты ответов должны быть уникальными")
         return v
     
     @field_validator('channel_points_per_vote')
     @classmethod
     def validate_channel_points(cls, v: Optional[int], info) -> Optional[int]:
-        """Р’Р°Р»РёРґР°С†РёСЏ channel_points_per_vote"""
+        """Валидация channel_points_per_vote"""
         enabled = info.data.get('channel_points_voting_enabled')
         if enabled and not v:
             raise ValueError(
-                "channel_points_per_vote РѕР±СЏР·Р°С‚РµР»РµРЅ РєРѕРіРґР° channel_points_voting_enabled=true"
+                "channel_points_per_vote обязателен когда channel_points_voting_enabled=true"
             )
         if not enabled and v:
             raise ValueError(
-                "channel_points_per_vote РЅРµ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ СѓРєР°Р·Р°РЅ РєРѕРіРґР° channel_points_voting_enabled=false"
+                "channel_points_per_vote не должен быть указан когда channel_points_voting_enabled=false"
             )
         return v
 
 
 class PollEnd(BaseModel):
-    """Р—Р°РІРµСЂС€РµРЅРёРµ РіРѕР»РѕСЃРѕРІР°РЅРёСЏ"""
+    """Завершение голосования"""
     status: Literal["TERMINATED", "ARCHIVED"] = Field(
         ...,
-        description="РЎС‚Р°С‚СѓСЃ Р·Р°РІРµСЂС€РµРЅРёСЏ (TERMINATED - РґРѕСЃСЂРѕС‡РЅРѕ, ARCHIVED - Р°СЂС…РёРІРёСЂРѕРІР°С‚СЊ)"
+        description="Статус завершения (TERMINATED - досрочно, ARCHIVED - архивировать)"
     )
 
 
 # === Helper Functions ===
 
 async def get_twitch_token(user: User) -> str:
-    """РџРѕР»СѓС‡РёС‚СЊ Twitch OAuth С‚РѕРєРµРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ С‡РµСЂРµР· СЂРµРїРѕР·РёС‚РѕСЂРёР№"""
+    """Получить Twitch OAuth токен пользователя через репозиторий"""
     from core.database import get_db
     from core.token_encryption import decrypt_token, is_token_encrypted
     from repositories.user_token_repository import UserTokenRepository
@@ -112,7 +112,7 @@ async def get_twitch_token(user: User) -> str:
             )
             raise HTTPException(
                 status_code=400,
-                detail="Twitch OAuth С‚РѕРєРµРЅ РЅРµ РЅР°Р№РґРµРЅ"
+                detail="Twitch OAuth токен не найден"
             )
         
         token = user_token.access_token
@@ -132,7 +132,7 @@ async def make_twitch_api_request(
     json_data: Optional[dict] = None,
     params: Optional[dict] = None
 ) -> dict:
-    """Р’С‹РїРѕР»РЅРёС‚СЊ Р·Р°РїСЂРѕСЃ Рє Twitch API"""
+    """Выполнить запрос к Twitch API"""
     url = f"https://api.twitch.tv/helix{endpoint}"
     headers = {
         "Authorization": f"Bearer {token}",
@@ -177,7 +177,7 @@ async def make_twitch_api_request(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° РїРѕРґРєР»СЋС‡РµРЅРёСЏ Рє Twitch API"
+            detail=f"Ошибка подключения к Twitch API"
         )
 
 
@@ -189,18 +189,18 @@ async def create_poll(
     current_user: User = Depends(get_current_user)
 ):
     """
-    РЎРѕР·РґР°С‚СЊ РіРѕР»РѕСЃРѕРІР°РЅРёРµ
+    Создать голосование
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    Требования:
     - Scope: channel:manage:polls
-    - Broadcaster РёР»Рё Editor
+    - Broadcaster или Editor
     
-    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#create-poll
+    Документация: https://dev.twitch.tv/docs/api/reference#create-poll
     """
     try:
         token = await get_twitch_token(current_user)
         
-        # Р¤РѕСЂРјРёСЂСѓРµРј РґР°РЅРЅС‹Рµ РґР»СЏ API
+        # Формируем данные для API
         data = {
             "broadcaster_id": current_user.twitch_user_id,
             "title": poll.title,
@@ -208,7 +208,7 @@ async def create_poll(
             "duration": poll.duration
         }
         
-        # Р”РѕР±Р°РІР»СЏРµРј Channel Points РЅР°СЃС‚СЂРѕР№РєРё РµСЃР»Рё РІРєР»СЋС‡РµРЅС‹
+        # Добавляем Channel Points настройки если включены
         if poll.channel_points_voting_enabled:
             data["channel_points_voting_enabled"] = True
             data["channel_points_per_vote"] = poll.channel_points_per_vote
@@ -221,7 +221,7 @@ async def create_poll(
             duration=poll.duration
         )
         
-        # РЎРѕР·РґР°РµРј РіРѕР»РѕСЃРѕРІР°РЅРёРµ
+        # Создаем голосование
         response = await make_twitch_api_request(
             method="POST",
             endpoint="/polls",
@@ -253,7 +253,7 @@ async def create_poll(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РіРѕР»РѕСЃРѕРІР°РЅРёСЏ"
+            detail=f"Ошибка создания голосования"
         )
 
 
@@ -264,17 +264,17 @@ async def end_poll(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Р—Р°РІРµСЂС€РёС‚СЊ РіРѕР»РѕСЃРѕРІР°РЅРёРµ
+    Завершить голосование
     
-    РЎС‚Р°С‚СѓСЃС‹:
-    - TERMINATED: Р—Р°РІРµСЂС€РёС‚СЊ РґРѕСЃСЂРѕС‡РЅРѕ
-    - ARCHIVED: РђСЂС…РёРІРёСЂРѕРІР°С‚СЊ (РїРѕСЃР»Рµ РµСЃС‚РµСЃС‚РІРµРЅРЅРѕРіРѕ Р·Р°РІРµСЂС€РµРЅРёСЏ)
+    Статусы:
+    - TERMINATED: Завершить досрочно
+    - ARCHIVED: Архивировать (после естественного завершения)
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
+    Требования:
     - Scope: channel:manage:polls
-    - Broadcaster РёР»Рё Editor
+    - Broadcaster или Editor
     
-    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#end-poll
+    Документация: https://dev.twitch.tv/docs/api/reference#end-poll
     """
     try:
         token = await get_twitch_token(current_user)
@@ -324,7 +324,7 @@ async def end_poll(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° Р·Р°РІРµСЂС€РµРЅРёСЏ РіРѕР»РѕСЃРѕРІР°РЅРёСЏ"
+            detail=f"Ошибка завершения голосования"
         )
 
 
@@ -333,12 +333,12 @@ async def get_active_polls(
     current_user: User = Depends(get_current_user)
 ):
     """
-    РџРѕР»СѓС‡РёС‚СЊ Р°РєС‚РёРІРЅС‹Рµ РіРѕР»РѕСЃРѕРІР°РЅРёСЏ
+    Получить активные голосования
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
-    - Scope: channel:read:polls РёР»Рё channel:manage:polls
+    Требования:
+    - Scope: channel:read:polls или channel:manage:polls
     
-    Р”РѕРєСѓРјРµРЅС‚Р°С†РёСЏ: https://dev.twitch.tv/docs/api/reference#get-polls
+    Документация: https://dev.twitch.tv/docs/api/reference#get-polls
     """
     try:
         token = await get_twitch_token(current_user)
@@ -373,7 +373,7 @@ async def get_active_polls(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РіРѕР»РѕСЃРѕРІР°РЅРёР№"
+            detail=f"Ошибка получения голосований"
         )
 
 
@@ -383,10 +383,10 @@ async def get_poll(
     current_user: User = Depends(get_current_user)
 ):
     """
-    РџРѕР»СѓС‡РёС‚СЊ РёРЅС„РѕСЂРјР°С†РёСЋ Рѕ РєРѕРЅРєСЂРµС‚РЅРѕРј РіРѕР»РѕСЃРѕРІР°РЅРёРё
+    Получить информацию о конкретном голосовании
     
-    РўСЂРµР±РѕРІР°РЅРёСЏ:
-    - Scope: channel:read:polls РёР»Рё channel:manage:polls
+    Требования:
+    - Scope: channel:read:polls или channel:manage:polls
     """
     try:
         token = await get_twitch_token(current_user)
@@ -406,7 +406,7 @@ async def get_poll(
         if not polls:
             raise HTTPException(
                 status_code=404,
-                detail="Р“РѕР»РѕСЃРѕРІР°РЅРёРµ РЅРµ РЅР°Р№РґРµРЅРѕ"
+                detail="Голосование не найдено"
             )
         
         return {
@@ -425,6 +425,6 @@ async def get_poll(
         )
         raise HTTPException(
             status_code=500,
-            detail=f"РћС€РёР±РєР° РїРѕР»СѓС‡РµРЅРёСЏ РіРѕР»РѕСЃРѕРІР°РЅРёСЏ"
+            detail=f"Ошибка получения голосования"
         )
 

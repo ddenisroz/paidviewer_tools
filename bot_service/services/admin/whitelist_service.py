@@ -1,7 +1,5 @@
 # bot_service/services/admin/whitelist_service.py
-"""
-РЎРµСЂРІРёСЃ СѓРїСЂР°РІР»РµРЅРёСЏ Р±РµР»С‹Рј СЃРїРёСЃРєРѕРј РєР°РЅР°Р»РѕРІ.
-"""
+"""module: cleaned corrupted docstring."""
 
 import logging
 import re

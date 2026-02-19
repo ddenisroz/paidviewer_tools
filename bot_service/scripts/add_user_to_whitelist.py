@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-РЎРєСЂРёРїС‚ РґР»СЏ РґРѕР±Р°РІР»РµРЅРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ whitelist
+Скрипт для добавления пользователя в whitelist
 """
 import sys
 import os
@@ -11,10 +11,10 @@ from core.database import User, WhitelistedChannel, get_db
 from utils.whitelist_cache import invalidate_whitelist_cache
 
 def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
-    """Р”РѕР±Р°РІР»СЏРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ whitelist"""
+    """Добавляет пользователя в whitelist"""
     db = next(get_db())
     try:
-        # РџРѕР»СѓС‡Р°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        # Получаем пользователя
         user = db.query(User).filter(User.id == user_id).first()
         
         if not user:
@@ -26,7 +26,7 @@ def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
             print(f"[ERROR] Invalid platform: {platform}. Must be 'twitch' or 'vk'")
             return False
         
-        # РћРїСЂРµРґРµР»СЏРµРј РєР°РєРѕРµ РёРјСЏ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ
+        # Определяем какое имя использовать
         if platform == 'twitch':
             channel_name = user.twitch_username
         else:
@@ -38,7 +38,7 @@ def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
         
         channel_name = channel_name.lower()
         
-        # РџСЂРѕРІРµСЂСЏРµРј, РЅРµ РґРѕР±Р°РІР»РµРЅ Р»Рё СѓР¶Рµ
+        # Проверяем, не добавлен ли уже
         existing = db.query(WhitelistedChannel).filter(
             WhitelistedChannel.channel_name == channel_name,
             WhitelistedChannel.platform == platform
@@ -48,7 +48,7 @@ def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
             print(f"[WARN] Channel '{channel_name}' ({platform}) already in whitelist")
             return True
         
-        # Р”РѕР±Р°РІР»СЏРµРј РІ whitelist
+        # Добавляем в whitelist
         whitelist_entry = WhitelistedChannel(
             channel_name=channel_name,
             platform=platform
@@ -90,7 +90,7 @@ if __name__ == "__main__":
             print(f"[ERROR] Invalid platform: {platform}. Must be 'twitch' or 'vk'")
             sys.exit(1)
     
-    # Р”РѕР±Р°РІР»СЏРµРј РґР»СЏ РѕР±РµРёС… РїР»Р°С‚С„РѕСЂРј РµСЃР»Рё Сѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РµСЃС‚СЊ РѕР±Р° username
+    # Добавляем для обеих платформ если у пользователя есть оба username
     user = next(get_db()).query(User).filter(User.id == user_id).first()
     if user:
         if user.twitch_username:

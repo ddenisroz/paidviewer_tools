@@ -1,5 +1,5 @@
 """
-РћР±РЅРѕРІРёС‚СЊ РІСЃРµ Р°РєС‚РёРІРЅС‹Рµ СЃРµСЃСЃРёРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ, СЃРґРµР»Р°РІ РµРіРѕ Р°РґРјРёРЅРѕРј.
+Обновить все активные сессии пользователя, сделав его админом.
 
 РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ:
     python scripts/fix_admin_session.py
@@ -8,10 +8,10 @@
 import sys
 import os
 
-# Р”РѕР±Р°РІР»СЏРµРј РєРѕСЂРЅРµРІСѓСЋ РґРёСЂРµРєС‚РѕСЂРёСЋ РІ РїСѓС‚СЊ
+# Добавляем корневую директорию в путь
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Р—Р°РіСЂСѓР¶Р°РµРј РїРµСЂРµРјРµРЅРЅС‹Рµ РѕРєСЂСѓР¶РµРЅРёСЏ
+# Загружаем переменные окружения
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -20,14 +20,14 @@ from core.database import db_session  # noqa: E402
 
 
 def fix_admin_session():
-    """РћР±РЅРѕРІРёС‚СЊ СЃРµСЃСЃРёРё Р°РґРјРёРЅР°"""
+    """Обновить сессии админа"""
     
     print("\n" + "="*60)
     print("РћР‘РќРћР’Р›Р•РќРР• РЎР•РЎРЎРР™ РђР”РњРРќРђ")
     print("="*60 + "\n")
     
     with db_session() as db:
-        # РќР°С…РѕРґРёРј РІСЃРµС… Р°РґРјРёРЅРѕРІ
+        # Находим всех админов
         result = db.execute(text("""
             SELECT id, twitch_username, vk_username, role
             FROM users 
@@ -37,12 +37,12 @@ def fix_admin_session():
         admins = result.fetchall()
         
         if not admins:
-            print("[ERROR] РђРґРјРёРЅС‹ РЅРµ РЅР°Р№РґРµРЅС‹ РІ Р‘Р”")
-            print("\nРЎРЅР°С‡Р°Р»Р° СЃРґРµР»Р°Р№С‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ Р°РґРјРёРЅРѕРј:")
+            print("[ERROR] Админы не найдены в БД")
+            print("\nСначала сделайте пользователя админом:")
             print("  python scripts/make_admin.py")
             return
         
-        print(f" РќР°Р№РґРµРЅРѕ Р°РґРјРёРЅРѕРІ: {len(admins)}\n")
+        print(f" Найдено админов: {len(admins)}\n")
         
         for user_id, twitch_username, vk_username, role in admins:
             print(f" User ID: {user_id}")
@@ -50,18 +50,18 @@ def fix_admin_session():
             print(f"   VK: {vk_username or 'N/A'}")
             print(f"   Role: {role}")
             
-            # 1. РћР±РЅРѕРІР»СЏРµРј role РІ С‚Р°Р±Р»РёС†Рµ users
+            # 1. Обновляем role в таблице users
             if role != 'admin':
                 db.execute(text("""
                     UPDATE users 
                     SET role = 'admin' 
                     WHERE id = :user_id
                 """), {"user_id": user_id})
-                print(f"    Role РѕР±РЅРѕРІР»РµРЅ: {role} в†’ admin")
+                print(f"    Role обновлен: {role} → admin")
             else:
                 print("    Role СѓР¶Рµ admin")
             
-            # 2. РЈРґР°Р»СЏРµРј РІСЃРµ СЃС‚Р°СЂС‹Рµ СЃРµСЃСЃРёРё (С‡С‚РѕР±С‹ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ РїРµСЂРµР»РѕРіРёРЅРёР»СЃСЏ)
+            # 2. Удаляем все старые сессии (чтобы пользователь перелогинился)
             result = db.execute(text("""
                 DELETE FROM user_sessions 
                 WHERE user_id = :user_id
@@ -71,24 +71,24 @@ def fix_admin_session():
             deleted_sessions = result.fetchall()
             
             if deleted_sessions:
-                print(f"    РЈРґР°Р»РµРЅРѕ СЃС‚Р°СЂС‹С… СЃРµСЃСЃРёР№: {len(deleted_sessions)}")
-                print("   [INFO]пёЏ  РўРµРїРµСЂСЊ РІРѕР№РґРёС‚Рµ Р·Р°РЅРѕРІРѕ РІ frontend")
+                print(f"    Удалено старых сессий: {len(deleted_sessions)}")
+                print("   [INFO]️  Теперь войдите заново в frontend")
             else:
-                print("   [INFO]пёЏ  РЎРµСЃСЃРёР№ РЅРµ Р±С‹Р»Рѕ, РїСЂРѕСЃС‚Рѕ РІРѕР№РґРёС‚Рµ РІ СЃРёСЃС‚РµРјСѓ")
+                print("   [INFO]️  Сессий не было, просто войдите в систему")
             
             print()
         
         db.commit()
         
         print("="*60)
-        print(" Р“РћРўРћР’Рћ!")
+        print(" ГОТОВО!")
         print("="*60)
-        print("\nРўРµРїРµСЂСЊ:")
-        print("1. РћР±РЅРѕРІРёС‚Рµ СЃС‚СЂР°РЅРёС†Сѓ РІ Р±СЂР°СѓР·РµСЂРµ (F5)")
-        print("2. РђРґРјРёРЅ РїР°РЅРµР»СЊ РґРѕР»Р¶РЅР° СЃС‚Р°С‚СЊ РґРѕСЃС‚СѓРїРЅР°")
-        print("\nР•СЃР»Рё РЅРµ РїРѕРјРѕРіР»Рѕ - РїРµСЂРµР»РѕРіРёРЅСЊС‚РµСЃСЊ:")
-        print("1. РЈРґР°Р»РёС‚Рµ cookie 'session_id' РІ DevTools")
-        print("2. Р’РѕР№РґРёС‚Рµ Р·Р°РЅРѕРІРѕ\n")
+        print("\nТеперь:")
+        print("1. Обновите страницу в браузере (F5)")
+        print("2. Админ панель должна стать доступна")
+        print("\nЕсли не помогло - перелогиньтесь:")
+        print("1. Удалите cookie 'session_id' в DevTools")
+        print("2. Войдите заново\n")
 
 
 if __name__ == "__main__":

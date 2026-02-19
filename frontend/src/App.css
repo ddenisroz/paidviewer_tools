@@ -46,7 +46,7 @@
   }
 }
 
-/* View Transitions API - СЃРѕРІСЂРµРјРµРЅРЅС‹Рµ РїР»Р°РІРЅС‹Рµ РїРµСЂРµС…РѕРґС‹ РјРµР¶РґСѓ СЃС‚СЂР°РЅРёС†Р°РјРё */
+/* View Transitions API - современные плавные переходы между страницами */
 @view-transition {
   navigation: auto;
 }
@@ -65,7 +65,7 @@
   z-index: 2;
 }
 
-/* Reset СЃС‚РёР»Рё */
+/* Reset стили */
 * {
   margin: 0;
   padding: 0;
@@ -117,7 +117,7 @@ textarea:-webkit-autofill:focus {
   white-space: pre-wrap;
 }
 
-/* РљР°СЃС‚РѕРјРЅС‹Рµ Р°РЅРёРјР°С†РёРё РґР»СЏ Р°РІС‚РѕСЂРёР·Р°С†РёРё */
+/* Кастомные анимации для авторизации */
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);
@@ -140,7 +140,7 @@ textarea:-webkit-autofill:focus {
   }
 }
 
-/* РЈР±СЂР°Р»Рё Р°РЅРёРјР°С†РёРё pulse */
+/* Убрали анимации pulse */
 
 .auth-spinner {
   animation: spin-slow 2s linear infinite;
@@ -184,7 +184,7 @@ textarea:-webkit-autofill:focus {
 
     --radius: 0.5rem;
 
-    /* Quality colors РґР»СЏ Drops СЃРёСЃС‚РµРјС‹ - СЃС‚Р°РЅРґР°СЂС‚РёР·РёСЂРѕРІР°РЅРЅС‹Рµ */
+    /* Quality colors для Drops системы - стандартизированные */
     --quality-common: 215 16% 47%;
     /* #6B7280 */
     --quality-rare: 217 91% 60%;
@@ -194,9 +194,9 @@ textarea:-webkit-autofill:focus {
     --quality-legendary: 38 92% 50%;
     /* #F59E0B */
     --quality-mythical: 310 70% 55%;
-    /* РњРёС„РёС‡РµСЃРєРёР№ */
+    /* Мифический */
 
-    /* Typography - СЃС‚Р°РЅРґР°СЂС‚РёР·РёСЂРѕРІР°РЅРЅС‹Рµ С€СЂРёС„С‚С‹ */
+    /* Typography - стандартизированные шрифты */
     /* Font families with consistent fallbacks to prevent layout shift */
     --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
@@ -277,26 +277,26 @@ textarea:-webkit-autofill:focus {
   }
 }
 
-/* РџСЂР°РІРёР»СЊРЅС‹Р№ РїРµСЂРµРЅРѕСЃ СЌРјРѕРґР¶Рё Рё Unicode СЃРёРјРІРѕР»РѕРІ */
+/* Правильный перенос эмоджи и Unicode символов */
 @layer base {
 
-  /* РЈР»СѓС‡С€РµРЅРЅР°СЏ РѕР±СЂР°Р±РѕС‚РєР° РїРµСЂРµРЅРѕСЃР° РґР»СЏ СЌРјРѕРґР¶Рё Рё Unicode */
+  /* Улучшенная обработка переноса для эмоджи и Unicode */
   p,
   span,
   div,
   textarea {
     word-break: break-word;
     overflow-wrap: anywhere;
-    /* Р”Р»СЏ СЌРјРѕРґР¶Рё Рё РґСЂСѓРіРёС… Unicode СЃРёРјРІРѕР»РѕРІ */
+    /* Для эмоджи и других Unicode символов */
   }
 
-  /* РЎРїРµС†РёР°Р»СЊРЅРѕ РґР»СЏ СЃРѕРѕР±С‰РµРЅРёР№ РІ С‚РёРєРµС‚Р°С… Рё С‡Р°С‚Рµ */
+  /* Специально для сообщений в тикетах и чате */
   .ticket-message,
   .chat-message,
   [class*="whitespace-pre-wrap"] {
     word-break: break-word;
     overflow-wrap: anywhere;
-    /* РЎРѕС…СЂР°РЅСЏРµРј РїРµСЂРµРЅРѕСЃС‹ СЃС‚СЂРѕРє, РЅРѕ РїСЂР°РІРёР»СЊРЅРѕ РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј СЌРјРѕРґР¶Рё */
+    /* Сохраняем переносы строк, но правильно обрабатываем эмоджи */
     white-space: pre-wrap;
   }
 }
@@ -310,7 +310,7 @@ textarea:-webkit-autofill:focus {
     @apply bg-background text-foreground;
     font-family: var(--font-family-base) !important;
     font-size: 14px !important;
-    /* Р‘Р°Р·РѕРІС‹Р№ СЂР°Р·РјРµСЂ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ */
+    /* Базовый размер по умолчанию */
     line-height: 1.5 !important;
     -webkit-font-smoothing: var(--font-smoothing);
     -moz-osx-font-smoothing: grayscale;
@@ -320,7 +320,7 @@ textarea:-webkit-autofill:focus {
     -webkit-text-size-adjust: 100%;
   }
 
-  /* РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј Р±Р°Р·РѕРІС‹Рµ СЂР°Р·РјРµСЂС‹ РґР»СЏ РїСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёСЏ FOUT */
+  /* Устанавливаем базовые размеры для предотвращения FOUT */
   h1,
   h2,
   h3,
@@ -333,8 +333,8 @@ textarea:-webkit-autofill:focus {
   }
 }
 
-/* === Toast СѓРІРµРґРѕРјР»РµРЅРёСЏ (Sonner) === */
-/* РљРѕРЅС‚РµР№РЅРµСЂ РґР»СЏ РІСЃРµС… toast - РїСЂР°РІРёР»СЊРЅРѕРµ РїРѕР·РёС†РёРѕРЅРёСЂРѕРІР°РЅРёРµ */
+/* === Toast уведомления (Sonner) === */
+/* Контейнер для всех toast - правильное позиционирование */
 [data-sonner-toaster] {
   position: fixed !important;
   z-index: 13000 !important;
@@ -347,14 +347,14 @@ textarea:-webkit-autofill:focus {
 
 [data-sonner-toaster][data-y-position="top"] {
   top: 120px !important;
-  /* РЈРІРµР»РёС‡РµРЅРѕ РґР»СЏ header (64px) + РѕС‚СЃС‚СѓРї (56px) */
+  /* Увеличено для header (64px) + отступ (56px) */
 }
 
 [data-sonner-toaster][data-y-position="bottom"] {
   bottom: 16px !important;
 }
 
-/* РЎС‚Р°РЅРґР°СЂС‚РёР·РёСЂРѕРІР°РЅРЅС‹Рµ СЃС‚РёР»Рё РґР»СЏ РІСЃРµС… toast - Р±Р°Р·РѕРІС‹Рµ РїСЂР°РІРёР»Р° РїРѕР·РёС†РёРѕРЅРёСЂРѕРІР°РЅРёСЏ Рё Р°РЅРёРјР°С†РёРё */
+/* Стандартизированные стили для всех toast - базовые правила позиционирования и анимации */
 [data-sonner-toast] {
   pointer-events: auto !important;
   margin-bottom: 8px !important;
@@ -393,7 +393,7 @@ textarea:-webkit-autofill:focus {
   }
 }
 
-/* РЎРєСЂС‹РІР°РµРј СЃРєСЂРѕР»Р»Р±Р°СЂ РґР»СЏ html Рё body (РіР»Р°РІРЅС‹Р№ СЃРєСЂРѕР»Р» СЃС‚СЂР°РЅРёС†С‹) */
+/* Скрываем скроллбар для html и body (главный скролл страницы) */
 html, body {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -403,7 +403,7 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-/* РўРѕРЅРєРёР№ СЃРєСЂРѕР»Р»Р±Р°СЂ РґР»СЏ РІРЅСѓС‚СЂРµРЅРЅРёС… СЌР»РµРјРµРЅС‚РѕРІ (РїРѕРїРѕРІРµСЂС‹, СЃРїРёСЃРєРё Рё С‚.Рґ.) */
+/* Тонкий скроллбар для внутренних элементов (поповеры, списки и т.д.) */
 .overflow-y-auto,
 .overflow-auto,
 [data-radix-scroll-area-viewport],
@@ -430,7 +430,7 @@ body::-webkit-scrollbar {
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* РЎРєСЂС‹С‚С‹Р№ СЃРєСЂРѕР»Р»Р±Р°СЂ РґР»СЏ РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅС‹С… С‚Р°Р±РѕРІ/РїР°РЅРµР»РµР№ */
+/* Скрытый скроллбар для горизонтальных табов/панелей */
 .hide-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -442,7 +442,7 @@ body::-webkit-scrollbar {
   height: 0;
 }
 
-/* Body font - РёСЃРїРѕР»СЊР·СѓРµС‚ CSS РїРµСЂРµРјРµРЅРЅСѓСЋ */
+/* Body font - использует CSS переменную */
 body {
   font-family: var(--font-family-base);
   font-size: 14px;
@@ -454,7 +454,7 @@ body {
 /* Font sizes are defined in index.html inline CSS with !important */
 /* This prevents Tailwind from overriding them and causing FOUT */
 
-/* РћРїС‚РёРјРёР·Р°С†РёСЏ СЂРµРЅРґРµСЂРёРЅРіР° - РїСЂРёРѕСЂРёС‚РµС‚ РѕС‚СЂРёСЃРѕРІРєРё РІРёРґРёРјРѕРіРѕ РєРѕРЅС‚РµРЅС‚Р° */
+/* Оптимизация рендеринга - приоритет отрисовки видимого контента */
 * {
   will-change: auto;
 }
@@ -497,7 +497,7 @@ body {
   animation: progress-shimmer 2s infinite;
 }
 
-/* РљР°СЃС‚РѕРјРЅС‹Рµ Р°РЅРёРјР°С†РёРё РґР»СЏ РёРЅРґРёРєР°С‚РѕСЂР° Р°РІС‚РѕСЂРёР·Р°С†РёРё */
+/* Кастомные анимации для индикатора авторизации */
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);
@@ -558,7 +558,7 @@ body {
   animation: orbit 4s linear infinite;
 }
 
-/* РЎС‚РёР»Рё РґР»СЏ СЃС‚СЂР°РЅРёС†С‹ Р»РѕРіРёРЅР°, РєР°Рє РЅР° СЃРєСЂРёРЅС€РѕС‚Рµ */
+/* Стили для страницы логина, как на скриншоте */
 .login-page-bg {
   background: hsl(var(--background));
 }
@@ -606,12 +606,12 @@ body {
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
 }
 
-/* РђРЅРёРјР°С†РёСЏ РїРѕСЏРІР»РµРЅРёСЏ/РёСЃС‡РµР·Р°РЅРёСЏ С‚РµРєСЃС‚Р° */
+/* Анимация появления/исчезания текста */
 .subtitle-fade {
   transition: opacity 0.5s ease-in-out;
 }
 
-/* Р­С„С„РµРєС‚ СЃРІРµС‡РµРЅРёСЏ СЃРІРµСЂС…Сѓ */
+/* Эффект свечения сверху */
 .login-card::before {
   display: none;
 }
@@ -631,7 +631,7 @@ body {
   }
 }
 
-/* РђРЅРёРјР°С†РёСЏ РєСѓСЂСЃРѕСЂР° РґР»СЏ Р·Р°РіРѕР»РѕРІРєР° */
+/* Анимация курсора для заголовка */
 .blinking-cursor {
   animation: blink 1s step-end infinite;
 }
@@ -645,11 +645,11 @@ body {
 
   50% {
     color: #34D399;
-    /* Р—РµР»РµРЅС‹Р№ С†РІРµС‚ РєСѓСЂСЃРѕСЂР° */
+    /* Зеленый цвет курсора */
   }
 }
 
-/* РђРЅРёРјР°С†РёРё РґР»СЏ СѓРІРµРґРѕРјР»РµРЅРёР№ */
+/* Анимации для уведомлений */
 @keyframes slide-in-bottom {
   from {
     transform: translate(-50%, 20px);
@@ -682,7 +682,7 @@ body {
   animation: slide-out-bottom 0.3s ease-in forwards;
 }
 
-/* РђРЅРёРјР°С†РёРё РґР»СЏ Р»СѓС‚Р±РѕРєСЃРѕРІ СЃ РєР°СЂС‚РёРЅРєР°РјРё */
+/* Анимации для лутбоксов с картинками */
 @keyframes shimmer {
   0% {
     transform: translateX(-100%);
@@ -697,7 +697,7 @@ body {
   animation: shimmer 1.5s ease-in-out infinite;
 }
 
-/* РђРЅРёРјР°С†РёСЏ РїРѕСЏРІР»РµРЅРёСЏ Р»СѓС‚Р±РѕРєСЃР° */
+/* Анимация появления лутбокса */
 @keyframes lootbox-appear {
   0% {
     opacity: 0;
@@ -719,7 +719,7 @@ body {
   animation: lootbox-appear 0.8s ease-out forwards;
 }
 
-/* РђРЅРёРјР°С†РёСЏ РѕС‚РєСЂС‹С‚РёСЏ Р»СѓС‚Р±РѕРєСЃР° */
+/* Анимация открытия лутбокса */
 @keyframes lootbox-open {
   0% {
     transform: scale(1) rotateY(0deg);
@@ -746,7 +746,7 @@ body {
   animation: lootbox-open 1.2s ease-in-out forwards;
 }
 
-/* Р­С„С„РµРєС‚ СЃРІРµС‡РµРЅРёСЏ РґР»СЏ СЂРµРґРєРёС… Р»СѓС‚Р±РѕРєСЃРѕРІ */
+/* Эффект свечения для редких лутбоксов */
 .lootbox-glow-rare {
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
 }
@@ -772,7 +772,7 @@ body {
   }
 }
 
-/* РђРЅРёРјР°С†РёСЏ СЃРјРµРЅС‹ РєР°СЂС‚РёРЅРѕРє */
+/* Анимация смены картинок */
 @keyframes image-transition {
   0% {
     opacity: 1;
@@ -794,7 +794,7 @@ body {
   animation: image-transition 0.3s ease-in-out;
 }
 
-/* Р­С„С„РµРєС‚ Р±Р»РµСЃРєР° РїСЂРё РѕС‚РєСЂС‹С‚РёРё */
+/* Эффект блеска при открытии */
 @keyframes sparkle {
   0% {
     opacity: 0;
@@ -816,44 +816,44 @@ body {
   animation: sparkle 0.6s ease-out;
 }
 
-/* РџСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёРµ СЃРґРІРёРіР° РІРµСЂСЃС‚РєРё РґР»СЏ DropdownMenu */
+/* Предотвращение сдвига верстки для DropdownMenu */
 [data-radix-dropdown-menu-content] {
   position: absolute !important;
   z-index: 10020 !important;
 }
 
-/* РџСЂРµРґРѕС‚РІСЂР°С‰РµРЅРёРµ СЃРґРІРёРіР° РєРѕРЅС‚РµРЅС‚Р° РїСЂРё РѕС‚РєСЂС‹С‚РёРё РјРѕРґР°Р»СЊРЅС‹С… РѕРєРѕРЅ */
+/* Предотвращение сдвига контента при открытии модальных окон */
 body:has([data-radix-dialog-content]),
 body:has([data-radix-dropdown-menu-content]) {
   overflow: hidden !important;
 }
 
-/* Р’РѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёРµ РїСЂРѕРєСЂСѓС‚РєРё РїРѕСЃР»Рµ Р·Р°РєСЂС‹С‚РёСЏ РјРѕРґР°Р»СЊРЅС‹С… РѕРєРѕРЅ */
+/* Восстановление прокрутки после закрытия модальных окон */
 body:not(:has([data-radix-dialog-content])):not(:has([data-radix-dropdown-menu-content])) {
   overflow: auto !important;
 }
 
 
-/* РЈР±СЂР°Р»Рё РїСЂР°РІРёР»Р° РјРѕСЂРіР°РЅРёСЏ - РѕРЅРё РјРµС€Р°Р»Рё */
+/* Убрали правила моргания - они мешали */
 
-/* РЈР±СЂР°Р»Рё Р°РЅРёРјР°С†РёРё fade-in */
+/* Убрали анимации fade-in */
 
-/* РЈР±СЂР°Р»Рё Р°РЅРёРјР°С†РёРё СЃРєРµР»РµС‚РѕРЅРѕРІ */
+/* Убрали анимации скелетонов */
 
-/* РЈР±СЂР°Р»Рё Р°РЅРёРјР°С†РёРё integration-card */
+/* Убрали анимации integration-card */
 
-/* РџСЂРµРґРѕС‚РІСЂР°С‰Р°РµРј РІРёРґРёРјСѓСЋ Р·Р°РіСЂСѓР·РєСѓ РїР»РµР№СЃС…РѕР»РґРµСЂРѕРІ */
+/* Предотвращаем видимую загрузку плейсхолдеров */
 input[placeholder] {
   color: inherit !important;
   background-color: inherit !important;
 }
 
-/* РЈР±РёСЂР°РµРј С‚РѕР»СЊРєРѕ РїСЂРѕР±Р»РµРјРЅС‹Рµ Р°РЅРёРјР°С†РёРё */
+/* Убираем только проблемные анимации */
 .animate-pulse {
   animation: none !important;
 }
 
-/* РћСЃС‚Р°РІР»СЏРµРј Р°РЅРёРјР°С†РёСЋ bounce РґР»СЏ С‚РѕС‡РµРє Р·Р°РіСЂСѓР·РєРё */
+/* Оставляем анимацию bounce для точек загрузки */
 .animate-bounce {
   animation: bounce 1s infinite !important;
 }
@@ -882,7 +882,7 @@ input[placeholder] {
   }
 }
 
-/* РћСЃС‚Р°РІР»СЏРµРј С‚РѕР»СЊРєРѕ Р°РЅРёРјР°С†РёСЋ Р·Р°РіСЂСѓР·РєРё */
+/* Оставляем только анимацию загрузки */
 .animate-spin {
   animation: spin 1s linear infinite !important;
 }
@@ -897,10 +897,10 @@ input[placeholder] {
   }
 }
 
-/* РЈР±РёСЂР°РµРј transitions С‚РѕР»СЊРєРѕ РґР»СЏ РЅРµРєРѕС‚РѕСЂС‹С… СЌР»РµРјРµРЅС‚РѕРІ */
-/* РќРѕ РќР• РѕС‚РєР»СЋС‡Р°РµРј РїРѕР»РЅРѕСЃС‚СЊСЋ - transitions РЅСѓР¶РЅС‹ РґР»СЏ РїР»Р°РІРЅРѕР№ Р·Р°РіСЂСѓР·РєРё */
+/* Убираем transitions только для некоторых элементов */
+/* Но НЕ отключаем полностью - transitions нужны для плавной загрузки */
 
-/* РЎРєСЂС‹РІР°РµРј РєРѕРЅС‚РµРЅС‚ РґРѕ РїРѕР»РЅРѕР№ Р·Р°РіСЂСѓР·РєРё */
+/* Скрываем контент до полной загрузки */
 .content-hidden {
   visibility: hidden;
 }
@@ -909,7 +909,7 @@ input[placeholder] {
   visibility: visible;
 }
 
-/* РљР°СЃС‚РѕРјРЅС‹Р№ СЃРєСЂРѕР»Р»Р±Р°СЂ РґР»СЏ ChatBox РїСЂРµРґРїСЂРѕСЃРјРѕС‚СЂР° */
+/* Кастомный скроллбар для ChatBox предпросмотра */
 .chatbox-preview-scroll::-webkit-scrollbar {
   width: 8px;
   height: 8px;
