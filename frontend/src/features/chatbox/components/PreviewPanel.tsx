@@ -88,6 +88,19 @@ const PREVIEW_7TV_FALLBACKS: EmoteData[] = [
     }
 ];
 
+const PREVIEW_TWITCH_BADGE_FALLBACKS: Record<string, string> = {
+    'broadcaster/1': 'https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1',
+    'moderator/1': 'https://static-cdn.jtvnw.net/badges/v1/3267646d-33f0-4b17-b3df-f923a41db1d0/1',
+    'vip/1': 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/1'
+};
+
+const normalizeVkAssetUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('//')) return `https:${url}`;
+    if (url.startsWith('/')) return `https://images.live.vkvideo.ru${url}`;
+    return url;
+};
+
 const tryVkAssetFallback = (img: HTMLImageElement): boolean => {
     const src = img.src || '';
     if (!src.includes('images.live.vkvideo.ru')) return false;
@@ -109,6 +122,20 @@ const tryVkAssetFallback = (img: HTMLImageElement): boolean => {
         return true;
     }
     return false;
+};
+
+const registerInlineEmote = (map: Map<string, EmoteData>, emote: EmoteData): void => {
+    if (!emote.name || !emote.url) return;
+    const trimmed = emote.name.replace(/^:+|:+$/g, '');
+    const keys = new Set<string>([
+        emote.name,
+        emote.name.toLowerCase(),
+        trimmed,
+        trimmed.toLowerCase(),
+        `:${trimmed}:`,
+        `:${trimmed.toLowerCase()}:`
+    ]);
+    keys.forEach((key) => map.set(key, emote));
 };
 
 const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessage => ({
@@ -354,12 +381,11 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                     if (!emote?.name || !emote?.url) return;
                                     const mapped: EmoteData = {
                                         id: String(emote.id || emote.name),
-                                        name: emote.name,
-                                        url: emote.url,
+                                        name: emote.name.replace(/^:+|:+$/g, ''),
+                                        url: normalizeVkAssetUrl(emote.url),
                                         animated: false
                                     };
-                                    vkInlineEmotes.set(emote.name, mapped);
-                                    vkInlineEmotes.set(emote.name.toLowerCase(), mapped);
+                                    registerInlineEmote(vkInlineEmotes, mapped);
                                 });
                             }
                             const messageGlobalEmotes = settings.show_7tv_emotes
@@ -416,16 +442,18 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                     <VKIcon className="inline-block" style={{ width: `${platformIconSize}px`, height: `${platformIconSize}px`, verticalAlign: 'text-bottom', color: '#FF4444' }} />
                                                 )
                                             )}
-                                            {settings.show_badges && badgesReady && msg.badges.length > 0 && msg.platform === 'twitch' && (
+                                            {settings.show_badges && msg.badges.length > 0 && msg.platform === 'twitch' && (
                                                 <>
                                                     {msg.badges.map((badge) => {
                                                         const [badgeId, version] = badge.split('/');
-                                                        const badgeUrl = twitchBadgesService.getBadgeUrl(
+                                                        const cachedBadgeUrl = twitchBadgesService.getBadgeUrl(
                                                             badgeId,
                                                             version,
                                                             '1x',
                                                             twitchChannelName || null
                                                         );
+                                                        const fallbackBadgeUrl = PREVIEW_TWITCH_BADGE_FALLBACKS[badge];
+                                                        const badgeUrl = cachedBadgeUrl || fallbackBadgeUrl;
                                                         if (!badgeUrl) return null;
 
                                                         const badgeSize = Math.max(14, Math.min(24, settings.font_size * 1.1));
@@ -450,7 +478,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                                     {msg.badges.map((badge, idx) => (
                                                         <img
                                                             key={`${msg.id}-${idx}`}
-                                                            src={badge}
+                                                            src={normalizeVkAssetUrl(badge)}
                                                             alt="badge"
                                                             loading="lazy"
                                                             style={{

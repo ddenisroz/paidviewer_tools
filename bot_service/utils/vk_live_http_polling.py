@@ -1,4 +1,4 @@
-﻿"""
+"""
 VK Live HTTP Polling клиент для получения сообщений из чата
 Использует GET /v1/chat/messages вместо WebSocket
 """
@@ -7,6 +7,7 @@ import aiohttp
 import logging
 import time
 import os
+import re
 from typing import Optional, Callable, Dict, Set
 
 from utils.vk_channel_url import extract_vk_channel_slug
@@ -53,6 +54,9 @@ class VKLiveHTTPPolling:
         self.refresh_cooldown_seconds: int = 15
         self._last_refresh_attempt_monotonic: float = 0.0
         self._last_chat_404_notice_monotonic: float = 0.0
+        self._smile_map: Dict[str, Dict] = {}
+        self._smile_map_updated_at: float = 0.0
+        self._smile_map_ttl_seconds: int = 300
 
     def _format_channel_url(self, channel_url: str) -> str:
         if not channel_url:
@@ -348,6 +352,7 @@ class VKLiveHTTPPolling:
             parts = normalize_parts(message.get("parts", []), message.get("data"))
             message_text, emotes = build_message_text_and_emotes(parts)
             badges = extract_vk_badge_urls(author)
+            emotes = await self._enrich_vk_text_emotes(message_text, emotes)
 
             # [OK] НЕ пропускаем сообщения, даже если текст пустой - возможно это только ссылка или эмодзи
             # Проверяем наличие хотя бы одного part
@@ -380,6 +385,124 @@ class VKLiveHTTPPolling:
             logger.error(f"Error processing VK message: {e}")
             import traceback
             logger.error(traceback.format_exc())
+
+    async def _enrich_vk_text_emotes(self, message_text: str, emotes: Optional[list]) -> Optional[list]:
+        """
+        Fallback for VK messages that arrive as plain text tokens like :lasqaJoyge:
+        without smile URLs in parts/data payload.
+        """
+        emotes_list = list(emotes or [])
+        if not isinstance(message_text, str) or not message_text:
+            return emotes_list or None
+
+        # Build a quick lookup for already mapped emotes by position.
+        occupied_ranges = {(e.get("start"), e.get("end")) for e in emotes_list if isinstance(e, dict)}
+
+        smile_map = await self._get_smile_map()
+        if not smile_map:
+            return emotes_list or None
+
+        for match in re.finditer(r":([A-Za-z0-9_]+):", message_text):
+            token = match.group(1)
+            key = token.lower()
+            smile = smile_map.get(key)
+            if not smile:
+                continue
+
+            start = match.start()
+            end = match.end() - 1
+            if (start, end) in occupied_ranges:
+                continue
+
+            url = smile.get("url")
+            if not url:
+                continue
+
+            emotes_list.append({
+                "id": smile.get("id") or token,
+                "name": smile.get("name") or token,
+                "url": url,
+                "start": start,
+                "end": end,
+            })
+            occupied_ranges.add((start, end))
+
+        return emotes_list or None
+
+    async def _get_smile_map(self) -> Dict[str, Dict]:
+        now = time.monotonic()
+        if self._smile_map and (now - self._smile_map_updated_at) < self._smile_map_ttl_seconds:
+            return self._smile_map
+
+        channel_slug = extract_vk_channel_slug(self.channel_url)
+        if not channel_slug:
+            return self._smile_map
+
+        url = f"{self.api_base_url}/v1/blog/{channel_slug}/smile/user_set/"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}",
+            "Content-Type": "application/json",
+        }
+        params = {"mode": "public_video_stream"}
+
+        try:
+            async with aiohttp.ClientSession(connector=self._get_connector()) as session:
+                async with session.get(url, headers=headers, params=params) as response:
+                    if response.status != 200:
+                        return self._smile_map
+
+                    payload = await response.json()
+        except Exception:
+            return self._smile_map
+
+        candidates = []
+        if isinstance(payload, dict):
+            data = payload.get("data")
+            if isinstance(data, dict):
+                for key in ("smiles", "items", "list"):
+                    if isinstance(data.get(key), list):
+                        candidates = data.get(key) or []
+                        break
+                if not candidates and isinstance(data.get("smile_user_set"), list):
+                    candidates = data.get("smile_user_set") or []
+            elif isinstance(data, list):
+                candidates = data
+
+            if not candidates:
+                for key in ("smiles", "items", "list"):
+                    if isinstance(payload.get(key), list):
+                        candidates = payload.get(key) or []
+                        break
+
+        smile_map: Dict[str, Dict] = {}
+        for item in candidates:
+            if not isinstance(item, dict):
+                continue
+            name = item.get("name") or item.get("baseName")
+            if not name:
+                continue
+            url = (
+                item.get("largeUrl")
+                or item.get("large_url")
+                or item.get("mediumUrl")
+                or item.get("medium_url")
+                or item.get("smallUrl")
+                or item.get("small_url")
+                or item.get("url")
+            )
+            if not url:
+                continue
+            smile_map[str(name).lower()] = {
+                "id": item.get("id") or item.get("uuid") or name,
+                "name": name,
+                "url": url,
+            }
+
+        if smile_map:
+            self._smile_map = smile_map
+            self._smile_map_updated_at = now
+
+        return self._smile_map
 
     async def send_message(self, text: str) -> bool:
         """Отправить сообщение в чат"""

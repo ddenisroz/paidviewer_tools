@@ -217,9 +217,10 @@ const renderMessageWithEmotes = (
                         className={className}
                         title={title}
                         style={{
-                            width: '1.35em',
                             height: '1.35em',
-                            minWidth: '1.35em',
+                            width: 'auto',
+                            maxHeight: '1.35em',
+                            minWidth: '1em',
                             minHeight: '1.35em',
                             display: 'inline-block',
                             verticalAlign: 'middle',

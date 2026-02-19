@@ -80,52 +80,83 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
     {
         id: 1,
         platform: 'twitch',
-        author: 'Streamer',
-        message: 'Привет всем Kappa Em',
+        author: 'dimplik',
+        message: 'Доброе утро Em',
         time: '12:00',
-        role: 'Broadcaster',
-        badges: ['broadcaster/1'],
-        emotes: [
-            { id: '25', name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0', start: 12, end: 16 }
-        ],
-        avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=S'
+        role: 'Viewer',
+        badges: [],
+        avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=D'
     },
     {
         id: 2,
         platform: 'twitch',
-        author: 'VIPUser',
-        message: 'Nice clutch PogChamp Based',
+        author: 'podarok',
+        message: 'аравудус подрубил Kappa',
         time: '12:01',
         role: 'VIP',
         badges: ['vip/1'],
         emotes: [
-            { id: '88', name: 'PogChamp', url: 'https://static-cdn.jtvnw.net/emoticons/v2/88/default/dark/1.0', start: 12, end: 19 }
+            { id: '25', name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0', start: 18, end: 22 }
         ],
-        avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=V'
+        avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=P'
     },
     {
         id: 3,
-        platform: 'vk',
-        author: 'VKUser',
-        message: 'Это огонь smile_32 и smile_451',
+        platform: 'twitch',
+        author: 'arolkish',
+        message: 'Ребят, а что выграло на ауке?',
         time: '12:02',
-        role: 'moderator',
-        badges: ['https://images.live.vkvideo.ru/smile/451/icon/size/small'],
-        emotes: [
-            { id: '32', name: 'smile_32', url: 'https://images.live.vkvideo.ru/smile/32/icon/size/small', start: 10, end: 19 },
-            { id: '451', name: 'smile_451', url: 'https://images.live.vkvideo.ru/smile/451/icon/size/small', start: 23, end: 33 }
-        ],
-        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=VK'
+        role: 'Moderator',
+        badges: ['moderator/1'],
+        avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=A'
     },
     {
         id: 4,
-        platform: 'twitch',
-        author: 'Moderator',
-        message: 'Го в катку JustAnotherDay Em',
+        platform: 'vk',
+        author: 'Дмитрий Хохлов',
+        message: 'когда уже игры будут? :lasqaJoyge:',
         time: '12:03',
-        role: 'Moderator',
-        badges: ['moderator/1'],
-        avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=M'
+        role: '',
+        badges: ['https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731'],
+        emotes: [
+            {
+                id: 'e46b4fbd-901a-4f62-8924-da9eb4f094f8',
+                name: 'lasqaJoyge',
+                url: 'https://images.live.vkvideo.ru/smile/e46b4fbd-901a-4f62-8924-da9eb4f094f8/icon/size/large?change_time=1759944303',
+                start: 0,
+                end: 0
+            }
+        ],
+        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=DK'
+    },
+    {
+        id: 5,
+        platform: 'vk',
+        author: 'Zavtra_Zaeb',
+        message: 'Доброе утро :lasqaPoPivu:',
+        time: '12:04',
+        role: '',
+        badges: ['https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731'],
+        emotes: [
+            {
+                id: 'e46b4fbd-901a-4f62-8924-da9eb4f094f8',
+                name: 'lasqaPoPivu',
+                url: 'https://images.live.vkvideo.ru/smile/e46b4fbd-901a-4f62-8924-da9eb4f094f8/icon/size/large?change_time=1759944303',
+                start: 0,
+                end: 0
+            }
+        ],
+        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=ZZ'
+    },
+    {
+        id: 6,
+        platform: 'twitch',
+        author: 'Posobachii',
+        message: 'аравудус подрубил JustAnotherDay',
+        time: '12:05',
+        role: 'Viewer',
+        badges: [],
+        avatar_url: 'https://placehold.co/40x40/475569/FFFFFF?text=P'
     }
 ];
 
@@ -136,6 +167,13 @@ const SETTINGS_SELECT_TRIGGER_CLASS = 'h-9 bg-background/70 border-border/60 tex
 const FONT_OPTIONS = [
     'Inter', 'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Oswald',
     'Raleway', 'Poppins', 'Ubuntu', 'Nunito', 'Rubik', 'Fira Sans'
+];
+
+const FONT_WEIGHT_OPTIONS = [
+    { value: 'normal', label: 'Обычный' },
+    { value: '500', label: 'Средний' },
+    { value: '600', label: 'Полужирный' },
+    { value: '700', label: 'Жирный' }
 ];
 
 const ANIMATION_OPTIONS = [
@@ -337,7 +375,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                 <TabsContent value="appearance" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Типографика</div>
-                                        <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="grid gap-4 md:grid-cols-3">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Шрифт</Label>
                                                 <Select
@@ -368,6 +406,24 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     inputWidth={56}
                                                     inputClassName="text-sm"
                                                 />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Насыщенность</Label>
+                                                <Select
+                                                    value={String(settings.font_weight || 'normal')}
+                                                    onValueChange={(v) => handleChange('font_weight', v)}
+                                                >
+                                                    <SelectTrigger className={SETTINGS_SELECT_TRIGGER_CLASS}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-card border-border/60 z-[11000] font-base">
+                                                        {FONT_WEIGHT_OPTIONS.map((option) => (
+                                                            <SelectItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
                                         </div>
                                     </div>

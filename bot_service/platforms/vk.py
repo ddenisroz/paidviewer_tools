@@ -121,16 +121,6 @@ class VKPlatform(StreamingPlatform):
                 except Exception as e:
                     logger.warning(f"Failed to resolve VK channel URL: {e}")
 
-            if not channel_name:
-                twitch_fallback = self._normalize_channel_slug(user.twitch_username)
-                if twitch_fallback:
-                    channel_name = twitch_fallback
-                    logger.warning(
-                        "Using Twitch username as VK channel slug fallback for user %s: %s",
-                        user_id,
-                        channel_name,
-                    )
-
             if channel_name and channel_name != user.vk_channel_name:
                 try:
                     from repositories.user_repository import UserRepository

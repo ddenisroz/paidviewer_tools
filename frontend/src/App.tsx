@@ -1,8 +1,9 @@
-﻿import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useContext } from 'react';
 
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
+import { AuthContext } from '@/context/AuthContext';
 import AppErrorBoundary from '@/shared/components/ErrorBoundary/AppErrorBoundary';
 import RouteErrorBoundary from '@/shared/components/ErrorBoundary/RouteErrorBoundary';
 import Layout from '@/shared/components/layout/Layout';
@@ -40,8 +41,11 @@ const DropsMainPage = lazy(() => import('./features/drops/pages/DropsMainPage'))
 const DropsWidget = lazy(() => import('./pages/obs/DropsWidget'));
 
 const App: React.FC = () => {
+    const authContext = useContext(AuthContext);
+    const userId = authContext?.user?.id;
+
     // Инициализируем WebSocket синхронизацию кэша
-    useCacheWebSocketSync();
+    useCacheWebSocketSync(userId);
 
     return (
         <>

@@ -62,19 +62,21 @@ export const VkRoleBadge: React.FC<VkRoleBadgeProps> = ({ role, size = 14, class
         return (
             <span
                 className={className}
+                title={role}
+                aria-label={role}
                 style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    padding: '2px 6px',
+                    justifyContent: 'center',
+                    width: `${size + 8}px`,
+                    height: `${size + 8}px`,
                     borderRadius: '6px',
-                    fontSize: `${Math.max(10, Math.round(size * 0.7))}px`,
-                    textTransform: 'uppercase',
                     backgroundColor: 'rgba(239, 68, 68, 0.2)',
                     color: '#F87171',
                     ...style
                 }}
             >
-                {role}
+                <ShieldCheck style={{ width: `${size}px`, height: `${size}px` }} />
             </span>
         );
     }
@@ -83,21 +85,21 @@ export const VkRoleBadge: React.FC<VkRoleBadgeProps> = ({ role, size = 14, class
     return (
         <span
             className={className}
+            title={config.label}
+            aria-label={config.label}
             style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '4px',
-                padding: '2px 6px',
+                justifyContent: 'center',
+                width: `${size + 8}px`,
+                height: `${size + 8}px`,
                 borderRadius: '6px',
-                fontSize: `${Math.max(10, Math.round(size * 0.7))}px`,
-                textTransform: 'uppercase',
                 backgroundColor: config.bg,
                 color: config.color,
                 ...style
             }}
         >
             <Icon style={{ width: `${size}px`, height: `${size}px` }} />
-            <span>{config.label}</span>
         </span>
     );
 };

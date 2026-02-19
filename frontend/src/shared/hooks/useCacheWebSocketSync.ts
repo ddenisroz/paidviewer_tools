@@ -10,11 +10,13 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { logger } from '@/shared/utils/prodLogger';
 import { getSharedWebSocket } from '@/shared/utils/sharedWebSocket';
+import { queryKeys } from '@/queries/queryKeys';
 
 interface WebSocketMessage {
     type: string;
-    data?: unknown;
+    data?: Record<string, unknown>;
     queryKey?: string[];
+    platform?: 'twitch' | 'vk';
 }
 
 /**
@@ -33,6 +35,36 @@ export const useCacheWebSocketSync = (userId?: string | number) => {
         } else if (msg?.type === 'update' && msg.queryKey && msg.data) {
             logger.debug('[CacheSync] Updating query:', msg.queryKey);
             queryClient.setQueryData(msg.queryKey, msg.data);
+        } else if (msg?.type === 'stream_info_updated') {
+            const payload = msg.data || {};
+            const platform = (payload.platform || msg.platform) as 'twitch' | 'vk' | undefined;
+            const streamInfo = payload.stream_info as Record<string, unknown> | undefined;
+
+            if (platform === 'twitch') {
+                if (streamInfo) {
+                    queryClient.setQueryData(queryKeys.stream.twitchInfo(), (old: Record<string, unknown> | undefined) => ({
+                        ...(old || {}),
+                        data: {
+                            ...((old as { data?: Record<string, unknown> } | undefined)?.data || {}),
+                            ...streamInfo,
+                        },
+                    }));
+                }
+                queryClient.invalidateQueries({ queryKey: queryKeys.stream.twitchInfo() });
+            } else if (platform === 'vk') {
+                if (streamInfo) {
+                    queryClient.setQueryData(queryKeys.stream.vkInfo(), (old: Record<string, unknown> | undefined) => ({
+                        ...(old || {}),
+                        data: {
+                            ...((old as { data?: Record<string, unknown> } | undefined)?.data || {}),
+                            ...streamInfo,
+                        },
+                    }));
+                }
+                queryClient.invalidateQueries({ queryKey: queryKeys.stream.vkInfo() });
+            } else {
+                queryClient.invalidateQueries({ queryKey: queryKeys.stream.all });
+            }
         }
     }, [queryClient]);
 

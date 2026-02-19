@@ -484,11 +484,17 @@ class VKLiveWebSocketClient:
     async def _handle_chat_message(self, channel: str, message_data: dict):
         """Обработка сообщения чата"""
         try:
+            chat_payload = message_data
+            if isinstance(message_data, dict):
+                nested_payload = message_data.get("chat_message") or message_data.get("message")
+                if isinstance(nested_payload, dict):
+                    chat_payload = nested_payload
+
             # Извлекаем данные сообщения
-            author = message_data.get("author", {})
-            message_id = message_data.get("id")
-            created_at = message_data.get("created_at")
-            parts = normalize_parts(message_data.get("parts", []), message_data.get("data"))
+            author = chat_payload.get("author", {})
+            message_id = chat_payload.get("id")
+            created_at = chat_payload.get("created_at")
+            parts = normalize_parts(chat_payload.get("parts", []), chat_payload.get("data"))
 
             # Формируем текст сообщения
             message_text, emotes = build_message_text_and_emotes(parts)

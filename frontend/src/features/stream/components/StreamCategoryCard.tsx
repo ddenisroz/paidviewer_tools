@@ -50,6 +50,7 @@ const StreamCategoryCard: React.FC = () => {
     const isSyncingRef = useRef(false);
     const skipNextSyncRef = useRef(false);
     const suppressSyncUntilRef = useRef(0);
+    const suppressBlurRestoreRef = useRef(false);
     const focusRestoreRef = useRef<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
     const clearedOnFocusRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
 
@@ -293,8 +294,14 @@ const StreamCategoryCard: React.FC = () => {
         }
 
         if (Object.keys(payload).length > 0) {
-            await saveChanges(payload, 'saveCategory');
-            setIsUserDirty(false);
+            const success = await saveChanges(payload, 'saveCategory');
+            if (success) {
+                setIsUserDirty(false);
+                isEditingRef.current = { twitch: false, vk: false };
+                suppressBlurRestoreRef.current = true;
+                const active = document.activeElement as HTMLElement | null;
+                active?.blur();
+            }
         }
     };
 
@@ -384,6 +391,10 @@ const StreamCategoryCard: React.FC = () => {
                                     if (twitchEnabled) setShowDropdown({ twitch: true, vk: false });
                                 }}
                                 onBlur={() => {
+                                    if (suppressBlurRestoreRef.current) {
+                                        suppressBlurRestoreRef.current = false;
+                                        return;
+                                    }
                                     isEditingRef.current = isLinked && bothEnabled
                                         ? { twitch: false, vk: false }
                                         : { ...isEditingRef.current, twitch: false };
@@ -449,6 +460,10 @@ const StreamCategoryCard: React.FC = () => {
                                         }
                                     }}
                                     onBlur={() => {
+                                        if (suppressBlurRestoreRef.current) {
+                                            suppressBlurRestoreRef.current = false;
+                                            return;
+                                        }
                                         isEditingRef.current = { ...isEditingRef.current, vk: false };
                                         if (!showDropdown.vk) {
                                             const vkName = getCategoryName(currentData.vk?.category as StreamCategory | undefined);

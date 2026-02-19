@@ -100,9 +100,10 @@ textarea:-webkit-autofill:focus {
 /* Inline chat emotes: large visually, stable line-height footprint */
 .chat-inline-emote {
   display: inline-block;
-  width: 1.35em;
   height: 1.35em;
-  min-width: 1.35em;
+  width: auto;
+  max-height: 1.35em;
+  min-width: 1em;
   min-height: 1.35em;
   vertical-align: middle;
   object-fit: contain;
@@ -975,4 +976,3 @@ input[placeholder] {
     opacity: 1;
   }
 }
-

@@ -28,6 +28,13 @@ interface Emotes {
     globalEmotes: Map<string, unknown>;
 }
 
+const normalizeVkAssetUrl = (url?: string): string => {
+    if (!url) return '';
+    if (url.startsWith('//')) return `https:${url}`;
+    if (url.startsWith('/')) return `https://images.live.vkvideo.ru${url}`;
+    return url;
+};
+
 const ChatWindow: React.FC = () => {
     const { user, isAuthenticated } = useAuth();
     const { messages, isConnected } = useChat();
@@ -433,6 +440,29 @@ const ChatWindow: React.FC = () => {
                                             {settings.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
                                                 <>
                                                     {msg.badges.map((badge: string, idx: number) => {
+                                                        if (msg.platform === 'vk') {
+                                                            const badgeUrl = normalizeVkAssetUrl(badge);
+                                                            if (!badgeUrl) return null;
+                                                            return (
+                                                                <img
+                                                                    key={idx}
+                                                                    src={badgeUrl}
+                                                                    alt="vk-badge"
+                                                                    title={badge}
+                                                                    style={{
+                                                                        width: `${badgeSize}px`,
+                                                                        height: `${badgeSize}px`,
+                                                                        objectFit: 'contain',
+                                                                        display: 'inline-block',
+                                                                        verticalAlign: 'text-bottom'
+                                                                    }}
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            );
+                                                        }
+
                                                         const [badgeId, version] = badge.split('/');
                                                         const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
 

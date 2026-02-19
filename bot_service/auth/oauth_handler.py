@@ -253,6 +253,9 @@ class OAuthHandler:
                         if vk_channel:
                             unified_user.vk_channel_name = vk_channel
                             logger.info(f"Updated VK channel_name: {vk_channel}")
+                        else:
+                            unified_user.vk_channel_name = None
+                            logger.info("Cleared stale VK channel_name (no channel slug in OAuth data)")
                         if vk_display:
                             unified_user.vk_username = vk_display
 
@@ -298,6 +301,9 @@ class OAuthHandler:
                         if vk_channel:
                             unified_user.vk_channel_name = vk_channel
                             logger.info(f"Updated VK channel_name: {vk_channel}")
+                        else:
+                            unified_user.vk_channel_name = None
+                            logger.info("Cleared stale VK channel_name (no channel slug in OAuth data)")
                         if vk_display:
                             unified_user.vk_username = vk_display
 
@@ -621,6 +627,9 @@ class OAuthHandler:
                 if channel_name:
                     settings.vk_channel_name = channel_name.lower()
                     logger.info(f"[OK] Set VK channel_name: {channel_name}")
+                else:
+                    settings.vk_channel_name = None
+                    logger.info("[OK] Cleared VK channel_name in UserSettings (no channel slug)")
 
             db.commit()
             logger.info(f"[OK] UserSettings updated for user {user_id}, platform {platform}")

@@ -331,6 +331,13 @@ class VKClient(BaseIntegrationClient):
             return False
 
         except IntegrationError as e:
+            if e.status_code == 403:
+                logger.warning("[VK client] Stream update forbidden for channel %s", channel_url)
+                self.last_error = (
+                    "VK denied stream update (403 forbidden). "
+                    "Connected VK token has no stream-edit rights for this channel."
+                )
+                return False
             if e.status_code == 405:
                 logger.warning(f"[VK client] Stream update is unsupported by VK API (405): {e}")
                 self.last_error = "VK API does not support stream update for this channel/app"

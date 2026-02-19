@@ -56,6 +56,8 @@ const clampNumber = (value: number, min: number, max: number): number => {
 
 const normalizeVkAssetUrl = (url?: string): string => {
     if (!url) return '';
+    if (url.startsWith('//')) return `https:${url}`;
+    if (url.startsWith('/')) return `https://images.live.vkvideo.ru${url}`;
     return url;
 };
 

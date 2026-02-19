@@ -44,23 +44,23 @@ const HomePage: React.FC = () => {
 
     const { data: twitchStreamInfo } = useTwitchStreamInfo({
         enabled: !!isAuthenticated && !!integrations?.twitch?.enabled,
-        staleTime: 120 * 1000,
+        staleTime: 30 * 1000,
         gcTime: 5 * 60 * 1000,
-        refetchInterval: 120 * 1000,
+        refetchInterval: 30 * 1000,
         refetchIntervalInBackground: false,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
         retry: 1,
     });
 
     const { data: vkStreamInfo } = useVkStreamInfo({
         enabled: !!isAuthenticated && !!integrations?.vk?.enabled,
-        staleTime: 120 * 1000,
+        staleTime: 30 * 1000,
         gcTime: 5 * 60 * 1000,
-        refetchInterval: 120 * 1000,
+        refetchInterval: 30 * 1000,
         refetchIntervalInBackground: false,
-        refetchOnMount: false,
-        refetchOnWindowFocus: false,
+        refetchOnMount: true,
+        refetchOnWindowFocus: true,
         retry: 1,
     });
 

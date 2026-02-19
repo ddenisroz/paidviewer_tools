@@ -49,6 +49,7 @@ const StreamTitleCard: React.FC = () => {
     const focusRestoreRef = useRef<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
     const clearedOnFocusRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
     const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+    const suppressBlurRestoreRef = useRef(false);
 
     useEffect(() => {
         if (Date.now() < suppressSyncUntilRef.current) {
@@ -146,19 +147,26 @@ const StreamTitleCard: React.FC = () => {
         if (title === undefined) return;
 
         try {
+            let success = false;
             if (isLinked) {
                 if (!isChanged) return;
-                await saveChanges({
+                success = await saveChanges({
                     twitch: { title: currentData.twitch?.title },
                     vk: { title: currentData.twitch?.title } // Sync VK to Twitch
                 }, 'saveTitle');
-                setIsUserDirty(false);
             } else {
                 if (!hasPlatformChange(platform)) return;
                 const payload: Partial<Record<'twitch' | 'vk', { title: string }>> = {};
                 payload[platform] = { title };
-                await saveChanges(payload, 'saveTitle');
+                success = await saveChanges(payload, 'saveTitle');
+            }
+
+            if (success) {
                 setIsUserDirty(false);
+                isEditingRef.current = false;
+                suppressBlurRestoreRef.current = true;
+                const active = document.activeElement as HTMLElement | null;
+                active?.blur();
             }
         } catch (error) {
             logger.error('Error saving title:', error);
@@ -202,6 +210,11 @@ const StreamTitleCard: React.FC = () => {
 
     const handleInputBlur = (platform: 'twitch' | 'vk', e: React.FocusEvent<HTMLInputElement>) => {
         isEditingRef.current = false;
+
+        if (suppressBlurRestoreRef.current) {
+            suppressBlurRestoreRef.current = false;
+            return;
+        }
 
         const nextFocused = e.relatedTarget as Node | null;
         if (nextFocused && saveButtonRef.current?.contains(nextFocused)) {
