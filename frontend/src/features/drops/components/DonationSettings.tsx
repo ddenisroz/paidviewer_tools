@@ -312,7 +312,8 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       {/* Настройки донатов - компактно */}
       <Card className={SURFACE_CARD_CLASS}>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Платные вознаграждения</CardTitle>
             <div className="flex items-center gap-2">
               <Label className="text-sm font-medium">Включить donation drops</Label>
               <div title={!donationalertsConnected ? "Нажмите чтобы подключить DonationAlerts" : ""}>
@@ -394,7 +395,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       {/* Мифический lootbox - компактно */}
       <Card className={`${SURFACE_CARD_CLASS} border-emerald-500/30`}>
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between min-h-[48px]">
             <CardTitle className="text-lg flex items-center gap-2 text-emerald-300">
               <img src={MythycClosed} alt="Мифический" className="w-10 h-10 flex-shrink-0" />
               <Sparkles className="w-5 h-5 flex-shrink-0" />
@@ -470,7 +471,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       }`}
                       onClick={() => setMythicalMinInterval(preset)}
                     >
-                      {preset}С‡
+                      {preset}ч
                     </Button>
                   ))}
                 </div>
@@ -509,7 +510,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       }`}
                       onClick={() => setMythicalMaxInterval(preset)}
                     >
-                      {preset}С‡
+                      {preset}ч
                     </Button>
                   ))}
                 </div>
@@ -548,7 +549,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       }`}
                       onClick={() => setMythicalWindowDuration(preset)}
                     >
-                      {preset}Рј
+                      {preset}м
                     </Button>
                   ))}
                 </div>
@@ -588,7 +589,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                       }`}
                       onClick={() => setMythicalDonationAmount(preset)}
                     >
-                      {preset}в‚Ѕ
+                      {preset}₽
                     </Button>
                   ))}
                 </div>
@@ -607,4 +608,3 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
 };
 
 export default DonationSettings;
-

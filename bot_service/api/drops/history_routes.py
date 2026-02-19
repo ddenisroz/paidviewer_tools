@@ -5,6 +5,7 @@ Drops History, Stats, Streaks, and Open endpoints.
 Clean Architecture: endpoints delegate to DropsService.
 """
 import logging
+from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -69,6 +70,11 @@ async def get_drops_qualities(db: Session = Depends(get_db)):
 async def get_drops_history(
     channel_name: str,
     platform: Optional[str] = None,
+    viewer: Optional[str] = None,
+    reward: Optional[str] = None,
+    drops_type: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
     current_user: dict = Depends(get_current_user),
@@ -85,9 +91,41 @@ async def get_drops_history(
             limit=limit,
             offset=offset
         )
+
+        filtered_history = history
+
+        if viewer:
+            viewer_norm = viewer.strip().lower()
+            filtered_history = [h for h in filtered_history if viewer_norm in (h.viewer_name or "").lower()]
+
+        if reward:
+            reward_norm = reward.strip().lower()
+            filtered_history = [h for h in filtered_history if reward_norm in (h.reward_name or "").lower()]
+
+        if drops_type:
+            type_norm = drops_type.strip().lower()
+            filtered_history = [h for h in filtered_history if (h.lootbox_type or "").lower() == type_norm]
+
+        parsed_date_from: Optional[datetime] = None
+        parsed_date_to: Optional[datetime] = None
+        if date_from:
+            try:
+                parsed_date_from = datetime.fromisoformat(date_from)
+            except ValueError:
+                parsed_date_from = None
+        if date_to:
+            try:
+                parsed_date_to = datetime.fromisoformat(date_to)
+            except ValueError:
+                parsed_date_to = None
+
+        if parsed_date_from:
+            filtered_history = [h for h in filtered_history if h.created_at and h.created_at >= parsed_date_from]
+        if parsed_date_to:
+            filtered_history = [h for h in filtered_history if h.created_at and h.created_at <= parsed_date_to]
         
         # Get quality info for entries
-        quality_ids = {e.quality_id for e in history if e.quality_id}
+        quality_ids = {e.quality_id for e in filtered_history if e.quality_id}
         qualities = service.get_qualities_by_ids(list(quality_ids))
         
         return {
@@ -96,6 +134,7 @@ async def get_drops_history(
                 {
                     "id": entry.id,
                     "viewer_name": entry.viewer_name,
+                    "platform": entry.platform,
                     "drops_type": entry.lootbox_type,
                     "quality": qualities.get(entry.quality_id, {}),
                     "reward_name": entry.reward_name,
@@ -105,7 +144,7 @@ async def get_drops_history(
                     "messages_count": entry.messages_count,
                     "created_at": entry.created_at
                 }
-                for entry in history
+                for entry in filtered_history
             ]
         }
     except HTTPException:

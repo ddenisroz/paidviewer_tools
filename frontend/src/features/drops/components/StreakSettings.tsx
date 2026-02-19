@@ -1,8 +1,7 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
-/* eslint-disable no-alert */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Gift, Loader2, Package } from 'lucide-react';
+import { AlertTriangle, Loader2, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { DROPS_CONSTANTS } from '@/constants/drops';
@@ -44,6 +43,7 @@ interface StreakSettingsFormData {
 }
 
 const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
+const BLUE_TEXT_BUTTON_CLASS = 'border-border/70 bg-transparent text-sky-300 hover:bg-transparent hover:text-sky-200';
 
 const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasRewards = false, integrations }) => {
   const navigate = useNavigate();
@@ -62,6 +62,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     streak_enabled_twitch: false,
     streak_enabled_vk: false
   });
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     const handleDropsConfigChange = (event: CustomEvent) => {
@@ -227,11 +228,11 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       toast.error('Недостаточно данных');
       return;
     }
-
-    if (!confirm('Вы уверены, что хотите сбросить всю статистику серии? Это действие необратимо!')) {
+    if (!showResetConfirm) {
+      setShowResetConfirm(true);
       return;
     }
-
+    setShowResetConfirm(false);
     resetStatsMutation.mutate();
   };
 
@@ -315,7 +316,6 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
           <div className="flex items-center justify-between flex-wrap gap-3">
             {/* Заголовок календаря - слева */}
             <div className="flex items-center gap-2">
-              <Gift className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">Календарь стриков</h3>
             </div>
 
@@ -356,14 +356,14 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
       <Card className={SURFACE_CARD_CLASS}>
         <CardContent className="space-y-4 pt-6">
           {/* Сообщений для засчета дня */}
-          <div className="space-y-2">
+          <div className="space-y-2 rounded-xl border border-border/70 bg-transparent p-3">
             <div className="flex items-center justify-between">
               <Label className="text-sm">Сообщений для засчета стрима</Label>
               <Input
                 type="number"
                 value={messagesRequired}
                 onChange={(e) => handleMessagesRequiredChange(parseInt(e.target.value, 10) || 1)}
-                className="w-20 h-8 text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="h-9 w-24 border-border/70 bg-transparent text-center text-base font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 min={1}
                 max={maxMessagesRequired}
               />
@@ -375,41 +375,58 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
               max={maxMessagesRequired}
               step={1}
             />
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>Минимум: 1</span>
-              <span>Максимум: {maxMessagesRequired}</span>
-            </div>
-          </div>
-
-          {/* Сброс при пропуске */}
-          <div className="flex items-center justify-between p-3 border border-border/70 bg-card/60 rounded-lg">
-            <div>
-              <Label className="text-sm font-medium">Сброс при пропуске</Label>
-              <p className="text-xs text-muted-foreground">Обнулять стрик при неактивности во время стрима</p>
-            </div>
-            <Switch
-              checked={formData.streak_reset_on_skip}
-              onCheckedChange={(checked) => {
-                setFormData({ ...formData, streak_reset_on_skip: checked });
-                // Автосохранение уже в useEffect
-              }}
-            />
           </div>
         </CardContent>
       </Card>
 
+      <div className="flex items-center justify-between rounded-xl border border-border/70 bg-transparent p-3">
+        <div>
+          <Label className="text-sm font-medium">Сброс при пропуске</Label>
+          <p className="text-xs text-muted-foreground">Обнулять стрик при неактивности во время стрима</p>
+        </div>
+        <Switch
+          checked={formData.streak_reset_on_skip}
+          onCheckedChange={(checked) => {
+            setFormData({ ...formData, streak_reset_on_skip: checked });
+          }}
+        />
+      </div>
+
       {/* Кнопка сброса статистики */}
-      <div className="flex items-center gap-3 justify-end">
-        <Button
-          onClick={handleResetStatistics}
-          disabled={resetStatsMutation.isPending}
-          size="sm"
-          variant="destructive"
-          className="gap-2"
-        >
-          <AlertTriangle className="w-4 h-4" />
-          {resetStatsMutation.isPending ? 'Сброс...' : 'Сбросить статистику стриков'}
-        </Button>
+      <div className="flex items-center justify-end gap-2">
+        {showResetConfirm ? (
+          <>
+            <Button
+              onClick={handleResetStatistics}
+              disabled={resetStatsMutation.isPending}
+              size="sm"
+              variant="outline"
+              className="gap-2 border-red-500/40 bg-transparent text-red-300 hover:bg-transparent hover:text-red-200"
+            >
+              <AlertTriangle className="w-4 h-4" />
+              {resetStatsMutation.isPending ? 'Сброс...' : 'Подтвердить сброс'}
+            </Button>
+            <Button
+              onClick={() => setShowResetConfirm(false)}
+              size="sm"
+              variant="outline"
+              className={BLUE_TEXT_BUTTON_CLASS}
+            >
+              Отмена
+            </Button>
+          </>
+        ) : (
+          <Button
+            onClick={handleResetStatistics}
+            disabled={resetStatsMutation.isPending}
+            size="sm"
+            variant="outline"
+            className={BLUE_TEXT_BUTTON_CLASS}
+          >
+            <AlertTriangle className="w-4 h-4 mr-2" />
+            Сбросить статистику стриков
+          </Button>
+        )}
       </div>
     </div>
   );

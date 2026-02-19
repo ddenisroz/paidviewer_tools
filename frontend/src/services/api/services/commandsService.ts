@@ -18,6 +18,10 @@ export const commandsService = {
     return apiClient.get('/api/commands');
   },
 
+  async getHistory(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse<Command[]>>> {
+    return apiClient.get('/api/commands/history', { params });
+  },
+
   /**
    * Создать команду
    * @param command - Данные команды

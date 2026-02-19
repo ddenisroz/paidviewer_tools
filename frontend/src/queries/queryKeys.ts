@@ -65,6 +65,7 @@ export const queryKeys = {
   commands: {
     all: ['commands'] as const,
     list: () => ['commands'] as const,
+    history: (params?: Record<string, unknown>) => ['commands', 'history', params] as const,
   },
 
   // Chat

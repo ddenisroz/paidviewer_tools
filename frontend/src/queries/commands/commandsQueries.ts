@@ -32,7 +32,10 @@ interface ApiCommandResponse {
   alias?: string;
   created_at?: string;
   updated_at?: string;
+  last_used?: string;
+  usage_count?: number;
   tags?: string[];
+  extra_settings?: Record<string, unknown>;
 }
 
 interface CommandsApiResponse {
@@ -71,8 +74,11 @@ const mapApiCommandToFrontend = (cmd: ApiCommandResponse): ChatCommand => {
     platform,
     created_at: cmd.created_at,
     updated_at: cmd.updated_at,
+    last_used: cmd.last_used,
+    usage_count: cmd.usage_count || 0,
     tags: cmd.tags || [],
     command_type: cmd.command_type as 'global' | 'override' | 'custom' | undefined,
+    extra_settings: cmd.extra_settings || {},
   };
 };
 
@@ -95,6 +101,23 @@ export const useCommands = (options?: Omit<UseQueryOptions<CommandsData, AxiosEr
     refetchOnMount: true,
     refetchOnWindowFocus: false,
     retry: 1,
+    ...options,
+  });
+};
+
+export const useCommandsHistory = (
+  params: Record<string, unknown> = {},
+  options?: Omit<UseQueryOptions<ChatCommand[], AxiosError>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery<ChatCommand[], AxiosError>({
+    queryKey: queryKeys.commands.history(params),
+    queryFn: async () => {
+      const response = await unwrapResponse(commandsService.getHistory(params));
+      const raw = (response?.data || []) as unknown as ApiCommandResponse[];
+      return raw.map(mapApiCommandToFrontend);
+    },
+    staleTime: 15 * 1000,
+    gcTime: 5 * 60 * 1000,
     ...options,
   });
 };

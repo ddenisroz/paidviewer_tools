@@ -230,6 +230,49 @@ class CommandRepository(BaseRepository[BotCommand]):
         ).filter(
             BotCommand.is_enabled == True
         ).all()
+
+    def get_command_history(
+        self,
+        user_id: int,
+        platform: Optional[str] = None,
+        command_type: Optional[str] = None,
+        search: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[BotCommand]:
+        """Get recently used commands for user with optional filters."""
+        query = self.db.query(BotCommand).filter(
+            and_(
+                BotCommand.user_id == user_id,
+                or_(BotCommand.last_used.isnot(None), BotCommand.usage_count > 0),
+            )
+        )
+
+        if platform:
+            query = query.filter(
+                or_(
+                    BotCommand.platforms.like(f"%{platform}%"),
+                    BotCommand.platforms.like("%all%"),
+                )
+            )
+
+        if command_type and command_type != "all":
+            query = query.filter(BotCommand.command_type == command_type)
+
+        if search:
+            pattern = f"%{search.strip().lower()}%"
+            query = query.filter(
+                or_(
+                    BotCommand.command_name.ilike(pattern),
+                    BotCommand.alias.ilike(pattern),
+                    BotCommand.response_text.ilike(pattern),
+                )
+            )
+
+        return (
+            query.order_by(BotCommand.last_used.desc().nullslast(), BotCommand.usage_count.desc())
+            .limit(max(1, min(limit, 300)))
+            .all()
+        )
         
     def delete_command(self, command: BotCommand) -> None:
         """Delete command."""

@@ -163,6 +163,7 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
 const SETTINGS_SECTION_CLASS = 'rounded-lg border border-border/60 bg-card/60 p-4 space-y-4';
 const SETTINGS_SECTION_TITLE_CLASS = 'text-[11px] uppercase tracking-wider text-muted-foreground';
 const SETTINGS_SELECT_TRIGGER_CLASS = 'h-9 bg-background/70 border-border/60 text-sm font-normal font-base';
+const BLUE_ACTIVE_CLASS = 'data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:border-sky-500/60';
 
 const FONT_OPTIONS = [
     'Inter', 'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Oswald',
@@ -340,16 +341,27 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                             {/* OBS URL */}
                             <div className="space-y-2">
                                 <Label className="text-xs text-muted-foreground">Ссылка для OBS</Label>
-                                <div className="flex gap-1.5">
+                                <div className="flex gap-2">
                                     <Input
                                         value={settings.widget_url || ''}
                                         readOnly
-                                        className="bg-background/70 text-foreground border-border/60 h-8 flex-1 truncate text-sm font-normal font-base"
+                                        className="h-9 flex-1 truncate border-sky-500/35 bg-background/60 text-sm font-medium text-foreground font-base shadow-[0_0_0_1px_rgba(14,165,233,0.15)]"
                                     />
-                                    <Button onClick={copyToClipboard} variant="outline" size="sm" className="border-border/60 h-8 w-8 p-0">
+                                    <Button
+                                        onClick={copyToClipboard}
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-9 w-9 border-sky-500/40 bg-transparent p-0 text-sky-300 hover:bg-sky-500/10 hover:text-sky-200"
+                                    >
                                         {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                                     </Button>
-                                    <Button onClick={() => handleSave(true)} variant="outline" size="sm" className="border-border/60 h-8 w-8 p-0" title="Обновить токен">
+                                    <Button
+                                        onClick={() => handleSave(true)}
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-9 w-9 border-sky-500/40 bg-transparent p-0 text-sky-300 hover:bg-sky-500/10 hover:text-sky-200"
+                                        title="Обновить токен"
+                                    >
                                         <RefreshCw className="w-3 h-3" />
                                     </Button>
                                 </div>
@@ -359,14 +371,14 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         {/* Right: Settings Tabs */}
                         <div className="flex-1 min-w-0 min-h-0">
                             <Tabs defaultValue="appearance" className="h-full flex flex-col overflow-hidden min-h-0">
-                                <TabsList className="grid grid-cols-3 gap-1 p-1 rounded-lg border border-border/60 bg-card/50 mb-4 font-base">
-                                    <TabsTrigger value="appearance" className="text-xs gap-1.5 rounded-md text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+                                <TabsList className="mb-4 grid grid-cols-3 gap-2 bg-transparent p-0 font-base">
+                                    <TabsTrigger value="appearance" className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}>
                                         <Palette className="w-3 h-3" /> Внешний вид
                                     </TabsTrigger>
-                                    <TabsTrigger value="animation" className="text-xs gap-1.5 rounded-md text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+                                    <TabsTrigger value="animation" className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}>
                                         <Sparkles className="w-3 h-3" /> Анимация
                                     </TabsTrigger>
-                                    <TabsTrigger value="display" className="text-xs gap-1.5 rounded-md text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+                                    <TabsTrigger value="display" className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}>
                                         <Settings2 className="w-3 h-3" /> Отображение
                                     </TabsTrigger>
                                 </TabsList>
@@ -584,10 +596,6 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Аватарки</Label>
                                                 <Switch checked={settings.show_avatars ?? false} onCheckedChange={(v) => handleChange('show_avatars', v)} />
-                                            </div>
-                                            <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
-                                                <Label className="text-sm text-foreground">Роли</Label>
-                                                <Switch checked={settings.show_roles ?? false} onCheckedChange={(v) => handleChange('show_roles', v)} />
                                             </div>
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Автозагрузка медиа</Label>

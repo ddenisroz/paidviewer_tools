@@ -22,12 +22,11 @@ interface QualityConfig {
 }
 
 const QUALITY_CONFIGS: QualityConfig[] = [
-  { id: 'common', label: 'РћР±С‹С‡РЅС‹Р№', color: '#6B7280', image: CommonClosed },
-  { id: 'rare', label: 'Р РµРґРєРёР№', color: '#3B82F6', image: RareClosed },
-  { id: 'epic', label: 'Р­РїРёС‡РµСЃРєРёР№', color: '#8B5CF6', image: EpicClosed },
-  { id: 'legendary', label: 'Р›РµРіРµРЅРґР°СЂРЅС‹Р№', color: '#F59E0B', image: LegendaryClosed }
+  { id: 'common', label: 'Обычный', color: '#6B7280', image: CommonClosed },
+  { id: 'rare', label: 'Редкий', color: '#3B82F6', image: RareClosed },
+  { id: 'epic', label: 'Эпический', color: '#8B5CF6', image: EpicClosed },
+  { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed }
 ];
-const DONATION_PRESETS = [50, 100, 250, 500, 1000, 2000, 5000];
 
 interface DonationGridFormData {
     donation_amount_common: number[];
@@ -84,7 +83,7 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                   />
                   <div>
                     <Label className="text-sm font-medium">{quality.label}</Label>
-                    <p className="text-xs text-muted-foreground">РћС‚ {value}в‚Ѕ</p>
+                    <p className="text-xs text-muted-foreground">От {value}?</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 border border-border/70 bg-card/70 rounded-lg">
@@ -116,24 +115,6 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                   </Button>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {DONATION_PRESETS.filter((preset) => preset <= maxValue).map((preset) => (
-                  <Button
-                    key={`${quality.id}-${preset}`}
-                    type="button"
-                    variant={value === preset ? 'secondary' : 'outline'}
-                    size="sm"
-                    className={`h-7 px-2 text-xs ${
-                      value === preset
-                        ? 'bg-accent text-foreground border-border/70'
-                        : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
-                    }`}
-                    onClick={() => setFormData({ ...formData, [fieldName]: [preset] })}
-                  >
-                    {preset}в‚Ѕ
-                  </Button>
-                ))}
-              </div>
               <Slider
                 value={formData[fieldName]}
                 onValueChange={(val) => setFormData({ ...formData, [fieldName]: val })}
@@ -151,4 +132,6 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
 };
 
 export default DonationGrid;
+
+
 

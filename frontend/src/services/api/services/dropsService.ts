@@ -94,10 +94,19 @@ export const dropsService = {
    * @returns Promise с ответом API
    */
   async toggleReward(_channelName: string, rewardId: number, isActive: boolean): Promise<AxiosResponse<ApiResponse>> {
-    // Backend endpoint: PATCH /api/drops/rewards/{reward_id}/toggle
-    return apiClient.patch(`/api/drops/rewards/${rewardId}/toggle`, {
-      is_active: isActive,
-    });
+    // Primary endpoint: PATCH /api/drops/rewards/{reward_id}/toggle
+    // Fallback for older backend builds: PUT /api/drops/rewards/{reward_id}
+    try {
+      return await apiClient.patch(`/api/drops/rewards/${rewardId}/toggle`, {
+        is_active: isActive,
+      });
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status !== 404) throw error;
+      return apiClient.put(`/api/drops/rewards/${rewardId}`, {
+        is_active: isActive,
+      });
+    }
   },
 
   /**

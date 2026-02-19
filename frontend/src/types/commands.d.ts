@@ -18,10 +18,12 @@ export interface ChatCommand {
   platform?: 'twitch' | 'vk' | 'youtube' | 'all';
   channel_name?: string;
   usage_count?: number;
+  last_used?: string;
   created_at?: string;
   updated_at?: string;
   tags?: string[];
   command_type?: 'global' | 'override' | 'custom';
+  extra_settings?: Record<string, unknown>;
 }
 
 /**

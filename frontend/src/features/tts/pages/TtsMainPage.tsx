@@ -1512,18 +1512,18 @@ const TtsMainPageContent: React.FC = () => {
                                                 <div className="grid grid-cols-2 gap-2 mb-3">
                                                     <button
                                                         onClick={() => handleListeningModeChange('website')}
-                                                        className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
-                                                            ? 'bg-emerald-600 text-white'
-                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                        className={`py-2 px-3 rounded-lg border text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
+                                                            ? 'border-sky-500/60 bg-transparent text-sky-300'
+                                                            : 'border-gray-700/50 bg-transparent text-gray-400 hover:border-sky-500/40 hover:text-sky-300'
                                                             }`}
                                                     >
                                                         Браузер
                                                     </button>
                                                     <button
                                                         onClick={() => handleListeningModeChange('obs')}
-                                                        className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
-                                                            ? 'bg-emerald-600 text-white'
-                                                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700/60 border border-gray-700/50'
+                                                        className={`py-2 px-3 rounded-lg border text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
+                                                            ? 'border-sky-500/60 bg-transparent text-sky-300'
+                                                            : 'border-gray-700/50 bg-transparent text-gray-400 hover:border-sky-500/40 hover:text-sky-300'
                                                             }`}
                                                     >
                                                         OBS
@@ -1539,7 +1539,7 @@ const TtsMainPageContent: React.FC = () => {
                                                     </p>
                                                     <Button
                                                         onClick={openPlayerTab}
-                                                        className="h-9 w-full bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-500"
+                                                        className="h-9 w-full border border-sky-500/50 bg-transparent text-xs font-semibold text-sky-200 hover:bg-sky-500/10 hover:text-sky-100"
                                                     >
                                                         Открыть TTS Player
                                                     </Button>
@@ -1610,12 +1610,10 @@ const TtsMainPageContent: React.FC = () => {
                                                     key={platform}
                                                     onClick={() => handlePlatformToggle(platform)}
                                                     className={`
-                                                    cursor-pointer relative overflow-hidden rounded-xl border transition-all duration-300
-                                                    ${shouldGlow
-                                                            ? platform === 'twitch'
-                                                                ? 'bg-purple-900/40 border-purple-500/50 hover:bg-purple-900/60'
-                                                                : 'bg-rose-900/40 border-rose-500/50 hover:bg-rose-900/60'
-                                                            : 'bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50 hover:border-gray-600/50'
+                                                    cursor-pointer relative overflow-hidden rounded-xl border bg-transparent transition-all duration-300
+                                                    ${platform === 'twitch'
+                                                            ? 'border-purple-500/35 hover:border-purple-400/70'
+                                                            : 'border-rose-500/35 hover:border-rose-400/70'
                                                         }
                                                 `}
                                                 >
@@ -1623,14 +1621,14 @@ const TtsMainPageContent: React.FC = () => {
                                                         <div className={`
                                                         w-10 h-10 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110
                                                         ${shouldGlow
-                                                                ? platform === 'twitch' ? 'bg-purple-500 text-white' : 'bg-rose-500 text-white'
-                                                                : 'bg-gray-700 text-gray-400'
+                                                                ? platform === 'twitch' ? 'bg-purple-500/20 text-purple-300' : 'bg-rose-500/20 text-rose-300'
+                                                                : 'bg-transparent text-gray-400'
                                                             }
                                                     `}>
                                                             {platform === 'twitch' ? <TwitchIcon className="w-5 h-5" /> : <VKIcon className="w-5 h-5" />}
                                                         </div>
                                                         <div className="text-center">
-                                                            <div className="text-sm font-semibold text-white capitalize">{platform}</div>
+                                                            <div className={`text-sm font-semibold capitalize ${platform === 'twitch' ? 'text-purple-300' : 'text-rose-300'}`}>{platform}</div>
                                                             <div className={`text-xs ${statusColor}`}>
                                                                 {statusText}
                                                             </div>
@@ -1649,7 +1647,7 @@ const TtsMainPageContent: React.FC = () => {
                                     </CardHeader>
                                     <CardContent className="space-y-2">
                                         {/* 7TV Emotes */}
-                                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:bg-gray-800/60 transition-colors">
+                                        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-transparent p-3 transition-colors hover:border-sky-500/35 hover:bg-sky-500/5">
                                             <span className="text-sm font-medium text-gray-200">7TV смайлы</span>
                                             <Switch
                                                 checked={ttsSettings.enable7TV}
@@ -1659,7 +1657,7 @@ const TtsMainPageContent: React.FC = () => {
                                         </div>
 
                                         {/* Twitch Emotes */}
-                                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:bg-gray-800/60 transition-colors">
+                                        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-transparent p-3 transition-colors hover:border-sky-500/35 hover:bg-sky-500/5">
                                             <span className="text-sm font-medium text-gray-200">Twitch смайлы</span>
                                             <Switch
                                                 checked={ttsSettings.enableTwitch}
@@ -1669,7 +1667,7 @@ const TtsMainPageContent: React.FC = () => {
                                         </div>
 
                                         {/* Filter Mentions */}
-                                        <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800/40 border border-gray-700/30 hover:bg-gray-800/60 transition-colors">
+                                        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-transparent p-3 transition-colors hover:border-sky-500/35 hover:bg-sky-500/5">
                                             <span className="text-sm font-medium text-gray-200">Озвучивать «@»</span>
                                             <Switch
                                                 checked={!ttsSettings.filterMentions}

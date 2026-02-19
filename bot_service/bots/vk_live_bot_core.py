@@ -344,6 +344,14 @@ class VKLiveBotCore:
                 logger.info(f"[GAME] [VK CMD] Handler completed for: {text[:50]}")
                 return  # Не обрабатываем TTS для команд
 
+            await self.universal_command_handler.handle_vk_message(channel_id, {
+                'message': text,
+                'author_nick': user,
+                'author_id': message.get("author", {}).get("id"),
+                'is_moderator': message.get("author", {}).get("is_moderator", False),
+                'is_owner': message.get("author", {}).get("is_owner", False)
+            }, self)
+
             # 4. Извлекаем reward_id из сообщения
             reward_id = None
             reward_title = None

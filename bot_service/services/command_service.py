@@ -165,7 +165,33 @@ class CommandService:
             "alias": cmd.alias,
             "created_at": cmd.created_at.isoformat() if cmd.created_at else None,
             "updated_at": cmd.updated_at.isoformat() if cmd.updated_at else None,
-            "tags": tags
+            "last_used": cmd.last_used.isoformat() if cmd.last_used else None,
+            "usage_count": cmd.usage_count or 0,
+            "tags": tags,
+            "extra_settings": cmd.extra_settings or {}
+        }
+
+    def get_command_history(
+        self,
+        user_id: int,
+        platform: Optional[str],
+        command_type: Optional[str],
+        search: Optional[str],
+        limit: int,
+        db: Session,
+    ) -> Dict[str, Any]:
+        """Return usage history for user commands."""
+        repo = self._get_repo(db)
+        commands = repo.get_command_history(
+            user_id=user_id,
+            platform=platform,
+            command_type=command_type,
+            search=search,
+            limit=limit,
+        )
+        return {
+            "success": True,
+            "data": [self._command_to_dict(cmd) for cmd in commands],
         }
 
     # === CRUD Methods ===
@@ -179,6 +205,7 @@ class CommandService:
         allowed_roles: str = "all",
         cooldown_seconds: int = 0,
         is_enabled: bool = True,
+        extra_settings: Optional[Dict[str, Any]] = None,
         db: Session = None
     ) -> Dict[str, Any]:
         """
@@ -215,7 +242,8 @@ class CommandService:
             platforms=platforms,
             allowed_roles=allowed_roles,
             cooldown_seconds=cooldown_seconds,
-            is_enabled=is_enabled
+            is_enabled=is_enabled,
+            extra_settings=extra_settings or {}
         )
         
         created = repo.create_command(new_command)
@@ -270,6 +298,8 @@ class CommandService:
                 max_length=1000,
                 allow_special=False
             )
+        if "extra_settings" in update_data and update_data["extra_settings"] is not None:
+            command.extra_settings = update_data["extra_settings"]
         
         repo.update_command(command)
         

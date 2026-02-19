@@ -296,7 +296,9 @@ class Bot(TwitchBotCore):
             
             ctx = SimpleContext(message, self)
             await self.universal_command_handler.handle_twitch_command(ctx, self)
-            return  # Не обрабатываем TTS для команд
+            return
+
+        await self.universal_command_handler.handle_twitch_message(message, self)  # Не обрабатываем TTS для команд
         
         # Обработка TTS для всех сообщений (родитель уже трансляет сообщение)
         await self._handle_tts(message)
@@ -433,3 +435,4 @@ class Bot(TwitchBotCore):
             logger.info("[BOT] Twitch bot shutdown complete")
         except Exception as e:
             logger.error(f"[ERROR] Error during bot shutdown: {e}")
+

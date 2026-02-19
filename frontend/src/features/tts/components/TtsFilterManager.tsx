@@ -1,5 +1,4 @@
 ﻿// src/components/tts/TtsFilterManager.tsx
-/* eslint-disable no-alert */
 import React, { useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,6 +44,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
     // Состояния для черного списка
     const [newUsername, setNewUsername] = useState('');
     const [selectedUserPlatform, setSelectedUserPlatform] = useState<string>('twitch');
+    const [pendingUnblockKey, setPendingUnblockKey] = useState<string | null>(null);
 
     // Состояния для словаря фильтра
     const [newWord, setNewWord] = useState('');
@@ -89,6 +89,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
     const unblockUserMutation = useUnblockUser({
         onSuccess: (response, variables) => {
             toast.success(`Пользователь ${variables.username} разблокирован`);
+            setPendingUnblockKey(null);
             queryClient.setQueryData(queryKeys.tts.blockedUsers(), (prev: unknown) => {
                 const prevList = Array.isArray(prev)
                     ? prev as BlockedUser[]
@@ -193,10 +194,6 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
 
     // Удаление пользователя из черного списка
     const removeFromBlacklist = (blockedUser: BlockedUser) => {
-        if (!window.confirm(`Разблокировать пользователя ${blockedUser.username}?`)) {
-            return;
-        }
-
         const channelName = blockedUser.channel_name || getChannelName(blockedUser.platform);
         if (!channelName) {
             toast.error(`Не удалось получить имя канала для платформы ${blockedUser.platform}`);
@@ -314,12 +311,29 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                                         </div>
                                         <span className="text-sm text-gray-200 truncate font-medium">{blockedUser.username}</span>
                                     </div>
-                                    <button
-                                        onClick={() => removeFromBlacklist(blockedUser)}
-                                        className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-colors duration-200 p-1 hover:bg-red-500/10 rounded"
-                                    >
-                                        <X className="h-3.5 w-3.5" />
-                                    </button>
+                                    {pendingUnblockKey === `${blockedUser.username}-${blockedUser.platform}` ? (
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => removeFromBlacklist(blockedUser)}
+                                                className="rounded bg-red-500/15 px-2 py-1 text-[10px] font-medium text-red-300 hover:bg-red-500/25"
+                                            >
+                                                Да
+                                            </button>
+                                            <button
+                                                onClick={() => setPendingUnblockKey(null)}
+                                                className="rounded bg-gray-700/70 px-2 py-1 text-[10px] font-medium text-gray-200 hover:bg-gray-600/70"
+                                            >
+                                                Нет
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setPendingUnblockKey(`${blockedUser.username}-${blockedUser.platform}`)}
+                                            className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-colors duration-200 p-1 hover:bg-red-500/10 rounded"
+                                        >
+                                            <X className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
                                 </div>
                             ))
                         )}

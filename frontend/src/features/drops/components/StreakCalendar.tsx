@@ -117,10 +117,6 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                 step={5}
                                 className="w-full"
                             />
-                            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                                <span>1</span>
-                                <span>{maxStreakDays}</span>
-                            </div>
                         </div>
                     );
                 })}

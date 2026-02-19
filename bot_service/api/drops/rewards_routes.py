@@ -51,6 +51,11 @@ class DropsRewardUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class DropsRewardToggle(BaseModel):
+    """Toggle reward active state."""
+    is_active: bool
+
+
 # === UTILITY FUNCTIONS ===
 
 def sanitize_html(text: str) -> str:
@@ -273,6 +278,53 @@ async def update_drops_reward(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@router.patch("/rewards/{reward_id}/toggle")
+async def toggle_drops_reward(
+    reward_id: int,
+    toggle_data: DropsRewardToggle,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Toggle drops reward active state."""
+    try:
+        repo = DropsRewardRepository(db)
+        reward = repo.get_by_id_and_user(reward_id, current_user["id"])
+
+        if not reward:
+            raise HTTPException(status_code=404, detail="Reward not found")
+
+        reward = repo.update(reward, {"is_active": toggle_data.is_active})
+        invalidate_cache(f"drops_rewards:{current_user['id']}:{reward.channel_name}:")
+
+        try:
+            from services.memory_websocket_manager import get_memory_websocket_manager
+            user_id = current_user.get('id')
+            if user_id and user_id != -1:
+                cache_invalidation_event = {
+                    "type": "cache_invalidate",
+                    "cache_key": f"drops_rewards_{reward.channel_name}",
+                    "reason": "drops_reward_toggled"
+                }
+                await get_memory_websocket_manager().send_to_user(user_id, cache_invalidation_event)
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket notification: {ws_error}")
+
+        return {
+            "success": True,
+            "message": "Reward status updated",
+            "data": {
+                "id": reward.id,
+                "is_active": reward.is_active,
+                "updated_at": reward.updated_at
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error toggling drops reward")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @router.delete("/rewards/{reward_id}")
 async def delete_drops_reward(
     reward_id: int,
@@ -426,5 +478,4 @@ async def upload_reward_sound(
     except Exception:
         logger.exception("Error uploading reward sound")
         raise HTTPException(status_code=500, detail="Internal server error")
-
 

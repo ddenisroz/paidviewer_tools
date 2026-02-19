@@ -4,6 +4,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {
     AlertCircle,
+    BarChart3,
     CheckCircle2,
     ChevronDown,
     Clock,
@@ -35,6 +36,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import {
     useCommands,
+    useCommandsHistory,
     useCreateCommand,
     useCreateCommandOverride,
     useDeleteCommand,
@@ -70,6 +72,13 @@ interface CreateForm {
     allowed_roles: string;
     cooldown_seconds: number;
     is_enabled: boolean;
+    trigger_mode: 'command' | 'keyword' | 'timer';
+    trigger_keyword: string;
+    timer_interval_seconds: number;
+    priority: number;
+    anti_spam_window_seconds: number;
+    condition_live_only: boolean;
+    condition_min_streak_days: number;
 }
 
 interface EditForm {
@@ -79,6 +88,13 @@ interface EditForm {
     cooldown_seconds: number;
     response_text: string;
     extra_settings: Record<string, unknown>;
+    trigger_mode: 'command' | 'keyword' | 'timer';
+    trigger_keyword: string;
+    timer_interval_seconds: number;
+    priority: number;
+    anti_spam_window_seconds: number;
+    condition_live_only: boolean;
+    condition_min_streak_days: number;
 }
 
 interface RoleOption {
@@ -107,17 +123,23 @@ interface CommandCardProps {
 }
 
 const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
-const CONTROL_TRIGGER_CLASS = 'h-9 w-full border-border/70 bg-background/80 shadow-none';
+const CONTROL_TRIGGER_CLASS = 'h-9 w-full border-sky-500/25 bg-transparent text-sky-100 shadow-none data-[state=open]:border-sky-500/55';
 const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const TAB_TRIGGER_CLASS =
-    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-400 data-[state=active]:shadow-none';
+    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none';
+
+const TRIGGER_MODE_LABELS: Record<'command' | 'keyword' | 'timer', string> = {
+    command: 'По !команде',
+    keyword: 'По слову',
+    timer: 'По таймеру',
+};
 
 const hasBrokenSymbols = (text: string): boolean => {
     const normalized = text.trim();
     const compactText = normalized.replace(/\s+/g, '');
     if (!compactText) return false;
 
-    const brokenChars = (compactText.match(/[?�]/g) || []).length;
+    const brokenChars = (compactText.match(/[??]/g) || []).length;
     if (brokenChars >= 3 && brokenChars / compactText.length > 0.35) {
         return true;
     }
@@ -142,6 +164,14 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
     const safeCommandName = toSafeText(command.name, 'unknown');
     const safeDescription = toSafeText(command.description, 'Описание команды недоступно');
     const safeResponse = toSafeText(command.response, '');
+    const commandSettings = (command.extra_settings || {}) as Record<string, unknown>;
+    const triggerMode = (commandSettings.trigger_mode as 'command' | 'keyword' | 'timer' | undefined) || 'command';
+    const triggerKeyword = String(commandSettings.trigger_keyword || '').trim();
+    const timerInterval = Number(commandSettings.timer_interval_seconds || 300);
+    const priority = Number(commandSettings.priority || 0);
+    const antiSpamWindow = Number(commandSettings.anti_spam_window_seconds || 0);
+    const conditionLiveOnly = Boolean(commandSettings.condition_live_only || false);
+    const conditionMinStreak = Number(commandSettings.condition_min_streak_days || 0);
 
     const getRoleIcon = (role: string | undefined): React.ReactNode => {
         if (!role || role.trim() === '') {
@@ -261,6 +291,24 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     </div>
                 </div>
 
+                {type === 'custom' && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-300">
+                            {TRIGGER_MODE_LABELS[triggerMode] || TRIGGER_MODE_LABELS.command}
+                        </Badge>
+                        {triggerMode === 'keyword' && triggerKeyword && (
+                            <span>Триггер: <span className="text-foreground">{triggerKeyword}</span></span>
+                        )}
+                        {triggerMode === 'timer' && (
+                            <span>{Math.max(15, timerInterval)}с</span>
+                        )}
+                        <span>prio {Math.max(0, priority)}</span>
+                        {antiSpamWindow > 0 && <span>анти-спам {antiSpamWindow}с</span>}
+                        {conditionLiveOnly && <span>только онлайн</span>}
+                        {conditionMinStreak > 0 && <span>стрик {conditionMinStreak}+</span>}
+                    </div>
+                )}
+
                 {command.tags && Array.isArray(command.tags) && command.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                         {command.tags.map((tag, index) => {
@@ -318,6 +366,17 @@ const CommandsPage: React.FC = () => {
     const { data: commandsData, isLoading: loading, isInitialLoading: initialLoading } = useCommands({
         enabled: !!isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
     });
+    const [historySearch, setHistorySearch] = useState<string>('');
+    const [historyPlatform, setHistoryPlatform] = useState<string>('all');
+    const [historyType, setHistoryType] = useState<string>('all');
+    const { data: commandHistory = [], isLoading: historyLoading } = useCommandsHistory({
+        search: historySearch || undefined,
+        platform: historyPlatform === 'all' ? undefined : historyPlatform,
+        command_type: historyType === 'all' ? undefined : historyType,
+        limit: 100,
+    }, {
+        enabled: !!isAuthenticated,
+    });
 
     const createCommandMutation = useCreateCommand();
     const createOverrideMutation = useCreateCommandOverride();
@@ -342,7 +401,14 @@ const CommandsPage: React.FC = () => {
         platforms: 'twitch,vk',
         allowed_roles: 'all',
         cooldown_seconds: 0,
-        is_enabled: true
+        is_enabled: true,
+        trigger_mode: 'command',
+        trigger_keyword: '',
+        timer_interval_seconds: 300,
+        priority: 0,
+        anti_spam_window_seconds: 0,
+        condition_live_only: false,
+        condition_min_streak_days: 0,
     });
 
     const [editForm, setEditForm] = useState<EditForm>({
@@ -351,7 +417,14 @@ const CommandsPage: React.FC = () => {
         allowed_roles: 'all',
         cooldown_seconds: 0,
         response_text: '',
-        extra_settings: {}
+        extra_settings: {},
+        trigger_mode: 'command',
+        trigger_keyword: '',
+        timer_interval_seconds: 300,
+        priority: 0,
+        anti_spam_window_seconds: 0,
+        condition_live_only: false,
+        condition_min_streak_days: 0,
     });
 
     const basicCommands = useMemo<ChatCommand[]>(() => {
@@ -481,17 +554,25 @@ const CommandsPage: React.FC = () => {
     };
 
     const handleCreateCommand = (): void => {
-        // Преобразуем форму в формат Partial<ChatCommand>
-        const commandData: Partial<ChatCommand> = {
-            name: createForm.command_name,
-            response: createForm.response_text,
-            platform: createForm.platforms as 'twitch' | 'vk' | 'youtube' | 'all',
-            user_level: createForm.allowed_roles as 'everyone' | 'subscriber' | 'moderator' | 'broadcaster',
-            cooldown: createForm.cooldown_seconds,
-            enabled: createForm.is_enabled
+        const commandData = {
+            command_name: createForm.command_name,
+            response_text: createForm.response_text,
+            platforms: createForm.platforms,
+            allowed_roles: createForm.allowed_roles,
+            cooldown_seconds: createForm.cooldown_seconds,
+            is_enabled: createForm.is_enabled,
+            extra_settings: {
+                trigger_mode: createForm.trigger_mode,
+                trigger_keyword: createForm.trigger_mode === 'keyword' ? createForm.trigger_keyword.trim() : '',
+                timer_interval_seconds: createForm.trigger_mode === 'timer' ? Math.max(15, createForm.timer_interval_seconds) : 300,
+                priority: Math.max(0, Math.min(100, createForm.priority)),
+                anti_spam_window_seconds: Math.max(0, Math.min(600, createForm.anti_spam_window_seconds)),
+                condition_live_only: createForm.condition_live_only,
+                condition_min_streak_days: Math.max(0, Math.min(365, createForm.condition_min_streak_days)),
+            }
         };
 
-        createCommandMutation.mutate(commandData, {
+        createCommandMutation.mutate(commandData as unknown as Partial<ChatCommand>, {
             onSuccess: () => {
                 setIsCreateDialogOpen(false);
                 setCreateForm({
@@ -500,7 +581,14 @@ const CommandsPage: React.FC = () => {
                     platforms: 'twitch,vk',
                     allowed_roles: 'all',
                     cooldown_seconds: 0,
-                    is_enabled: true
+                    is_enabled: true,
+                    trigger_mode: 'command',
+                    trigger_keyword: '',
+                    timer_interval_seconds: 300,
+                    priority: 0,
+                    anti_spam_window_seconds: 0,
+                    condition_live_only: false,
+                    condition_min_streak_days: 0,
                 });
             }
         });
@@ -517,7 +605,16 @@ const CommandsPage: React.FC = () => {
                 allowed_roles: editForm.allowed_roles,
                 cooldown_seconds: editForm.cooldown_seconds,
                 alias: null,
-                extra_settings: editForm.extra_settings
+                extra_settings: {
+                    ...editForm.extra_settings,
+                    trigger_mode: editForm.trigger_mode,
+                    trigger_keyword: editForm.trigger_mode === 'keyword' ? editForm.trigger_keyword.trim() : '',
+                    timer_interval_seconds: editForm.trigger_mode === 'timer' ? Math.max(15, editForm.timer_interval_seconds) : 300,
+                    priority: Math.max(0, Math.min(100, editForm.priority)),
+                    anti_spam_window_seconds: Math.max(0, Math.min(600, editForm.anti_spam_window_seconds)),
+                    condition_live_only: editForm.condition_live_only,
+                    condition_min_streak_days: Math.max(0, Math.min(365, editForm.condition_min_streak_days)),
+                }
             }, {
                 onSuccess: () => {
                     setIsEditDialogOpen(false);
@@ -525,16 +622,25 @@ const CommandsPage: React.FC = () => {
                 },
             });
         } else {
-            // Преобразуем форму в формат Partial<ChatCommand>
-            const commandData: Partial<ChatCommand> = {
-                response: editForm.response_text,
-                platform: editForm.platforms === 'twitch,vk' ? 'all' : editForm.platforms as 'twitch' | 'vk' | 'youtube' | 'all',
-                user_level: editForm.allowed_roles as 'everyone' | 'subscriber' | 'moderator' | 'broadcaster',
-                cooldown: editForm.cooldown_seconds,
-                enabled: editForm.is_enabled
+            const commandData = {
+                response_text: editForm.response_text,
+                platforms: editForm.platforms,
+                allowed_roles: editForm.allowed_roles,
+                cooldown_seconds: editForm.cooldown_seconds,
+                is_enabled: editForm.is_enabled,
+                extra_settings: {
+                    ...editForm.extra_settings,
+                    trigger_mode: editForm.trigger_mode,
+                    trigger_keyword: editForm.trigger_mode === 'keyword' ? editForm.trigger_keyword.trim() : '',
+                    timer_interval_seconds: editForm.trigger_mode === 'timer' ? Math.max(15, editForm.timer_interval_seconds) : 300,
+                    priority: Math.max(0, Math.min(100, editForm.priority)),
+                    anti_spam_window_seconds: Math.max(0, Math.min(600, editForm.anti_spam_window_seconds)),
+                    condition_live_only: editForm.condition_live_only,
+                    condition_min_streak_days: Math.max(0, Math.min(365, editForm.condition_min_streak_days)),
+                }
             };
 
-            updateCommandMutation.mutate({ commandId, command: commandData }, {
+            updateCommandMutation.mutate({ commandId, command: commandData as unknown as Partial<ChatCommand> }, {
                 onSuccess: () => {
                     setIsEditDialogOpen(false);
                     setEditingCommand(null);
@@ -568,13 +674,27 @@ const CommandsPage: React.FC = () => {
         };
         // Get extra_settings from command if available
         const cmdExtraSettings = (command as unknown as { extra_settings?: Record<string, unknown> }).extra_settings || {};
+        const triggerMode = (cmdExtraSettings.trigger_mode as 'command' | 'keyword' | 'timer' | undefined) || 'command';
+        const triggerKeyword = String(cmdExtraSettings.trigger_keyword || '');
+        const timerInterval = Number(cmdExtraSettings.timer_interval_seconds || 300);
+        const priority = Number(cmdExtraSettings.priority || 0);
+        const antiSpamWindow = Number(cmdExtraSettings.anti_spam_window_seconds || 0);
+        const conditionLiveOnly = Boolean(cmdExtraSettings.condition_live_only || false);
+        const conditionMinStreakDays = Number(cmdExtraSettings.condition_min_streak_days || 0);
         setEditForm({
             is_enabled: command.enabled ?? true,
             platforms: platform === 'all' ? 'twitch,vk' : platform,
             allowed_roles: roleMap[user_level] || user_level,
             cooldown_seconds: command.cooldown || 0,
             response_text: command.response || '',
-            extra_settings: cmdExtraSettings
+            extra_settings: cmdExtraSettings,
+            trigger_mode: triggerMode,
+            trigger_keyword: triggerKeyword,
+            timer_interval_seconds: Number.isFinite(timerInterval) ? Math.max(15, timerInterval) : 300,
+            priority: Number.isFinite(priority) ? Math.max(0, Math.min(100, priority)) : 0,
+            anti_spam_window_seconds: Number.isFinite(antiSpamWindow) ? Math.max(0, Math.min(600, antiSpamWindow)) : 0,
+            condition_live_only: conditionLiveOnly,
+            condition_min_streak_days: Number.isFinite(conditionMinStreakDays) ? Math.max(0, Math.min(365, conditionMinStreakDays)) : 0,
         });
         setIsEditDialogOpen(true);
     };
@@ -605,6 +725,12 @@ const CommandsPage: React.FC = () => {
                     >
                         Кастомные команды
                     </TabsTrigger>
+                    <TabsTrigger
+                        value="history"
+                        className={TAB_TRIGGER_CLASS}
+                    >
+                        История
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-4">
@@ -619,7 +745,7 @@ const CommandsPage: React.FC = () => {
                                             placeholder="Поиск команд..."
                                             value={basicSearchTerm}
                                             onChange={(e) => setBasicSearchTerm(e.target.value)}
-                                            className="pl-10"
+                                            className="border-sky-500/25 bg-transparent pl-10 text-sky-100 placeholder:text-sky-200/50"
                                         />
                                     </div>
                                 </div>
@@ -656,7 +782,7 @@ const CommandsPage: React.FC = () => {
                                 <div className="relative">
                                     <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-9 w-full justify-between">
+                                            <Button variant="outline" size="sm" className="h-9 w-full justify-between border-sky-500/25 bg-transparent text-sky-100 hover:bg-sky-500/10">
                                                 <span className="inline-flex items-center gap-2">
                                                     <Filter className="h-4 w-4" />
                                                     Фильтр по тегам
@@ -694,7 +820,7 @@ const CommandsPage: React.FC = () => {
                                                     placeholder="Поиск тегов..."
                                                     value={tagSearchTerm}
                                                     onChange={(e) => setTagSearchTerm(e.target.value)}
-                                                    className="h-8 text-xs"
+                                                    className="h-8 border-sky-500/25 bg-transparent text-xs text-sky-100 placeholder:text-sky-200/50"
                                                 />
                                             </div>
                                             <div className="max-h-64 overflow-y-auto">
@@ -758,9 +884,6 @@ const CommandsPage: React.FC = () => {
                                     <Terminal className="h-5 w-5" />
                                     Кастомные команды
                                 </CardTitle>
-                                <p className="text-sm text-muted-foreground">
-                                    Создавайте собственные команды с настраиваемыми ответами.
-                                </p>
                             </div>
                             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                                 <DialogTrigger asChild>
@@ -865,6 +988,114 @@ const CommandsPage: React.FC = () => {
                                                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div>
+                                                <Label>Режим запуска</Label>
+                                                <Select
+                                                    value={createForm.trigger_mode}
+                                                    onValueChange={(value) => setCreateForm(prev => ({
+                                                        ...prev,
+                                                        trigger_mode: value as 'command' | 'keyword' | 'timer'
+                                                    }))}
+                                                >
+                                                    <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className={CONTROL_CONTENT_CLASS}>
+                                                        <SelectItem value="command">По !команде</SelectItem>
+                                                        <SelectItem value="keyword">По ключевому слову</SelectItem>
+                                                        <SelectItem value="timer">По таймеру</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            {createForm.trigger_mode === 'keyword' && (
+                                                <div>
+                                                    <Label htmlFor="trigger_keyword">Ключевое слово</Label>
+                                                    <Input
+                                                        id="trigger_keyword"
+                                                        placeholder="например: привет"
+                                                        value={createForm.trigger_keyword}
+                                                        onChange={(e) => setCreateForm(prev => ({
+                                                            ...prev,
+                                                            trigger_keyword: e.target.value
+                                                        }))}
+                                                    />
+                                                </div>
+                                            )}
+                                            {createForm.trigger_mode === 'timer' && (
+                                                <div>
+                                                    <Label htmlFor="timer_interval">Интервал автозапуска (сек)</Label>
+                                                    <Input
+                                                        id="timer_interval"
+                                                        type="number"
+                                                        min="15"
+                                                        value={createForm.timer_interval_seconds}
+                                                        onChange={(e) => setCreateForm(prev => ({
+                                                            ...prev,
+                                                            timer_interval_seconds: Math.max(15, parseInt(e.target.value, 10) || 15)
+                                                        }))}
+                                                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label htmlFor="priority">Приоритет (0-100)</Label>
+                                                    <Input
+                                                        id="priority"
+                                                        type="number"
+                                                        min="0"
+                                                        max="100"
+                                                        value={createForm.priority}
+                                                        onChange={(e) => setCreateForm(prev => ({
+                                                            ...prev,
+                                                            priority: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0))
+                                                        }))}
+                                                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="anti_spam_window">Анти-спам (сек)</Label>
+                                                    <Input
+                                                        id="anti_spam_window"
+                                                        type="number"
+                                                        min="0"
+                                                        max="600"
+                                                        value={createForm.anti_spam_window_seconds}
+                                                        onChange={(e) => setCreateForm(prev => ({
+                                                            ...prev,
+                                                            anti_spam_window_seconds: Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0))
+                                                        }))}
+                                                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="flex items-center justify-between rounded-md border border-border/70 p-2">
+                                                    <Label htmlFor="condition_live_only" className="text-sm">Только когда стрим онлайн</Label>
+                                                    <Switch
+                                                        id="condition_live_only"
+                                                        checked={createForm.condition_live_only}
+                                                        onCheckedChange={(checked) => setCreateForm(prev => ({ ...prev, condition_live_only: checked }))}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="condition_min_streak_days">Мин. стрик зрителя</Label>
+                                                    <Input
+                                                        id="condition_min_streak_days"
+                                                        type="number"
+                                                        min="0"
+                                                        max="365"
+                                                        value={createForm.condition_min_streak_days}
+                                                        onChange={(e) => setCreateForm(prev => ({
+                                                            ...prev,
+                                                            condition_min_streak_days: Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0))
+                                                        }))}
+                                                        className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <DialogFooter>
                                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -890,7 +1121,7 @@ const CommandsPage: React.FC = () => {
                                                     placeholder="Поиск кастомных команд..."
                                                     value={customSearchTerm}
                                                     onChange={(e) => setCustomSearchTerm(e.target.value)}
-                                                    className="pl-10"
+                                                    className="border-sky-500/25 bg-transparent pl-10 text-sky-100 placeholder:text-sky-200/50"
                                                 />
                                             </div>
                                         </div>
@@ -932,9 +1163,6 @@ const CommandsPage: React.FC = () => {
                                     <Terminal className="h-16 w-16 mx-auto text-muted-foreground opacity-50" />
                                     <div>
                                         <h4 className="text-lg font-semibold mb-2">Нет кастомных команд</h4>
-                                        <p className="text-muted-foreground">
-                                            Создайте первую команду для взаимодействия с вашей аудиторией
-                                        </p>
                                     </div>
                                 </div>
                             ) : (
@@ -948,6 +1176,71 @@ const CommandsPage: React.FC = () => {
                                                 onEdit={openEditDialog}
                                                 onDelete={handleDeleteCommand}
                                             />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="history" className="space-y-4">
+                    <Card className={SURFACE_CARD_CLASS}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <BarChart3 className="h-5 w-5" />
+                                История команд
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-[minmax(220px,1fr)_160px_180px] gap-2">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Поиск по команде..."
+                                        value={historySearch}
+                                        onChange={(e) => setHistorySearch(e.target.value)}
+                                        className="border-sky-500/25 bg-transparent pl-10 text-sky-100 placeholder:text-sky-200/50"
+                                    />
+                                </div>
+                                <Select value={historyPlatform} onValueChange={setHistoryPlatform}>
+                                    <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
+                                        <SelectValue placeholder="Платформа" />
+                                    </SelectTrigger>
+                                    <SelectContent className={CONTROL_CONTENT_CLASS}>
+                                        <SelectItem value="all">Все платформы</SelectItem>
+                                        <SelectItem value="twitch">Twitch</SelectItem>
+                                        <SelectItem value="vk">VK Live</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select value={historyType} onValueChange={setHistoryType}>
+                                    <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
+                                        <SelectValue placeholder="Тип" />
+                                    </SelectTrigger>
+                                    <SelectContent className={CONTROL_CONTENT_CLASS}>
+                                        <SelectItem value="all">Все типы</SelectItem>
+                                        <SelectItem value="custom">Кастомные</SelectItem>
+                                        <SelectItem value="override">Override</SelectItem>
+                                        <SelectItem value="global">Глобальные</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            {historyLoading ? (
+                                <div className="text-sm text-muted-foreground">Загрузка истории...</div>
+                            ) : commandHistory.length === 0 ? (
+                                <div className="text-sm text-muted-foreground">История команд пока пуста</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {commandHistory.map((cmd) => (
+                                        <div key={`hist-${cmd.id}`} className="flex items-center justify-between rounded-md border border-border/70 bg-card/60 p-2.5">
+                                            <div className="min-w-0">
+                                                <div className="font-mono text-sm text-foreground truncate">!{cmd.name}</div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    Последний вызов: {cmd.last_used ? new Date(cmd.last_used).toLocaleString('ru-RU') : 'нет'}
+                                                </div>
+                                            </div>
+                                            <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-200">
+                                                {cmd.usage_count || 0}
+                                            </Badge>
                                         </div>
                                     ))}
                                 </div>
@@ -1046,6 +1339,116 @@ const CommandsPage: React.FC = () => {
                                 />
                             </div>
 
+                            {editingCommand.command_type === 'custom' && (
+                                <div className="grid grid-cols-1 gap-4">
+                                    <div>
+                                        <Label>Режим запуска</Label>
+                                        <Select
+                                            value={editForm.trigger_mode}
+                                            onValueChange={(value) => setEditForm(prev => ({
+                                                ...prev,
+                                                trigger_mode: value as 'command' | 'keyword' | 'timer'
+                                            }))}
+                                        >
+                                            <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className={CONTROL_CONTENT_CLASS}>
+                                                <SelectItem value="command">По !команде</SelectItem>
+                                                <SelectItem value="keyword">По ключевому слову</SelectItem>
+                                                <SelectItem value="timer">По таймеру</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {editForm.trigger_mode === 'keyword' && (
+                                        <div>
+                                            <Label htmlFor="edit_trigger_keyword">Ключевое слово</Label>
+                                            <Input
+                                                id="edit_trigger_keyword"
+                                                value={editForm.trigger_keyword}
+                                                onChange={(e) => setEditForm(prev => ({
+                                                    ...prev,
+                                                    trigger_keyword: e.target.value
+                                                }))}
+                                            />
+                                        </div>
+                                    )}
+                                    {editForm.trigger_mode === 'timer' && (
+                                        <div>
+                                            <Label htmlFor="edit_timer_interval">Интервал автозапуска (сек)</Label>
+                                            <Input
+                                                id="edit_timer_interval"
+                                                type="number"
+                                                min="15"
+                                                value={editForm.timer_interval_seconds}
+                                                onChange={(e) => setEditForm(prev => ({
+                                                    ...prev,
+                                                    timer_interval_seconds: Math.max(15, parseInt(e.target.value, 10) || 15)
+                                                }))}
+                                                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label htmlFor="edit_priority">Приоритет (0-100)</Label>
+                                            <Input
+                                                id="edit_priority"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={editForm.priority}
+                                                onChange={(e) => setEditForm(prev => ({
+                                                    ...prev,
+                                                    priority: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0))
+                                                }))}
+                                                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="edit_anti_spam_window">Анти-спам (сек)</Label>
+                                            <Input
+                                                id="edit_anti_spam_window"
+                                                type="number"
+                                                min="0"
+                                                max="600"
+                                                value={editForm.anti_spam_window_seconds}
+                                                onChange={(e) => setEditForm(prev => ({
+                                                    ...prev,
+                                                    anti_spam_window_seconds: Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0))
+                                                }))}
+                                                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex items-center justify-between rounded-md border border-border/70 p-2">
+                                            <Label htmlFor="edit_condition_live_only" className="text-sm">Только когда стрим онлайн</Label>
+                                            <Switch
+                                                id="edit_condition_live_only"
+                                                checked={editForm.condition_live_only}
+                                                onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, condition_live_only: checked }))}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="edit_condition_min_streak_days">Мин. стрик зрителя</Label>
+                                            <Input
+                                                id="edit_condition_min_streak_days"
+                                                type="number"
+                                                min="0"
+                                                max="365"
+                                                value={editForm.condition_min_streak_days}
+                                                onChange={(e) => setEditForm(prev => ({
+                                                    ...prev,
+                                                    condition_min_streak_days: Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0))
+                                                }))}
+                                                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Настройки голосования для команды skip */}
                             {editingCommand.name === 'skip' && (
                                 <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800/50 mt-4">
@@ -1091,4 +1494,5 @@ const CommandsPage: React.FC = () => {
 };
 
 export default CommandsPage;
+
 

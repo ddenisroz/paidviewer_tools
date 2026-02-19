@@ -33,6 +33,7 @@ class CommandCreate(BaseModel):
     allowed_roles: str = "all"
     cooldown_seconds: int = 0
     is_enabled: bool = True
+    extra_settings: Optional[Dict[str, Any]] = None
 
     @field_validator("command_name")
     @classmethod
@@ -162,6 +163,33 @@ async def get_commands_no_slash(
     return await get_commands(current_user, db)
 
 
+@router.get("/history")
+async def get_commands_history(
+    platform: Optional[str] = None,
+    command_type: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 100,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get usage history for user commands."""
+    try:
+        service = get_command_service()
+        return service.get_command_history(
+            user_id=current_user["id"],
+            platform=platform,
+            command_type=command_type,
+            search=search,
+            limit=limit,
+            db=db,
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error loading command history")
+        raise HTTPException(status_code=500, detail="Failed to load command history")
+
+
 @router.post("/")
 @limiter.limit("20/minute")
 async def create_command(
@@ -180,6 +208,7 @@ async def create_command(
             allowed_roles=command_data.allowed_roles,
             cooldown_seconds=command_data.cooldown_seconds,
             is_enabled=command_data.is_enabled,
+            extra_settings=command_data.extra_settings,
             db=db,
         )
         return result

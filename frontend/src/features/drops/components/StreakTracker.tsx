@@ -20,6 +20,7 @@ interface StreakTrackerProps {
 }
 
 const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
+const BLUE_TEXT_BUTTON_CLASS = 'border-border/70 bg-transparent text-sky-300 hover:bg-transparent hover:text-sky-200';
 
 const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
   const [streaks, setStreaks] = useState<Streak[]>([]);
@@ -138,12 +139,12 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
             placeholder="Поиск по имени зрителя..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="border-border/70 bg-transparent pl-9"
           />
         </div>
 
         {/* Таблица стриков */}
-        <div className="border border-border/70 rounded-lg overflow-hidden bg-card/60">
+        <div className="border border-border/70 rounded-xl overflow-hidden bg-transparent">
           {filteredStreaks.length === 0 && !loading ? (
             <div className="text-center py-12 text-muted-foreground">
               <Trophy className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -153,7 +154,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-card/70">
+                <thead className="bg-transparent">
                   <tr>
                     <th className="text-left p-3 font-medium text-sm">#</th>
                     <th className="text-left p-3 font-medium text-sm">Зритель</th>
@@ -163,13 +164,13 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
                     <th className="text-right p-3 font-medium text-sm">Активность</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-border/60">
                   {filteredStreaks.map((streak, index) => {
                     const badge = getStreakBadge(streak.current_streak);
                     const colorClass = getStreakColor(streak.current_streak);
 
                     return (
-                        <tr key={`${streak.viewer_name}-${streak.current_streak}`} className="hover:bg-card/70 transition-colors">
+                        <tr key={`${streak.viewer_name}-${streak.current_streak}`} className="hover:bg-card/40 transition-colors">
                         <td className="p-3 text-sm text-muted-foreground">
                           {index + 1}
                         </td>
@@ -220,11 +221,7 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
         {/* Загрузить еще */}
         {hasMore && (
           <div className="flex justify-center pt-4">
-            <Button
-              variant="outline"
-              onClick={handleLoadMore}
-              disabled={loading}
-            >
+            <Button variant="outline" onClick={handleLoadMore} disabled={loading} className={BLUE_TEXT_BUTTON_CLASS}>
               {loading ? 'Загрузка...' : 'Загрузить еще'}
             </Button>
           </div>
@@ -235,4 +232,3 @@ const StreakTracker: React.FC<StreakTrackerProps> = ({ user, channelName }) => {
 };
 
 export default StreakTracker;
-
