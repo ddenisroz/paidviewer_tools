@@ -138,6 +138,7 @@ async def update_stream(
         session_id = user.get("session_id")
         results = []
         failures = []
+        failed_reasons = {}
 
         async def _broadcast_stream_info(platform_name: str) -> None:
             try:
@@ -159,6 +160,9 @@ async def update_stream(
                     await _broadcast_stream_info("twitch")
                 else:
                     failures.append("Twitch")
+                    twitch_reason = service.last_error_by_platform.get("twitch")
+                    if twitch_reason:
+                        failed_reasons["twitch"] = twitch_reason
                     logger.error("Failed to update Twitch for user %s", user_id)
 
         # Update VK
@@ -173,22 +177,32 @@ async def update_stream(
                     await _broadcast_stream_info("vk")
                 else:
                     failures.append("VK")
+                    vk_reason = service.last_error_by_platform.get("vk")
+                    if vk_reason:
+                        failed_reasons["vk"] = vk_reason
                     logger.error("Failed to update VK for user %s", user_id)
 
         if not results and not failures:
             return JSONResponse(content={"success": True, "message": "No changes or updates needed"})
 
         if failures:
+            failed_names = [item.lower() for item in failures]
+            message = (
+                f"Updated: {', '.join(results)}. Failed: {', '.join(failures)}"
+                if results
+                else f"Failed to update: {', '.join(failures)}"
+            )
+            if len(failed_names) == 1:
+                single_reason = failed_reasons.get(failed_names[0])
+                if single_reason:
+                    message = f"{message}. Reason: {single_reason}"
             raise HTTPException(
                 status_code=409,
                 detail={
-                    "message": (
-                        f"Updated: {', '.join(results)}. Failed: {', '.join(failures)}"
-                        if results
-                        else f"Failed to update: {', '.join(failures)}"
-                    ),
+                    "message": message,
                     "updated_platforms": [item.replace(" updated", "").lower() for item in results],
-                    "failed_platforms": [item.lower() for item in failures],
+                    "failed_platforms": failed_names,
+                    "failed_reasons": failed_reasons,
                 },
             )
 

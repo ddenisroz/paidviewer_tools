@@ -20,6 +20,7 @@ class VKClient(BaseIntegrationClient):
     def __init__(self, oauth: VKOAuth):
         super().__init__(self.BASE_URL)
         self.oauth = oauth
+        self.last_error: Optional[str] = None
 
     @staticmethod
     def _normalize_category_id(value: Optional[Any]) -> Optional[str]:
@@ -208,6 +209,7 @@ class VKClient(BaseIntegrationClient):
         Update stream title or category.
         Requires getting current state first to merge.
         """
+        self.last_error = None
         try:
             base_candidates = [self.PROD_BASE_URL, self.DEV_BASE_URL]
             channel_candidates = get_vk_channel_candidates(channel_url)
@@ -247,7 +249,8 @@ class VKClient(BaseIntegrationClient):
             payload = {
                 "title": title if title is not None else stream_info.get("title", "")
             }
-            resolved_category_id = self._normalize_category_id(category_id)
+            requested_category_id = self._normalize_category_id(category_id)
+            resolved_category_id = requested_category_id
             if not resolved_category_id:
                 resolved_category_id = self._normalize_category_id(current_cat_id)
             if not resolved_category_id:
@@ -258,17 +261,22 @@ class VKClient(BaseIntegrationClient):
                 except Exception as fallback_error:
                     logger.warning(f"[VK client] Failed fallback category resolution: {fallback_error}")
 
-            if not resolved_category_id:
-                logger.error(
-                    "[VK client] Missing category.id for stream update "
-                    "(channel=%s, title_changed=%s, requested_category=%s)",
-                    channel_url,
-                    title is not None,
-                    category_id,
-                )
+            if category_id is not None and not requested_category_id:
+                self.last_error = "Invalid VK category id for stream update"
                 return False
 
-            payload["category"] = {"id": resolved_category_id}
+            # Keep existing category when available; allow title-only update without category.
+            if resolved_category_id:
+                payload["category"] = {"id": resolved_category_id}
+            elif category_id is not None:
+                logger.error(
+                    "[VK client] Missing category.id for explicit category update "
+                    "(channel=%s, requested_category=%s)",
+                    channel_url,
+                    category_id,
+                )
+                self.last_error = "Missing VK category id for stream update"
+                return False
             if stream_info.get("description"):
                 payload["description"] = stream_info.get("description")
 
@@ -315,15 +323,20 @@ class VKClient(BaseIntegrationClient):
                         "[VK client] Stream update methods are not supported by current VK API for channel %s",
                         channel_url,
                     )
+                    self.last_error = "VK API does not support stream update for this channel/app"
                     return False
+                self.last_error = str(last_error)
                 raise last_error
+            self.last_error = "VK stream update request failed"
             return False
 
         except IntegrationError as e:
             if e.status_code == 405:
                 logger.warning(f"[VK client] Stream update is unsupported by VK API (405): {e}")
+                self.last_error = "VK API does not support stream update for this channel/app"
                 return False
             logger.error(f"[VK client] Failed to update stream: {e}")
+            self.last_error = str(e)
             return False
 
     async def search_categories(self, query: str, token: TokenInfo) -> List[Dict[str, Any]]:

@@ -55,7 +55,7 @@ class Settings(BaseSettings):
 
     # === DATABASE ===
     database_url: str = Field(
-        default="sqlite:///./data/bot_service.db",
+        default="postgresql://user:password@localhost:5432/bot_service_db",
         description="Database connection URL"
     )
     chat_messages_db_limit_per_user: int = Field(

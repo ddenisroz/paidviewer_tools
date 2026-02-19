@@ -45,6 +45,20 @@ function createApiClient({ baseURL, withCredentials = true, timeout = 30000 }: A
         });
       }
 
+      // CSRF protection for cookie-based session requests
+      const method = config.method?.toLowerCase();
+      const isMutatingMethod = method === 'post' || method === 'put' || method === 'patch' || method === 'delete';
+      if (isMutatingMethod && typeof document !== 'undefined') {
+        const csrfToken = document.cookie
+          .split('; ')
+          .find((row) => row.startsWith('csrf_token='))
+          ?.split('=')[1];
+        if (csrfToken) {
+          config.headers = config.headers || {};
+          config.headers['X-CSRF-Token'] = decodeURIComponent(csrfToken);
+        }
+      }
+
       // Добавляем ключ для дедупликации GET запросов
       if (config.method?.toLowerCase() === 'get') {
         const dedupeKey = `${config.method}:${config.url}:${JSON.stringify(config.params || {})}`;

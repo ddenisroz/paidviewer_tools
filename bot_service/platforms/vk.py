@@ -37,15 +37,31 @@ class VKPlatform(StreamingPlatform):
         self.oauth = VKOAuth()
         self.client = VKClient(self.oauth)
         self.user_service = UserService()
+        self.last_error: Optional[str] = None
+
+    @staticmethod
+    def _normalize_channel_slug(value: Optional[str]) -> Optional[str]:
+        if not value:
+            return None
+        candidate = value.strip()
+        if not candidate:
+            return None
+        if candidate.startswith("http://") or candidate.startswith("https://"):
+            candidate = candidate.rstrip("/").split("/")[-1]
+        if " " in candidate or "/" in candidate:
+            return None
+        return candidate
 
     async def _get_user_context(self, user_id: int):
         """Helper to get token and channel info."""
+        self.last_error = None
         db = next(get_db())
         try:
             token = self.user_service.get_user_token(user_id, 'vk', db)
             user = db.query(User).filter(User.id == user_id).first()
             
             if not token or not user:
+                self.last_error = "VK token or user is missing"
                 return None, None
 
             decrypted_token = self.user_service.decrypt_access_token(token.access_token)
@@ -55,29 +71,65 @@ class VKPlatform(StreamingPlatform):
                 scopes=token.scopes
             )
 
-            channel_name = user.vk_channel_name or user.vk_username
+            channel_name = self._normalize_channel_slug(user.vk_channel_name)
+            if not channel_name:
+                channel_name = self._normalize_channel_slug(user.vk_username)
+            resolved_channel_name = None
+            try:
+                user_info = await self.client.get_current_user(token_info)
+                user_profile = user_info.get("user") if isinstance(user_info, dict) and isinstance(user_info.get("user"), dict) else user_info
+                if user_info:
+                    channel_obj = user_info.get('channel') or {}
+                    channel_url = channel_obj.get('url') if isinstance(channel_obj, dict) else None
+                    channel_url = channel_url or user_info.get('channel_url')
+                    if not channel_url and isinstance(user_profile, dict):
+                        channel_url = user_profile.get("channel_url")
+                    if not channel_url:
+                        channels = user_info.get("channels")
+                        if isinstance(channels, list) and channels:
+                            first_channel = channels[0]
+                            if isinstance(first_channel, dict):
+                                channel_url = first_channel.get("url")
+                    if channel_url:
+                        resolved_channel_name = self._normalize_channel_slug(channel_url)
+            except Exception as e:
+                logger.warning(f"Failed to validate VK streamer profile: {e}")
+
+            if resolved_channel_name:
+                channel_name = resolved_channel_name
+
             invalid_channel_name = bool(channel_name and (' ' in channel_name or channel_name.startswith('http')))
             if not channel_name or invalid_channel_name:
                 try:
                     user_info = await self.client.get_current_user(token_info)
-                    if user_info and user_info.get('is_streamer') is False:
-                        logger.warning("VK account is not a streamer; channel URL not available")
-                        if invalid_channel_name and user.vk_channel_name:
-                            try:
-                                from repositories.user_repository import UserRepository
-                                UserRepository(db).update(user, {"vk_channel_name": None})
-                            except Exception as e:
-                                logger.warning(f"Failed to clear invalid VK channel name: {e}")
-                        return None, None
+                    user_profile = user_info.get("user") if isinstance(user_info, dict) and isinstance(user_info.get("user"), dict) else user_info
                     channel_url = None
                     if user_info:
                         channel_obj = user_info.get('channel') or {}
                         channel_url = channel_obj.get('url') if isinstance(channel_obj, dict) else None
                         channel_url = channel_url or user_info.get('channel_url')
+                        if not channel_url and isinstance(user_profile, dict):
+                            channel_url = user_profile.get("channel_url")
+                        if not channel_url:
+                            channels = user_info.get("channels")
+                            if isinstance(channels, list) and channels:
+                                first_channel = channels[0]
+                                if isinstance(first_channel, dict):
+                                    channel_url = first_channel.get("url")
                     if channel_url:
-                        channel_name = channel_url.rstrip('/').split('/')[-1]
+                        channel_name = self._normalize_channel_slug(channel_url)
                 except Exception as e:
                     logger.warning(f"Failed to resolve VK channel URL: {e}")
+
+            if not channel_name:
+                twitch_fallback = self._normalize_channel_slug(user.twitch_username)
+                if twitch_fallback:
+                    channel_name = twitch_fallback
+                    logger.warning(
+                        "Using Twitch username as VK channel slug fallback for user %s: %s",
+                        user_id,
+                        channel_name,
+                    )
 
             if channel_name and channel_name != user.vk_channel_name:
                 try:
@@ -90,6 +142,8 @@ class VKPlatform(StreamingPlatform):
                 except Exception as e:
                     logger.warning(f"Failed to persist VK channel name: {e}")
 
+            if not channel_name:
+                self.last_error = self.last_error or "VK channel URL is not available for this account"
             return token_info, channel_name
         finally:
             db.close()
@@ -147,15 +201,21 @@ class VKPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
+        self.last_error = None
         try:
             token_info, channel_name = await self._get_user_context(user_id)
             if not token_info or not channel_name:
                 logger.warning(f"No VK token or channel name for user {user_id}")
+                self.last_error = self.last_error or "VK token or channel is not available"
                 return False
 
-            return await self.client.update_stream(channel_name, token_info, title=title)
+            success = await self.client.update_stream(channel_name, token_info, title=title)
+            if not success:
+                self.last_error = self.client.last_error or "VK stream title update failed"
+            return success
         except Exception as e:
             logger.error(f"Error updating VK stream title: {e}")
+            self.last_error = str(e)
             return False
 
     async def update_stream_category(self, user_id: int, category_id: str) -> bool:
@@ -169,15 +229,21 @@ class VKPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
+        self.last_error = None
         try:
             token_info, channel_name = await self._get_user_context(user_id)
             if not token_info or not channel_name:
                 logger.warning(f"No VK token or channel name for user {user_id}")
+                self.last_error = self.last_error or "VK token or channel is not available"
                 return False
 
-            return await self.client.update_stream(channel_name, token_info, category_id=category_id)
+            success = await self.client.update_stream(channel_name, token_info, category_id=category_id)
+            if not success:
+                self.last_error = self.client.last_error or "VK stream category update failed"
+            return success
         except Exception as e:
             logger.error(f"Error updating VK stream category: {e}")
+            self.last_error = str(e)
             return False
 
     async def search_categories(self, query: str) -> List[Dict[str, Any]]:

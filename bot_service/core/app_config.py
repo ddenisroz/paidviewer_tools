@@ -61,7 +61,14 @@ def create_app(lifespan: Optional[Callable] = None) -> FastAPI:
         allow_origins=allowed_origins,
         allow_credentials=allow_credentials,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
+        allow_headers=[
+            "Content-Type",
+            "Authorization",
+            "X-Requested-With",
+            "Accept",
+            "Origin",
+            "X-CSRF-Token",
+        ],
         max_age=3600,  # Кэшировать preflight запросы на 1 час
     )
 

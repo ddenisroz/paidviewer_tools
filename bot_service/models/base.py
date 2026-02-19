@@ -7,19 +7,12 @@ import logging
 import os
 from contextlib import contextmanager
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from core.config import settings
 
 logger = logging.getLogger(__name__)
-
-DEV_SQLITE_FALLBACK_URL = "sqlite:///./data/bot_service.db"
-PLACEHOLDER_POSTGRES_URLS = {
-    "postgresql://user:password@127.0.0.1:5432/database",
-    "postgresql://user:password@localhost:5432/database",
-    "postgresql://user:password@localhost:5432/bot_service_db",
-}
 
 
 # Resolve database URL from settings
@@ -31,16 +24,8 @@ if not DATABASE_URL:
 IS_TESTING = os.getenv("TESTING", "false").lower() == "true" or getattr(settings, "testing", False)
 IS_POSTGRESQL = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")
 
-if settings.is_development and DATABASE_URL in PLACEHOLDER_POSTGRES_URLS:
-    logger.warning("[WARN] Placeholder DATABASE_URL detected in development. Falling back to local SQLite database.")
-    DATABASE_URL = DEV_SQLITE_FALLBACK_URL
-    IS_POSTGRESQL = False
-
-if not IS_POSTGRESQL and not IS_TESTING and not DATABASE_URL.startswith("sqlite"):
-    if settings.is_development:
-        logger.warning("[WARN] Non-PostgreSQL DATABASE_URL detected in development.")
-    else:
-        raise ValueError(f"Only PostgreSQL is supported. Current DATABASE_URL: {DATABASE_URL[:50]}...")
+if not IS_POSTGRESQL and not IS_TESTING:
+    raise ValueError(f"Only PostgreSQL is supported. Current DATABASE_URL: {DATABASE_URL[:50]}...")
 
 
 def _create_sqlite_engine(db_url: str):
@@ -78,25 +63,10 @@ def _create_postgres_engine(db_url: str):
     )
 
 
-if IS_TESTING or DATABASE_URL.startswith("sqlite"):
+if IS_TESTING:
     engine = _create_sqlite_engine(DATABASE_URL)
 else:
     engine = _create_postgres_engine(DATABASE_URL)
-
-    # In local development, fallback to SQLite if PostgreSQL is unavailable
-    # (including Windows-specific psycopg2 UnicodeDecodeError on failed connect).
-    if settings.is_development:
-        try:
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-        except Exception as exc:
-            logger.warning(
-                "[WARN] PostgreSQL connection failed in development (%s). Falling back to SQLite.",
-                exc,
-            )
-            DATABASE_URL = DEV_SQLITE_FALLBACK_URL
-            IS_POSTGRESQL = False
-            engine = _create_sqlite_engine(DATABASE_URL)
 
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -127,7 +97,13 @@ def init_db():
         logger.error("[ERROR] Database engine is not configured")
         return
 
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except UnicodeDecodeError as exc:
+        logger.error("[ERROR] PostgreSQL connection failed while initializing schema: %s", exc)
+        raise RuntimeError(
+            "PostgreSQL connection failed (possible invalid DATABASE_URL or unreachable PostgreSQL server)."
+        ) from exc
 
     default_qualities = [
         {"name": "Common", "color": "#9ca3af", "weight": 100},

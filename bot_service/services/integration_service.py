@@ -186,9 +186,10 @@ class IntegrationService:
     async def _disconnect_vk_bot(self, channel_name: str) -> None:
         """Disconnect VK bot from channel."""
         try:
-            import main
-            if main.vk_live_bot_instance:
-                await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
+            from startup.bot_registry import get_bot_registry
+            vk_bot = get_bot_registry().vk_bot
+            if vk_bot:
+                await vk_bot.disconnect_from_channel(channel_name)
                 logger.info(f"[OK] Disconnected VK bot from {channel_name}")
         except Exception:
             logger.exception("Error disconnecting VK bot")

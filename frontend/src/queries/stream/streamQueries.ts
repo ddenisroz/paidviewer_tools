@@ -347,7 +347,13 @@ export const useUpdateStream = (options?: UseMutationOptions<ApiResponse<StreamI
       }
       logger.error('Error updating stream:', error);
       const errorData = error.response?.data as Record<string, unknown> | undefined;
-      const errorMessage = (errorData?.detail || errorData?.message || 'Не удалось сохранить изменения') as string;
+      const rawErrorMessage = errorData?.detail || errorData?.message;
+      const errorMessage =
+        typeof rawErrorMessage === 'string'
+          ? rawErrorMessage
+          : rawErrorMessage != null && typeof rawErrorMessage === 'object'
+            ? JSON.stringify(rawErrorMessage)
+            : 'Не удалось сохранить изменения';
       toast.error(errorMessage);
     },
     onSettled: (_data, _error, variables) => {

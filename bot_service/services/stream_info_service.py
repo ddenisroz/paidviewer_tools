@@ -17,6 +17,7 @@ class StreamInfoService:
     def __init__(self, db: Session):
         self.db = db
         self.session_service = StreamSessionService(db)
+        self.last_error_by_platform: Dict[str, str] = {}
 
     async def get_stream_info(self, user_id: int, platform_name: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -140,19 +141,28 @@ class StreamInfoService:
         """
         Update stream title/category.
         """
+        self.last_error_by_platform.pop(platform_name, None)
         platform = platform_registry.get(platform_name)
         if not platform:
-             return False
-             
+            self.last_error_by_platform[platform_name] = f"Platform '{platform_name}' is not available"
+            return False
+
         success = True
         if title is not None:
-             if not await platform.update_stream_title(user_id, title):
-                 success = False
-        
+            if not await platform.update_stream_title(user_id, title):
+                success = False
+
         if category_id is not None:
-             if not await platform.update_stream_category(user_id, category_id):
-                 success = False
-                 
+            if not await platform.update_stream_category(user_id, category_id):
+                success = False
+
+        if not success:
+            platform_error = getattr(platform, "last_error", None)
+            if platform_error:
+                self.last_error_by_platform[platform_name] = str(platform_error)
+            else:
+                self.last_error_by_platform[platform_name] = "Stream update failed"
+
         return success
 
     async def search_categories(self, platform_name: str, query: str, user_id: Optional[int] = None) -> List[Dict[str, Any]]:

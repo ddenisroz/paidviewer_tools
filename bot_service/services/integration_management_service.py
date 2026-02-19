@@ -176,9 +176,10 @@ class IntegrationManagementService:
             return
             
         try:
-            import main
-            if main.vk_live_bot_instance:
-                await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
+            from startup.bot_registry import get_bot_registry
+            vk_bot = get_bot_registry().vk_bot
+            if vk_bot:
+                await vk_bot.disconnect_from_channel(channel_name)
                 logger.info(f"[INTEGRATION] VK bot disconnected from {channel_name}")
             
             connection_manager.disable_tts_for_channel(channel_name.lower())

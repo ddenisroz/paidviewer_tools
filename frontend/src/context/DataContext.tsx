@@ -575,12 +575,41 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             setStatus(prev => ({ ...prev, [statusType]: 'error' }));
             logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
 
-            const errorResponse = error as { response?: { status?: number; data?: { message?: string; detail?: string } } };
-            const backendMessage = errorResponse.response?.data?.message || errorResponse.response?.data?.detail;
-            const rawUpdatedPlatforms =
-                (errorResponse.response?.data as { updated_platforms?: unknown[] } | undefined)?.updated_platforms || [];
-            const rawFailedPlatforms =
-                (errorResponse.response?.data as { failed_platforms?: unknown[] } | undefined)?.failed_platforms || [];
+            const errorResponse = error as {
+                response?: {
+                    status?: number;
+                    data?: {
+                        message?: unknown;
+                        detail?: unknown;
+                        updated_platforms?: unknown[];
+                        failed_platforms?: unknown[];
+                    };
+                };
+            };
+            const errorData = errorResponse.response?.data;
+            const detailObject =
+                errorData?.detail != null && typeof errorData.detail === 'object'
+                    ? (errorData.detail as Record<string, unknown>)
+                    : undefined;
+            const backendMessageRaw =
+                errorData?.message ??
+                detailObject?.message ??
+                errorData?.detail;
+            const backendMessage = typeof backendMessageRaw === 'string'
+                ? backendMessageRaw
+                : (backendMessageRaw != null && typeof backendMessageRaw === 'object'
+                    ? JSON.stringify(backendMessageRaw)
+                    : undefined);
+            const rawUpdatedPlatforms = Array.isArray(errorData?.updated_platforms)
+                ? errorData.updated_platforms
+                : (Array.isArray(detailObject?.updated_platforms)
+                    ? (detailObject.updated_platforms as unknown[])
+                    : []);
+            const rawFailedPlatforms = Array.isArray(errorData?.failed_platforms)
+                ? errorData.failed_platforms
+                : (Array.isArray(detailObject?.failed_platforms)
+                    ? (detailObject.failed_platforms as unknown[])
+                    : []);
             const updatedPlatforms = rawUpdatedPlatforms.filter(isStreamPlatform);
             const failedPlatforms = rawFailedPlatforms.filter(isStreamPlatform);
             const hasPartialSuccess = updatedPlatforms.length > 0;
