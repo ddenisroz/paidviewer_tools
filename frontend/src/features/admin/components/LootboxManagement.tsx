@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { Textarea } from '@/shared/components/ui/textarea';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
-
+import { getWsUrl } from '@/utils/urlUtils';
 
 interface Lootbox {
     id: number;
@@ -125,7 +125,7 @@ const LootboxManagement: React.FC = () => {
                 lootboxService.getAdminLootboxes(),
                 lootboxService.getAdminAchievements()
             ]);
-            
+
             setLootboxes((lootboxesResponse.data?.data || lootboxesResponse.data || []) as Lootbox[]);
             setAchievements((achievementsResponse.data?.data || achievementsResponse.data || []) as Achievement[]);
         } catch (error) {
@@ -156,13 +156,13 @@ const LootboxManagement: React.FC = () => {
             await lootboxService.createReward(rewardForm as unknown as Record<string, unknown>);
             toast.success('Награда создана!');
             setIsDialogOpen(false);
-            setRewardForm({ 
-                lootbox_id: '', 
-                name: '', 
-                description: '', 
-                type: 'currency', 
-                value: '{"amount": 100, "currency": "points"}', 
-                weight: 1 
+            setRewardForm({
+                lootbox_id: '',
+                name: '',
+                description: '',
+                type: 'currency',
+                value: '{"amount": 100, "currency": "points"}',
+                weight: 1
             });
             loadData();
         } catch (error) {
@@ -176,14 +176,14 @@ const LootboxManagement: React.FC = () => {
             await lootboxService.createAchievement(achievementForm as unknown as Record<string, unknown>);
             toast.success('Достижение создано!');
             setIsDialogOpen(false);
-            setAchievementForm({ 
-                channel_name: '', 
-                name: '', 
-                description: '', 
-                type: 'daily_streak', 
-                requirement_value: 1, 
-                reward_type: 'free_lootbox', 
-                reward_value: 1 
+            setAchievementForm({
+                channel_name: '',
+                name: '',
+                description: '',
+                type: 'daily_streak',
+                requirement_value: 1,
+                reward_type: 'free_lootbox',
+                reward_value: 1
             });
             loadData();
         } catch (error) {
@@ -222,8 +222,8 @@ const LootboxManagement: React.FC = () => {
                         </div>
                         <div>
                             <Label htmlFor="type">Тип</Label>
-                            <Select 
-                                value={lootboxForm.type} 
+                            <Select
+                                value={lootboxForm.type}
                                 onValueChange={(value: 'free' | 'paid') => setLootboxForm({ ...lootboxForm, type: value })}
                             >
                                 <SelectTrigger>
@@ -258,8 +258,8 @@ const LootboxManagement: React.FC = () => {
                     <div className="space-y-4">
                         <div>
                             <Label htmlFor="lootbox_id">Лутбокс</Label>
-                            <Select 
-                                value={rewardForm.lootbox_id} 
+                            <Select
+                                value={rewardForm.lootbox_id}
                                 onValueChange={(value: string) => setRewardForm({ ...rewardForm, lootbox_id: value })}
                             >
                                 <SelectTrigger>
@@ -294,8 +294,8 @@ const LootboxManagement: React.FC = () => {
                         </div>
                         <div>
                             <Label htmlFor="type">Тип награды</Label>
-                            <Select 
-                                value={rewardForm.type} 
+                            <Select
+                                value={rewardForm.type}
                                 onValueChange={(value: 'currency' | 'item' | 'special') => setRewardForm({ ...rewardForm, type: value })}
                             >
                                 <SelectTrigger>
@@ -365,8 +365,8 @@ const LootboxManagement: React.FC = () => {
                         </div>
                         <div>
                             <Label htmlFor="type">Тип достижения</Label>
-                            <Select 
-                                value={achievementForm.type} 
+                            <Select
+                                value={achievementForm.type}
                                 onValueChange={(value: AchievementForm['type']) => setAchievementForm({ ...achievementForm, type: value })}
                             >
                                 <SelectTrigger>
@@ -393,8 +393,8 @@ const LootboxManagement: React.FC = () => {
                         </div>
                         <div>
                             <Label htmlFor="reward_type">Тип награды</Label>
-                            <Select 
-                                value={achievementForm.reward_type} 
+                            <Select
+                                value={achievementForm.reward_type}
                                 onValueChange={(value: AchievementForm['reward_type']) => setAchievementForm({ ...achievementForm, reward_type: value })}
                             >
                                 <SelectTrigger>
@@ -599,7 +599,7 @@ const LootboxManagement: React.FC = () => {
                                 <Label htmlFor="obs_url">WebSocket URL для OBS</Label>
                                 <Input
                                     id="obs_url"
-                                    value={`${import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'}/ws/obs/lootbox_yourchy`}
+                                    value={`${getWsUrl()}/ws/obs/lootbox_yourchy`}
                                     readOnly
                                     className={READONLY_FIELD_CLASS}
                                 />
@@ -611,7 +611,7 @@ const LootboxManagement: React.FC = () => {
                                 <Label>Lua скрипт для OBS</Label>
                                 <Textarea
                                     value={`-- Вставьте этот код в OBS Scripts
-local websocket_url = "${import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'}/ws/obs/lootbox_yourchy"
+local websocket_url = "${getWsUrl()}/ws/obs/lootbox_yourchy"
 -- ... настройте скрипт под проект`}
                                     readOnly
                                     className={`${READONLY_FIELD_CLASS} font-mono text-xs`}

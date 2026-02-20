@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import { PageLoader } from '@/shared/components/ui/loader';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
+import { getApiUrl } from '@/utils/urlUtils';
 
 interface Metrics {
   users?: {
@@ -58,7 +59,7 @@ const ACTION_BUTTON_CLASS = 'h-9 border-border/70 hover:bg-muted/60 shadow-none'
 const MonitoringPage: React.FC = () => {
   const queryClient = useQueryClient();
   const handleOpenPrometheus = (): void => {
-    const metricsUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}/metrics`;
+    const metricsUrl = `${getApiUrl()}/metrics`;
     const safeUrl = getSafeNavigationUrl(metricsUrl);
     if (!safeUrl) {
       logger.warn('Blocked unsafe Prometheus URL', { metricsUrl });
