@@ -1,8 +1,54 @@
-import os
+﻿import os
+import logging
+from pathlib import Path
+
+from dotenv import dotenv_values
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/bot_service_db").strip().strip('"').strip("'")
+logger = logging.getLogger(__name__)
+
+PLACEHOLDER_DATABASE_URL = "postgresql://user:password@localhost:5432/bot_service_db"
+
+
+def _clean_env_value(value: str | None) -> str:
+    if value is None:
+        return ""
+    # Drop quotes and invisible whitespace often introduced by copy/paste.
+    return value.strip().strip('"').strip("'").replace("\ufeff", "").replace("\u00a0", "").strip()
+
+
+def _load_fallback_database_url_from_bot_service() -> str:
+    project_root = Path(__file__).resolve().parent.parent
+    bot_env_path = project_root / "bot_service" / ".env"
+    if not bot_env_path.exists():
+        return ""
+    bot_database_url = _clean_env_value(dotenv_values(bot_env_path).get("DATABASE_URL"))
+    if bot_database_url and bot_database_url != PLACEHOLDER_DATABASE_URL:
+        return bot_database_url
+    return ""
+
+
+def _resolve_database_url() -> str:
+    env_database_url = _clean_env_value(os.getenv("DATABASE_URL"))
+    if env_database_url and env_database_url != PLACEHOLDER_DATABASE_URL:
+        return env_database_url
+
+    fallback_database_url = _load_fallback_database_url_from_bot_service()
+    if fallback_database_url:
+        if not env_database_url:
+            logger.info("[DB] DATABASE_URL is not set in tts_service env; using bot_service/.env DATABASE_URL")
+        else:
+            logger.warning(
+                "[DB] DATABASE_URL in tts_service env is placeholder; using bot_service/.env DATABASE_URL"
+            )
+        return fallback_database_url
+
+    # Preserve previous behavior when no fallback exists.
+    return env_database_url or PLACEHOLDER_DATABASE_URL
+
+
+DATABASE_URL = _resolve_database_url()
 
 IS_TESTING = os.getenv("TESTING", "false").lower() == "true"
 IS_POSTGRESQL = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://")
@@ -27,8 +73,8 @@ else:
     )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
-# РћРїСЂРµРґРµР»СЏРµРј РјРѕРґРµР»Рё, РєРѕС‚РѕСЂС‹Рµ РЅСѓР¶РЅС‹ СЌС‚РѕРјСѓ СЃРµСЂРІРёСЃСѓ
-# (РѕРЅРё РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РёРґРµРЅС‚РёС‡РЅС‹ РјРѕРґРµР»СЏРј РІ bot_service.database)
+# Р С›Р С—РЎР‚Р ВµР Т‘Р ВµР В»РЎРЏР ВµР С Р СР С•Р Т‘Р ВµР В»Р С‘, Р С”Р С•РЎвЂљР С•РЎР‚РЎвЂ№Р Вµ Р Р…РЎС“Р В¶Р Р…РЎвЂ№ РЎРЊРЎвЂљР С•Р СРЎС“ РЎРѓР ВµРЎР‚Р Р†Р С‘РЎРѓРЎС“
+# (Р С•Р Р…Р С‘ Р Т‘Р С•Р В»Р В¶Р Р…РЎвЂ№ Р В±РЎвЂ№РЎвЂљРЎРЉ Р С‘Р Т‘Р ВµР Р…РЎвЂљР С‘РЎвЂЎР Р…РЎвЂ№ Р СР С•Р Т‘Р ВµР В»РЎРЏР С Р Р† bot_service.database)
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, ForeignKey, Float, UniqueConstraint
 from sqlalchemy.sql import func
 
@@ -44,12 +90,12 @@ class User(Base):
     settings = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), default=func.now())
     
-    # TTS РЅР°СЃС‚СЂРѕР№РєРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
-    tts_max_text_length = Column(Integer, default=200)  # РњР°РєСЃРёРјР°Р»СЊРЅР°СЏ РґР»РёРЅР° С‚РµРєСЃС‚Р°
-    tts_daily_limit = Column(Integer, default=100)  # Р”РЅРµРІРЅРѕР№ Р»РёРјРёС‚ Р·Р°РїСЂРѕСЃРѕРІ
-    tts_gpu_time_limit = Column(Float, default=300.0)  # Р›РёРјРёС‚ GPU РІСЂРµРјРµРЅРё РІ СЃРµРєСѓРЅРґР°С… РІ РґРµРЅСЊ
-    tts_priority_level = Column(Integer, default=2)  # РЈСЂРѕРІРµРЅСЊ РїСЂРёРѕСЂРёС‚РµС‚Р° (1-4)
-    tts_enabled = Column(Boolean, default=True)  # Р’РєР»СЋС‡РµРЅ Р»Рё TTS РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+    # TTS Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р в„–Р С”Р С‘ Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЏ
+    tts_max_text_length = Column(Integer, default=200)  # Р СљР В°Р С”РЎРѓР С‘Р СР В°Р В»РЎРЉР Р…Р В°РЎРЏ Р Т‘Р В»Р С‘Р Р…Р В° РЎвЂљР ВµР С”РЎРѓРЎвЂљР В°
+    tts_daily_limit = Column(Integer, default=100)  # Р вЂќР Р…Р ВµР Р†Р Р…Р С•Р в„– Р В»Р С‘Р СР С‘РЎвЂљ Р В·Р В°Р С—РЎР‚Р С•РЎРѓР С•Р Р†
+    tts_gpu_time_limit = Column(Float, default=300.0)  # Р вЂєР С‘Р СР С‘РЎвЂљ GPU Р Р†РЎР‚Р ВµР СР ВµР Р…Р С‘ Р Р† РЎРѓР ВµР С”РЎС“Р Р…Р Т‘Р В°РЎвЂ¦ Р Р† Р Т‘Р ВµР Р…РЎРЉ
+    tts_priority_level = Column(Integer, default=2)  # Р Р€РЎР‚Р С•Р Р†Р ВµР Р…РЎРЉ Р С—РЎР‚Р С‘Р С•РЎР‚Р С‘РЎвЂљР ВµРЎвЂљР В° (1-4)
+    tts_enabled = Column(Boolean, default=True)  # Р вЂ™Р С”Р В»РЎР‹РЎвЂЎР ВµР Р… Р В»Р С‘ TTS Р Т‘Р В»РЎРЏ Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЏ
 
 class Voice(Base):
     __tablename__ = 'voices'
@@ -57,66 +103,66 @@ class Voice(Base):
     name = Column(String, unique=True, nullable=False)
     voice_type = Column(String, default='global') # 'global' or 'user'
     file_path = Column(String, nullable=False)
-    reference_text = Column(String, nullable=True)  # РСЃРїСЂР°РІР»РµРЅРѕ: Р±С‹Р»Рѕ ref_text_path
+    reference_text = Column(String, nullable=True)  # Р ВРЎРѓР С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…Р С•: Р В±РЎвЂ№Р В»Р С• ref_text_path
     owner_id = Column(Integer, ForeignKey('users.id'), nullable=True)
     is_public = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     is_global = Column(Boolean, default=False)  # True for admin-uploaded global voices, False for user voices
     created_at = Column(DateTime(timezone=True), default=func.now())
     
-    # РќР°СЃС‚СЂРѕР№РєРё РіРµРЅРµСЂР°С†РёРё TTS (РЅР°СЃС‚СЂР°РёРІР°РµРјС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј)
-    cfg_strength = Column(Float, default=2.5)  # CFG strength (2.0-5.0 СЂРµРєРѕРјРµРЅРґСѓРµС‚СЃСЏ)
+    # Р СњР В°РЎРѓРЎвЂљРЎР‚Р С•Р в„–Р С”Р С‘ Р С–Р ВµР Р…Р ВµРЎР‚Р В°РЎвЂ Р С‘Р С‘ TTS (Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р В°Р С‘Р Р†Р В°Р ВµР СРЎвЂ№Р Вµ Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»Р ВµР С)
+    cfg_strength = Column(Float, default=2.5)  # CFG strength (2.0-5.0 РЎР‚Р ВµР С”Р С•Р СР ВµР Р…Р Т‘РЎС“Р ВµРЎвЂљРЎРѓРЎРЏ)
     speed_preset = Column(String, default='normal')  # 'very_slow', 'slow', 'normal'
     
-    # РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РѕРїСЂРµРґРµР»СЏРµРјС‹Рµ СЃРёСЃС‚РµРјРѕР№ РїР°СЂР°РјРµС‚СЂС‹ (РќР• С…СЂР°РЅСЏС‚СЃСЏ РІ Р‘Р”)
-    # target_rms, speed, nfe_step - РѕРїСЂРµРґРµР»СЏСЋС‚СЃСЏ РґРёРЅР°РјРёС‡РµСЃРєРё РІ РєРѕРґРµ
+    # Р С’Р Р†РЎвЂљР С•Р СР В°РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С‘ Р С•Р С—РЎР‚Р ВµР Т‘Р ВµР В»РЎРЏР ВµР СРЎвЂ№Р Вµ РЎРѓР С‘РЎРѓРЎвЂљР ВµР СР С•Р в„– Р С—Р В°РЎР‚Р В°Р СР ВµРЎвЂљРЎР‚РЎвЂ№ (Р СњР вЂў РЎвЂ¦РЎР‚Р В°Р Р…РЎРЏРЎвЂљРЎРѓРЎРЏ Р Р† Р вЂР вЂќ)
+    # target_rms, speed, nfe_step - Р С•Р С—РЎР‚Р ВµР Т‘Р ВµР В»РЎРЏРЎР‹РЎвЂљРЎРѓРЎРЏ Р Т‘Р С‘Р Р…Р В°Р СР С‘РЎвЂЎР ВµРЎРѓР С”Р С‘ Р Р† Р С”Р С•Р Т‘Р Вµ
     
-    # Р¤РёРєСЃРёСЂРѕРІР°РЅРЅС‹Рµ РїР°СЂР°РјРµС‚СЂС‹ (РЅРµ РЅР°СЃС‚СЂР°РёРІР°РµРјС‹Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»РµРј)
+    # Р В¤Р С‘Р С”РЎРѓР С‘РЎР‚Р С•Р Р†Р В°Р Р…Р Р…РЎвЂ№Р Вµ Р С—Р В°РЎР‚Р В°Р СР ВµРЎвЂљРЎР‚РЎвЂ№ (Р Р…Р Вµ Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р В°Р С‘Р Р†Р В°Р ВµР СРЎвЂ№Р Вµ Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»Р ВµР С)
     cross_fade_duration = Column(Float, default=0.15)
     silence_duration_ms = Column(Integer, default=100)
     sway_sampling_coef = Column(Float, default=-1.0)
 
 class UserVoiceEnabled(Base):
-    """РўР°Р±Р»РёС†Р° РґР»СЏ С…СЂР°РЅРµРЅРёСЏ РёРЅС„РѕСЂРјР°С†РёРё Рѕ С‚РѕРј, РєР°РєРёРµ РіРѕР»РѕСЃР° РІРєР»СЋС‡РµРЅС‹ РґР»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ"""
+    """Р СћР В°Р В±Р В»Р С‘РЎвЂ Р В° Р Т‘Р В»РЎРЏ РЎвЂ¦РЎР‚Р В°Р Р…Р ВµР Р…Р С‘РЎРЏ Р С‘Р Р…РЎвЂћР С•РЎР‚Р СР В°РЎвЂ Р С‘Р С‘ Р С• РЎвЂљР С•Р С, Р С”Р В°Р С”Р С‘Р Вµ Р С–Р С•Р В»Р С•РЎРѓР В° Р Р†Р С”Р В»РЎР‹РЎвЂЎР ВµР Р…РЎвЂ№ Р Т‘Р В»РЎРЏ Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЏ"""
     __tablename__ = 'user_voice_enabled'
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     voice_id = Column(Integer, ForeignKey('voices.id'), nullable=False, index=True)
-    is_enabled = Column(Boolean, default=True)  # Р’РєР»СЋС‡РµРЅ Р»Рё РіРѕР»РѕСЃ РґР»СЏ СЌС‚РѕРіРѕ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+    is_enabled = Column(Boolean, default=True)  # Р вЂ™Р С”Р В»РЎР‹РЎвЂЎР ВµР Р… Р В»Р С‘ Р С–Р С•Р В»Р С•РЎРѓ Р Т‘Р В»РЎРЏ РЎРЊРЎвЂљР С•Р С–Р С• Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЏ
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     
-    # РЈРЅРёРєР°Р»СЊРЅС‹Р№ РёРЅРґРµРєСЃ: РѕРґРёРЅ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊ - РѕРґРёРЅ РіРѕР»РѕСЃ
+    # Р Р€Р Р…Р С‘Р С”Р В°Р В»РЎРЉР Р…РЎвЂ№Р в„– Р С‘Р Р…Р Т‘Р ВµР С”РЎРѓ: Р С•Р Т‘Р С‘Р Р… Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЉ - Р С•Р Т‘Р С‘Р Р… Р С–Р С•Р В»Р С•РЎРѓ
     __table_args__ = (
         UniqueConstraint('user_id', 'voice_id', name='uq_user_voice'),
     )
 
 class UserTTSUsage(Base):
-    """Р›РѕРіРёСЂРѕРІР°РЅРёРµ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ TTS РїРѕР»СЊР·РѕРІР°С‚РµР»СЏРјРё РґР»СЏ Р±РёР»Р»РёРЅРіР° Рё throttle"""
+    """Р вЂєР С•Р С–Р С‘РЎР‚Р С•Р Р†Р В°Р Р…Р С‘Р Вµ Р С‘РЎРѓР С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°Р Р…Р С‘РЎРЏ TTS Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЏР СР С‘ Р Т‘Р В»РЎРЏ Р В±Р С‘Р В»Р В»Р С‘Р Р…Р С–Р В° Р С‘ throttle"""
     __tablename__ = 'user_tts_usage'
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     date = Column(DateTime(timezone=True), default=func.now(), index=True)
     
-    # РЎС‚Р°С‚РёСЃС‚РёРєР° РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ
-    requests_count = Column(Integer, default=0)  # РљРѕР»РёС‡РµСЃС‚РІРѕ Р·Р°РїСЂРѕСЃРѕРІ
-    gpu_time_seconds = Column(Float, default=0.0)  # Р’СЂРµРјСЏ GPU РІ СЃРµРєСѓРЅРґР°С…
-    cpu_time_seconds = Column(Float, default=0.0)  # Р’СЂРµРјСЏ CPU РІ СЃРµРєСѓРЅРґР°С…
-    total_characters = Column(Integer, default=0)  # РћР±С‰РµРµ РєРѕР»РёС‡РµСЃС‚РІРѕ СЃРёРјРІРѕР»РѕРІ
-    successful_requests = Column(Integer, default=0)  # РЈСЃРїРµС€РЅС‹Рµ Р·Р°РїСЂРѕСЃС‹
-    failed_requests = Column(Integer, default=0)  # РќРµСѓРґР°С‡РЅС‹Рµ Р·Р°РїСЂРѕСЃС‹
+    # Р РЋРЎвЂљР В°РЎвЂљР С‘РЎРѓРЎвЂљР С‘Р С”Р В° Р С‘РЎРѓР С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°Р Р…Р С‘РЎРЏ
+    requests_count = Column(Integer, default=0)  # Р С™Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р С• Р В·Р В°Р С—РЎР‚Р С•РЎРѓР С•Р Р†
+    gpu_time_seconds = Column(Float, default=0.0)  # Р вЂ™РЎР‚Р ВµР СРЎРЏ GPU Р Р† РЎРѓР ВµР С”РЎС“Р Р…Р Т‘Р В°РЎвЂ¦
+    cpu_time_seconds = Column(Float, default=0.0)  # Р вЂ™РЎР‚Р ВµР СРЎРЏ CPU Р Р† РЎРѓР ВµР С”РЎС“Р Р…Р Т‘Р В°РЎвЂ¦
+    total_characters = Column(Integer, default=0)  # Р С›Р В±РЎвЂ°Р ВµР Вµ Р С”Р С•Р В»Р С‘РЎвЂЎР ВµРЎРѓРЎвЂљР Р†Р С• РЎРѓР С‘Р СР Р†Р С•Р В»Р С•Р Р†
+    successful_requests = Column(Integer, default=0)  # Р Р€РЎРѓР С—Р ВµРЎв‚¬Р Р…РЎвЂ№Р Вµ Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎвЂ№
+    failed_requests = Column(Integer, default=0)  # Р СњР ВµРЎС“Р Т‘Р В°РЎвЂЎР Р…РЎвЂ№Р Вµ Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎвЂ№
     
-    # Р”РµС‚Р°Р»Рё РїРѕ С‚РёРїР°Рј РѕР±СЂР°Р±РѕС‚РєРё
-    gpu_requests = Column(Integer, default=0)  # Р—Р°РїСЂРѕСЃС‹ РЅР° GPU
-    cpu_requests = Column(Integer, default=0)  # Р—Р°РїСЂРѕСЃС‹ РЅР° CPU
+    # Р вЂќР ВµРЎвЂљР В°Р В»Р С‘ Р С—Р С• РЎвЂљР С‘Р С—Р В°Р С Р С•Р В±РЎР‚Р В°Р В±Р С•РЎвЂљР С”Р С‘
+    gpu_requests = Column(Integer, default=0)  # Р вЂ”Р В°Р С—РЎР‚Р С•РЎРѓРЎвЂ№ Р Р…Р В° GPU
+    cpu_requests = Column(Integer, default=0)  # Р вЂ”Р В°Р С—РЎР‚Р С•РЎРѓРЎвЂ№ Р Р…Р В° CPU
     
-    # РџСЂРёРѕСЂРёС‚РµС‚С‹
-    critical_requests = Column(Integer, default=0)  # РљСЂРёС‚РёС‡РµСЃРєРёРµ Р·Р°РїСЂРѕСЃС‹
-    high_requests = Column(Integer, default=0)  # Р’С‹СЃРѕРєРёР№ РїСЂРёРѕСЂРёС‚РµС‚
-    normal_requests = Column(Integer, default=0)  # РћР±С‹С‡РЅС‹Рµ Р·Р°РїСЂРѕСЃС‹
-    low_requests = Column(Integer, default=0)  # РќРёР·РєРёР№ РїСЂРёРѕСЂРёС‚РµС‚
+    # Р СџРЎР‚Р С‘Р С•РЎР‚Р С‘РЎвЂљР ВµРЎвЂљРЎвЂ№
+    critical_requests = Column(Integer, default=0)  # Р С™РЎР‚Р С‘РЎвЂљР С‘РЎвЂЎР ВµРЎРѓР С”Р С‘Р Вµ Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎвЂ№
+    high_requests = Column(Integer, default=0)  # Р вЂ™РЎвЂ№РЎРѓР С•Р С”Р С‘Р в„– Р С—РЎР‚Р С‘Р С•РЎР‚Р С‘РЎвЂљР ВµРЎвЂљ
+    normal_requests = Column(Integer, default=0)  # Р С›Р В±РЎвЂ№РЎвЂЎР Р…РЎвЂ№Р Вµ Р В·Р В°Р С—РЎР‚Р С•РЎРѓРЎвЂ№
+    low_requests = Column(Integer, default=0)  # Р СњР С‘Р В·Р С”Р С‘Р в„– Р С—РЎР‚Р С‘Р С•РЎР‚Р С‘РЎвЂљР ВµРЎвЂљ
     
     created_at = Column(DateTime(timezone=True), default=func.now())
     updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
@@ -133,17 +179,26 @@ def get_db():
         try:
             db.close()
         except Exception:
-            pass  # РРіРЅРѕСЂРёСЂСѓРµРј РѕС€РёР±РєРё РїСЂРё Р·Р°РєСЂС‹С‚РёРё
+            pass  # Р ВР С–Р Р…Р С•РЎР‚Р С‘РЎР‚РЎС“Р ВµР С Р С•РЎв‚¬Р С‘Р В±Р С”Р С‘ Р С—РЎР‚Р С‘ Р В·Р В°Р С”РЎР‚РЎвЂ№РЎвЂљР С‘Р С‘
 
 def close_all_connections():
-    """Р—Р°РєСЂС‹РІР°РµС‚ РІСЃРµ СЃРѕРµРґРёРЅРµРЅРёСЏ СЃ Р±Р°Р·РѕР№ РґР°РЅРЅС‹С…"""
+    """Р вЂ”Р В°Р С”РЎР‚РЎвЂ№Р Р†Р В°Р ВµРЎвЂљ Р Р†РЎРѓР Вµ РЎРѓР С•Р ВµР Т‘Р С‘Р Р…Р ВµР Р…Р С‘РЎРЏ РЎРѓ Р В±Р В°Р В·Р С•Р в„– Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦"""
     try:
         engine.dispose()
     except Exception:
         pass
 
 def init_db():
-    """РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ Р±Р°Р·С‹ РґР°РЅРЅС‹С…"""
-    # РЎРѕР·РґР°РµРј РІСЃРµ С‚Р°Р±Р»РёС†С‹
-    Base.metadata.create_all(bind=engine)
+    """Р ВР Р…Р С‘РЎвЂ Р С‘Р В°Р В»Р С‘Р В·Р В°РЎвЂ Р С‘РЎРЏ Р В±Р В°Р В·РЎвЂ№ Р Т‘Р В°Р Р…Р Р…РЎвЂ№РЎвЂ¦"""
+    # Р РЋР С•Р В·Р Т‘Р В°Р ВµР С Р Р†РЎРѓР Вµ РЎвЂљР В°Р В±Р В»Р С‘РЎвЂ РЎвЂ№
+    try:
+        Base.metadata.create_all(bind=engine)
+    except UnicodeDecodeError as exc:
+        logger.error(
+            "[DB] PostgreSQL connection failed while decoding server response. Check DATABASE_URL in tts_service/.env or bot_service/.env."
+        )
+        raise RuntimeError(
+            "PostgreSQL connection failed due to invalid DATABASE_URL or unreachable PostgreSQL server."
+        ) from exc
+
 

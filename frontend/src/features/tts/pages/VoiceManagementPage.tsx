@@ -143,7 +143,19 @@ const VoiceManagementPageContent: React.FC = () => {
         refetchOnWindowFocus: false,
     });
 
-    const whitelistStatus = whitelistStatusData?.data as WhitelistStatus | undefined;
+    const whitelistStatusRaw = (whitelistStatusData as { data?: unknown } | undefined)?.data ?? whitelistStatusData;
+    const whitelistStatusCandidate = whitelistStatusRaw as Partial<WhitelistStatus> | undefined;
+    const whitelistStatus =
+        whitelistStatusCandidate &&
+        (typeof whitelistStatusCandidate.is_whitelisted === 'boolean' ||
+            typeof whitelistStatusCandidate.can_manage_voices === 'boolean')
+            ? ({
+                is_whitelisted: Boolean(whitelistStatusCandidate.is_whitelisted),
+                can_manage_voices: Boolean(whitelistStatusCandidate.can_manage_voices),
+                platform: whitelistStatusCandidate.platform,
+                message: whitelistStatusCandidate.message,
+            } as WhitelistStatus)
+            : undefined;
 
     const { data: globalVoicesData = [], isLoading: globalVoicesLoading, isError: globalVoicesError, error: globalVoicesErrorData } = useQuery<TtsVoice[]>({
         queryKey: ['global-voices'],
@@ -1315,7 +1327,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                 <Edit className="h-4 w-4 mr-2" />Переименовать
                             </Button>
                         )}
-                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[clamp(110px,20vw,140px)] bg-blue-600 hover:bg-blue-700">
+                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[clamp(110px,20vw,140px)] bg-blue-700 hover:bg-blue-800">
                             <Settings className="h-4 w-4 mr-2" />Сохранить
                         </Button>
                     </DialogFooter>

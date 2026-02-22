@@ -51,7 +51,7 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                         variant="default"
                         size="sm"
                         onClick={() => setShowObsSettings(false)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2"
+                        className="bg-blue-700 hover:bg-blue-800 text-white font-medium px-4 py-2"
                     >
                         <X className="h-4 w-4" />
                     </Button>

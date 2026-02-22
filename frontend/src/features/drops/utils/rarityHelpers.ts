@@ -28,7 +28,7 @@ export function getRarityButtonColor(rarity: Rarity): string {
     const buttonColors: Record<Rarity, string> = {
         legendary: 'bg-yellow-600 hover:bg-yellow-700',
         epic: 'bg-purple-600 hover:bg-purple-700',
-        rare: 'bg-blue-600 hover:bg-blue-700',
+        rare: 'bg-blue-700 hover:bg-blue-800',
         common: 'bg-gray-600 hover:bg-gray-700'
     };
     

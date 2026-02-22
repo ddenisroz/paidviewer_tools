@@ -187,9 +187,9 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
           <button
             onClick={() => onModeChange('all_messages')}
             disabled={isSaving}
-            className={`p-3 rounded-lg border-2 transition-all text-left ${ttsMode === 'all_messages'
-              ? 'border-purple-500 bg-purple-500/10 text-white'
-              : 'border-gray-700 hover:border-purple-500/50 text-gray-400'
+            className={`p-3 rounded-lg border transition-all text-left ${ttsMode === 'all_messages'
+              ? 'border-green-500 bg-green-500/25 text-white'
+              : 'border-gray-700 hover:border-green-500/50 text-gray-400'
               }`}
           >
             <div className="font-semibold text-sm mb-0.5">Все сообщения</div>
@@ -199,10 +199,10 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
           <button
             onClick={() => onModeChange('channel_points')}
             disabled={isSaving || !isTwitchConnected}
-            className={`p-3 rounded-lg border-2 transition-all text-left ${!isTwitchConnected
+            className={`p-3 rounded-lg border transition-all text-left ${!isTwitchConnected
               ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
               : ttsMode === 'channel_points'
-                ? 'border-green-500 bg-green-500/10 text-white'
+                ? 'border-green-500 bg-green-500/25 text-white'
                 : 'border-gray-700 hover:border-green-500/50 text-gray-400'
               }`}
           >

@@ -245,7 +245,7 @@ const YouTubeQueueCarousel: React.FC = () => {
             <Button
               onClick={() => addVideo(newVideoUrl)}
               disabled={!newVideoUrl.trim() || addingVideo}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-700 hover:bg-blue-800 text-white"
             >
               {addingVideo ? 'Добавление...' : 'Добавить'}
             </Button>
@@ -265,7 +265,7 @@ const YouTubeQueueCarousel: React.FC = () => {
                 {!showAddForm && (
                   <Button
                     onClick={() => setShowAddForm(true)}
-                    className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
+                    className="mt-4 bg-blue-700 hover:bg-blue-800 text-white"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Добавить видео

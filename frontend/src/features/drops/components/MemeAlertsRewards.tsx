@@ -661,7 +661,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                         onChange={(e) => setGrantValue(Number(e.target.value))}
                                         className={FIELD_CLASS}
                                     />
-                                    <Button onClick={handleGrant} disabled={granting} className="h-9 md:min-w-[140px] bg-blue-600 hover:bg-blue-700 text-white">
+                                    <Button onClick={handleGrant} disabled={granting} className="h-9 md:min-w-[140px] bg-blue-700 hover:bg-blue-800 text-white">
                                         {granting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Выдать
                                     </Button>
@@ -767,7 +767,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                     <Button
                                         onClick={handleCreatePointsReward}
                                         disabled={rewardCreating || settingsLoading}
-                                        className="h-9 w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                        className="h-9 w-full bg-blue-700 hover:bg-blue-800 text-white"
                                     >
                                         {rewardCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Создать/обновить награду
@@ -840,7 +840,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                     <Button
                                         onClick={handleSaveDonationAuto}
                                         disabled={settingsSaving || (!donationAlertsConnected && !automationSettings.donation_auto.enabled)}
-                                        className="h-9 w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                        className="h-9 w-full bg-blue-700 hover:bg-blue-800 text-white"
                                     >
                                         {settingsSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                         Сохранить настройки

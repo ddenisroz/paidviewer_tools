@@ -378,7 +378,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                             onClick={addWord}
                             disabled={addingWord || !newWord.trim()}
                             size="sm"
-                            className="h-9 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-900/20 transition-all duration-200"
+                            className="h-9 px-4 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold shadow-lg shadow-blue-900/20 transition-all duration-200"
                         >
                             {addingWord ? '...' : <><Plus className="h-3.5 w-3.5 mr-1" />Добавить</>}
                         </Button>

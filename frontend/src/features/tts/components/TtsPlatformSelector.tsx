@@ -118,14 +118,14 @@ const TtsPlatformSelector: React.FC = () => {
       accentBg: 'bg-purple-500/15',
       accentBorder: 'border-purple-500/30',
       pill: 'bg-purple-500/15 text-purple-200 border border-purple-500/30',
-      toggleOn: 'bg-emerald-500',
+      toggleOn: 'bg-green-600',
     },
     vk: {
       accentText: 'text-red-300',
       accentBg: 'bg-red-500/15',
       accentBorder: 'border-red-500/30',
       pill: 'bg-red-500/15 text-red-200 border border-red-500/30',
-      toggleOn: 'bg-emerald-500',
+      toggleOn: 'bg-green-600',
     },
   };
 

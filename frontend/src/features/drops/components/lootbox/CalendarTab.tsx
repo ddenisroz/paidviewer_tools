@@ -58,7 +58,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ gameFieldData, onDayClick }) 
                             ${dayData.hasViewer
                                 ? dayData.isActive
                                     ? 'bg-green-600 text-white border-green-500 hover:bg-green-700'
-                                    : 'bg-blue-600 text-white border-blue-500 hover:bg-blue-700'
+                                    : 'bg-blue-700 text-white border-blue-600 hover:bg-blue-800'
                                 : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-gray-600'
                             }
                         `}
@@ -103,7 +103,7 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ gameFieldData, onDayClick }) 
                     <span className="text-gray-300">Активный зритель</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-blue-600 rounded border border-blue-500"></div>
+                    <div className="w-4 h-4 bg-blue-700 rounded border border-blue-600"></div>
                     <span className="text-gray-300">Есть зритель</span>
                 </div>
                 <div className="flex items-center gap-2">

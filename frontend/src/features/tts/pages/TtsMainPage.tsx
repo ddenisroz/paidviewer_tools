@@ -1320,7 +1320,7 @@ const TtsMainPageContent: React.FC = () => {
                                                     onCheckedChange={handleBasicTtsToggle}
                                                     onClick={(e) => e.stopPropagation()}
                                                     disabled={isEngineActionPending}
-                                                    className="data-[state=checked]:bg-emerald-600"
+                                                    className="data-[state=checked]:bg-green-600"
                                                 />
                                             </div>
                                         </div>
@@ -1367,7 +1367,7 @@ const TtsMainPageContent: React.FC = () => {
                                                     onCheckedChange={handleGcloudTtsToggle}
                                                     onClick={(e) => e.stopPropagation()}
                                                     disabled={isEngineActionPending}
-                                                    className="data-[state=checked]:bg-emerald-600"
+                                                    className="data-[state=checked]:bg-green-600"
                                                 />
                                             </div>
                                             {(gcloudTtsEnabled || ttsEngine === 'gcloud') && (
@@ -1478,7 +1478,7 @@ const TtsMainPageContent: React.FC = () => {
                                                     onCheckedChange={handleAiTtsToggle}
                                                     onClick={(e) => e.stopPropagation()}
                                                     disabled={!canToggleF5TTS || isEngineActionPending}
-                                                    className="data-[state=checked]:bg-emerald-600"
+                                                    className="data-[state=checked]:bg-green-600"
                                                 />
                                             </div>
                                             {aiTtsEnabled && (
@@ -1513,8 +1513,8 @@ const TtsMainPageContent: React.FC = () => {
                                                     <button
                                                         onClick={() => handleListeningModeChange('website')}
                                                         className={`py-2 px-3 rounded-lg border text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
-                                                            ? 'border-sky-500/60 bg-transparent text-sky-300'
-                                                            : 'border-gray-700/50 bg-transparent text-gray-400 hover:border-sky-500/40 hover:text-sky-300'
+                                                            ? 'border-green-500 bg-green-500/25 text-white'
+                                                            : 'border-gray-700 bg-transparent text-gray-400 hover:border-green-500/50'
                                                             }`}
                                                     >
                                                         Браузер
@@ -1522,8 +1522,8 @@ const TtsMainPageContent: React.FC = () => {
                                                     <button
                                                         onClick={() => handleListeningModeChange('obs')}
                                                         className={`py-2 px-3 rounded-lg border text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
-                                                            ? 'border-sky-500/60 bg-transparent text-sky-300'
-                                                            : 'border-gray-700/50 bg-transparent text-gray-400 hover:border-sky-500/40 hover:text-sky-300'
+                                                            ? 'border-green-500 bg-green-500/25 text-white'
+                                                            : 'border-gray-700 bg-transparent text-gray-400 hover:border-green-500/50'
                                                             }`}
                                                     >
                                                         OBS
@@ -1533,13 +1533,10 @@ const TtsMainPageContent: React.FC = () => {
 
                                             {/* Website mode: управление только через отдельный TTS Player */}
                                             {listeningMode === 'website' && (
-                                                <div className="space-y-2">
-                                                    <p className="text-xs font-medium text-gray-300">
-                                                        Browser mode активна только через отдельную вкладку TTS Player
-                                                    </p>
+                                                <div>
                                                     <Button
                                                         onClick={openPlayerTab}
-                                                        className="h-9 w-full border border-sky-500/50 bg-transparent text-xs font-semibold text-sky-200 hover:bg-sky-500/10 hover:text-sky-100"
+                                                        className="h-9 w-full border border-blue-700 bg-blue-700 text-xs font-semibold text-white hover:bg-blue-800"
                                                     >
                                                         Открыть TTS Player
                                                     </Button>
@@ -1652,7 +1649,7 @@ const TtsMainPageContent: React.FC = () => {
                                             <Switch
                                                 checked={ttsSettings.enable7TV}
                                                 onCheckedChange={(val) => handleTtsSettingChange('enable7TV', val)}
-                                                className="data-[state=checked]:bg-emerald-600"
+                                                className="data-[state=checked]:bg-green-600"
                                             />
                                         </div>
 
@@ -1662,7 +1659,7 @@ const TtsMainPageContent: React.FC = () => {
                                             <Switch
                                                 checked={ttsSettings.enableTwitch}
                                                 onCheckedChange={(val) => handleTtsSettingChange('enableTwitch', val)}
-                                                className="data-[state=checked]:bg-emerald-600"
+                                                className="data-[state=checked]:bg-green-600"
                                             />
                                         </div>
 
@@ -1672,7 +1669,7 @@ const TtsMainPageContent: React.FC = () => {
                                             <Switch
                                                 checked={!ttsSettings.filterMentions}
                                                 onCheckedChange={(val) => handleTtsSettingChange('filterMentions', !val)}
-                                                className="data-[state=checked]:bg-emerald-600"
+                                                className="data-[state=checked]:bg-green-600"
                                             />
                                         </div>
                                     </CardContent>
