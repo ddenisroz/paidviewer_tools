@@ -24,8 +24,8 @@ This checklist tracks readiness to move `F5_tts/` into a standalone repository (
 
 ## 3. Docker and Runtime Profiles
 
-- Single-node profile works: `deploy/docker/docker-compose.tts-simple.yml`.
-- Advanced profile works: `deploy/docker/docker-compose.tts-advanced.yml`.
+- Standalone single-node profile works: `F5_tts/deploy/docker-compose.simple.yml`.
+- Standalone advanced profile works: `F5_tts/deploy/docker-compose.advanced.yml`.
 - `F5_tts/Dockerfile.prod` builds without local path assumptions.
 - `.dockerignore` is present and excludes runtime artifacts.
 
@@ -65,10 +65,12 @@ This checklist tracks readiness to move `F5_tts/` into a standalone repository (
 ## 9. Final Cutover Plan
 
 1. Freeze API changes in current monorepo.
-2. Copy `F5_tts/` to new repository.
-3. Run smoke tests with existing `bot_service`.
-4. Switch deployment references to new image/repo.
-5. Remove duplicated service code from monorepo only after successful cutover window.
+2. Export bundle:
+   - `.\scripts\dev\prepare_f5_tts_export.ps1 -OutputDir artifacts/f5-tts-service -FlatLayout`
+3. Copy export bundle contents to new repository.
+4. Run smoke tests with existing `bot_service`.
+5. Switch deployment references to new image/repo.
+6. Remove duplicated service code from monorepo only after successful cutover window.
 
 ## 10. Encoding Sanity
 

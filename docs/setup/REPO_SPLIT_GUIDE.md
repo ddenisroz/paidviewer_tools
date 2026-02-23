@@ -43,17 +43,19 @@ Security contract:
 ## 4. Extract `F5_tts` repository
 
 1. Create new empty repository `f5-tts-service`.
-2. Copy from monorepo:
+2. Prefer automated export:
+- `.\scripts\dev\prepare_f5_tts_export.ps1 -OutputDir artifacts/f5-tts-service -FlatLayout`
+3. Or copy manually from monorepo:
 - `F5_tts/**`
 - `docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md`
-- `deploy/docker/docker-compose.tts-simple.yml`
-- `deploy/docker/docker-compose.tts-advanced.yml`
-3. In copied compose files, keep paths local to new repo root (no `../../` links).
-4. Add CI steps:
+- `F5_tts/deploy/docker-compose.simple.yml`
+- `F5_tts/deploy/docker-compose.advanced.yml`
+4. In copied compose files, keep paths local to new repo root (no `../../` links).
+5. Add CI steps:
 - `ruff check .`
 - `ruff format --check .`
 - service smoke test (`/health/live`, `/health/ready` + one synthesis dry-run)
-5. Publish first image tag (example): `ghcr.io/<org>/f5-tts-service:<tag>`.
+6. Publish first image tag (example): `ghcr.io/<org>/f5-tts-service:<tag>`.
 
 ## 5. Prepare `ttv-core` after extraction
 

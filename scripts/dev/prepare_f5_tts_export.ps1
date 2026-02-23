@@ -1,6 +1,7 @@
 param(
     [string]$OutputDir = "artifacts/F5_tts_export",
-    [switch]$CleanExisting
+    [switch]$CleanExisting,
+    [switch]$FlatLayout
 )
 
 Set-StrictMode -Version Latest
@@ -121,28 +122,23 @@ Ensure-Directory -Path $targetRoot
 Write-Host "[INFO] Exporting F5_tts to $targetRoot"
 
 $serviceSource = Join-Path $repoRoot "F5_tts"
-$serviceTarget = Join-Path $targetRoot "F5_tts"
+$serviceTarget = if ($FlatLayout) { $targetRoot } else { Join-Path $targetRoot "F5_tts" }
 Copy-Directory -Source $serviceSource -Destination $serviceTarget
 
-# Copy docker profiles needed for standalone operations.
-Ensure-Directory -Path (Join-Path $targetRoot "deploy/docker")
-Copy-Item (Join-Path $repoRoot "deploy/docker/docker-compose.tts-simple.yml") (Join-Path $targetRoot "deploy/docker/docker-compose.tts-simple.yml")
-Copy-Item (Join-Path $repoRoot "deploy/docker/docker-compose.tts-advanced.yml") (Join-Path $targetRoot "deploy/docker/docker-compose.tts-advanced.yml")
-
-# Copy extraction docs.
-Ensure-Directory -Path (Join-Path $targetRoot "docs/setup")
-Copy-Item (Join-Path $repoRoot "docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md") (Join-Path $targetRoot "docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md")
+# Copy extraction checklist from monorepo docs for handoff context.
+$docsTarget = if ($FlatLayout) { Join-Path $targetRoot "docs/setup" } else { Join-Path $targetRoot "docs/setup" }
+Ensure-Directory -Path $docsTarget
+Copy-Item (Join-Path $repoRoot "docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md") (Join-Path $docsTarget "F5_TTS_EXTRACTION_CHECKLIST.md")
 
 $manifestPath = Join-Path $targetRoot "EXPORT_MANIFEST.txt"
 @(
     "F5_tts export bundle"
     "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     "Source: $repoRoot"
+    "Layout: $(if ($FlatLayout) { 'flat' } else { 'nested' })"
     ""
     "Included:"
-    "- F5_tts/"
-    "- deploy/docker/docker-compose.tts-simple.yml"
-    "- deploy/docker/docker-compose.tts-advanced.yml"
+    $(if ($FlatLayout) { "- <repo-root from F5_tts contents>" } else { "- F5_tts/" })
     "- docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md"
 ) | Set-Content -Path $manifestPath -Encoding UTF8
 

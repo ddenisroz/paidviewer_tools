@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Environment
+.env
+.env.local
+
+# Runtime artifacts
+logs/
+backups/
+audio/cache/
+audio/temp/
+audio/generated/
+f5_tts_cache/
+*.sqlite
+*.db
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+

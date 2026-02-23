@@ -1,96 +1,71 @@
-# F5 TTS Service (`F5_tts`)
+# F5_tts Service
 
-Advanced F5-based TTS backend used by `bot_service`.
+`F5_tts` is the F5 synthesis backend used by `bot_service`.
 
-This service is prepared to run as a standalone repository.
+This folder is maintained in extraction-ready state for moving into a standalone repository (`f5-tts-service`).
 
-## What This Service Handles
+## Service Scope
 
-- F5 synthesis endpoints (`/api/tts/*`)
-- voice management endpoints (`/api/tts/voices/*`, `/api/admin/*`)
-- user/global voice storage
-- optional worker-pool mode with Redis
+Handles:
 
-## What It Does Not Handle
+- synthesis API (`/api/tts/*`)
+- voice storage/management API (`/api/tts/voices/*`, `/api/admin/*`)
+- health/readiness API (`/health/live`, `/health/ready`)
+- optional Redis worker-pool mode
 
-- Google Cloud TTS runtime logic (handled in `bot_service`)
-- Qwen cloud runtime logic (external provider service, routed from `bot_service`)
+Out of scope:
 
-## Local Run (without Docker)
+- Google Cloud TTS runtime behavior
+- Qwen provider runtime behavior
+- frontend routing/UI logic
 
-1. Create env file:
+## Docs
+
+- `docs/README.md`
+- `docs/API_CONTRACT.md`
+- `docs/DEPLOYMENT.md`
+- `docs/RUNBOOK.md`
+- `docs/MIGRATION_TO_STANDALONE.md`
+
+## Local Run
 
 ```bash
 cp .env.example .env
-```
-
-2. Install dependencies:
-
-```bash
 pip install -r requirements.txt
-```
-
-3. Start service:
-
-```bash
 python main.py
 ```
 
-Default health endpoint: `http://localhost:8001/health`
+Health:
 
-## Docker Run
+- `GET http://localhost:8001/health/live`
+- `GET http://localhost:8001/health/ready`
 
-Single-node profile (no Redis worker-pool):
+## Docker Run (inside `F5_tts/`)
+
+Simple profile:
 
 ```bash
-docker compose -f deploy/docker/docker-compose.tts-simple.yml up -d
+docker compose -f deploy/docker-compose.simple.yml up -d --build
 ```
 
 Advanced profile (Redis + workers):
 
 ```bash
-docker compose -f deploy/docker/docker-compose.tts-advanced.yml up -d
+docker compose -f deploy/docker-compose.advanced.yml up -d --build
 ```
 
-## Export Helper (for `F5_tts` split)
+## Extraction Helper
 
-From repo root:
+From monorepo root:
 
 ```powershell
-.\scripts\dev\prepare_f5_tts_export.ps1
+.\scripts\dev\prepare_f5_tts_export.ps1 -OutputDir artifacts/f5-tts-service -FlatLayout
 ```
 
-Default output folder: `artifacts/F5_tts_export`.
-If the folder already exists, script creates a timestamped target.
-Use `-CleanExisting` to overwrite existing target path.
+This produces export bundle ready to initialize a dedicated repository.
 
-## Required Environment Variables
+## Integration Contract
 
-Minimum:
-
-- `SECRET_KEY` (must match `bot_service` secret)
-- `DATABASE_URL`
-- `TTS_HOST`, `TTS_PORT`
-
-Recommended:
-
-- `TTS_INTERNAL_API_KEY` for internal service auth
-- `REDIS_URL` only when using worker-pool mode
-
-See full list in `F5_tts/.env.example`.
-
-## Contract Notes for `bot_service`
-
-- `bot_service` expects stable endpoints for voices and synthesis in this service.
-- When changing endpoint contracts, update:
-  - `bot_service/services/voice_management_service.py`
-  - `bot_service/api/tts/voices_routes.py`
-  - frontend API wrappers
-
-## Extraction Checklist (`F5_tts`)
-
-- keep env and Docker startup reproducible
-- keep API contract backward-compatible
-- avoid project-root hardcoded paths
-- keep requirements and CUDA notes explicit
-- keep service-level docs updated
+- Primary internal auth: service JWT (`Authorization: Bearer ...`)
+- Temporary compatibility: `X-Internal-Service-Key`
+- `bot_service` depends on stable endpoint contracts; apply deprecation headers before breaking changes.
