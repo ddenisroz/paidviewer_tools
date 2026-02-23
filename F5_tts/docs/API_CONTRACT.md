@@ -1,44 +1,49 @@
 # API Contract
 
-Last updated: 2026-02-23
-
 ## Base URL
 
-- Local default: `http://localhost:8001`
+- Default local: `http://localhost:8001`
 
 ## Authentication
 
-Inter-service authorization supports:
+Supported inter-service auth methods:
 
-1. Primary: `Authorization: Bearer <service JWT>`
-2. Compatibility fallback: `X-Internal-Service-Key: <TTS_INTERNAL_API_KEY>`
+1. `Authorization: Bearer <service-jwt>` (recommended)
+2. `X-Internal-Service-Key: <TTS_INTERNAL_API_KEY>` (compatibility fallback)
 
-Expected JWT claims:
+Expected service JWT claims:
 
 - `type=service`
-- `iss=bot_service` (configurable)
-- `aud=f5_tts` (configurable)
-- `sub=bot_service` (allowed subjects configurable)
+- `iss=<INTERNAL_SERVICE_JWT_ISSUER>`
+- `aud=<INTERNAL_SERVICE_JWT_AUDIENCE>`
+- `sub` in `INTERNAL_SERVICE_JWT_ALLOWED_SUBJECTS`
 
-User JWT authorization is also accepted where applicable.
+## Mode Semantics
 
-## Health Endpoints
+The API contract is identical for:
 
-- `GET /health/live` - liveness probe.
-- `GET /health/ready` - readiness probe (DB + engine + background tasks).
-- `GET /health` - compatibility alias.
-- `GET /api/health` - compatibility alias for legacy callers.
-- `GET /detailed` - detailed component checks.
-- `GET /metrics` - service metrics payload.
+1. local self-hosted deployments
+2. managed cloud deployments
 
-## Stable Endpoints Used By bot_service
+Routing policy (which endpoint is selected) is handled by the caller/orchestrator (`bot_service`), not by `F5_tts`.
 
-### Synthesis
+## Health
+
+- `GET /health/live`
+- `GET /health/ready`
+- `GET /health` (legacy alias)
+- `GET /api/health` (legacy alias)
+- `GET /detailed`
+- `GET /metrics`
+
+## Core Endpoints
+
+Synthesis:
 
 - `POST /api/tts/synthesize-channel`
 - `GET /api/tts/task/{task_id}`
 
-### Voices (provider storage side)
+Voices:
 
 - `GET /api/tts/voices`
 - `GET /api/tts/voices/global`
@@ -50,13 +55,13 @@ User JWT authorization is also accepted where applicable.
 - `POST /api/tts/user/voices/{voice_id}/retranscribe`
 - `PUT /api/tts/user/voices/{voice_id}/settings`
 
-### User Voice Enabled
+User enabled voices:
 
 - `GET /api/tts/user/voices/enabled/{user_id}`
 - `POST /api/tts/user/voices/enabled/{user_id}`
 - `PUT /api/tts/user/voices/enabled/{user_id}/{voice_id}`
 
-### Admin
+Admin:
 
 - `GET /api/admin/voices`
 - `POST /api/admin/voices/upload`
@@ -69,22 +74,7 @@ User JWT authorization is also accepted where applicable.
 - `GET /api/admin/system/status`
 - `POST /api/admin/system/restart`
 
-## Deprecated Endpoints
+## Deprecation Policy
 
-Deprecated headers are intentionally returned for one-release grace period:
-
-- `DELETE /api/admin/legacy/voices/{voice_id}`
-- `PUT /api/admin/legacy/voices/{voice_id}/settings`
-- `PUT /api/admin/legacy/voices/{voice_id}/rename`
-
-Headers:
-
-- `Deprecation: true`
-- `Sunset: Wed, 31 Dec 2026 23:59:59 GMT`
-- `Link: </api/admin/voices>; rel="successor-version"`
-
-## Compatibility Notes
-
-- Keep request/response contracts backward-compatible for `bot_service` integration paths.
-- If schema changes are required, release with deprecation headers first, then remove after a full warning release.
-
+- Legacy endpoints return standard deprecation headers during grace period.
+- Breaking changes require one release of warning headers before removal.

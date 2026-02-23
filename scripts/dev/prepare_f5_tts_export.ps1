@@ -125,11 +125,6 @@ $serviceSource = Join-Path $repoRoot "F5_tts"
 $serviceTarget = if ($FlatLayout) { $targetRoot } else { Join-Path $targetRoot "F5_tts" }
 Copy-Directory -Source $serviceSource -Destination $serviceTarget
 
-# Copy extraction checklist from monorepo docs for handoff context.
-$docsTarget = if ($FlatLayout) { Join-Path $targetRoot "docs/setup" } else { Join-Path $targetRoot "docs/setup" }
-Ensure-Directory -Path $docsTarget
-Copy-Item (Join-Path $repoRoot "docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md") (Join-Path $docsTarget "F5_TTS_EXTRACTION_CHECKLIST.md")
-
 $manifestPath = Join-Path $targetRoot "EXPORT_MANIFEST.txt"
 @(
     "F5_tts export bundle"
@@ -139,7 +134,6 @@ $manifestPath = Join-Path $targetRoot "EXPORT_MANIFEST.txt"
     ""
     "Included:"
     $(if ($FlatLayout) { "- <repo-root from F5_tts contents>" } else { "- F5_tts/" })
-    "- docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md"
 ) | Set-Content -Path $manifestPath -Encoding UTF8
 
 Write-Host "[OK] Export bundle prepared: $targetRoot"

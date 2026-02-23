@@ -1,33 +1,45 @@
-# F5_tts Service
+# F5 TTS Service
 
-`F5_tts` is the F5 synthesis backend used by `bot_service`.
+FastAPI service for F5-based text-to-speech synthesis and voice management.
 
-This folder is maintained in extraction-ready state for moving into a standalone repository (`f5-tts-service`).
+## What It Provides
 
-## Service Scope
+- TTS synthesis API (`/api/tts/*`)
+- voice management API (`/api/tts/voices/*`, `/api/admin/*`)
+- health/readiness endpoints (`/health/live`, `/health/ready`)
+- optional Redis worker mode for higher throughput
 
-Handles:
+## Deployment Modes
 
-- synthesis API (`/api/tts/*`)
-- voice storage/management API (`/api/tts/voices/*`, `/api/admin/*`)
-- health/readiness API (`/health/live`, `/health/ready`)
-- optional Redis worker-pool mode
+The same service supports both production usage patterns:
 
-Out of scope:
+1. `Self-hosted local endpoint` (user-hosted instance)
+2. `Managed cloud endpoint` (shared/global instance)
 
-- Google Cloud TTS runtime behavior
-- Qwen provider runtime behavior
-- frontend routing/UI logic
+`bot_service` decides which endpoint to call based on provider settings (`f5_mode`, `use_local_tts`) and endpoint health.
 
-## Docs
+## Quick Start (Docker)
 
-- `docs/README.md`
-- `docs/API_CONTRACT.md`
-- `docs/DEPLOYMENT.md`
-- `docs/RUNBOOK.md`
-- `docs/MIGRATION_TO_STANDALONE.md`
+```bash
+cp .env.production.example .env
+docker compose -f deploy/docker-compose.simple.yml up -d --build
+```
 
-## Local Run
+Set real values before first start:
+
+- `SECRET_KEY`
+- `POSTGRES_PASSWORD`
+- `DATABASE_URL` (if not using compose-generated default)
+- `INTERNAL_SERVICE_JWT_SECRET` (recommended)
+
+Health check:
+
+```bash
+curl -f http://localhost:8001/health/live
+curl -f http://localhost:8001/health/ready
+```
+
+## Quick Start (Local)
 
 ```bash
 cp .env.example .env
@@ -35,37 +47,28 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Health:
-
-- `GET http://localhost:8001/health/live`
-- `GET http://localhost:8001/health/ready`
-
-## Docker Run (inside `F5_tts/`)
-
-Simple profile:
-
-```bash
-docker compose -f deploy/docker-compose.simple.yml up -d --build
-```
-
-Advanced profile (Redis + workers):
-
-```bash
-docker compose -f deploy/docker-compose.advanced.yml up -d --build
-```
-
-## Extraction Helper
-
-From monorepo root:
+PowerShell:
 
 ```powershell
-.\scripts\dev\prepare_f5_tts_export.ps1 -OutputDir artifacts/f5-tts-service -FlatLayout
+Copy-Item .env.example .env
+pip install -r requirements.txt
+python main.py
 ```
 
-This produces export bundle ready to initialize a dedicated repository.
+## Runtime Profiles
 
-## Integration Contract
+- `deploy/docker-compose.simple.yml`: API + PostgreSQL
+- `deploy/docker-compose.advanced.yml`: API + PostgreSQL + Redis + workers
 
-- Primary internal auth: service JWT (`Authorization: Bearer ...`)
-- Temporary compatibility: `X-Internal-Service-Key`
-- `bot_service` depends on stable endpoint contracts; apply deprecation headers before breaking changes.
+## Auth
+
+Inter-service auth:
+
+1. `Authorization: Bearer <service-jwt>` (recommended)
+2. `X-Internal-Service-Key: <TTS_INTERNAL_API_KEY>` (compatibility)
+
+## Documentation
+
+- `docs/API_CONTRACT.md`
+- `docs/DEPLOYMENT.md`
+- `docs/RUNBOOK.md`
