@@ -148,6 +148,36 @@ class TestBasicTTS:
             )
 
 
+class TestTTSAPI:
+    """Tests for API facade forwarding to TTSManager."""
+
+    @pytest.mark.asyncio
+    async def test_send_tts_request_forwards_user_and_db_session(self):
+        from services.tts.tts_core import TTSAPI
+
+        fake_db_session = object()
+        mock_manager = AsyncMock()
+        mock_manager.synthesize_tts.return_value = {"success": True}
+
+        with patch("services.tts.tts_core.get_tts_manager", return_value=mock_manager):
+            api = TTSAPI()
+            await api.send_tts_request(
+                channel_name="channel",
+                text="hello",
+                author="tester",
+                user_id=42,
+                db_session=fake_db_session,
+                use_ai_tts=True,
+                use_basic_tts=True,
+                engine="f5tts",
+            )
+
+        assert mock_manager.synthesize_tts.await_count == 1
+        kwargs = mock_manager.synthesize_tts.await_args.kwargs
+        assert kwargs["user_id"] == 42
+        assert kwargs["db_session"] is fake_db_session
+
+
 
 class TestTTSService:
     """Тесты для TTS Service"""

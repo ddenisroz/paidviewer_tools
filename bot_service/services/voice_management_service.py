@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from core.config import settings
 from repositories.user_voice_settings_repository import UserVoiceSettingsRepository
 from core.database import UserVoiceSettings
+from services.tts.provider_utils import get_provider_service_url, normalize_provider
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,31 @@ class VoiceManagementService:
         self.tts_url = settings.tts_service_url
         self.tts_api_base = f"{self.tts_url.rstrip('/')}/api/tts"
 
-    async def get_global_voices(self) -> List[Dict[str, Any]]:
+    def _resolve_provider(self, provider: str = "f5") -> str:
+        return normalize_provider(provider)
+
+    def _provider_tts_api_base(self, provider: str = "f5") -> str:
+        provider_url = get_provider_service_url(self._resolve_provider(provider))
+        return f"{provider_url.rstrip('/')}/api/tts"
+
+    def _provider_admin_api_base(self, provider: str = "f5") -> str:
+        provider_url = get_provider_service_url(self._resolve_provider(provider))
+        return f"{provider_url.rstrip('/')}/api/admin"
+
+    def _tts_auth_headers(self) -> dict:
+        headers: dict = {}
+        if settings.tts_internal_api_key:
+            headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
+        return headers
+
+    async def get_global_voices(self, provider: str = "f5") -> List[Dict[str, Any]]:
         """Get list of available global voices from external TTS service."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.tts_api_base}/voices/global")
+                response = await client.get(
+                    f"{self._provider_tts_api_base(provider)}/voices/global",
+                    headers=self._tts_auth_headers(),
+                )
                 
                 if response.status_code == 200:
                     return response.json()
@@ -36,11 +57,14 @@ class VoiceManagementService:
             logger.exception("Error fetching global voices")
             return []
 
-    async def get_user_custom_voices(self, user_id: int) -> List[Dict[str, Any]]:
+    async def get_user_custom_voices(self, user_id: int, provider: str = "f5") -> List[Dict[str, Any]]:
         """Get list of custom voices for a specific user."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.tts_api_base}/user/voices/{user_id}")
+                response = await client.get(
+                    f"{self._provider_tts_api_base(provider)}/user/voices/{user_id}",
+                    headers=self._tts_auth_headers(),
+                )
                 
                 if response.status_code == 200:
                     return response.json()
@@ -54,11 +78,14 @@ class VoiceManagementService:
             logger.exception("Error fetching user voices")
             return []
 
-    async def get_voice_info(self, voice_id: int) -> Optional[Dict[str, Any]]:
+    async def get_voice_info(self, voice_id: int, provider: str = "f5") -> Optional[Dict[str, Any]]:
         """Get information about a specific voice."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{self.tts_api_base}/voices/{voice_id}")
+                response = await client.get(
+                    f"{self._provider_tts_api_base(provider)}/voices/{voice_id}",
+                    headers=self._tts_auth_headers(),
+                )
                 if response.status_code == 200:
                     return response.json()
                 return None
@@ -70,14 +97,16 @@ class VoiceManagementService:
         self, 
         user_id: int, 
         voice_id: int, 
-        settings_data: Dict[str, Any]
+        settings_data: Dict[str, Any],
+        provider: str = "f5",
     ) -> Dict[str, Any]:
         """
         Update voice settings for a user.
         Handles both global voices (stored in DB) and custom voices (stored in external service).
         """
         # 1. Check if it's a global voice or custom voice
-        voice_info = await self.get_voice_info(voice_id)
+        normalized_provider = self._resolve_provider(provider)
+        voice_info = await self.get_voice_info(voice_id, provider=normalized_provider)
         
         if not voice_info:
             raise HTTPException(
@@ -89,7 +118,11 @@ class VoiceManagementService:
         
         if is_global:
             # Handle global voice settings (stored locally for each user)
-            current_settings = self.repository.get_by_user_and_voice_id(user_id, voice_id)
+            current_settings = self.repository.get_by_user_and_voice_id(
+                user_id,
+                voice_id,
+                tts_provider=normalized_provider,
+            )
             
             if current_settings:
                 # Update existing settings
@@ -107,6 +140,7 @@ class VoiceManagementService:
                     "id": current_settings.id,
                     "voice_id": current_settings.voice_id,
                     "voice_name": current_settings.voice_name,
+                    "tts_provider": current_settings.tts_provider,
                     "cfg_strength": current_settings.cfg_strength,
                     "speed_preset": current_settings.speed_preset,
                     "volume": current_settings.volume
@@ -117,6 +151,7 @@ class VoiceManagementService:
                     user_id=user_id,
                     voice_id=voice_id,
                     voice_name=voice_info.get('name'),
+                    tts_provider=normalized_provider,
                     cfg_strength=settings_data.get('cfg_strength'),
                     speed_preset=settings_data.get('speed_preset'),
                     volume=settings_data.get('volume')
@@ -127,6 +162,7 @@ class VoiceManagementService:
                     "id": new_settings.id,
                     "voice_id": new_settings.voice_id,
                     "voice_name": new_settings.voice_name,
+                    "tts_provider": new_settings.tts_provider,
                     "cfg_strength": new_settings.cfg_strength,
                     "speed_preset": new_settings.speed_preset,
                     "volume": new_settings.volume
@@ -137,8 +173,9 @@ class VoiceManagementService:
             try:
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     response = await client.put(
-                        f"{self.tts_api_base}/user/voices/{voice_id}/settings",
-                        json=settings_data
+                        f"{self._provider_tts_api_base(normalized_provider)}/user/voices/{voice_id}/settings",
+                        json=settings_data,
+                        headers=self._tts_auth_headers(),
                     )
                     
                     if response.status_code == 200:
@@ -155,7 +192,15 @@ class VoiceManagementService:
             except Exception:
                 logger.exception("Error updating custom voice settings")
                 raise HTTPException(status_code=500, detail="Internal server error")
-    async def upload_user_voice(self, user_id: int, name: str, filename: str, content: bytes, content_type: str) -> Dict[str, Any]:
+    async def upload_user_voice(
+        self,
+        user_id: int,
+        name: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        provider: str = "f5",
+    ) -> Dict[str, Any]:
         """
         Upload a user voice.
         Validates the file and sends it to the external TTS service.
@@ -206,9 +251,10 @@ class VoiceManagementService:
 
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
-                    f"{self.tts_api_base}/user/voices/upload",
+                    f"{self._provider_tts_api_base(provider)}/user/voices/upload",
                     files=files,
-                    data=data
+                    data=data,
+                    headers=self._tts_auth_headers(),
                 )
 
             if response.status_code == 200:
@@ -242,13 +288,14 @@ class VoiceManagementService:
                 except Exception as cleanup_error:
                     logger.warning(f"Failed to cleanup temp file: {cleanup_error}")
 
-    async def delete_custom_voice(self, user_id: int, voice_id: int) -> bool:
+    async def delete_custom_voice(self, user_id: int, voice_id: int, provider: str = "f5") -> bool:
         """Delete a custom voice for a user."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.delete(
-                    f"{self.tts_api_base}/user/voices/{voice_id}",
-                    params={"user_id": user_id}
+                    f"{self._provider_tts_api_base(provider)}/user/voices/{voice_id}",
+                    params={"user_id": user_id},
+                    headers=self._tts_auth_headers(),
                 )
 
             if response.status_code == 200:
@@ -264,13 +311,14 @@ class VoiceManagementService:
             logger.exception("Error deleting custom voice")
             raise HTTPException(status_code=500, detail="Failed to delete voice")
 
-    async def admin_get_global_voices(self) -> List[Dict[str, Any]]:
+    async def admin_get_global_voices(self, provider: str = "f5") -> List[Dict[str, Any]]:
         """Get all global voices (for admin)."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.get(
-                    f"{self.tts_api_base}/admin/voices",
-                    params={"voice_type": "global"}
+                    f"{self._provider_admin_api_base(provider)}/voices",
+                    params={"voice_type": "global"},
+                    headers=self._tts_auth_headers(),
                 )
                 if response.status_code == 200:
                     return response.json()
@@ -279,13 +327,19 @@ class VoiceManagementService:
             logger.exception("Error fetching admin global voices")
             return []
 
-    async def admin_update_global_voice(self, voice_id: int, settings_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def admin_update_global_voice(
+        self,
+        voice_id: int,
+        settings_data: Dict[str, Any],
+        provider: str = "f5",
+    ) -> Dict[str, Any]:
         """Update global voice settings (admin)."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.put(
-                    f"{self.tts_api_base}/admin/voices/{voice_id}/settings",
-                    json=settings_data
+                    f"{self._provider_admin_api_base(provider)}/voices/{voice_id}/settings",
+                    json=settings_data,
+                    headers=self._tts_auth_headers(),
                 )
                 if response.status_code == 200:
                     return response.json()
@@ -296,12 +350,13 @@ class VoiceManagementService:
             logger.exception("Error updating global voice")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    async def admin_delete_global_voice(self, voice_id: int) -> bool:
+    async def admin_delete_global_voice(self, voice_id: int, provider: str = "f5") -> bool:
         """Delete a global voice (admin)."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.delete(
-                    f"{self.tts_api_base}/admin/voices/{voice_id}"
+                    f"{self._provider_admin_api_base(provider)}/voices/{voice_id}",
+                    headers=self._tts_auth_headers(),
                 )
                 if response.status_code == 200:
                     return True
@@ -312,13 +367,14 @@ class VoiceManagementService:
             logger.exception("Error deleting global voice")
             raise HTTPException(status_code=500, detail="Internal server error")
 
-    async def admin_rename_global_voice(self, voice_id: int, new_name: str) -> bool:
+    async def admin_rename_global_voice(self, voice_id: int, new_name: str, provider: str = "f5") -> bool:
         """Rename a global voice (admin)."""
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 response = await client.put(
-                    f"{self.tts_api_base}/admin/voices/{voice_id}/rename",
-                    json={"new_name": new_name}
+                    f"{self._provider_admin_api_base(provider)}/voices/{voice_id}/rename",
+                    params={"new_name": new_name},
+                    headers=self._tts_auth_headers(),
                 )
                 if response.status_code == 200:
                     return True
@@ -327,5 +383,44 @@ class VoiceManagementService:
             raise
         except Exception:
             logger.exception("Error renaming global voice")
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    async def admin_upload_voice(
+        self,
+        name: str,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        provider: str = "f5",
+    ) -> Dict[str, Any]:
+        """Upload a global voice in selected provider service."""
+        files = {"file": (filename, content, content_type)}
+        data: Dict[str, str] = {}
+        if name:
+            data["name"] = name
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    f"{self._provider_admin_api_base(provider)}/voices/upload",
+                    files=files,
+                    data=data,
+                    headers=self._tts_auth_headers(),
+                )
+
+            if response.status_code == 200:
+                return response.json()
+
+            logger.warning(
+                "Admin upload voice failed provider=%s status=%s body=%s",
+                provider,
+                response.status_code,
+                (response.text or "")[:500],
+            )
+            raise HTTPException(status_code=response.status_code, detail="Failed to upload voice")
+        except HTTPException:
+            raise
+        except Exception:
+            logger.exception("Error uploading global voice")
             raise HTTPException(status_code=500, detail="Internal server error")
 

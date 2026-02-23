@@ -16,35 +16,40 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
     def __init__(self, db: Session):
         super().__init__(UserVoiceSettings, db)
     
-    def get_by_user_id(self, user_id: int) -> List[UserVoiceSettings]:
+    def get_by_user_id(self, user_id: int, tts_provider: str = "f5") -> List[UserVoiceSettings]:
         """Get all voice settings for a user."""
         return self.db.query(UserVoiceSettings).filter(
-            UserVoiceSettings.user_id == user_id
+            UserVoiceSettings.user_id == user_id,
+            UserVoiceSettings.tts_provider == tts_provider,
         ).all()
     
     def get_by_voice_name(
         self,
         user_id: int,
-        voice_name: str
+        voice_name: str,
+        tts_provider: str = "f5",
     ) -> Optional[UserVoiceSettings]:
         """Get voice settings for a specific voice."""
         return self.db.query(UserVoiceSettings).filter(
             UserVoiceSettings.user_id == user_id,
-            UserVoiceSettings.voice_name == voice_name
+            UserVoiceSettings.voice_name == voice_name,
+            UserVoiceSettings.tts_provider == tts_provider,
         ).first()
     
     def get_or_create(
         self,
         user_id: int,
-        voice_name: str
+        voice_name: str,
+        tts_provider: str = "f5",
     ) -> UserVoiceSettings:
         """Get existing voice settings or create defaults."""
-        settings = self.get_by_voice_name(user_id, voice_name)
+        settings = self.get_by_voice_name(user_id, voice_name, tts_provider=tts_provider)
         
         if not settings:
             settings = UserVoiceSettings(
                 user_id=user_id,
-                voice_name=voice_name
+                voice_name=voice_name,
+                tts_provider=tts_provider,
             )
             self.db.add(settings)
             self.db.commit()
@@ -58,10 +63,11 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
         voice_name: str,
         cfg_strength: Optional[float] = None,
         speed_preset: Optional[str] = None,
-        volume: Optional[int] = None
+        volume: Optional[int] = None,
+        tts_provider: str = "f5",
     ) -> UserVoiceSettings:
         """Update voice settings."""
-        settings = self.get_or_create(user_id, voice_name)
+        settings = self.get_or_create(user_id, voice_name, tts_provider=tts_provider)
         
         if cfg_strength is not None:
             settings.cfg_strength = cfg_strength
@@ -77,15 +83,17 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
     def get_settings_dict(
         self,
         user_id: int,
-        voice_name: str
+        voice_name: str,
+        tts_provider: str = "f5",
     ) -> Optional[Dict[str, Any]]:
         """Get voice settings as dictionary."""
-        settings = self.get_by_voice_name(user_id, voice_name)
+        settings = self.get_by_voice_name(user_id, voice_name, tts_provider=tts_provider)
         if not settings:
             return None
         
         return {
             "voice_name": settings.voice_name,
+            "tts_provider": settings.tts_provider,
             "cfg_strength": settings.cfg_strength,
             "speed_preset": settings.speed_preset,
             "volume": settings.volume,
@@ -94,19 +102,22 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
     def get_by_user_and_voice_id(
         self,
         user_id: int,
-        voice_id: int
+        voice_id: int,
+        tts_provider: str = "f5",
     ) -> Optional[UserVoiceSettings]:
         """Get voice settings for a specific user and voice ID."""
         return self.db.query(UserVoiceSettings).filter(
             UserVoiceSettings.user_id == user_id,
-            UserVoiceSettings.voice_id == voice_id
+            UserVoiceSettings.voice_id == voice_id,
+            UserVoiceSettings.tts_provider == tts_provider,
         ).first()
 
-    def delete_by_voice_id(self, voice_id: int) -> int:
+    def delete_by_voice_id(self, voice_id: int, tts_provider: Optional[str] = None) -> int:
         """Delete all settings for a voice ID. Returns count deleted."""
-        result = self.db.query(UserVoiceSettings).filter(
-            UserVoiceSettings.voice_id == voice_id
-        ).delete()
+        query = self.db.query(UserVoiceSettings).filter(UserVoiceSettings.voice_id == voice_id)
+        if tts_provider:
+            query = query.filter(UserVoiceSettings.tts_provider == tts_provider)
+        result = query.delete()
         self.db.commit()
         return result
     
@@ -114,12 +125,13 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
         self,
         user_id: int,
         voice_id: int,
-        settings_data: Dict[str, Any]
+        settings_data: Dict[str, Any],
+        tts_provider: str = "f5",
     ) -> UserVoiceSettings:
         """Update existing or create new settings by voice_id."""
         from core.datetime_utils import utcnow_naive
         
-        settings = self.get_by_user_and_voice_id(user_id, voice_id)
+        settings = self.get_by_user_and_voice_id(user_id, voice_id, tts_provider=tts_provider)
         
         if settings:
             if 'cfg_strength' in settings_data:
@@ -134,6 +146,7 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
                 user_id=user_id,
                 voice_id=voice_id,
                 voice_name=settings_data.get('voice_name'),
+                tts_provider=tts_provider,
                 cfg_strength=settings_data.get('cfg_strength'),
                 speed_preset=settings_data.get('speed_preset'),
                 volume=settings_data.get('volume')

@@ -478,11 +478,14 @@ export const useDeleteTtsReward = (options?: UseMutationOptions<ApiResponse, Axi
 /**
  * Получить конфигурацию локального TTS
  */
-export const useLocalTtsConfig = (options?: Omit<UseQueryOptions<LocalTtsConfig | null, AxiosError>, 'queryKey' | 'queryFn'>) => {
+export const useLocalTtsConfig = (
+  provider: 'f5' | 'qwen' = 'f5',
+  options?: Omit<UseQueryOptions<LocalTtsConfig | null, AxiosError>, 'queryKey' | 'queryFn'>
+) => {
   return useQuery<LocalTtsConfig | null, AxiosError>({
-    queryKey: queryKeys.tts.localTtsConfig(),
+    queryKey: queryKeys.tts.localTtsConfig(provider),
     queryFn: async () => {
-      const response = await unwrapResponse(ttsService.getLocalTtsConfig()) as ApiResponse<LocalTtsConfig> & { config?: LocalTtsConfig };
+      const response = await unwrapResponse(ttsService.getLocalTtsConfig(provider)) as ApiResponse<LocalTtsConfig> & { config?: LocalTtsConfig };
       return response?.config || response?.data || null;
     },
     staleTime: 5 * 60 * 1000, // 5 минут
@@ -501,69 +504,103 @@ export const useSaveLocalTtsConfig = (options?: UseMutationOptions<ApiResponse<L
   const queryClient = useQueryClient();
 
   return useMutation({
+    ...options,
     mutationFn: (config: Partial<LocalTtsConfig>) => unwrapResponse(ttsService.saveLocalTtsConfig(config)),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig() });
-      if (!options?.onSuccess) {
+    onSuccess: (response, variables, onMutateResult, context) => {
+      const provider = (variables?.provider as 'f5' | 'qwen' | undefined) || 'f5';
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig(provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.status(null) });
+      if (options?.onSuccess) {
+        options.onSuccess(response, variables, onMutateResult, context);
+      } else {
         toast.success('Настройки локального TTS сохранены');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, variables, onMutateResult, context) => {
       logger.error('Error saving local TTS config:', error);
-      if (!options?.onError) {
+      if (options?.onError) {
+        options.onError(error, variables, onMutateResult, context);
+      } else {
         toast.error('Ошибка сохранения настроек локального TTS');
       }
     },
-    ...options,
+    onSettled: (data, error, variables, onMutateResult, context) => {
+      const provider = (variables?.provider as 'f5' | 'qwen' | undefined) || 'f5';
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig(provider) });
+      if (options?.onSettled) {
+        options.onSettled(data, error, variables, onMutateResult, context);
+      }
+    },
   });
 };
 
 /**
  * Протестировать соединение с локальным TTS сервером
  */
-export const useTestLocalTtsConnection = (options?: UseMutationOptions<ApiResponse, AxiosError, { host?: string; port?: number; api_key?: string }, unknown>) => {
+export const useTestLocalTtsConnection = (
+  options?: UseMutationOptions<ApiResponse, AxiosError, { endpoint_url: string; api_key?: string; provider?: 'f5' | 'qwen'; use_local?: boolean }, unknown>
+) => {
   return useMutation({
-    mutationFn: (params: { host?: string; port?: number; api_key?: string }) => unwrapResponse(ttsService.testLocalTtsConnection(params)),
-    onSuccess: (response) => {
-      if (!options?.onSuccess) {
-        if (response?.success) {
+    ...options,
+    mutationFn: (params: { endpoint_url: string; api_key?: string; provider?: 'f5' | 'qwen'; use_local?: boolean }) => unwrapResponse(ttsService.testLocalTtsConnection(params)),
+    onSuccess: (response, variables, onMutateResult, context) => {
+      if (options?.onSuccess) {
+        options.onSuccess(response, variables, onMutateResult, context);
+      } else {
+        const success = (response as { success?: boolean } | undefined)?.success
+          ?? (response as { data?: { success?: boolean } } | undefined)?.data?.success;
+        if (success) {
           toast.success('Соединение успешно!');
         } else {
           toast.error('Не удалось подключиться');
         }
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, variables, onMutateResult, context) => {
       logger.error('Error testing local TTS connection:', error);
-      if (!options?.onError) {
+      if (options?.onError) {
+        options.onError(error, variables, onMutateResult, context);
+      } else {
         toast.error('Ошибка подключения к серверу');
       }
     },
-    ...options,
   });
 };
 
 /**
  * Переключить использование локального TTS
  */
-export const useToggleLocalTts = (options?: UseMutationOptions<ApiResponse, AxiosError, void, unknown>) => {
+export const useToggleLocalTts = (options?: UseMutationOptions<ApiResponse, AxiosError, 'f5' | 'qwen', unknown>) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: () => unwrapResponse(ttsService.toggleLocalTts()),
-    onSuccess: (response) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig() });
-      if (!options?.onSuccess) {
+    ...options,
+    mutationFn: (provider: 'f5' | 'qwen') => unwrapResponse(ttsService.toggleLocalTts(provider)),
+    onSuccess: (response, provider, onMutateResult, context) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig(provider) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tts.status(null) });
+      if (options?.onSuccess) {
+        options.onSuccess(response, provider, onMutateResult, context);
+      } else {
         toast.success(response?.message || 'Локальный TTS переключен');
       }
     },
-    onError: (error: AxiosError) => {
+    onError: (error: AxiosError, variables, onMutateResult, context) => {
       logger.error('Error toggling local TTS:', error);
-      if (!options?.onError) {
+      if (options?.onError) {
+        options.onError(error, variables, onMutateResult, context);
+      } else {
         toast.error('Ошибка переключения локального TTS');
       }
     },
-    ...options,
+    onSettled: (data, error, provider, onMutateResult, context) => {
+      if (provider) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.tts.localTtsConfig(provider) });
+      }
+      if (options?.onSettled) {
+        options.onSettled(data, error, provider, onMutateResult, context);
+      }
+    },
   });
 };
 

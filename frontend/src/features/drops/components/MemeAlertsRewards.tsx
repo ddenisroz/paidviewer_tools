@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import { AlertCircle, Coins, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -361,7 +361,7 @@ export const MemeAlertsRewards: React.FC = () => {
                 stopPopupWatcher();
                 setConnecting(false);
             } else if (data.access_token && !data.type) {
-                // Legacy format вЂ” keep backward compat.
+                // Legacy format - keep backward compatibility.
                 const success = await saveTokenToBackend(data.access_token, data.refresh_token);
                 if (success && popupRef.current && !popupRef.current.closed) {
                     popupRef.current.close();
@@ -547,7 +547,7 @@ export const MemeAlertsRewards: React.FC = () => {
     };
 
     const formatTimestamp = (value?: string) => {
-        if (!value) return 'вЂ”';
+        if (!value) return '-';
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return value;
         return date.toLocaleString('ru-RU', { hour12: false });
@@ -853,7 +853,7 @@ export const MemeAlertsRewards: React.FC = () => {
                     <Card className={`${SURFACE_CARD_CLASS} h-fit`}>
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">�?стория мемкоинов</CardTitle>
+                                <CardTitle className="text-base">История мемкоинов</CardTitle>
                                 <Button
                                     variant="outline"
                                     size="sm"

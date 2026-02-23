@@ -1,339 +1,111 @@
-# 🏠 Локальный TTS F5 - Полная интеграция с ботом
+﻿# Local TTS Integration (F5 + Qwen)
 
-## 📊 Статус: ✅ ГОТОВО К ИСПОЛЬЗОВАНИЮ
+Last updated: 2026-02-22
 
-Локальный TTS (`tts_service_simple`) теперь **ПОЛНОСТЬЮ интегрирован** с `bot_service` и может озвучивать сообщения из Twitch/VK чата!
+## Goal
 
----
+Connect user-owned local TTS instances (F5 or Qwen) to `bot_service` so chat messages can be synthesized through local endpoints.
 
-## 🎯 Что работает?
+## What Is Supported
 
-### ✅ Полная функциональность
+- Per-user local endpoint configuration.
+- Provider split: `f5` and `qwen` are configured independently.
+- Cloud/local mode switch in Advanced TTS settings.
+- Automatic fallback to basic `gtts` if local/cloud advanced synthesis fails.
 
-1. **Озвучка чата** 🎙️
-   - Автоматическая озвучка сообщений из Twitch/VK
-   - Фильтрация запрещённых слов
-   - Блокировка пользователей
-   - Настройка максимальной длины сообщений
-   - Пропуск команд (начинающихся с `!`)
+## Prerequisites
 
-2. **Управление голосами** 🎤
-   - Загрузка голосов через админку
-   - Автоконвертация MP3/FLAC → WAV 48kHz Mono 16-bit
-   - Автотранскрибация текста из аудио (Whisper)
-   - Перетранскрибация и ручное редактирование текста
+- Running backend: `bot_service`.
+- Running frontend.
+- Local provider endpoint reachable from backend host.
+- User/channel in whitelist (required for advanced provider synthesis when not using an explicitly healthy local endpoint).
 
-3. **Настройки пользователя** ⚙️
-   - Индивидуальный endpoint для каждого пользователя
-   - Переключение между облачным и локальным TTS
-   - Проверка доступности сервиса (health check)
-   - Кеширование состояния для производительности
+## 1. Configure backend URLs
 
----
+In `bot_service/.env`:
 
-## 🚀 Как использовать?
-
-### Шаг 1: Запустить локальный TTS сервис
-
-```bash
-cd tts_service_simple
-python main.py
+```env
+TTS_SERVICE_URL=http://localhost:8001
+F5_TTS_SERVICE_URL=http://localhost:8001
+QWEN_TTS_SERVICE_URL=http://localhost:8011
 ```
 
-По умолчанию запустится на `http://localhost:8001`
-
-### Шаг 2: Настроить в админке
-
-1. Открыть `/dashboard/tts/local`
-2. **Вкладка "Подключение":**
-   - Endpoint URL: `http://localhost:8001`
-   - Нажать **"Проверить соединение"**
-   - Если успешно → включить **"Использовать локальный TTS"**
-   - Нажать **"Сохранить настройки"**
-
-3. **Вкладка "Голоса":**
-   - Загрузить свои голоса через админку
-   - Система автоматически конвертирует и транскрибирует
-
-### Шаг 3: Готово! 🎉
-
-Теперь сообщения из чата будут озвучиваться через локальный TTS!
-
----
-
-## 🔧 Технические детали
-
-### Backend архитектура
-
-```
-bot_service/utils/websocket_helper.py
-    └─> handle_tts_for_message()
-        └─> tts_api.send_tts_request()
-            └─> bot_service/services/tts_manager.py
-                └─> synthesize_tts()
-                    ├─> Проверяет use_ai_tts
-                    ├─> Получает LocalTTSEndpoint из БД
-                    │   └─> Если use_local=True → использует endpoint_url
-                    └─> Отправляет POST запрос на:
-                        http://localhost:8001/api/tts/synthesize-channel
-```
-
-### Новый endpoint в `tts_service_simple`
-
-**POST `/api/tts/synthesize-channel`**
-
-**Request:**
-```json
-{
-  "channel_name": "yourchy",
-  "text": "Hello world",
-  "author": "username",
-  "user_id": 1,
-  "volume_level": 50,
-  "tts_settings": {
-    "enable7TV": true,
-    "enableTwitch": true,
-    "enableProfanity": true,
-    "maxLength": 200,
-    "skipCommands": true
-  },
-  "word_filter": ["badword1", "badword2"],
-  "blocked_users": ["spammer"]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "audio_url": "/api/audio/channel_yourchy_1234567890.wav",
-  "voice": "default",
-  "volume": 50,
-  "tts_type": "local_f5",
-  "duration": 1.5,
-  "channel": "yourchy",
-  "author": "username"
-}
-```
-
-### База данных
-
-**Модель `LocalTTSEndpoint`:**
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `user_id` | Integer | ID пользователя (FK) |
-| `endpoint_url` | String | URL локального TTS (`http://localhost:8001`) |
-| `api_key` | String | Опциональный API ключ |
-| `use_local` | Boolean | Использовать локальный вместо облачного |
-| `is_active` | Boolean | Активен ли endpoint |
-| `is_healthy` | Boolean | Доступен ли сервис |
-| `last_health_check` | DateTime | Последняя проверка здоровья |
-
----
-
-## 🎨 Frontend UI
-
-### Страница настроек: `/dashboard/tts/local`
-
-**Вкладки:**
-
-1. **Подключение** 🔌
-   - Endpoint URL
-   - API ключ (опционально)
-   - Переключатель "Использовать локальный TTS"
-   - Кнопка "Проверить соединение"
-   - Кнопка "Сохранить настройки"
-
-2. **Мониторинг** 📊
-   - Статус сервиса (GPU, CPU, RAM)
-   - Количество обработанных запросов
-   - Доступные голоса
-
-3. **Голоса** 🎤
-   - Список загруженных голосов
-   - Кнопка "Создать голос"
-   - Загрузка аудио сэмпла
-   - Настройка параметров (reference_text, cfg_strength, speed_preset)
-
----
-
-## 📋 API Endpoints
-
-### Backend (`bot_service`)
-
-| Endpoint | Метод | Описание |
-|----------|-------|----------|
-| `/api/local-tts/config` | GET | Получить конфигурацию |
-| `/api/local-tts/config` | POST | Сохранить конфигурацию |
-| `/api/local-tts/test-connection` | POST | Протестировать соединение |
-| `/api/local-tts/toggle` | POST | Переключить use_local |
-
-### Local TTS (`tts_service_simple`)
-
-| Endpoint | Метод | Описание |
-|----------|-------|----------|
-| `/api/tts/synthesize-channel` | POST | **Синтез для чата (НОВЫЙ)** |
-| `/api/tts/synthesize` | POST | Обычный синтез |
-| `/api/health` | GET | Статус здоровья |
-| `/api/status` | GET | Детальный статус |
-| `/api/voices` | GET | Список голосов |
-
----
-
-## 🔄 Логика работы
-
-### 1. Пользователь пишет в Twitch чат
-
-```
-Twitch IRC → bot_service/bots/twitch_bot.py
-    └─> on_message()
-        └─> handle_tts_for_message()
-            └─> Проверяет:
-                ├─> Блокировка пользователя
-                ├─> Фильтр слов
-                ├─> Настройки TTS (skipCommands, maxLength)
-                └─> Вызывает tts_manager.synthesize_tts()
-```
-
-### 2. TTS Manager выбирает систему
-
-```python
-# bot_service/services/tts_manager.py
-
-if use_ai_tts:
-    # Шаг 1: Проверяем локальный endpoint пользователя
-    local_endpoint = await get_user_tts_endpoint(user_id, db_session)
-    
-    if local_endpoint and local_endpoint.use_local:
-        tts_endpoint = local_endpoint.endpoint_url  # http://localhost:8001
-    else:
-        tts_endpoint = DEFAULT_TTS_SERVICE_URL  # облачный
-    
-    # Шаг 2: Отправляем запрос
-    result = await _synthesize_via_tts_service(
-        channel_name, text, author, user_id, volume_level,
-        tts_endpoint=tts_endpoint  # ← локальный или облачный
-    )
-```
-
-### 3. Локальный TTS обрабатывает запрос
-
-```python
-# tts_service_simple/main.py
-
-@app.post("/api/tts/synthesize-channel")
-async def synthesize_channel_tts(request: ChannelTTSRequest):
-    # 1. Проверка блокировки пользователя
-    if request.author in request.blocked_users:
-        return {"success": False, "error": "User blocked"}
-    
-    # 2. Фильтрация запрещённых слов
-    filtered_text = apply_word_filter(request.text, request.word_filter)
-    
-    # 3. Применение настроек (maxLength, skipCommands)
-    if len(filtered_text) > request.tts_settings.maxLength:
-        filtered_text = filtered_text[:request.tts_settings.maxLength]
-    
-    # 4. Синтез речи
-    audio_path = synthesize_f5_tts(filtered_text, voice="default")
-    
-    # 5. Возврат результата
-    return {
-        "success": True,
-        "audio_url": f"/api/audio/{audio_path}",
-        "tts_type": "local_f5"
-    }
-```
-
-### 4. Бот отправляет аудио в WebSocket
-
-```
-tts_manager → WebSocket → Frontend → Audio Player → OBS Browser Source
-```
-
----
-
-## 🆚 Сравнение: Локальный vs Облачный TTS
-
-| Функция | Локальный TTS | Облачный TTS |
-|---------|---------------|--------------|
-| **Озвучка чата** | ✅ Работает | ✅ Работает |
-| **Загрузка голосов** | ✅ Работает | ✅ Работает |
-| **Автоконвертация** | ✅ Работает | ✅ Работает |
-| **Автотранскрибация** | ✅ Работает | ✅ Работает |
-| **Фильтры и блокировки** | ✅ Работает | ✅ Работает |
-| **Настройки громкости** | ✅ Работает | ✅ Работает |
-| **Приоритетные голоса** | ⚠️ TODO | ✅ Работает |
-| **Whitelist** | ⚠️ TODO | ✅ Работает |
-
----
-
-## ⚠️ Ограничения
-
-### Что ещё НЕ работает в локальном TTS:
-
-1. ❌ **Приоритетные голоса**
-   - Нет логики для `connection_manager.get_voice_volume()`
-   - Все голоса озвучиваются с одинаковой громкостью
-
-2. ❌ **Whitelist для AI TTS**
-   - Нет проверки `user.is_whitelisted`
-   - Все пользователи имеют доступ к F5-TTS
-
-3. ⚠️ **Реальная генерация аудио**
-   - Endpoint возвращает заглушку: `audio_filename = f"channel_{channel_name}_{timestamp}.wav"`
-   - TODO: интегрировать с реальным F5-TTS движком
-
----
-
-## 🚧 TODO (для полной функциональности)
-
-### Приоритет 1: Критично
-
-- [ ] Интегрировать реальную генерацию аудио в `/synthesize-channel`
-- [ ] Добавить выбор голоса пользователя из БД
-- [ ] Обработка ошибок и логирование
-
-### Приоритет 2: Важно
-
-- [ ] Добавить систему whitelist для AI TTS
-- [ ] Добавить приоритетные громкости для голосов
-- [ ] Добавить кеширование сгенерированных аудио
-
-### Приоритет 3: Улучшения
-
-- [ ] Metrics и мониторинг через Prometheus
-- [ ] Rate limiting для защиты от спама
-- [ ] Автоматическая очистка старых аудио файлов
-
----
-
-## 📚 Связанные документы
-
-- [TTS_INTEGRATION_STATUS.md](./TTS_INTEGRATION_STATUS.md) - Общий статус TTS интеграции
-- [VOICE_UPLOAD_UNIFIED.md](./VOICE_UPLOAD_UNIFIED.md) - Система загрузки голосов
-- [tts_service_simple/README.md](../tts_service_simple/README.md) - Локальный TTS сервис
-- [tts_service_simple/VOICE_MANAGEMENT.md](../tts_service_simple/VOICE_MANAGEMENT.md) - Управление голосами
-
----
-
-## ✅ Заключение
-
-Локальный TTS **РАБОТАЕТ** и может использоваться для озвучки чата!
-
-**Преимущества:**
-- 🚀 Полный контроль над TTS движком
-- 🔒 Приватность (данные не уходят на удалённый сервер)
-- ⚡ Быстрая генерация (если есть мощный GPU)
-
-**Недостатки:**
-- 💻 Требуется мощный компьютер (GPU)
-- ⚙️ Нужна дополнительная настройка
-- 🔧 Некоторые функции ещё в разработке
-
-**Рекомендация:**
-- Для новичков → используйте **облачный TTS** (работает из коробки)
-- Для опытных пользователей с GPU → используйте **локальный TTS** (больше контроля)
+Notes:
 
+- `F5_TTS_SERVICE_URL` is the cloud/default F5 provider endpoint.
+- `QWEN_TTS_SERVICE_URL` is the cloud/default Qwen provider endpoint.
+- Per-user local endpoints are configured via API/UI and override cloud endpoint in local mode.
 
+## 2. Configure local endpoint in UI
+
+Open Local TTS settings and save endpoint for selected provider:
+
+- Provider: `F5` or `Qwen`
+- Endpoint URL: e.g. `http://127.0.0.1:8001` (F5) or `http://127.0.0.1:8011` (Qwen)
+- Optional API key
+- Enable local usage
+
+## 3. Select provider and mode in Advanced TTS
+
+In TTS main page:
+
+1. Set Advanced provider: `F5 TTS` or `Qwen 3 TTS`.
+2. Select mode: `Local`.
+3. Ensure local endpoint health is green.
+
+For Google Cloud provider, local mode is not applicable.
+
+## 4. API endpoints used
+
+Local endpoint management:
+
+- `GET /api/local-tts/config?provider=f5|qwen`
+- `POST /api/local-tts/config`
+- `POST /api/local-tts/test-connection`
+- `POST /api/local-tts/toggle?provider=f5|qwen`
+
+Provider-aware voice management:
+
+- `GET /api/voices/global?provider=f5|qwen`
+- `GET /api/voices/user/custom?provider=f5|qwen`
+- `POST /api/user/voices/upload?provider=f5|qwen`
+
+## 5. Runtime behavior summary
+
+- If engine is `f5tts` or `qwen` and mode is `local`, runtime tries per-user local endpoint for that provider.
+- If local endpoint is not healthy or missing, runtime falls back to basic `gtts`.
+- If advanced provider request fails (timeout/upstream error), runtime falls back to basic `gtts`.
+
+## 6. Troubleshooting
+
+### Local endpoint saved, but synthesis still cloud/fallback
+
+Check:
+
+- `provider` matches selected advanced provider (`f5` vs `qwen`).
+- local endpoint health status is `healthy`.
+- user/channel whitelist status.
+- backend logs for provider resolution and fallback reason.
+
+### Voice list is empty
+
+Check:
+
+- correct provider query (`provider=f5|qwen`).
+- upstream provider service responds to `/api/tts/voices/global`.
+- internal auth key (`TTS_INTERNAL_API_KEY`) if enabled.
+
+### Google Cloud not working
+
+Use dedicated endpoints:
+
+- `GET /api/tts/gcloud/voices`
+- `POST /api/tts/gcloud/preview`
+
+And verify credentials (ADC or API key) on backend side.
+
+## 7. Security recommendations
+
+- Keep local endpoints private (LAN/VPN/Tunnel), not public without auth.
+- Use `TTS_INTERNAL_API_KEY` for service-to-service protection.
+- Rotate tokens/API keys periodically.

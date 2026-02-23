@@ -103,7 +103,7 @@ TTS_TTV_0.03 поддерживает гибкие deployment сценарии:
 │ Machine 1 (User's PC with GPU)      │
 │                                     │
 │  ┌──────────────────────────────┐  │
-│  │ TTS Service Simple (F5-TTS)  │  │
+│  │ TTS Service (Single Node)    │  │
 │  │ - Port: 8001                 │  │
 │  │ - GPU: CUDA required         │  │
 │  │ - Voices: Local storage      │  │
@@ -177,8 +177,7 @@ TTS_TTV_0.03 поддерживает гибкие deployment сценарии:
 
 ```bash
 # === DATABASE ===
-DATABASE_URL=sqlite:///./data/bot_service.db  # Dev
-# DATABASE_URL=postgresql://user:pass@host:5432/dbname  # Prod
+DATABASE_URL=postgresql://user:pass@host:5432/dbname
 
 # === SERVICES ===
 BOT_SERVICE_HOST=0.0.0.0
@@ -228,7 +227,7 @@ LOG_FILE=logs/bot_service.log
 
 ### TTS Service (.env)
 
-Создайте `tts_service/.env`:
+Создайте `F5_tts/.env`:
 
 ```bash
 # === SERVICE ===
@@ -256,43 +255,13 @@ ALLOWED_ORIGINS=http://localhost:8000,http://localhost:5173
 
 # === LOGGING ===
 LOG_LEVEL=INFO
-LOG_FILE=logs/tts_service.log
+LOG_FILE=logs/f5_tts.log
 ```
 
-### TTS Service Simple (.env)
+### TTS Service Single-Node Profile (.env)
 
-Создайте `tts_service_simple/.env`:
-
-```bash
-# === SERVICE ===
-TTS_SIMPLE_HOST=0.0.0.0
-TTS_SIMPLE_PORT=8001
-
-# === F5-TTS CONFIGURATION ===
-F5_TTS_MODEL_PATH=./models/f5_tts
-F5_TTS_DEVICE=cuda
-F5_TTS_MAX_WORKERS=2
-
-# === VOICE STORAGE ===
-VOICES_DIR=./voices
-
-# === GLOBAL VOICE REPOSITORY ===
-GLOBAL_VOICES_REPO=https://tts-voices.example.com
-
-# === AUDIO SETTINGS ===
-SAMPLE_RATE=22050
-AUDIO_FORMAT=wav
-
-# === SECURITY ===
-ALLOWED_ORIGINS=http://localhost:8000
-
-# === CLOUDFLARE TUNNEL ===
-CLOUDFLARE_TUNNEL_TOKEN=your-tunnel-token
-
-# === LOGGING ===
-LOG_LEVEL=INFO
-LOG_FILE=logs/tts_simple.log
-```
+Используйте тот же файл `F5_tts/.env`.
+Для single-node профиля (`deploy/docker/docker-compose.tts-simple.yml`) отдельный env не требуется.
 
 ### Frontend (.env)
 
@@ -316,19 +285,19 @@ VITE_ENABLE_DEBUG=true
 
 ---
 
-## TTS Service: Advanced vs Simple
+## TTS Service: Advanced vs Single-Node
 
 ### Сравнение
 
-| Аспект | TTS Service (Advanced) | TTS Service Simple |
+| Аспект | TTS Service (Advanced) | TTS Service (Single-Node) |
 |--------|------------------------|-------------------|
-| **Назначение** | Централизованный TTS для нескольких пользователей | Персональный TTS для одного пользователя |
+| **Назначение** | Централизованный TTS для нескольких пользователей | Упрощенный профиль без Redis/worker pool |
 | **Движок** | F5-TTS | F5-TTS (тот же) |
 | **Требования** | GPU (CUDA), 8GB+ VRAM | GPU (CUDA), 8GB+ VRAM |
-| **Хранение голосов** | `/app/voices/` (все пользователи) | `/app/voices/user_{user_id}/` (изолированно) |
-| **Глобальные голоса** | Админ загружает, доступны всем | Пользователь скачивает из репозитория |
-| **Deployment** | Один инстанс для всех Bot Services | Один инстанс на пользователя |
-| **Use Case** | Shared hosting, несколько стримеров | Личное использование, приватность |
+| **Хранение голосов** | `/app/voices/` | `/app/voices/` |
+| **Глобальные голоса** | Админ загружает, доступны всем | Та же модель управления голосами |
+| **Deployment** | API + Redis + worker pool | Только API, без Redis и воркеров |
+| **Use Case** | Shared hosting, несколько стримеров | Локальный персональный запуск |
 | **API** | Идентичный | Идентичный |
 
 ### Unified API
@@ -383,7 +352,7 @@ git clone <repo>
 cd TTS_TTV_0.03
 
 # Только TTS Service
-cd tts_service  # или tts_service_simple
+cd F5_tts
 pip install -r requirements.txt
 
 # Настройка .env
@@ -398,9 +367,9 @@ nano .env  # Заполните настройки
 python main.py
 
 # Production (Docker)
-docker-compose -f docker-compose.tts-advanced.yml up -d
+docker compose -f deploy/docker/docker-compose.tts-advanced.yml up -d
 # или
-docker-compose -f docker-compose.tts-simple.yml up -d
+docker compose -f deploy/docker/docker-compose.tts-simple.yml up -d
 ```
 
 #### 4. Проверка
@@ -450,7 +419,7 @@ cd bot_service
 python main.py
 
 # Production (Docker)
-docker-compose -f docker-compose.bot.yml up -d
+docker compose -f deploy/docker/docker-compose.bot.yml up -d
 ```
 
 #### 4. Запуск Frontend
@@ -462,7 +431,7 @@ npm install
 npm run dev
 
 # Production (Docker)
-# Frontend включен в docker-compose.bot.yml
+# Frontend включен в deploy/docker/docker-compose.bot.yml
 ```
 
 #### 5. Проверка
@@ -538,7 +507,7 @@ sudo systemctl start cloudflared
 sudo systemctl enable cloudflared
 
 # Production (Docker)
-# Включен в docker-compose.tts-advanced.yml и docker-compose.tts-simple.yml
+# Включен в deploy/docker/docker-compose.tts-advanced.yml и deploy/docker/docker-compose.tts-simple.yml
 ```
 
 ### 7. Проверка
@@ -556,18 +525,18 @@ curl https://tts.yourdomain.com/health
 
 ```bash
 # Все сервисы локально
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 
 # Проверка
-docker-compose -f docker-compose.dev.yml ps
-docker-compose -f docker-compose.dev.yml logs -f
+docker compose -f deploy/docker/docker-compose.dev.yml ps
+docker compose -f deploy/docker/docker-compose.dev.yml logs -f
 ```
 
 ### Production: TTS Service (Advanced)
 
 ```bash
 # Machine 1 (GPU)
-docker-compose -f docker-compose.tts-advanced.yml up -d
+docker compose -f deploy/docker/docker-compose.tts-advanced.yml up -d
 
 # Проверка
 docker ps
@@ -575,22 +544,22 @@ docker logs tts_service
 docker logs cloudflared
 ```
 
-### Production: TTS Service Simple
+### Production: TTS Service (Single-Node)
 
 ```bash
 # Machine 1 (User PC)
-docker-compose -f docker-compose.tts-simple.yml up -d
+docker compose -f deploy/docker/docker-compose.tts-simple.yml up -d
 
 # Проверка
 docker ps
-docker logs tts_service_simple
+docker logs tts_service_single
 ```
 
 ### Production: Bot Service
 
 ```bash
 # Machine 2 (Remote)
-docker-compose -f docker-compose.bot.yml up -d
+docker compose -f deploy/docker/docker-compose.bot.yml up -d
 
 # Проверка
 docker ps
@@ -603,18 +572,18 @@ docker logs postgres
 
 ```bash
 # Остановка
-docker-compose -f <file> down
+docker compose -f <file> down
 
 # Перезапуск
-docker-compose -f <file> restart
+docker compose -f <file> restart
 
 # Логи
-docker-compose -f <file> logs -f <service>
+docker compose -f <file> logs -f <service>
 
 # Обновление
 git pull
-docker-compose -f <file> build
-docker-compose -f <file> up -d
+docker compose -f <file> build
+docker compose -f <file> up -d
 ```
 
 ---
@@ -635,9 +604,9 @@ if [ ! -f bot_service/.env ]; then
     echo "✓ Created bot_service/.env"
 fi
 
-if [ ! -f tts_service/.env ]; then
-    cp tts_service/.env.example tts_service/.env
-    echo "✓ Created tts_service/.env"
+if [ ! -f F5_tts/.env ]; then
+    cp F5_tts/.env.example F5_tts/.env
+    echo "✓ Created F5_tts/.env"
 fi
 
 if [ ! -f frontend/.env ]; then
@@ -767,12 +736,11 @@ curl -i -N -H "Connection: Upgrade" -H "Upgrade: websocket" \
 # Проверка DATABASE_URL
 cat bot_service/.env | grep DATABASE_URL
 
-# Создание директории
-mkdir -p data
+# Проверка подключения к PostgreSQL
+psql "$DATABASE_URL" -c "SELECT 1;"
 
-# Пересоздание БД
+# Запуск миграций
 cd bot_service
-rm -f data/bot_service.db
 alembic upgrade head
 ```
 

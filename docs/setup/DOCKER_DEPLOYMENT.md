@@ -1,4 +1,4 @@
-# Docker Deployment Guide
+﻿# Docker Deployment Guide
 
 ## Overview
 
@@ -10,7 +10,7 @@ This guide explains how to deploy the TTS Bot using Docker Compose in different 
 Run everything on one machine for development.
 
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f deploy/docker/docker-compose.dev.yml up -d
 ```
 
 ### Scenario 2: Distributed with Advanced TTS (Production)
@@ -25,7 +25,7 @@ docker-compose -f docker-compose.dev.yml up -d
 # 3. Configure cloudflared-config.yml with your domain
 
 # Start TTS service
-docker-compose -f docker-compose.tts-advanced.yml up -d
+docker compose -f deploy/docker/docker-compose.tts-advanced.yml up -d
 ```
 
 **Machine 2 (Server):**
@@ -34,25 +34,25 @@ docker-compose -f docker-compose.tts-advanced.yml up -d
 # TTS_SERVICE_URL=https://tts.yourdomain.com
 
 # Start bot service and frontend
-docker-compose -f docker-compose.bot.yml up -d
+docker compose -f deploy/docker/docker-compose.bot.yml up -d
 ```
 
-### Scenario 3: Distributed with Simple TTS (Personal Use)
-- **Machine 1 (GPU PC)**: TTS Service Simple + Cloudflare Tunnel
+### Scenario 3: Distributed with Single-Node F5 TTS (Personal Use)
+- **Machine 1 (GPU PC)**: `F5_tts` (single-node profile, compose service name `tts_service`) + Cloudflare Tunnel
 - **Machine 2 (Server)**: Bot Service + Frontend + Database
 
 **Machine 1 (GPU PC):**
 ```bash
 # Setup Cloudflare Tunnel (same as Scenario 2)
 
-# Start TTS Simple
-docker-compose -f docker-compose.tts-simple.yml up -d
+# Start single-node TTS profile
+docker compose -f deploy/docker/docker-compose.tts-simple.yml up -d
 ```
 
 **Machine 2 (Server):**
 ```bash
 # Same as Scenario 2
-docker-compose -f docker-compose.bot.yml up -d
+docker compose -f deploy/docker/docker-compose.bot.yml up -d
 ```
 
 ## Prerequisites
@@ -68,7 +68,7 @@ docker-compose -f docker-compose.bot.yml up -d
 
 ### Server Machine
 - 2GB+ RAM
-- PostgreSQL (included in docker-compose.bot.yml)
+- PostgreSQL (included in `deploy/docker/docker-compose.bot.yml`)
 
 ## Setup Steps
 
@@ -77,8 +77,7 @@ docker-compose -f docker-compose.bot.yml up -d
 Copy .env.example files to .env:
 ```bash
 cp bot_service/.env.example bot_service/.env
-cp tts_service/.env.example tts_service/.env
-cp tts_service_simple/.env.example tts_service_simple/.env
+cp F5_tts/.env.example F5_tts/.env
 cp frontend/.env.example frontend/.env
 ```
 
@@ -193,3 +192,4 @@ docker-compose exec postgres pg_dump -U tts_user tts_bot > backup.sql
 ```bash
 docker-compose exec -T postgres psql -U tts_user tts_bot < backup.sql
 ```
+

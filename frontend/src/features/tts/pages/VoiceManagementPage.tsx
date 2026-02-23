@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 /* eslint-disable no-alert */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
@@ -70,6 +70,8 @@ interface TestVoiceResponse {
     audio_url?: string;
 }
 
+type VoiceProvider = 'f5' | 'qwen';
+
 const extractApiErrorMessage = (error: unknown): string | null => {
     if (!error) return null;
     const typedError = error as {
@@ -115,6 +117,7 @@ const VoiceManagementPageContent: React.FC = () => {
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
     const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
+    const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>('f5');
     const [voiceVolumes, _setVoiceVolumes] = useState<Record<string, number>>({});
     const fileInputRef = React.useRef<HTMLInputElement | null>(null);
     const voiceVolumeSaveTimeout = React.useRef<Record<string, NodeJS.Timeout>>({});
@@ -144,23 +147,30 @@ const VoiceManagementPageContent: React.FC = () => {
     });
 
     const whitelistStatusRaw = (whitelistStatusData as { data?: unknown } | undefined)?.data ?? whitelistStatusData;
-    const whitelistStatusCandidate = whitelistStatusRaw as Partial<WhitelistStatus> | undefined;
-    const whitelistStatus =
-        whitelistStatusCandidate &&
-        (typeof whitelistStatusCandidate.is_whitelisted === 'boolean' ||
-            typeof whitelistStatusCandidate.can_manage_voices === 'boolean')
-            ? ({
-                is_whitelisted: Boolean(whitelistStatusCandidate.is_whitelisted),
-                can_manage_voices: Boolean(whitelistStatusCandidate.can_manage_voices),
-                platform: whitelistStatusCandidate.platform,
-                message: whitelistStatusCandidate.message,
-            } as WhitelistStatus)
-            : undefined;
+    const whitelistStatus = useMemo(() => {
+        const whitelistStatusCandidate = whitelistStatusRaw as Partial<WhitelistStatus> | undefined;
+        if (
+            !whitelistStatusCandidate ||
+            (
+                typeof whitelistStatusCandidate.is_whitelisted !== 'boolean' &&
+                typeof whitelistStatusCandidate.can_manage_voices !== 'boolean'
+            )
+        ) {
+            return undefined;
+        }
+
+        return {
+            is_whitelisted: Boolean(whitelistStatusCandidate.is_whitelisted),
+            can_manage_voices: Boolean(whitelistStatusCandidate.can_manage_voices),
+            platform: whitelistStatusCandidate.platform,
+            message: whitelistStatusCandidate.message,
+        } as WhitelistStatus;
+    }, [whitelistStatusRaw]);
 
     const { data: globalVoicesData = [], isLoading: globalVoicesLoading, isError: globalVoicesError, error: globalVoicesErrorData } = useQuery<TtsVoice[]>({
-        queryKey: ['global-voices'],
+        queryKey: ['global-voices', voiceProvider],
         queryFn: async () => {
-            const response = await getGlobalVoices();
+            const response = await getGlobalVoices(voiceProvider);
             const voiceResponse = (response as unknown) as VoiceApiResponse | undefined;
             const payload = voiceResponse?.data || (response as { data?: unknown })?.data || response;
             const data = Array.isArray(payload)
@@ -182,10 +192,10 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const userId = user?.id;
     const { data: userVoicesData = [], isLoading: userVoicesLoading, isError: userVoicesError, error: userVoicesErrorData } = useQuery<TtsVoice[]>({
-        queryKey: ['user-voices', userId],
+        queryKey: ['user-voices', userId, voiceProvider],
         queryFn: async () => {
             if (!userId) return [];
-            const response = await getUserVoices(userId);
+            const response = await getUserVoices(userId, voiceProvider);
             const voiceResponse = (response as unknown) as VoiceApiResponse | undefined;
             const payload = voiceResponse?.data || (response as { data?: unknown })?.data || response;
             const data = Array.isArray(payload)
@@ -208,7 +218,7 @@ const VoiceManagementPageContent: React.FC = () => {
     const uploadVoiceMutation = useMutation({
         mutationFn: async ({ userId, formData }: { userId: number; formData: FormData }) => {
             setIsUploading(true);
-            return await uploadUserVoice(userId, formData);
+            return await uploadUserVoice(userId, formData, voiceProvider);
         },
         onSuccess: () => {
             addToast({ type: 'success', title: 'Успех', message: 'Голос успешно загружен!' });
@@ -218,7 +228,7 @@ const VoiceManagementPageContent: React.FC = () => {
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
-            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
         },
         onError: (error: unknown) => {
             const mutationError = error as MutationError;
@@ -231,11 +241,11 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const deleteVoiceMutation = useMutation({
         mutationFn: async ({ voiceId, userId, voiceName: _voiceName }: { voiceId: number; userId: number; voiceName: string }) => {
-            return await deleteUserVoice(String(voiceId), userId);
+            return await deleteUserVoice(String(voiceId), userId, voiceProvider);
         },
         onSuccess: (_data: unknown, variables: { voiceId: number; userId: number; voiceName: string }) => {
             addToast({ type: 'success', title: 'Успех', message: `Голос "${variables.voiceName}" удалён.` });
-            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
         },
         onError: (error: unknown) => {
             const mutationError = error as MutationError;
@@ -245,13 +255,13 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const renameVoiceMutation = useMutation({
         mutationFn: async ({ voiceId, userId, newName }: { voiceId: number; userId: number; newName: string }) => {
-            return await renameUserVoice(voiceId, userId, newName);
+            return await renameUserVoice(voiceId, userId, newName, voiceProvider);
         },
         onSuccess: () => {
             addToast({ type: 'success', title: 'Успех', message: 'Голос успешно переименован!' });
             setRenameDialogOpen(false);
             setEditDialogOpen(false);
-            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
         },
         onError: (error: unknown) => {
             const mutationError = error as MutationError;
@@ -261,25 +271,25 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const updateVoiceSettingsMutation = useMutation({
         mutationFn: async ({ voiceId, userId, settings }: { voiceId: number; userId: number; settings: Record<string, unknown> }) => {
-            return await updateUserVoiceSettings(voiceId, userId, settings);
+            return await updateUserVoiceSettings(voiceId, userId, settings, voiceProvider);
         },
         onSuccess: () => {
             setEditDialogOpen(false);
-            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
-            queryClient.invalidateQueries({ queryKey: ['global-voices'] });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
+            queryClient.invalidateQueries({ queryKey: ['global-voices', voiceProvider] });
         },
         onError: (error: unknown) => {
             const mutationError = error as MutationError;
             addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось обновить настройки.' });
-            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
-            queryClient.invalidateQueries({ queryKey: ['global-voices'] });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
+            queryClient.invalidateQueries({ queryKey: ['global-voices', voiceProvider] });
         }
     });
 
     const transcribeVoiceMutation = useMutation({
         mutationFn: async ({ voiceId, userId }: { voiceId: number; userId: number }) => {
             setIsTranscribing(true);
-            return await retranscribeUserVoice(voiceId, userId);
+            return await retranscribeUserVoice(voiceId, userId, undefined, voiceProvider);
         },
         onSuccess: (response: unknown) => {
             const transcribeResponse = response as TranscribeResponse;
@@ -288,7 +298,7 @@ const VoiceManagementPageContent: React.FC = () => {
                 setCurrentVoice({ ...currentVoice, reference_text: newReferenceText });
                 addToast({ type: 'success', title: 'Успех', message: 'Референсный текст обновлён!' });
             }
-            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
         },
         onError: (error: unknown) => {
             const mutationError = error as MutationError;
@@ -300,11 +310,11 @@ const VoiceManagementPageContent: React.FC = () => {
     });
 
     const { data: enabledVoicesData, isLoading: _enabledVoicesLoading } = useQuery<number[]>({
-        queryKey: ['enabled-voices', userId],
+        queryKey: ['enabled-voices', userId, voiceProvider],
         queryFn: async () => {
             if (!userId) return [];
             try {
-                const response = await ttsService.getEnabledVoices(userId);
+                const response = await ttsService.getEnabledVoices(userId, voiceProvider);
                 const enabledResponse = response.data as EnabledVoicesResponse;
                 return enabledResponse.enabled_voice_ids || [];
             } catch (error: unknown) {
@@ -320,10 +330,10 @@ const VoiceManagementPageContent: React.FC = () => {
 
     const updateEnabledVoicesMutation = useMutation({
         mutationFn: async ({ userId, voiceIds }: { userId: number; voiceIds: number[] }) => {
-            return await ttsService.saveEnabledVoices(userId, voiceIds);
+            return await ttsService.saveEnabledVoices(userId, voiceIds, voiceProvider);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['enabled-voices', userId] });
+            queryClient.invalidateQueries({ queryKey: ['enabled-voices', userId, voiceProvider] });
         },
         onError: (error: unknown) => {
             logger.error('Error updating enabled voices:', error);
@@ -516,13 +526,13 @@ const VoiceManagementPageContent: React.FC = () => {
         };
 
         if (currentVoice.voice_type === 'global') {
-            queryClient.setQueryData(['global-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+            queryClient.setQueryData(['global-voices', voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
                 voice.id === currentVoice.id
                     ? { ...voice, ...settings }
                     : voice
             ));
         } else {
-            queryClient.setQueryData(['user-voices', userId], (prev: TtsVoice[] = []) => prev.map(voice =>
+            queryClient.setQueryData(['user-voices', userId, voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
                 voice.id === currentVoice.id
                     ? { ...voice, ...settings }
                     : voice
@@ -583,10 +593,7 @@ const VoiceManagementPageContent: React.FC = () => {
                 volume: voiceVolumes[currentVoice.name] || 50
             });
 
-            const response = await testVoice(
-                currentVoice.id,
-                testText
-            );
+            const response = await testVoice(currentVoice.id, testText, voiceProvider);
 
             const testResponse = response.data as TestVoiceResponse;
             const audioUrl = testResponse.audio_url;
@@ -643,11 +650,11 @@ const VoiceManagementPageContent: React.FC = () => {
         try {
             await updateUserVoiceSettings(currentVoice.id, user.id, {
                 cfg_strength: currentVoice.cfg_strength
-            });
+            }, voiceProvider);
             addToast({ type: 'success', title: 'Успех', message: `Настройки голоса "${currentVoice.name}" обновлены.` });
             setEditDialogOpen(false);
-            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
-            queryClient.invalidateQueries({ queryKey: ['global-voices'] });
+            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
+            queryClient.invalidateQueries({ queryKey: ['global-voices', voiceProvider] });
         } catch (error: unknown) {
             const mutationError = error as MutationError;
             addToast({ type: 'error', title: 'Ошибка', message: mutationError.message || 'Не удалось обновить настройки.' });
@@ -765,6 +772,31 @@ const VoiceManagementPageContent: React.FC = () => {
                     : ""
             }
         >
+            <Card className="card-glass border-blue-500/25">
+                <CardContent className="pt-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-300/90">Провайдер голосов</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Голоса, сэмплы и персональные настройки редактируются отдельно для F5 и Qwen.
+                            </p>
+                        </div>
+                        <div className="w-full sm:w-[240px]">
+                            <Label htmlFor="voice-provider-select" className="text-xs text-slate-300">Активный провайдер</Label>
+                            <select
+                                id="voice-provider-select"
+                                value={voiceProvider}
+                                onChange={(event) => setVoiceProvider(event.target.value as VoiceProvider)}
+                                className="mt-1 h-10 w-full rounded-md border border-blue-500/35 bg-transparent px-3 text-sm text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500/35"
+                            >
+                                <option value="f5" className="bg-slate-900 text-slate-100">F5 TTS</option>
+                                <option value="qwen" className="bg-slate-900 text-slate-100">Qwen 3 TTS</option>
+                            </select>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
+
             <input
                 ref={(el) => {
                     fileInputRef.current = el;
@@ -791,8 +823,8 @@ const VoiceManagementPageContent: React.FC = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                            queryClient.invalidateQueries({ queryKey: ['global-voices'] });
-                            queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+                            queryClient.invalidateQueries({ queryKey: ['global-voices', voiceProvider] });
+                            queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
                         }}
                         className="border-red-400/50 text-red-200 hover:text-white hover:bg-red-500/20"
                     >
@@ -835,8 +867,8 @@ const VoiceManagementPageContent: React.FC = () => {
                         <Button
                             variant="outline"
                             onClick={() => {
-                                queryClient.invalidateQueries({ queryKey: ['global-voices'] });
-                                queryClient.invalidateQueries({ queryKey: ['user-voices', userId] });
+                                queryClient.invalidateQueries({ queryKey: ['global-voices', voiceProvider] });
+                                queryClient.invalidateQueries({ queryKey: ['user-voices', userId, voiceProvider] });
                             }}
                         >
                             <RefreshCw className="h-4 w-4 mr-2" />
@@ -912,7 +944,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                         </div>
                                         {uploadFile && (
                                             <p className="text-xs text-green-400 mt-1">
-                                                ✓ Файл выбран: {uploadFile.name}
+                                                ? Файл выбран: {uploadFile.name}
                                             </p>
                                         )}
                                     </div>
@@ -1020,7 +1052,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                                 </div>
                                                 {uploadFile && (
                                                     <p className="text-xs text-green-400 mt-1">
-                                                        ✓ Файл выбран: {uploadFile.name}
+                                                        ? Файл выбран: {uploadFile.name}
                                                     </p>
                                                 )}
                                             </div>
@@ -1389,6 +1421,7 @@ const VoiceManagementPage: React.FC = () => {
 };
 
 export default VoiceManagementPage;
+
 
 
 

@@ -1,4 +1,4 @@
-# Статус Endpoint'ов Админ-Панели
+﻿# Статус Endpoint'ов Админ-Панели
 
 **Дата:** 29.10.2025  
 **Обновлено:** 2025-01-09  
@@ -21,23 +21,23 @@
 
 | Endpoint | Метод | Статус | Файл |
 |----------|-------|--------|------|
-| `/api/admin/voices` | GET | ✅ Есть | `tts_service/admin_api.py:58` |
-| `/api/admin/voices/upload` | POST | ✅ Есть + Конвертация + Транскрибация | `tts_service/admin_api.py:116` |
-| `/api/admin/voices/{id}/toggle` | POST | ✅ Есть | `tts_service/admin_api.py:88` |
-| `/api/voices/{id}/retranscribe` | POST | ✅ Есть | `tts_service/admin_api.py:255` |
-| `/api/admin/voices/{id}` | DELETE | ✅ Есть | `tts_service/admin_api.py:303` |
-| `/api/admin/voices/{id}/rename` | PUT | ✅ Есть | `tts_service/admin_api.py:335` |
-| `/api/tts/user/voices/upload` | POST | ✅ Есть + Конвертация + Транскрибация | `tts_service/api_endpoints.py:704` |
-| `/api/user/voices/{user_id}` | GET | ✅ Есть | `tts_service/api_endpoints.py:699` |
-| `/api/user/voices/{voice_id}` | DELETE | ✅ Есть | `tts_service/api_endpoints.py:843` |
-| `/api/user/voices/{voice_id}/rename` | PUT | ✅ Есть | `tts_service/api_endpoints.py:875` |
-| `/api/tts/user/voices/{voice_id}/transcribe` | POST | ✅ Есть | `tts_service/api_endpoints.py:907` |
-| `/api/tts/user/voices/{voice_id}/retranscribe` | POST | ✅ Есть | `tts_service/api_endpoints.py:954` |
-| `/api/tts/user/voices/{voice_id}/settings` | PUT | ✅ Есть | `tts_service/api_endpoints.py:1001` |
-| `/api/tts/test` | POST | ❓ Проверить | `tts_service/api_endpoints.py` |
-| `/api/admin/system/status` | GET | ✅ Есть | `tts_service/admin_api.py:188` |
-| `/api/admin/system/restart` | POST | ✅ Есть | `tts_service/admin_api.py:208` |
-| `/api/admin/stats` | GET | ✅ Есть | `tts_service/admin_api.py:19` |
+| `/api/admin/voices` | GET | ✅ Есть | `F5_tts/admin_api.py:58` |
+| `/api/admin/voices/upload` | POST | ✅ Есть + Конвертация + Транскрибация | `F5_tts/admin_api.py:116` |
+| `/api/admin/voices/{id}/toggle` | POST | ✅ Есть | `F5_tts/admin_api.py:88` |
+| `/api/voices/{id}/retranscribe` | POST | ✅ Есть | `F5_tts/admin_api.py:255` |
+| `/api/admin/voices/{id}` | DELETE | ✅ Есть | `F5_tts/admin_api.py:303` |
+| `/api/admin/voices/{id}/rename` | PUT | ✅ Есть | `F5_tts/admin_api.py:335` |
+| `/api/tts/user/voices/upload` | POST | ✅ Есть + Конвертация + Транскрибация | `F5_tts/api_endpoints.py:704` |
+| `/api/user/voices/{user_id}` | GET | ✅ Есть | `F5_tts/api_endpoints.py:699` |
+| `/api/user/voices/{voice_id}` | DELETE | ✅ Есть | `F5_tts/api_endpoints.py:843` |
+| `/api/user/voices/{voice_id}/rename` | PUT | ✅ Есть | `F5_tts/api_endpoints.py:875` |
+| `/api/tts/user/voices/{voice_id}/transcribe` | POST | ✅ Есть | `F5_tts/api_endpoints.py:907` |
+| `/api/tts/user/voices/{voice_id}/retranscribe` | POST | ✅ Есть | `F5_tts/api_endpoints.py:954` |
+| `/api/tts/user/voices/{voice_id}/settings` | PUT | ✅ Есть | `F5_tts/api_endpoints.py:1001` |
+| `/api/tts/test` | POST | ❓ Проверить | `F5_tts/api_endpoints.py` |
+| `/api/admin/system/status` | GET | ✅ Есть | `F5_tts/admin_api.py:188` |
+| `/api/admin/system/restart` | POST | ✅ Есть | `F5_tts/admin_api.py:208` |
+| `/api/admin/stats` | GET | ✅ Есть | `F5_tts/admin_api.py:19` |
 
 ### Bot Service (localhost:8000)
 
@@ -133,7 +133,7 @@
 ### TTS Service
 
 ```python
-# tts_service/admin_api.py
+# F5_tts/admin_api.py
 
 @admin_router.delete("/voices/{voice_id}")
 async def delete_voice(voice_id: int, db: Session = Depends(get_db)):
@@ -275,7 +275,7 @@ async def transcribe_voice(voice_id: int, db: Session = Depends(get_db)):
 
 ---
 
-### ✅ TTS Service Simple (localhost:8001)
+### ✅ TTS Service Single-Node Profile (localhost:8001)
 
 **Статус:** ✅ **РЕАЛИЗОВАНА** автоконвертация и транскрибация!
 

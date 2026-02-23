@@ -110,9 +110,9 @@ class YouTubeService:
             return None
 
     async def _get_video_info_fallback(self, video_id: str, video_url: str) -> Dict[str, Any]:
-        """Fallback ????? ????????? ?????????? ??? API"""
+        """Fallback video info retrieval when API calls fail."""
         try:
-            # ???????? ???????? ?????????? ????? pytube
+            # First fallback: read metadata via pytube.
             try:
                 from pytube import YouTube
                 yt = YouTube(video_url)
@@ -136,7 +136,7 @@ class YouTubeService:
                 if yt_dlp_info:
                     return yt_dlp_info
 
-                # ???? yt-dlp ?? ????????, ?????????? ??????? ??????????
+                # Last resort fallback if yt-dlp also fails.
                 return {
                     'video_id': video_id,
                     'title': f"YouTube Video {video_id}",
@@ -312,7 +312,7 @@ class YouTubeService:
         return f"https://www.youtube.com/embed/{video_id}"
 
     async def search_videos(self, query: str, max_results: int = 5) -> list:
-        """????? ????? ?? ???????"""
+        """Search videos by free-text query."""
         try:
             if not self.api_key:
                 logger.warning("YouTube API key not configured for search")

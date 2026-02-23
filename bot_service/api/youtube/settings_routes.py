@@ -237,7 +237,7 @@ async def get_obs_url(
         user_record = repo.get_by_id(user_id)
 
         if not user_record:
-            raise HTTPException(status_code=404, detail='Р В РЎСџР В РЎвЂўР В Р’В»Р РЋР Р‰Р В Р’В·Р В РЎвЂўР В Р вЂ Р В Р’В°Р РЋРІР‚С™Р В Р’ВµР В Р’В»Р РЋР Р‰ Р В Р вЂ¦Р В Р’Вµ Р В Р вЂ¦Р В Р’В°Р В РІвЂћвЂ“Р В РўвЂР В Р’ВµР В Р вЂ¦')
+            raise HTTPException(status_code=404, detail="User not found")
 
         return {
             'obs_token': user_record.obs_token,

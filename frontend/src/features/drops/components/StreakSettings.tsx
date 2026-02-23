@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Loader2, Package } from 'lucide-react';
@@ -67,7 +67,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
   useEffect(() => {
     const handleDropsConfigChange = (event: CustomEvent) => {
       const { streak_enabled, channel, platform: eventPlatform, source } = event.detail;
-      // [OK] �?СПРАВЛЕН�?Е: Обновляем локальное состояние только если событие пришло от QuickActionsBar
+      // [OK] FIX: update local state only for QuickActionsBar events
       // Если событие пришло от useDropsConfig (наш собственный saveMutation), то состояние уже обновлено через setFormData
       if (channel === channelName && streak_enabled !== undefined && eventPlatform && source === 'QuickActionsBar') {
         if (eventPlatform === 'twitch') {
@@ -100,7 +100,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     };
   }, [config]);
 
-  // [OK] �?Н�?Ц�?АЛ�?ЗАЦ�?Я: Загружаем данные при первой загрузке
+  // [OK] INIT: load data on first render
   useEffect(() => {
     if (initialFormData && isInitialLoad) {
       setFormData(initialFormData);
@@ -108,7 +108,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     }
   }, [initialFormData, isInitialLoad, setIsInitialLoad]);
 
-  // [OK] С�?НХРОН�?ЗАЦ�?Я: Синхронизируем formData с config из React Query
+  // [OK] SYNC: keep formData aligned with React Query config
   // Обновляем все поля, включая streak_enabled (fallback если событие не было обработано)
   useEffect(() => {
     if (!isInitialLoad && config && initialFormData) {
@@ -179,7 +179,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     autoSave({ ...createPayload(), [platformKey]: enabled });
   };
 
-  // [OK] �?СПРАВЛЕН�?Е: Автосохранение только для настроек, НЕ для streak_enabled_twitch/vk
+  // [OK] FIX: autosave only settings, not streak_enabled_twitch/vk
   // streak_enabled_twitch/vk сохраняются отдельно через handlePlatformToggle
   // Это предотвращает повторное сохранение при обновлении из QuickActionsBar
   useEffect(() => {
@@ -203,7 +203,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
     isInitialLoad,
     config,
     autoSave
-    // [OK] �?СКЛЮЧЕНО: formData.streak_enabled_twitch, formData.streak_enabled_vk
+    // [OK] EXCLUDED: formData.streak_enabled_twitch, formData.streak_enabled_vk
     // Эти поля сохраняются отдельно через handlePlatformToggle
   ]);
 

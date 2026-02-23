@@ -5,6 +5,7 @@ Replaces hardcoded values and os.getenv() calls throughout the application
 """
 import logging
 import os
+import sys
 from typing import Optional, List
 from pydantic import Field, field_validator, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -44,6 +45,14 @@ class Settings(BaseSettings):
     backend_url: str = Field(default="http://localhost:8000", description="Backend URL")
     frontend_url: str = Field(default="http://localhost:5173", description="Frontend URL")
     tts_service_url: str = Field(default="http://localhost:8001", description="TTS service URL")
+    f5_tts_service_url: str = Field(
+        default="http://localhost:8001",
+        description="F5 TTS service URL (legacy fallback for TTS_SERVICE_URL)",
+    )
+    qwen_tts_service_url: str = Field(
+        default="http://localhost:8011",
+        description="Qwen TTS service URL",
+    )
     tts_internal_api_key: Optional[str] = Field(
         default=None,
         description="Shared internal API key for bot_service -> tts_service admin calls",
@@ -230,14 +239,14 @@ class Settings(BaseSettings):
         if not v:
             raise ValueError("DATABASE_URL is required")
 
-        environment = info.data.get('environment', 'development')
+        environment = str(info.data.get('environment', 'development')).lower()
+        testing_from_env = os.getenv("TESTING", "false").strip().lower() == "true"
+        pytest_mode = "PYTEST_CURRENT_TEST" in os.environ or "pytest" in sys.modules
+        is_testing_mode = environment in {"test", "testing"} or testing_from_env or pytest_mode
 
-        # Warn if using SQLite in production
-        if environment.lower() == 'production' and v.startswith('sqlite'):
-            logger.warning(
-                "[WARN] Using SQLite in production is not recommended. "
-                "Consider using PostgreSQL for better performance and reliability."
-            )
+        # Runtime policy: PostgreSQL only (SQLite allowed only in explicit test mode).
+        if v.startswith('sqlite') and not is_testing_mode:
+            raise ValueError("Only PostgreSQL is supported for runtime DATABASE_URL")
 
         return v
 

@@ -2,8 +2,6 @@
 # Bot Service deployment (Machine 2 - Remote Server)
 # Connects to remote TTS service via Cloudflare Tunnel
 
-version: '3.8'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -27,22 +25,24 @@ services:
   # Bot Service - Main API
   bot_service:
     build:
-      context: ./bot_service
+      context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service
     ports:
       - "8000:8000"
     env_file:
-      - ./bot_service/.env
+      - ../../bot_service/.env
     environment:
       # Override with PostgreSQL
       - DATABASE_URL=postgresql://${DB_USER:-tts_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-tts_bot}
       # TTS service via Cloudflare Tunnel
       - TTS_SERVICE_URL=${TTS_SERVICE_URL:-https://tts.yourdomain.com}
+      - F5_TTS_SERVICE_URL=${F5_TTS_SERVICE_URL:-https://tts.yourdomain.com}
+      - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-https://qwen-tts.yourdomain.com}
     volumes:
-      - ./bot_service/data:/app/data
-      - ./bot_service/logs:/app/logs
-      - ./bot_service/backups:/app/backups
+      - ../../bot_service/data:/app/data
+      - ../../bot_service/logs:/app/logs
+      - ../../bot_service/backups:/app/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,7 +56,7 @@ services:
   # Frontend - React UI with Nginx
   frontend:
     build:
-      context: ./frontend
+      context: ../../frontend
       dockerfile: Dockerfile.prod
       args:
         - VITE_BOT_SERVICE_URL=${BACKEND_URL:-https://api.yourdomain.com}
@@ -67,8 +67,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../ssl:/etc/nginx/ssl:ro
     depends_on:
       - bot_service
     restart: unless-stopped
@@ -81,3 +81,4 @@ networks:
   default:
     name: tts_bot_network
     driver: bridge
+

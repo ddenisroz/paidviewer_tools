@@ -2,6 +2,7 @@
 Comprehensive test suite for Drops system functionality
 Tests drops opening mechanism, streak tracking, donation-triggered drops, and reward calculation
 """
+
 import pytest
 import sys
 from pathlib import Path
@@ -13,32 +14,41 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 
-from core.database import Base, DropsConfig, DropsReward, DropsQuality, UserStreak, DropsHistory
+from core.database import (
+    Base,
+    DropsConfig,
+    DropsReward,
+    DropsQuality,
+    UserStreak,
+    DropsHistory,
+    MythicalDropsSession,
+)
 from services.drops.drops_service import DropsService
 from services.drops.drops_calculation_service import DropsCalculationService
+from repositories.drops_history_repository import DropsHistoryRepository
 from core.datetime_utils import utcnow_naive
 
 
 @pytest.fixture
 def db_session():
     """Create a test database session"""
-    engine = create_engine('sqlite:///:memory:')
+    engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
     session = Session()
-    
+
     # Create default qualities
     qualities = [
-        DropsQuality(id=1, name='Common', color='#808080', weight=100),
-        DropsQuality(id=2, name='Rare', color='#0070dd', weight=100),
-        DropsQuality(id=3, name='Epic', color='#a335ee', weight=100),
-        DropsQuality(id=4, name='Legendary', color='#ff8000', weight=100),
-        DropsQuality(id=5, name='Mythical', color='#e6cc80', weight=100),
+        DropsQuality(id=1, name="Common", color="#808080", weight=100),
+        DropsQuality(id=2, name="Rare", color="#0070dd", weight=100),
+        DropsQuality(id=3, name="Epic", color="#a335ee", weight=100),
+        DropsQuality(id=4, name="Legendary", color="#ff8000", weight=100),
+        DropsQuality(id=5, name="Mythical", color="#e6cc80", weight=100),
     ]
     for quality in qualities:
         session.add(quality)
     session.commit()
-    
+
     yield session
     session.close()
 
@@ -60,8 +70,8 @@ def test_config(db_session):
     """Create a test drops configuration"""
     config = DropsConfig(
         user_id=1,
-        channel_name='test_channel',
-        platform='global',
+        channel_name="test_channel",
+        platform="global",
         # Streak settings
         streak_days_common=1,
         streak_days_rare=3,
@@ -99,411 +109,481 @@ def test_rewards(db_session):
     """Create test rewards for each quality"""
     rewards = []
     qualities = db_session.query(DropsQuality).all()
-    
+
     for quality in qualities:
         for i in range(3):  # 3 rewards per quality
             reward = DropsReward(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',  # Platform is stored but rewards are cross-platform
-                name=f'{quality.name} Reward {i+1}',
-                description=f'Test {quality.name} reward',
+                channel_name="test_channel",
+                platform="twitch",  # Platform is stored but rewards are cross-platform
+                name=f"{quality.name} Reward {i + 1}",
+                description=f"Test {quality.name} reward",
                 quality_id=quality.id,
                 weight=100 if i == 0 else (50 if i == 1 else 25),  # Different weights
-                reward_type='points',
-                reward_value='100',
+                reward_type="points",
+                reward_value="100",
                 is_active=True,
             )
             db_session.add(reward)
             rewards.append(reward)
-    
+
     db_session.commit()
     return rewards
 
 
 class TestDropsOpening:
     """Test drops opening mechanism"""
-    
+
     def test_calculate_drop_basic(self, drops_calc_service, test_config, test_rewards):
         """Test basic drop calculation"""
         result = drops_calc_service.calculate_drop(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            quality_name='Common'
+            channel_name="test_channel",
+            platform="twitch",
+            quality_name="Common",
         )
-        
+
         assert result is not None
-        assert 'reward_id' in result
-        assert 'reward_name' in result
-        assert 'quality' in result
-        assert result['quality'] == 'Common'
+        assert "reward_id" in result
+        assert "reward_name" in result
+        assert "quality" in result
+        assert result["quality"] == "Common"
         print(f"[OK] Basic drop calculation works: {result['reward_name']}")
-    
-    def test_calculate_drop_all_qualities(self, drops_calc_service, test_config, test_rewards):
+
+    def test_calculate_drop_all_qualities(
+        self, drops_calc_service, test_config, test_rewards
+    ):
         """Test drop calculation for all quality tiers"""
-        qualities = ['Common', 'Rare', 'Epic', 'Legendary', 'Mythical']
-        
+        qualities = ["Common", "Rare", "Epic", "Legendary", "Mythical"]
+
         for quality in qualities:
             result = drops_calc_service.calculate_drop(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',
-                quality_name=quality
+                channel_name="test_channel",
+                platform="twitch",
+                quality_name=quality,
             )
-            
+
             assert result is not None
-            assert result['quality'] == quality
+            assert result["quality"] == quality
             print(f"[OK] {quality} drop calculation works")
-    
-    def test_weighted_random_selection(self, drops_calc_service, test_config, test_rewards):
+
+    def test_weighted_random_selection(
+        self, drops_calc_service, test_config, test_rewards
+    ):
         """Test that weighted random selection respects weights"""
         # Run multiple calculations and check distribution
         results = {}
         iterations = 1000
-        
+
         for _ in range(iterations):
             result = drops_calc_service.calculate_drop(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',
-                quality_name='Common'
+                channel_name="test_channel",
+                platform="twitch",
+                quality_name="Common",
             )
-            reward_name = result['reward_name']
+            reward_name = result["reward_name"]
             results[reward_name] = results.get(reward_name, 0) + 1
-        
+
         # Check that higher weight rewards appear more often
         # Weights are 100, 50, 25 (total 175)
         # Expected probabilities: ~57%, ~29%, ~14%
         print(f"[OK] Weighted selection distribution over {iterations} iterations:")
-        for reward_name, count in sorted(results.items(), key=lambda x: x[1], reverse=True):
+        for reward_name, count in sorted(
+            results.items(), key=lambda x: x[1], reverse=True
+        ):
             percentage = (count / iterations) * 100
             print(f"   {reward_name}: {count} times ({percentage:.1f}%)")
-        
+
         # Basic sanity check: highest weight should appear most often
         most_common = max(results.items(), key=lambda x: x[1])[0]
-        assert 'Reward 1' in most_common  # Reward 1 has weight 100
-    
+        assert "Reward 1" in most_common  # Reward 1 has weight 100
+
     def test_drop_invalid_quality(self, drops_calc_service, test_config, test_rewards):
         """Test drop calculation with invalid quality"""
         with pytest.raises(ValueError, match="Quality .* not found"):
             drops_calc_service.calculate_drop(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',
-                quality_name='InvalidQuality'
+                channel_name="test_channel",
+                platform="twitch",
+                quality_name="InvalidQuality",
             )
         print("[OK] Invalid quality handling works")
-    
+
     def test_drop_no_rewards(self, drops_calc_service, test_config, db_session):
         """Test drop calculation when no rewards exist"""
         # Create a new quality without rewards
-        new_quality = DropsQuality(id=10, name='TestQuality', color='#000000', weight=100)
+        new_quality = DropsQuality(
+            id=10, name="TestQuality", color="#000000", weight=100
+        )
         db_session.add(new_quality)
         db_session.commit()
-        
+
         with pytest.raises(ValueError, match="No rewards available"):
             drops_calc_service.calculate_drop(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',
-                quality_name='TestQuality'
+                channel_name="test_channel",
+                platform="twitch",
+                quality_name="TestQuality",
             )
         print("[OK] No rewards handling works")
 
 
 class TestStreakTracking:
     """Test streak tracking functionality"""
-    
+
     def test_create_new_streak(self, drops_service, test_config):
         """Test creating a new streak"""
         streak = drops_service.get_user_streak(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123'
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
         )
-        
+
         assert streak is None  # No streak exists yet
-        
+
         # Increment message count (creates streak)
         streak = drops_service.increment_viewer_message_count(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123',
-            viewer_name='TestViewer'
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
         )
-        
+
         assert streak is not None
-        assert streak.viewer_id == 'viewer123'
+        assert streak.viewer_id == "viewer123"
         assert streak.messages_this_stream == 1
         assert streak.current_streak == 0  # No streak yet
         print("[OK] New streak creation works")
-    
+
     def test_increment_message_count(self, drops_service, test_config):
         """Test incrementing message count"""
         # Create initial streak
         streak = drops_service.increment_viewer_message_count(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123',
-            viewer_name='TestViewer'
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
         )
         initial_count = streak.messages_this_stream
-        
+
         # Increment again
         streak = drops_service.increment_viewer_message_count(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123',
-            viewer_name='TestViewer'
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
         )
-        
+
         assert streak.messages_this_stream == initial_count + 1
-        print(f"[OK] Message count increment works: {initial_count} -> {streak.messages_this_stream}")
-    
+        print(
+            f"[OK] Message count increment works: {initial_count} -> {streak.messages_this_stream}"
+        )
+
     def test_streak_quality_determination(self, drops_service, test_config):
         """Test streak quality determination based on days"""
         # Test different streak days
         test_cases = [
-            (1, 'Common'),
-            (3, 'Rare'),
-            (7, 'Epic'),
-            (14, 'Legendary'),
+            (1, "Common"),
+            (3, "Rare"),
+            (7, "Epic"),
+            (14, "Legendary"),
         ]
-        
+
         for days, expected_quality in test_cases:
             quality = drops_service._get_streak_quality(days, test_config)
             assert quality == expected_quality
             print(f"[OK] Streak day {days} -> {expected_quality}")
-    
+
     def test_streak_messages_requirement(self, drops_service, test_config):
         """Test that streak requires minimum messages"""
         # Create streak with insufficient messages
         for i in range(test_config.streak_messages_required - 1):
             drops_service.increment_viewer_message_count(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',
-                viewer_id='viewer123',
-                viewer_name='TestViewer'
+                channel_name="test_channel",
+                platform="twitch",
+                viewer_id="viewer123",
+                viewer_name="TestViewer",
             )
-        
+
         streak = drops_service.get_user_streak(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123'
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
         )
-        
+
         assert streak.messages_this_stream == test_config.streak_messages_required - 1
-        print(f"[OK] Streak messages requirement tracking works: {streak.messages_this_stream}/{test_config.streak_messages_required}")
+        print(
+            f"[OK] Streak messages requirement tracking works: {streak.messages_this_stream}/{test_config.streak_messages_required}"
+        )
 
 
 class TestDonationDrops:
     """Test donation-triggered drops"""
-    
+
     def test_donation_quality_determination(self, drops_service, test_config):
         """Test donation quality determination based on amount"""
         test_cases = [
-            (50.0, 'Common'),
-            (100.0, 'Rare'),
-            (500.0, 'Epic'),
-            (1000.0, 'Legendary'),
+            (50.0, "Common"),
+            (100.0, "Rare"),
+            (500.0, "Epic"),
+            (1000.0, "Legendary"),
         ]
-        
+
         for amount, expected_quality in test_cases:
             quality = drops_service._get_donation_quality(amount, test_config)
             assert quality == expected_quality
             print(f"[OK] Donation ${amount} -> {expected_quality}")
-    
+
     def test_donation_drops_disabled(self, drops_service, test_config, db_session):
         """Test that donation drops can be disabled"""
         # Disable donation drops
         test_config.donation_enabled = False
         db_session.commit()
-        
+
         result = drops_service.process_donation_drops(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123',
-            viewer_name='TestViewer',
-            donation_amount=100.0
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            donation_amount=100.0,
         )
-        
+
         assert result is None
         print("[OK] Donation drops can be disabled")
-    
+
     def test_donation_drops_enabled(self, drops_service, test_config, test_rewards):
         """Test that donation drops work when enabled"""
         result = drops_service.process_donation_drops(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123',
-            viewer_name='TestViewer',
-            donation_amount=100.0
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            donation_amount=100.0,
         )
-        
+
         assert result is not None
-        assert result['type'] == 'donation'
-        assert result['quality'] == 'Rare'  # 100.0 = Rare
-        assert result['donation_amount'] == 100.0
+        assert result["type"] == "donation"
+        assert result["quality"] == "Rare"  # 100.0 = Rare
+        assert result["donation_amount"] == 100.0
         print(f"[OK] Donation drops work: {result['reward']} ({result['quality']})")
 
 
 class TestRewardCalculation:
     """Test reward calculation correctness"""
-    
-    def test_probability_validation(self, drops_calc_service, test_config, test_rewards):
+
+    def test_probability_validation(
+        self, drops_calc_service, test_config, test_rewards
+    ):
         """Test that probabilities are valid"""
         is_valid, error = drops_calc_service.validate_probabilities(
-            user_id=1,
-            channel_name='test_channel',
-            quality_name='Common'
+            user_id=1, channel_name="test_channel", quality_name="Common"
         )
-        
+
         assert is_valid
         assert error is None
         print("[OK] Probability validation works")
-    
+
     def test_get_probabilities(self, drops_calc_service, test_config, test_rewards):
         """Test getting probability distribution"""
         probabilities = drops_calc_service.get_probabilities(
-            user_id=1,
-            channel_name='test_channel',
-            quality_name='Common'
+            user_id=1, channel_name="test_channel", quality_name="Common"
         )
-        
+
         assert len(probabilities) > 0
         total_prob = sum(probabilities.values())
         assert 0.99 <= total_prob <= 1.01  # Allow small floating point error
-        print(f"[OK] Probability distribution works: {len(probabilities)} rewards, total={total_prob:.4f}")
-    
+        print(
+            f"[OK] Probability distribution works: {len(probabilities)} rewards, total={total_prob:.4f}"
+        )
+
     def test_zero_weight_handling(self, drops_calc_service, test_config, db_session):
         """Test handling of zero-weight rewards"""
         # Create a new quality for this test
-        new_quality = DropsQuality(id=10, name='TestQuality', color='#000000', weight=100)
+        new_quality = DropsQuality(
+            id=10, name="TestQuality", color="#000000", weight=100
+        )
         db_session.add(new_quality)
         db_session.commit()
-        
+
         # Add rewards with zero weights
         for i in range(3):
             reward = DropsReward(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',
-                name=f'Zero Weight Reward {i+1}',
+                channel_name="test_channel",
+                platform="twitch",
+                name=f"Zero Weight Reward {i + 1}",
                 quality_id=new_quality.id,
                 weight=0,
-                reward_type='points',
-                reward_value='100',
+                reward_type="points",
+                reward_value="100",
                 is_active=True,
             )
             db_session.add(reward)
         db_session.commit()
-        
+
         is_valid, error = drops_calc_service.validate_probabilities(
-            user_id=1,
-            channel_name='test_channel',
-            quality_name='TestQuality'
+            user_id=1, channel_name="test_channel", quality_name="TestQuality"
         )
-        
+
         assert not is_valid
-        assert 'invalid weights' in error.lower() or 'total weight is 0' in error.lower()
+        assert (
+            "invalid weights" in error.lower() or "total weight is 0" in error.lower()
+        )
         print("[OK] Zero weight handling works")
 
 
 class TestDropsHistory:
     """Test drops history recording"""
-    
+
     def test_record_drops_history(self, drops_service, test_config, test_rewards):
         """Test that drops are recorded in history"""
         # Process a donation drop
         result = drops_service.process_donation_drops(
             user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            viewer_id='viewer123',
-            viewer_name='TestViewer',
-            donation_amount=100.0
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            donation_amount=100.0,
         )
-        
+
         assert result is not None
-        
+
         # Check history
         history = drops_service.get_drops_history(
-            user_id=1,
-            channel_name='test_channel',
-            platform='twitch',
-            limit=10
+            user_id=1, channel_name="test_channel", platform="twitch", limit=10
         )
-        
+
         assert len(history) > 0
-        assert history[0].viewer_id == 'viewer123'
-        assert history[0].lootbox_type == 'donation'
+        assert history[0].viewer_id == "viewer123"
+        assert history[0].lootbox_type == "donation"
         print(f"[OK] Drops history recording works: {len(history)} entries")
-    
+
     def test_drops_stats(self, drops_service, test_config, test_rewards):
         """Test drops statistics"""
         # Create some drops
         for i in range(5):
             drops_service.process_donation_drops(
                 user_id=1,
-                channel_name='test_channel',
-                platform='twitch',
-                viewer_id=f'viewer{i}',
-                viewer_name=f'TestViewer{i}',
-                donation_amount=100.0
+                channel_name="test_channel",
+                platform="twitch",
+                viewer_id=f"viewer{i}",
+                viewer_name=f"TestViewer{i}",
+                donation_amount=100.0,
             )
-        
+
         stats = drops_service.get_drops_stats(
-            user_id=1,
-            channel_name='test_channel',
-            platform='twitch'
+            user_id=1, channel_name="test_channel", platform="twitch"
         )
-        
-        assert stats['totalDrops'] >= 5
+
+        assert stats["totalDrops"] >= 5
+        assert stats["total_drops"] == stats["totalDrops"]
+        assert stats["today_drops"] == stats["todayDrops"]
+        assert stats["legendary_drops"] == stats["legendaryDrops"]
+        assert stats["mythical_drops"] == stats["mythicalDrops"]
         print(f"[OK] Drops stats work: {stats}")
+
+
+class TestMythicalSessionRepository:
+    """Regression tests for mythical session repository helpers."""
+
+    def test_get_active_mythical_session_returns_record(self, db_session):
+        now = utcnow_naive()
+        session = MythicalDropsSession(
+            user_id=1,
+            session_id=None,
+            channel_name="test_channel",
+            platform="twitch",
+            donation_amount=2000.0,
+            window_duration_minutes=5,
+            is_active=True,
+            started_at=now,
+            expires_at=now + timedelta(minutes=5),
+        )
+        db_session.add(session)
+        db_session.commit()
+
+        repo = DropsHistoryRepository(db_session)
+        found = repo.get_active_mythical_session(
+            channel_name="test_channel",
+            now_time=now,
+            user_id=1,
+            session_id=None,
+        )
+
+        assert found is not None
+        assert found.id == session.id
+
+    def test_get_active_mythical_session_ignores_expired(self, db_session):
+        now = utcnow_naive()
+        expired = MythicalDropsSession(
+            user_id=1,
+            session_id=None,
+            channel_name="test_channel",
+            platform="twitch",
+            donation_amount=2000.0,
+            window_duration_minutes=5,
+            is_active=True,
+            started_at=now - timedelta(minutes=10),
+            expires_at=now - timedelta(minutes=1),
+        )
+        db_session.add(expired)
+        db_session.commit()
+
+        repo = DropsHistoryRepository(db_session)
+        found = repo.get_active_mythical_session(
+            channel_name="test_channel",
+            now_time=now,
+            user_id=1,
+            session_id=None,
+        )
+
+        assert found is None
 
 
 class TestCrossPlatformRewards:
     """Test that rewards are cross-platform"""
-    
-    def test_rewards_available_on_all_platforms(self, drops_service, test_config, test_rewards):
+
+    def test_rewards_available_on_all_platforms(
+        self, drops_service, test_config, test_rewards
+    ):
         """Test that rewards created for one platform are available on all platforms"""
         # Get rewards for Twitch
         twitch_rewards = drops_service.get_rewards(
-            user_id=1,
-            channel_name='test_channel',
-            platform='twitch'
+            user_id=1, channel_name="test_channel", platform="twitch"
         )
-        
+
         # Get rewards for VK
         vk_rewards = drops_service.get_rewards(
-            user_id=1,
-            channel_name='test_channel',
-            platform='vk'
+            user_id=1, channel_name="test_channel", platform="vk"
         )
-        
+
         # Should be the same rewards (cross-platform)
         assert len(twitch_rewards) == len(vk_rewards)
-        print(f"[OK] Cross-platform rewards work: {len(twitch_rewards)} rewards available on all platforms")
+        print(
+            f"[OK] Cross-platform rewards work: {len(twitch_rewards)} rewards available on all platforms"
+        )
 
 
 def run_all_tests():
     """Run all tests"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("DROPS SYSTEM FUNCTIONALITY TESTS")
-    print("="*80 + "\n")
-    
+    print("=" * 80 + "\n")
+
     # Run pytest
-    pytest.main([__file__, '-v', '--tb=short'])
+    pytest.main([__file__, "-v", "--tb=short"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_all_tests()

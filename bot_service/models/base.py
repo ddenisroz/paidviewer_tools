@@ -28,7 +28,7 @@ if not IS_POSTGRESQL and not IS_TESTING:
     raise ValueError(f"Only PostgreSQL is supported. Current DATABASE_URL: {DATABASE_URL[:50]}...")
 
 
-def _create_sqlite_engine(db_url: str):
+def _create_test_engine(db_url: str):
     if IS_TESTING:
         from sqlalchemy.pool import StaticPool
 
@@ -64,7 +64,7 @@ def _create_postgres_engine(db_url: str):
 
 
 if IS_TESTING:
-    engine = _create_sqlite_engine(DATABASE_URL)
+    engine = _create_test_engine(DATABASE_URL)
 else:
     engine = _create_postgres_engine(DATABASE_URL)
 

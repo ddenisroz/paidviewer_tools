@@ -15,203 +15,95 @@ from auth.auth import get_current_user_optional
 from auth.oauth_handler import oauth_handler, OAuthUserData
 from constants import Platform
 from core.security_modern import limiter
-
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
-
-# Twitch OAuth настройки из централизованной конфигурации
 TWITCH_CLIENT_ID = settings.twitch_client_id
 TWITCH_CLIENT_SECRET = settings.twitch_client_secret
 BACKEND_URL = settings.backend_url
 FRONTEND_URL = settings.frontend_url
 
-
-@router.get("/auth/twitch/login")
-@limiter.limit("10/minute")
+@router.get('/auth/twitch/login')
+@limiter.limit('10/minute')
 async def login_twitch(request: Request):
-    """РРЅРёС†РёРёСЂРѕРІР°С‚СЊ Twitch OAuth СЃ РїРѕР»РЅРѕР№ Р°РІС‚РѕСЂРёР·Р°С†РёРµР№"""
+    """Text cleaned."""
     try:
         if not TWITCH_CLIENT_ID:
-            logger.error("TWITCH_CLIENT_ID not configured")
-            raise HTTPException(status_code=500, detail="Twitch integration is not configured")
-
+            logger.error('TWITCH_CLIENT_ID not configured')
+            raise HTTPException(status_code=500, detail='Twitch integration is not configured')
         from constants import OAUTH_SCOPES
-
-        scopes = OAUTH_SCOPES["twitch"]
-        logger.info(f"Twitch OAuth requested with scopes: {scopes}")
-
-        redirect_uri = f"{BACKEND_URL}/auth/twitch/callback"
-
-        # Генерируем state для защиты от CSRF
+        scopes = OAUTH_SCOPES['twitch']
+        logger.info(f'Twitch OAuth requested with scopes: {scopes}')
+        redirect_uri = f'{BACKEND_URL}/auth/twitch/callback'
         import secrets
         state = secrets.token_urlsafe(16)
-
-        auth_url = (
-            f"https://id.twitch.tv/oauth2/authorize"
-            f"?client_id={TWITCH_CLIENT_ID}"
-            f"&redirect_uri={redirect_uri}"
-            f"&response_type=code"
-            f"&scope={scopes}"
-            f"&state={state}"
-        )
-
-        logger.info("Twitch OAuth login URL generated")
+        auth_url = f'https://id.twitch.tv/oauth2/authorize?client_id={TWITCH_CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope={scopes}&state={state}'
+        logger.info('Twitch OAuth login URL generated')
         from fastapi.responses import RedirectResponse
         response = RedirectResponse(url=auth_url)
-        # Сохраняем state в cookie для CSRF проверки в callback
-        response.set_cookie(
-            key="oauth_state",
-            value=state,
-            max_age=600,  # 10 минут
-            httponly=True,
-            samesite="lax",
-            secure=settings.is_production
-        )
+        response.set_cookie(key='oauth_state', value=state, max_age=600, httponly=True, samesite='lax', secure=settings.is_production)
         return response
-
     except Exception as e:
-        logger.error(f"Error generating Twitch login URL: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.error(f'Error generating Twitch login URL: {e}')
+        raise HTTPException(status_code=500, detail='Internal server error')
 
-
-@router.get("/auth/twitch/callback")
-@limiter.limit("20/minute")
-async def twitch_callback(
-    request: Request,
-    db: Session = Depends(get_db),
-    code: str = None,
-    state: str = None,
-    error: str = None,
-    error_description: str = None,
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)
-):
+@router.get('/auth/twitch/callback')
+@limiter.limit('20/minute')
+async def twitch_callback(request: Request, db: Session=Depends(get_db), code: str=None, state: str=None, error: str=None, error_description: str=None, current_user: Optional[Dict[str, Any]]=Depends(get_current_user_optional)):
     """Обработка Twitch OAuth callback"""
-
-    logger.info(f"Twitch callback received. Query params: {dict(request.query_params)}")
-
-    # Обработка отмены авторизации
+    logger.info(f'Twitch callback received. Query params: {dict(request.query_params)}')
     if error:
-        logger.warning(f"Twitch OAuth cancelled: {error} - {error_description}")
-        return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?auth_error=cancelled")
-
-    # Проверяем наличие кода авторизации
+        logger.warning(f'Twitch OAuth cancelled: {error} - {error_description}')
+        return RedirectResponse(url=f'{FRONTEND_URL}/dashboard?auth_error=cancelled')
     if not code:
-        logger.error("No authorization code received from Twitch")
-        raise HTTPException(status_code=400, detail="No authorization code received from Twitch")
-
-    # CSRF: валидация state
-    expected_state = request.cookies.get("oauth_state")
+        logger.error('No authorization code received from Twitch')
+        raise HTTPException(status_code=400, detail='No authorization code received from Twitch')
+    expected_state = request.cookies.get('oauth_state')
     if not state or state != expected_state:
-        logger.warning(f"Twitch OAuth CSRF state mismatch: got {state}, expected {expected_state}")
-        raise HTTPException(status_code=400, detail="Invalid OAuth state (CSRF protection)")
-
+        logger.warning(f'Twitch OAuth CSRF state mismatch: got {state}, expected {expected_state}')
+        raise HTTPException(status_code=400, detail='Invalid OAuth state (CSRF protection)')
     if not all([TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET]):
-        logger.error("Twitch credentials not configured")
-        raise HTTPException(status_code=500, detail="Twitch integration is not configured")
-
-    logger.info(f"Authorization code received: {code[:10]}...")
-
+        logger.error('Twitch credentials not configured')
+        raise HTTPException(status_code=500, detail='Twitch integration is not configured')
+    logger.info(f'Authorization code received: {code[:10]}...')
     try:
-        # 1. Обмен кода на токен
-        redirect_uri = f"{BACKEND_URL}/auth/twitch/callback"
-
+        redirect_uri = f'{BACKEND_URL}/auth/twitch/callback'
         async with httpx.AsyncClient(timeout=30.0) as client:
-            token_response = await client.post(
-                "https://id.twitch.tv/oauth2/token",
-                params={
-                    "client_id": TWITCH_CLIENT_ID,
-                    "client_secret": TWITCH_CLIENT_SECRET,
-                    "code": code,
-                    "grant_type": "authorization_code",
-                    "redirect_uri": redirect_uri
-                }
-            )
-
-            logger.info(f"Twitch token response status: {token_response.status_code}")
-
+            token_response = await client.post('https://id.twitch.tv/oauth2/token', params={'client_id': TWITCH_CLIENT_ID, 'client_secret': TWITCH_CLIENT_SECRET, 'code': code, 'grant_type': 'authorization_code', 'redirect_uri': redirect_uri})
+            logger.info(f'Twitch token response status: {token_response.status_code}')
             if token_response.status_code != 200:
                 error_body = token_response.text
-                logger.error(f"Twitch token exchange failed. Status: {token_response.status_code}, Body: {error_body}")
-                raise HTTPException(
-                    status_code=token_response.status_code,
-                    detail=f"Twitch API error: {error_body}"
-                )
-
+                logger.error(f'Twitch token exchange failed. Status: {token_response.status_code}, Body: {error_body}')
+                raise HTTPException(status_code=token_response.status_code, detail=f'Twitch API error: {error_body}')
             token_data = token_response.json()
-            access_token = token_data.get("access_token")
-            refresh_token = token_data.get("refresh_token")
-            expires_in = token_data.get("expires_in", 3600)
-
-            # Логируем реальное время жизни токена
-            logger.info(f"[TWITCH AUTH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
-
+            access_token = token_data.get('access_token')
+            refresh_token = token_data.get('refresh_token')
+            expires_in = token_data.get('expires_in', 3600)
+            logger.info(f'[TWITCH AUTH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)')
             expires_at = utcnow_naive() + timedelta(seconds=expires_in)
-            scopes = token_data.get("scope", [])
-
-            logger.info(f"Token exchange successful. Scopes: {scopes}")
-
-            # 2. Получаем информацию о пользователе
-            headers = {
-                "Authorization": f"Bearer {access_token}",
-                "Client-ID": TWITCH_CLIENT_ID
-            }
-
+            scopes = token_data.get('scope', [])
+            logger.info(f'Token exchange successful. Scopes: {scopes}')
+            headers = {'Authorization': f'Bearer {access_token}', 'Client-ID': TWITCH_CLIENT_ID}
             async with httpx.AsyncClient(timeout=30.0) as client:
-                user_response = await client.get(
-                    "https://api.twitch.tv/helix/users",
-                    headers=headers
-                )
-
-                logger.info(f"Twitch user response status: {user_response.status_code}")
-
+                user_response = await client.get('https://api.twitch.tv/helix/users', headers=headers)
+                logger.info(f'Twitch user response status: {user_response.status_code}')
                 if user_response.status_code != 200:
                     error_body = user_response.text
-                    logger.error(f"Failed to get Twitch user info. Status: {user_response.status_code}, Body: {error_body}")
-                    raise HTTPException(
-                        status_code=user_response.status_code,
-                        detail="Failed to get user info from Twitch"
-                    )
-
+                    logger.error(f'Failed to get Twitch user info. Status: {user_response.status_code}, Body: {error_body}')
+                    raise HTTPException(status_code=user_response.status_code, detail='Failed to get user info from Twitch')
                 user_data_response = user_response.json()
-                user_info = user_data_response.get("data", [{}])[0]
-
-                platform_user_id = user_info.get("id")
-                username = user_info.get("login")
-                avatar_url = user_info.get("profile_image_url")
-
+                user_info = user_data_response.get('data', [{}])[0]
+                platform_user_id = user_info.get('id')
+                username = user_info.get('login')
+                avatar_url = user_info.get('profile_image_url')
                 if not platform_user_id:
-                    logger.error("No user ID in Twitch response")
-                    raise HTTPException(status_code=400, detail="No user ID in Twitch response")
-
-                logger.info(f"Twitch user: {username} ({platform_user_id})")
-
-                # 3. РСЃРїРѕР»СЊР·СѓРµРј РѕР±С‰РёР№ OAuth handler
-                oauth_user_data = OAuthUserData(
-                    platform_user_id=platform_user_id,
-                    avatar_url=avatar_url,
-                    access_token=access_token,
-                    refresh_token=refresh_token,
-                    expires_at=expires_at,
-                    scopes=scopes,
-                    username=username
-                )
-
-                # РСЃРїРѕР»СЊР·СѓРµРј РѕР±С‰РёР№ OAuth handler СЃ Р°РІС‚РѕРїРѕРґРєР»СЋС‡РµРЅРёРµРј Р±РѕС‚Р°
-                oauth_result = await oauth_handler.handle_oauth_callback(
-                    request=request,
-                    db=db,
-                    platform=Platform.TWITCH,
-                    user_data=oauth_user_data,
-                    current_user=current_user,
-                    auto_connect_bot=True
-                )
-
-                # Создаем ответ с редиректом
+                    logger.error('No user ID in Twitch response')
+                    raise HTTPException(status_code=400, detail='No user ID in Twitch response')
+                logger.info(f'Twitch user: {username} ({platform_user_id})')
+                oauth_user_data = OAuthUserData(platform_user_id=platform_user_id, avatar_url=avatar_url, access_token=access_token, refresh_token=refresh_token, expires_at=expires_at, scopes=scopes, username=username)
+                oauth_result = await oauth_handler.handle_oauth_callback(request=request, db=db, platform=Platform.TWITCH, user_data=oauth_user_data, current_user=current_user, auto_connect_bot=True)
                 return oauth_handler.create_oauth_response(oauth_result)
-
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Twitch auth error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error during Twitch authentication")
+        logger.error(f'Twitch auth error: {e}', exc_info=True)
+        raise HTTPException(status_code=500, detail='Internal server error during Twitch authentication')

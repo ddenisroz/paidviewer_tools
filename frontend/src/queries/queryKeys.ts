@@ -39,7 +39,7 @@ export const queryKeys = {
     },
     filteredWords: () => ['tts', 'filtered-words'] as const,
     blockedUsers: () => ['tts', 'blocked-users'] as const,
-    localTtsConfig: () => ['tts', 'local-tts-config'] as const,
+    localTtsConfig: (provider: 'f5' | 'qwen' = 'f5') => ['tts', 'local-tts-config', provider] as const,
     whitelistStatus: () => ['tts', 'voices-whitelist-status'] as const,
   },
 

@@ -1,5 +1,30 @@
 import pytest
 import json
+import sys
+import importlib.util
+from pathlib import Path
+
+F5_TTS_ROOT = Path(__file__).resolve().parents[2] / "F5_tts"
+if str(F5_TTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(F5_TTS_ROOT))
+
+_f5_auth_spec = importlib.util.spec_from_file_location("f5_tts_auth", F5_TTS_ROOT / "auth.py")
+if _f5_auth_spec is None or _f5_auth_spec.loader is None:
+    raise RuntimeError("Unable to load F5_tts auth module for security regression tests")
+_f5_auth = importlib.util.module_from_spec(_f5_auth_spec)
+_f5_auth_spec.loader.exec_module(_f5_auth)
+
+_prev_auth = sys.modules.get("auth")
+try:
+    sys.modules["auth"] = _f5_auth
+    from routers import media as tts_media_router
+    import tts_control_api
+finally:
+    if _prev_auth is not None:
+        sys.modules["auth"] = _prev_auth
+    else:
+        sys.modules.pop("auth", None)
+
 from fastapi import HTTPException
 from starlette.requests import Request
 
@@ -34,8 +59,6 @@ from api.youtube import routes as youtube_routes
 from services.psychology_service import PsychologyService
 from services import psychology_service as psychology_service_module
 from services.database_maintenance.database_backup_service import DatabaseBackupService
-from tts_service.routers import media as tts_media_router
-from tts_service import tts_control_api
 
 
 def _dummy_asgi_app(scope, receive, send):
@@ -696,6 +719,9 @@ async def test_stream_info_twitch_raises_500_on_internal_error():
 @pytest.mark.asyncio
 async def test_stream_update_platform_raises_409_on_failed_update():
     class DummyService:
+        def __init__(self):
+            self.last_error_by_platform = {"twitch": "update failed"}
+
         async def update_stream(self, *_args, **_kwargs):
             return False
 
@@ -724,6 +750,9 @@ async def test_stream_update_raises_409_with_failure_details():
             self.vk = None
 
     class DummyService:
+        def __init__(self):
+            self.last_error_by_platform = {"twitch": "update failed"}
+
         async def update_stream(self, *_args, **_kwargs):
             return False
 
@@ -825,7 +854,7 @@ async def test_local_tts_toggle_returns_503_when_health_fails(monkeypatch):
         def is_user_whitelisted(self, _db_user, _login_platform):
             return True
 
-        def get_by_user_id(self, _user_id):
+        def get_by_user_id(self, _user_id, provider=None):
             return DummyConfig()
 
         def toggle_use_local(self, config):
@@ -862,7 +891,7 @@ async def test_local_tts_test_connection_returns_504_on_timeout(monkeypatch):
             raise tts_local_routes.httpx.TimeoutException("timeout")
 
     monkeypatch.setattr(tts_local_routes.httpx, "AsyncClient", lambda *args, **kwargs: DummyClient())
-    req = type("Req", (), {"endpoint_url": "http://localhost:8001", "api_key": None})()
+    req = type("Req", (), {"endpoint_url": "http://localhost:8001", "api_key": None, "provider": "f5"})()
 
     with pytest.raises(HTTPException) as exc_info:
         await tts_local_routes.test_local_tts_connection(request=req, user={"id": 1}, db=None)
@@ -882,7 +911,7 @@ async def test_local_tts_test_connection_returns_502_on_connect_error(monkeypatc
             raise tts_local_routes.httpx.ConnectError("connect failed")
 
     monkeypatch.setattr(tts_local_routes.httpx, "AsyncClient", lambda *args, **kwargs: DummyClient())
-    req = type("Req", (), {"endpoint_url": "http://localhost:8001", "api_key": None})()
+    req = type("Req", (), {"endpoint_url": "http://localhost:8001", "api_key": None, "provider": "f5"})()
 
     with pytest.raises(HTTPException) as exc_info:
         await tts_local_routes.test_local_tts_connection(request=req, user={"id": 1}, db=None)

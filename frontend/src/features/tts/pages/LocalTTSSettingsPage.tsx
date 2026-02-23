@@ -1,7 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 
 /* eslint-disable no-alert */
-import { useQueryClient } from '@tanstack/react-query';
 import {
     AlertCircle,
     AlertTriangle,
@@ -51,13 +50,39 @@ import { Textarea } from '@/shared/components/ui/textarea';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
-import type { ApiResponse } from '@/types/api';
 import type { AxiosError } from 'axios';
+
+type LocalTtsProvider = 'f5' | 'qwen';
+
+interface ProviderMeta {
+    label: string;
+    defaultEndpoint: string;
+    folder: string;
+    runCommand: string;
+    apiKeyHint: string;
+    docsUrl?: string;
+}
+
+const PROVIDER_META: Record<LocalTtsProvider, ProviderMeta> = {
+    f5: {
+        label: 'F5 TTS',
+        defaultEndpoint: 'http://localhost:8001',
+        folder: 'F5_tts',
+        runCommand: 'python main.py',
+        apiKeyHint: 'Если включена авторизация, укажите API ключ из .env или config сервиса.'
+    },
+    qwen: {
+        label: 'Qwen 3 TTS',
+        defaultEndpoint: 'http://localhost:8002',
+        folder: 'nano-qwen3tts-vllm',
+        runCommand: 'python <entrypoint>.py',
+        apiKeyHint: 'API ключ обязателен только если в Qwen включена авторизация.',
+        docsUrl: 'https://github.com/calldatfate/nano-qwen3tts-vllm'
+    }
+};
 
 interface LocalTtsConfigState {
     endpoint_url: string;
-    host?: string;
-    port?: number;
     api_key: string;
     use_local: boolean;
 }
@@ -78,7 +103,7 @@ interface HealthData {
 }
 
 interface StatusData {
-    stats: {
+    stats?: {
         total_requests: number;
         successful_requests: number;
         failed_requests: number;
@@ -91,7 +116,7 @@ interface Voice {
     name: string;
     language: string;
     description?: string;
-    type: 'base' | 'custom';
+    type?: 'base' | 'custom';
     samples_count?: number;
 }
 
@@ -111,9 +136,11 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     const isTwitchConnected = integrations.twitch?.enabled;
     const isVkConnected = integrations.vk?.enabled;
+    const [provider, setProvider] = useState<LocalTtsProvider>('f5');
+    const providerMeta = PROVIDER_META[provider];
 
     const [config, setConfig] = useState<LocalTtsConfigState>({
-        endpoint_url: 'http://localhost:8001',
+        endpoint_url: providerMeta.defaultEndpoint,
         api_key: '',
         use_local: false
     });
@@ -123,39 +150,47 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [testResult, setTestResult] = useState<TestResult | null>(null);
     const [healthData, setHealthData] = useState<HealthData | null>(null);
     const [statusData, setStatusData] = useState<StatusData | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
+
+    const activeVoicesEndpoint = testResult?.success ? config.endpoint_url : undefined;
 
     // TanStack Query for voices (replaces manual axios calls)
-    const { data: voicesData, isLoading: loadingVoices, refetch: refetchVoices } = useLocalVoicesQuery(config.endpoint_url);
+    const { data: voicesData, isLoading: loadingVoices, refetch: refetchVoices } = useLocalVoicesQuery(provider, activeVoicesEndpoint);
     const voices = (voicesData || []) as Voice[];
 
-    const createVoiceMutation = useCreateVoiceMutation(config.endpoint_url);
-    const uploadSampleMutation = useUploadSampleMutation(config.endpoint_url);
-    const deleteVoiceMutation = useDeleteVoiceMutation(config.endpoint_url);
+    const createVoiceMutation = useCreateVoiceMutation(provider, activeVoicesEndpoint);
+    const uploadSampleMutation = useUploadSampleMutation(provider, activeVoicesEndpoint);
+    const deleteVoiceMutation = useDeleteVoiceMutation(provider, activeVoicesEndpoint);
 
     const [isCreateVoiceDialogOpen, setIsCreateVoiceDialogOpen] = useState<boolean>(false);
     const [newVoice, setNewVoice] = useState<NewVoice>({ name: '', language: 'ru', description: '' });
-    const [_selectedVoice, _setSelectedVoice] = useState<Voice | null>(null);
     const uploadingFile = uploadSampleMutation.isPending;
     const [currentTab, setCurrentTab] = useState<'connection' | 'voices'>('connection');
-    const [_isWhitelisted, _setIsWhitelisted] = useState<boolean>(true);
-    const [_whitelistChecked, _setWhitelistChecked] = useState<boolean>(true);
+    const { data: configData, isLoading: configLoading, error: configError } = useLocalTtsConfig(provider);
 
-    const _queryClient = useQueryClient();
-
-    const { data: configData, isLoading: configLoading, error: configError } = useLocalTtsConfig({
-    });
+    useEffect(() => {
+        setTestResult(null);
+        setHealthData(null);
+        setStatusData(null);
+        setCurrentTab('connection');
+    }, [provider]);
 
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
-        if (configData) {
+        if (configLoading) return;
+        if (!configData) {
             setConfig({
-                endpoint_url: configData.host || 'http://localhost:8001',
-                api_key: configData.api_key || '',
-                use_local: configData.enabled || false
+                endpoint_url: providerMeta.defaultEndpoint,
+                api_key: '',
+                use_local: false
             });
+            return;
         }
-    }, [configData]);
+        setConfig({
+            endpoint_url: configData.endpoint_url || configData.host || providerMeta.defaultEndpoint,
+            api_key: configData.api_key || '',
+            use_local: configData.use_local ?? configData.enabled ?? false
+        });
+    }, [configData, configLoading, providerMeta.defaultEndpoint]);
 
     useEffect(() => {
         if (configError) {
@@ -163,23 +198,36 @@ const LocalTTSSettingsPage: React.FC = () => {
         }
     }, [configError]);
 
-    useEffect(() => {
-        setLoading(configLoading);
-    }, [configLoading]);
-
     const testConnectionMutation = useTestLocalTtsConnection({
         onSuccess: (response) => {
-            const data = (response as ApiResponse<{ success?: boolean; health_data?: HealthData; status_data?: StatusData; error?: string }>).data || {};
-            if (data.success) {
-                setTestResult({ success: true, message: 'Соединение успешно!' });
-                setHealthData(data.health_data || null);
-                setStatusData(data.status_data || null);
-            } else {
-                setTestResult({
-                    success: false,
-                    message: data.error || 'Не удалось подключиться'
-                });
+            const payload = response as {
+                success?: boolean;
+                message?: string;
+                error?: string;
+                health_data?: HealthData;
+                status_data?: StatusData;
+                data?: {
+                    success?: boolean;
+                    message?: string;
+                    error?: string;
+                    health_data?: HealthData;
+                    status_data?: StatusData;
+                };
+            };
+            const nested = payload.data || {};
+            const success = payload.success ?? nested.success ?? false;
+            if (success) {
+                setTestResult({ success: true, message: payload.message || nested.message || 'Соединение успешно!' });
+                setHealthData(payload.health_data || nested.health_data || null);
+                setStatusData(payload.status_data || nested.status_data || null);
+                return;
             }
+            setTestResult({
+                success: false,
+                message: payload.error || nested.error || payload.message || nested.message || 'Не удалось подключиться'
+            });
+            setHealthData(null);
+            setStatusData(null);
         },
         onError: (error) => {
             const axiosError = error as AxiosError<{ detail?: string }>;
@@ -199,11 +247,17 @@ const LocalTTSSettingsPage: React.FC = () => {
         },
     });
 
-    const testConnection = async (): Promise<void> => {
+    const testConnection = (): void => {
+        const endpoint = config.endpoint_url.trim();
+        if (!endpoint) {
+            toast.error('Укажите URL сервера');
+            return;
+        }
         testConnectionMutation.mutate({
-            host: config.host,
-            port: config.port,
-            api_key: config.api_key
+            provider,
+            endpoint_url: endpoint,
+            api_key: config.api_key.trim() || undefined,
+            use_local: config.use_local
         });
     };
 
@@ -222,36 +276,52 @@ const LocalTTSSettingsPage: React.FC = () => {
         },
     });
 
-    const saveConfig = async (): Promise<void> => {
+    const saveConfig = (): void => {
+        const endpoint = config.endpoint_url.trim();
+        if (!endpoint) {
+            toast.error('Укажите URL сервера');
+            return;
+        }
         saveConfigMutation.mutate({
-            endpoint_url: config.endpoint_url,
-            api_key: config.api_key,
+            provider,
+            endpoint_url: endpoint,
+            api_key: config.api_key.trim() || undefined,
             use_local: config.use_local
         });
     };
 
     const toggleServiceMutation = useToggleLocalTts({
         onSuccess: (response) => {
-            const data = (response as ApiResponse<{ success?: boolean; use_local?: boolean; message?: string }>).data || {};
-            if (data.success) {
-                setConfig(prev => ({ ...prev, use_local: data.use_local || false }));
-            } else {
-                toast.error(data.message || 'Ошибка переключения');
+            const payload = response as {
+                success?: boolean;
+                message?: string;
+                use_local?: boolean;
+                data?: { success?: boolean; message?: string; use_local?: boolean };
+            };
+            const nested = payload.data || {};
+            const success = payload.success ?? nested.success ?? false;
+            const useLocal = payload.use_local ?? nested.use_local ?? false;
+            const message = payload.message || nested.message;
+            if (success) {
+                setConfig(prev => ({ ...prev, use_local: useLocal }));
+                toast.success(message || (useLocal ? 'Локальный режим включен' : 'Локальный режим отключен'));
+                return;
             }
+            toast.error(message || 'Ошибка переключения локального режима');
         },
         onError: (error) => {
             logger.error('Error toggling service:', error);
-            toast.error('[ERROR] Ошибка переключения сервиса');
+            toast.error('Ошибка переключения локального режима');
         },
     });
 
-    const toggleService = async (): Promise<void> => {
-        toggleServiceMutation.mutate();
+    const toggleService = (): void => {
+        toggleServiceMutation.mutate(provider);
     };
 
     const copyToClipboard = (text: string): void => {
         navigator.clipboard.writeText(text);
-        toast.success('[LIST] Скопировано в буфер обмена');
+        toast.success('Скопировано в буфер обмена');
     };
 
     // Using TanStack Query mutation instead of direct axios
@@ -276,7 +346,6 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [currentSampleVoiceId, setCurrentSampleVoiceId] = useState<number | null>(null);
     const [sampleText, setSampleText] = useState<string>('');
     const [sampleFile, setSampleFile] = useState<File | null>(null);
-    const [_isTranscribing, _setIsTranscribing] = useState<boolean>(false);
 
     const openSampleDialog = (voiceId: number): void => {
         setCurrentSampleVoiceId(voiceId);
@@ -317,7 +386,7 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     if (!isAuthenticated) {
         return (
-            <PageWrapper title="Настройка TTS">
+            <PageWrapper title="Настройка локального TTS">
                 <Card className="border-gray-700">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
@@ -333,7 +402,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </div>
                         <Button
                             onClick={() => navigate('/login')}
-                            className="gap-2"
+                            className="gap-2 border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
                         >
                             <Settings className="w-4 h-4" />
                             Войти в систему
@@ -346,7 +415,7 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     if (!isTwitchConnected && !isVkConnected) {
         return (
-            <PageWrapper title="Настройка TTS">
+            <PageWrapper title="Настройка локального TTS">
                 <Card className="border-gray-700">
                     <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center">
@@ -362,7 +431,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </div>
                         <Button
                             onClick={() => navigate('/dashboard/settings')}
-                            className="gap-2"
+                            className="gap-2 border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
                         >
                             <Settings className="w-4 h-4" />
                             Перейти в настройки
@@ -373,7 +442,7 @@ const LocalTTSSettingsPage: React.FC = () => {
         );
     }
 
-    if (loading) {
+    if (configLoading) {
         return (
             <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -383,6 +452,46 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     return (
         <div className="container mx-auto max-w-5xl space-y-6">
+            <Card className="card-glass border-blue-500/20">
+                <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center justify-between gap-3 text-base">
+                        <span>Провайдер локального TTS</span>
+                        <Badge variant="secondary" className="bg-blue-500/15 text-blue-200 border border-blue-500/30">
+                            {providerMeta.label}
+                        </Badge>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setProvider('f5')}
+                            className={`h-9 border ${provider === 'f5'
+                                ? 'border-blue-500 bg-blue-500/20 text-blue-200'
+                                : 'border-blue-900/60 bg-transparent text-blue-300 hover:bg-blue-500/10'
+                                }`}
+                        >
+                            F5 TTS
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setProvider('qwen')}
+                            className={`h-9 border ${provider === 'qwen'
+                                ? 'border-blue-500 bg-blue-500/20 text-blue-200'
+                                : 'border-blue-900/60 bg-transparent text-blue-300 hover:bg-blue-500/10'
+                                }`}
+                        >
+                            Qwen 3 TTS
+                        </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        Конфигурация, локальный режим и список голосов разделены по провайдеру.
+                    </p>
+                </CardContent>
+            </Card>
+
             <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="w-full">
                 <TabsList className="h-auto w-full justify-start rounded-none bg-transparent p-0 border-b border-border">
                     <TabsTrigger value="connection" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`}>
@@ -397,7 +506,7 @@ const LocalTTSSettingsPage: React.FC = () => {
 
                 {!testResult?.success && (
                     <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                        Управление голосами станет доступно после успешного теста подключения.
+                        Управление голосами станет доступно после успешного теста подключения выбранного провайдера.
                     </div>
                 )}
 
@@ -406,7 +515,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         <CardHeader>
                             <CardTitle className="text-blue-400 flex items-center gap-2">
                                 <ExternalLink className="w-5 h-5" />
-                                Как запустить локальный TTS движок?
+                                Как запустить локальный {providerMeta.label}?
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -416,7 +525,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <div>
                                         <p className="font-medium">Перейдите в папку сервиса:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            cd tts_service_simple
+                                            cd {providerMeta.folder}
                                         </code>
                                     </div>
                                 </div>
@@ -426,7 +535,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <div>
                                         <p className="font-medium">Установите зависимости:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            py -3.12 -m pip install -r requirements.txt
+                                            python -m pip install -r requirements.txt
                                         </code>
                                     </div>
                                 </div>
@@ -434,10 +543,9 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="flex items-start gap-3">
                                     <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">3</span>
                                     <div>
-                                        <p className="font-medium">Запустите сервер:</p>
+                                        <p className="font-medium">Запустите API сервер:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            py -3.12 run.py  # Windows<br />
-                                            python3.12 run.py # Linux/Mac
+                                            {providerMeta.runCommand}
                                         </code>
                                     </div>
                                 </div>
@@ -445,22 +553,34 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="flex items-start gap-3">
                                     <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">4</span>
                                     <div>
-                                        <p className="font-medium">Укажите API ключ в файле <code>config.json</code></p>
+                                        <p className="font-medium">Проверьте URL и API ключ в форме ниже</p>
                                         <p className="text-muted-foreground text-xs mt-1">
-                                            Скопируйте ключ и вставьте в поле "api_key"
+                                            {providerMeta.apiKeyHint}
                                         </p>
                                     </div>
                                 </div>
                             </div>
 
+                            {providerMeta.docsUrl && (
+                                <a
+                                    href={providerMeta.docsUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-2 text-xs text-blue-300 hover:text-blue-200"
+                                >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    Открыть репозиторий {providerMeta.label}
+                                </a>
+                            )}
+
                             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 flex items-start gap-2">
                                 <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
                                 <div className="text-sm text-yellow-200">
-                                    <p className="font-medium">Системные требования:</p>
+                                    <p className="font-medium">Рекомендации:</p>
                                     <ul className="list-disc list-inside mt-1 space-y-1 text-xs text-yellow-200/80">
-                                        <li>Python 3.12+</li>
-                                        <li>NVIDIA GPU с VRAM ≥ 6GB (рекомендуется)</li>
-                                        <li>8GB RAM (16GB рекомендуется)</li>
+                                        <li>Используйте отдельный порт для каждого локального провайдера</li>
+                                        <li>Перед включением локального режима выполняйте тест подключения</li>
+                                        <li>Если используется Docker, проверьте доступность порта из bot_service</li>
                                     </ul>
                                 </div>
                             </div>
@@ -471,7 +591,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Server className="w-5 h-5" />
-                                Настройки подключения
+                                Настройки подключения {providerMeta.label}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -481,43 +601,44 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     id="endpoint_url"
                                     value={config.endpoint_url}
                                     onChange={(e) => setConfig({ ...config, endpoint_url: e.target.value })}
-                                    placeholder="http://localhost:8001"
+                                    placeholder={providerMeta.defaultEndpoint}
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    По умолчанию: http://localhost:8001
+                                    По умолчанию: {providerMeta.defaultEndpoint}
                                 </p>
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="api_key">API Ключ</Label>
+                                <Label htmlFor="api_key">API ключ (опционально)</Label>
                                 <div className="flex gap-2">
                                     <Input
                                         id="api_key"
                                         type="password"
                                         value={config.api_key}
                                         onChange={(e) => setConfig({ ...config, api_key: e.target.value })}
-                                        placeholder="Введите API ключ из config.json"
+                                        placeholder="Введите API ключ, если включена авторизация"
                                     />
                                     {config.api_key && (
                                         <Button
                                             variant="outline"
                                             size="icon"
                                             onClick={() => copyToClipboard(config.api_key)}
+                                            className="border-blue-800/60 text-blue-300 hover:bg-blue-500/10"
                                         >
                                             <Copy className="w-4 h-4" />
                                         </Button>
                                     )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
-                                    Находится в файле tts_service_simple/config.json
+                                    {providerMeta.apiKeyHint}
                                 </p>
                             </div>
 
                             <div className="flex gap-2">
                                 <Button
                                     onClick={testConnection}
-                                    disabled={testing || !config.endpoint_url || !config.api_key}
-                                    className="flex-1"
+                                    disabled={testing || !config.endpoint_url.trim()}
+                                    className="flex-1 border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
                                 >
                                     {testing ? (
                                         <>
@@ -534,8 +655,9 @@ const LocalTTSSettingsPage: React.FC = () => {
 
                                 <Button
                                     onClick={saveConfig}
-                                    disabled={saving || !config.endpoint_url || !config.api_key}
-                                    className="flex-1 bg-green-600 hover:bg-green-700"
+                                    disabled={saving || !config.endpoint_url.trim()}
+                                    variant="outline"
+                                    className="flex-1 border-blue-700 text-blue-300 hover:bg-blue-500/10"
                                 >
                                     {saving ? (
                                         <>
@@ -543,7 +665,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                             Сохранение...
                                         </>
                                     ) : (
-                                        'Сохранить'
+                                        'Сохранить конфиг'
                                     )}
                                 </Button>
                             </div>
@@ -619,7 +741,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {statusData && (
+                                {statusData?.stats && (
                                     <div className="mt-4 pt-4 border-t border-gray-700">
                                         <h4 className="text-sm font-medium mb-3">Статистика</h4>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -669,17 +791,20 @@ const LocalTTSSettingsPage: React.FC = () => {
                             <CardContent>
                                 <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                                     <div>
-                                        <p className="font-medium">Использовать локальный TTS</p>
+                                        <p className="font-medium">Использовать локальный {providerMeta.label}</p>
                                         <p className="text-sm text-muted-foreground">
                                             {config.use_local
-                                                ? 'Все запросы озвучки идут через локальный сервис'
-                                                : 'Все запросы озвучки идут через облако (или по умолчанию)'
+                                                ? 'Запросы выбранного провайдера идут через локальный сервис'
+                                                : 'Выбранный провайдер работает в облачном режиме или через фолбэк'
                                             }
                                         </p>
                                     </div>
                                     <Button
                                         onClick={toggleService}
                                         variant={config.use_local ? 'default' : 'outline'}
+                                        className={config.use_local
+                                            ? 'bg-green-600 hover:bg-green-700 text-white'
+                                            : 'border-blue-700 text-blue-300 hover:bg-blue-500/10'}
                                     >
                                         {config.use_local ? 'Включено' : 'Отключено'}
                                     </Button>
@@ -696,15 +821,15 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div>
                                     <CardTitle className="flex items-center gap-2">
                                         <Mic className="w-5 h-5" />
-                                        Управление голосами
+                                        Управление голосами ({providerMeta.label})
                                     </CardTitle>
                                     <p className="text-sm text-muted-foreground mt-1">
-                                        Добавление и управление собственными голосами для клонирования
+                                        Голоса и сэмплы сохраняются отдельно для выбранного провайдера
                                     </p>
                                 </div>
                                 <Dialog open={isCreateVoiceDialogOpen} onOpenChange={setIsCreateVoiceDialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button className="flex items-center gap-2">
+                                        <Button className="flex items-center gap-2 border border-blue-700 bg-blue-700 text-white hover:bg-blue-800">
                                             <Plus className="w-4 h-4" />
                                             Создать голос
                                         </Button>
@@ -743,10 +868,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                                             </div>
                                         </div>
                                         <DialogFooter>
-                                            <Button variant="outline" onClick={() => setIsCreateVoiceDialogOpen(false)}>
+                                            <Button variant="outline" onClick={() => setIsCreateVoiceDialogOpen(false)} className="border-blue-700 text-blue-300 hover:bg-blue-500/10">
                                                 Отмена
                                             </Button>
-                                            <Button onClick={createVoice}>
+                                            <Button onClick={createVoice} className="border border-blue-700 bg-blue-700 text-white hover:bg-blue-800">
                                                 Создать
                                             </Button>
                                         </DialogFooter>
@@ -767,22 +892,24 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {voices.map((voice) => (
-                                        <Card key={voice.id} className="overflow-hidden">
+                                    {voices.map((voice) => {
+                                        const voiceType = voice.type === 'base' ? 'base' : 'custom';
+                                        return (
+                                            <Card key={voice.id} className="overflow-hidden">
                                             <CardHeader className="pb-3">
                                                 <div className="flex items-start justify-between">
                                                     <div className="flex-1">
                                                         <CardTitle className="text-base flex items-center gap-2">
                                                             {voice.name}
-                                                            <Badge variant={voice.type === 'base' ? 'default' : 'secondary'}>
-                                                                {voice.type === 'base' ? 'Базовый' : 'Свой'}
+                                                            <Badge variant={voiceType === 'base' ? 'default' : 'secondary'}>
+                                                                {voiceType === 'base' ? 'Базовый' : 'Свой'}
                                                             </Badge>
                                                         </CardTitle>
                                                         <p className="text-xs text-muted-foreground mt-1">
                                                             {voice.language === 'ru' ? 'RU Русский' : 'EN English'}
                                                         </p>
                                                     </div>
-                                                    {voice.type === 'custom' && (
+                                                    {voiceType === 'custom' && (
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
@@ -795,7 +922,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                 </div>
                                             </CardHeader>
                                             <CardContent>
-                                                {voice.type === 'custom' && (
+                                                {voiceType === 'custom' && (
                                                     <>
                                                         <div className="flex items-center justify-between mb-3">
                                                             <span className="text-sm text-muted-foreground">
@@ -805,7 +932,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                         <Button
                                                             onClick={() => openSampleDialog(voice.id)}
                                                             variant="outline"
-                                                            className="w-full"
+                                                            className="w-full border-blue-700 text-blue-300 hover:bg-blue-500/10"
                                                             disabled={uploadingFile}
                                                         >
                                                             <Upload className="w-4 h-4 mr-2" />
@@ -813,14 +940,15 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                         </Button>
                                                     </>
                                                 )}
-                                                {voice.type === 'base' && (
+                                                {voiceType === 'base' && (
                                                     <p className="text-xs text-muted-foreground italic">
                                                         Базовые голоса нельзя изменять
                                                     </p>
                                                 )}
                                             </CardContent>
-                                        </Card>
-                                    ))}
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
                             )}
                         </CardContent>
@@ -855,10 +983,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setSampleDialogOpen(false)}>
+                            <Button variant="outline" onClick={() => setSampleDialogOpen(false)} className="border-blue-700 text-blue-300 hover:bg-blue-500/10">
                                 Отмена
                             </Button>
-                            <Button onClick={handleSampleUpload} disabled={uploadingFile || !sampleFile}>
+                            <Button onClick={handleSampleUpload} disabled={uploadingFile || !sampleFile} className="border border-blue-700 bg-blue-700 text-white hover:bg-blue-800">
                                 {uploadingFile && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                 Загрузить
                             </Button>

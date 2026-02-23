@@ -128,7 +128,7 @@ TTS_TTV_0.02/
 │   │   └── utils/       # Utilities
 │   └── package.json
 │
-├── tts_service/         # TTS service (optional)
+├── F5_tts/         # TTS service (optional)
 ├── docs/                # Documentation
 └── scripts/             # Utility scripts
 ```
@@ -182,7 +182,7 @@ Input validation uses Pydantic models:
 ```python
 # bot_service/models/validation_models.py
 class TTSSettingsUpdate(BaseModel):
-    engine: Literal['gtts', 'f5tts']
+    engine: Literal['gtts', 'gcloud', 'f5tts', 'qwen']
     enabled_platforms: List[str]
     voice: Optional[str] = None
 ```
@@ -192,7 +192,7 @@ Frontend validation uses Zod:
 ```typescript
 // frontend/src/utils/validationSchemas.ts
 const ttsSettingsSchema = z.object({
-  engine: z.enum(['gtts', 'f5tts']),
+  engine: z.enum(['gtts', 'gcloud', 'f5tts', 'qwen']),
   enabled_platforms: z.array(z.string()),
   voice: z.string().optional()
 });
@@ -428,7 +428,7 @@ console.log('Context state:', useContext(MyContext));
 
 **Database errors:**
 - Run `alembic upgrade head` to apply migrations
-- Check database file permissions (SQLite)
+- Verify PostgreSQL connection settings and credentials
 - Verify PostgreSQL connection (production)
 
 **CORS errors:**

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { AlertTriangle, Loader2, Package, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -99,7 +99,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     // Если интеграция не подключена, принудительно ставим false
     const donationEnabled = currentDonationalertsConnected ? donationEnabledFromServer : false;
 
-    // ✅ М�?Ф�?ЧЕСК�?Й DROPS ДОСТУПЕН ТОЛЬКО С DONATIONALERTS
+    // Mythical Drops are available only with DonationAlerts integration
     // Мифический drops работает на основе донатов, поэтому требует подключения DonationAlerts
     const mythicalEnabledFromServer = typedConfig.mythical_enabled ?? false;
     const mythicalEnabled = currentDonationalertsConnected ? mythicalEnabledFromServer : false;
@@ -125,12 +125,12 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
     }
   }, [initialFormData, isInitialLoad, setIsInitialLoad]);
 
-  // ✅ �?СПРАВЛЕН�?Е: �?спользуем функциональное обновление и удаляем formData из зависимостей
+  // FIX: use functional updates and remove formData from dependencies
   // чтобы избежать бесконечного цикла. Проверяем текущие значения через ref или функциональное обновление.
   useEffect(() => {
     if (!donationalertsConnected) {
       // Отключаем donation и mythical drops если DonationAlerts отключен
-      // ✅ �?спользуем функциональное обновление для чтения актуальных значений без добавления в зависимости
+      // Functional update keeps latest values without extending dependencies
       setFormData(prev => {
         // ✅ Проверяем текущие значения и обновляем только если они true
         if (prev.donation_enabled || prev.mythical_enabled) {
@@ -355,7 +355,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         </CardContent>
       </Card>
 
-      {/* �?нструкция и цветовая схема */}
+      {/* Instruction and color legend */}
       {donationEnabledDisplay && (
         <Card className={SURFACE_CARD_CLASS}>
           <CardContent className="pt-4 pb-4 space-y-3">
@@ -599,7 +599,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         )}
       </Card>
 
-      {/* �?стория донатов */}
+      {/* Donation history */}
       <DonationHistory user={user} platform={platform} channelName={channelName} />
 
       {/* ✅ Убрали кнопку "Сохранить" - автосохранение работает автоматически */}

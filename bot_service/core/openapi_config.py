@@ -32,7 +32,7 @@ Production-ready text-to-speech bot for streamers on Twitch and VK Live platform
 ## Features
 
 - **Multi-Platform Support**: Twitch and VK Live integration
-- **TTS Engines**: Google Cloud TTS, F5-TTS Advanced, F5-TTS Simple
+- **TTS Engines**: Google Cloud TTS, F5-TTS, Qwen3-TTS
 - **YouTube Integration**: Queue management and player
 - **Channel Points System**: Twitch and VK Live rewards
 - **Drops System**: Lootbox mechanics with streak tracking

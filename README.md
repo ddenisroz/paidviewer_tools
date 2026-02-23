@@ -13,8 +13,7 @@ Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, an
 ## Project Layout
 - `bot_service/` FastAPI backend (API, services, repositories, bots).
 - `frontend/` React + Vite dashboard.
-- `tts_service/` Advanced shared TTS service.
-- `tts_service_simple/` Lightweight personal TTS service.
+- `F5_tts/` Advanced F5 TTS service (prepared for extraction to standalone repository).
 - `deploy/` Docker compose and deployment assets.
 - `docs/` Architecture, setup, and feature docs.
 - `scripts/` Project tooling and migrations.
@@ -23,8 +22,7 @@ Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, an
 ## Quick Start (Local)
 1. Configure env files:
    - `bot_service/.env`
-   - `tts_service/.env`
-   - `tts_service_simple/.env`
+   - `F5_tts/.env`
    - `frontend/.env`
    - Optional: set `DEEPSEEK_API_KEY` in `bot_service/.env` to enable `!analyze`
    - Optional: set `GOOGLE_CLOUD_API_KEY` in `bot_service/.env` for YouTube + Google Cloud TTS
@@ -34,7 +32,7 @@ Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, an
 3. Start services:
    - Backend: `cd bot_service; python main.py`
    - Frontend: `cd frontend; npm install; npm run dev`
-   - TTS: `cd tts_service; python main.py` (or `tts_service_simple`)
+   - TTS: `cd F5_tts; python main.py`
 
 ## Common Commands
 - Backend: `ruff check .`, `ruff format .`, `pytest`

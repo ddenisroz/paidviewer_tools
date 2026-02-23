@@ -40,11 +40,11 @@ async def get_pool_status(current_user: dict = Depends(get_current_user)):
         pool = engine.pool
         pool_class = pool.__class__.__name__
         
-        # Check if this is SQLite's StaticPool (used in tests)
+        # StaticPool is used in test mode and does not expose pool metrics.
         if pool_class == "StaticPool":
             return {
                 "status": "healthy",
-                "message": "Using StaticPool (SQLite/Testing)",
+                "message": "Using StaticPool (testing mode)",
                 "pool_size": 1,
                 "pool_class": pool_class,
                 "note": "StaticPool does not support connection pooling metrics",
@@ -134,12 +134,12 @@ async def database_health_check(
         pool = engine.pool
         pool_class = pool.__class__.__name__
         
-        # Check if this is SQLite's StaticPool (used in tests)
+        # StaticPool is used in test mode and does not expose pool metrics.
         if pool_class == "StaticPool":
             health_data["checks"]["connection_pool"] = {
                 "status": "healthy",
                 "pool_class": pool_class,
-                "note": "StaticPool (SQLite/Testing) - no pooling metrics available"
+                "note": "StaticPool (testing mode) - no pooling metrics available"
             }
         else:
             checked_out = pool.checkedout()

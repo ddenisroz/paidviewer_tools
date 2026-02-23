@@ -1,31 +1,24 @@
 # docker-compose.tts-simple.yml
-# TTS Service Simple - Lightweight personal TTS with F5-TTS
-# Machine 1 - Local PC with GPU + Cloudflare Tunnel
-# No Redis required - perfect for single user
-
-version: '3.8'
+# Single-node F5 TTS deployment (no worker pool / no Redis).
+# Kept as compatibility compose profile for personal setups.
 
 services:
-  # TTS Service Simple - Personal TTS
-  tts_service_simple:
+  tts_service:
     build:
-      context: ./tts_service_simple
-      dockerfile: Dockerfile
-    container_name: tts_service_simple
+      context: ../../F5_tts
+      dockerfile: Dockerfile.prod
+    container_name: tts_service_single
     ports:
       - "8001:8001"
     env_file:
-      - ./tts_service_simple/.env
-    environment:
-      - TTS_SIMPLE_PORT=8001
-      - F5_TTS_DEVICE=cuda
-      - GLOBAL_VOICES_REPO=${GLOBAL_VOICES_REPO:-https://tts-voices.example.com}
+      - ../../F5_tts/.env
     volumes:
-      - ./tts_service_simple:/app
-      - ./models/f5_tts:/app/models
-      - ./voices:/app/voices
-      - ./audio:/app/audio
-      - ./tts_service_simple/logs:/app/logs
+      - ../../F5_tts:/app
+      - ../../models/f5_tts:/app/models
+      - ../../voices:/app/voices
+      - ../../audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
     restart: unless-stopped
     deploy:
       resources:
@@ -41,17 +34,16 @@ services:
       retries: 3
       start_period: 60s
 
-  # Cloudflare Tunnel for secure remote access
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
-      - ./cloudflared-config.yml:/etc/cloudflared/config.yml:ro
-      - ./cloudflared-credentials.json:/etc/cloudflared/credentials.json:ro
+      - ../../cloudflared-config.yml:/etc/cloudflared/config.yml:ro
+      - ../../cloudflared-credentials.json:/etc/cloudflared/credentials.json:ro
     restart: unless-stopped
     depends_on:
-      - tts_service_simple
+      - tts_service
 
 volumes:
   tts_cache:
@@ -59,5 +51,8 @@ volumes:
 
 networks:
   default:
-    name: tts_simple_network
+    name: tts_single_network
     driver: bridge
+
+
+

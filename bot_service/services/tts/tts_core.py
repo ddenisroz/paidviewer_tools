@@ -54,6 +54,9 @@ class TtsSettingsRequest(BaseModel):
     enableLexiconFilter: bool = Field(True)
     enableCustomLexicon: bool = Field(False)
     engine: str = Field('gtts')
+    advancedProvider: Optional[str] = Field(None)
+    f5Mode: Optional[str] = Field(None)
+    qwenMode: Optional[str] = Field(None)
     voice: str = Field('female_1')
     listeningMode: str = Field('website')
     maxMessageLength: int = Field(500, ge=50, le=2000)
@@ -63,14 +66,36 @@ class TtsSettingsRequest(BaseModel):
     filterMentions: bool = Field(False)
     gcloudVoices: Optional[List[str]] = None
     gcloudMood: Optional[str] = None
+    qwenVoice: Optional[str] = None
+    qwenModel: Optional[str] = None
     version: int = Field(1, ge=1)
 
     @field_validator('engine')
     @classmethod
     def validate_engine(cls, v):
-        if v not in ['gtts', 'f5tts', 'gcloud']:
-            raise ValueError('engine must be either "gtts", "f5tts", or "gcloud"')
+        if v not in ['gtts', 'f5tts', 'gcloud', 'qwen']:
+            raise ValueError('engine must be either "gtts", "f5tts", "gcloud", or "qwen"')
         return v
+
+    @field_validator('advancedProvider')
+    @classmethod
+    def validate_advanced_provider(cls, v):
+        if v is None:
+            return v
+        normalized = str(v).strip().lower()
+        if normalized not in {'f5', 'gcloud', 'qwen'}:
+            raise ValueError('advancedProvider must be one of: f5, gcloud, qwen')
+        return normalized
+
+    @field_validator('f5Mode', 'qwenMode')
+    @classmethod
+    def validate_provider_mode(cls, v):
+        if v is None:
+            return v
+        normalized = str(v).strip().lower()
+        if normalized not in {'cloud', 'local'}:
+            raise ValueError('mode must be one of: cloud, local')
+        return normalized
 
     @field_validator('listeningMode')
     @classmethod
@@ -136,9 +161,18 @@ class TranscriptionResponse(BaseModel):
 
 
 class LocalTTSConfigRequest(BaseModel):
+    provider: str = Field(default="f5")
     endpoint_url: str
     api_key: Optional[str] = None
     use_local: bool = False
+
+    @field_validator('provider')
+    @classmethod
+    def validate_provider(cls, v):
+        normalized = str(v).strip().lower()
+        if normalized not in {'f5', 'qwen'}:
+            raise ValueError('provider must be either "f5" or "qwen"')
+        return normalized
 
 
 class LocalTTSConfigResponse(BaseModel):
@@ -175,6 +209,7 @@ class TTSAPI:
         text: str,
         author: str,
         user_id: int = None,
+        db_session=None,
         volume_level: float = 50.0,
         connection_manager=None,
         use_ai_tts: bool = False,
@@ -190,6 +225,7 @@ class TTSAPI:
                 channel_name=channel_name,
                 text=text,
                 author=author,
+                user_id=user_id,
                 volume_level=volume_level,
                 use_ai_tts=use_ai_tts,
                 use_basic_tts=use_basic_tts,
@@ -197,7 +233,8 @@ class TTSAPI:
                 connection_manager=connection_manager,
                 tts_settings=tts_settings,
                 word_filter=word_filter,
-                blocked_users=blocked_users
+                blocked_users=blocked_users,
+                db_session=db_session,
             )
 
             if result.get("success"):
@@ -270,5 +307,3 @@ async def check_local_tts_health(endpoint_url: str, api_key: Optional[str] = Non
 
 # Global instance
 tts_api_instance = TTSAPI()
-
-

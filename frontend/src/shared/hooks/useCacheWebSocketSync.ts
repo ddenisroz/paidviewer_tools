@@ -8,9 +8,9 @@ import { useCallback, useEffect } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
+import { queryKeys } from '@/queries/queryKeys';
 import { logger } from '@/shared/utils/prodLogger';
 import { getSharedWebSocket } from '@/shared/utils/sharedWebSocket';
-import { queryKeys } from '@/queries/queryKeys';
 
 interface WebSocketMessage {
     type: string;

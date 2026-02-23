@@ -61,7 +61,7 @@ python -m uvicorn main:app --reload
 2. POST /api/tts/enable
    ├─ bot_service/api/tts_api.py:512
    └─ TTSService.enable_tts()
-       └─ bot_service/services/tts_service.py:392
+       └─ bot_service/services/tts/tts_service.py
 
 3. Message arrives in Twitch chat
    ↓
@@ -99,7 +99,7 @@ user.twitch_username: String
 user.vk_username: String
 
 # TTSUserSettings
-tts_user_settings.engine: String  # 'gtts' or 'f5tts'
+tts_user_settings.engine: String  # 'gtts' | 'gcloud' | 'f5tts' | 'qwen'
 tts_user_settings.enabled_platforms: JSON  # ['twitch', 'vk']
 tts_user_settings.voice: String
 tts_user_settings.listening_mode: String  # 'website' or 'obs'
@@ -149,7 +149,7 @@ print(cm.is_tts_enabled("yourchy"))  # Should return True
 4. Verify `/api/tts/audio/{filename}` returns 200 with WAV file
 
 ### **Problem: 500 Error on /api/tts/enable**
-1. Check `bot_service/services/tts_service.py:392` for exceptions
+1. Check `bot_service/services/tts/tts_service.py` for exceptions
 2. Verify `user_id` is not None
 3. Check `connection_manager.enable_tts_for_channel()` doesn't throw
 
@@ -180,7 +180,7 @@ print(cm.is_tts_enabled("yourchy"))  # Should return True
 # TTS Control
 POST /api/tts/enable         # Enable TTS for user
 POST /api/tts/disable        # Disable TTS
-POST /api/tts/engine-config  # Set gtts or f5tts
+POST /api/tts/engine         # Set gtts | gcloud | f5_cloud | f5_local | qwen_cloud | qwen_local
 GET  /api/tts/audio/{file}   # Serve audio file
 
 # Settings

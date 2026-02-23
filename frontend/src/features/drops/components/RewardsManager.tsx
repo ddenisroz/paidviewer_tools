@@ -118,9 +118,8 @@ const dedupeRewards = (items: Reward[]): Reward[] => {
 
     const existingId = Number(existing.id);
     const nextId = Number(reward.id);
-    const preferNew = Boolean(reward.is_active) && !Boolean(existing.is_active)
-      ? true
-      : Number.isFinite(nextId) && Number.isFinite(existingId) && nextId > existingId;
+    const preferNew = (reward.is_active && !existing.is_active)
+      || (Number.isFinite(nextId) && Number.isFinite(existingId) && nextId > existingId);
 
     if (preferNew) {
       bySignature.set(signature, reward);

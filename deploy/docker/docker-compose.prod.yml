@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Postgres Database
   postgres:
@@ -39,7 +37,7 @@ services:
   # TTS Service - генерация речи
   tts_service:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_tts_service_prod
     ports:
@@ -59,9 +57,9 @@ services:
       - MAX_CONCURRENT_SYNTHESIS=4
       - MAX_CONCURRENT_CONVERSIONS=8
     volumes:
-      - ./tts_service/audio:/app/audio
-      - ./tts_service/logs:/app/logs
-      - ./tts_service/backups:/app/backups
+      - ../../F5_tts/audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
+      - ../../F5_tts/backups:/app/backups
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -79,7 +77,7 @@ services:
   # TTS Workers - обработка очередей
   tts_worker_1:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_worker_1_prod
     command: python worker.py
@@ -93,8 +91,8 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
       - WORKER_ID=worker_1
     volumes:
-      - ./tts_service/audio:/app/audio
-      - ./tts_service/logs:/app/logs
+      - ../../F5_tts/audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -105,7 +103,7 @@ services:
 
   tts_worker_2:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_worker_2_prod
     command: python worker.py
@@ -119,8 +117,8 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
       - WORKER_ID=worker_2
     volumes:
-      - ./tts_service/audio:/app/audio
-      - ./tts_service/logs:/app/logs
+      - ../../F5_tts/audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -131,7 +129,7 @@ services:
 
   tts_worker_3:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_worker_3_prod
     command: python worker.py
@@ -145,8 +143,8 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
       - WORKER_ID=worker_3
     volumes:
-      - ./tts_service/audio:/app/audio
-      - ./tts_service/logs:/app/logs
+      - ../../F5_tts/audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -157,7 +155,7 @@ services:
 
   tts_worker_4:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_worker_4_prod
     command: python worker.py
@@ -171,8 +169,8 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
       - WORKER_ID=worker_4
     volumes:
-      - ./tts_service/audio:/app/audio
-      - ./tts_service/logs:/app/logs
+      - ../../F5_tts/audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -184,7 +182,7 @@ services:
   # Bot Service - основной API
   bot_service:
     build:
-      context: ./bot_service
+      context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_prod
     ports:
@@ -201,6 +199,8 @@ services:
       - BACKEND_URL=${BACKEND_URL:-https://yourdomain.com}
       - FRONTEND_URL=${FRONTEND_URL:-https://yourdomain.com}
       - TTS_SERVICE_URL=http://tts_service:8001
+      - F5_TTS_SERVICE_URL=http://tts_service:8001
+      - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-https://qwen-tts.yourdomain.com}
       
       # Redis
       - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
@@ -246,9 +246,9 @@ services:
       - ENABLE_JSON_LOGS=true
       - ENABLE_LOG_ROTATION=true
     volumes:
-      - ./bot_service/core/data:/app/core/data
-      - ./bot_service/logs:/app/logs
-      - ./bot_service/backups:/app/backups
+      - ../../bot_service/core/data:/app/core/data
+      - ../../bot_service/logs:/app/logs
+      - ../../bot_service/backups:/app/backups
       - bot_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -267,7 +267,7 @@ services:
   # Frontend - React UI
   frontend:
     build:
-      context: ./frontend
+      context: ../../frontend
       dockerfile: Dockerfile.prod
       args:
         - VITE_BOT_SERVICE_URL=${BACKEND_URL:-https://yourdomain.com}
@@ -278,8 +278,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../ssl:/etc/nginx/ssl:ro
       - nginx_cache:/var/cache/nginx
     depends_on:
       - bot_service
@@ -306,3 +306,6 @@ networks:
   default:
     name: tts_network
     driver: bridge
+
+
+

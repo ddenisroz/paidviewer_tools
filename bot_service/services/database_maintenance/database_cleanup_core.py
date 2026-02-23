@@ -5,6 +5,7 @@ import logging
 import os
 from datetime import timedelta
 from typing import Dict, Any
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
@@ -28,6 +29,15 @@ class DatabaseCleanupCore:
         self.MAX_CHAT_MESSAGES_PER_USER = settings.chat_messages_db_limit_per_user
         self.MAX_TOTAL_CHAT_MESSAGES = settings.chat_messages_db_limit_total
         self.CHAT_MESSAGES_RETENTION_DAYS = settings.chat_messages_retention_days
+        self.repo_root = Path(__file__).resolve().parents[3]
+
+    def _cache_dirs(self) -> list[Path]:
+        """Return known cache directories for current project layout."""
+        return [
+            self.repo_root / '.cache',
+            self.repo_root / 'F5_tts' / 'audio' / 'cache',
+            self.repo_root / 'temp',
+        ]
 
     def cleanup_old_data(self) -> Dict[str, int]:
         """Clean old data: expired messages and over-limit messages."""
@@ -138,17 +148,11 @@ class DatabaseCleanupCore:
         try:
             import pathlib
 
-            cache_dirs = [
-                os.path.join(os.getcwd(), '.cache'),
-                os.path.join(os.getcwd(), 'tts_service', 'cache'),
-                os.path.join(os.getcwd(), 'temp'),
-            ]
-
             deleted_files = 0
             freed_space = 0
 
-            for cache_dir in cache_dirs:
-                if not os.path.exists(cache_dir):
+            for cache_dir in self._cache_dirs():
+                if not cache_dir.exists():
                     continue
 
                 try:

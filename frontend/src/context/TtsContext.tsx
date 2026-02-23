@@ -80,7 +80,12 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const ttsStatusInterval = isTtsPage ? 30 * 1000 : 120 * 1000;
 
     const channelName = null;
-    const shouldCheckF5Health = !!user && (selectedEngineType === 'cloud' || selectedEngineType === 'local');
+    const shouldCheckF5Health = !!user && (
+        selectedEngineType === 'cloud'
+        || selectedEngineType === 'local'
+        || selectedEngineType === 'f5_cloud'
+        || selectedEngineType === 'f5_local'
+    );
 
     const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
         enabled: !!user,
@@ -118,7 +123,12 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
 
                 const engineType = statusResponse.engine_type ?? null;
                 setSelectedEngineType(engineType);
-                if (engineType !== 'cloud' && engineType !== 'local') {
+                if (
+                    engineType !== 'cloud'
+                    && engineType !== 'local'
+                    && engineType !== 'f5_cloud'
+                    && engineType !== 'f5_local'
+                ) {
                     setEngineStatus({ loaded: true, error: null });
                 }
 

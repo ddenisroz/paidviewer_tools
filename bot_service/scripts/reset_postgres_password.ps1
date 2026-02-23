@@ -1,5 +1,37 @@
-# Reset PostgreSQL user password
-$PSQL_PATH = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+﻿# Reset PostgreSQL user password
+function Resolve-PsqlPath {
+    if ($env:PSQL_PATH -and (Test-Path $env:PSQL_PATH)) {
+        return $env:PSQL_PATH
+    }
+
+    $psqlCommand = Get-Command psql -ErrorAction SilentlyContinue
+    if ($psqlCommand) {
+        return $psqlCommand.Source
+    }
+
+    $versions = @("18", "17", "16", "15", "14")
+    $programFilesX86 = ${env:ProgramFiles(x86)}
+    $candidates = @()
+
+    foreach ($version in $versions) {
+        if ($env:ProgramFiles) {
+            $candidates += (Join-Path $env:ProgramFiles "PostgreSQL\$version\bin\psql.exe")
+        }
+        if ($programFilesX86) {
+            $candidates += (Join-Path $programFilesX86 "PostgreSQL\$version\bin\psql.exe")
+        }
+    }
+
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+$PSQL_PATH = Resolve-PsqlPath
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  PostgreSQL Password Reset" -ForegroundColor Cyan
@@ -7,7 +39,8 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
 if (-not (Test-Path $PSQL_PATH)) {
-    Write-Host "PostgreSQL not found!" -ForegroundColor Red
+    Write-Host "PostgreSQL psql.exe not found." -ForegroundColor Red
+    Write-Host "Set PSQL_PATH environment variable or add psql to PATH." -ForegroundColor Yellow
     exit 1
 }
 
@@ -96,4 +129,5 @@ Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 Write-Host ""
 Write-Host "Press Enter to exit..."
 Read-Host
+
 

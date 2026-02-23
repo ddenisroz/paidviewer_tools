@@ -1,4 +1,4 @@
-# 🎨 Система Персональных Настроек Голосов
+﻿# 🎨 Система Персональных Настроек Голосов
 
 **Дата:** 31 октября 2025  
 **Версия:** 1.0.0  
@@ -33,7 +33,7 @@
 └─────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────┐
-│      TTS Service / TTS Simple (8001)        │
+│   TTS Service (advanced/single-node) (8001) │
 │                                             │
 │  ┌─────────────────────────────────────┐   │
 │  │  voices (Дефолтные настройки)       │   │
@@ -183,7 +183,7 @@ python -m alembic upgrade head
 
 Или через отдельные команды:
 ```powershell
-cd H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service
+cd .\bot_service
 python -m alembic upgrade head
 ```
 
@@ -307,7 +307,7 @@ if user_voice_config:
         tts_settings_dict["voice_settings"] = voice_settings_dict
 ```
 
-В `tts_service/tts_engine.py` при синтезе:
+В `F5_tts/tts_engine.py` при синтезе:
 
 ```python
 # Извлекаем voice_settings из tts_settings
@@ -381,5 +381,6 @@ TTS Service:
    - `cfg_strength` → из `UserVoiceSettings.cfg_strength` (если не NULL) или из `Voice.cfg_strength`
    - `speed_preset` → из `UserVoiceSettings.speed_preset` (если не NULL) или из `Voice.speed_preset`
    - `volume` → из `UserVoiceSettings.volume` (если не NULL) или из `AudioSettings`
+
 
 

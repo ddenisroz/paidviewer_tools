@@ -41,6 +41,9 @@ htmlcov/
 .nox/
 .coverage
 .coverage.*
+.coverage*
+coverage_focus
+coverage_full
 .cache
 nosetests.xml
 coverage.xml
@@ -226,6 +229,7 @@ dist
 # Temporary folders
 tmp/
 temp/
+artifacts/
 
 # Logs
 logs
@@ -267,6 +271,7 @@ Thumbs.db
 
 # Docker
 .dockerignore
+!tts_service/.dockerignore
 
 # Cloudflare
 .cloudflared/

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test configuration system
 Tests environment variable loading, validation, and error handling
 """
@@ -171,13 +171,13 @@ class TestConfigurationSystem:
     def test_env_example_files_exist(self):
         """Test that .env.example files exist for all services"""
         bot_service_env = Path(".env.example")
-        tts_service_env = Path("../tts_service/.env.example")
+        tts_service_env = Path("../F5_tts/.env.example")
         frontend_env = Path("../frontend/.env.example")
         
         if not bot_service_env.exists():
             print("[WARN] bot_service/.env.example not found")
         if not tts_service_env.exists():
-            print("[WARN] tts_service/.env.example not found")
+            print("[WARN] F5_tts/.env.example not found")
         if not frontend_env.exists():
             print("[WARN] frontend/.env.example not found")
         
@@ -264,3 +264,4 @@ def run_tests():
 if __name__ == "__main__":
     success = run_tests()
     sys.exit(0 if success else 1)
+

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class WhitelistService:
-    """Р РЋР ВµРЎР‚Р Р†Р С‘РЎРѓ Р Т‘Р В»РЎРЏ РЎС“Р С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…Р С‘РЎРЏ Р В±Р ВµР В»РЎвЂ№Р С РЎРѓР С—Р С‘РЎРѓР С”Р С•Р С Р С”Р В°Р Р…Р В°Р В»Р С•Р Р†."""
+    """Service for whitelist channel management."""
 
     @staticmethod
     def _normalize_channel_name(raw_value: str, platform: str) -> str:
@@ -43,7 +43,7 @@ class WhitelistService:
         return value
 
     async def get_whitelist(self, db: Session) -> WhitelistResponse:
-        """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РєР°РЅР°Р»РѕРІ РІ whitelist."""
+        """Return all whitelisted channels."""
         repo = WhitelistedChannelRepository(db)
         channels = repo.get_all()
         return WhitelistResponse(
@@ -55,7 +55,7 @@ class WhitelistService:
     async def add_to_whitelist(
         self, request: AddToWhitelistRequest, db: Session
     ) -> dict:
-        """Р”РѕР±Р°РІРёС‚СЊ РєР°РЅР°Р» РІ whitelist."""
+        """Add channel to whitelist."""
         repo = WhitelistedChannelRepository(db)
         platform = request.platform.lower()
         username = self._normalize_channel_name(request.username, platform)
@@ -77,7 +77,7 @@ class WhitelistService:
     async def remove_from_whitelist(
         self, request: AddToWhitelistRequest, db: Session
     ) -> dict:
-        """РЈРґР°Р»РёС‚СЊ РєР°РЅР°Р» РёР· whitelist."""
+        """Remove channel from whitelist."""
         repo = WhitelistedChannelRepository(db)
         platform = request.platform.lower()
         username = self._normalize_channel_name(request.username, platform)
@@ -99,4 +99,3 @@ class WhitelistService:
 
 # Singleton instance
 whitelist_service = WhitelistService()
-

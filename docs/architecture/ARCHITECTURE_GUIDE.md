@@ -1,82 +1,49 @@
-# 🏗️ Архитектура v2.0.0
+﻿# Architecture Guide
 
-**Дата:** 20 октября 2025 | **Версия:** 2.0.0
+## Overview
 
-## 📐 Система
+The project consists of three runtime zones:
 
-```
-Frontend (React)  ──websocket──> Bot Service (FastAPI)
-                      │              │
-                      └──────────────┴──> SQLite DB
-                           │
-                    TTS Service (опционально)
-```
+- `frontend`: React + Vite UI.
+- `bot_service`: FastAPI backend, auth, business logic, orchestration.
+- `F5_tts`: advanced standalone-ready F5 TTS service.
 
-## 📁 Структура
+The backend also integrates with external/local providers for Qwen and F5 where configured.
 
-```
-bot_service/
-├── api/              # 54+ endpoints (все работают ✅)
-├── auth/             # OAuth 2.0 (Twitch + VK Live)
-├── core/             # Database models
-├── services/         # Business logic
-├── bots/             # Twitch bot + VK bot
-└── utils/            # Helpers (WebSocket, logging)
+## TTS Model
 
-frontend/
-├── pages/            # Dashboard, TTS Settings, Admin
-├── components/       # 50+ React components
-├── context/          # Chat, User, TTS context
-└── services/         # API client
-```
+Provider-aware advanced TTS now supports:
 
-## 🔄 Процессы
+- `gcloud`: Google Cloud TTS (voice selection settings).
+- `f5`: F5 provider (cloud/local mode).
+- `qwen`: Qwen 3 provider (cloud/local mode).
 
-### TTS Озвучка
-```
-Chat Message → WebSocket Handler → Apply Filters → Check Blocked Users 
-    ↓
-Check Platform Enabled → Send to TTS Engine → Audio → Browser/OBS
-```
+If advanced synthesis fails, runtime falls back to basic Google TTS.
 
-### Авторизация
-```
-User → OAuth → Token Save in DB → Session Create → Auto-connect Bot
-```
+## Data and Ownership
 
-### История Чата
-```
-Chat Message → Save to DB (author_username) → Load on Page Start
-```
+- Primary runtime database: PostgreSQL.
+- SQLite is test-only.
+- Voice settings and usage are provider-aware.
+- Local endpoint configs are separated by provider (`f5`, `qwen`).
 
-## 🗄️ База Данных
+## Service Boundaries
 
-**Главные таблицы:**
-- `users` - пользователи
-- `tts_user_settings` - TTS настройки (listening_mode, enabled_platforms)
-- `chat_messages` - история (с author_username)
-- `filtered_word` - фильтры слов
-- `tts_blocked_user` - чёрный список
+- `bot_service` is the control plane (permissions, whitelist, safety filters, queueing).
+- `F5_tts` is an execution plane for F5 synthesis and voice operations.
+- Qwen local/cloud endpoints are treated as external execution planes and called through `bot_service` integration endpoints.
 
-## 🔐 Безопасность
+## Deployment Notes
 
-- ✅ JWT токены
-- ✅ OAuth 2.0
-- ✅ Шифрование токенов
-- ✅ CORS configured
-- ✅ Rate limiting (3 req/sec)
-- ✅ Pydantic validation
+- Compose profiles support both integrated and split deployment strategies.
+- Environment compatibility is preserved with `TTS_SERVICE_URL`, while provider-specific URLs are available:
+  - `F5_TTS_SERVICE_URL`
+  - `QWEN_TTS_SERVICE_URL`
 
-## 📈 Статус
+## Repository Split Readiness
 
-| Компонент | Статус |
-|-----------|--------|
-| API | ✅ 100% работает |
-| TTS | ✅ Полная функциональность |
-| WebSocket | ✅ Real-time |
-| Authorization | ✅ OAuth работает |
-| Database | ✅ Синхронизирована |
-| Admin Panel | ✅ Analytics работает |
-| YouTube | ✅ Поиск + очередь |
+`F5_tts` is organized to be exported into a separate repository with minimal coupling.
+See:
 
-**Версия:** 2.0.0 | **Готово:** 100%
+- `docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md`
+- `docs/setup/REPO_SPLIT_GUIDE.md`

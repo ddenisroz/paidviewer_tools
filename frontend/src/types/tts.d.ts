@@ -11,8 +11,14 @@ export interface TtsStatus {
   platform?: 'twitch' | 'vk' | 'youtube';
   is_playing?: boolean;
   current_voice?: string;
-  engine_type?: 'gtts' | 'local' | 'cloud' | 'gcloud';
+  engine_type?: 'gtts' | 'gcloud' | 'f5_cloud' | 'f5_local' | 'qwen_cloud' | 'qwen_local' | 'local' | 'cloud';
+  advanced_provider?: 'f5' | 'gcloud' | 'qwen';
+  f5_mode?: 'cloud' | 'local';
+  qwen_mode?: 'cloud' | 'local';
   has_local_setup?: boolean;
+  has_local_setup_f5?: boolean;
+  has_local_setup_qwen?: boolean;
+  is_whitelisted?: boolean;
 }
 
 /**
@@ -43,9 +49,14 @@ export interface TtsSettings {
   maxMessageLength?: number;
   skipCommands?: boolean;
   useLocalTTS?: boolean;
+  advancedProvider?: 'f5' | 'gcloud' | 'qwen';
+  f5Mode?: 'cloud' | 'local';
+  qwenMode?: 'cloud' | 'local';
   gcloudVoices?: string[];
   gcloudMood?: 'neutral' | 'sad' | 'happy';
   gcloud_mood?: 'neutral' | 'sad' | 'happy';
+  qwenVoice?: string;
+  qwenModel?: string;
 }
 
 /**
@@ -107,6 +118,7 @@ export interface BlockedUser {
  */
 export interface LocalTtsConfig {
   enabled: boolean;
+  provider?: 'f5' | 'qwen';
   use_local?: boolean;
   host?: string;
   port?: number;

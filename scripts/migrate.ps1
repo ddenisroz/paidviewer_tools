@@ -1,4 +1,4 @@
-# migrate.ps1 - TTS Bot Migration Script for Windows
+﻿# migrate.ps1 - TTS Bot Migration Script for Windows
 # Easy migration to new machine with automated setup
 
 Write-Host "=== TTS Bot Migration Script ===" -ForegroundColor Cyan
@@ -7,7 +7,7 @@ Write-Host ""
 # Check if .env files exist
 $envFiles = @(
     "bot_service\.env",
-    "tts_service\.env",
+    "F5_tts\\.env",
     "frontend\.env"
 )
 
@@ -27,14 +27,9 @@ if ($missingEnv.Count -gt 0) {
         Write-Host "✓ Created bot_service\.env" -ForegroundColor Green
     }
     
-    if (-not (Test-Path "tts_service\.env")) {
-        Copy-Item "tts_service\.env.example" "tts_service\.env"
-        Write-Host "✓ Created tts_service\.env" -ForegroundColor Green
-    }
-    
-    if (-not (Test-Path "tts_service_simple\.env")) {
-        Copy-Item "tts_service_simple\.env.example" "tts_service_simple\.env"
-        Write-Host "✓ Created tts_service_simple\.env" -ForegroundColor Green
+    if (-not (Test-Path "F5_tts\\.env")) {
+        Copy-Item "F5_tts\\.env.example" "F5_tts\\.env"
+        Write-Host "✓ Created F5_tts\\.env" -ForegroundColor Green
     }
     
     if (-not (Test-Path "frontend\.env")) {
@@ -74,17 +69,10 @@ print(Fernet.generate_key().decode())
         $botEnv = $botEnv -replace "your-encryption-key-here-generate-with-fernet", $encryptionKey
         $botEnv | Set-Content "bot_service\.env"
         
-        # Update tts_service/.env
-        $ttsEnv = Get-Content "tts_service\.env" -Raw
+        # Update F5_tts/.env
+        $ttsEnv = Get-Content "F5_tts\\.env" -Raw
         $ttsEnv = $ttsEnv -replace "your-secret-key-here-must-match-bot-service", $secretKey
-        $ttsEnv | Set-Content "tts_service\.env"
-        
-        # Update tts_service_simple/.env if it exists
-        if (Test-Path "tts_service_simple\.env") {
-            $ttsSimpleEnv = Get-Content "tts_service_simple\.env" -Raw
-            $ttsSimpleEnv = $ttsSimpleEnv -replace "your-secret-key-here-must-match-bot-service", $secretKey
-            $ttsSimpleEnv | Set-Content "tts_service_simple\.env"
-        }
+        $ttsEnv | Set-Content "F5_tts\\.env"
         
         Write-Host "[OK] Generated security keys" -ForegroundColor Green
     } else {
@@ -112,12 +100,9 @@ $directories = @(
     "audio",
     "bot_service\data",
     "bot_service\logs",
-    "tts_service\data",
-    "tts_service\logs",
-    "tts_service\audio",
-    "tts_service_simple\logs",
-    "tts_service_simple\audio",
-    "tts_service_simple\voices"
+    "F5_tts\\data",
+    "F5_tts\\logs",
+    "F5_tts\\audio"
 )
 
 foreach ($dir in $directories) {
@@ -177,6 +162,8 @@ Write-Host "3. Run: docker-compose up -d (or npm run dev for development)" -Fore
 Write-Host ""
 Write-Host "Development commands:" -ForegroundColor Cyan
 Write-Host "  cd bot_service; python main.py   - Start bot service" -ForegroundColor White
-Write-Host "  cd tts_service; python main.py  - Start TTS service" -ForegroundColor White
+Write-Host "  cd F5_tts; python main.py       - Start TTS service" -ForegroundColor White
 Write-Host "  cd frontend; npm run dev        - Start frontend" -ForegroundColor White
 Write-Host ""
+
+

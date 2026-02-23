@@ -120,7 +120,7 @@
 
 ## 🔌 API Endpoints
 
-### Backend (tts_service)
+### Backend (`F5_tts` provider API)
 
 | Endpoint | Метод | Описание | Тип голосов |
 |----------|-------|----------|-------------|
@@ -205,14 +205,14 @@ if (currentVoice.voice_type === 'global') {
 
 ### Backend
 
-**`tts_service/api_endpoints.py`**
+**`F5_tts/api_endpoints.py`**
 - Добавлен `GET /api/voices/global` для получения глобальных голосов
 - Уже существовал `GET /api/tts/user/voices/{user_id}` для пользовательских
 
-**`tts_service/admin_api.py`**
+**`F5_tts/admin_api.py`**
 - `POST /api/admin/voices/upload` создаёт голоса с `voice_type='global'`
 
-**`tts_service/api_endpoints.py`**
+**`F5_tts/api_endpoints.py`**
 - `POST /api/tts/user/voices/upload` создаёт голоса с `voice_type='user'`
 
 ---
@@ -253,5 +253,3 @@ if (currentVoice.voice_type === 'global') {
 ## 🎉 Заключение
 
 Теперь система управления голосами имеет **чёткое разделение** между глобальными (для всех) и пользовательскими (личными) голосами, с соответствующими ограничениями и UI/UX, что соответствует требованиям документации и обеспечивает правильную работу системы.
-
-

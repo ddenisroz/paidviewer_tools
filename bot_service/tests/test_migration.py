@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test migration script functionality
 Tests that migration script creates necessary files and directories
 """
@@ -48,9 +48,9 @@ class TestMigrationScript:
         print("[OK] bot_service/.env.example check complete")
         
         # TTS service .env.example
-        tts_env_path = Path("../tts_service/.env.example")
+        tts_env_path = Path("../F5_tts/.env.example")
         if not tts_env_path.exists():
-            print("[WARN] tts_service/.env.example not found")
+            print("[WARN] F5_tts/.env.example not found")
             return
         
         with open(tts_env_path, 'r') as f:
@@ -61,14 +61,14 @@ class TestMigrationScript:
             'TTS_HOST',
             'TTS_PORT',
             'BOT_SERVICE_URL',
-            'TTS_ENGINE',
-            'F5_TTS_DEVICE'
+            'DATABASE_URL',
+            'TTS_CFG_STRENGTH',
         ]
         
         for var in required_tts_vars:
-            assert var in tts_env_content, f"{var} not found in tts_service/.env.example"
+            assert var in tts_env_content, f"{var} not found in F5_tts/.env.example"
         
-        print("[OK] tts_service/.env.example is complete")
+        print("[OK] F5_tts/.env.example is complete")
         
         # Frontend .env.example
         frontend_env_path = Path("../frontend/.env.example")
@@ -192,8 +192,7 @@ class TestMigrationScript:
         """Test that required directory structure is documented"""
         required_structure = {
             'bot_service': ['data', 'logs'],
-            'tts_service': ['data', 'logs', 'audio'],
-            'tts_service_simple': ['logs', 'audio', 'voices'],
+            'F5_tts': ['data', 'logs', 'audio'],
             'frontend': [],
             'logs': ['access', 'app', 'audit', 'errors', 'monitoring']
         }
@@ -300,3 +299,4 @@ def run_tests():
 if __name__ == "__main__":
     success = run_tests()
     sys.exit(0 if success else 1)
+

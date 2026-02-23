@@ -196,8 +196,8 @@ export const ttsService = {
    * Получить глобальные голоса
    * @returns Promise с ответом API
    */
-  async getGlobalVoices(): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
-    return apiClient.get('/api/voices/global');
+  async getGlobalVoices(provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
+    return apiClient.get('/api/voices/global', { params: { provider } });
   },
 
   /**
@@ -205,8 +205,8 @@ export const ttsService = {
    * @param userId - ID пользователя
    * @returns Promise с ответом API
    */
-  async getUserVoices(userId: number): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
-    return apiClient.get(`/api/user/voices/${userId}`);
+  async getUserVoices(userId: number, provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> {
+    return apiClient.get(`/api/user/voices/${userId}`, { params: { provider } });
   },
 
   /**
@@ -215,7 +215,11 @@ export const ttsService = {
    * @param formData - FormData с файлом голоса
    * @returns Promise с ответом API
    */
-  async uploadUserVoice(userId: number, formData: FormData): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
+  async uploadUserVoice(
+    userId: number,
+    formData: FormData,
+    provider: 'f5' | 'qwen' = 'f5',
+  ): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
     const payload = new FormData();
     formData.forEach((value, key) => {
       payload.append(key, value);
@@ -229,7 +233,7 @@ export const ttsService = {
     }
 
     return apiClient.post('/api/user/voices/upload', payload, {
-      params: { user_id: userId },
+      params: { user_id: userId, provider },
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -241,8 +245,9 @@ export const ttsService = {
    * @param formData - FormData с файлом голоса
    * @returns Promise с ответом API
    */
-  async uploadVoice(formData: FormData): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
+  async uploadVoice(formData: FormData, provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse<TtsVoice>>> {
     return apiClient.post('/api/voices/admin/upload', formData, {
+      params: { provider },
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -255,9 +260,13 @@ export const ttsService = {
    * @param userId - ID пользователя
    * @returns Promise с ответом API
    */
-  async deleteUserVoice(voiceId: string, userId: number): Promise<AxiosResponse<ApiResponse>> {
+  async deleteUserVoice(
+    voiceId: string,
+    userId: number,
+    provider: 'f5' | 'qwen' = 'f5',
+  ): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.delete(`/api/voices/user/custom/${voiceId}`, {
-      params: { user_id: userId },
+      params: { user_id: userId, provider },
     });
   },
 
@@ -266,8 +275,8 @@ export const ttsService = {
    * @param voiceId - ID голоса
    * @returns Promise с ответом API
    */
-  async deleteVoice(voiceId: number): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.delete(`/api/admin/voices/${voiceId}`);
+  async deleteVoice(voiceId: number, provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.delete(`/api/voices/admin/global/${voiceId}`, { params: { provider } });
   },
 
   /**
@@ -294,8 +303,8 @@ export const ttsService = {
    * @param text - Текст для тестирования
    * @returns Promise с ответом API
    */
-  async testVoice(voiceId: number, text: string): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post(`/api/voices/${voiceId}/test`, { text });
+  async testVoice(voiceId: number, text: string, provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post(`/api/voices/${voiceId}/test`, { text }, { params: { provider } });
   },
 
   /**
@@ -354,8 +363,8 @@ export const ttsService = {
    * Получить локальную конфигурацию TTS
    * @returns Promise с ответом API
    */
-  async getLocalTtsConfig(): Promise<AxiosResponse<ApiResponse<LocalTtsConfig>>> {
-    return apiClient.get('/api/local-tts/config');
+  async getLocalTtsConfig(provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse<LocalTtsConfig>>> {
+    return apiClient.get('/api/local-tts/config', { params: { provider } });
   },
 
   /**
@@ -372,7 +381,7 @@ export const ttsService = {
    * @param params - Параметры подключения
    * @returns Promise с ответом API
    */
-  async testLocalTtsConnection(params: { host?: string; port?: number; api_key?: string }): Promise<AxiosResponse<ApiResponse>> {
+  async testLocalTtsConnection(params: { endpoint_url: string; api_key?: string; provider?: 'f5' | 'qwen'; use_local?: boolean }): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/local-tts/test-connection', params);
   },
 
@@ -380,8 +389,8 @@ export const ttsService = {
    * Переключить локальный TTS
    * @returns Promise с ответом API
    */
-  async toggleLocalTts(): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/local-tts/toggle');
+  async toggleLocalTts(provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post('/api/local-tts/toggle', null, { params: { provider } });
   },
 
   /**
@@ -397,8 +406,8 @@ export const ttsService = {
    * @param userId - ID пользователя
    * @returns Promise с ответом API
    */
-  async getEnabledVoices(userId: number): Promise<AxiosResponse<ApiResponse<number[]>>> {
-    return apiClient.get(`/api/user/voices/enabled/${userId}`);
+  async getEnabledVoices(userId: number, provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse<number[]>>> {
+    return apiClient.get(`/api/user/voices/enabled/${userId}`, { params: { provider } });
   },
 
   /**
@@ -407,8 +416,12 @@ export const ttsService = {
    * @param voiceIds - Массив ID голосов
    * @returns Promise с ответом API
    */
-  async saveEnabledVoices(userId: number, voiceIds: number[]): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post(`/api/user/voices/enabled/${userId}`, voiceIds);
+  async saveEnabledVoices(
+    userId: number,
+    voiceIds: number[],
+    provider: 'f5' | 'qwen' = 'f5',
+  ): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post(`/api/user/voices/enabled/${userId}`, voiceIds, { params: { provider } });
   },
 
   /**

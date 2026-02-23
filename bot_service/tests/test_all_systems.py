@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import os
 from pathlib import Path
 
@@ -104,7 +104,7 @@ class TestAllSystems:
     
     def test_tts_service_config_exists(self):
         """Test that TTS service configuration exists"""
-        tts_env = PROJECT_ROOT / "tts_service/.env.example"
+        tts_env = PROJECT_ROOT / "F5_tts/.env.example"
         
         if not tts_env.exists():
             print("[WARN]  TTS service .env.example not found, skipping test")
@@ -138,15 +138,10 @@ class TestAllSystems:
     
     def test_tts_service_files_exist(self):
         """Test that TTS service files exist"""
-        tts_main = PROJECT_ROOT / "tts_service/main.py"
-        tts_simple_main = PROJECT_ROOT / "tts_service_simple/main.py"
+        tts_main = PROJECT_ROOT / "F5_tts/main.py"
         
         if not tts_main.exists():
             print("[WARN]  TTS service main.py not found, skipping test")
-            return
-        
-        if not tts_simple_main.exists():
-            print("[WARN]  TTS service simple main.py not found, skipping test")
             return
         
         print("[OK] TTS service files exist")
@@ -351,7 +346,7 @@ class TestAllSystems:
         """Test that all .env.example files are complete"""
         env_files = [
             (PROJECT_ROOT / '.env.example', ['SECRET_KEY', 'DATABASE_URL', 'TWITCH_CLIENT_ID']),
-            (PROJECT_ROOT / 'tts_service/.env.example', ['TTS_ENGINE', 'TTS_HOST', 'TTS_PORT']),
+            (PROJECT_ROOT / 'F5_tts/.env.example', ['TTS_ENGINE', 'TTS_HOST', 'TTS_PORT']),
             (PROJECT_ROOT / 'frontend/.env.example', ['VITE_BOT_SERVICE_URL', 'VITE_TTS_SERVICE_URL']),
         ]
         
@@ -495,3 +490,4 @@ def run_tests():
 if __name__ == "__main__":
     success = run_tests()
     sys.exit(0 if success else 1)
+

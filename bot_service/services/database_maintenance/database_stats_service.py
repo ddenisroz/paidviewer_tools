@@ -4,6 +4,7 @@
 import logging
 import os
 from typing import Dict, Any
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -28,6 +29,26 @@ class DatabaseStatsService:
         # Psychology analyses no longer stored in DB
         self.MAX_PSYCHOLOGY_ANALYSES = 0
         self.PSYCHOLOGY_RETENTION_DAYS = 0
+        self.repo_root = Path(__file__).resolve().parents[3]
+
+    def _resolve_voices_dir(self) -> Path:
+        """Resolve active voices directory in F5_tts layouts."""
+        candidates = [
+            self.repo_root / 'F5_tts' / 'audio' / 'voices' / 'user',
+            self.repo_root / 'F5_tts' / 'user_voices',
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return candidates[0]
+
+    def _cache_dirs(self) -> list[Path]:
+        """Return known cache directories for current project layout."""
+        return [
+            self.repo_root / '.cache',
+            self.repo_root / 'F5_tts' / 'audio' / 'cache',
+            self.repo_root / 'temp',
+        ]
 
     def get_database_stats(self) -> Dict[str, Any]:
         """Get database statistics using repository pattern."""
@@ -96,8 +117,8 @@ class DatabaseStatsService:
     def _get_voices_size(self) -> int:
         """Get voices directory size in bytes."""
         try:
-            voices_dir = os.path.join(os.getcwd(), 'tts_service', 'user_voices')
-            if not os.path.exists(voices_dir):
+            voices_dir = self._resolve_voices_dir()
+            if not voices_dir.exists():
                 return 0
             total_size = 0
             for root, dirs, files in os.walk(voices_dir):
@@ -112,8 +133,8 @@ class DatabaseStatsService:
     def _count_voice_files(self) -> int:
         """Count voice files in directory."""
         try:
-            voices_dir = os.path.join(os.getcwd(), 'tts_service', 'user_voices')
-            if not os.path.exists(voices_dir):
+            voices_dir = self._resolve_voices_dir()
+            if not voices_dir.exists():
                 return 0
             return len([f for f in os.listdir(voices_dir) if f.endswith('.wav')])
         except Exception:
@@ -123,14 +144,9 @@ class DatabaseStatsService:
     def _get_cache_size(self) -> int:
         """Get cache directory size in bytes."""
         try:
-            cache_dirs = [
-                os.path.join(os.getcwd(), '.cache'),
-                os.path.join(os.getcwd(), 'tts_service', 'cache'),
-                os.path.join(os.getcwd(), 'temp'),
-            ]
             total_size = 0
-            for cache_dir in cache_dirs:
-                if not os.path.exists(cache_dir):
+            for cache_dir in self._cache_dirs():
+                if not cache_dir.exists():
                     continue
                 for root, dirs, files in os.walk(cache_dir):
                     for file in files:
@@ -144,14 +160,9 @@ class DatabaseStatsService:
     def _count_cache_files(self) -> int:
         """Count files in cache directories."""
         try:
-            cache_dirs = [
-                os.path.join(os.getcwd(), '.cache'),
-                os.path.join(os.getcwd(), 'tts_service', 'cache'),
-                os.path.join(os.getcwd(), 'temp'),
-            ]
             total_count = 0
-            for cache_dir in cache_dirs:
-                if not os.path.exists(cache_dir):
+            for cache_dir in self._cache_dirs():
+                if not cache_dir.exists():
                     continue
                 total_count += sum(len(files) for _, _, files in os.walk(cache_dir))
             return total_count
@@ -162,7 +173,7 @@ class DatabaseStatsService:
     def _get_latest_backup_size(self) -> int:
         """Get latest backup size in bytes."""
         try:
-            backup_dir = os.path.join(os.getcwd(), 'backups')
+            backup_dir = self.repo_root / 'backups'
             if not os.path.exists(backup_dir):
                 return 0
             files = os.listdir(backup_dir)
@@ -178,7 +189,7 @@ class DatabaseStatsService:
         """Get latest backup time."""
         try:
             from datetime import datetime
-            backup_dir = os.path.join(os.getcwd(), 'backups')
+            backup_dir = self.repo_root / 'backups'
             if not os.path.exists(backup_dir):
                 return None
             files = [f for f in os.listdir(backup_dir) if f.startswith('backup_') and (f.endswith('.db') or f.endswith('.sql'))]

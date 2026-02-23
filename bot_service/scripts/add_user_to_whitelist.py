@@ -58,7 +58,7 @@ def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
         
         print(f"[OK] Added '{channel_name}' ({platform}) to whitelist")
         
-        # РРЅРІР°Р»РёРґРёСЂСѓРµРј РєРµС€
+        # Invalidate cache
         invalidate_whitelist_cache(channel_name, platform)
         print(f"[OK] Whitelist cache invalidated")
         
@@ -102,4 +102,3 @@ if __name__ == "__main__":
     else:
         print(f"[ERROR] User {user_id} not found")
         sys.exit(1)
-

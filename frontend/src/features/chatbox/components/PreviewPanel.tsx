@@ -144,7 +144,7 @@ const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessa
 });
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, twitchChannelName }) => {
-    const [badgesReady, setBadgesReady] = useState(false);
+    const [, setBadgesReady] = useState(false);
     const [globalEmotes, setGlobalEmotes] = useState<Map<string, EmoteData>>(new Map());
     const [simulatedMessages, setSimulatedMessages] = useState<RenderedPreviewMessage[]>([]);
     const [lastAnimatedMessageKey, setLastAnimatedMessageKey] = useState<string | null>(null);

@@ -8,6 +8,7 @@ Provides reusable fixtures for testing:
 - Authenticated users
 - Mock data
 """
+
 import pytest
 import os
 from typing import Generator
@@ -27,6 +28,7 @@ os.environ["OPENAI_API_KEY"] = "test_openai_key"
 # Add bot_service to path
 import sys
 from pathlib import Path
+
 BOT_SERVICE_ROOT = Path(__file__).parent.parent
 if str(BOT_SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(BOT_SERVICE_ROOT))
@@ -53,10 +55,10 @@ def db_session() -> Generator[Session, None, None]:
     """
     # Create all tables
     Base.metadata.create_all(bind=engine)
-    
+
     # Create session
     session = TestingSessionLocal()
-    
+
     try:
         yield session
     finally:
@@ -69,15 +71,15 @@ def db_session() -> Generator[Session, None, None]:
 def db() -> Generator[Session, None, None]:
     """
     Create a fresh database for each test.
-    
+
     This ensures test isolation - each test gets a clean database.
     """
     # Create all tables
     Base.metadata.create_all(bind=engine)
-    
+
     # Create session
     session = TestingSessionLocal()
-    
+
     try:
         yield session
     finally:
@@ -90,101 +92,109 @@ def db() -> Generator[Session, None, None]:
 def client(db: Session) -> Generator[TestClient, None, None]:
     """
     Create a test client with database override.
-    
+
     Usage:
         def test_endpoint(client):
             response = client.get("/api/endpoint")
             assert response.status_code == 200
     """
+
     def override_get_db():
         try:
             yield db
         finally:
             pass
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     # Override session_manager's validate_session to use test database
     from core.session_manager import session_manager
+
     original_validate = session_manager.validate_session
-    
+
     def test_validate_session(session_id: str):
         """Test version of validate_session that uses test database"""
         if not session_id or len(session_id) < 10:
             return None
-        
+
         try:
             # Query test database directly
             from models.user import UserSession as UserSessionModel, User as UserModel
-            
-            session = db.query(UserSessionModel).filter_by(session_id=session_id, is_active=True).first()
+
+            session = (
+                db.query(UserSessionModel)
+                .filter_by(session_id=session_id, is_active=True)
+                .first()
+            )
             if not session:
                 return None
-            
+
             user = db.query(UserModel).filter_by(id=session.user_id).first()
             if not user:
                 return None
-            
+
             login_platform = None
             if session.device_info and isinstance(session.device_info, dict):
-                login_platform = session.device_info.get('platform')
-            
+                login_platform = session.device_info.get("platform")
+
             return {
                 "user_id": user.id,
                 "id": user.id,
                 "session_id": session_id,
-                "is_admin": user.role == 'admin',
+                "is_admin": user.role == "admin",
                 "is_blocked": user.is_blocked,
                 "blocked_reason": user.blocked_reason,
                 "blocked_at": user.blocked_at,
                 "integrations": {},
-                "login_platform": login_platform
+                "login_platform": login_platform,
             }
         except Exception as e:
             import traceback
+
             print(f"[TEST] validate_session error: {e}")
             traceback.print_exc()
             return None
-    
+
     session_manager.validate_session = test_validate_session
-    
+
     # Override user_cache.get() to use test database
     from core.user_cache import user_cache
+
     original_user_cache_get = user_cache.get
-    
+
     def test_user_cache_get(user_id: int, db_session=None):
         """Test version of user_cache.get that uses test database"""
         # Always use test database, ignore cache
         from models.user import User as UserModel
-        
+
         user = db.query(UserModel).filter_by(id=user_id).first()
         if not user:
             return None
-        
+
         return {
-            'id': user.id,
-            'role': user.role,
-            'is_admin': user.role == 'admin',
-            'is_active': user.is_active,
-            'is_blocked': user.is_blocked,
-            'blocked_reason': user.blocked_reason,
-            'twitch_username': user.twitch_username,
-            'vk_username': user.vk_username,
-            'vk_channel_name': user.vk_channel_name,
-            'donationalerts_user_id': user.donationalerts_user_id,
-            'twitch_is_broadcaster': user.twitch_is_broadcaster,
-            'twitch_is_moderator': user.twitch_is_moderator,
-            'twitch_is_vip': user.twitch_is_vip,
-            'twitch_is_subscriber': user.twitch_is_subscriber,
-            'vk_is_owner': user.vk_is_owner,
-            'vk_is_moderator': user.vk_is_moderator,
+            "id": user.id,
+            "role": user.role,
+            "is_admin": user.role == "admin",
+            "is_active": user.is_active,
+            "is_blocked": user.is_blocked,
+            "blocked_reason": user.blocked_reason,
+            "twitch_username": user.twitch_username,
+            "vk_username": user.vk_username,
+            "vk_channel_name": user.vk_channel_name,
+            "donationalerts_user_id": user.donationalerts_user_id,
+            "twitch_is_broadcaster": user.twitch_is_broadcaster,
+            "twitch_is_moderator": user.twitch_is_moderator,
+            "twitch_is_vip": user.twitch_is_vip,
+            "twitch_is_subscriber": user.twitch_is_subscriber,
+            "vk_is_owner": user.vk_is_owner,
+            "vk_is_moderator": user.vk_is_moderator,
         }
-    
+
     user_cache.get = test_user_cache_get
-    
+
     with TestClient(app) as test_client:
         yield test_client
-    
+
     # Restore original functions
     session_manager.validate_session = original_validate
     user_cache.get = original_user_cache_get
@@ -195,7 +205,7 @@ def client(db: Session) -> Generator[TestClient, None, None]:
 def test_user(db: Session) -> User:
     """
     Create a test user.
-    
+
     Returns:
         User object with basic settings
     """
@@ -215,29 +225,29 @@ def test_user(db: Session) -> User:
 def test_session(db: Session, test_user: User) -> str:
     """
     Create a test session for a user.
-    
+
     Returns:
         Session ID string
     """
     from core.datetime_utils import utcnow_naive
     from models.user import UserSession as UserSessionModel
     import uuid
-    
+
     # Create session directly in test database
     session_id = str(uuid.uuid4())
-    
+
     new_session = UserSessionModel(
         user_id=test_user.id,
         session_id=session_id,
         device_info={"platform": "test"},
         is_active=True,
         created_at=utcnow_naive(),
-        last_activity=utcnow_naive()
+        last_activity=utcnow_naive(),
     )
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
-    
+
     return session_id
 
 
@@ -245,7 +255,7 @@ def test_session(db: Session, test_user: User) -> str:
 def admin_user(db: Session) -> User:
     """
     Create an admin user.
-    
+
     Returns:
         User object with admin privileges
     """
@@ -264,17 +274,19 @@ def admin_user(db: Session) -> User:
 def test_user_token(db: Session, test_user: User) -> str:
     """
     Create a JWT token for a regular test user.
-    
+
     Returns:
         JWT token string
     """
     from core.security_modern import modern_security_manager
-    
-    token = modern_security_manager.create_access_token({
-        "user_id": test_user.id,
-        "sub": str(test_user.id),
-        "is_admin": False,
-    })
+
+    token = modern_security_manager.create_access_token(
+        {
+            "user_id": test_user.id,
+            "sub": str(test_user.id),
+            "is_admin": False,
+        }
+    )
     return token
 
 
@@ -282,25 +294,37 @@ def test_user_token(db: Session, test_user: User) -> str:
 def test_admin_token(db: Session, admin_user: User) -> str:
     """
     Create a JWT token for an admin user.
-    
+
     Returns:
         JWT token string for admin access
     """
     from core.security_modern import modern_security_manager
-    
-    token = modern_security_manager.create_access_token({
-        "user_id": admin_user.id,
-        "sub": str(admin_user.id),
-        "is_admin": True,
-    })
+
+    token = modern_security_manager.create_access_token(
+        {
+            "user_id": admin_user.id,
+            "sub": str(admin_user.id),
+            "is_admin": True,
+        }
+    )
     return token
 
 
+def _bootstrap_csrf(client: TestClient) -> None:
+    """Fetch CSRF cookie and attach matching header for state-changing requests."""
+    client.get("/api/auth/status")
+    csrf_token = client.cookies.get("csrf_token")
+    if csrf_token:
+        client.headers.update({"X-CSRF-Token": csrf_token})
+
+
 @pytest.fixture
-def authenticated_client(client: TestClient, test_user: User, db: Session) -> TestClient:
+def authenticated_client(
+    client: TestClient, test_user: User, db: Session
+) -> TestClient:
     """
     Create an authenticated test client.
-    
+
     Usage:
         def test_protected_endpoint(authenticated_client):
             response = authenticated_client.get("/api/protected")
@@ -310,9 +334,9 @@ def authenticated_client(client: TestClient, test_user: User, db: Session) -> Te
     from core.database import UserSession
     from core.datetime_utils import utcnow_naive
     import uuid
-    
+
     session_id = str(uuid.uuid4())
-    
+
     # Create session in database with proper timestamps
     new_session = UserSession(
         user_id=test_user.id,
@@ -320,15 +344,16 @@ def authenticated_client(client: TestClient, test_user: User, db: Session) -> Te
         device_info={"platform": "twitch"},
         is_active=True,
         created_at=utcnow_naive(),
-        last_activity=utcnow_naive()
+        last_activity=utcnow_naive(),
     )
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
-    
+
     # Set cookie
     client.cookies.set("session_id", session_id)
-    
+    _bootstrap_csrf(client)
+
     return client
 
 
@@ -336,7 +361,7 @@ def authenticated_client(client: TestClient, test_user: User, db: Session) -> Te
 def admin_client(client: TestClient, admin_user: User, db: Session) -> TestClient:
     """
     Create an authenticated admin client.
-    
+
     Usage:
         def test_admin_endpoint(admin_client):
             response = admin_client.get("/api/admin/users")
@@ -346,9 +371,9 @@ def admin_client(client: TestClient, admin_user: User, db: Session) -> TestClien
     from core.database import UserSession
     from core.datetime_utils import utcnow_naive
     import uuid
-    
+
     session_id = str(uuid.uuid4())
-    
+
     # Create session in database with proper timestamps
     new_session = UserSession(
         user_id=admin_user.id,
@@ -356,15 +381,16 @@ def admin_client(client: TestClient, admin_user: User, db: Session) -> TestClien
         device_info={"platform": "twitch"},
         is_active=True,
         created_at=utcnow_naive(),
-        last_activity=utcnow_naive()
+        last_activity=utcnow_naive(),
     )
     db.add(new_session)
     db.commit()
     db.refresh(new_session)
-    
+
     # Set cookie
     client.cookies.set("session_id", session_id)
-    
+    _bootstrap_csrf(client)
+
     return client
 
 
@@ -372,7 +398,7 @@ def admin_client(client: TestClient, admin_user: User, db: Session) -> TestClien
 def user_with_token(db: Session, test_user: User) -> tuple[User, UserToken]:
     """
     Create a user with an OAuth token.
-    
+
     Returns:
         Tuple of (User, UserToken)
     """
@@ -394,12 +420,12 @@ def user_with_token(db: Session, test_user: User) -> tuple[User, UserToken]:
 def user_with_tts(db: Session, test_user: User) -> tuple[User, TTSUserSettings]:
     """
     Create a user with TTS settings.
-    
+
     Returns:
         Tuple of (User, TTSUserSettings)
     """
     test_user.tts_enabled = True
-    
+
     tts_settings = TTSUserSettings(
         user_id=test_user.id,
         platform="twitch",
@@ -417,7 +443,7 @@ def user_with_tts(db: Session, test_user: User) -> tuple[User, TTSUserSettings]:
 def youtube_queue_items(db: Session, test_user: User) -> list[YouTubeQueue]:
     """
     Create test YouTube queue items.
-    
+
     Returns:
         List of YouTubeQueue objects
     """
@@ -441,15 +467,15 @@ def youtube_queue_items(db: Session, test_user: User) -> list[YouTubeQueue]:
             status="playing",
         ),
     ]
-    
+
     for item in items:
         db.add(item)
-    
+
     db.commit()
-    
+
     for item in items:
         db.refresh(item)
-    
+
     return items
 
 
@@ -457,7 +483,7 @@ def youtube_queue_items(db: Session, test_user: User) -> list[YouTubeQueue]:
 def drops_config(db: Session, test_user: User) -> DropsConfig:
     """
     Create test drops configuration.
-    
+
     Returns:
         DropsConfig object
     """
@@ -475,16 +501,18 @@ def drops_config(db: Session, test_user: User) -> DropsConfig:
 
 # Mock fixtures for external services
 
+
 @pytest.fixture
 def mock_twitch_api(monkeypatch):
     """
     Mock Twitch API calls.
-    
+
     Usage:
         def test_twitch_integration(mock_twitch_api):
             # Twitch API calls will be mocked
             pass
     """
+
     class MockTwitchAPI:
         def get_user(self, user_id: str):
             return {
@@ -492,7 +520,7 @@ def mock_twitch_api(monkeypatch):
                 "login": "test_user",
                 "display_name": "Test User",
             }
-        
+
         def get_stream(self, user_id: str):
             return {
                 "id": "stream123",
@@ -500,7 +528,7 @@ def mock_twitch_api(monkeypatch):
                 "game_name": "Just Chatting",
                 "viewer_count": 100,
             }
-    
+
     return MockTwitchAPI()
 
 
@@ -508,12 +536,13 @@ def mock_twitch_api(monkeypatch):
 def mock_vk_api(monkeypatch):
     """
     Mock VK API calls.
-    
+
     Usage:
         def test_vk_integration(mock_vk_api):
             # VK API calls will be mocked
             pass
     """
+
     class MockVKAPI:
         def get_user(self, user_id: str):
             return {
@@ -521,7 +550,7 @@ def mock_vk_api(monkeypatch):
                 "first_name": "Test",
                 "last_name": "User",
             }
-        
+
         def get_stream(self, user_id: str):
             return {
                 "id": "stream123",
@@ -529,7 +558,7 @@ def mock_vk_api(monkeypatch):
                 "title": "Test Stream",
                 "viewers": 50,
             }
-    
+
     return MockVKAPI()
 
 
@@ -537,28 +566,30 @@ def mock_vk_api(monkeypatch):
 def mock_tts_service(monkeypatch):
     """
     Mock TTS service calls.
-    
+
     Usage:
         def test_tts(mock_tts_service):
             # TTS service calls will be mocked
             pass
     """
+
     class MockTTSService:
         async def synthesize(self, text: str, voice_id: int):
             return {
                 "audio_url": "http://example.com/audio.mp3",
                 "duration": 5.0,
             }
-    
+
     return MockTTSService()
 
 
 # Utility functions for tests
 
+
 def create_test_user(db: Session, **kwargs) -> User:
     """
     Helper function to create a test user with custom attributes.
-    
+
     Usage:
         user = create_test_user(db, twitch_username="custom_user", is_admin=True)
     """
@@ -568,7 +599,7 @@ def create_test_user(db: Session, **kwargs) -> User:
         "is_active": True,
     }
     defaults.update(kwargs)
-    
+
     user = User(**defaults)
     db.add(user)
     db.commit()
@@ -579,12 +610,14 @@ def create_test_user(db: Session, **kwargs) -> User:
 def assert_response_success(response, expected_status: int = 200):
     """
     Assert that response is successful.
-    
+
     Usage:
         response = client.get("/api/endpoint")
         assert_response_success(response)
     """
-    assert response.status_code == expected_status, f"Expected {expected_status}, got {response.status_code}: {response.text}"
+    assert response.status_code == expected_status, (
+        f"Expected {expected_status}, got {response.status_code}: {response.text}"
+    )
     data = response.json()
     assert "success" in data or response.status_code < 400
 
@@ -592,9 +625,11 @@ def assert_response_success(response, expected_status: int = 200):
 def assert_response_error(response, expected_status: int = 400):
     """
     Assert that response is an error.
-    
+
     Usage:
         response = client.get("/api/invalid")
         assert_response_error(response, 404)
     """
-    assert response.status_code == expected_status, f"Expected {expected_status}, got {response.status_code}"
+    assert response.status_code == expected_status, (
+        f"Expected {expected_status}, got {response.status_code}"
+    )

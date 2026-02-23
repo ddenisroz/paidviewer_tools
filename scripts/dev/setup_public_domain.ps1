@@ -63,13 +63,14 @@ if (-not (Test-Path $cloudflaredConfigDir)) {
 
 $cloudflaredTemplatePath = Join-Path $root "scripts/dev/cloudflared.public.template.yml"
 $cloudflaredConfigPath = Join-Path $cloudflaredConfigDir "config.yml"
+$cloudflaredCredentialsTemplatePath = Join-Path $cloudflaredConfigDir "REPLACE_WITH_TUNNEL_ID.json"
 
 $template = @"
 # 1) Run once: cloudflared tunnel login
 # 2) Create tunnel: cloudflared tunnel create tts-ttv
 # 3) Put real tunnel id and credentials file below.
 tunnel: REPLACE_WITH_TUNNEL_NAME_OR_ID
-credentials-file: C:\Users\$env:USERNAME\.cloudflared\REPLACE_WITH_TUNNEL_ID.json
+credentials-file: $cloudflaredCredentialsTemplatePath
 
 ingress:
   - hostname: $appHost

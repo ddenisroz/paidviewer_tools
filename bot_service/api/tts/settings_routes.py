@@ -17,6 +17,11 @@ from services.tts.google_cloud_tts import (
     is_gemini_or_chirp_voice,
     normalize_gcloud_mood,
 )
+from services.tts.provider_utils import (
+    get_provider_service_url,
+    infer_provider_from_engine,
+    normalize_provider,
+)
 from services.tts.tts_core import (
     AudioSettingsRequest,
     TtsSettingsRequest,
@@ -34,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 
 class EngineRequest(BaseModel):
-    engine_type: str = Field(..., min_length=2, max_length=20)
+    engine_type: str = Field(..., min_length=2, max_length=32)
 
 
 class GcloudVoiceSelectionRequest(BaseModel):
@@ -60,6 +65,91 @@ def _tts_auth_headers() -> dict:
 
 def _is_admin(user: dict) -> bool:
     return user.get("role") == "admin" or bool(user.get("is_admin", False))
+
+
+_CANONICAL_ENGINE_TYPES = {
+    "gtts",
+    "gcloud",
+    "f5_cloud",
+    "f5_local",
+    "qwen_cloud",
+    "qwen_local",
+}
+
+_ENGINE_TYPE_ALIASES = {
+    "cloud": "f5_cloud",
+    "local": "f5_local",
+    "f5": "f5_cloud",
+    "qwen": "qwen_cloud",
+}
+
+
+def _normalize_engine_type(engine_type: str) -> str:
+    normalized = (engine_type or "").strip().lower()
+    return _ENGINE_TYPE_ALIASES.get(normalized, normalized)
+
+
+async def _resolve_voice_proxy_provider(
+    *,
+    requested_provider: Optional[str],
+    user_id: int,
+    service: TTSService,
+) -> str:
+    if requested_provider and requested_provider.strip():
+        return normalize_provider(requested_provider)
+
+    try:
+        settings_dict = await service.get_tts_settings(user_id=user_id)
+        return infer_provider_from_engine(
+            settings_dict.get("engine"),
+            advanced_provider=settings_dict.get("advanced_provider"),
+        )
+    except Exception:
+        logger.exception("Failed to resolve provider for voice proxy user_id=%s", user_id)
+        return "f5"
+
+
+def _engine_type_to_settings_payload(engine_type: str) -> dict:
+    if engine_type == "gtts":
+        return {
+            "engine": "gtts",
+            "use_local_tts": False,
+        }
+    if engine_type == "gcloud":
+        return {
+            "engine": "gcloud",
+            "advanced_provider": "gcloud",
+            "use_local_tts": False,
+        }
+    if engine_type == "f5_cloud":
+        return {
+            "engine": "f5tts",
+            "advanced_provider": "f5",
+            "f5_mode": "cloud",
+            "use_local_tts": False,
+        }
+    if engine_type == "f5_local":
+        return {
+            "engine": "f5tts",
+            "advanced_provider": "f5",
+            "f5_mode": "local",
+            "use_local_tts": True,
+        }
+    if engine_type == "qwen_cloud":
+        return {
+            "engine": "qwen",
+            "advanced_provider": "qwen",
+            "qwen_mode": "cloud",
+            "use_local_tts": False,
+        }
+    if engine_type == "qwen_local":
+        return {
+            "engine": "qwen",
+            "advanced_provider": "qwen",
+            "qwen_mode": "local",
+            "use_local_tts": True,
+        }
+    raise ValueError(f"Unsupported engine_type: {engine_type}")
 
 # ============================================================================
 # TTS SETTINGS
@@ -87,6 +177,9 @@ async def update_tts_settings(
         "enableLexiconFilter": "enable_lexicon_filter",
         "enableCustomLexicon": "enable_custom_lexicon",
         "engine": "engine",
+        "advancedProvider": "advanced_provider",
+        "f5Mode": "f5_mode",
+        "qwenMode": "qwen_mode",
         "voice": "voice",
         "listeningMode": "listening_mode",
         "maxMessageLength": "max_message_length",
@@ -96,6 +189,8 @@ async def update_tts_settings(
         "filterMentions": "filter_mentions",
         "gcloudVoices": "gcloud_voices",
         "gcloudMood": "gcloud_mood",
+        "qwenVoice": "qwen_voice",
+        "qwenModel": "qwen_model",
     }
 
     model_fields_set = getattr(settings_req, "model_fields_set", set())
@@ -141,27 +236,29 @@ async def set_tts_engine(
     user: dict = Depends(get_current_user),
     service: TTSService = Depends(get_tts_service)
 ):
-    """Set TTS engine type."""
-    engine_type = request.engine_type
-    valid_engines = ['gtts', 'cloud', 'local', 'gcloud']
-    if engine_type not in valid_engines:
-        raise HTTPException(status_code=400, detail=f"Invalid engine. Must be one of: {valid_engines}")
+    """
+    Set TTS engine type.
 
-    if engine_type in ['cloud', 'local']:
-        engine = 'f5tts'
-        use_local_tts = engine_type == 'local'
-    elif engine_type == 'gcloud':
-        engine = 'gcloud'
-        use_local_tts = False
-    else:
-        engine = 'gtts'
-        use_local_tts = False
+    Canonical values:
+    - gtts
+    - gcloud
+    - f5_cloud / f5_local
+    - qwen_cloud / qwen_local
 
-    result = await service.save_tts_settings(
-        user_id=user['id'],
-        engine=engine,
-        use_local_tts=use_local_tts
-    )
+    Backward-compatible aliases are accepted:
+    - cloud -> f5_cloud
+    - local -> f5_local
+    """
+    raw_engine_type = request.engine_type
+    engine_type = _normalize_engine_type(raw_engine_type)
+    if engine_type not in _CANONICAL_ENGINE_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid engine. Must be one of: {sorted(_CANONICAL_ENGINE_TYPES)}",
+        )
+
+    payload = _engine_type_to_settings_payload(engine_type)
+    result = await service.save_tts_settings(user_id=user['id'], **payload)
     if not result.get("success"):
         raise HTTPException(status_code=500, detail="Failed to update engine")
 
@@ -308,13 +405,30 @@ async def unblock_user(
 
 @router.get("/voices/global")
 async def get_global_voices(
-    user: dict = Depends(get_current_user)
+    provider: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+    service: TTSService = Depends(get_tts_service),
 ):
     """Get global voices (Proxy)."""
-    tts_url = settings.tts_service_url
+    actor_id = user.get("id", user.get("user_id"))
+    if not isinstance(actor_id, int) or actor_id <= 0:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    resolved_provider = await _resolve_voice_proxy_provider(
+        requested_provider=provider,
+        user_id=actor_id,
+        service=service,
+    )
+    if resolved_provider == "gcloud":
+        return {"voices": [], "provider": "gcloud", "hint": "Use /api/tts/gcloud/voices"}
+
+    tts_url = get_provider_service_url(resolved_provider)
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(f"{tts_url}/api/tts/voices/global")
+            resp = await client.get(
+                f"{tts_url}/api/tts/voices/global",
+                headers=_tts_auth_headers(),
+            )
             if resp.status_code == 200:
                 return resp.json()
             return {"voices": []}
@@ -333,13 +447,24 @@ async def get_global_voices(
 @router.get("/user/voices/{target_user_id}")
 async def get_user_voices(
     target_user_id: int,
-    user: dict = Depends(get_current_user)
+    provider: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+    service: TTSService = Depends(get_tts_service),
 ):
     """Get user voices (Proxy)."""
     actor_id = user.get("id", user.get("user_id"))
     if actor_id != target_user_id and not _is_admin(user):
         raise HTTPException(status_code=403, detail="Access denied")
-    tts_url = settings.tts_service_url
+
+    resolved_provider = await _resolve_voice_proxy_provider(
+        requested_provider=provider,
+        user_id=target_user_id,
+        service=service,
+    )
+    if resolved_provider == "gcloud":
+        return {"voices": [], "provider": "gcloud", "hint": "Use /api/tts/gcloud/voices"}
+
+    tts_url = get_provider_service_url(resolved_provider)
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(

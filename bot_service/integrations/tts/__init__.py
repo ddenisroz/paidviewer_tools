@@ -4,8 +4,8 @@ TTS Engines Integration Layer.
 
 Изолированные клиенты для TTS сервисов:
 - Google Cloud TTS
-- F5-TTS (Advanced)
-- F5-TTS Simple
+- F5-TTS (advanced/single-node profile)
+- Qwen3-TTS (local/cloud provider)
 
 TODO: Выстроить единый интерфейс для всех TTS движков.
 """

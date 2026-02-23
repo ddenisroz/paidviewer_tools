@@ -19,6 +19,7 @@ from services.user_service import UserService
 from services.platform_rewards_service import PlatformRewardsService
 from services.notification_service import notification_service
 from services.memory_websocket_manager import get_memory_websocket_manager
+from services.tts.provider_utils import infer_provider_from_engine, normalize_provider_mode
 
 # API (for specific legacy checks if needed)
 from api.moderation_api import is_user_blocked_from_tts
@@ -270,7 +271,11 @@ class TTSHandlerService:
             use_ai_tts_requested = connection_manager.is_tts_enabled(channel_identifier)
 
         engine = tts_settings.engine or 'gtts'
-        use_ai_tts = (engine == 'f5tts')
+        advanced_provider = infer_provider_from_engine(
+            engine,
+            advanced_provider=getattr(tts_settings, "advanced_provider", None),
+        )
+        use_ai_tts = (engine in {'f5tts', 'qwen'})
         use_basic_tts = True
 
         if use_ai_tts and not use_ai_tts_requested:
@@ -279,18 +284,24 @@ class TTSHandlerService:
         
         # Check Local Endpoint
         local_tts_repo = LocalTTSRepository(db)
-        local_tts = local_tts_repo.get_by_user_id(user_id)
+        local_tts = local_tts_repo.get_by_user_id(user_id, provider=advanced_provider)
         has_local_endpoint = use_ai_tts and local_tts and local_tts.use_local
 
         # Whitelist Check
         if use_ai_tts and not has_local_endpoint:
             from utils.whitelist_cache import is_user_whitelisted_cached
             if not is_user_whitelisted_cached(user_data["user"], db):
-                 logger.warning(f"[WARN] [{platform.upper()} TTS] User {user_id} not in whitelist, falling back to gTTS")
-                 use_ai_tts = False
+                logger.warning(
+                    f"[WARN] [{platform.upper()} TTS] User {user_id} not in whitelist for {advanced_provider}, "
+                    "falling back to gTTS"
+                )
+                use_ai_tts = False
 
         if has_local_endpoint:
-             logger.info(f"[LOCAL] [{platform.upper()} TTS] Using local TTS endpoint for user {user_id}: {local_tts.endpoint_url}")
+            logger.info(
+                f"[LOCAL] [{platform.upper()} TTS] Using local {advanced_provider} endpoint for "
+                f"user {user_id}: {local_tts.endpoint_url}"
+            )
 
         # Volume
         base_volume_level = audio_settings_dict.get('websiteVolume', TTS_DEFAULT_VOLUME)
@@ -304,7 +315,11 @@ class TTSHandlerService:
         # Voice Specific Settings
         if use_ai_tts and tts_settings.voice:
              voice_settings_repo = UserVoiceSettingsRepository(db)
-             user_voice_config = voice_settings_repo.get_by_voice_name(user_id, tts_settings.voice)
+             user_voice_config = voice_settings_repo.get_by_voice_name(
+                 user_id,
+                 tts_settings.voice,
+                 tts_provider=advanced_provider,
+             )
              
              if user_voice_config:
                  if user_voice_config.cfg_strength is not None:
@@ -316,6 +331,9 @@ class TTSHandlerService:
 
         return {
             "engine": engine,
+            "advanced_provider": advanced_provider,
+            "f5_mode": normalize_provider_mode(getattr(tts_settings, "f5_mode", "cloud")),
+            "qwen_mode": normalize_provider_mode(getattr(tts_settings, "qwen_mode", "cloud")),
             "use_ai_tts": use_ai_tts,
             "use_basic_tts": use_basic_tts,
             "volume": final_volume,
@@ -333,20 +351,30 @@ class TTSHandlerService:
             "maxLength": tts_settings.max_message_length,
             "skipCommands": tts_settings.skip_commands,
             "voice": tts_settings.voice,
+            "advanced_provider": getattr(tts_settings, "advanced_provider", engine_config.get("advanced_provider", "f5")),
+            "f5_mode": getattr(tts_settings, "f5_mode", engine_config.get("f5_mode", "cloud")),
+            "qwen_mode": getattr(tts_settings, "qwen_mode", engine_config.get("qwen_mode", "cloud")),
             "gcloud_voices": getattr(tts_settings, "gcloud_voices", []) or [],
             "gcloud_mood": getattr(tts_settings, "gcloud_mood", "neutral") or "neutral",
+            "qwen_voice": getattr(tts_settings, "qwen_voice", "default") or "default",
+            "qwen_model": getattr(tts_settings, "qwen_model", None),
         }
         
         if engine_config["voice_settings"]:
              tts_settings_dict["voice_settings"] = engine_config["voice_settings"]
 
-        logger.info(f"[MIC] [{platform.upper()} TTS] Processing: {username}: {text[:50]}... (engine={tts_settings.engine}, volume={engine_config['volume']}%)")
+        logger.info(
+            f"[MIC] [{platform.upper()} TTS] Processing: {username}: {text[:50]}... "
+            f"(engine={tts_settings.engine}, provider={engine_config.get('advanced_provider')}, "
+            f"volume={engine_config['volume']}%)"
+        )
 
         result = await tts_api.send_tts_request(
             channel_name=channel_identifier,
             text=text,
             author=username,
             user_id=user_id,
+            db_session=db,
             volume_level=engine_config["volume"],
             use_ai_tts=engine_config["use_ai_tts"],
             use_basic_tts=engine_config["use_basic_tts"],

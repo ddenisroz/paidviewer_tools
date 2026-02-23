@@ -29,8 +29,15 @@ class TTSUserSettings(Base):
     engine = Column(String, nullable=False, default='gtts')
     voice = Column(String, nullable=False, default='female_1')
     listening_mode = Column(String, nullable=False, default='website')
+    # Advanced provider selected in UI dropdown: f5 | gcloud | qwen
+    advanced_provider = Column(String, nullable=False, default='f5')
+    # Provider-specific execution mode: cloud | local
+    f5_mode = Column(String, nullable=False, default='cloud')
+    qwen_mode = Column(String, nullable=False, default='cloud')
     gcloud_voices = Column(JSON, nullable=False, default=list)
     gcloud_mood = Column(String, nullable=False, default='neutral')
+    qwen_voice = Column(String, nullable=False, default='default')
+    qwen_model = Column(String, nullable=True)
 
     # Платформы для озвучки
     enabled_platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])
@@ -113,6 +120,8 @@ class LocalTTSEndpoint(Base):
     """Модель конфигурации локального TTS F5 движка"""
     __tablename__ = 'local_tts_endpoints'
     __table_args__ = (
+        UniqueConstraint('user_id', 'provider', name='uq_local_tts_endpoints_user_provider'),
+        UniqueConstraint('session_id', 'provider', name='uq_local_tts_endpoints_session_provider'),
         CheckConstraint(
             '(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)',
             name='check_user_or_session_local_tts'
@@ -125,6 +134,7 @@ class LocalTTSEndpoint(Base):
     session_id = Column(String, nullable=True, index=True)
 
     # Конфигурация endpoint
+    provider = Column(String, nullable=False, default='f5', index=True)
     endpoint_url = Column(String, nullable=False)
     api_key = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
@@ -164,7 +174,7 @@ class UserVoiceSettings(Base):
     """
     __tablename__ = 'user_voice_settings'
     __table_args__ = (
-        UniqueConstraint('user_id', 'voice_id', name='uq_user_voice_settings'),
+        UniqueConstraint('user_id', 'voice_id', 'tts_provider', name='uq_user_voice_settings'),
         {'extend_existing': True}
     )
 
@@ -172,6 +182,7 @@ class UserVoiceSettings(Base):
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
     voice_id = Column(Integer, nullable=False, index=True)
     voice_name = Column(String, nullable=False)
+    tts_provider = Column(String, nullable=False, default='f5', index=True)
 
     # Personal settings for this voice
     cfg_strength = Column(Float, nullable=True)

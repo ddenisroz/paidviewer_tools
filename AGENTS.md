@@ -7,13 +7,13 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - `bot_service/`: FastAPI backend. Layers include `api/` (routes), `services/` (logic), `repositories/` (data access), `core/` (config/auth), and `tests/`.
 - `frontend/`: React + Vite app (`src/`) with assets in `public/`.
 - ChatBox UI: settings modal in `frontend/src/components/ChatBoxSettingsModal.tsx`, preview in `frontend/src/features/chatbox/components/PreviewPanel.tsx` (keep preview/overlay behavior aligned).
-- `tts_service/`: Advanced shared TTS service (`python main.py`).
-- `tts_service_simple/`: Personal TTS microservice (`python run.py`).
+- `F5_tts/`: Advanced F5 TTS service (`python main.py`), prepared for extraction to standalone repository.
+- Local Qwen/F5 provider instances are external and connected via `bot_service` local TTS endpoints.
 - `deploy/`: Docker compose and deployment assets.
 - `docs/`: architecture and developer guides.
 - `scripts/`: project tooling (e.g., design system migration).
 - `scripts/dev/`: one-off debug/diagnostic scripts (keep root clean).
-- `logs/`: runtime logs (for example `logs/bot_service.log`, `logs/tts_service.log`).
+- `logs/`: runtime logs (for example `logs/bot_service.log`, `logs/f5_tts.log`).
 
 ## Build, Test, and Development Commands
 
@@ -24,7 +24,7 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - Frontend build: `cd frontend; npm run build`.
 - Frontend lint/format/type-check: `npm run lint`, `npm run format`, `npm run type-check`.
 - Frontend tests: `npm run test` or `npm run test:coverage`.
-- TTS services: `cd tts_service; python main.py` and `cd tts_service_simple; python run.py`.
+- TTS services: `cd F5_tts; python main.py`.
 - Docker dev stack: `.\start-dev.ps1` (uses compose files in `deploy/`).
 - API types: `cd frontend; npm run generate-api-types`.
 
@@ -47,7 +47,7 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 
 ## Security & Configuration
 
-- Use per-service `.env` files: `bot_service/.env`, `tts_service/.env`, `tts_service_simple/.env`, `frontend/.env`. Never commit secrets.
+- Use per-service `.env` files: `bot_service/.env`, `F5_tts/.env`, `frontend/.env`. Never commit secrets.
 - Deployment guidance lives in `docs/setup/DEPLOYMENT.md`.
 
 ## Repository Hygiene

@@ -22,6 +22,10 @@ from services.advanced_rate_limiter import advanced_rate_limiter
 from services.user_identity_service import UserIdentityService
 from services.voice_management_service import VoiceManagementService
 import random
+from services.tts.provider_utils import (
+    infer_provider_from_engine,
+    normalize_provider_mode,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -266,8 +270,20 @@ class TTSService:
 
         settings = self.settings_repo.get_or_create(user_id=user_id)
         engine = getattr(settings, 'engine', 'gtts')
+        provider = infer_provider_from_engine(
+            engine,
+            advanced_provider=getattr(settings, "advanced_provider", None),
+        )
+        use_local_tts = bool(getattr(settings, "use_local_tts", False))
+        f5_mode = normalize_provider_mode(getattr(settings, "f5_mode", "cloud"))
+        qwen_mode = normalize_provider_mode(getattr(settings, "qwen_mode", "cloud"))
+
         if engine == 'f5tts':
-            engine_type = 'local' if getattr(settings, 'use_local_tts', False) else 'cloud'
+            resolved_mode = 'local' if use_local_tts else f5_mode
+            engine_type = f'f5_{resolved_mode}'
+        elif engine == 'qwen':
+            resolved_mode = 'local' if use_local_tts else qwen_mode
+            engine_type = f'qwen_{resolved_mode}'
         elif engine == 'gcloud':
             engine_type = 'gcloud'
         else:
@@ -276,12 +292,17 @@ class TTSService:
         listening_mode = getattr(settings, 'listening_mode', None) or getattr(user, 'tts_listening_mode', 'website')
 
         has_local_setup = False
+        has_local_setup_f5 = False
+        has_local_setup_qwen = False
         is_whitelisted = False
 
         try:
             local_repo = LocalTTSRepository(self.db)
-            local_config = local_repo.get_active(user_id=user_id)
-            has_local_setup = bool(local_config and local_config.is_healthy)
+            local_f5 = local_repo.get_active(user_id=user_id, provider="f5")
+            has_local_setup_f5 = bool(local_f5 and local_f5.is_healthy)
+            local_qwen = local_repo.get_active(user_id=user_id, provider="qwen")
+            has_local_setup_qwen = bool(local_qwen and local_qwen.is_healthy)
+            has_local_setup = has_local_setup_qwen if provider == "qwen" else has_local_setup_f5
         except Exception as e:
             logger.exception("Failed to resolve local TTS status for user %s", user_id)
 
@@ -296,7 +317,12 @@ class TTSService:
             "listening_mode": listening_mode,
             "listeningMode": listening_mode,
             "engine_type": engine_type,
+            "advanced_provider": provider,
+            "f5_mode": f5_mode,
+            "qwen_mode": qwen_mode,
             "has_local_setup": has_local_setup,
+            "has_local_setup_f5": has_local_setup_f5,
+            "has_local_setup_qwen": has_local_setup_qwen,
             "is_whitelisted": is_whitelisted,
         }
 
@@ -382,21 +408,42 @@ class TTSService:
     async def set_voice(self, user_id: int, voice_name: str, db: Session = None) -> bool:
         """Set TTS voice for user."""
         try:
-            # Init VoiceManagementService
-            voice_service = VoiceManagementService(self.db)
-            
-            # Fetch available voices
-            global_voices = await voice_service.get_global_voices()
-            user_voices = await voice_service.get_user_custom_voices(user_id)
-            
-            all_voices = [v.get('name', '').lower() for v in global_voices + user_voices]
-            
-            if voice_name.lower() not in all_voices:
-                return False
-                
-            # Update settings - repository handles commit
             settings = self.settings_repo.get_or_create(user_id=user_id)
-            self.settings_repo.update_settings(settings, {'voice': voice_name})
+            provider = infer_provider_from_engine(
+                getattr(settings, "engine", None),
+                advanced_provider=getattr(settings, "advanced_provider", None),
+            )
+            target_voice = (voice_name or "").strip().lower()
+            if not target_voice:
+                return False
+
+            available_voices: List[str] = []
+            if provider == "gcloud":
+                available_voices = [
+                    str(voice).strip()
+                    for voice in (getattr(settings, "gcloud_voices", None) or [])
+                    if isinstance(voice, str) and str(voice).strip()
+                ]
+            else:
+                voice_service = VoiceManagementService(self.db)
+                global_voices = await voice_service.get_global_voices(provider=provider)
+                user_voices = await voice_service.get_user_custom_voices(user_id, provider=provider)
+                available_voices = [
+                    str(v.get("name", "")).strip()
+                    for v in (global_voices + user_voices)
+                    if isinstance(v, dict) and v.get("name")
+                ]
+
+            resolved_voice = None
+            for candidate in available_voices:
+                if candidate.lower() == target_voice:
+                    resolved_voice = candidate
+                    break
+
+            if not resolved_voice:
+                return False
+
+            self.settings_repo.update_settings(settings, {"voice": resolved_voice})
             return True
             
         except Exception as e:
@@ -406,19 +453,34 @@ class TTSService:
     async def set_random_voice(self, user_id: int, db: Session = None) -> Optional[str]:
         """Set random TTS voice for user."""
         try:
-            voice_service = VoiceManagementService(self.db)
-            
-            global_voices = await voice_service.get_global_voices()
-            user_voices = await voice_service.get_user_custom_voices(user_id)
-            
-            available_voices = [v.get('name') for v in global_voices + user_voices if v.get('name')]
-            
+            settings = self.settings_repo.get_or_create(user_id=user_id)
+            provider = infer_provider_from_engine(
+                getattr(settings, "engine", None),
+                advanced_provider=getattr(settings, "advanced_provider", None),
+            )
+
+            available_voices: List[str] = []
+            if provider == "gcloud":
+                available_voices = [
+                    str(voice).strip()
+                    for voice in (getattr(settings, "gcloud_voices", None) or [])
+                    if isinstance(voice, str) and str(voice).strip()
+                ]
+            else:
+                voice_service = VoiceManagementService(self.db)
+                global_voices = await voice_service.get_global_voices(provider=provider)
+                user_voices = await voice_service.get_user_custom_voices(user_id, provider=provider)
+                available_voices = [
+                    str(v.get("name", "")).strip()
+                    for v in (global_voices + user_voices)
+                    if isinstance(v, dict) and v.get("name")
+                ]
+
             if not available_voices:
                 return None
                 
             voice_name = random.choice(available_voices)
             
-            settings = self.settings_repo.get_or_create(user_id=user_id)
             self.settings_repo.update_settings(settings, {'voice': voice_name})
             # Repository handles commit
             

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Test Configuration System
 Tests for environment variable loading, validation, and configuration management
 Requirements: 1.1, 1.2
@@ -162,8 +162,7 @@ class TestMigrationScript:
         """Verify .env.example templates exist for all services"""
         required_env_examples = [
             '.env.example',
-            '../tts_service/.env.example',
-            '../tts_service_simple/.env.example',
+            '../F5_tts/.env.example',
             '../frontend/.env.example',
         ]
         
@@ -287,3 +286,4 @@ class TestDockerConfiguration:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+

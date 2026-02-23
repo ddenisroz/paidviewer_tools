@@ -11,7 +11,6 @@
  */
 
 import * as Sentry from "@sentry/react";
-import { BrowserTracing } from "@sentry/tracing";
 
 import { logger } from "@/shared/utils/prodLogger";
 
@@ -47,15 +46,8 @@ export function initSentry() {
 
       // Performance Monitoring
       integrations: [
-        new BrowserTracing({
-          // Track navigation and route changes
-          // @ts-expect-error - Sentry type definitions incomplete, API works at runtime
-          routingInstrumentation: Sentry.reactRouterV6Instrumentation(
-            // Will be set up in App.tsx with useEffect
-          ),
-        }),
-        // @ts-expect-error - Sentry type definitions incomplete, API works at runtime
-        new Sentry.Replay({
+        Sentry.browserTracingIntegration(),
+        Sentry.replayIntegration({
           // Mask all text and input content
           maskAllText: true,
           blockAllMedia: true,
@@ -218,11 +210,21 @@ export function captureMessage(
  *   transaction.finish();
  */
 export function startTransaction(name: string, op: string = 'custom') {
-  // @ts-expect-error - Sentry v7 API compatibility
-  return Sentry.startTransaction({
-    name,
-    op,
-  });
+  const span = Sentry.startInactiveSpan({ name, op });
+
+  return {
+    setStatus(status: string) {
+      // Sentry span status typing differs across SDK versions.
+      if (span && typeof span.setStatus === 'function') {
+        span.setStatus(status as never);
+      }
+    },
+    finish() {
+      if (span && typeof span.end === 'function') {
+        span.end();
+      }
+    },
+  };
 }
 
 /**

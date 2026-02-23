@@ -22,10 +22,10 @@ interface QualityConfig {
 }
 
 const QUALITY_CONFIGS: QualityConfig[] = [
-  { id: 'common', label: 'Обычный', color: '#6B7280', image: CommonClosed },
-  { id: 'rare', label: 'Редкий', color: '#3B82F6', image: RareClosed },
-  { id: 'epic', label: 'Эпический', color: '#8B5CF6', image: EpicClosed },
-  { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed }
+  { id: 'common', label: 'РћР±С‹С‡РЅС‹Р№', color: '#6B7280', image: CommonClosed },
+  { id: 'rare', label: 'Р РµРґРєРёР№', color: '#3B82F6', image: RareClosed },
+  { id: 'epic', label: 'Р­РїРёС‡РµСЃРєРёР№', color: '#8B5CF6', image: EpicClosed },
+  { id: 'legendary', label: 'Р›РµРіРµРЅРґР°СЂРЅС‹Р№', color: '#F59E0B', image: LegendaryClosed }
 ];
 
 interface DonationGridFormData {
@@ -83,7 +83,7 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                   />
                   <div>
                     <Label className="text-sm font-medium">{quality.label}</Label>
-                    <p className="text-xs text-muted-foreground">От {value}?</p>
+                    <p className="text-xs text-muted-foreground">РћС‚ {value}?</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 border border-border/70 bg-card/70 rounded-lg">

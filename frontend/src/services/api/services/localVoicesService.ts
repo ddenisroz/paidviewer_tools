@@ -1,6 +1,6 @@
 /**
- * Local TTS Voices Service - API calls to external tts_service_simple
- * 
+ * Local TTS Voices Service - API calls to external local TTS providers (F5/Qwen).
+ *
  * These endpoints are on the user's local TTS server, not our backend.
  */
 import axios, { AxiosError } from 'axios';

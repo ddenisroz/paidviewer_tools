@@ -2,8 +2,6 @@
 # TTS Service (Advanced) with F5-TTS and GPU Worker Pool
 # Machine 1 - Local PC with GPU + Cloudflare Tunnel
 
-version: '3.8'
-
 services:
   # Redis for GPU Worker Pool
   redis:
@@ -24,22 +22,22 @@ services:
   # TTS Service - Main API
   tts_service:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_service
     ports:
       - "8001:8001"
     env_file:
-      - ./tts_service/.env
+      - ../../F5_tts/.env
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
       - GPU_REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
     volumes:
-      - ./tts_service:/app
-      - ./models/f5_tts:/app/models
-      - ./voices:/app/voices
-      - ./audio:/app/audio
-      - ./tts_service/logs:/app/logs
+      - ../../F5_tts:/app
+      - ../../models/f5_tts:/app/models
+      - ../../voices:/app/voices
+      - ../../audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -62,22 +60,22 @@ services:
   # GPU Workers (4 workers for parallel processing)
   tts_worker_1:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_worker_1
     command: python worker.py
     env_file:
-      - ./tts_service/.env
+      - ../../F5_tts/.env
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
       - GPU_REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
       - WORKER_ID=worker_1
     volumes:
-      - ./tts_service:/app
-      - ./models/f5_tts:/app/models
-      - ./voices:/app/voices
-      - ./audio:/app/audio
-      - ./tts_service/logs:/app/logs
+      - ../../F5_tts:/app
+      - ../../models/f5_tts:/app/models
+      - ../../voices:/app/voices
+      - ../../audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -93,22 +91,22 @@ services:
 
   tts_worker_2:
     build:
-      context: ./tts_service
+      context: ../../F5_tts
       dockerfile: Dockerfile.prod
     container_name: tts_worker_2
     command: python worker.py
     env_file:
-      - ./tts_service/.env
+      - ../../F5_tts/.env
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
       - GPU_REDIS_URL=redis://:${REDIS_PASSWORD:-change_this_password}@redis:6379/0
       - WORKER_ID=worker_2
     volumes:
-      - ./tts_service:/app
-      - ./models/f5_tts:/app/models
-      - ./voices:/app/voices
-      - ./audio:/app/audio
-      - ./tts_service/logs:/app/logs
+      - ../../F5_tts:/app
+      - ../../models/f5_tts:/app/models
+      - ../../voices:/app/voices
+      - ../../audio:/app/audio
+      - ../../F5_tts/logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -128,8 +126,8 @@ services:
     container_name: cloudflared
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
-      - ./cloudflared-config.yml:/etc/cloudflared/config.yml:ro
-      - ./cloudflared-credentials.json:/etc/cloudflared/credentials.json:ro
+      - ../../cloudflared-config.yml:/etc/cloudflared/config.yml:ro
+      - ../../cloudflared-credentials.json:/etc/cloudflared/credentials.json:ro
     restart: unless-stopped
     depends_on:
       - tts_service
@@ -144,3 +142,6 @@ networks:
   default:
     name: tts_advanced_network
     driver: bridge
+
+
+

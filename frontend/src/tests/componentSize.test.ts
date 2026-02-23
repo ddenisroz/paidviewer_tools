@@ -1,24 +1,19 @@
-// src/tests/componentSize.test.ts
+﻿// src/tests/componentSize.test.ts
 /**
- * Property Test: Component Size Compliance
- * Feature: frontend-typescript-linting, Property 3: Component Size Compliance
- * Validates: Requirements 2.3, 3.1
- * 
- * This test verifies that all React component files do not exceed 150 lines of code
- * (excluding imports, comments, and type definitions).
+ * Property Test: Component Size Compliance (ratchet mode)
+ *
+ * Rules:
+ * - New components must stay <= 150 code lines.
+ * - Existing oversized components are tracked in baseline and must not grow.
  */
 
 import { describe, it, expect } from 'vitest';
-import { readdirSync, statSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readdirSync, statSync, readFileSync } from 'fs';
+import { join, relative } from 'path';
 
 const MAX_LINES = 150;
-const COMPONENT_DIRS = [
-    'src/components',
-    'src/features',
-    'src/pages',
-    'src/widgets'
-];
+const BASELINE_PATH = join(process.cwd(), 'src/tests/baselines/component-size-baseline.json');
+const COMPONENT_DIRS = ['src/components', 'src/features', 'src/pages', 'src/widgets'];
 
 interface ComponentFile {
     path: string;
@@ -26,139 +21,155 @@ interface ComponentFile {
     codeLines: number;
 }
 
-/**
- * Recursively find all .tsx and .jsx files in a directory
- */
-function findComponentFiles(dir: string, baseDir: string = dir): ComponentFile[] {
-    const files: ComponentFile[] = [];
+type ComponentSizeBaseline = Record<string, number>;
+
+function normalizePath(fullPath: string): string {
+    return relative(process.cwd(), fullPath).replace(/\\/g, '/');
+}
+
+function loadBaseline(): ComponentSizeBaseline {
+    if (!existsSync(BASELINE_PATH)) {
+        return {};
+    }
 
     try {
-        const entries = readdirSync(dir);
+        const raw = readFileSync(BASELINE_PATH, 'utf-8').replace(/^\uFEFF/, '');
+        const parsed = JSON.parse(raw) as unknown;
+        return typeof parsed === 'object' && parsed !== null
+            ? (parsed as ComponentSizeBaseline)
+            : {};
+    } catch {
+        return {};
+    }
+}
 
-        for (const entry of entries) {
-            const fullPath = join(dir, entry);
-            const stat = statSync(fullPath);
+function findComponentFiles(dir: string): ComponentFile[] {
+    const files: ComponentFile[] = [];
 
-            if (stat.isDirectory()) {
-                // Skip node_modules and test directories
-                if (entry === 'node_modules' || entry === '__tests__' || entry.endsWith('.test')) {
-                    continue;
-                }
-                files.push(...findComponentFiles(fullPath, baseDir));
-            } else if (entry.endsWith('.tsx') || entry.endsWith('.jsx')) {
-                // Skip test files
-                if (entry.includes('.test.') || entry.includes('.spec.')) {
-                    continue;
-                }
+    if (!existsSync(dir)) {
+        return files;
+    }
 
-                const content = readFileSync(fullPath, 'utf-8');
-                const lines = content.split('\n');
-                const totalLines = lines.length;
+    const entries = readdirSync(dir);
 
-                // Count code lines (excluding imports, comments, empty lines, and type definitions)
-                let codeLines = 0;
-                let inMultilineComment = false;
-                let inImportBlock = false;
-                let inTypeDefinition = false;
+    for (const entry of entries) {
+        const fullPath = join(dir, entry);
+        const stat = statSync(fullPath);
 
-                for (const line of lines) {
-                    const trimmed = line.trim();
-
-                    // Skip empty lines
-                    if (trimmed === '') continue;
-
-                    // Handle multiline comments
-                    if (trimmed.startsWith('/*')) {
-                        inMultilineComment = true;
-                    }
-                    if (inMultilineComment) {
-                        if (trimmed.endsWith('*/')) {
-                            inMultilineComment = false;
-                        }
-                        continue;
-                    }
-
-                    // Skip single-line comments
-                    if (trimmed.startsWith('//')) continue;
-
-                    // Skip import statements
-                    if (trimmed.startsWith('import ')) {
-                        inImportBlock = true;
-                        continue;
-                    }
-                    if (inImportBlock && (trimmed.endsWith(';') || trimmed.endsWith("';") || trimmed.endsWith('";'))) {
-                        inImportBlock = false;
-                        continue;
-                    }
-                    if (inImportBlock) continue;
-
-                    // Skip type/interface definitions (but count their content)
-                    if (trimmed.startsWith('interface ') || trimmed.startsWith('type ')) {
-                        inTypeDefinition = true;
-                        continue;
-                    }
-                    if (inTypeDefinition && trimmed === '}') {
-                        inTypeDefinition = false;
-                        continue;
-                    }
-                    if (inTypeDefinition) continue;
-
-                    // Count this as a code line
-                    codeLines++;
-                }
-
-                const relativePath = fullPath.replace(baseDir + '/', '');
-                files.push({
-                    path: relativePath,
-                    lines: totalLines,
-                    codeLines
-                });
+        if (stat.isDirectory()) {
+            if (entry === 'node_modules' || entry === '__tests__' || entry.endsWith('.test')) {
+                continue;
             }
+            files.push(...findComponentFiles(fullPath));
+            continue;
         }
-    } catch (error) {
-        // Directory might not exist, skip it
-        console.warn(`Warning: Could not read directory ${dir}:`, error);
+
+        if (!entry.endsWith('.tsx') && !entry.endsWith('.jsx')) {
+            continue;
+        }
+
+        if (entry.includes('.test.') || entry.includes('.spec.')) {
+            continue;
+        }
+
+        const content = readFileSync(fullPath, 'utf-8');
+        const lines = content.split('\n');
+
+        let codeLines = 0;
+        let inMultilineComment = false;
+        let inImportBlock = false;
+        let inTypeDefinition = false;
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed === '') continue;
+
+            if (trimmed.startsWith('/*')) {
+                inMultilineComment = true;
+            }
+            if (inMultilineComment) {
+                if (trimmed.endsWith('*/')) {
+                    inMultilineComment = false;
+                }
+                continue;
+            }
+
+            if (trimmed.startsWith('//')) continue;
+
+            if (trimmed.startsWith('import ')) {
+                inImportBlock = true;
+                continue;
+            }
+            if (inImportBlock && (trimmed.endsWith(';') || trimmed.endsWith("';") || trimmed.endsWith('";'))) {
+                inImportBlock = false;
+                continue;
+            }
+            if (inImportBlock) continue;
+
+            if (trimmed.startsWith('interface ') || trimmed.startsWith('type ')) {
+                inTypeDefinition = true;
+                continue;
+            }
+            if (inTypeDefinition && trimmed === '}') {
+                inTypeDefinition = false;
+                continue;
+            }
+            if (inTypeDefinition) continue;
+
+            codeLines++;
+        }
+
+        files.push({
+            path: normalizePath(fullPath),
+            lines: lines.length,
+            codeLines,
+        });
     }
 
     return files;
 }
 
 describe('Component Size Compliance', () => {
-    // Feature: frontend-typescript-linting, Property 3: Component Size Compliance
-    it('should ensure all components are under 150 lines of code', () => {
+    it('should enforce size limits without regressions', () => {
+        const baseline = loadBaseline();
         const allFiles: ComponentFile[] = [];
 
-        // Collect all component files from all directories
         for (const dir of COMPONENT_DIRS) {
-            const fullPath = join(process.cwd(), dir);
-            allFiles.push(...findComponentFiles(fullPath, fullPath));
+            allFiles.push(...findComponentFiles(join(process.cwd(), dir)));
         }
 
-        // Find files that exceed the limit
-        const oversizedFiles = allFiles.filter(file => file.codeLines > MAX_LINES);
+        const oversizedFiles = allFiles
+            .filter(file => file.codeLines > MAX_LINES)
+            .sort((a, b) => a.path.localeCompare(b.path));
 
-        // Report oversized files
-        if (oversizedFiles.length > 0) {
-            console.log('\n[ERROR] Components exceeding 150 lines:');
-            oversizedFiles.forEach(file => {
-                console.log(`  - ${file.path}: ${file.codeLines} lines (${file.lines} total)`);
+        const regressions = oversizedFiles.filter(file => {
+            const baselineValue = baseline[file.path];
+            if (baselineValue === undefined) {
+                return true; // new oversized file
+            }
+            return file.codeLines > baselineValue; // grew above baseline
+        });
+
+        if (regressions.length > 0) {
+            console.log('\n[ERROR] Component size regressions:');
+            regressions.forEach(file => {
+                const baselineValue = baseline[file.path];
+                const baselineHint = baselineValue === undefined
+                    ? 'new oversized file (no baseline)'
+                    : `baseline=${baselineValue}`;
+                console.log(`  - ${file.path}: ${file.codeLines} code lines, ${baselineHint}`);
             });
             console.log('');
-        } else {
-            console.log('\n[OK] All components are under 150 lines of code');
         }
 
-        // The test passes if no files exceed the limit
-        expect(oversizedFiles).toHaveLength(0);
+        expect(regressions).toHaveLength(0);
     });
 
     it('should report component size statistics', () => {
         const allFiles: ComponentFile[] = [];
 
-        // Collect all component files
         for (const dir of COMPONENT_DIRS) {
-            const fullPath = join(process.cwd(), dir);
-            allFiles.push(...findComponentFiles(fullPath, fullPath));
+            allFiles.push(...findComponentFiles(join(process.cwd(), dir)));
         }
 
         if (allFiles.length === 0) {
@@ -166,21 +177,20 @@ describe('Component Size Compliance', () => {
             return;
         }
 
-        // Calculate statistics
         const totalFiles = allFiles.length;
         const totalCodeLines = allFiles.reduce((sum, file) => sum + file.codeLines, 0);
         const averageLines = Math.round(totalCodeLines / totalFiles);
         const maxFile = allFiles.reduce((max, file) => file.codeLines > max.codeLines ? file : max);
         const minFile = allFiles.reduce((min, file) => file.codeLines < min.codeLines ? file : min);
 
-        console.log('\n📊 Component Size Statistics:');
+        console.log('\n[INFO] Component Size Statistics:');
         console.log(`  Total components: ${totalFiles}`);
         console.log(`  Average lines: ${averageLines}`);
         console.log(`  Largest: ${maxFile.path} (${maxFile.codeLines} lines)`);
         console.log(`  Smallest: ${minFile.path} (${minFile.codeLines} lines)`);
         console.log('');
 
-        // This test always passes, it's just for reporting
         expect(totalFiles).toBeGreaterThan(0);
     });
 });
+

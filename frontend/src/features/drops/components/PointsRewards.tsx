@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 /* eslint-disable no-alert */
 import { Coins, Edit, Loader2, Plus, Power, PowerOff, Trash2 } from 'lucide-react';
@@ -87,7 +87,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
   const twitchAvailable = !!(actualIntegrations?.twitch?.enabled && user?.twitch_username);
   const vkAvailable = !!(actualIntegrations?.vk?.enabled && (user?.vk_username || user?.vk_channel_name));
 
-  // [OK] УПРОЩЕН�?Е: Автоматически определяем платформу (приоритет: Twitch -> VK)
+  // [OK] SIMPLIFICATION: auto-select platform with Twitch -> VK priority
   useEffect(() => {
     if (!selectedPlatform) {
       if (platform) {
@@ -255,7 +255,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
       <Card className={SURFACE_CARD_CLASS}>
         <CardContent className="p-8">
           <div className="text-center py-8 text-muted-foreground">
-            <h3 className="text-lg font-semibold mb-2">�?нтеграция не подключена</h3>
+            <h3 className="text-lg font-semibold mb-2">Интеграция не подключена</h3>
             <p className="text-sm break-words">
               Подключите Twitch или VK в настройках, чтобы создавать награды.
             </p>

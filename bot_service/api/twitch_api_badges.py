@@ -7,15 +7,10 @@ from services.twitch_badges_service import get_global_badges, get_channel_badges
 from core.config import settings
 import logging
 from cachetools import TTLCache
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# [OK] PERFORMANCE: Кеш для App Access Token (1 час TTL)
-# РР·Р±РµРіР°РµРј РїРѕРІС‚РѕСЂРЅС‹С… Р·Р°РїСЂРѕСЃРѕРІ Рє Twitch OAuth РґР»СЏ РєР°Р¶РґРѕРіРѕ Р·Р°РїСЂРѕСЃР° badges
-_app_token_cache = TTLCache(maxsize=1, ttl=3600)  # 1 С‡Р°СЃ
-_CACHE_KEY = "app_access_token"
-
+_app_token_cache = TTLCache(maxsize=1, ttl=3600)
+_CACHE_KEY = 'app_access_token'
 
 async def get_cached_app_token() -> str:
     """
@@ -27,68 +22,45 @@ async def get_cached_app_token() -> str:
     Raises:
         HTTPException: Если не удалось получить токен
     """
-    # Проверяем кеш
     if _CACHE_KEY in _app_token_cache:
-        logger.debug("[OK] [CACHE HIT] Using cached App Access Token")
+        logger.debug('[OK] [CACHE HIT] Using cached App Access Token')
         return _app_token_cache[_CACHE_KEY]
-
-    logger.debug("[ERROR] [CACHE MISS] Fetching new App Access Token")
-
-    # Получаем новый токен
+    logger.debug('[ERROR] [CACHE MISS] Fetching new App Access Token')
     client_id = settings.twitch_client_id
     client_secret = settings.twitch_client_secret
-
     if not client_id or not client_secret:
-        raise HTTPException(status_code=500, detail="Twitch credentials not configured")
-
+        raise HTTPException(status_code=500, detail='Twitch credentials not configured')
     import aiohttp
     async with aiohttp.ClientSession() as session:
-        async with session.post(
-            "https://id.twitch.tv/oauth2/token",
-            params={
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "grant_type": "client_credentials"
-            }
-        ) as response:
+        async with session.post('https://id.twitch.tv/oauth2/token', params={'client_id': client_id, 'client_secret': client_secret, 'grant_type': 'client_credentials'}) as response:
             if response.status == 200:
                 token_data = await response.json()
-                access_token = token_data["access_token"]
-
-                # Сохраняем в кеш
+                access_token = token_data['access_token']
                 _app_token_cache[_CACHE_KEY] = access_token
-                logger.info("[OK] [CACHE] Stored new App Access Token (TTL: 3600s)")
-
+                logger.info('[OK] [CACHE] Stored new App Access Token (TTL: 3600s)')
                 return access_token
             else:
                 error_text = await response.text()
-                logger.error(f"Failed to get App Access Token: {response.status} - {error_text}")
-                raise HTTPException(status_code=500, detail="Failed to get App Access Token")
+                logger.error(f'Failed to get App Access Token: {response.status} - {error_text}')
+                raise HTTPException(status_code=500, detail='Failed to get App Access Token')
 
-
-@router.get("/badges/global")
+@router.get('/badges/global')
 async def get_twitch_global_badges() -> JSONResponse:
     """
     Получить маппинг глобальных Twitch badges (публичный endpoint)
     """
     try:
         client_id = settings.twitch_client_id
-
-        # [OK] PERFORMANCE: РСЃРїРѕР»СЊР·СѓРµРј РєРµС€РёСЂРѕРІР°РЅРЅС‹Р№ App Access Token
         access_token = await get_cached_app_token()
-
-        # Получаем badges
         badges = await get_global_badges(client_id, access_token)
-
-        return JSONResponse(content={"success": True, "badges": badges})
+        return JSONResponse(content={'success': True, 'badges': badges})
     except HTTPException:
         raise
     except Exception:
-        logger.exception("[ERROR] Error fetching global badges")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception('[ERROR] Error fetching global badges')
+        raise HTTPException(status_code=500, detail='Internal server error')
 
-
-@router.get("/badges/channel/{identifier}")
+@router.get('/badges/channel/{identifier}')
 async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
     """
     Получить маппинг badges конкретного канала (публичный endpoint)
@@ -96,55 +68,33 @@ async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
     """
     try:
         client_id = settings.twitch_client_id
-
         if not client_id:
-            logger.error("Twitch credentials not configured")
-            return JSONResponse(content={"success": True, "badges": {}})
-
-        # [OK] PERFORMANCE: РСЃРїРѕР»СЊР·СѓРµРј РєРµС€РёСЂРѕРІР°РЅРЅС‹Р№ App Access Token
+            logger.error('Twitch credentials not configured')
+            return JSONResponse(content={'success': True, 'badges': {}})
         access_token = await get_cached_app_token()
-
         import aiohttp
         async with aiohttp.ClientSession() as session:
-            # Определяем, что передано: username или broadcaster_id
             broadcaster_id = identifier
-
-            # Если identifier не является числом, значит это username - конвертируем в broadcaster_id
             if not identifier.isdigit():
                 logger.info(f"Converting username '{identifier}' to broadcaster_id...")
-                headers = {
-                    "Authorization": f"Bearer {access_token}",
-                    "Client-Id": client_id
-                }
-
-                async with session.get(
-                    "https://api.twitch.tv/helix/users",
-                    headers=headers,
-                    params={"login": identifier.lower()}
-                ) as user_response:
+                headers = {'Authorization': f'Bearer {access_token}', 'Client-Id': client_id}
+                async with session.get('https://api.twitch.tv/helix/users', headers=headers, params={'login': identifier.lower()}) as user_response:
                     if user_response.status == 200:
                         user_data = await user_response.json()
-                        if user_data.get("data") and len(user_data["data"]) > 0:
-                            broadcaster_id = user_data["data"][0]["id"]
+                        if user_data.get('data') and len(user_data['data']) > 0:
+                            broadcaster_id = user_data['data'][0]['id']
                             logger.info(f"[OK] Converted username '{identifier}' to broadcaster_id: {broadcaster_id}")
                         else:
                             logger.warning(f"User '{identifier}' not found on Twitch")
-                            return JSONResponse(content={"success": True, "badges": {}})
+                            return JSONResponse(content={'success': True, 'badges': {}})
                     else:
                         error_text = await user_response.text()
-                        logger.error(f"Failed to get user info: {user_response.status} - {error_text}")
-                        # Если не удалось получить user info, возвращаем пустые badges вместо ошибки
-                        return JSONResponse(content={"success": True, "badges": {}})
-
-            # Получаем badges
+                        logger.error(f'Failed to get user info: {user_response.status} - {error_text}')
+                        return JSONResponse(content={'success': True, 'badges': {}})
             badges = await get_channel_badges(broadcaster_id, client_id, access_token)
-
-            return JSONResponse(content={"success": True, "badges": badges})
+            return JSONResponse(content={'success': True, 'badges': badges})
     except HTTPException:
         raise
     except Exception:
-        logger.exception("[ERROR] Error fetching channel badges")
-        # Возвращаем пустые badges вместо ошибки, чтобы не ломать интерфейс
-        return JSONResponse(content={"success": True, "badges": {}})
-
-
+        logger.exception('[ERROR] Error fetching channel badges')
+        return JSONResponse(content={'success': True, 'badges': {}})

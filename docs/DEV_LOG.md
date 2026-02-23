@@ -226,9 +226,9 @@
 - **Результат:** Честная система drops, защита от читов
 
 #### 5. TTS Service Architecture ✅
-- **Unified API:** Одинаковый API для TTS Service и TTS Service Simple
+- **Unified API:** Одинаковый API для профилей `tts_service` (advanced и single-node)
 - **TTS Service (Advanced):** Централизованный F5-TTS для нескольких пользователей
-- **TTS Service Simple:** Персональный F5-TTS для одного пользователя
+- **TTS Service (Single-Node):** Персональный F5-TTS профиль без worker pool
 - **Connection-based generation:** TTS генерируется только при активных подключениях
 - **Результат:** Гибкий выбор deployment, экономия ресурсов
 
@@ -305,7 +305,7 @@
 
 - ✅ **Platform Abstraction:** Готовность к Kick, YouTube Live
 - ✅ **Permission System:** Role-based access control
-- ✅ **TTS Service Simple:** Персональный TTS deployment
+- ✅ **TTS Service Single-Node:** Персональный TTS deployment
 - ✅ **Distributed Architecture:** TTS на одной машине, Bot на другой
 - ✅ **Environment Config:** Полная конфигурируемость через .env
 - ✅ **Migration Scripts:** Автоматическая настройка проекта
@@ -624,7 +624,7 @@ alembic upgrade head
 - Analytics Dashboard
 - Skeleton loading вместо Spinner
 - Performance monitoring (Prometheus)
-- �� Advanced caching (Redis)
+- Advanced caching (Redis)
 
 ---
 

@@ -152,7 +152,7 @@ async def get_vk_stream_info(
     user: dict = Depends(get_current_user),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """???????? ?????????? ? VK Live ??????"""
+    """Get stream info from VK Live."""
     try:
         user_id = user.get("id")
         session_id = user.get("session_id")

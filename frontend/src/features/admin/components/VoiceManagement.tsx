@@ -29,6 +29,7 @@ interface VoiceManagementUser {
 
 type SpeedPreset = 'very_slow' | 'slow' | 'normal' | 'fast' | 'very_fast';
 type OwnerType = 'global' | 'user';
+type VoiceProvider = 'f5' | 'qwen';
 
 interface ApiResponse {
     data?: unknown;
@@ -81,6 +82,7 @@ const VoiceManagement: React.FC = () => {
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [voiceName, setVoiceName] = useState<string>('');
     const [ownerId, setOwnerId] = useState<OwnerType>('global');
+    const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>('f5');
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
@@ -100,10 +102,10 @@ const VoiceManagement: React.FC = () => {
 
     // React Query: загружаем голоса для админа
     const { data: voicesData = [], isLoading: voicesLoading, error: voicesError } = useQuery<TtsVoice[]>({
-        queryKey: ['admin-voices'],
+        queryKey: ['admin-voices', voiceProvider],
         queryFn: async (): Promise<TtsVoice[]> => {
             logger.log('[DEBUG] [ADMIN] Fetching voices...');
-            const response = await getAdminVoices();
+            const response = await getAdminVoices(voiceProvider);
             logger.log('[DEBUG] [ADMIN] Raw response:', response);
 
             const apiResponse = response as ApiResponse;
@@ -317,9 +319,9 @@ const VoiceManagement: React.FC = () => {
             if (ownerId === 'user') {
                 const { uploadUserVoice } = await import('../../../services/unified-api');
                 formData.append('user_id', selectedUserId);
-                await uploadUserVoice(parseInt(selectedUserId, 10), formData);
+                await uploadUserVoice(parseInt(selectedUserId, 10), formData, voiceProvider);
             } else {
-                await uploadVoice(formData);
+                await uploadVoice(formData, voiceProvider);
             }
 
             const message = ownerId === 'global'
@@ -331,7 +333,7 @@ const VoiceManagement: React.FC = () => {
             setVoiceName('');
             setOwnerId('global');
             setSelectedUserId('');
-            queryClient.invalidateQueries({ queryKey: ['admin-voices'] });
+            queryClient.invalidateQueries({ queryKey: ['admin-voices', voiceProvider] });
         } catch (error: unknown) {
             const err = error as { message?: string };
             addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось загрузить голос.' });
@@ -347,9 +349,9 @@ const VoiceManagement: React.FC = () => {
         }
 
         try {
-            await deleteVoice(voiceId);
+            await deleteVoice(voiceId, voiceProvider);
             addToast({ type: 'success', title: 'Успех', message: `Голос "${voiceToDelete.name}" удален.` });
-            queryClient.invalidateQueries({ queryKey: ['admin-voices'] });
+            queryClient.invalidateQueries({ queryKey: ['admin-voices', voiceProvider] });
         } catch (error: unknown) {
             const err = error as { message?: string };
             addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось удалить голос.' });
@@ -375,9 +377,9 @@ const VoiceManagement: React.FC = () => {
         if (!newName || newName.trim() === '' || newName === currentVoice.name) return;
 
         try {
-            await renameVoice(currentVoice.id, newName.trim());
+            await renameVoice(currentVoice.id, newName.trim(), voiceProvider);
 
-            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
                 voice.id === currentVoice.id
                     ? { ...voice, name: newName.trim() }
                     : voice
@@ -402,9 +404,9 @@ const VoiceManagement: React.FC = () => {
                 reference_text: currentVoice.reference_text
             };
 
-            await updateVoiceSettings(currentVoice.id, settings);
+            await updateVoiceSettings(currentVoice.id, settings, voiceProvider);
 
-            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
                 voice.id === currentVoice.id
                     ? { ...voice, ...settings }
                     : voice
@@ -427,10 +429,7 @@ const VoiceManagement: React.FC = () => {
 
         setIsTestingVoice(true);
         try {
-            const response = await testVoice(
-                currentVoice.id || 0,
-                testText
-            );
+            const response = await testVoice(currentVoice.id || 0, testText, voiceProvider);
 
             const audioResponse = response as AudioResponse;
             const audioUrl = audioResponse.data?.audio_url || audioResponse.audio_url;
@@ -512,12 +511,12 @@ const VoiceManagement: React.FC = () => {
 
         setIsTranscribing(true);
         try {
-            const response = await retranscribeVoice(currentVoice.id);
+            const response = await retranscribeVoice(currentVoice.id, voiceProvider);
             const transcribeResponse = response as unknown as TranscribeResponse;
 
             setCurrentVoice(prev => prev ? { ...prev, reference_text: transcribeResponse.data.reference_text } : null);
 
-            queryClient.setQueryData(['admin-voices'], (prev: TtsVoice[] = []) => prev.map(voice =>
+            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
                 voice.id === currentVoice.id
                     ? { ...voice, reference_text: transcribeResponse.data.reference_text }
                     : voice
@@ -535,7 +534,7 @@ const VoiceManagement: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <h2 className="flex items-center gap-2 text-2xl font-semibold text-foreground">
                         <Mic className="h-6 w-6 text-muted-foreground" />
@@ -543,13 +542,27 @@ const VoiceManagement: React.FC = () => {
                     </h2>
                     <p className="text-muted-foreground mt-1">Загрузка и управление всеми голосовыми сэмплами</p>
                 </div>
-                <Button
-                    className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={() => setUploadDialogOpen(true)}
-                >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Загрузить голос
-                </Button>
+                <div className="flex items-end gap-2">
+                    <div className="w-44">
+                        <Label className="text-xs text-muted-foreground">Провайдер</Label>
+                        <Select value={voiceProvider} onValueChange={(value) => setVoiceProvider(value as VoiceProvider)}>
+                            <SelectTrigger className="mt-1 h-9">
+                                <SelectValue placeholder="Выберите провайдер" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="f5">F5 TTS</SelectItem>
+                                <SelectItem value="qwen">Qwen 3 TTS</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <Button
+                        className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+                        onClick={() => setUploadDialogOpen(true)}
+                    >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Загрузить голос
+                    </Button>
+                </div>
             </div>
 
             <Card className={SURFACE_CARD_CLASS}>
@@ -584,7 +597,7 @@ const VoiceManagement: React.FC = () => {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-voices'] })}
+                                    onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-voices', voiceProvider] })}
                                     className="text-amber-200 hover:bg-amber-500/15 hover:text-amber-100"
                                 >
                                     <RefreshCw className="h-4 w-4" />

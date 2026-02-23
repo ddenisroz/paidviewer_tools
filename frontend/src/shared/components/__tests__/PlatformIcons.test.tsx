@@ -89,7 +89,7 @@ describe('PlatformIcons', () => {
         it('has correct viewBox', () => {
             const { container } = render(<VKIcon />);
             const svg = container.querySelector('svg');
-            expect(svg).toHaveAttribute('viewBox', '0 0 20 20');
+            expect(svg).toHaveAttribute('viewBox', '2 2 20 20');
         });
 
         it('uses currentColor fill', () => {
@@ -116,7 +116,7 @@ describe('PlatformIcons', () => {
             const vkSvg = vkContainer.querySelector('svg');
             
             expect(twitchSvg?.getAttribute('viewBox')).toBe('0 0 24 24');
-            expect(vkSvg?.getAttribute('viewBox')).toBe('0 0 20 20');
+            expect(vkSvg?.getAttribute('viewBox')).toBe('2 2 20 20');
         });
     });
 });

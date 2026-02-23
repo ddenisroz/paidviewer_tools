@@ -242,7 +242,7 @@ def init_global_commands():
 
                 "description": "Отправить историю сообщений на анализ ИИ",
 
-                "tags": "?????????? ?????",
+                "tags": "Анализ чата",
 
                 "allowed_roles": "broadcaster",
 
@@ -251,7 +251,7 @@ def init_global_commands():
             },
             {
                 "command_name": "memegrant",
-                "description": "?????? ???????? (MemeAlerts) ????? ???",
+                "description": "Выдать мемкоины (MemeAlerts) через чат",
                 "tags": "Memealerts",
                 "allowed_roles": "broadcaster,moderator",
                 "cooldown_seconds": 5

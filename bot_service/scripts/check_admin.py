@@ -22,7 +22,7 @@ def check_admin():
     """Проверить наличие admin пользователя."""
     db = SessionLocal()
     try:
-        # РС‰РµРј admin РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+        # Find admin user
         admin = db.query(User).filter((User.role == 'admin') | (User.is_admin.is_(True))).first()
         
         if admin:

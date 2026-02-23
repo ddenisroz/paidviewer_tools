@@ -204,9 +204,9 @@ async def permanently_delete_user(
     db: Session = Depends(get_db),
 ):
     """
-    [ADMIN ONLY] Окончательное удаление пользователя из базы данных.
-    
-    Р’РќРРњРђРќРР•: Р­С‚Рѕ РґРµР№СЃС‚РІРёРµ РќР•РћР‘Р РђРўРРњРћ!
+    [ADMIN ONLY] Permanently delete a user account from the database.
+
+    WARNING: this operation is irreversible.
     """
     # Проверка прав администратора
     if not (current_user.get('role') == 'admin' or current_user.get('is_admin', False)):
