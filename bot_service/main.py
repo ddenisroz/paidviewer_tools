@@ -15,6 +15,8 @@ import logging
 from pathlib import Path
 
 from dotenv import load_dotenv
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 # === Path Setup ===
 _bot_service_root = Path(__file__).parent
@@ -88,6 +90,68 @@ register_all_routers(app)
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "bot_service"}
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe: process is up."""
+    return {"status": "alive", "service": "bot_service"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe: core dependencies are available."""
+    checks = {
+        "database": "unknown",
+        "tts_queue": "unknown",
+        "websocket_manager": "unknown",
+    }
+    ready = True
+
+    db = None
+    try:
+        from core.database import get_db as _get_db
+
+        db = next(_get_db())
+        db.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception:
+        logger.exception("Readiness database check failed")
+        checks["database"] = "error"
+        ready = False
+    finally:
+        if db is not None:
+            db.close()
+
+    try:
+        from services.tts.memory_tts_queue import get_memory_tts_queue
+
+        queue_running = bool(get_memory_tts_queue()._running)
+        checks["tts_queue"] = "ok" if queue_running else "not_running"
+        ready = ready and queue_running
+    except Exception:
+        logger.exception("Readiness queue check failed")
+        checks["tts_queue"] = "error"
+        ready = False
+
+    try:
+        from services.memory_websocket_manager import get_memory_websocket_manager
+
+        ws_running = bool(get_memory_websocket_manager()._running)
+        checks["websocket_manager"] = "ok" if ws_running else "not_running"
+        ready = ready and ws_running
+    except Exception:
+        logger.exception("Readiness websocket manager check failed")
+        checks["websocket_manager"] = "error"
+        ready = False
+
+    status_code = 200 if ready else 503
+    payload = {
+        "status": "ready" if ready else "not_ready",
+        "service": "bot_service",
+        "checks": checks,
+    }
+    return JSONResponse(status_code=status_code, content=payload)
 
 
 # === Exception Handlers ===

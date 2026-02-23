@@ -1,26 +1,26 @@
-# Многоэтапная сборка для продакшена
+﻿# РњРЅРѕРіРѕСЌС‚Р°РїРЅР°СЏ СЃР±РѕСЂРєР° РґР»СЏ РїСЂРѕРґР°РєС€РµРЅР°
 FROM node:18-alpine as builder
 
 WORKDIR /app
 
-# Копируем package files
+# РљРѕРїРёСЂСѓРµРј package files
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
-# Копируем исходники и собираем
+# РљРѕРїРёСЂСѓРµРј РёСЃС…РѕРґРЅРёРєРё Рё СЃРѕР±РёСЂР°РµРј
 COPY . .
 RUN npm run build
 
-# Production stage с Nginx
+# Production stage СЃ Nginx
 FROM nginx:alpine
 
-# Копируем собранные файлы
+# РљРѕРїРёСЂСѓРµРј СЃРѕР±СЂР°РЅРЅС‹Рµ С„Р°Р№Р»С‹
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Копируем конфигурацию nginx
+# РљРѕРїРёСЂСѓРµРј РєРѕРЅС„РёРіСѓСЂР°С†РёСЋ nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Экспонируем порты
+# Р­РєСЃРїРѕРЅРёСЂСѓРµРј РїРѕСЂС‚С‹
 EXPOSE 80 443
 
 CMD ["nginx", "-g", "daemon off;"]

@@ -31,7 +31,8 @@ async def get_cached_app_token() -> str:
     if not client_id or not client_secret:
         raise HTTPException(status_code=500, detail='Twitch credentials not configured')
     import aiohttp
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=30, connect=10)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         async with session.post('https://id.twitch.tv/oauth2/token', params={'client_id': client_id, 'client_secret': client_secret, 'grant_type': 'client_credentials'}) as response:
             if response.status == 200:
                 token_data = await response.json()
@@ -73,7 +74,8 @@ async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
             return JSONResponse(content={'success': True, 'badges': {}})
         access_token = await get_cached_app_token()
         import aiohttp
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=30, connect=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             broadcaster_id = identifier
             if not identifier.isdigit():
                 logger.info(f"Converting username '{identifier}' to broadcaster_id...")

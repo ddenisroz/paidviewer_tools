@@ -40,6 +40,7 @@ class MemoryWebSocketManager:
         self._running = False
         self._ping_interval = 30
         self._ping_task: Optional[asyncio.Task] = None
+        self._last_server_ping: Dict[str, float] = {}
 
     async def start(self):
         """Start manager."""
@@ -148,6 +149,7 @@ class MemoryWebSocketManager:
                 del self.channel_connections[connection.channel]
 
         del self.connections[conn_id]
+        self._last_server_ping.pop(conn_id, None)
 
         await self.sync_user_tts_generation(user_id)
         await self._schedule_tts_disconnect_if_needed(user_id)
@@ -286,7 +288,7 @@ class MemoryWebSocketManager:
                 current_time = time.time()
                 inactive_connections: List[str] = []
 
-                for conn_id, connection in self.connections.items():
+                for conn_id, connection in list(self.connections.items()):
                     if not connection.is_active:
                         continue
 
@@ -296,10 +298,14 @@ class MemoryWebSocketManager:
                         inactive_connections.append(conn_id)
                         continue
 
-                    if time_since_last_ping > self._ping_interval:
+                    last_server_ping = self._last_server_ping.get(conn_id, 0.0)
+                    if (
+                        time_since_last_ping > self._ping_interval
+                        and (current_time - last_server_ping) >= self._ping_interval
+                    ):
                         try:
                             await connection.websocket.send_json({"type": "ping"})
-                            connection.last_ping = current_time
+                            self._last_server_ping[conn_id] = current_time
                         except Exception as error:
                             logger.warning("Ping failed for %s: %s", conn_id, error)
                             inactive_connections.append(conn_id)

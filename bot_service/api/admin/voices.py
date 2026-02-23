@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form
+﻿from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from core.database import get_db
 from auth.auth import get_current_user
 from core.config import settings
+from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from repositories.user_voice_settings_repository import UserVoiceSettingsRepository
 from typing import Optional
 import logging
@@ -25,10 +26,7 @@ def _tts_unavailable_error(tts_url: str) -> HTTPException:
 
 
 def _tts_auth_headers() -> dict:
-    headers: dict = {}
-    if settings.tts_internal_api_key:
-        headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
-    return headers
+    return build_tts_auth_headers()
 
 
 def _raise_tts_upstream_error(response: httpx.Response, operation: str) -> None:
@@ -62,14 +60,14 @@ async def update_voice_settings(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить настройки голоса
+    """РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё РіРѕР»РѕСЃР°
     
-    Для глобальных голосов: обновляет настройки самого голоса в TTS Service (reference_text, cfg_strength, speed_preset)
-    Для пользовательских голосов: обновляет настройки в TTS Service
-    Также создаёт/обновляет персональные настройки пользователя в bot_service (UserVoiceSettings)
+    Р”Р»СЏ РіР»РѕР±Р°Р»СЊРЅС‹С… РіРѕР»РѕСЃРѕРІ: РѕР±РЅРѕРІР»СЏРµС‚ РЅР°СЃС‚СЂРѕР№РєРё СЃР°РјРѕРіРѕ РіРѕР»РѕСЃР° РІ TTS Service (reference_text, cfg_strength, speed_preset)
+    Р”Р»СЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёС… РіРѕР»РѕСЃРѕРІ: РѕР±РЅРѕРІР»СЏРµС‚ РЅР°СЃС‚СЂРѕР№РєРё РІ TTS Service
+    РўР°РєР¶Рµ СЃРѕР·РґР°С‘С‚/РѕР±РЅРѕРІР»СЏРµС‚ РїРµСЂСЃРѕРЅР°Р»СЊРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ bot_service (UserVoiceSettings)
     """
     try:
-        # Проверяем права доступа (только админ может обновлять дефолты)
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° (С‚РѕР»СЊРєРѕ Р°РґРјРёРЅ РјРѕР¶РµС‚ РѕР±РЅРѕРІР»СЏС‚СЊ РґРµС„РѕР»С‚С‹)
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
@@ -77,9 +75,9 @@ async def update_voice_settings(
         
         user_id = user['id']
         
-        # Для глобальных голосов: обновляем сам голос в TTS Service (reference_text, cfg_strength, speed_preset)
-        # Отправляем запрос в TTS Service для обновления настроек голоса
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        # Р”Р»СЏ РіР»РѕР±Р°Р»СЊРЅС‹С… РіРѕР»РѕСЃРѕРІ: РѕР±РЅРѕРІР»СЏРµРј СЃР°Рј РіРѕР»РѕСЃ РІ TTS Service (reference_text, cfg_strength, speed_preset)
+        # РћС‚РїСЂР°РІР»СЏРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ РЅР°СЃС‚СЂРѕРµРє РіРѕР»РѕСЃР°
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.put(
                 f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/settings",
                 json=settings_dict,
@@ -89,7 +87,7 @@ async def update_voice_settings(
             _raise_tts_upstream_error(response, "update voice settings")
         logger.info(f"[OK] Voice {voice_id} settings updated in TTS Service")
         
-        # Создаём/обновляем персональные настройки пользователя в bot_service
+        # РЎРѕР·РґР°С‘Рј/РѕР±РЅРѕРІР»СЏРµРј РїРµСЂСЃРѕРЅР°Р»СЊРЅС‹Рµ РЅР°СЃС‚СЂРѕР№РєРё РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РІ bot_service
         repo = UserVoiceSettingsRepository(db)
         voice_settings = repo.update_or_create_by_voice_id(user_id, voice_id, settings_dict)
         
@@ -97,7 +95,7 @@ async def update_voice_settings(
         
         return {
             "status": "success",
-            "message": "Настройки голоса обновлены",
+            "message": "РќР°СЃС‚СЂРѕР№РєРё РіРѕР»РѕСЃР° РѕР±РЅРѕРІР»РµРЅС‹",
             "settings": {
                 "voice_id": voice_settings.voice_id,
                 "cfg_strength": voice_settings.cfg_strength,
@@ -124,19 +122,19 @@ async def test_voice(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Тестировать голос с заданным текстом и настройками (прокси к TTS Service с проверкой прав)"""
+    """РўРµСЃС‚РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃ СЃ Р·Р°РґР°РЅРЅС‹Рј С‚РµРєСЃС‚РѕРј Рё РЅР°СЃС‚СЂРѕР№РєР°РјРё (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут тестировать голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ С‚РµСЃС‚РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # Проверяем, что user_id соответствует текущему пользователю
+        # РџСЂРѕРІРµСЂСЏРµРј, С‡С‚Рѕ user_id СЃРѕРѕС‚РІРµС‚СЃС‚РІСѓРµС‚ С‚РµРєСѓС‰РµРјСѓ РїРѕР»СЊР·РѕРІР°С‚РµР»СЋ
         if user.get('id') != user_id:
             raise HTTPException(status_code=403, detail="User ID mismatch")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Подготавливаем данные для FormData в TTS Service
+        # РџРѕРґРіРѕС‚Р°РІР»РёРІР°РµРј РґР°РЅРЅС‹Рµ РґР»СЏ FormData РІ TTS Service
         data = {
             'voice_name': voice_name,
             'user_id': str(user_id),
@@ -147,8 +145,8 @@ async def test_voice(
         if speed_preset is not None:
             data['speed_preset'] = speed_preset
         
-        # Проксируем запрос в TTS Service
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        async with httpx.AsyncClient(timeout=30.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
                 f"{TTS_SERVICE_URL}/api/admin/voices/test",
                 data=data,
@@ -174,16 +172,16 @@ async def get_admin_voices(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список всех голосов (прокси к TTS Service с проверкой прав)"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РІСЃРµС… РіРѕР»РѕСЃРѕРІ (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут просматривать все голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ РїСЂРѕСЃРјР°С‚СЂРёРІР°С‚СЊ РІСЃРµ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Проксируем запрос в TTS Service
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.get(
                 f"{TTS_SERVICE_URL}/api/admin/voices",
                 headers=_tts_auth_headers(),
@@ -197,20 +195,20 @@ async def get_admin_voices(
     except HTTPException:
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
-        # TTS сервис недоступен - возвращаем пустой список с предупреждением
+        # TTS СЃРµСЂРІРёСЃ РЅРµРґРѕСЃС‚СѓРїРµРЅ - РІРѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє СЃ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµРј
         TTS_SERVICE_URL = settings.tts_service_url
-        logger.warning(f"TTS Service недоступен ({TTS_SERVICE_URL}): {e}. Возвращаю пустой список голосов.")
+        logger.warning(f"TTS Service РЅРµРґРѕСЃС‚СѓРїРµРЅ ({TTS_SERVICE_URL}): {e}. Р’РѕР·РІСЂР°С‰Р°СЋ РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє РіРѕР»РѕСЃРѕРІ.")
         return {
             "success": True,
             "voices": [],
             "global_voices": [],
             "user_voices": [],
-            "warning": f"TTS сервис недоступен ({TTS_SERVICE_URL}). Убедитесь, что TTS сервис запущен.",
+            "warning": f"TTS СЃРµСЂРІРёСЃ РЅРµРґРѕСЃС‚СѓРїРµРЅ ({TTS_SERVICE_URL}). РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ TTS СЃРµСЂРІРёСЃ Р·Р°РїСѓС‰РµРЅ.",
             "tts_service_url": TTS_SERVICE_URL
         }
     except Exception:
         logger.exception("Get admin voices error")
-        # Для других ошибок тоже возвращаем пустой список вместо 500
+        # Р”Р»СЏ РґСЂСѓРіРёС… РѕС€РёР±РѕРє С‚РѕР¶Рµ РІРѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє РІРјРµСЃС‚Рѕ 500
         TTS_SERVICE_URL = settings.tts_service_url
         return {
             "success": True,
@@ -228,29 +226,29 @@ async def upload_voice_proxy(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Загрузить голос (прокси к TTS Service с проверкой прав)"""
+    """Р—Р°РіСЂСѓР·РёС‚СЊ РіРѕР»РѕСЃ (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     from validators.file_validators import validate_file_magic_number, ALLOWED_AUDIO_TYPES, validate_voice_file
     
     temp_file_path = None
     try:
-        # Проверяем права доступа - только админы могут загружать голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ Р·Р°РіСЂСѓР¶Р°С‚СЊ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # [OK] SECURITY: Валидация файла (размер, тип, имя)
+        # [OK] SECURITY: Р’Р°Р»РёРґР°С†РёСЏ С„Р°Р№Р»Р° (СЂР°Р·РјРµСЂ, С‚РёРї, РёРјСЏ)
         validate_voice_file(file)
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Читаем файл
+        # Р§РёС‚Р°РµРј С„Р°Р№Р»
         file_content = await file.read()
         
-        # [OK] SECURITY: Сохраняем во временный файл для проверки magic numbers
+        # [OK] SECURITY: РЎРѕС…СЂР°РЅСЏРµРј РІРѕ РІСЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р» РґР»СЏ РїСЂРѕРІРµСЂРєРё magic numbers
         with tempfile.NamedTemporaryFile(delete=False, suffix='.tmp') as temp_file:
             temp_file.write(file_content)
             temp_file_path = temp_file.name
         
-        # [OK] SECURITY: Проверяем magic numbers (реальный тип файла)
+        # [OK] SECURITY: РџСЂРѕРІРµСЂСЏРµРј magic numbers (СЂРµР°Р»СЊРЅС‹Р№ С‚РёРї С„Р°Р№Р»Р°)
         is_valid, error = validate_file_magic_number(temp_file_path, ALLOWED_AUDIO_TYPES)
         
         if not is_valid:
@@ -265,8 +263,8 @@ async def upload_voice_proxy(
         
         logger.info(f"[OK] [SECURITY] Admin voice file validated: admin={user.get('id')}, filename={file.filename}")
         
-        # Проксируем запрос в TTS Service
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
             files = {
                 'file': (file.filename, file_content, file.content_type)
             }
@@ -295,7 +293,7 @@ async def upload_voice_proxy(
         logger.exception("Upload voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
-        # Удаляем временный файл
+        # РЈРґР°Р»СЏРµРј РІСЂРµРјРµРЅРЅС‹Р№ С„Р°Р№Р»
         if temp_file_path and os.path.exists(temp_file_path):
             try:
                 os.unlink(temp_file_path)
@@ -308,16 +306,16 @@ async def delete_voice_proxy(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить голос (прокси к TTS Service с проверкой прав)"""
+    """РЈРґР°Р»РёС‚СЊ РіРѕР»РѕСЃ (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут удалять голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ СѓРґР°Р»СЏС‚СЊ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Проксируем запрос в TTS Service
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.delete(
                 f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}",
                 headers=_tts_auth_headers(),
@@ -344,16 +342,16 @@ async def rename_voice_proxy(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Переименовать голос (прокси к TTS Service с проверкой прав)"""
+    """РџРµСЂРµРёРјРµРЅРѕРІР°С‚СЊ РіРѕР»РѕСЃ (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут переименовывать голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ РїРµСЂРµРёРјРµРЅРѕРІС‹РІР°С‚СЊ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Проксируем запрос в TTS Service с query параметром
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service СЃ query РїР°СЂР°РјРµС‚СЂРѕРј
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.put(
                 f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/rename",
                 params={'new_name': new_name},
@@ -380,20 +378,20 @@ async def transcribe_voice_proxy(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Транскрибировать голос (прокси к TTS Service с проверкой прав)"""
+    """РўСЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃ (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут транскрибировать голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ С‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Проксируем запрос в TTS Service
-        # Проверяем, есть ли такой endpoint в TTS Service
-        # Если нет, используем retranscribe, который делает то же самое
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            # Попробуем найти endpoint для транскрибации в TTS Service
-            # Если его нет, используем retranscribe
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        # РџСЂРѕРІРµСЂСЏРµРј, РµСЃС‚СЊ Р»Рё С‚Р°РєРѕР№ endpoint РІ TTS Service
+        # Р•СЃР»Рё РЅРµС‚, РёСЃРїРѕР»СЊР·СѓРµРј retranscribe, РєРѕС‚РѕСЂС‹Р№ РґРµР»Р°РµС‚ С‚Рѕ Р¶Рµ СЃР°РјРѕРµ
+        async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
+            # РџРѕРїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё endpoint РґР»СЏ С‚СЂР°РЅСЃРєСЂРёР±Р°С†РёРё РІ TTS Service
+            # Р•СЃР»Рё РµРіРѕ РЅРµС‚, РёСЃРїРѕР»СЊР·СѓРµРј retranscribe
             response = await client.post(
                 f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/retranscribe",
                 headers=_tts_auth_headers(),
@@ -419,16 +417,16 @@ async def retranscribe_voice_proxy(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Перетранскрибировать голос (прокси к TTS Service с проверкой прав)"""
+    """РџРµСЂРµС‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃ (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут перетранскрибировать голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ РїРµСЂРµС‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Проксируем запрос в TTS Service
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
                 f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/retranscribe",
                 headers=_tts_auth_headers(),
@@ -454,16 +452,16 @@ async def toggle_voice_proxy(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Включить/выключить голос (прокси к TTS Service с проверкой прав)"""
+    """Р’РєР»СЋС‡РёС‚СЊ/РІС‹РєР»СЋС‡РёС‚СЊ РіРѕР»РѕСЃ (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут включать/выключать голоса
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ РІРєР»СЋС‡Р°С‚СЊ/РІС‹РєР»СЋС‡Р°С‚СЊ РіРѕР»РѕСЃР°
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Проксируем запрос в TTS Service
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
                 f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/toggle",
                 headers=_tts_auth_headers(),
@@ -488,16 +486,16 @@ async def get_tts_stats(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить статистику TTS Service (прокси к TTS Service с проверкой прав)"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ TTS Service (РїСЂРѕРєСЃРё Рє TTS Service СЃ РїСЂРѕРІРµСЂРєРѕР№ РїСЂР°РІ)"""
     try:
-        # Проверяем права доступа - только админы могут просматривать статистику
+        # РџСЂРѕРІРµСЂСЏРµРј РїСЂР°РІР° РґРѕСЃС‚СѓРїР° - С‚РѕР»СЊРєРѕ Р°РґРјРёРЅС‹ РјРѕРіСѓС‚ РїСЂРѕСЃРјР°С‚СЂРёРІР°С‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
         TTS_SERVICE_URL = settings.tts_service_url
         
-        # Проксируем запрос в TTS Service
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.get(
                 f"{TTS_SERVICE_URL}/api/admin/stats",
                 headers=_tts_auth_headers(),
@@ -516,6 +514,7 @@ async def get_tts_stats(
     except Exception:
         logger.exception("Get TTS stats error")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 
 

@@ -19,7 +19,6 @@ export * from './platformHelpers';
 export * from './preloadRoute';
 export * from '@/shared/utils/prodLogger';
 export * from './queryPersist';
-export * from './requestDeduplication';
 export * from './sharedWebSocket';
 export * from '@/shared/utils/toastManager';
 export * from './urlUtils';

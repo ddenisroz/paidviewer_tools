@@ -12,6 +12,7 @@ Features:
 - Log rotation
 """
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Any, Dict
@@ -22,6 +23,57 @@ from structlog.types import EventDict, Processor
 from core.config import settings
 
 module_logger = logging.getLogger(__name__)
+
+_SENSITIVE_TEXT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(r"(?i)(authorization\\s*[:=]\\s*)(bearer\\s+)?[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(access_token\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(refresh_token\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(client_secret\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(api[_-]?key\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(password\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(code\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(state\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+]
+
+
+def _redact_text(value: str) -> str:
+    redacted = value
+    for pattern, replacement in _SENSITIVE_TEXT_PATTERNS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
+def _redact_object(value: Any) -> Any:
+    if isinstance(value, dict):
+        result: Dict[Any, Any] = {}
+        for key, item in value.items():
+            key_str = str(key).lower()
+            if any(s in key_str for s in ("authorization", "token", "secret", "password", "api_key", "code", "state")):
+                result[key] = "[FILTERED]"
+            else:
+                result[key] = _redact_object(item)
+        return result
+    if isinstance(value, (list, tuple)):
+        redacted_seq = [_redact_object(item) for item in value]
+        return type(value)(redacted_seq)
+    if isinstance(value, str):
+        return _redact_text(value)
+    return value
+
+
+class SensitiveDataFilter(logging.Filter):
+    """Log filter that redacts sensitive values in stdlib logging records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
+        try:
+            if isinstance(record.msg, str):
+                record.msg = _redact_text(record.msg)
+            if record.args:
+                record.args = _redact_object(record.args)
+        except Exception:
+            # Never block logging because of redaction errors.
+            return True
+        return True
 
 
 def add_app_context(logger: Any, method_name: str, event_dict: EventDict) -> EventDict:
@@ -219,6 +271,7 @@ def setup_structured_logging():
     console_handler = logging.StreamHandler(utf8_stdout)
     console_handler.setLevel(log_level)
     console_handler.setFormatter(console_formatter)
+    console_handler.addFilter(SensitiveDataFilter())
     root_logger.addHandler(console_handler)
     
     # Redirect warnings to logging
@@ -287,6 +340,7 @@ def setup_log_rotation():
 
     handler.setFormatter(formatter)
     handler.setLevel(file_log_level)
+    handler.addFilter(SensitiveDataFilter())
 
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)

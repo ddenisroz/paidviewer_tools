@@ -1,6 +1,6 @@
-# bot_service/services/admin/bot_control_service.py
+﻿# bot_service/services/admin/bot_control_service.py
 """
-Сервис управления ботами (статус, перезапуск).
+РЎРµСЂРІРёСЃ СѓРїСЂР°РІР»РµРЅРёСЏ Р±РѕС‚Р°РјРё (СЃС‚Р°С‚СѓСЃ, РїРµСЂРµР·Р°РїСѓСЃРє).
 """
 
 import logging
@@ -9,6 +9,7 @@ import httpx
 
 from core.config import settings
 from core.datetime_utils import utcnow_naive
+from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from core.connection_manager import get_connection_manager
 from core.database import get_db
 from startup.bot_registry import get_bot_registry
@@ -17,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class BotControlService:
-    """Сервис для управления ботами."""
+    """РЎРµСЂРІРёСЃ РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ Р±РѕС‚Р°РјРё."""
 
     async def get_bots_status(self) -> dict:
-        """Получить статус всех ботов."""
+        """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ РІСЃРµС… Р±РѕС‚РѕРІ."""
         try:
             registry = get_bot_registry()
             connection_manager = get_connection_manager()
@@ -84,7 +85,7 @@ class BotControlService:
             }
 
     async def restart_bot(self, bot_name: str) -> dict:
-        """Перезапустить бота."""
+        """РџРµСЂРµР·Р°РїСѓСЃС‚РёС‚СЊ Р±РѕС‚Р°."""
         try:
             registry = get_bot_registry()
             connection_manager = get_connection_manager()
@@ -101,13 +102,13 @@ class BotControlService:
             return {"error": "Failed to restart bot"}
 
     async def _restart_twitch_bot(self, registry, connection_manager) -> dict:
-        """Перезапустить Twitch бота."""
+        """РџРµСЂРµР·Р°РїСѓСЃС‚РёС‚СЊ Twitch Р±РѕС‚Р°."""
         logger.info("[REFRESH] Restarting Twitch bot...")
 
-        # Останавливаем текущий бот
+        # РћСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‚РµРєСѓС‰РёР№ Р±РѕС‚
         await registry.stop_twitch_bot()
 
-        # Получаем активные каналы
+        # РџРѕР»СѓС‡Р°РµРј Р°РєС‚РёРІРЅС‹Рµ РєР°РЅР°Р»С‹
         db = next(get_db())
         try:
             active_channels = await connection_manager.get_twitch_channels_for_bot(db)
@@ -126,13 +127,13 @@ class BotControlService:
         }
 
     async def _restart_vk_bot(self, registry, connection_manager) -> dict:
-        """Перезапустить VK Live бота."""
+        """РџРµСЂРµР·Р°РїСѓСЃС‚РёС‚СЊ VK Live Р±РѕС‚Р°."""
         logger.info("[REFRESH] Restarting VK Live bot...")
 
-        # Останавливаем текущий бот
+        # РћСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‚РµРєСѓС‰РёР№ Р±РѕС‚
         await registry.stop_vk_bot()
 
-        # Получаем активные каналы
+        # РџРѕР»СѓС‡Р°РµРј Р°РєС‚РёРІРЅС‹Рµ РєР°РЅР°Р»С‹
         db = next(get_db())
         try:
             active_channels = await connection_manager.get_vk_channels_for_bot(db)
@@ -144,7 +145,7 @@ class BotControlService:
         if not success:
             return {"error": "VK bot OAuth token not configured. Use /auth/vk/bot/login"}
 
-        # Подключаем к каналам
+        # РџРѕРґРєР»СЋС‡Р°РµРј Рє РєР°РЅР°Р»Р°Рј
 
         logger.info(f"[OK] VK Live bot restarted with channels: {active_channels}")
         return {
@@ -153,16 +154,14 @@ class BotControlService:
         }
 
     async def restart_tts_engine(self) -> dict:
-        """Перезагрузить TTS движок."""
+        """РџРµСЂРµР·Р°РіСЂСѓР·РёС‚СЊ TTS РґРІРёР¶РѕРє."""
         try:
             tts_service_url = settings.tts_service_url
             if not tts_service_url:
                 raise ValueError("TTS_SERVICE_URL is not configured")
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                headers = {}
-                if settings.tts_internal_api_key:
-                    headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
+            async with httpx.AsyncClient(timeout=30.0, **build_tts_httpx_client_kwargs()) as client:
+                headers = build_tts_auth_headers()
                 response = await client.post(f"{tts_service_url}/api/tts/restart", headers=headers)
 
                 if response.status_code == 200:
@@ -179,4 +178,5 @@ class BotControlService:
 
 # Singleton instance
 bot_control_service = BotControlService()
+
 

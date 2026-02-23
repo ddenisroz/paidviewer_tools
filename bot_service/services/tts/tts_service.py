@@ -85,12 +85,19 @@ class TTSService:
                 text_length=len(text)
             )
 
-            if not limit_result['allowed']:
+            allowed = bool(limit_result.get("allowed")) if isinstance(limit_result, dict) else bool(limit_result)
+            retry_after = (
+                int(limit_result.get("retry_after", 10))
+                if isinstance(limit_result, dict)
+                else 10
+            )
+
+            if not allowed:
                 logger.warning(f"Rate limit exceeded for user {rate_limit_id}")
                 return {
                     "success": False,
                     "error": "Rate limit exceeded",
-                    "retry_after": 10
+                    "retry_after": max(1, retry_after),
                 }
 
             # 4. Fetch User Settings (for metadata in queue)

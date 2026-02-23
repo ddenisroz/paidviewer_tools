@@ -1,10 +1,10 @@
-# Multi-stage build для TTS Service
-# Multi-stage build для TTS Service
+﻿# Multi-stage build РґР»СЏ TTS Service
+# Multi-stage build РґР»СЏ TTS Service
 FROM python:3.12-slim as builder
 
 WORKDIR /build
 
-# Устанавливаем системные зависимости для сборки
+# РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃРёСЃС‚РµРјРЅС‹Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё РґР»СЏ СЃР±РѕСЂРєРё
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем requirements и устанавливаем зависимости
+# РљРѕРїРёСЂСѓРµРј requirements Рё СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
@@ -22,23 +22,23 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Устанавливаем runtime зависимости
+# РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј runtime Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
 RUN apt-get update && apt-get install -y \
     libsndfile1 \
     ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем установленные пакеты из builder
+# РљРѕРїРёСЂСѓРµРј СѓСЃС‚Р°РЅРѕРІР»РµРЅРЅС‹Рµ РїР°РєРµС‚С‹ РёР· builder
 COPY --from=builder /root/.local /root/.local
 
-# Добавляем в PATH
+# Р”РѕР±Р°РІР»СЏРµРј РІ PATH
 ENV PATH=/root/.local/bin:$PATH
 
-# Копируем приложение
+# РљРѕРїРёСЂСѓРµРј РїСЂРёР»РѕР¶РµРЅРёРµ
 COPY . .
 
-# Создаем необходимые директории
+# РЎРѕР·РґР°РµРј РЅРµРѕР±С…РѕРґРёРјС‹Рµ РґРёСЂРµРєС‚РѕСЂРёРё
 RUN mkdir -p \
     /app/audio/cache \
     /app/audio/voices/global \
@@ -47,19 +47,19 @@ RUN mkdir -p \
     /app/backups \
     /app/f5_tts_cache
 
-# Создаем пользователя для безопасности
+# РЎРѕР·РґР°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 
 USER appuser
 
-# Экспонируем порт
+# Р­РєСЃРїРѕРЅРёСЂСѓРµРј РїРѕСЂС‚
 EXPOSE 8001
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8001/health || exit 1
+    CMD curl -f http://localhost:8001/health/live || exit 1
 
-# Запускаем с production настройками
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4", "--log-level", "info"]
+# Р—Р°РїСѓСЃРєР°РµРј СЃ production РЅР°СЃС‚СЂРѕР№РєР°РјРё
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "1", "--log-level", "info"]
 

@@ -38,6 +38,53 @@ async def health_check():
     }
 
 
+@health_router.get("/health/live")
+async def health_live():
+    """Liveness probe: process is up."""
+    return {"status": "alive", "service": "f5_tts"}
+
+
+@health_router.get("/health/ready")
+async def health_ready(db: Session = Depends(get_db)):
+    """Readiness probe: dependencies are available."""
+    checks = {
+        "database": "unknown",
+        "tts_engine": "unknown",
+        "background_tasks": "unknown",
+    }
+    ready = True
+
+    try:
+        db.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception:
+        logger.exception("Readiness DB check failed")
+        checks["database"] = "error"
+        ready = False
+
+    try:
+        engine_ready = bool(tts_engine_manager.is_ready())
+        checks["tts_engine"] = "ok" if engine_ready else "not_ready"
+        ready = ready and engine_ready
+    except Exception:
+        logger.exception("Readiness TTS engine check failed")
+        checks["tts_engine"] = "error"
+        ready = False
+
+    try:
+        bg_running = bool(background_task_manager.is_running())
+        checks["background_tasks"] = "ok" if bg_running else "not_running"
+        ready = ready and bg_running
+    except Exception:
+        logger.exception("Readiness background tasks check failed")
+        checks["background_tasks"] = "error"
+        ready = False
+
+    if ready:
+        return {"status": "ready", "service": "f5_tts", "checks": checks}
+    raise HTTPException(status_code=503, detail={"status": "not_ready", "service": "f5_tts", "checks": checks})
+
+
 @api_health_router.get("/health")
 async def api_health_check_alias():
     """Compatibility alias used by bot_service."""

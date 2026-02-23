@@ -57,6 +57,42 @@ class Settings(BaseSettings):
         default=None,
         description="Shared internal API key for bot_service -> tts_service admin calls",
     )
+    internal_service_jwt_enabled: bool = Field(
+        default=True,
+        description="Enable signed JWT for internal service-to-service calls",
+    )
+    internal_service_jwt_issuer: str = Field(
+        default="bot_service",
+        description="Issuer claim for internal service JWT",
+    )
+    internal_service_jwt_audience_tts: str = Field(
+        default="f5_tts",
+        description="Audience claim for bot_service -> F5_tts JWT",
+    )
+    internal_service_jwt_secret: Optional[str] = Field(
+        default=None,
+        description="Optional dedicated signing secret for internal service JWT (falls back to SECRET_KEY)",
+    )
+    internal_service_jwt_ttl_seconds: int = Field(
+        default=120,
+        description="TTL for internal service JWT in seconds",
+    )
+    internal_service_mtls_enabled: bool = Field(
+        default=False,
+        description="Enable mTLS client certs for internal service-to-service HTTP calls",
+    )
+    internal_service_ca_cert_path: Optional[str] = Field(
+        default=None,
+        description="Optional CA bundle path used to verify internal service TLS certificate",
+    )
+    internal_service_client_cert_path: Optional[str] = Field(
+        default=None,
+        description="Optional client certificate path for mTLS internal calls",
+    )
+    internal_service_client_key_path: Optional[str] = Field(
+        default=None,
+        description="Optional client private key path for mTLS internal calls",
+    )
     cors_origins: str = Field(
         default="http://localhost:5173,http://localhost:3000",
         description="CORS allowed origins (comma-separated)"
@@ -256,6 +292,14 @@ class Settings(BaseSettings):
         """Validate port number"""
         if not 1 <= v <= 65535:
             raise ValueError(f"Port must be between 1 and 65535, got {v}")
+        return v
+
+    @field_validator("internal_service_jwt_ttl_seconds")
+    @classmethod
+    def validate_internal_jwt_ttl(cls, v: int) -> int:
+        """Validate internal JWT TTL to avoid near-eternal tokens."""
+        if v < 30 or v > 3600:
+            raise ValueError("INTERNAL_SERVICE_JWT_TTL_SECONDS must be between 30 and 3600")
         return v
 
     @field_validator('max_requests_per_minute')

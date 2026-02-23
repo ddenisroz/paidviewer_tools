@@ -6,6 +6,7 @@ import logging
 import time
 import sys
 import os
+import asyncio
 from core.database import get_db
 from services.youtube.queue_service import QueueService
 from repositories.command_repository import CommandRepository
@@ -293,12 +294,15 @@ async def search_youtube_videos(query: str=None, platform: str='youtube', user: 
         ydl_opts = {'quiet': True, 'no_warnings': True, 'default_search': 'ytsearch5', 'extract_flat': True, 'skip_download': True}
         search_results = []
         try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(query, download=False)
-                if 'entries' in info:
-                    for entry in info['entries'][:5]:
-                        if entry.get('id'):
-                            search_results.append({'video_id': entry.get('id'), 'title': entry.get('title', 'Unknown'), 'thumbnail': entry.get('thumbnail', f"https://img.youtube.com/vi/{entry.get('id')}/mqdefault.jpg"), 'channel': entry.get('uploader', 'Unknown'), 'duration': entry.get('duration', 'Unknown'), 'url': f"https://www.youtube.com/watch?v={entry.get('id')}"})
+            def _extract_info():
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    return ydl.extract_info(query, download=False)
+
+            info = await asyncio.to_thread(_extract_info)
+            if 'entries' in info:
+                for entry in info['entries'][:5]:
+                    if entry.get('id'):
+                        search_results.append({'video_id': entry.get('id'), 'title': entry.get('title', 'Unknown'), 'thumbnail': entry.get('thumbnail', f"https://img.youtube.com/vi/{entry.get('id')}/mqdefault.jpg"), 'channel': entry.get('uploader', 'Unknown'), 'duration': entry.get('duration', 'Unknown'), 'url': f"https://www.youtube.com/watch?v={entry.get('id')}"})
         except Exception as yt_error:
             logger.warning(f'yt-dlp search failed: {yt_error}, using fallback')
             search_results = []

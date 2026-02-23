@@ -36,6 +36,19 @@ Source of truth: `users.role='admin'`.
 - Add redirect URL:
   - Local: `http://localhost:8000/auth/twitch/bot/callback`
   - Prod: `https://<your-domain>/auth/twitch/bot/callback`
+- Bot OAuth requests these scopes:
+  - `chat:read`
+  - `chat:edit`
+  - `channel:moderate`
+  - `moderation:read`
+  - `channel:read:polls`
+  - `channel:manage:polls`
+  - `channel:manage:predictions`
+  - `channel:manage:redemptions`
+  - `channel:manage:broadcast`
+  - `clips:edit`
+  - `whispers:read`
+  - `whispers:edit`
 
 ### VK Live
 

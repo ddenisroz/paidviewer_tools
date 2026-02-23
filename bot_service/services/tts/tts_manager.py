@@ -584,7 +584,8 @@ class TTSManager:
             async with aiofiles.open(audio_path, "rb") as file_handle:
                 audio_data = await file_handle.read()
 
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 data = aiohttp.FormData()
                 data.add_field("file", audio_data, filename=filename, content_type="audio/wav")
 

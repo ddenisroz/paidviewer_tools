@@ -1,6 +1,6 @@
 ﻿# Local TTS Integration (F5 + Qwen)
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 ## Goal
 
@@ -93,7 +93,8 @@ Check:
 
 - correct provider query (`provider=f5|qwen`).
 - upstream provider service responds to `/api/tts/voices/global`.
-- internal auth key (`TTS_INTERNAL_API_KEY`) if enabled.
+- service JWT contract (`INTERNAL_SERVICE_JWT_*`) or compatibility key (`TTS_INTERNAL_API_KEY`).
+- when using internal HTTPS/mTLS, verify `INTERNAL_SERVICE_MTLS_*` certificate paths in `bot_service`.
 
 ### Google Cloud not working
 
@@ -107,5 +108,6 @@ And verify credentials (ADC or API key) on backend side.
 ## 7. Security recommendations
 
 - Keep local endpoints private (LAN/VPN/Tunnel), not public without auth.
-- Use `TTS_INTERNAL_API_KEY` for service-to-service protection.
+- Prefer short-lived service JWT (`Authorization: Bearer`) for service-to-service auth.
+- Keep `TTS_INTERNAL_API_KEY` only for transition compatibility.
 - Rotate tokens/API keys periodically.

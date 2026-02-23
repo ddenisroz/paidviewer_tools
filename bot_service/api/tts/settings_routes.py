@@ -10,6 +10,7 @@ from typing import List, Optional
 from core.database import get_db
 from auth.auth import get_current_user
 from core.config import settings
+from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from constants import DEFAULT_ENABLED_PLATFORMS
 from services.tts.tts_service import TTSService
 from services.tts.google_cloud_tts import (
@@ -57,10 +58,7 @@ def get_tts_service(db: Session = Depends(get_db)) -> TTSService:
 
 
 def _tts_auth_headers() -> dict:
-    headers: dict = {}
-    if settings.tts_internal_api_key:
-        headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
-    return headers
+    return build_tts_auth_headers()
 
 
 def _is_admin(user: dict) -> bool:
@@ -424,7 +422,7 @@ async def get_global_voices(
 
     tts_url = get_provider_service_url(resolved_provider)
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             resp = await client.get(
                 f"{tts_url}/api/tts/voices/global",
                 headers=_tts_auth_headers(),
@@ -466,7 +464,7 @@ async def get_user_voices(
 
     tts_url = get_provider_service_url(resolved_provider)
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             resp = await client.get(
                 f"{tts_url}/api/tts/user/voices/{target_user_id}",
                 headers=_tts_auth_headers(),
@@ -636,6 +634,7 @@ async def set_listening_mode(
         raise HTTPException(status_code=500, detail="Failed to save listening mode")
 
     return {"success": True, "listening_mode": mode, "listeningMode": mode}
+
 
 
 

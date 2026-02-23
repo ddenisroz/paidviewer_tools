@@ -1,14 +1,12 @@
-services:
+﻿services:
   # Postgres Database
   postgres:
     image: postgres:15-alpine
     container_name: tts_postgres_prod
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-app_data}
-    ports:
-      - "5432:5432"
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      - POSTGRES_DB=${POSTGRES_DB:?POSTGRES_DB is required}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -18,23 +16,21 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis для кеширования и rate limiting
+  # Redis РґР»СЏ РєРµС€РёСЂРѕРІР°РЅРёСЏ Рё rate limiting
   redis:
     image: redis:7-alpine
     container_name: tts_redis_prod
-    command: redis-server --requirepass ${REDIS_PASSWORD:-your_redis_password}
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:?REDIS_PASSWORD is required} ping"]
       interval: 10s
       timeout: 3s
       retries: 3
 
-  # TTS Service - генерация речи
+  # TTS Service - РіРµРЅРµСЂР°С†РёСЏ СЂРµС‡Рё
   tts_service:
     build:
       context: ../../F5_tts
@@ -46,13 +42,20 @@ services:
       - ENVIRONMENT=production
       - TTS_DEBUG=false
       - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
+      - ALGORITHM=HS256
+      - TTS_INTERNAL_API_KEY=${TTS_INTERNAL_API_KEY}
+      - INTERNAL_SERVICE_JWT_SECRET=${INTERNAL_SERVICE_JWT_SECRET}
+      - INTERNAL_SERVICE_JWT_ISSUER=${INTERNAL_SERVICE_JWT_ISSUER:-bot_service}
+      - INTERNAL_SERVICE_JWT_AUDIENCE=${INTERNAL_SERVICE_JWT_AUDIENCE:-f5_tts}
+      - INTERNAL_SERVICE_JWT_ALLOWED_SUBJECTS=${INTERNAL_SERVICE_JWT_ALLOWED_SUBJECTS:-bot_service}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
       - HF_HOME=/app/f5_tts_cache
       - CORS_ORIGINS=${FRONTEND_URL:-https://yourdomain.com}
       - TTS_WORKERS=4
       # Redis
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       # Async Architecture
       - MAX_CONCURRENT_SYNTHESIS=4
       - MAX_CONCURRENT_CONVERSIONS=8
@@ -68,13 +71,13 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
-  # TTS Workers - обработка очередей
+  # TTS Workers - РѕР±СЂР°Р±РѕС‚РєР° РѕС‡РµСЂРµРґРµР№
   tts_worker_1:
     build:
       context: ../../F5_tts
@@ -85,10 +88,10 @@ services:
       - ENVIRONMENT=production
       - TTS_DEBUG=false
       - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
       - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_1
     volumes:
       - ../../F5_tts/audio:/app/audio
@@ -111,10 +114,10 @@ services:
       - ENVIRONMENT=production
       - TTS_DEBUG=false
       - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
       - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_2
     volumes:
       - ../../F5_tts/audio:/app/audio
@@ -137,10 +140,10 @@ services:
       - ENVIRONMENT=production
       - TTS_DEBUG=false
       - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
       - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_3
     volumes:
       - ../../F5_tts/audio:/app/audio
@@ -163,10 +166,10 @@ services:
       - ENVIRONMENT=production
       - TTS_DEBUG=false
       - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
       - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_4
     volumes:
       - ../../F5_tts/audio:/app/audio
@@ -179,7 +182,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # Bot Service - основной API
+  # Bot Service - РѕСЃРЅРѕРІРЅРѕР№ API
   bot_service:
     build:
       context: ../../bot_service
@@ -191,9 +194,19 @@ services:
       - ENVIRONMENT=production
       - DEBUG=false
       - LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
-      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY is required}
       - ALGORITHM=HS256
+      - TTS_INTERNAL_API_KEY=${TTS_INTERNAL_API_KEY}
+      - INTERNAL_SERVICE_JWT_ENABLED=${INTERNAL_SERVICE_JWT_ENABLED:-true}
+      - INTERNAL_SERVICE_JWT_ISSUER=${INTERNAL_SERVICE_JWT_ISSUER:-bot_service}
+      - INTERNAL_SERVICE_JWT_AUDIENCE_TTS=${INTERNAL_SERVICE_JWT_AUDIENCE_TTS:-f5_tts}
+      - INTERNAL_SERVICE_JWT_SECRET=${INTERNAL_SERVICE_JWT_SECRET}
+      - INTERNAL_SERVICE_JWT_TTL_SECONDS=${INTERNAL_SERVICE_JWT_TTL_SECONDS:-120}
+      - INTERNAL_SERVICE_MTLS_ENABLED=${INTERNAL_SERVICE_MTLS_ENABLED:-false}
+      - INTERNAL_SERVICE_CA_CERT_PATH=${INTERNAL_SERVICE_CA_CERT_PATH}
+      - INTERNAL_SERVICE_CLIENT_CERT_PATH=${INTERNAL_SERVICE_CLIENT_CERT_PATH}
+      - INTERNAL_SERVICE_CLIENT_KEY_PATH=${INTERNAL_SERVICE_CLIENT_KEY_PATH}
       
       # URLs
       - BACKEND_URL=${BACKEND_URL:-https://yourdomain.com}
@@ -203,7 +216,7 @@ services:
       - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-https://qwen-tts.yourdomain.com}
       
       # Redis
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-your_redis_password}@redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - RATE_LIMIT_ENABLED=true
       - MAX_REQUESTS_PER_MINUTE=60
       
@@ -259,7 +272,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
       interval: 30s
       timeout: 10s
       retries: 3

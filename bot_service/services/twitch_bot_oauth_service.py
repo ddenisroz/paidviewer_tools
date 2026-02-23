@@ -32,6 +32,13 @@ class TwitchBotOAuthService:
         'chat:read',      # Чтение сообщений чата
         'chat:edit',      # Отправка сообщений в чат
         'channel:moderate',  # Модерация (опционально)
+        'moderation:read',  # Чтение модерационных данных
+        'channel:read:polls',  # Чтение опросов
+        'channel:manage:polls',  # Управление опросами
+        'channel:manage:predictions',  # Управление предсказаниями
+        'channel:manage:redemptions',  # Управление Channel Points redemption
+        'channel:manage:broadcast',  # Обновление title/category стрима
+        'clips:edit',  # Создание клипов
         'whispers:read',  # Чтение whispers (опционально)
         'whispers:edit'   # Отправка whispers (опционально)
     ]

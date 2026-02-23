@@ -61,7 +61,7 @@ class ConnectionManager(ConnectionManagerCore):
             from auth.auth import verify_jwt_token
 
             try:
-                payload = verify_jwt_token(token)
+                payload = verify_jwt_token(token, expected_type="obs")
                 if payload and 'user_id' in payload:
                     user_id = payload['user_id']
                     self.cancel_tts_disconnect(user_id)
@@ -92,7 +92,7 @@ class ConnectionManager(ConnectionManagerCore):
                 from core.database import get_db, User
 
                 try:
-                    payload = verify_jwt_token(token)
+                    payload = verify_jwt_token(token, expected_type="obs")
                     if payload and 'user_id' in payload:
                         user_id = payload['user_id']
                         db = next(get_db())

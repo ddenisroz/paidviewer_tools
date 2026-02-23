@@ -1,5 +1,6 @@
 # bot_service/services/youtube/youtube_service.py
 # -*- coding: utf-8 -*-
+import asyncio
 import re
 import aiohttp
 import logging
@@ -115,17 +116,29 @@ class YouTubeService:
             # First fallback: read metadata via pytube.
             try:
                 from pytube import YouTube
-                yt = YouTube(video_url)
+
+                def _read_pytube_info() -> Dict[str, Any]:
+                    yt = YouTube(video_url)
+                    return {
+                        'title': yt.title or f"YouTube Video {video_id}",
+                        'duration': self._format_duration_seconds(yt.length or 0),
+                        'thumbnail_url': yt.thumbnail_url or f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
+                        'channel_title': yt.author or "Unknown Channel",
+                        'view_count': yt.views or 0,
+                        'description': (yt.description or "")[:500],
+                    }
+
+                pytube_info = await asyncio.to_thread(_read_pytube_info)
 
                 return {
                     'video_id': video_id,
-                    'title': yt.title or f"YouTube Video {video_id}",
-                    'duration': self._format_duration_seconds(yt.length or 0),
-                    'thumbnail_url': yt.thumbnail_url or f"https://img.youtube.com/vi/{video_id}/mqdefault.jpg",
-                    'channel_title': yt.author or "Unknown Channel",
-                    'view_count': yt.views or 0,
+                    'title': pytube_info['title'],
+                    'duration': pytube_info['duration'],
+                    'thumbnail_url': pytube_info['thumbnail_url'],
+                    'channel_title': pytube_info['channel_title'],
+                    'view_count': pytube_info['view_count'],
                     'like_count': 0,
-                    'description': (yt.description or "")[:500],
+                    'description': pytube_info['description'],
                     'url': video_url,
                     'is_fallback': True
                 }
@@ -242,8 +255,13 @@ class YouTubeService:
                 'skip_download': True,
                 'extract_flat': False
             }
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(video_url, download=False)
+
+            def _extract_info() -> dict:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    return ydl.extract_info(video_url, download=False)
+
+            info = await asyncio.to_thread(_extract_info)
+
             if not info:
                 return None
             video_id = info.get('id') or self._extract_video_id(video_url) or ''
@@ -281,8 +299,13 @@ class YouTubeService:
                 'skip_download': True,
             }
             results = []
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(query, download=False)
+
+            def _extract_search() -> dict:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    return ydl.extract_info(query, download=False)
+
+            info = await asyncio.to_thread(_extract_search)
+
             for entry in (info.get('entries') or [])[:max_results]:
                 video_id = entry.get('id')
                 if not video_id:
@@ -327,7 +350,8 @@ class YouTubeService:
                 'key': self.api_key
             }
 
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(url, params=params) as response:
                     if response.status == 200:
                         data = await response.json()

@@ -211,10 +211,6 @@ class AuthHandlers:
                 db_session.close()
         is_guest = user_type == UserType.GUEST
         response = JSONResponse(content={'success': True, 'message': 'Logged out successfully', 'tokens_deleted': not is_guest})
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRFToken'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.delete_cookie(key='session_id', httponly=True, samesite='lax')
         logger.info(f'[LOGOUT] User {user_id} logged out successfully')
         return response

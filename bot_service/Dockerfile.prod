@@ -1,25 +1,25 @@
-FROM python:3.11-slim
+﻿FROM python:3.11-slim
 
 WORKDIR /app
 
-# Устанавливаем системные зависимости
+# РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃРёСЃС‚РµРјРЅС‹Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
 RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем requirements и устанавливаем зависимости
+# РљРѕРїРёСЂСѓРµРј requirements Рё СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копируем приложение
+# РљРѕРїРёСЂСѓРµРј РїСЂРёР»РѕР¶РµРЅРёРµ
 COPY . .
 
-# Создаем пользователя для безопасности
+# РЎРѕР·РґР°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Экспонируем порт
+# Р­РєСЃРїРѕРЅРёСЂСѓРµРј РїРѕСЂС‚
 EXPOSE 8000
 
-# Запускаем с продакшен настройками
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Р—Р°РїСѓСЃРєР°РµРј СЃ РїСЂРѕРґР°РєС€РµРЅ РЅР°СЃС‚СЂРѕР№РєР°РјРё
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

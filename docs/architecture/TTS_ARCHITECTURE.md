@@ -1,6 +1,6 @@
 ﻿# TTS Architecture
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 ## 1. Current Provider Model
 
@@ -86,7 +86,22 @@ Available compose profiles in `deploy/docker/`:
 - `docker-compose.tts-simple.yml`: single-node `tts_service` (no Redis/worker pool).
 - `docker-compose.bot.yml`: backend/frontend/database side.
 
-## 8. F5_tts Extraction Readiness
+## 8. Inter-Service Auth and Health
+
+Internal auth for `bot_service -> F5_tts` now supports:
+
+- primary: short-lived service JWT in `Authorization: Bearer <token>`
+- compatibility fallback: `X-Internal-Service-Key`
+- optional transport hardening: mTLS client certs for internal HTTPS calls (`INTERNAL_SERVICE_MTLS_*` in `bot_service`)
+
+Health endpoints:
+
+- `GET /health/live` for liveness
+- `GET /health/ready` for readiness
+
+Legacy alias `/health` remains for compatibility where still used.
+
+## 9. F5_tts Extraction Readiness
 
 `F5_tts` is the source directory for future standalone `F5_tts` repository.
 
@@ -97,7 +112,7 @@ Before extraction, keep:
 - dependency list in sync (`requirements*.txt`),
 - external API contract stable (`/api/tts/*`, `/api/admin/*`).
 
-## 9. Frontend Behavior (Advanced TTS)
+## 10. Frontend Behavior (Advanced TTS)
 
 Advanced provider dropdown has three options:
 

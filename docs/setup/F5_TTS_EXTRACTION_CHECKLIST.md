@@ -1,6 +1,6 @@
 ﻿# F5_tts Extraction Checklist
 
-Last updated: 2026-02-22
+Last updated: 2026-02-23
 
 This checklist tracks readiness to move `F5_tts/` into a standalone repository (`F5_tts`).
 
@@ -10,7 +10,8 @@ This checklist tracks readiness to move `F5_tts/` into a standalone repository (
   - `/api/tts/synthesize-channel`
   - `/api/tts/voices/*`
   - `/api/admin/voices/*`
-  - `/health` and `/api/health`
+  - `/health/live` and `/health/ready`
+  - `/health` and `/api/health` (legacy compatibility aliases)
 - Document request/response payloads for each public endpoint.
 - Mark deprecated endpoints before removal.
 
@@ -18,7 +19,7 @@ This checklist tracks readiness to move `F5_tts/` into a standalone repository (
 
 - `F5_tts/.env.example` is complete and runnable.
 - No hardcoded absolute paths.
-- Required runtime secrets are explicit (`SECRET_KEY`, `DATABASE_URL`, optional `TTS_INTERNAL_API_KEY`).
+- Required runtime secrets are explicit (`SECRET_KEY`, `DATABASE_URL`) and internal auth vars are explicit (`INTERNAL_SERVICE_JWT_*`, optional `TTS_INTERNAL_API_KEY` for compatibility).
 - Redis settings are optional for single-node mode and required for worker-pool mode.
 
 ## 3. Docker and Runtime Profiles
@@ -42,7 +43,7 @@ This checklist tracks readiness to move `F5_tts/` into a standalone repository (
 
 ## 6. Observability and Ops
 
-- Health endpoint returns service-ready signal.
+- Liveness and readiness endpoints return service-ready signals (`/health/live`, `/health/ready`).
 - Logs include synthesis failures and upstream errors.
 - Minimal runbook exists (start, stop, health check, log check).
 
@@ -52,7 +53,7 @@ This checklist tracks readiness to move `F5_tts/` into a standalone repository (
   - `TTS_SERVICE_URL`
   - `F5_TTS_SERVICE_URL`
   - `QWEN_TTS_SERVICE_URL`
-- Internal auth key compatibility verified (`TTS_INTERNAL_API_KEY`).
+- Service JWT auth verified (`Authorization: Bearer ...`, audience-scoped), with optional legacy key compatibility (`TTS_INTERNAL_API_KEY`).
 - Provider-aware voice routing validated after extraction.
 
 ## 8. CI/CD Baseline (Target Repo)

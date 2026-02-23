@@ -316,18 +316,6 @@ class VKLiveBotCore:
             except Exception as streak_err:
                 logger.debug(f"Could not increment streak message count for VK: {streak_err}")
 
-            # 2. Проверка гостевого кода (если это 6 цифр)
-            if text.strip().isdigit() and len(text.strip()) == 6:
-                logger.info(f"[DEBUG] [GUEST_VK] Detected 6-digit code: {text.strip()}")
-                from api.guest_api import confirm_guest_code
-                confirm_guest_code(
-                    channel_name=channel_id,
-                    code=text.strip(),
-                    username=user.lower(),
-                    is_owner=is_owner
-                )
-                return  # Не обрабатываем TTS для кодов
-
             # 3. Обрабатываем команды через универсальную систему
             if text.startswith('!'):
                 logger.info(f"[GAME] [VK CMD] Detected command: {text[:50]}")
@@ -511,7 +499,8 @@ class VKLiveBotCore:
             while self.is_running:
                 try:
                     # Получаем сообщения через VK API
-                    async with aiohttp.ClientSession() as session:
+                    timeout = aiohttp.ClientTimeout(total=30, connect=10)
+                    async with aiohttp.ClientSession(timeout=timeout) as session:
                         # Пробуем разные API endpoints
                         endpoints = [
                             f"https://api.live.vkvideo.ru/v1/streams/{channel_id}/chat/messages" for channel_id in self.connected_channels
@@ -550,3 +539,4 @@ class VKLiveBotCore:
 
         except Exception as e:
             logger.error(f"Fatal error in VK Live polling: {e}")
+

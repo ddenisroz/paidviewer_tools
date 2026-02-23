@@ -1,5 +1,5 @@
-"""
-Twitch OAuth авторизация
+﻿"""
+Twitch OAuth Р°РІС‚РѕСЂРёР·Р°С†РёСЏ
 """
 import httpx
 import logging
@@ -49,8 +49,8 @@ async def login_twitch(request: Request):
 @router.get('/auth/twitch/callback')
 @limiter.limit('20/minute')
 async def twitch_callback(request: Request, db: Session=Depends(get_db), code: str=None, state: str=None, error: str=None, error_description: str=None, current_user: Optional[Dict[str, Any]]=Depends(get_current_user_optional)):
-    """Обработка Twitch OAuth callback"""
-    logger.info(f'Twitch callback received. Query params: {dict(request.query_params)}')
+    """РћР±СЂР°Р±РѕС‚РєР° Twitch OAuth callback"""
+    logger.info('Twitch callback received')
     if error:
         logger.warning(f'Twitch OAuth cancelled: {error} - {error_description}')
         return RedirectResponse(url=f'{FRONTEND_URL}/dashboard?auth_error=cancelled')
@@ -59,21 +59,20 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
         raise HTTPException(status_code=400, detail='No authorization code received from Twitch')
     expected_state = request.cookies.get('oauth_state')
     if not state or state != expected_state:
-        logger.warning(f'Twitch OAuth CSRF state mismatch: got {state}, expected {expected_state}')
+        logger.warning('Twitch OAuth CSRF state mismatch')
         raise HTTPException(status_code=400, detail='Invalid OAuth state (CSRF protection)')
     if not all([TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET]):
         logger.error('Twitch credentials not configured')
         raise HTTPException(status_code=500, detail='Twitch integration is not configured')
-    logger.info(f'Authorization code received: {code[:10]}...')
+    logger.info('Twitch authorization code received')
     try:
         redirect_uri = f'{BACKEND_URL}/auth/twitch/callback'
         async with httpx.AsyncClient(timeout=30.0) as client:
             token_response = await client.post('https://id.twitch.tv/oauth2/token', params={'client_id': TWITCH_CLIENT_ID, 'client_secret': TWITCH_CLIENT_SECRET, 'code': code, 'grant_type': 'authorization_code', 'redirect_uri': redirect_uri})
             logger.info(f'Twitch token response status: {token_response.status_code}')
             if token_response.status_code != 200:
-                error_body = token_response.text
-                logger.error(f'Twitch token exchange failed. Status: {token_response.status_code}, Body: {error_body}')
-                raise HTTPException(status_code=token_response.status_code, detail=f'Twitch API error: {error_body}')
+                logger.error(f'Twitch token exchange failed. Status: {token_response.status_code}')
+                raise HTTPException(status_code=token_response.status_code, detail='Twitch API error during token exchange')
             token_data = token_response.json()
             access_token = token_data.get('access_token')
             refresh_token = token_data.get('refresh_token')
@@ -87,8 +86,7 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
                 user_response = await client.get('https://api.twitch.tv/helix/users', headers=headers)
                 logger.info(f'Twitch user response status: {user_response.status_code}')
                 if user_response.status_code != 200:
-                    error_body = user_response.text
-                    logger.error(f'Failed to get Twitch user info. Status: {user_response.status_code}, Body: {error_body}')
+                    logger.error(f'Failed to get Twitch user info. Status: {user_response.status_code}')
                     raise HTTPException(status_code=user_response.status_code, detail='Failed to get user info from Twitch')
                 user_data_response = user_response.json()
                 user_info = user_data_response.get('data', [{}])[0]
@@ -107,3 +105,4 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
     except Exception as e:
         logger.error(f'Twitch auth error: {e}', exc_info=True)
         raise HTTPException(status_code=500, detail='Internal server error during Twitch authentication')
+

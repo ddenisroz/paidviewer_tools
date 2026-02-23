@@ -1,5 +1,5 @@
-"""API для администрирования TTS Service"""
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body, Query
+﻿"""API РґР»СЏ Р°РґРјРёРЅРёСЃС‚СЂРёСЂРѕРІР°РЅРёСЏ TTS Service"""
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Body, Query, Response
 from sqlalchemy.orm import Session
 from database import get_db, Voice as VoiceModel
 from tts_engine import tts_engine_manager
@@ -16,6 +16,12 @@ import re
 logger = logging.getLogger(__name__)
 admin_router = APIRouter(tags=['admin'], dependencies=[Depends(get_admin_user)])
 VOICE_NAME_RE = re.compile('^[0-9A-Za-z\\u0400-\\u04FF _-]{1,80}$')
+
+
+def _set_legacy_deprecation_headers(response: Response) -> None:
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "Wed, 31 Dec 2026 23:59:59 GMT"
+    response.headers["Link"] = '</api/admin/voices>; rel=\"successor-version\"'
 
 def _sanitize_voice_name(raw_name: str) -> str:
     normalized = (raw_name or '').strip()
@@ -52,7 +58,7 @@ def _has_valid_audio_signature(file_path: str) -> bool:
 
 @admin_router.get('/stats')
 async def get_admin_stats(db: Session=Depends(get_db)):
-    """Получить статистику для админки"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚РёСЃС‚РёРєСѓ РґР»СЏ Р°РґРјРёРЅРєРё"""
     try:
         stats = stats_service.get_system_overview()
         voices = db.query(VoiceModel).all()
@@ -67,7 +73,7 @@ async def get_admin_stats(db: Session=Depends(get_db)):
 
 @admin_router.get('/voices')
 async def get_voices(db: Session=Depends(get_db)):
-    """Получить список голосов"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃРїРёСЃРѕРє РіРѕР»РѕСЃРѕРІ"""
     try:
         voices = db.query(VoiceModel).all()
         return {'status': 'success', 'voices': [{'id': voice.id, 'name': voice.name, 'voice_type': voice.voice_type, 'owner_id': voice.owner_id, 'is_active': voice.is_active, 'file_path': voice.file_path, 'reference_text': voice.reference_text, 'cfg_strength': voice.cfg_strength, 'speed_preset': voice.speed_preset, 'created_at': voice.created_at.isoformat() if voice.created_at else None} for voice in voices]}
@@ -79,7 +85,7 @@ async def get_voices(db: Session=Depends(get_db)):
 
 @admin_router.post('/voices/{voice_id}/toggle')
 async def toggle_voice(voice_id: int, db: Session=Depends(get_db)):
-    """Включить/выключить голос"""
+    """Р’РєР»СЋС‡РёС‚СЊ/РІС‹РєР»СЋС‡РёС‚СЊ РіРѕР»РѕСЃ"""
     try:
         voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
         if not voice:
@@ -96,7 +102,7 @@ async def toggle_voice(voice_id: int, db: Session=Depends(get_db)):
 
 @admin_router.post('/voices/upload')
 async def upload_voice(file: UploadFile=File(...), name: str=None, db: Session=Depends(get_db), current_user: Dict[str, Any]=Depends(get_admin_user)):
-    """Загрузить новый голос для AI TTS с автоматической конвертацией и транскрибацией"""
+    """Р—Р°РіСЂСѓР·РёС‚СЊ РЅРѕРІС‹Р№ РіРѕР»РѕСЃ РґР»СЏ AI TTS СЃ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕР№ РєРѕРЅРІРµСЂС‚Р°С†РёРµР№ Рё С‚СЂР°РЅСЃРєСЂРёР±Р°С†РёРµР№"""
     import tempfile
     temp_input_path = None
     temp_converted_path = None
@@ -105,11 +111,11 @@ async def upload_voice(file: UploadFile=File(...), name: str=None, db: Session=D
         allowed_extensions = ['.wav', '.mp3', '.ogg', '.flac', '.m4a', '.aac', '.wma', '.aiff', '.au']
         file_extension = os.path.splitext(file.filename)[1].lower()
         if file_extension not in allowed_extensions:
-            raise HTTPException(status_code=400, detail=f"Неподдерживаемый формат файла. Разрешены: {', '.join(allowed_extensions)}")
+            raise HTTPException(status_code=400, detail=f"РќРµРїРѕРґРґРµСЂР¶РёРІР°РµРјС‹Р№ С„РѕСЂРјР°С‚ С„Р°Р№Р»Р°. Р Р°Р·СЂРµС€РµРЅС‹: {', '.join(allowed_extensions)}")
         voice_name = _sanitize_voice_name(name or os.path.splitext(file.filename)[0])
         existing_voice = db.query(VoiceModel).filter(VoiceModel.name == voice_name).first()
         if existing_voice:
-            raise HTTPException(status_code=400, detail=f"Голос с именем '{voice_name}' уже существует")
+            raise HTTPException(status_code=400, detail=f"Р“РѕР»РѕСЃ СЃ РёРјРµРЅРµРј '{voice_name}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
             contents = await file.read()
             temp_file.write(contents)
@@ -152,7 +158,7 @@ async def upload_voice(file: UploadFile=File(...), name: str=None, db: Session=D
         db.commit()
         db.refresh(new_voice)
         logger.info(f"[OK] Global voice '{voice_name}' uploaded successfully by admin user {current_user.get('user_id')} (Voice ID: {new_voice.id})")
-        return {'status': 'success', 'message': f"Голос '{voice_name}' успешно загружен, конвертирован в WAV и транскрибирован", 'voice': {'id': new_voice.id, 'name': new_voice.name, 'voice_type': new_voice.voice_type, 'is_active': new_voice.is_active, 'file_path': str(final_voice_path), 'reference_text': reference_text[:100] + '...' if reference_text and len(reference_text) > 100 else reference_text, 'format': 'WAV 48kHz Mono 16-bit'}}
+        return {'status': 'success', 'message': f"Р“РѕР»РѕСЃ '{voice_name}' СѓСЃРїРµС€РЅРѕ Р·Р°РіСЂСѓР¶РµРЅ, РєРѕРЅРІРµСЂС‚РёСЂРѕРІР°РЅ РІ WAV Рё С‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°РЅ", 'voice': {'id': new_voice.id, 'name': new_voice.name, 'voice_type': new_voice.voice_type, 'is_active': new_voice.is_active, 'file_path': str(final_voice_path), 'reference_text': reference_text[:100] + '...' if reference_text and len(reference_text) > 100 else reference_text, 'format': 'WAV 48kHz Mono 16-bit'}}
     except HTTPException:
         raise
     except Exception:
@@ -175,13 +181,13 @@ async def upload_voice(file: UploadFile=File(...), name: str=None, db: Session=D
 
 @admin_router.post('/voices/{voice_id}/retranscribe')
 async def retranscribe_voice(voice_id: int, db: Session=Depends(get_db)):
-    """Перетранскрибировать голос - извлечь reference_text из аудиофайла заново"""
+    """РџРµСЂРµС‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃ - РёР·РІР»РµС‡СЊ reference_text РёР· Р°СѓРґРёРѕС„Р°Р№Р»Р° Р·Р°РЅРѕРІРѕ"""
     try:
         voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
         if not voice:
-            raise HTTPException(status_code=404, detail='Голос не найден')
+            raise HTTPException(status_code=404, detail='Р“РѕР»РѕСЃ РЅРµ РЅР°Р№РґРµРЅ')
         if not voice.file_path or not os.path.exists(voice.file_path):
-            raise HTTPException(status_code=404, detail='Аудиофайл не найден')
+            raise HTTPException(status_code=404, detail='РђСѓРґРёРѕС„Р°Р№Р» РЅРµ РЅР°Р№РґРµРЅ')
         logger.info(f'[REFRESH] Starting retranscription for voice {voice_id} ({voice.name})')
         reference_text = ''
         try:
@@ -198,7 +204,7 @@ async def retranscribe_voice(voice_id: int, db: Session=Depends(get_db)):
         db.commit()
         db.refresh(voice)
         logger.info(f'[OK] Voice {voice_id} retranscribed successfully')
-        return {'status': 'success', 'message': f"Голос '{voice.name}' успешно перетранскрибирован", 'reference_text': reference_text, 'voice_id': voice_id}
+        return {'status': 'success', 'message': f"Р“РѕР»РѕСЃ '{voice.name}' СѓСЃРїРµС€РЅРѕ РїРµСЂРµС‚СЂР°РЅСЃРєСЂРёР±РёСЂРѕРІР°РЅ", 'reference_text': reference_text, 'voice_id': voice_id}
     except HTTPException:
         raise
     except Exception:
@@ -207,7 +213,7 @@ async def retranscribe_voice(voice_id: int, db: Session=Depends(get_db)):
 
 @admin_router.post('/voices/test')
 async def test_voice(voice_name: str=Form(...), user_id: int=Form(...), test_text: str=Form(...), cfg_strength: float=Form(None), speed_preset: str=Form(None), db: Session=Depends(get_db)):
-    """Тестировать голос с заданным текстом и настройками"""
+    """РўРµСЃС‚РёСЂРѕРІР°С‚СЊ РіРѕР»РѕСЃ СЃ Р·Р°РґР°РЅРЅС‹Рј С‚РµРєСЃС‚РѕРј Рё РЅР°СЃС‚СЂРѕР№РєР°РјРё"""
     from pathlib import Path
     try:
         if not voice_name or not test_text:
@@ -252,9 +258,10 @@ async def test_voice(voice_name: str=Form(...), user_id: int=Form(...), test_tex
         raise HTTPException(status_code=500, detail='Internal server error')
 
 @admin_router.delete('/legacy/voices/{voice_id}')
-async def delete_legacy_voice(voice_id: int, db: Session=Depends(get_db)):
-    """Удалить голос"""
+async def delete_legacy_voice(voice_id: int, response: Response, db: Session=Depends(get_db)):
+    """РЈРґР°Р»РёС‚СЊ РіРѕР»РѕСЃ"""
     try:
+        _set_legacy_deprecation_headers(response)
         voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
         if not voice:
             raise HTTPException(status_code=404, detail='Voice not found')
@@ -267,7 +274,7 @@ async def delete_legacy_voice(voice_id: int, db: Session=Depends(get_db)):
         db.delete(voice)
         db.commit()
         logger.info(f"Voice '{voice.name}' (ID: {voice_id}) deleted successfully")
-        return {'status': 'success', 'message': f"Голос '{voice.name}' успешно удалён"}
+        return {'status': 'success', 'message': f"Р“РѕР»РѕСЃ '{voice.name}' СѓСЃРїРµС€РЅРѕ СѓРґР°Р»С‘РЅ"}
     except HTTPException:
         raise
     except Exception:
@@ -276,12 +283,13 @@ async def delete_legacy_voice(voice_id: int, db: Session=Depends(get_db)):
         raise HTTPException(status_code=500, detail='Internal server error')
 
 @admin_router.put('/legacy/voices/{voice_id}/settings')
-async def update_legacy_voice_settings(voice_id: int, settings: dict=Body(...), db: Session=Depends(get_db)):
-    """Обновить настройки голоса (reference_text, cfg_strength, speed_preset)"""
+async def update_legacy_voice_settings(voice_id: int, response: Response, settings: dict=Body(...), db: Session=Depends(get_db)):
+    """РћР±РЅРѕРІРёС‚СЊ РЅР°СЃС‚СЂРѕР№РєРё РіРѕР»РѕСЃР° (reference_text, cfg_strength, speed_preset)"""
     try:
+        _set_legacy_deprecation_headers(response)
         voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
         if not voice:
-            raise HTTPException(status_code=404, detail='Голос не найден')
+            raise HTTPException(status_code=404, detail='Р“РѕР»РѕСЃ РЅРµ РЅР°Р№РґРµРЅ')
         if 'reference_text' in settings:
             voice.reference_text = settings['reference_text']
         if 'cfg_strength' in settings:
@@ -291,7 +299,7 @@ async def update_legacy_voice_settings(voice_id: int, settings: dict=Body(...), 
         db.commit()
         db.refresh(voice)
         logger.info(f'[OK] Voice {voice_id} settings updated')
-        return {'status': 'success', 'message': 'Настройки голоса обновлены', 'voice': {'id': voice.id, 'name': voice.name, 'reference_text': voice.reference_text, 'cfg_strength': voice.cfg_strength, 'speed_preset': voice.speed_preset}}
+        return {'status': 'success', 'message': 'РќР°СЃС‚СЂРѕР№РєРё РіРѕР»РѕСЃР° РѕР±РЅРѕРІР»РµРЅС‹', 'voice': {'id': voice.id, 'name': voice.name, 'reference_text': voice.reference_text, 'cfg_strength': voice.cfg_strength, 'speed_preset': voice.speed_preset}}
     except HTTPException:
         raise
     except Exception:
@@ -300,21 +308,22 @@ async def update_legacy_voice_settings(voice_id: int, settings: dict=Body(...), 
         raise HTTPException(status_code=500, detail='Internal server error')
 
 @admin_router.put('/legacy/voices/{voice_id}/rename')
-async def rename_legacy_voice(voice_id: int, new_name: str=Query(..., description='Новое имя голоса'), db: Session=Depends(get_db)):
-    """Переименовать голос"""
+async def rename_legacy_voice(voice_id: int, response: Response, new_name: str=Query(..., description='РќРѕРІРѕРµ РёРјСЏ РіРѕР»РѕСЃР°'), db: Session=Depends(get_db)):
+    """РџРµСЂРµРёРјРµРЅРѕРІР°С‚СЊ РіРѕР»РѕСЃ"""
     try:
+        _set_legacy_deprecation_headers(response)
         voice = db.query(VoiceModel).filter(VoiceModel.id == voice_id).first()
         if not voice:
             raise HTTPException(status_code=404, detail='Voice not found')
         sanitized_new_name = _sanitize_voice_name(new_name)
         existing_voice = db.query(VoiceModel).filter(VoiceModel.name == sanitized_new_name, VoiceModel.id != voice_id).first()
         if existing_voice:
-            raise HTTPException(status_code=400, detail=f"Голос с именем '{sanitized_new_name}' уже существует")
+            raise HTTPException(status_code=400, detail=f"Р“РѕР»РѕСЃ СЃ РёРјРµРЅРµРј '{sanitized_new_name}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚")
         old_name = voice.name
         voice.name = sanitized_new_name
         db.commit()
         logger.info(f"Voice renamed from '{old_name}' to '{sanitized_new_name}' (ID: {voice_id})")
-        return {'status': 'success', 'message': f"Голос переименован: '{old_name}' → '{sanitized_new_name}'", 'voice': {'id': voice.id, 'name': voice.name}}
+        return {'status': 'success', 'message': f"Р“РѕР»РѕСЃ РїРµСЂРµРёРјРµРЅРѕРІР°РЅ: '{old_name}' в†’ '{sanitized_new_name}'", 'voice': {'id': voice.id, 'name': voice.name}}
     except HTTPException:
         raise
     except Exception:
@@ -324,7 +333,7 @@ async def rename_legacy_voice(voice_id: int, new_name: str=Query(..., descriptio
 
 @admin_router.get('/system/status')
 async def get_system_status():
-    """Получить статус системы"""
+    """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ СЃРёСЃС‚РµРјС‹"""
     try:
         return {'status': 'success', 'system': {'tts_engine': tts_engine_manager.is_initialized(), 'file_manager': file_manager.is_initialized(), 'background_tasks': background_task_manager.is_running(), 'monitoring': tts_monitor.is_running()}}
     except Exception:
@@ -333,7 +342,7 @@ async def get_system_status():
 
 @admin_router.post('/system/restart')
 async def restart_system():
-    """Перезапустить систему (заглушка)"""
+    """РџРµСЂРµР·Р°РїСѓСЃС‚РёС‚СЊ СЃРёСЃС‚РµРјСѓ (Р·Р°РіР»СѓС€РєР°)"""
     try:
         logger.warning('System restart requested')
         return {'status': 'success', 'message': 'Restart command sent (not implemented in development)'}
@@ -411,3 +420,4 @@ async def rename_voice_endpoint(voice_id: int, new_name: str, current_user: Dict
         logger.exception('Error renaming voice')
         db.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
+

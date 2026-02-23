@@ -1,10 +1,11 @@
-import httpx
+﻿import httpx
 import logging
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from core.config import settings
+from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from repositories.user_voice_settings_repository import UserVoiceSettingsRepository
 from core.database import UserVoiceSettings
 from services.tts.provider_utils import get_provider_service_url, normalize_provider
@@ -34,15 +35,12 @@ class VoiceManagementService:
         return f"{provider_url.rstrip('/')}/api/admin"
 
     def _tts_auth_headers(self) -> dict:
-        headers: dict = {}
-        if settings.tts_internal_api_key:
-            headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
-        return headers
+        return build_tts_auth_headers()
 
     async def get_global_voices(self, provider: str = "f5") -> List[Dict[str, Any]]:
         """Get list of available global voices from external TTS service."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.get(
                     f"{self._provider_tts_api_base(provider)}/voices/global",
                     headers=self._tts_auth_headers(),
@@ -60,7 +58,7 @@ class VoiceManagementService:
     async def get_user_custom_voices(self, user_id: int, provider: str = "f5") -> List[Dict[str, Any]]:
         """Get list of custom voices for a specific user."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.get(
                     f"{self._provider_tts_api_base(provider)}/user/voices/{user_id}",
                     headers=self._tts_auth_headers(),
@@ -81,7 +79,7 @@ class VoiceManagementService:
     async def get_voice_info(self, voice_id: int, provider: str = "f5") -> Optional[Dict[str, Any]]:
         """Get information about a specific voice."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.get(
                     f"{self._provider_tts_api_base(provider)}/voices/{voice_id}",
                     headers=self._tts_auth_headers(),
@@ -171,7 +169,7 @@ class VoiceManagementService:
             # Handle custom voice settings (stored in external service)
             # Verify ownership if possible, but the external service checks user_id usually
             try:
-                async with httpx.AsyncClient(timeout=10.0) as client:
+                async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                     response = await client.put(
                         f"{self._provider_tts_api_base(normalized_provider)}/user/voices/{voice_id}/settings",
                         json=settings_data,
@@ -249,7 +247,7 @@ class VoiceManagementService:
             files = {'file': (filename, content, content_type)}
             data = {'voice_name': name, 'user_id': str(user_id)}
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.post(
                     f"{self._provider_tts_api_base(provider)}/user/voices/upload",
                     files=files,
@@ -291,7 +289,7 @@ class VoiceManagementService:
     async def delete_custom_voice(self, user_id: int, voice_id: int, provider: str = "f5") -> bool:
         """Delete a custom voice for a user."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.delete(
                     f"{self._provider_tts_api_base(provider)}/user/voices/{voice_id}",
                     params={"user_id": user_id},
@@ -314,7 +312,7 @@ class VoiceManagementService:
     async def admin_get_global_voices(self, provider: str = "f5") -> List[Dict[str, Any]]:
         """Get all global voices (for admin)."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.get(
                     f"{self._provider_admin_api_base(provider)}/voices",
                     params={"voice_type": "global"},
@@ -335,7 +333,7 @@ class VoiceManagementService:
     ) -> Dict[str, Any]:
         """Update global voice settings (admin)."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.put(
                     f"{self._provider_admin_api_base(provider)}/voices/{voice_id}/settings",
                     json=settings_data,
@@ -353,7 +351,7 @@ class VoiceManagementService:
     async def admin_delete_global_voice(self, voice_id: int, provider: str = "f5") -> bool:
         """Delete a global voice (admin)."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.delete(
                     f"{self._provider_admin_api_base(provider)}/voices/{voice_id}",
                     headers=self._tts_auth_headers(),
@@ -370,7 +368,7 @@ class VoiceManagementService:
     async def admin_rename_global_voice(self, voice_id: int, new_name: str, provider: str = "f5") -> bool:
         """Rename a global voice (admin)."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.put(
                     f"{self._provider_admin_api_base(provider)}/voices/{voice_id}/rename",
                     params={"new_name": new_name},
@@ -400,7 +398,7 @@ class VoiceManagementService:
             data["name"] = name
 
         try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.post(
                     f"{self._provider_admin_api_base(provider)}/voices/upload",
                     files=files,
@@ -423,4 +421,5 @@ class VoiceManagementService:
         except Exception:
             logger.exception("Error uploading global voice")
             raise HTTPException(status_code=500, detail="Internal server error")
+
 

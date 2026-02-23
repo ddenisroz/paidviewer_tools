@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import logging
 
 import httpx
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from auth.auth import get_current_user
 from core.config import settings
 from core.database import get_db
+from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
@@ -15,10 +16,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 def _tts_auth_headers() -> dict:
-    headers: dict = {}
-    if settings.tts_internal_api_key:
-        headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
-    return headers
+    return build_tts_auth_headers()
 
 
 def _is_admin(user: dict) -> bool:
@@ -148,7 +146,7 @@ async def restart_tts_engine(
         tts_service_url = settings.tts_service_url
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=5.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.get(f"{tts_service_url}/health", headers=_tts_auth_headers())
                 if response.status_code != 200:
                     raise HTTPException(status_code=502, detail=f"TTS unhealthy (status={response.status_code})")
@@ -182,7 +180,7 @@ async def get_tts_system_status(
 
         tts_service_url = settings.tts_service_url
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.get(f"{tts_service_url}/api/admin/system/status", headers=_tts_auth_headers())
 
             if response.status_code != 200:
@@ -214,7 +212,7 @@ async def restart_tts_system(
 
         tts_service_url = settings.tts_service_url
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(f"{tts_service_url}/api/admin/system/restart", headers=_tts_auth_headers())
 
             if response.status_code != 200:
@@ -232,3 +230,4 @@ async def restart_tts_system(
     except Exception:
         logger.exception("Restart TTS system error")
         raise HTTPException(status_code=500, detail="Internal server error")
+

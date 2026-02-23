@@ -29,13 +29,16 @@ Freeze and version endpoints used by `ttv-core`:
 - `POST /api/tts/synthesize-channel`
 - `GET /api/tts/voices`
 - `POST /api/admin/voices/upload`
-- `GET /health`
-- `GET /api/health`
+- `GET /health/live`
+- `GET /health/ready`
+- `GET /health` (legacy alias, compatibility)
+- `GET /api/health` (legacy alias, compatibility)
 
 Security contract:
 
-- Internal header: `X-Internal-API-Key: <TTS_INTERNAL_API_KEY>`
-- Shared JWT secret consistency where required: `SECRET_KEY`
+- Primary: `Authorization: Bearer <service JWT>` with audience `f5_tts`
+- Compatibility fallback: `X-Internal-Service-Key: <TTS_INTERNAL_API_KEY>`
+- Shared signing secret consistency where required: `SECRET_KEY` (or dedicated `INTERNAL_SERVICE_JWT_SECRET`)
 
 ## 4. Extract `F5_tts` repository
 
@@ -49,7 +52,7 @@ Security contract:
 4. Add CI steps:
 - `ruff check .`
 - `ruff format --check .`
-- service smoke test (`/health` + one synthesis dry-run)
+- service smoke test (`/health/live`, `/health/ready` + one synthesis dry-run)
 5. Publish first image tag (example): `ghcr.io/<org>/f5-tts-service:<tag>`.
 
 ## 5. Prepare `ttv-core` after extraction
@@ -85,12 +88,25 @@ Recommended schema split in core DB:
 - `F5_TTS_SERVICE_URL`
 - `QWEN_TTS_SERVICE_URL`
 - `TTS_INTERNAL_API_KEY`
+- `INTERNAL_SERVICE_JWT_ENABLED`
+- `INTERNAL_SERVICE_JWT_ISSUER`
+- `INTERNAL_SERVICE_JWT_AUDIENCE_TTS`
+- `INTERNAL_SERVICE_JWT_SECRET`
+- `INTERNAL_SERVICE_JWT_TTL_SECONDS`
+- `INTERNAL_SERVICE_MTLS_ENABLED`
+- `INTERNAL_SERVICE_CA_CERT_PATH`
+- `INTERNAL_SERVICE_CLIENT_CERT_PATH`
+- `INTERNAL_SERVICE_CLIENT_KEY_PATH`
 
 `f5-tts-service`:
 
 - `DATABASE_URL` (required, explicit)
 - `SECRET_KEY`
 - `TTS_INTERNAL_API_KEY`
+- `INTERNAL_SERVICE_JWT_SECRET` (optional; defaults to `SECRET_KEY`)
+- `INTERNAL_SERVICE_JWT_ISSUER`
+- `INTERNAL_SERVICE_JWT_AUDIENCE`
+- `INTERNAL_SERVICE_JWT_ALLOWED_SUBJECTS`
 - optional Redis/worker settings
 
 `qwen3-tts-service`:
@@ -103,7 +119,8 @@ Recommended schema split in core DB:
 
 1. Deploy `f5-tts-service` in parallel with monorepo service.
 2. Run smoke checks from core host:
-- `/health`
+- `/health/live`
+- `/health/ready`
 - voice list API
 - one synthesis request
 3. Switch only `F5_TTS_SERVICE_URL` to new endpoint.

@@ -53,7 +53,8 @@ class VKOAuth:
         }
         
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(self.TOKEN_URL, data=payload) as response:
                     if response.status != 200:
                         error_text = await response.text()
@@ -94,7 +95,8 @@ class VKOAuth:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
+            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(self.TOKEN_URL, data=payload, headers=headers) as response:
                     if response.status != 200:
                         error_text = await response.text()

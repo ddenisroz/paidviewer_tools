@@ -166,7 +166,7 @@ async def get_tts_status(
         tts_service_url = settings.tts_service_url
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=5.0) as client:
                 response = await client.get(f"{tts_service_url}/health", timeout=5.0)
                 tts_data = response.json()
 

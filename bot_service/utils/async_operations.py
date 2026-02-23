@@ -89,7 +89,8 @@ async def fetch_multiple_urls(
         except Exception as e:
             return {"url": url, "status": 500, "data": None, "error": "Internal server error"}
 
-    async with aiohttp.ClientSession() as session:
+    session_timeout = aiohttp.ClientTimeout(total=timeout, connect=min(timeout, 10.0))
+    async with aiohttp.ClientSession(timeout=session_timeout) as session:
         tasks = [fetch_one(session, url) for url in urls]
         return await asyncio.gather(*tasks, return_exceptions=False)
 

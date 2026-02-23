@@ -112,14 +112,7 @@ async def login_vk(request: Request):
 @limiter.limit("20/minute")
 async def vk_callback(request: Request, db: Session = Depends(get_db), code: str = None, state: str = None, error: str = None, error_description: str = None, current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)):
 
-    logger.info("=" * 80)
-    logger.info("[VK] CALLBACK FUNCTION CALLED!")
-    logger.info(f"[VK] callback URL: {request.url}")
-    logger.info(f"[VK] callback cookies: {list(request.cookies.keys())}")
-    logger.info("=" * 80)
-
-    # Логируем все параметры запроса для отладки
-    logger.info(f"VK callback received. Query params: {dict(request.query_params)}")
+    logger.info("[VK] OAuth callback received")
 
     # --- ИСПРАВЛЕНО: Обработка отмены авторизации ---
     if error:
@@ -134,7 +127,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     # CSRF: валидация state
     expected_state = request.cookies.get("oauth_state_vk")
     if not state or state != expected_state:
-        logger.warning(f"VK OAuth CSRF state mismatch: got {state}, expected {expected_state}")
+        logger.warning("VK OAuth CSRF state mismatch")
         raise HTTPException(status_code=400, detail="Invalid OAuth state (CSRF protection)")
 
     # Используем настройки из централизованной конфигурации
@@ -144,8 +137,8 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
         logger.error(f"VK credentials not configured. VK_CLIENT_ID: {'[OK]' if VK_CLIENT_ID else '[X]'}, VK_CLIENT_SECRET: {'[OK]' if VK_CLIENT_SECRET else '[X]'}")
         raise HTTPException(status_code=500, detail="VK integration is not configured.")
 
-    logger.info(f"VK credentials loaded. Client ID: {VK_CLIENT_ID[:8]}..., Redirect URI: {VK_REDIRECT_URI}")
-    logger.info(f"Authorization code received: {code[:10]}...")
+    logger.info("VK credentials loaded")
+    logger.info("VK authorization code received")
 
     try:
         # --- 1. Обмен кода на токен ---
@@ -166,8 +159,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
         }
 
         async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
-            logger.info(f"Requesting token with payload: {payload}")
-            logger.info(f"Using headers: {headers}")
+            logger.info("Requesting VK token")
 
             token_response = await client.post(
                 "https://api.live.vkvideo.ru/oauth/server/token",
@@ -176,20 +168,15 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             )
 
             logger.info(f"Token exchange response status: {token_response.status_code}")
-            logger.info(f"Token exchange response headers: {dict(token_response.headers)}")
 
             if token_response.status_code != 200:
-                error_body = token_response.text
-                logger.error(f"VK token exchange failed. Status: {token_response.status_code}, Body: {error_body}")
+                logger.error(f"VK token exchange failed. Status: {token_response.status_code}")
                 raise HTTPException(
                     status_code=token_response.status_code,
-                    detail=f"VK API Error during token exchange: {error_body}"
+                    detail="VK API Error during token exchange"
                 )
 
             token_data = token_response.json()
-
-            # ДИАГНОСТИКА: Логируем весь ответ от VK
-            logger.info(f"[VK TOKEN] Full response: {token_data}")
 
             access_token = token_data["access_token"]
             refresh_token = token_data.get("refresh_token")
@@ -229,7 +216,6 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                         headers={"Authorization": f"Bearer {access_token}"}
                     )
                     logger.info(f"User info response status: {user_info_response.status_code}")
-                    logger.info(f"User info response: {user_info_response.text[:500]}")  # Логируем первые 500 символов
 
                     if user_info_response.status_code == 200:
                         data = user_info_response.json()
@@ -335,7 +321,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             )
             if not vk_display_name:
                 vk_display_name = f"vk{platform_user_id}"
-                logger.warning(f"[WARN] VK API returned user_info without display name: {user_info}")
+                logger.warning("[WARN] VK API returned user_info without display name")
 
             oauth_user_data = OAuthUserData(
                 platform_user_id=platform_user_id,
