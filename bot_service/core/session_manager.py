@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 
 from core.datetime_utils import utcnow_naive
+from core.log_sanitizer import mask_session_id
 from core.database import (
     User, UserToken, UserSession, UserSettings, TTSUserSettings,
     db_session
@@ -144,7 +145,12 @@ class SessionManager:
                     "termination_reason": reason,
                     "terminated_at": utcnow_naive().isoformat()
                 }
-                logger.info(f"Terminated user session {session.session_id} for channel {channel_name}: {reason}")
+                logger.info(
+                    "Terminated user session %s for channel %s: %s",
+                    mask_session_id(session.session_id),
+                    channel_name,
+                    reason,
+                )
 
             logger.info(f"Terminated {len(user_sessions)} user sessions for channel {channel_name}")
 
@@ -224,7 +230,7 @@ class SessionManager:
             db.flush()
             db.refresh(new_session)
 
-            logger.info(f"[OK] Session {session_id} created for user {user_id}")
+            logger.info("[OK] Session %s created for user %s", mask_session_id(session_id), user_id)
 
         return session_id
 
@@ -297,7 +303,12 @@ class SessionManager:
 
             for session in sessions:
                 session.is_active = False
-                logger.info(f"Terminated session {session.session_id} for user {user_id}, reason: {reason}")
+                logger.info(
+                    "Terminated session %s for user %s, reason: %s",
+                    mask_session_id(session.session_id),
+                    user_id,
+                    reason,
+                )
 
             logger.info(f"Sessions terminated for user {user_id}, reason: {reason}")
 
@@ -354,7 +365,7 @@ class SessionManager:
                 session.is_active = False
                 device_info = session.device_info
 
-            logger.info(f"Terminated session {session_id}, reason: {reason}")
+            logger.info("Terminated session %s, reason: %s", mask_session_id(session_id), reason)
 
             # Уведомляем connection_manager о завершении сессии
             try:
@@ -370,13 +381,13 @@ class SessionManager:
 
             return True
         except Exception as e:
-            logger.error(f"Error terminating session {session_id}: {e}")
+            logger.error("Error terminating session %s: %s", mask_session_id(session_id), e)
             return False
 
     def validate_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Проверяет валидность сессии и возвращает данные о пользователе."""
         if not session_id or len(session_id) < 10:
-            logger.warning(f"Invalid session_id format: {session_id}")
+            logger.warning("Invalid session_id format: %s", mask_session_id(session_id))
             return None
 
         try:
@@ -384,7 +395,7 @@ class SessionManager:
                 session = db.query(UserSession).filter_by(session_id=session_id, is_active=True).first()
 
                 if not session:
-                    logger.debug(f"Invalid or inactive session: {session_id[:20]}...")
+                    logger.debug("Invalid or inactive session: %s", mask_session_id(session_id))
                     return None
 
                 # Обновляем last_activity только если прошло больше 1 часа
@@ -394,7 +405,7 @@ class SessionManager:
 
                 user = db.query(User).filter_by(id=session.user_id).first()
                 if not user:
-                    logger.warning(f"User not found for session {session_id[:20]}...")
+                    logger.warning("User not found for session %s", mask_session_id(session_id))
                     return None
 
                 login_platform = None
@@ -420,7 +431,7 @@ class SessionManager:
                     "login_platform": login_platform
                 }
         except Exception as e:
-            logger.error(f"Error validating session {session_id}: {e}")
+            logger.error("Error validating session %s: %s", mask_session_id(session_id), e)
             return None
 
     def clear_all_user_tokens(self, user_id: int) -> bool:
@@ -458,7 +469,7 @@ class SessionManager:
                 cutoff_date = utcnow_naive() - timedelta(days=days_old)
 
                 old_sessions = db.query(UserSession).filter(
-                    UserSession.is_active == False,
+                    UserSession.is_active.is_(False),
                     UserSession.last_activity < cutoff_date
                 ).all()
 
@@ -498,7 +509,7 @@ class SessionManager:
 
                 cutoff_date = utcnow_naive() - timedelta(days=7)
                 old_inactive = db.query(UserSession).filter(
-                    UserSession.is_active == False,
+                    UserSession.is_active.is_(False),
                     UserSession.last_activity < cutoff_date
                 ).count()
 

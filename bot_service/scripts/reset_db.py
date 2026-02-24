@@ -30,7 +30,7 @@ def reset_database(dry_run: bool = False) -> None:
             "[DRY-RUN] Tables that would be dropped: %s",
             ", ".join(table_names) if table_names else "(no mapped tables found)",
         )
-        logger.info("[DRY-RUN] Would call init_db() to recreate schema and seed data")
+        logger.info("[DRY-RUN] Would call init_db(create_schema=True) to recreate schema and seed data")
         return
 
     logger.info("[RESET] Dropping all tables...")
@@ -38,7 +38,7 @@ def reset_database(dry_run: bool = False) -> None:
     logger.info("[OK] All tables dropped")
 
     logger.info("[RESET] Recreating schema and seed data...")
-    init_db()
+    init_db(create_schema=True, strict=True)
     logger.info("[OK] Database reset complete")
 
 

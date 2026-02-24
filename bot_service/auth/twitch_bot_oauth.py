@@ -92,7 +92,12 @@ async def twitch_bot_callback(
     error_description: str = None,
 ):
     """Handle Twitch bot OAuth callback."""
-    logger.info(f"[BOT OAUTH] Callback received. Query params: {dict(request.query_params)}")
+    logger.info(
+        "[BOT OAUTH] Callback received: path=%s has_code=%s has_error=%s",
+        request.url.path,
+        bool(code),
+        bool(error),
+    )
 
     if error:
         logger.warning(f"[BOT OAUTH] OAuth cancelled: {error} - {error_description}")

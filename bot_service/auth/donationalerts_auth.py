@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from core.database import get_db, UserToken
 from core.datetime_utils import utcnow_naive
 from core.config import settings
+from core.token_encryption import encrypt_token
+from core.log_sanitizer import mask_session_id
 from auth.auth import get_current_user_optional
 from core.security_modern import limiter
 
@@ -22,6 +24,17 @@ DA_CLIENT_SECRET = settings.donationalerts_client_secret
 DA_REDIRECT_URI = settings.donationalerts_redirect_uri
 FRONTEND_URL = settings.frontend_url
 
+
+def _redirect_with_state_cleanup(url: str) -> RedirectResponse:
+    response = RedirectResponse(url=url)
+    response.delete_cookie(
+        key="oauth_state_da",
+        httponly=True,
+        samesite="lax",
+        secure=settings.is_production,
+    )
+    return response
+
 # Проверяем настройки DonationAlerts (только warning, не raise - для dev окружения)
 if not DA_CLIENT_ID:
     logger.warning("DONATIONALERTS_CLIENT_ID not configured - DonationAlerts integration disabled")
@@ -34,6 +47,7 @@ if not DA_CLIENT_SECRET:
 async def donationalerts_callback(
     request: Request,
     code: str = None,
+    state: str = None,
     error: str = None,
     error_description: str = None,
     db: Session = Depends(get_db),
@@ -41,16 +55,26 @@ async def donationalerts_callback(
 ):
     """DonationAlerts OAuth callback"""
 
-    logger.info("=" * 80)
-    logger.info("[NOTIFY] DONATIONALERTS CALLBACK FUNCTION CALLED!")
-    logger.info(f"[NOTIFY] DA callback URL: {request.url}")
-    logger.info(f"[NOTIFY] DA callback cookies: {list(request.cookies.keys())}")
-    logger.info("=" * 80)
+    logger.info(
+        "[NOTIFY] DonationAlerts callback received: path=%s has_code=%s has_error=%s",
+        request.url.path,
+        bool(code),
+        bool(error),
+    )
+
+    expected_state = request.cookies.get("oauth_state_da")
+    if not state or not expected_state or state != expected_state:
+        logger.warning(
+            "DonationAlerts OAuth CSRF state mismatch: has_state=%s has_expected_state=%s",
+            bool(state),
+            bool(expected_state),
+        )
+        return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?auth_error=invalid_state")
 
     # Обработка отмены авторизации
     if error:
         logger.warning(f"DonationAlerts OAuth cancelled: {error} - {error_description}")
-        return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?auth_error=cancelled")
+        return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?auth_error=cancelled")
 
     # Проверяем наличие кода авторизации
     if not code:
@@ -76,17 +100,22 @@ async def donationalerts_callback(
         elif current_user.get('id') == -1:
             is_guest = True
             session_id = current_user.get('session_id')
-            logger.info(f"DonationAlerts callback for guest session {session_id}")
+            logger.info(
+                "DonationAlerts callback for guest session %s",
+                mask_session_id(session_id),
+            )
         else:
             logger.error("Invalid user_id in session")
-            return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?auth_error=invalid_session")
+            return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?auth_error=invalid_session")
     else:
         logger.info("DonationAlerts callback without authenticated session")
-        return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?auth_error=not_authenticated")
+        return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?auth_error=not_authenticated")
 
     try:
-        user_identifier = f"guest {session_id}" if is_guest else f"user {user_id}"
-        logger.info(f"DonationAlerts callback for {user_identifier}, code: {code[:10]}...")
+        user_identifier = (
+            f"guest {mask_session_id(session_id)}" if is_guest else f"user {user_id}"
+        )
+        logger.info("DonationAlerts callback for %s", user_identifier)
 
         # 1. Обмен кода на токен
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -156,8 +185,9 @@ async def donationalerts_callback(
 
             if existing_token:
                 # Обновляем существующий токен
-                existing_token.access_token = access_token
-                existing_token.refresh_token = refresh_token
+                existing_token.access_token = encrypt_token(access_token)
+                if refresh_token:
+                    existing_token.refresh_token = encrypt_token(refresh_token)
                 existing_token.platform_user_id = da_user_id
                 existing_token.is_active = True  # Активируем токен при повторной авторизации
                 existing_token.updated_at = utcnow_naive()
@@ -169,8 +199,8 @@ async def donationalerts_callback(
                     session_id=session_id if is_guest else None,
                     platform="donationalerts",
                     platform_user_id=da_user_id,
-                    access_token=access_token,
-                    refresh_token=refresh_token,
+                    access_token=encrypt_token(access_token),
+                    refresh_token=encrypt_token(refresh_token) if refresh_token else None,
                     avatar_url=None,
                     scopes=["oauth-user-show", "oauth-donation-subscribe", "oauth-donation-index"]
                 )
@@ -181,7 +211,7 @@ async def donationalerts_callback(
 
             # 4. Редиректим на дашборд
             logger.info(f"[OK] DonationAlerts integration completed for {user_identifier}")
-            return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?da_connected=true")
+            return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?da_connected=true")
 
     except HTTPException:
         raise

@@ -135,7 +135,7 @@ async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user
     Проверяет, обладает ли текущий пользователь правами администратора.
     Вызывает HTTPException 403, если права отсутствуют.
     """
-    if not current_user.get("is_admin"):
+    if not (current_user.get("role") == "admin" or current_user.get("is_admin", False)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_user
 

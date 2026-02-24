@@ -904,7 +904,7 @@ const ChatOverlay: React.FC = () => {
             }}>
                 <div style={{ fontSize: '48px' }}>⏳</div>
                 <div style={{ fontSize: '18px' }}>Загрузка настроек ChatBox...</div>
-                <div style={{ fontSize: '12px', opacity: 0.7 }}>Токен: {token?.slice(0, 8)}...</div>
+                <div style={{ fontSize: '12px', opacity: 0.7 }}>Токен виджета скрыт из соображений безопасности</div>
             </div>
         );
     }
@@ -953,7 +953,7 @@ const ChatOverlay: React.FC = () => {
             }}>
                 <div style={{ fontSize: '48px' }}>[WARN]</div>
                 <div style={{ fontSize: '18px' }}>Настройки не найдены</div>
-                <div style={{ fontSize: '12px', opacity: 0.7 }}>Токен: {token}</div>
+                <div style={{ fontSize: '12px', opacity: 0.7 }}>Проверьте токен виджета в настройках панели</div>
             </div>
         );
     }

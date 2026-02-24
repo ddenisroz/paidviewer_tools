@@ -299,8 +299,7 @@ class TTSHandlerService:
 
         if has_local_endpoint:
             logger.info(
-                f"[LOCAL] [{platform.upper()} TTS] Using local {advanced_provider} endpoint for "
-                f"user {user_id}: {local_tts.endpoint_url}"
+                f"[LOCAL] [{platform.upper()} TTS] Using local {advanced_provider} endpoint for user {user_id}"
             )
 
         # Volume
@@ -515,7 +514,7 @@ class TTSHandlerService:
                   else:
                        logger.debug(f"[DEBUG] [TWITCH TTS] No unfulfilled redemptions found for reward {reward_id}")
 
-        except Exception as e:
+        except Exception:
              logger.exception("[WARN] Error auto-accepting reward")
 
 tts_handler_service = TTSHandlerService()

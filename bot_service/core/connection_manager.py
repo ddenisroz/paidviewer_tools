@@ -5,6 +5,7 @@ from typing import List, TYPE_CHECKING
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 from .connection_manager_core import ConnectionManagerCore
+from core.log_sanitizer import mask_session_id
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -245,7 +246,11 @@ class ConnectionManager(ConnectionManagerCore):
                     # Добавляем сессию в connection manager
                     self.add_active_session(monitored_channel, session.session_id)
                     restored_count += 1
-                    logger.info(f"Restored session {session.session_id} for channel {monitored_channel}")
+                    logger.info(
+                        "Restored session %s for channel %s",
+                        mask_session_id(session.session_id),
+                        monitored_channel,
+                    )
 
             logger.info(f"Restored {restored_count} active sessions from database")
 

@@ -140,6 +140,14 @@ async def test_health_cache_scoped_by_endpoint(manager, monkeypatch):
         "services.tts.tts_manager.aiohttp.ClientSession",
         lambda timeout=None: _FakeClientSession(),
     )
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_hosts",
+        "endpoint-a,endpoint-b",
+    )
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_cidrs",
+        "",
+    )
 
     result_a = await manager.check_tts_service_health(
         provider="f5",

@@ -1,61 +1,74 @@
 # TTS_TTV
 
-Dashboard and bot stack for streamers with TTS, chat tools, YouTube requests, and multi-platform integrations.
+Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, DonationAlerts, YouTube queue, drops).
 
-## Key Features
-- AI TTS with multiple providers and per-user filters.
-- YouTube media requests and queue management via chat commands.
-- Chat overlay and moderation utilities.
-- Points, rewards, and drops systems.
-- Integrations for Twitch, VK Live, and DonationAlerts.
-- Optional chat analysis command via DeepSeek (requires env setup).
+## Start Here
+- [docs/QUICKSTART.md](docs/QUICKSTART.md): fastest local setup.
+- [docs/REPO_STRUCTURE.md](docs/REPO_STRUCTURE.md): what each top-level folder is for.
+- [docs/guides/REPO_CLEANUP_PLAN.md](docs/guides/REPO_CLEANUP_PLAN.md): what is already cleaned and what remains.
+- [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md): production deployment.
+- [docs/architecture/ARCHITECTURE_GUIDE.md](docs/architecture/ARCHITECTURE_GUIDE.md): architecture deep dive.
 
-## Project Layout
-- `bot_service/` FastAPI backend (API, services, repositories, bots).
-- `frontend/` React + Vite dashboard.
-- `F5_tts/` Advanced F5 TTS service (prepared for extraction to standalone repository).
-- `deploy/` Docker compose and deployment assets.
-- `docs/` Architecture, setup, and feature docs.
-- `scripts/` Project tooling and migrations.
-- `scripts/dev/` One-off debug/diagnostic utilities.
-
-## Quick Start (Local)
+## Minimal Local Run (required path)
 1. Configure env files:
-   - `bot_service/.env`
-   - `F5_tts/.env`
-   - `frontend/.env`
-   - Optional: set `DEEPSEEK_API_KEY` in `bot_service/.env` to enable `!analyze`
-   - Optional: set `GOOGLE_CLOUD_API_KEY` in `bot_service/.env` for YouTube + Google Cloud TTS
-2. Run migration/bootstrap:
-   - Windows: `.\scripts\migrate.ps1`
-   - Linux/Mac: `./scripts/migrate.sh`
-3. Start services:
-   - Backend: `cd bot_service; python main.py`
-   - Frontend: `cd frontend; npm install; npm run dev`
-   - TTS: `cd F5_tts; python main.py`
+- `bot_service/.env`
+- `frontend/.env`
+- optional external TTS service env (if used): separate `F5_tts` repository.
 
-## Common Commands
-- Backend: `ruff check .`, `ruff format .`, `pytest`
-- Frontend: `npm run lint`, `npm run format`, `npm run type-check`, `npm run test`
+2. Run DB bootstrap:
+- Windows: `.\scripts\migrate.ps1`
+- Linux/Mac: `./scripts/migrate.sh`
 
-## Repository Hygiene
-- Keep the repo free from local artifacts before commits:
-  - remove dev-only browser traces (`.playwright-cli/`, `.playwright/`, `playwright-report/`)
-  - do not commit cache/build/runtime outputs (`__pycache__/`, `.ruff_cache/`, `logs/`, `frontend/dist/`)
-  - keep large one-off debug artifacts out of git (for example `*.har`)
-- Fast cleanup helper: `.\scripts\cleanup-dev-artifacts.ps1`
-  - optional flags: `-RemoveHarFiles -RemoveOutput -RemovePycache -RemoveTempAudio`
-- Before pushing:
-  - `ruff check bot_service`
-  - `cd frontend; npm run type-check`
+3. Start app:
+- Backend: `cd bot_service; python main.py`
+- Frontend: `cd frontend; npm install; npm run dev`
 
-## Documentation
-- `docs/README.md`
-- `docs/QUICKSTART.md`
-- `docs/FEATURES.md`
-- `docs/setup/DEPLOYMENT.md`
-- `docs/architecture/ARCHITECTURE_GUIDE.md`
-- `bot_service/scripts/README_MAINTENANCE.md`
+## What Is Core vs Noise
+
+| Path | Role | Required for runtime |
+|---|---|---|
+| `bot_service/` | FastAPI backend (API, auth, services, repositories, models, bots) | Yes |
+| `frontend/` | React + Vite dashboard | Yes |
+| `deploy/` | Docker compose and nginx configs | Yes for container deploy |
+| `docs/` | Documentation | No runtime, but required for maintenance |
+| `scripts/` | Tooling and migrations | No runtime, operational |
+| `logs/` | Local runtime logs | No |
+| `.github/` | CI workflows | No local runtime |
+| `.husky/` | Git pre-commit hooks | No runtime, keep in repo |
+| `.venv/` | Local Python virtual environment | No runtime artifact in git |
+
+## Why You See Folders Like `.benchmarks`, `artifacts`, `__pycache__`
+
+These are local or generated artifacts, not business logic.
+
+| Folder/File | Why it appears | Keep in git | Safe to delete |
+|---|---|---|---|
+| `.benchmarks/` | pytest benchmark output | No | Yes |
+| `artifacts/` | local test/CI-like output bundle | No | Yes |
+| `**/__pycache__/` | Python bytecode cache | No | Yes |
+| `bot_service/.ruff_cache/` | ruff lint cache | No | Yes |
+| `bot_service/.pytest_cache/` | pytest cache | No | Yes |
+| `frontend/dist/` | frontend build output | No | Yes |
+| `logs/` | local logs | No | Yes (if logs not needed) |
+| `.venv/` | local Python environment and package bytecode | No | Yes (recreate with venv/pip install) |
+
+## Cleanup Commands
+- Canonical script (single entrypoint): `.\scripts\prepare-release.ps1`
+- Dry-run (shows exactly what will be deleted): `.\scripts\prepare-release.ps1`
+- Apply cleanup: `.\scripts\prepare-release.ps1 -ApplyCleanup`
+- Apply cleanup + checks: `.\scripts\prepare-release.ps1 -ApplyCleanup -RunChecks`
+- Also clean `.venv` bytecode caches: `.\scripts\prepare-release.ps1 -ApplyCleanup -IncludeVenvCaches`
+
+By default this script targets generated artifacts only:
+- `artifacts/`, `.benchmarks/`, `playwright-report/`, `.playwright*/`
+- `frontend/dist`, `frontend/coverage`, `frontend/.vite`, `frontend/.vitest`
+- `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `htmlcov`
+- `**/__pycache__/`, `*.pyc`, `*.pyo` (project roots; optional `.venv` via flag)
+- `*.har`
+
+## Quality Gates Before Push
+- Backend: `cd bot_service; ruff check .; pytest -q`
+- Frontend: `cd frontend; npm run lint; npm run type-check; npm run build`
 
 ## License
-MIT License
+MIT

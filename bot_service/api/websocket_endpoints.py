@@ -8,12 +8,14 @@ WebSocket endpoints для чата и тестирования.
 import json
 import asyncio
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from fastapi import APIRouter, WebSocket
 
-from core.database import ChatMessage, User, get_db
+from core.config import settings
+from core.database import ChatMessage, get_db
 from core.connection_manager import get_connection_manager
+from core.session_manager import session_manager
 from services.memory_websocket_manager import get_memory_websocket_manager
 from repositories.user_repository import UserRepository
 
@@ -40,17 +42,20 @@ async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
                 return []
             
             platforms = []
-            if user.twitch_username: platforms.append('twitch')
-            if user.vk_channel_name: platforms.append('vk')
-            
-            if not platforms: return []
+            if user.twitch_username:
+                platforms.append("twitch")
+            if user.vk_channel_name:
+                platforms.append("vk")
+
+            if not platforms:
+                return []
             
             chat_repo = ChatMessageRepository(db)
             # Оптимизация: limit=20 для быстрой загрузки, клиент может запросить больше если надо
             messages = chat_repo.get_history_by_platforms(user_id, platforms, limit=20)
             messages.sort(key=lambda x: x.timestamp)
             return messages
-        except Exception as e:
+        except Exception:
             logger.exception("Error querying chat history")
             return []
         finally:
@@ -110,8 +115,30 @@ async def _send_chat_history(websocket: WebSocket, user_id: int) -> None:
         
         logger.info(f"[HISTORY] Sent {len(history_data)} messages")
         
-    except Exception as e:
+    except Exception:
         logger.exception("[WARN] Error loading chat history")
+
+
+async def _resolve_authenticated_user_id(websocket: WebSocket) -> Optional[int]:
+    """Resolve authenticated user_id from session cookie for WebSocket handshake."""
+    session_id = websocket.cookies.get("session_id")
+    if not session_id:
+        return None
+
+    session_data = await asyncio.to_thread(session_manager.validate_session, session_id)
+    if not session_data or session_data.get("is_blocked"):
+        return None
+
+    raw_user_id = session_data.get("id") or session_data.get("user_id")
+    try:
+        user_id = int(raw_user_id)
+    except (TypeError, ValueError):
+        return None
+
+    if user_id <= 0:
+        return None
+
+    return user_id
 
 
 @router.websocket("/ws/chat/{user_id}")
@@ -120,14 +147,29 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
     WebSocket endpoint для чата.
     """
     logger.info(f"[WS] Connection request for user {user_id}")
-    
-    await websocket.accept()
-    
+
     user_id_int = int(user_id) if user_id.isdigit() else -1
     if user_id_int <= 0:
         logger.warning(f"[WS] Invalid user_id {user_id}, closing")
-        await websocket.close(code=4000)
+        await websocket.close(code=4400)
         return
+
+    authenticated_user_id = await _resolve_authenticated_user_id(websocket)
+    if not authenticated_user_id:
+        logger.warning("[WS] Unauthorized connection attempt: missing/invalid session")
+        await websocket.close(code=4401)
+        return
+
+    if authenticated_user_id != user_id_int:
+        logger.warning(
+            "[WS] Forbidden connection attempt: session user_id=%s path user_id=%s",
+            authenticated_user_id,
+            user_id_int,
+        )
+        await websocket.close(code=4403)
+        return
+
+    await websocket.accept()
 
     manager = get_memory_websocket_manager()
     conn_mgr = get_connection_manager()
@@ -236,6 +278,10 @@ async def _schedule_tts_disconnect(user_id: int) -> None:
 @router.websocket("/ws/test")
 async def websocket_test(websocket: WebSocket):
     """Тестовый WebSocket endpoint."""
+    if settings.is_production:
+        await websocket.close(code=4403)
+        return
+
     logger.info("[WS] Test WebSocket connection attempt")
     await websocket.accept()
     logger.info("[OK] Test WebSocket connected")
@@ -245,7 +291,6 @@ async def websocket_test(websocket: WebSocket):
             data = await websocket.receive_text()
             logger.info(f"[WS] Test received: {data}")
             await websocket.send_text(f"Echo: {data}")
-    except Exception as e:
+    except Exception:
         logger.exception("[ERROR] Test WebSocket error")
         await websocket.close()
-

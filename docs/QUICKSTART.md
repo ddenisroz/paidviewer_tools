@@ -1,8 +1,10 @@
 # Quickstart
 
+If repository layout is unclear, read `docs/REPO_STRUCTURE.md` first.
+
 ## Requirements
 - Python 3.10+
-- Node.js 18+
+- Node.js 22+
 - PostgreSQL
 - GPU optional for F5-TTS
 

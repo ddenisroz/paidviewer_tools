@@ -1,6 +1,8 @@
 # bot_service/api/donationalerts_api.py
 """API для DonationAlerts - Clean Architecture версия"""
-from fastapi import APIRouter, Depends, HTTPException
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode, urlparse
 from core.database import get_db
@@ -75,7 +77,8 @@ async def get_donationalerts_status(
 @router.post("/connect")
 async def connect_donationalerts(
     user: dict = Depends(get_current_user_optional),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    response: Response = None,
 ):
     """Подключить DonationAlerts"""
     try:
@@ -98,17 +101,29 @@ async def connect_donationalerts(
             raise HTTPException(status_code=503, detail="DonationAlerts integration is not configured")
 
         # Формируем URL авторизации
+        state = secrets.token_urlsafe(16)
         params = {
             "client_id": client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
-            "scope": "oauth-user-show oauth-donation-subscribe oauth-donation-index"
+            "scope": "oauth-user-show oauth-donation-subscribe oauth-donation-index",
+            "state": state,
         }
         auth_url = f"https://www.donationalerts.com/oauth/authorize?{urlencode(params)}"
 
         if not _is_safe_donationalerts_auth_url(auth_url):
             logger.error("Unsafe DonationAlerts auth URL generated for user %s", user_id)
             raise HTTPException(status_code=500, detail="Failed to generate secure auth URL")
+
+        if response is not None:
+            response.set_cookie(
+                key="oauth_state_da",
+                value=state,
+                max_age=600,
+                httponly=True,
+                samesite="lax",
+                secure=settings.is_production,
+            )
 
         logger.info("DonationAlerts auth URL generated for user %s", user_id)
 

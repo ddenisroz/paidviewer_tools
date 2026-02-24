@@ -33,6 +33,7 @@ class AdvancedRateLimiter:
             self.storage = storage.MemoryStorage()
 
         self.strategy = MovingWindowRateLimiter(self.storage)
+        self.storage_backend = storage_backend
         self.limits = {
             "default": "60/minute",
             "login": "5/15minutes",
@@ -42,12 +43,31 @@ class AdvancedRateLimiter:
         }
         logger.info("[RATE-LIMITER] Advanced Rate Limiter initialized with limits library (storage=%s)", storage_backend)
 
+    @staticmethod
+    def _extract_client_ip(request: Request) -> str:
+        """Extract best-effort client IP for reverse-proxy deployments."""
+        forwarded_for = (request.headers.get("x-forwarded-for") or "").strip()
+        if forwarded_for:
+            first_hop = forwarded_for.split(",")[0].strip()
+            if first_hop:
+                return first_hop
+
+        real_ip = (request.headers.get("x-real-ip") or "").strip()
+        if real_ip:
+            return real_ip
+
+        cf_ip = (request.headers.get("cf-connecting-ip") or "").strip()
+        if cf_ip:
+            return cf_ip
+
+        return getattr(request.client, "host", "unknown")
+
     def _get_identifier(self, request: Request = None, user_id: int = None) -> str:
         """Получить идентификатор для rate limiting."""
         if user_id:
             return f"user:{user_id}"
         if request:
-            client_ip = getattr(request.client, "host", "unknown")
+            client_ip = self._extract_client_ip(request)
             return f"ip:{client_ip}"
         return "global"
 
@@ -99,7 +119,7 @@ class AdvancedRateLimiter:
         """Получить статистику rate limiter."""
         try:
             return {
-                "storage_type": "memory",
+                "storage_type": self.storage_backend,
                 "strategy": "moving_window",
                 "limits": self.limits,
                 "library": "limits",

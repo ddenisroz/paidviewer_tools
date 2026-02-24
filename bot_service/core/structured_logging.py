@@ -33,6 +33,7 @@ _SENSITIVE_TEXT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(?i)(password\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
     (re.compile(r"(?i)(code\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
     (re.compile(r"(?i)(state\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
+    (re.compile(r"(?i)(session_id\\s*[:=]\\s*)[^\\s,;]+"), r"\\1[FILTERED]"),
 ]
 
 
@@ -48,7 +49,19 @@ def _redact_object(value: Any) -> Any:
         result: Dict[Any, Any] = {}
         for key, item in value.items():
             key_str = str(key).lower()
-            if any(s in key_str for s in ("authorization", "token", "secret", "password", "api_key", "code", "state")):
+            if any(
+                s in key_str
+                for s in (
+                    "authorization",
+                    "token",
+                    "secret",
+                    "password",
+                    "api_key",
+                    "code",
+                    "state",
+                    "session_id",
+                )
+            ):
                 result[key] = "[FILTERED]"
             else:
                 result[key] = _redact_object(item)
@@ -119,7 +132,7 @@ def censor_sensitive_data(logger: Any, method_name: str, event_dict: EventDict) 
     """
     sensitive_fields = [
         "password", "token", "secret", "api_key", 
-        "access_token", "refresh_token", "authorization"
+        "access_token", "refresh_token", "authorization", "session_id"
     ]
     
     def censor_dict(d: Dict) -> Dict:

@@ -8,7 +8,7 @@
 
 ### Required Software
 - **Python 3.10+** - Backend runtime
-- **Node.js 18+** - Frontend build tools
+- **Node.js 22+** - Frontend build tools
 - **Git** - Version control
 - **Docker** (optional) - For containerized deployment
 

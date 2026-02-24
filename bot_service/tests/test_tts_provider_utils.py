@@ -103,3 +103,33 @@ def test_get_provider_service_url_fallbacks(monkeypatch):
 
     assert provider_utils.get_provider_service_url("qwen") == "http://localhost:8001"
     assert provider_utils.get_provider_service_url("unknown") == "http://localhost:8001"
+
+
+def test_normalize_local_tts_endpoint_url_accepts_allowed_host(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")
+
+    assert provider_utils.normalize_local_tts_endpoint_url("http://localhost:8001/") == "http://localhost:8001"
+
+
+def test_normalize_local_tts_endpoint_url_rejects_path(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")
+
+    with pytest.raises(ValueError, match="must not contain path"):
+        provider_utils.normalize_local_tts_endpoint_url("http://localhost:8001/api/health")
+
+
+def test_normalize_local_tts_endpoint_url_rejects_disallowed_host(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")
+
+    with pytest.raises(ValueError, match="host is not allowed"):
+        provider_utils.normalize_local_tts_endpoint_url("http://evil.example:9000")
+
+
+def test_normalize_local_tts_endpoint_url_allows_host_from_cidr(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "10.0.0.0/8")
+
+    assert provider_utils.normalize_local_tts_endpoint_url("http://10.5.6.7:8011") == "http://10.5.6.7:8011"

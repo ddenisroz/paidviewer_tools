@@ -16,6 +16,7 @@ from constants import (
 )
 from starlette import status
 from core.cookie_config import get_session_cookie_settings
+from core.log_sanitizer import mask_session_id
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -133,7 +134,7 @@ class OAuthHandler:
 
             # Получаем session_id из cookies (если есть)
             session_id = request.cookies.get('session_id')
-            logger.info(f"[OAUTH START] session_id from cookie: {session_id[:8] if session_id else 'NONE'}")
+            logger.info("[OAUTH START] session_id from cookie: %s", mask_session_id(session_id))
 
             # Централизованная проверка отпечатков платформ
             platform_fingerprint = f"{platform}:{user_data.platform_user_id}"
@@ -163,7 +164,11 @@ class OAuthHandler:
 
             # Проверяем авторизованные сессии для этого канала
             if active_session:
-                logger.info(f"Found active session {active_session.session_id} for channel {channel_name}")
+                logger.info(
+                    "Found active session %s for channel %s",
+                    mask_session_id(active_session.session_id),
+                    channel_name,
+                )
                 # Активная сессия принадлежит авторизованному пользователю
                 existing_user = db.query(User).filter(User.id == active_session.user_id).first()
 
@@ -188,7 +193,7 @@ class OAuthHandler:
                         user_id=current_user['id'],
                         device_info=device_info
                     )
-                    logger.info(f"[OK] Created replacement session: {session_id}")
+                    logger.info("[OK] Created replacement session: %s", mask_session_id(session_id))
 
                     # Объединяем аккаунты если нужно
                     if existing_user.id != current_user['id']:
@@ -386,7 +391,7 @@ class OAuthHandler:
                         user_id=unified_user.id,
                         device_info=device_info
                     )
-                    logger.info(f"[OK] New session created: {session_id}")
+                    logger.info("[OK] New session created: %s", mask_session_id(session_id))
                 else:
                     # Завершаем ВСЕ предыдущие сессии пользователя (принцип одной активной сессии)
                     logger.info(f"[SECURITY] New user login. Terminating all sessions for user {unified_user.id}...")
@@ -410,7 +415,7 @@ class OAuthHandler:
                         user_id=unified_user.id,
                         device_info=device_info
                     )
-                    logger.info(f"[OK] New session created: {session_id}")
+                    logger.info("[OK] New session created: %s", mask_session_id(session_id))
 
                 # Уведомляем connection_manager о новой активной сессии
                 try:

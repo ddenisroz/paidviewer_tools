@@ -14,6 +14,37 @@ from repositories.drops_reward_repository import DropsRewardRepository
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/drops', tags=['drops'])
 
+
+def _extract_donationalerts_webhook_secret(request: Request) -> str:
+    """Extract webhook secret from supported locations."""
+    return (
+        request.headers.get("X-DonationAlerts-Secret")
+        or request.headers.get("X-Webhook-Secret")
+        or request.query_params.get("secret")
+        or ""
+    )
+
+
+def _verify_donationalerts_webhook_secret(request: Request) -> None:
+    """
+    Verify DonationAlerts webhook secret.
+
+    Production fails closed when secret is not configured.
+    Non-production keeps backward compatibility (warn-only).
+    """
+    configured_secret = (settings.donationalerts_webhook_secret or "").strip()
+    if not configured_secret:
+        if settings.is_production:
+            logger.error("DonationAlerts webhook secret is not configured in production")
+            raise HTTPException(status_code=503, detail="Webhook is temporarily unavailable")
+        logger.warning("DonationAlerts webhook secret is not configured; accepting request in non-production mode")
+        return
+
+    provided_secret = _extract_donationalerts_webhook_secret(request).strip()
+    if not provided_secret or not secrets.compare_digest(provided_secret, configured_secret):
+        logger.warning("Rejected DonationAlerts webhook request: invalid or missing webhook secret")
+        raise HTTPException(status_code=403, detail="Invalid webhook signature")
+
 @router.get('/triggers')
 async def get_drops_triggers(current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
     """Text cleaned."""
@@ -144,6 +175,8 @@ async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends
 async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
     """Text cleaned."""
     try:
+        _verify_donationalerts_webhook_secret(request)
+
         from services.drops.drops_service import DropsService
         from services.memealerts_service import MemeAlertsService
         data = await request.json()

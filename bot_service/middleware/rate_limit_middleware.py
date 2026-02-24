@@ -28,6 +28,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         action = "default"
         if path.startswith("/api/auth/login"):
             action = "login"
+        elif path.startswith("/auth/") and ("/login" in path or "/callback" in path):
+            action = "login"
         elif path.startswith("/api/tts/youtube-settings"):
             # Dashboard reads/saves YouTube settings often; use regular API limit.
             action = "api"
@@ -47,11 +49,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if not advanced_rate_limiter.check_rate_limit(identifier, action):
             logger.warning("Rate limit exceeded for %s on %s (%s)", identifier, path, action)
+            retry_after = advanced_rate_limiter._estimate_retry_after(action)
             return JSONResponse(
                 status_code=429,
                 content={
                     "detail": "Too Many Requests",
-                    "message": "Вы отправляете слишком много запросов. Пожалуйста, подождите.",
+                    "message": "Too many requests. Please retry later.",
+                },
+                headers={
+                    "Retry-After": str(retry_after),
                 },
             )
 

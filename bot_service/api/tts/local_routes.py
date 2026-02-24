@@ -4,14 +4,16 @@ Provider-aware Local TTS API endpoints.
 """
 
 import logging
+from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from auth.auth import get_current_user, get_current_user_optional
+from auth.auth import get_current_user
 from core.database import get_db
 from repositories.local_tts_repository import LocalTTSRepository
+from services.tts.provider_utils import normalize_local_tts_endpoint_url
 from services.tts.tts_core import LocalTTSConfigRequest, check_local_tts_health
 
 logger = logging.getLogger("bot_service.tts.local")
@@ -24,6 +26,14 @@ def _normalize_local_provider(provider: str) -> str:
     if normalized not in {"f5", "qwen"}:
         raise HTTPException(status_code=400, detail='provider must be either "f5" or "qwen"')
     return normalized
+
+
+def _redact_api_key(api_key: Optional[str]) -> Optional[str]:
+    if not api_key:
+        return None
+    if len(api_key) <= 6:
+        return "*" * len(api_key)
+    return f"{api_key[:3]}***{api_key[-2:]}"
 
 
 # ============================================================================
@@ -60,10 +70,13 @@ async def get_local_tts_config(
                 "can_manage_voices": True,
                 "endpoint_url": None,
                 "api_key": None,
+                "api_key_redacted": None,
+                "has_api_key": False,
                 "use_local": False,
                 "message": "Local TTS is not configured",
             }
 
+        api_key_redacted = _redact_api_key(config.api_key)
         return {
             "success": True,
             "configured": True,
@@ -71,14 +84,18 @@ async def get_local_tts_config(
             "healthy": config.is_healthy,
             "can_manage_voices": True,
             "endpoint_url": config.endpoint_url,
-            "api_key": config.api_key,
+            "api_key": None,
+            "api_key_redacted": api_key_redacted,
+            "has_api_key": bool(config.api_key),
             "use_local": config.use_local,
             "is_active": config.is_active,
             "config": {
                 "id": config.id,
                 "provider": config.provider,
                 "endpoint_url": config.endpoint_url,
-                "api_key": config.api_key,
+                "api_key": None,
+                "api_key_redacted": api_key_redacted,
+                "has_api_key": bool(config.api_key),
                 "is_active": config.is_active,
                 "use_local": config.use_local,
                 "is_healthy": config.is_healthy,
@@ -126,7 +143,9 @@ async def save_local_tts_config(
                 "id": config.id,
                 "provider": config.provider,
                 "endpoint_url": config.endpoint_url,
-                "api_key": config.api_key,
+                "api_key": None,
+                "api_key_redacted": _redact_api_key(config.api_key),
+                "has_api_key": bool(config.api_key),
                 "use_local": config.use_local,
             },
         }
@@ -200,7 +219,7 @@ async def toggle_local_tts(
 @local_tts_router.post("/test-connection")
 async def test_local_tts_connection(
     request: LocalTTSConfigRequest,
-    user: dict = Depends(get_current_user_optional),
+    user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Test connection to a local provider endpoint."""
@@ -209,12 +228,13 @@ async def test_local_tts_connection(
 
     try:
         resolved_provider = _normalize_local_provider(request.provider)
+        endpoint = normalize_local_tts_endpoint_url(request.endpoint_url)
         headers = {}
         if request.api_key:
             headers["Authorization"] = f"Bearer {request.api_key}"
 
         async with httpx.AsyncClient(timeout=10.0) as client:
-            health_response = await client.get(f"{request.endpoint_url}/health", headers=headers)
+            health_response = await client.get(f"{endpoint}/health", headers=headers)
 
             if health_response.status_code != 200:
                 raise HTTPException(status_code=502, detail=f"Server returned status code {health_response.status_code}")
@@ -222,7 +242,7 @@ async def test_local_tts_connection(
             health_data = health_response.json()
 
             try:
-                status_response = await client.get(f"{request.endpoint_url}/api/status", headers=headers)
+                status_response = await client.get(f"{endpoint}/api/status", headers=headers)
                 status_data = status_response.json() if status_response.status_code == 200 else None
             except Exception:
                 status_data = None
@@ -234,6 +254,8 @@ async def test_local_tts_connection(
                 "health_data": health_data,
                 "status_data": status_data,
             }
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Timeout: service is not responding.")
     except httpx.ConnectError:
@@ -247,7 +269,7 @@ async def test_local_tts_connection(
 
 @local_tts_router.post("/sync-global-voices")
 async def sync_global_voices_to_local(
-    user: dict = Depends(get_current_user_optional),
+    user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
     provider: str = "f5",
 ):
@@ -267,10 +289,11 @@ async def sync_global_voices_to_local(
         headers = {}
         if config.api_key:
             headers["Authorization"] = f"Bearer {config.api_key}"
+        endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{config.endpoint_url}/api/voices/list", headers=headers)
+                response = await client.get(f"{endpoint}/api/voices/list", headers=headers)
                 if response.status_code != 200:
                     raise HTTPException(status_code=response.status_code, detail="Failed to fetch voices")
 
@@ -285,6 +308,8 @@ async def sync_global_voices_to_local(
             "message": f"Detected voices: {len(local_voices)}",
             "voices": local_voices,
         }
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
     except HTTPException:
         raise
     except Exception:

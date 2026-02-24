@@ -30,7 +30,8 @@ logger = logging.getLogger(__name__)
 
 async def _startup_database() -> None:
     """Инициализация базы данных."""
-    init_db()
+    # Production-safe startup: schema must be migrated before app boot.
+    init_db(create_schema=False, strict=True)
     logger.info("Database initialized")
 
 async def _startup_commands() -> None:

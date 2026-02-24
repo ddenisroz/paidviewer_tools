@@ -6,6 +6,7 @@ Replaces hardcoded values and os.getenv() calls throughout the application
 import logging
 import os
 import sys
+import ipaddress
 from typing import Optional, List
 from pydantic import Field, field_validator, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -44,6 +45,10 @@ class Settings(BaseSettings):
     bot_service_port: int = Field(default=8000, description="Bot service port")
     backend_url: str = Field(default="http://localhost:8000", description="Backend URL")
     frontend_url: str = Field(default="http://localhost:5173", description="Frontend URL")
+    tts_gateway_url: str = Field(
+        default="",
+        description="Optional unified TTS gateway URL for provider routing (f5/qwen)",
+    )
     f5_tts_service_url: str = Field(
         default="http://localhost:8001",
         description="F5 TTS service URL",
@@ -99,6 +104,18 @@ class Settings(BaseSettings):
     cors_origins: str = Field(
         default="http://localhost:5173,http://localhost:3000",
         description="CORS allowed origins (comma-separated)"
+    )
+    allowed_origins: Optional[str] = Field(
+        default=None,
+        description="Legacy alias for CORS_ORIGINS (comma-separated)",
+    )
+    local_tts_allowed_hosts: str = Field(
+        default="localhost,127.0.0.1,::1,host.docker.internal,f5_tts,tts_service,qwen_tts,qwen_service",
+        description="Allowed hostnames/IPs for user-defined local TTS endpoint URLs (comma-separated)",
+    )
+    local_tts_allowed_cidrs: str = Field(
+        default="127.0.0.0/8,::1/128",
+        description="Allowed CIDRs for local TTS endpoint IPs when raw IP host is used (comma-separated)",
     )
 
     # === DATABASE ===
@@ -156,6 +173,10 @@ class Settings(BaseSettings):
     donationalerts_redirect_uri: str = Field(
         default="http://localhost:8000/auth/donationalerts/callback",
         description="DonationAlerts OAuth redirect URI"
+    )
+    donationalerts_webhook_secret: Optional[str] = Field(
+        default=None,
+        description="Shared secret for DonationAlerts webhook verification (header/query secret)",
     )
 
     # === EXTERNAL APIS ===
@@ -222,8 +243,31 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def cors_origins_list(self) -> List[str]:
-        """Parse CORS origins string into list"""
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        """Parse effective CORS origins into list (supports legacy ALLOWED_ORIGINS alias)."""
+        default_cors = "http://localhost:5173,http://localhost:3000"
+        configured_cors = (self.cors_origins or "").strip()
+        legacy_cors = (self.allowed_origins or "").strip()
+
+        if configured_cors and (configured_cors != default_cors or not legacy_cors):
+            origins_raw = configured_cors
+        elif legacy_cors:
+            origins_raw = legacy_cors
+        else:
+            origins_raw = configured_cors or default_cors
+
+        return [origin.strip() for origin in origins_raw.split(",") if origin.strip()]
+
+    @computed_field
+    @property
+    def local_tts_allowed_hosts_list(self) -> List[str]:
+        """Parse local TTS endpoint host allowlist."""
+        return [host.strip().lower() for host in (self.local_tts_allowed_hosts or "").split(",") if host.strip()]
+
+    @computed_field
+    @property
+    def local_tts_allowed_cidrs_list(self) -> List[str]:
+        """Parse local TTS endpoint CIDR allowlist."""
+        return [cidr.strip() for cidr in (self.local_tts_allowed_cidrs or "").split(",") if cidr.strip()]
 
     @computed_field
     @property
@@ -295,6 +339,22 @@ class Settings(BaseSettings):
         """Validate port number"""
         if not 1 <= v <= 65535:
             raise ValueError(f"Port must be between 1 and 65535, got {v}")
+        return v
+
+    @field_validator("local_tts_allowed_cidrs")
+    @classmethod
+    def validate_local_tts_allowed_cidrs(cls, v: str) -> str:
+        """Validate LOCAL_TTS_ALLOWED_CIDRS values."""
+        raw = (v or "").strip()
+        if not raw:
+            return v
+
+        for cidr in [item.strip() for item in raw.split(",") if item.strip()]:
+            try:
+                ipaddress.ip_network(cidr, strict=False)
+            except ValueError as error:
+                raise ValueError(f"Invalid LOCAL_TTS_ALLOWED_CIDRS value '{cidr}'") from error
+
         return v
 
     @field_validator("internal_service_jwt_ttl_seconds")

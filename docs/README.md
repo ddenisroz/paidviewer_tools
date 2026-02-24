@@ -1,19 +1,23 @@
 # Docs Index
 
-Start here:
-- `QUICKSTART.md` - local setup and first run
-- `FEATURES.md` - what the platform supports
-- `DEVELOPER.md` - dev setup and rules
-- `ARCHITECTURE.md` - system overview
+## Start here
+- `QUICKSTART.md`: local setup and first run.
+- `REPO_STRUCTURE.md`: what folders are core logic vs generated artifacts.
+- `ARCHITECTURE.md`: high-level system overview.
+- `architecture/ARCHITECTURE_GUIDE.md`: deeper architecture details.
 
-Detailed references:
-- `api/` - API docs
-- `setup/` - deployment guides
-- `architecture/` - deep dives (auth, caching, TTS, shared WS)
-- `features/` - feature-specific notes
-- `guides/` - troubleshooting and how-tos
-- `setup/F5_TTS_EXTRACTION_CHECKLIST.md` - cutover checklist for standalone `f5-tts-service`
-- `setup/REPO_SPLIT_GUIDE.md` - split/cutover plan for `ttv-core`, `f5-tts-service`, and Qwen service repos
+## By topic
+- `setup/`: deployment and infrastructure guides.
+- `architecture/`: auth, caching, TTS, websocket deep dives.
+- `features/`: feature-specific implementation notes.
+- `guides/`: troubleshooting and developer how-to.
+  - `guides/REPO_CLEANUP_PLAN.md`: cleanup status and technical debt queue.
+- `api/`: API references.
+- `backlog/`: historical notes and temporary audit artifacts (not current source of truth).
 
-History:
+## Repo split and service extraction
+- `setup/F5_TTS_EXTRACTION_CHECKLIST.md`
+- `setup/REPO_SPLIT_GUIDE.md`
+
+## History
 - `CHANGELOG.md`

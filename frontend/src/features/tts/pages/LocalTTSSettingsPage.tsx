@@ -144,6 +144,7 @@ const LocalTTSSettingsPage: React.FC = () => {
         api_key: '',
         use_local: false
     });
+    const [hasStoredApiKey, setHasStoredApiKey] = useState<boolean>(false);
 
     const [testing, setTesting] = useState<boolean>(false);
     const [saving, setSaving] = useState<boolean>(false);
@@ -183,8 +184,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                 api_key: '',
                 use_local: false
             });
+            setHasStoredApiKey(false);
             return;
         }
+        setHasStoredApiKey(Boolean(configData.has_api_key));
         setConfig({
             endpoint_url: configData.endpoint_url || configData.host || providerMeta.defaultEndpoint,
             api_key: configData.api_key || '',
@@ -263,6 +266,9 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     const saveConfigMutation = useSaveLocalTtsConfig({
         onSuccess: () => {
+            if (config.api_key.trim()) {
+                setHasStoredApiKey(true);
+            }
             // Toast обработан в hook
         },
         onError: (error: unknown) => {
@@ -632,6 +638,11 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <p className="text-xs text-muted-foreground">
                                     {providerMeta.apiKeyHint}
                                 </p>
+                                {hasStoredApiKey && !config.api_key.trim() && (
+                                    <p className="text-xs text-amber-300">
+                                        Ключ сохранён на сервере. Оставьте поле пустым, чтобы не менять его.
+                                    </p>
+                                )}
                             </div>
 
                             <div className="flex gap-2">

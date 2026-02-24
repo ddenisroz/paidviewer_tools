@@ -5,6 +5,7 @@ from fastapi import HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from core.database import get_db
+from core.log_sanitizer import mask_session_id
 from auth.auth import get_current_user
 from services.user_identity_service import UserIdentityService, UserType
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ class AuthHandlers:
                 logger.info('[OK] All old sessions terminated. Creating new session...')
                 device_info = {'user_agent': request.headers.get('user-agent'), 'ip': getattr(request.client, 'host', 'unknown'), 'monitored_channel': twitch_username.lower(), 'platform': 'twitch'}
                 session_id = session_manager.create_session(user_id, device_info=device_info)
-                logger.info(f'[OK] New session created: {session_id}')
+                logger.info('[OK] New session created: %s', mask_session_id(session_id))
                 try:
                     from core.connection_manager import get_connection_manager
                     connection_manager = get_connection_manager()

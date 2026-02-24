@@ -27,6 +27,8 @@ In `bot_service/.env`:
 ```env
 F5_TTS_SERVICE_URL=http://localhost:8001
 QWEN_TTS_SERVICE_URL=http://localhost:8011
+LOCAL_TTS_ALLOWED_HOSTS=localhost,127.0.0.1,::1,host.docker.internal,f5_tts,tts_service,qwen_tts,qwen_service
+LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 ```
 
 Notes:
@@ -34,6 +36,8 @@ Notes:
 - `F5_TTS_SERVICE_URL` is the cloud/default F5 provider endpoint.
 - `QWEN_TTS_SERVICE_URL` is the cloud/default Qwen provider endpoint.
 - Per-user local endpoints are configured via API/UI and override cloud endpoint in local mode.
+- User-defined local endpoint URLs are accepted only for hosts/CIDRs from `LOCAL_TTS_ALLOWED_HOSTS` / `LOCAL_TTS_ALLOWED_CIDRS`.
+- Endpoint URL must be an origin only (`http(s)://host[:port]`), without path/query/credentials.
 
 ## 2. Configure local endpoint in UI
 
@@ -62,6 +66,7 @@ Local endpoint management:
 - `POST /api/local-tts/config`
 - `POST /api/local-tts/test-connection`
 - `POST /api/local-tts/toggle?provider=f5|qwen`
+- Endpoints above require authenticated user session.
 
 Provider-aware voice management:
 

@@ -424,31 +424,5 @@ export const ttsService = {
     return apiClient.post(`/api/user/voices/enabled/${userId}`, voiceIds, { params: { provider } });
   },
 
-  /**
-   * Включить TTS для гостя
-   * @param data - Данные для включения
-   * @returns Promise с ответом API
-   */
-  async enableGuest(data: { channel_name: string; platform: 'twitch' | 'vk' }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/guest/tts/enable', data);
-  },
-
-  /**
-   * Выключить TTS для гостя
-   * @param data - Данные для выключения
-   * @returns Promise с ответом API
-   */
-  async disableGuest(data: { channel_name: string; platform: 'twitch' | 'vk' }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/guest/tts/disable', data);
-  },
-
-  /**
-   * Отключить гостя от канала
-   * @param data - Данные для отключения
-   * @returns Promise с ответом API
-   */
-  async disconnectGuest(data: { channel_name: string; platform: 'twitch' | 'vk' }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/guest/disconnect', data);
-  },
 };
 

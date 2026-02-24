@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.session_manager import session_manager
 from core.config import settings
+from core.datetime_utils import utcnow_naive
+from core.log_sanitizer import mask_session_id
 from auth.auth import get_current_user_optional
 import base64
 import secrets
@@ -181,7 +183,6 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             access_token = token_data["access_token"]
             refresh_token = token_data.get("refresh_token")
             expires_in = token_data.get("expires_in", 3600)
-            from core.datetime_utils import utcnow_naive
             expires_at = utcnow_naive() + timedelta(seconds=expires_in)
 
             # Получаем scopes из ответа
@@ -407,7 +408,10 @@ async def vk_logout(request: Request, response: Response):
             # между сессиями. Пользователь может перелогиниться и сохранить интеграции.
             # Для полного удаления интеграций есть отдельные эндпоинты.
         else:
-            logger.warning(f"Could not get user data for session {session_id} during VK logout")
+            logger.warning(
+                "Could not get user data for session %s during VK logout",
+                mask_session_id(session_id),
+            )
 
         session_manager.terminate_session(session_id, "logout")
         response.delete_cookie("session_id")

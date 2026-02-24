@@ -191,10 +191,9 @@ FRONTEND_URL=http://localhost:5173     # Dev
 # === SECURITY ===
 # Generate with: openssl rand -hex 32
 SECRET_KEY=your-secret-key-here
-JWT_SECRET_KEY=your-jwt-secret
 
 # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-ENCRYPTION_KEY=your-fernet-key
+TOKEN_ENCRYPTION_KEY=your-fernet-key
 
 # === OAUTH CREDENTIALS ===
 TWITCH_CLIENT_ID=your-twitch-client-id
@@ -208,6 +207,8 @@ VK_REDIRECT_URI=http://localhost:8000/auth/vk/callback
 DONATION_ALERTS_CLIENT_ID=your-da-client-id
 DONATION_ALERTS_CLIENT_SECRET=your-da-secret
 DONATION_ALERTS_REDIRECT_URI=http://localhost:8000/auth/donationalerts/callback
+# Required in production for /api/drops/donationalerts/webhook verification
+DONATIONALERTS_WEBHOOK_SECRET=replace-with-random-shared-secret
 
 # === EXTERNAL APIS (Optional) ===
 # Google Cloud key for YouTube + TTS
@@ -252,7 +253,7 @@ GOOGLE_TTS_LANGUAGE=ru-RU
 CLOUDFLARE_TUNNEL_TOKEN=your-tunnel-token
 
 # === SECURITY ===
-ALLOWED_ORIGINS=http://localhost:8000,http://localhost:5173
+CORS_ORIGINS=http://localhost:8000,http://localhost:5173
 
 # === LOGGING ===
 LOG_LEVEL=INFO
@@ -619,12 +620,10 @@ fi
 if grep -q "your-secret-key-here" bot_service/.env; then
     echo "Generating secrets..."
     SECRET_KEY=$(openssl rand -hex 32)
-    JWT_SECRET=$(openssl rand -hex 32)
-    ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+    TOKEN_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
     
     sed -i "s/your-secret-key-here/$SECRET_KEY/" bot_service/.env
-    sed -i "s/your-jwt-secret/$JWT_SECRET/" bot_service/.env
-    sed -i "s/your-fernet-key/$ENCRYPTION_KEY/" bot_service/.env
+    sed -i "s/your-fernet-key/$TOKEN_ENCRYPTION_KEY/" bot_service/.env
     echo "✓ Generated security keys"
 fi
 

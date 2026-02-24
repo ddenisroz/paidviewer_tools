@@ -47,8 +47,7 @@ def create_app(lifespan: Optional[Callable] = None) -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
 
     # CORS настройки
-    # Парсим CORS origins из строки с запятыми
-    cors_origins_list = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+    cors_origins_list = settings.cors_origins_list
     
     allowed_origins = cors_origins_list
     allow_credentials = True

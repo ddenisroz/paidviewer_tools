@@ -1,25 +1,25 @@
-# bot_service/core/middleware.py
-"""Middleware для FastAPI приложения"""
-import time
+"""Middleware for FastAPI application."""
+
 import logging
 import secrets
+import time
+
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
 
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Middleware для добавления заголовков безопасности"""
+    """Attach security-related response headers."""
 
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         request_path = request.url.path or ""
 
-        # Генерируем nonce для inline скриптов (более безопасный подход)
+        # Use per-response nonce for strict CSP.
         script_nonce = secrets.token_urlsafe(16)
 
-        # Content Security Policy - более строгая, без unsafe-inline/eval
-        # Используем nonce для необходимых inline скриптов
         csp_policy = (
             f"default-src 'self'; "
             f"script-src 'self' 'nonce-{script_nonce}' https://cdn.jsdelivr.net https://cdn.socket.io; "
@@ -45,14 +45,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
                 f"report-uri /api/csp-report"
             )
 
-        # CORS headers (дополнение к CORS middleware)
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Max-Age"] = "3600"
+        forwarded_proto = (
+            (request.headers.get("x-forwarded-proto") or "")
+            .split(",")[0]
+            .strip()
+            .lower()
+        )
+        is_https_request = request.url.scheme == "https" or forwarded_proto == "https"
+        if is_https_request:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
-        # Другие security headers
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "SAMEORIGIN"  # Более мягче, чем DENY, для встраивания в OBS
+        # Keep SAMEORIGIN for OBS embed compatibility.
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = (
@@ -66,35 +71,31 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "accelerometer=()"
         )
 
-        # Expose nonce в заголовок для использования в клиенте (если нужно)
+        # Expose nonce for debugging/optional client use.
         response.headers["X-Script-Nonce"] = script_nonce
 
         return response
 
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware для логирования запросов"""
+    """Middleware for request logging."""
 
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
 
-        # Получаем информацию о пользователе из токена (если есть)
         user_info = "Anonymous"
         auth_header = request.headers.get("authorization")
         if auth_header and auth_header.startswith("Bearer "):
             try:
-                # Здесь можно декодировать JWT токен для получения user_id
-                # user_info = f"User:{user_id}"
+                # Reserved for token decode if needed in future.
                 pass
             except Exception:
                 pass
 
-        # Выполняем запрос
         response = await call_next(request)
 
-        # Вычисляем время выполнения
         process_time = time.time() - start_time
 
-        # Логируем только важные запросы
         if self.should_log_request(request.url.path, response.status_code):
             log_message = (
                 f"{request.method} {request.url.path} - "
@@ -112,45 +113,35 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         return response
 
     def should_log_request(self, path: str, status_code: int) -> bool:
-        """Определяет, нужно ли логировать запрос"""
-        # Игнорируем статические файлы и health checks
-        if path.startswith(('/static/', '/audio/', '/widgets/', '/favicon.ico')):
+        """Return True when request should be logged."""
+        if path.startswith(("/static/", "/audio/", "/widgets/", "/favicon.ico")):
             return False
 
-        # Игнорируем частые запросы
-        if path in ['/health', '/metrics', '/ping']:
+        if path in ["/health", "/metrics", "/ping"]:
             return False
 
-        # Не логируем ожидаемые 401 для публичных эндпоинтов (polling без авторизации)
         if status_code == 401:
-            # Эти эндпоинты часто опрашиваются frontend без авторизации
             polling_endpoints = [
-                '/api/user-settings/',
-                '/api/chat/status',
-                '/api/auth/status',
+                "/api/user-settings/",
+                "/api/chat/status",
+                "/api/auth/status",
             ]
             if any(path.startswith(endpoint) for endpoint in polling_endpoints):
                 return False
 
-        # Не логируем ожидаемые 403, 404
         if status_code in [403, 404]:
             return False
 
-        # Логируем серьезные ошибки (5xx)
         if status_code >= 500:
             return True
 
-        # Логируем клиентские ошибки (4xx), кроме уже исключенных
         if status_code >= 400:
             return True
 
-        # Логируем API запросы
-        if path.startswith('/api/'):
+        if path.startswith("/api/"):
             return True
 
-        # Логируем WebSocket подключения
-        if path.startswith('/ws/'):
+        if path.startswith("/ws/"):
             return True
 
         return False
-

@@ -4,6 +4,8 @@ import sys
 import importlib.util
 import os
 from pathlib import Path
+from types import SimpleNamespace
+from urllib.parse import parse_qs, urlparse
 
 _f5_root_env = (os.getenv("F5_TTS_REPO_ROOT") or "").strip()
 F5_TTS_ROOT = Path(_f5_root_env) if _f5_root_env else (Path(__file__).resolve().parents[2] / "F5_tts")
@@ -70,12 +72,15 @@ from api import stream_info_api
 from api.admin import users as admin_users_api
 from api.admin import dashboard as admin_dashboard_api
 from api.admin import system as admin_system_api
+from api.drops import webhooks_routes as drops_webhooks_routes
 from api.tts import settings_routes as tts_settings_routes
 from api.tts import local_routes as tts_local_routes
 from api.youtube import routes as youtube_routes
+from auth import donationalerts_auth
 from services.psychology_service import PsychologyService
 from services import psychology_service as psychology_service_module
 from services.database_maintenance.database_backup_service import DatabaseBackupService
+from services.advanced_rate_limiter import AdvancedRateLimiter
 
 
 def _dummy_asgi_app(scope, receive, send):
@@ -89,6 +94,70 @@ def test_csrf_exempt_path_does_not_match_prefix_collisions():
     assert middleware._is_exempt_path("/auth/twitch/callback")
     assert not middleware._is_exempt_path("/auth/twitchevil")
     assert not middleware._is_exempt_path("/docs-hack")
+
+
+def test_donationalerts_webhook_secret_rejects_invalid_secret(monkeypatch):
+    monkeypatch.setattr(
+        drops_webhooks_routes,
+        "settings",
+        SimpleNamespace(donationalerts_webhook_secret="expected-secret", is_production=False),
+    )
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/drops/donationalerts/webhook",
+        "headers": [(b"x-donationalerts-secret", b"wrong-secret")],
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    with pytest.raises(HTTPException) as exc_info:
+        drops_webhooks_routes._verify_donationalerts_webhook_secret(request)
+    assert exc_info.value.status_code == 403
+
+
+def test_donationalerts_webhook_secret_accepts_query_secret(monkeypatch):
+    monkeypatch.setattr(
+        drops_webhooks_routes,
+        "settings",
+        SimpleNamespace(donationalerts_webhook_secret="expected-secret", is_production=False),
+    )
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/drops/donationalerts/webhook",
+        "headers": [],
+        "query_string": b"secret=expected-secret",
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    # Should not raise for valid secret in query.
+    drops_webhooks_routes._verify_donationalerts_webhook_secret(request)
+
+
+def test_advanced_rate_limiter_prefers_forwarded_ip():
+    limiter = AdvancedRateLimiter()
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/test",
+        "headers": [(b"x-forwarded-for", b"203.0.113.10, 10.0.0.1")],
+        "query_string": b"",
+        "client": ("10.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    assert limiter._get_identifier(request=request) == "ip:203.0.113.10"
 
 
 @pytest.mark.asyncio
@@ -922,6 +991,16 @@ async def test_local_tts_test_connection_returns_504_on_timeout(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_local_tts_test_connection_rejects_disallowed_endpoint(monkeypatch):
+    monkeypatch.setattr(tts_local_routes, "normalize_local_tts_endpoint_url", lambda _url: (_ for _ in ()).throw(ValueError("blocked")))
+    req = type("Req", (), {"endpoint_url": "http://evil.example:8001", "api_key": None, "provider": "f5"})()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await tts_local_routes.test_local_tts_connection(request=req, user={"id": 1}, db=None)
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_local_tts_test_connection_returns_502_on_connect_error(monkeypatch):
     class DummyClient:
         async def __aenter__(self):
@@ -1145,6 +1224,59 @@ def test_donationalerts_auth_url_accepts_expected_domain():
         )
         is True
     )
+
+
+@pytest.mark.asyncio
+async def test_donationalerts_connect_sets_oauth_state_cookie(monkeypatch):
+    monkeypatch.setattr(
+        donationalerts_api,
+        "settings",
+        SimpleNamespace(
+            donationalerts_client_id="client-id",
+            donationalerts_redirect_uri="https://api.example.com/auth/donationalerts/callback",
+            is_production=False,
+        ),
+    )
+    response = Response()
+
+    result = await donationalerts_api.connect_donationalerts(
+        user={"id": 42},
+        db=None,
+        response=response,
+    )
+
+    assert result["success"] is True
+    query = parse_qs(urlparse(result["auth_url"]).query)
+    assert query.get("state")
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "oauth_state_da=" in set_cookie
+
+
+@pytest.mark.asyncio
+async def test_donationalerts_callback_rejects_invalid_state():
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/auth/donationalerts/callback",
+        "headers": [(b"cookie", b"oauth_state_da=expected-state")],
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+        "server": ("testserver", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+
+    response = await donationalerts_auth.donationalerts_callback(
+        request=request,
+        code="oauth-code",
+        state="wrong-state",
+        db=None,
+        current_user={"id": 1},
+    )
+
+    assert response.status_code in {302, 307}
+    assert "auth_error=invalid_state" in response.headers.get("location", "")
+    assert "oauth_state_da=" in response.headers.get("set-cookie", "")
 
 
 def test_memealerts_auth_url_rejects_external_host():

@@ -1,25 +1,30 @@
-﻿FROM python:3.11-slim
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј СЃРёСЃС‚РµРјРЅС‹Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# РљРѕРїРёСЂСѓРµРј requirements Рё СѓСЃС‚Р°РЅР°РІР»РёРІР°РµРј Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
 
-# РљРѕРїРёСЂСѓРµРј РїСЂРёР»РѕР¶РµРЅРёРµ
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
 COPY . .
 
-# РЎРѕР·РґР°РµРј РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
-# Р­РєСЃРїРѕРЅРёСЂСѓРµРј РїРѕСЂС‚
 EXPOSE 8000
 
-# Р—Р°РїСѓСЃРєР°РµРј СЃ РїСЂРѕРґР°РєС€РµРЅ РЅР°СЃС‚СЂРѕР№РєР°РјРё
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

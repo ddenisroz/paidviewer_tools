@@ -272,6 +272,8 @@ Thumbs.db
 # Docker
 .dockerignore
 !tts_service/.dockerignore
+!bot_service/.dockerignore
+!frontend/.dockerignore
 
 # Cloudflare
 .cloudflared/

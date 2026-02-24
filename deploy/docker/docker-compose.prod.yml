@@ -35,7 +35,7 @@ services:
     image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_tts_service_prod
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     environment:
       - ENVIRONMENT=production
       - TTS_DEBUG=false
@@ -179,7 +179,7 @@ services:
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_prod
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - ENVIRONMENT=production
       - DEBUG=false
@@ -212,7 +212,6 @@ services:
       # Twitch
       - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID}
       - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET}
-      - TWITCH_BOT_TOKEN=${TWITCH_BOT_TOKEN}
       - TWITCH_REDIRECT_URI=${BACKEND_URL:-https://yourdomain.com}/auth/twitch/callback
       
       # VK
@@ -220,7 +219,6 @@ services:
       - VK_CLIENT_SECRET=${VK_CLIENT_SECRET}
       - VK_REDIRECT_URI=${BACKEND_URL:-https://yourdomain.com}/auth/vk/callback
       - VK_AUTH_BASE_URL=https://auth.live.vkvideo.ru/app/oauth2/authorize
-      - VK_LIVE_USER_TOKEN=${VK_LIVE_USER_TOKEN}
       
       # YouTube
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
@@ -234,7 +232,7 @@ services:
       - HF_HOME=/app/f5_tts_cache
       
       # CORS
-      - ALLOWED_ORIGINS=${FRONTEND_URL:-https://yourdomain.com}
+      - CORS_ORIGINS=${FRONTEND_URL:-https://yourdomain.com}
       
       # Admin
       - ADMIN_USERS=${ADMIN_USERS}

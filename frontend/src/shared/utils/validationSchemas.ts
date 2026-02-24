@@ -130,16 +130,6 @@ export const commandSchema = z.object({
   is_enabled: z.boolean().optional().default(true),
 });
 
-// Guest mode validation
-export const guestModeSchema = z.object({
-  channel_name: z.string()
-    .min(1, 'Имя канала обязательно')
-    .max(50, 'Максимум 50 символов')
-    .regex(/^[a-zA-Z0-9_]+$/, 'Только латинские буквы, цифры и подчеркивания')
-    .trim(),
-  platform: z.enum(['twitch', 'vk']),
-});
-
 // Stream title validation
 export const streamTitleSchema = z.object({
   title: z.string()
@@ -360,6 +350,4 @@ export const safeParse = <T>(
   });
   return { success: false, errors };
 };
-
-
 

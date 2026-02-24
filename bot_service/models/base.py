@@ -87,23 +87,30 @@ def db_session():
         db.close()
 
 
-def init_db():
-    """Initialize DB schema and seed baseline data."""
-    from constants import DEFAULT_BLOCKED_BOTS
-    from models.drops import DropsQuality
-    from models.moderation import BlockedBot
-
+def ensure_db_schema():
+    """Create DB schema from SQLAlchemy metadata."""
     if engine is None:
         logger.error("[ERROR] Database engine is not configured")
-        return
+        raise RuntimeError("Database engine is not configured")
 
     try:
         Base.metadata.create_all(bind=engine)
+        logger.info("[DB] Schema create/update completed via SQLAlchemy metadata")
     except UnicodeDecodeError as exc:
         logger.error("[ERROR] PostgreSQL connection failed while initializing schema: %s", exc)
         raise RuntimeError(
             "PostgreSQL connection failed (possible invalid DATABASE_URL or unreachable PostgreSQL server)."
         ) from exc
+
+
+def init_db(*, create_schema: bool = False, strict: bool = True):
+    """Seed baseline data, optionally creating schema for local tooling."""
+    from constants import DEFAULT_BLOCKED_BOTS
+    from models.drops import DropsQuality
+    from models.moderation import BlockedBot
+
+    if create_schema:
+        ensure_db_schema()
 
     default_qualities = [
         {"name": "Common", "color": "#9ca3af", "weight": 100},
@@ -130,6 +137,8 @@ def init_db():
     except Exception as e:
         logger.error(f"Error during database seeding: {e}")
         db.rollback()
+        if strict:
+            raise
     finally:
         db.close()
 

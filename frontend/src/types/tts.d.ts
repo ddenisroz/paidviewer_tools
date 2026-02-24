@@ -124,6 +124,8 @@ export interface LocalTtsConfig {
   port?: number;
   endpoint_url?: string;
   api_key?: string;
+  api_key_redacted?: string;
+  has_api_key?: boolean;
   test_connection?: boolean;
   configured?: boolean;
   healthy?: boolean;

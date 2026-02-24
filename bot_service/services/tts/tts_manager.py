@@ -16,7 +16,7 @@ import random
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 import aiohttp
 
@@ -36,6 +36,7 @@ from services.tts.google_cloud_tts import (
 from services.tts.provider_utils import (
     get_provider_service_url,
     infer_provider_from_engine,
+    normalize_local_tts_endpoint_url,
     normalize_provider,
     normalize_provider_mode,
 )
@@ -103,13 +104,24 @@ class TTSManager:
             local_config = repo.get_healthy(user_id=user_id, provider=normalized_provider)
 
             if local_config:
+                try:
+                    normalized_endpoint = normalize_local_tts_endpoint_url(local_config.endpoint_url)
+                except ValueError as error:
+                    logger.warning(
+                        "[WARN] Ignoring invalid local endpoint for user_id=%s provider=%s: %s",
+                        user_id,
+                        normalized_provider,
+                        error,
+                    )
+                    return None
+
                 logger.info(
                     "[LOCAL] Using local endpoint for user_id=%s provider=%s endpoint=%s",
                     user_id,
                     normalized_provider,
-                    local_config.endpoint_url,
+                    normalized_endpoint,
                 )
-                return local_config.endpoint_url
+                return normalized_endpoint
 
             return None
         except Exception:
@@ -124,7 +136,19 @@ class TTSManager:
     ) -> bool:
         """Health check for remote/local provider endpoint with endpoint-aware cache."""
         normalized_provider = normalize_provider(provider)
-        endpoint = (endpoint_override or get_provider_service_url(normalized_provider)).rstrip("/")
+        if endpoint_override:
+            try:
+                endpoint = normalize_local_tts_endpoint_url(endpoint_override)
+            except ValueError as error:
+                if not force_check:
+                    logger.warning(
+                        "[WARN] Invalid endpoint override for health check provider=%s error=%s",
+                        normalized_provider,
+                        error,
+                    )
+                return False
+        else:
+            endpoint = get_provider_service_url(normalized_provider).rstrip("/")
         cache_key = (normalized_provider, endpoint)
         current_time = time.time()
         last_check = self._provider_last_health_check.get(cache_key, 0.0)
@@ -374,11 +398,38 @@ class TTSManager:
         tts_type = "ai_qwen" if normalized_provider == "qwen" else "ai_f5"
 
         try:
-            endpoint = (tts_endpoint or get_provider_service_url(normalized_provider)).rstrip("/")
+            if tts_endpoint:
+                try:
+                    endpoint = normalize_local_tts_endpoint_url(tts_endpoint)
+                except ValueError as error:
+                    logger.warning(
+                        "[WARN] Invalid local endpoint during synthesis provider=%s error=%s",
+                        normalized_provider,
+                        error,
+                    )
+                    return {"success": False, "error": "Invalid local endpoint configuration"}
+            else:
+                gateway_url = (settings.tts_gateway_url or "").strip()
+                if gateway_url and normalized_provider in {"f5", "qwen"}:
+                    endpoint = gateway_url.rstrip("/")
+                else:
+                    endpoint = get_provider_service_url(normalized_provider).rstrip("/")
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
 
             request_settings = dict(tts_settings or {})
             request_settings.setdefault("advanced_provider", normalized_provider)
+            f5_voice = str(request_settings.get("voice") or "").strip()
+            qwen_voice = str(request_settings.get("qwen_voice") or "").strip() or f5_voice
+            voice_map = {}
+            if f5_voice:
+                voice_map["f5"] = f5_voice
+            if qwen_voice:
+                voice_map["qwen"] = qwen_voice
+            selected_request_voice = (
+                voice_map.get(normalized_provider)
+                or f5_voice
+                or ("default" if normalized_provider == "qwen" else "female_1")
+            )
 
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 url = f"{endpoint}/api/tts/synthesize-channel"
@@ -391,6 +442,9 @@ class TTSManager:
                     "tts_settings": request_settings,
                     "word_filter": word_filter or [],
                     "blocked_users": blocked_users or [],
+                    "provider": normalized_provider,
+                    "voice": selected_request_voice,
+                    "voice_map": voice_map,
                 }
 
                 async with session.post(url, json=payload) as response:

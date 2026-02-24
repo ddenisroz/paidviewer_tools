@@ -91,7 +91,12 @@ async def vk_bot_callback(
     error_description: str | None = None,
 ):
     """Handle VK Live bot OAuth callback."""
-    logger.info(f"[VK BOT OAUTH] Callback received. Query params: {dict(request.query_params)}")
+    logger.info(
+        "[VK BOT OAUTH] Callback received: path=%s has_code=%s has_error=%s",
+        request.url.path,
+        bool(code),
+        bool(error),
+    )
 
     if error:
         logger.warning(f"[VK BOT OAUTH] OAuth cancelled: {error} - {error_description}")

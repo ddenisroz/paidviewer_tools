@@ -4,6 +4,7 @@ import asyncio
 from typing import Dict, Set, List, TYPE_CHECKING, Any
 from fastapi import WebSocket
 from constants import TTS_RECONNECT_TIMEOUT_SECONDS
+from core.log_sanitizer import mask_session_id
 if TYPE_CHECKING:
     pass
 logger = logging.getLogger(__name__)
@@ -40,7 +41,12 @@ class ConnectionManagerCore:
         if channel_name not in self.active_sessions:
             self.active_sessions[channel_name] = set()
         self.active_sessions[channel_name].add(session_id)
-        logger.debug(f'Added session {session_id} to channel {channel_name} ({platform})')
+        logger.debug(
+            "Added session %s to channel %s (%s)",
+            mask_session_id(session_id),
+            channel_name,
+            platform,
+        )
         try:
             from core.database import get_db, User
             db = next(get_db())
@@ -74,7 +80,12 @@ class ConnectionManagerCore:
             sessions = self.active_sessions[channel_name]
             if sessions:
                 session_id = sessions.pop()
-                logger.debug(f'Removed session {session_id} from channel {channel_name} ({reason})')
+                logger.debug(
+                    "Removed session %s from channel %s (%s)",
+                    mask_session_id(session_id),
+                    channel_name,
+                    reason,
+                )
                 if not sessions:
                     del self.active_sessions[channel_name]
                     logger.info(f'[TIMER] [SESSION] Last session removed for {channel_name}, checking TTS disconnect')

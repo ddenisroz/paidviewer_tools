@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from repositories.base_repository import BaseRepository
 from models.tts import LocalTTSEndpoint
 from core.database import WhitelistedChannel, User
+from services.tts.provider_utils import normalize_local_tts_endpoint_url
 
 
 class LocalTTSRepository(BaseRepository[LocalTTSEndpoint]):
@@ -74,23 +75,26 @@ class LocalTTSRepository(BaseRepository[LocalTTSEndpoint]):
         provider: str = "f5",
     ) -> LocalTTSEndpoint:
         """Create or update local TTS endpoint."""
+        normalized_endpoint_url = normalize_local_tts_endpoint_url(endpoint_url)
+
         if user_id:
             endpoint = self.get_by_user_id(user_id, provider=provider)
         elif session_id:
             endpoint = self.get_by_session_id(session_id, provider=provider)
         else:
             raise ValueError("Either user_id or session_id must be provided")
-        
+
         if endpoint:
-            endpoint.endpoint_url = endpoint_url
-            endpoint.api_key = api_key
+            endpoint.endpoint_url = normalized_endpoint_url
+            if api_key is not None:
+                endpoint.api_key = api_key
             endpoint.use_local = use_local
         else:
             endpoint = LocalTTSEndpoint(
                 user_id=user_id,
                 session_id=session_id,
                 provider=provider,
-                endpoint_url=endpoint_url,
+                endpoint_url=normalized_endpoint_url,
                 api_key=api_key,
                 use_local=use_local
             )

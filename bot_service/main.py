@@ -165,8 +165,8 @@ if __name__ == "__main__":
     is_dev = settings.is_development
     uvicorn.run(
         "main:app",
-        host="127.0.0.1",
-        port=8000,
+        host=settings.bot_service_host,
+        port=settings.bot_service_port,
         reload=is_dev,
         access_log=False,  # Request logging is already handled by middleware.
         log_config=None,   # Keep a single app-level logging format.

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from auth.auth import get_current_user
 from services.tts.tts_manager import get_tts_manager
+from services.tts.provider_utils import normalize_local_tts_endpoint_url
 
 logger = logging.getLogger('bot_service.tts')
 
@@ -172,6 +173,11 @@ class LocalTTSConfigRequest(BaseModel):
             raise ValueError('provider must be either "f5" or "qwen"')
         return normalized
 
+    @field_validator('endpoint_url')
+    @classmethod
+    def validate_endpoint_url(cls, v):
+        return normalize_local_tts_endpoint_url(v)
+
 
 class LocalTTSConfigResponse(BaseModel):
     success: bool
@@ -279,12 +285,13 @@ def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session =
 async def check_local_tts_health(endpoint_url: str, api_key: Optional[str] = None) -> dict:
     """Проверить здоровье локального TTS сервиса"""
     try:
+        endpoint = normalize_local_tts_endpoint_url(endpoint_url)
         headers = {}
         if api_key:
             headers['Authorization'] = f'Bearer {api_key}'
 
         async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{endpoint_url}/health", headers=headers)
+            response = await client.get(f"{endpoint}/health", headers=headers)
 
             if response.status_code == 200:
                 data = response.json()
@@ -296,6 +303,8 @@ async def check_local_tts_health(endpoint_url: str, api_key: Optional[str] = Non
             else:
                 return {"healthy": False, "error": f"HTTP {response.status_code}"}
 
+    except ValueError as error:
+        return {"healthy": False, "error": str(error)}
     except httpx.TimeoutException:
         return {"healthy": False, "error": "Timeout: сервис не отвечает"}
     except Exception:
