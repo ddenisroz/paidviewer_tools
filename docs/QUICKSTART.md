@@ -23,7 +23,6 @@ Copy the examples and fill in required keys:
 ```powershell
 cp bot_service/.env.example bot_service/.env
 cp frontend/.env.example frontend/.env
-cp F5_tts/.env.example F5_tts/.env
 ```
 
 Required backend fields (minimum):
@@ -56,8 +55,8 @@ cd frontend
 npm install
 npm run dev
 
-# TTS (F5 service)
-cd F5_tts
+# TTS (F5 service from separate repository)
+cd <f5-tts-service-repo>
 python main.py
 ```
 

@@ -67,7 +67,7 @@ const PROVIDER_META: Record<LocalTtsProvider, ProviderMeta> = {
     f5: {
         label: 'F5 TTS',
         defaultEndpoint: 'http://localhost:8001',
-        folder: 'F5_tts',
+        folder: 'f5-tts-service',
         runCommand: 'python main.py',
         apiKeyHint: 'Если включена авторизация, укажите API ключ из .env или config сервиса.'
     },

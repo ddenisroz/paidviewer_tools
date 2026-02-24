@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Edit, Globe, Loader2, Mic, RefreshCw, Settings, TestTube2, Trash2, Upload, User as UserIcon, Users, Volume2, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
-import { TTS_SERVICE_URL } from '@/constants';
+import { F5_TTS_SERVICE_URL } from '@/constants';
 import { useAuth } from '@/context/AuthContext';
 import { deleteVoice, getAdminVoices, getUsers, renameVoice, retranscribeVoice, testVoice, updateVoiceSettings, uploadVoice } from '@/services/unified-api';
 import { Badge } from '@/shared/components/ui/badge';
@@ -434,7 +434,7 @@ const VoiceManagement: React.FC = () => {
             const audioResponse = response as AudioResponse;
             const audioUrl = audioResponse.data?.audio_url || audioResponse.audio_url;
             if (audioUrl) {
-                const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${TTS_SERVICE_URL}${audioUrl}`;
+                const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${F5_TTS_SERVICE_URL}${audioUrl}`;
 
                 const audio = new Audio(fullAudioUrl);
 
@@ -591,7 +591,7 @@ const VoiceManagement: React.FC = () => {
                                     <p className="mb-1 font-semibold text-amber-200">TTS сервис недоступен</p>
                                     <p className="text-sm text-amber-100/90">{ttsServiceWarning}</p>
                                     <p className="mt-2 text-xs text-amber-100/70">
-                                        Убедитесь, что TTS сервис запущен и доступен по адресу указанному в переменной окружения TTS_SERVICE_URL.
+                                        Убедитесь, что TTS сервис запущен и доступен по адресу, указанному в `VITE_TTS_SERVICE_URL` (F5 endpoint).
                                     </p>
                                 </div>
                                 <Button

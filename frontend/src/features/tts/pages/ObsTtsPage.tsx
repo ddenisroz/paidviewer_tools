@@ -2,7 +2,7 @@
 
 import { useParams } from 'react-router-dom';
 
-import { TTS_SERVICE_URL, WS_BASE_URL } from '@/constants';
+import { F5_TTS_SERVICE_URL, WS_BASE_URL } from '@/constants';
 
 const ObsTtsPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
@@ -33,7 +33,7 @@ const ObsTtsPage: React.FC = () => {
                     if (message.type === 'tts_synthesized' && message.audio_url) {
                         let audioUrl = message.audio_url;
                         if (!audioUrl.startsWith('http')) {
-                            audioUrl = `${TTS_SERVICE_URL}${message.audio_url}`;
+                            audioUrl = `${F5_TTS_SERVICE_URL}${message.audio_url}`;
                         }
                         setAudioQueue(prevQueue => [...prevQueue, audioUrl]);
                     } else if (message.type === 'tts_error') {

@@ -6,7 +6,7 @@ The project consists of three runtime zones:
 
 - `frontend`: React + Vite UI.
 - `bot_service`: FastAPI backend, auth, business logic, orchestration.
-- `F5_tts`: advanced standalone-ready F5 TTS service.
+- external `f5-tts-service`: advanced F5 TTS execution service.
 
 The backend also integrates with external/local providers for Qwen and F5 where configured.
 
@@ -30,19 +30,19 @@ If advanced synthesis fails, runtime falls back to basic Google TTS.
 ## Service Boundaries
 
 - `bot_service` is the control plane (permissions, whitelist, safety filters, queueing).
-- `F5_tts` is an execution plane for F5 synthesis and voice operations.
+- `f5-tts-service` is an execution plane for F5 synthesis and voice operations.
 - Qwen local/cloud endpoints are treated as external execution planes and called through `bot_service` integration endpoints.
 
 ## Deployment Notes
 
 - Compose profiles support both integrated and split deployment strategies.
-- Environment compatibility is preserved with `TTS_SERVICE_URL`, while provider-specific URLs are available:
-  - `F5_TTS_SERVICE_URL`
-  - `QWEN_TTS_SERVICE_URL`
+- Provider endpoints are explicit:
+  - `F5_TTS_SERVICE_URL` (F5 provider endpoint)
+  - `QWEN_TTS_SERVICE_URL` (Qwen provider endpoint)
 
 ## Repository Split Readiness
 
-`F5_tts` is organized to be exported into a separate repository with minimal coupling.
+F5 TTS is extracted into a separate repository with minimal coupling.
 See:
 
 - `docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md`

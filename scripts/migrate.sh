@@ -8,7 +8,7 @@ echo "=== TTS Bot Migration Script ==="
 echo ""
 
 # Check if .env files exist
-ENV_FILES=("bot_service/.env" "F5_tts/.env" "frontend/.env")
+ENV_FILES=("bot_service/.env" "frontend/.env")
 MISSING_ENV=()
 
 for env_file in "${ENV_FILES[@]}"; do
@@ -24,11 +24,6 @@ if [ ${#MISSING_ENV[@]} -gt 0 ]; then
     if [ ! -f "bot_service/.env" ]; then
         cp bot_service/.env.example bot_service/.env
         echo "✓ Created bot_service/.env"
-    fi
-    
-    if [ ! -f "F5_tts/.env" ]; then
-        cp F5_tts/.env.example F5_tts/.env
-        echo "✓ Created F5_tts/.env"
     fi
     
     if [ ! -f "frontend/.env" ]; then
@@ -73,10 +68,6 @@ if grep -q "your-secret-key-here" bot_service/.env; then
     sed -i.bak "s/your-encryption-key-here-generate-with-fernet/$ENCRYPTION_KEY/" bot_service/.env
     rm bot_service/.env.bak
     
-    # Update F5_tts/.env
-    sed -i.bak "s/your-secret-key-here-must-match-bot-service/$SECRET_KEY/" F5_tts/.env
-    rm F5_tts/.env.bak
-    
     echo "✓ Generated security keys"
 fi
 
@@ -87,7 +78,6 @@ echo ""
 echo "Creating required directories..."
 mkdir -p data logs/{access,app,audit,errors,monitoring} models voices audio
 mkdir -p bot_service/{data,logs}
-mkdir -p F5_tts/{data,logs,audio}
 
 echo "✓ Created directories"
 echo ""
@@ -127,7 +117,7 @@ echo "3. Run: docker-compose up -d (or npm run dev for development)"
 echo ""
 echo "Development commands:"
 echo "  cd bot_service && python main.py   - Start bot service"
-echo "  cd F5_tts && python main.py       - Start TTS service"
+echo "  # Run F5 TTS from standalone repository or external host"
 echo "  cd frontend && npm run dev        - Start frontend"
 echo ""
 

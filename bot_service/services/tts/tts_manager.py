@@ -71,8 +71,6 @@ class TTSManager:
     def __init__(self):
         self.f5_tts_service_url = get_provider_service_url("f5")
         self.qwen_tts_service_url = get_provider_service_url("qwen")
-        # Keep legacy field for compatibility with old callers.
-        self.tts_service_url = self.f5_tts_service_url
         self.backend_url = settings.backend_url
 
         self.basic_tts = get_basic_tts()

@@ -4,20 +4,15 @@
 
 services:
   tts_service:
-    build:
-      context: ../../F5_tts
-      dockerfile: Dockerfile.prod
+    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_service_single
     ports:
       - "8001:8001"
-    env_file:
-      - ../../F5_tts/.env
     volumes:
-      - ../../F5_tts:/app
-      - ../../models/f5_tts:/app/models
-      - ../../voices:/app/voices
-      - ../../audio:/app/audio
-      - ../../F5_tts/logs:/app/logs
+      - tts_models:/app/models
+      - tts_voices:/app/voices
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     restart: unless-stopped
     deploy:
@@ -46,6 +41,14 @@ services:
       - tts_service
 
 volumes:
+  tts_models:
+    driver: local
+  tts_voices:
+    driver: local
+  tts_audio:
+    driver: local
+  tts_logs:
+    driver: local
   tts_cache:
     driver: local
 

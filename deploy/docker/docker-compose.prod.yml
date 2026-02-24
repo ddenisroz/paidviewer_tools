@@ -1,4 +1,4 @@
-﻿services:
+services:
   # Postgres Database
   postgres:
     image: postgres:15-alpine
@@ -16,7 +16,7 @@
       timeout: 5s
       retries: 5
 
-  # Redis РґР»СЏ РєРµС€РёСЂРѕРІР°РЅРёСЏ Рё rate limiting
+  # Redis для кеширования и rate limiting
   redis:
     image: redis:7-alpine
     container_name: tts_redis_prod
@@ -30,11 +30,9 @@
       timeout: 3s
       retries: 3
 
-  # TTS Service - РіРµРЅРµСЂР°С†РёСЏ СЂРµС‡Рё
+  # TTS Service - генерация речи
   tts_service:
-    build:
-      context: ../../F5_tts
-      dockerfile: Dockerfile.prod
+    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_tts_service_prod
     ports:
       - "8001:8001"
@@ -60,9 +58,9 @@
       - MAX_CONCURRENT_SYNTHESIS=4
       - MAX_CONCURRENT_CONVERSIONS=8
     volumes:
-      - ../../F5_tts/audio:/app/audio
-      - ../../F5_tts/logs:/app/logs
-      - ../../F5_tts/backups:/app/backups
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
+      - tts_backups:/app/backups
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -77,11 +75,9 @@
       retries: 3
       start_period: 60s
 
-  # TTS Workers - РѕР±СЂР°Р±РѕС‚РєР° РѕС‡РµСЂРµРґРµР№
+  # TTS Workers - обработка очередей
   tts_worker_1:
-    build:
-      context: ../../F5_tts
-      dockerfile: Dockerfile.prod
+    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_worker_1_prod
     command: python worker.py
     environment:
@@ -94,8 +90,8 @@
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_1
     volumes:
-      - ../../F5_tts/audio:/app/audio
-      - ../../F5_tts/logs:/app/logs
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -105,9 +101,7 @@
     restart: unless-stopped
 
   tts_worker_2:
-    build:
-      context: ../../F5_tts
-      dockerfile: Dockerfile.prod
+    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_worker_2_prod
     command: python worker.py
     environment:
@@ -120,8 +114,8 @@
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_2
     volumes:
-      - ../../F5_tts/audio:/app/audio
-      - ../../F5_tts/logs:/app/logs
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -131,9 +125,7 @@
     restart: unless-stopped
 
   tts_worker_3:
-    build:
-      context: ../../F5_tts
-      dockerfile: Dockerfile.prod
+    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_worker_3_prod
     command: python worker.py
     environment:
@@ -146,8 +138,8 @@
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_3
     volumes:
-      - ../../F5_tts/audio:/app/audio
-      - ../../F5_tts/logs:/app/logs
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -157,9 +149,7 @@
     restart: unless-stopped
 
   tts_worker_4:
-    build:
-      context: ../../F5_tts
-      dockerfile: Dockerfile.prod
+    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_worker_4_prod
     command: python worker.py
     environment:
@@ -172,8 +162,8 @@
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - WORKER_ID=worker_4
     volumes:
-      - ../../F5_tts/audio:/app/audio
-      - ../../F5_tts/logs:/app/logs
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       redis:
@@ -182,7 +172,7 @@
         condition: service_healthy
     restart: unless-stopped
 
-  # Bot Service - РѕСЃРЅРѕРІРЅРѕР№ API
+  # Bot Service - основной API
   bot_service:
     build:
       context: ../../bot_service
@@ -211,7 +201,6 @@
       # URLs
       - BACKEND_URL=${BACKEND_URL:-https://yourdomain.com}
       - FRONTEND_URL=${FRONTEND_URL:-https://yourdomain.com}
-      - TTS_SERVICE_URL=http://tts_service:8001
       - F5_TTS_SERVICE_URL=http://tts_service:8001
       - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-https://qwen-tts.yourdomain.com}
       
@@ -307,6 +296,12 @@ volumes:
   redis_data:
     driver: local
   postgres_data:
+    driver: local
+  tts_audio:
+    driver: local
+  tts_logs:
+    driver: local
+  tts_backups:
     driver: local
   tts_cache:
     driver: local

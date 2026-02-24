@@ -13,8 +13,6 @@ from sqlalchemy.orm import Session
 
 from core.database import get_db
 from auth.auth import get_current_user
-from core.config import settings
-from constants import DEFAULT_TTS_SERVICE_URL
 from services.tts.tts_manager import get_tts_manager
 
 logger = logging.getLogger('bot_service.tts')
@@ -200,7 +198,6 @@ class TTSAPI:
     """Main TTS API class for synthesis operations."""
     
     def __init__(self):
-        self.tts_service_url = settings.tts_service_url or DEFAULT_TTS_SERVICE_URL
         self.tts_manager = get_tts_manager()
 
     async def send_tts_request(

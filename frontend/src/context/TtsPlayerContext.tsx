@@ -2,7 +2,7 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 
 import { useLocation } from 'react-router-dom';
 
-import { API_BASE_URL, STORAGE_KEYS, TTS_SERVICE_URL, WS_BASE_URL } from '@/constants';
+import { API_BASE_URL, F5_TTS_SERVICE_URL, STORAGE_KEYS, WS_BASE_URL } from '@/constants';
 import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
@@ -162,16 +162,16 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             return audioUrl;
         }
 
-        if (audioUrl.startsWith('/audio/') && TTS_SERVICE_URL) {
-            return `${TTS_SERVICE_URL}${audioUrl}`;
+        if (audioUrl.startsWith('/audio/') && F5_TTS_SERVICE_URL) {
+            return `${F5_TTS_SERVICE_URL}${audioUrl}`;
         }
 
         if (audioUrl.startsWith('/')) {
             return `${API_BASE_URL}${audioUrl}`;
         }
 
-        if (TTS_SERVICE_URL) {
-            return `${TTS_SERVICE_URL}/${audioUrl.replace(/^\/+/, '')}`;
+        if (F5_TTS_SERVICE_URL) {
+            return `${F5_TTS_SERVICE_URL}/${audioUrl.replace(/^\/+/, '')}`;
         }
 
         return audioUrl;

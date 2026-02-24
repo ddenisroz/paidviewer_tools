@@ -168,13 +168,13 @@ const handleUpload = async (event) => {
 
 ### Backend
 
-**`F5_tts/admin_api.py`**
+**`f5-tts-service/admin_api.py`**
 - `GET /api/admin/voices` - получить ВСЕ голоса (глобальные + пользовательские)
 - `POST /api/admin/voices/upload` - загрузить глобальный голос
 - `DELETE /api/admin/voices/{id}` - удалить любой голос
 - `PUT /api/admin/voices/{id}/rename` - переименовать любой голос
 
-**`F5_tts/api_endpoints.py`**
+**`f5-tts-service/api_endpoints.py`**
 - `POST /api/tts/user/voices/upload` - загрузить пользовательский голос (используется админом от имени юзера)
 
 ---
@@ -298,6 +298,7 @@ if (!user?.is_admin) {
 ## 🎉 Заключение
 
 Админ-панель обеспечивает **централизованное управление** всеми голосами в системе с полным контролем над настройками, что позволяет администраторам эффективно управлять голосовыми ресурсами для всех пользователей.
+
 
 
 

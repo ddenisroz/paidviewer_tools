@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
-from core.config import settings
 from core.database import get_db
 from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from repositories.user_repository import UserRepository
+from services.tts.provider_utils import get_provider_service_url
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -143,7 +143,7 @@ async def restart_tts_engine(
             raise HTTPException(status_code=403, detail="Admin access required")
 
         logger.info("[REFRESH] [ADMIN] TTS engine restart requested by user %s", user.get("id"))
-        tts_service_url = settings.tts_service_url
+        tts_service_url = get_provider_service_url("f5")
 
         try:
             async with httpx.AsyncClient(timeout=5.0, **build_tts_httpx_client_kwargs()) as client:
@@ -178,7 +178,7 @@ async def get_tts_system_status(
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
 
-        tts_service_url = settings.tts_service_url
+        tts_service_url = get_provider_service_url("f5")
 
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.get(f"{tts_service_url}/api/admin/system/status", headers=_tts_auth_headers())
@@ -210,7 +210,7 @@ async def restart_tts_system(
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
 
-        tts_service_url = settings.tts_service_url
+        tts_service_url = get_provider_service_url("f5")
 
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(f"{tts_service_url}/api/admin/system/restart", headers=_tts_auth_headers())

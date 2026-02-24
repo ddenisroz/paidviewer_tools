@@ -1,6 +1,6 @@
 ﻿# TTS Architecture
 
-Last updated: 2026-02-23
+Last updated: 2026-02-24
 
 ## 1. Current Provider Model
 
@@ -88,7 +88,7 @@ Available compose profiles in `deploy/docker/`:
 
 ## 8. Inter-Service Auth and Health
 
-Internal auth for `bot_service -> F5_tts` now supports:
+Internal auth for `bot_service -> f5-tts-service` supports:
 
 - primary: short-lived service JWT in `Authorization: Bearer <token>`
 - compatibility fallback: `X-Internal-Service-Key`
@@ -101,11 +101,11 @@ Health endpoints:
 
 Legacy alias `/health` remains for compatibility where still used.
 
-## 9. F5_tts Extraction Readiness
+## 9. F5 Service Extraction Status
 
-`F5_tts` is the source directory for future standalone `F5_tts` repository.
+`f5-tts-service` is treated as standalone service and should not rely on monorepo-local paths.
 
-Before extraction, keep:
+For post-extraction stability, keep:
 
 - hardcoded project-relative paths removed or configurable,
 - clear `.env.example` and Docker startup path,

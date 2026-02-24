@@ -29,15 +29,20 @@ class DatabaseCleanupCore:
         self.MAX_CHAT_MESSAGES_PER_USER = settings.chat_messages_db_limit_per_user
         self.MAX_TOTAL_CHAT_MESSAGES = settings.chat_messages_db_limit_total
         self.CHAT_MESSAGES_RETENTION_DAYS = settings.chat_messages_retention_days
+        storage_root = (settings.f5_tts_storage_root or "").strip()
+        self.f5_storage_root = Path(storage_root).expanduser() if storage_root else None
         self.repo_root = Path(__file__).resolve().parents[3]
 
     def _cache_dirs(self) -> list[Path]:
         """Return known cache directories for current project layout."""
-        return [
+        cache_dirs = [
             self.repo_root / '.cache',
-            self.repo_root / 'F5_tts' / 'audio' / 'cache',
             self.repo_root / 'temp',
+            self.repo_root / 'audio' / 'cache',
         ]
+        if self.f5_storage_root:
+            cache_dirs.append(self.f5_storage_root / 'audio' / 'cache')
+        return cache_dirs
 
     def cleanup_old_data(self) -> Dict[str, int]:
         """Clean old data: expired messages and over-limit messages."""

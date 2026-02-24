@@ -33,7 +33,6 @@ services:
       - ALGORITHM=HS256
       - BACKEND_URL=http://localhost:8000
       - FRONTEND_URL=http://localhost:3000
-      - TTS_SERVICE_URL=http://tts_service:8001
       - F5_TTS_SERVICE_URL=http://tts_service:8001
       - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-http://host.docker.internal:8011}
       - TWITCH_CLIENT_ID=your_twitch_client_id
@@ -62,9 +61,7 @@ services:
     restart: unless-stopped
 
   tts_service:
-    build:
-      context: ../../F5_tts
-      dockerfile: Dockerfile.prod
+    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
     container_name: tts_tts_service_dev
     ports:
       - "8001:8001"
@@ -78,8 +75,8 @@ services:
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
       - TTS_WORKERS=2
     volumes:
-      - ../../F5_tts/audio:/app/audio
-      - ../../F5_tts/logs:/app/logs
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
       - tts_cache:/app/f5_tts_cache
     depends_on:
       postgres:
@@ -106,6 +103,10 @@ services:
 volumes:
   postgres_data:
     driver: local
+  tts_audio:
+    driver: local
+  tts_logs:
+    driver: local
   tts_cache:
     driver: local
 
@@ -113,6 +114,5 @@ networks:
   default:
     name: tts_network_dev
     driver: bridge
-
 
 

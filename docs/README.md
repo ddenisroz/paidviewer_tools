@@ -12,8 +12,8 @@ Detailed references:
 - `architecture/` - deep dives (auth, caching, TTS, shared WS)
 - `features/` - feature-specific notes
 - `guides/` - troubleshooting and how-tos
-- `setup/F5_TTS_EXTRACTION_CHECKLIST.md` - readiness checklist for extracting `F5_tts` to standalone repository
-- `setup/REPO_SPLIT_GUIDE.md` - step-by-step split plan for `ttv-core`, `F5_tts`, and Qwen service repos
+- `setup/F5_TTS_EXTRACTION_CHECKLIST.md` - cutover checklist for standalone `f5-tts-service`
+- `setup/REPO_SPLIT_GUIDE.md` - split/cutover plan for `ttv-core`, `f5-tts-service`, and Qwen service repos
 
 History:
 - `CHANGELOG.md`

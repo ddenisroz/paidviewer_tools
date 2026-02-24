@@ -93,5 +93,4 @@ def get_provider_service_url(provider: Optional[str]) -> str:
     f5_url = (settings.f5_tts_service_url or "").strip()
     if f5_url:
         return f5_url
-    return settings.tts_service_url
-
+    return "http://localhost:8001"

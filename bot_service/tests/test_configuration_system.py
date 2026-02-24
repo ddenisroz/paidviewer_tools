@@ -20,7 +20,8 @@ class TestConfigurationLoading:
             'DATABASE_URL': 'sqlite:///./test.db',
             'BOT_SERVICE_HOST': '0.0.0.0',
             'BOT_SERVICE_PORT': '8000',
-            'TTS_SERVICE_URL': 'http://localhost:8001',
+            'F5_TTS_SERVICE_URL': 'http://localhost:8001',
+            'QWEN_TTS_SERVICE_URL': 'http://localhost:8011',
             'FRONTEND_URL': 'http://localhost:5173',
             'SECRET_KEY': 'test-secret-key',
             'TOKEN_ENCRYPTION_KEY': 'test-encryption-key',
@@ -45,7 +46,8 @@ class TestConfigurationLoading:
             assert settings.database_url == 'sqlite:///./test.db'
             assert settings.bot_service_host == '0.0.0.0'
             assert settings.bot_service_port == 8000
-            assert settings.tts_service_url == 'http://localhost:8001'
+            assert settings.f5_tts_service_url == 'http://localhost:8001'
+            assert settings.qwen_tts_service_url == 'http://localhost:8011'
             assert settings.frontend_url == 'http://localhost:5173'
             assert settings.secret_key == 'test-secret-key'
             assert settings.token_encryption_key == 'test-encryption-key'
@@ -77,7 +79,7 @@ class TestConfigurationLoading:
         """Test that optional variables have correct defaults"""
         test_env = {
             'DATABASE_URL': 'sqlite:///./test.db',
-            'TTS_SERVICE_URL': 'http://localhost:8001',
+            'F5_TTS_SERVICE_URL': 'http://localhost:8001',
             'FRONTEND_URL': 'http://localhost:5173',
             'SECRET_KEY': 'test-secret-key',
             'TOKEN_ENCRYPTION_KEY': 'test-encryption-key',
@@ -112,7 +114,7 @@ class TestConfigurationLoading:
         test_env = {
             'DATABASE_URL': 'sqlite:///./test.db',
             'BOT_SERVICE_PORT': '9000',  # String in env, should become int
-            'TTS_SERVICE_URL': 'http://localhost:8001',
+            'F5_TTS_SERVICE_URL': 'http://localhost:8001',
             'FRONTEND_URL': 'http://localhost:5173',
             'SECRET_KEY': 'test-secret-key',
             'TOKEN_ENCRYPTION_KEY': 'test-encryption-key',
@@ -162,7 +164,6 @@ class TestMigrationScript:
         """Verify .env.example templates exist for all services"""
         required_env_examples = [
             '.env.example',
-            '../F5_tts/.env.example',
             '../frontend/.env.example',
         ]
         
@@ -188,7 +189,8 @@ class TestMigrationScript:
             'TWITCH_CLIENT_SECRET',
             'VK_CLIENT_ID',
             'VK_CLIENT_SECRET',
-            'TTS_SERVICE_URL',
+            'F5_TTS_SERVICE_URL',
+            'QWEN_TTS_SERVICE_URL',
             'FRONTEND_URL',
         ]
         
@@ -208,7 +210,7 @@ class TestConfigurationValidation:
         """Test validation passes with valid configuration"""
         test_env = {
             'DATABASE_URL': 'sqlite:///./test.db',
-            'TTS_SERVICE_URL': 'http://localhost:8001',
+            'F5_TTS_SERVICE_URL': 'http://localhost:8001',
             'FRONTEND_URL': 'http://localhost:5173',
             'SECRET_KEY': 'test-secret-key-with-sufficient-length',
             'TOKEN_ENCRYPTION_KEY': 'test-encryption-key-with-sufficient-length',
@@ -245,7 +247,7 @@ class TestConfigurationValidation:
                 content = f.read()
             
             # Should not have hardcoded localhost URLs
-            assert 'http://localhost:8001' not in content or 'settings.tts_service_url' in content
+            assert 'http://localhost:8001' not in content or 'settings.f5_tts_service_url' in content
             assert 'http://localhost:5173' not in content or 'settings.frontend_url' in content
 
 

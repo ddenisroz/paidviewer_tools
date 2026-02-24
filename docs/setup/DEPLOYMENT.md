@@ -1,4 +1,4 @@
-# Deployment Guide - TTS_TTV_0.03
+﻿# Deployment Guide - TTS_TTV_0.03
 
 **Последнее обновление:** 14 ноября 2025  
 **Версия:** 0.03
@@ -66,7 +66,7 @@ TTS_TTV_0.03 поддерживает гибкие deployment сценарии:
 │  ┌──────────────────────────────┐  │
 │  │ Bot Service                  │  │
 │  │ - Port: 8000                 │  │
-│  │ - TTS_SERVICE_URL:           │  │
+│  │ - F5_TTS_SERVICE_URL:           │  │
 │  │   https://tts.yourdomain.com │  │
 │  └──────────────────────────────┘  │
 │              ↓                      │
@@ -182,8 +182,9 @@ DATABASE_URL=postgresql://user:pass@host:5432/dbname
 # === SERVICES ===
 BOT_SERVICE_HOST=0.0.0.0
 BOT_SERVICE_PORT=8000
-TTS_SERVICE_URL=http://localhost:8001  # Local
-# TTS_SERVICE_URL=https://tts.yourdomain.com  # Cloudflare Tunnel
+F5_TTS_SERVICE_URL=http://localhost:8001  # Local
+# F5_TTS_SERVICE_URL=https://tts.yourdomain.com  # Cloudflare Tunnel
+QWEN_TTS_SERVICE_URL=http://localhost:8011
 FRONTEND_URL=http://localhost:5173     # Dev
 # FRONTEND_URL=https://yourdomain.com  # Prod
 
@@ -227,7 +228,7 @@ LOG_FILE=logs/bot_service.log
 
 ### TTS Service (.env)
 
-Создайте `F5_tts/.env`:
+Создайте `<f5-tts-service-repo>/.env`:
 
 ```bash
 # === SERVICE ===
@@ -260,7 +261,7 @@ LOG_FILE=logs/f5_tts.log
 
 ### TTS Service Single-Node Profile (.env)
 
-Используйте тот же файл `F5_tts/.env`.
+Используйте тот же файл `<f5-tts-service-repo>/.env`.
 Для single-node профиля (`deploy/docker/docker-compose.tts-simple.yml`) отдельный env не требуется.
 
 ### Frontend (.env)
@@ -326,7 +327,7 @@ POST /voices/download/{voice_id}
   Downloads global voice
 ```
 
-**Bot Service не знает разницы** - он просто отправляет запросы на `TTS_SERVICE_URL` из `.env`
+**Bot Service не знает разницы** - он просто отправляет запросы на `F5_TTS_SERVICE_URL` из `.env`
 
 ---
 
@@ -352,7 +353,7 @@ git clone <repo>
 cd TTS_TTV_0.03
 
 # Только TTS Service
-cd F5_tts
+cd <f5-tts-service-repo>
 pip install -r requirements.txt
 
 # Настройка .env
@@ -408,7 +409,7 @@ migrate.ps1   # Windows
 
 # Настройка .env
 cd bot_service
-nano .env  # Заполните TTS_SERVICE_URL=https://tts.yourdomain.com
+nano .env  # Заполните F5_TTS_SERVICE_URL=https://tts.yourdomain.com
 ```
 
 #### 3. Запуск Bot Service
@@ -604,9 +605,9 @@ if [ ! -f bot_service/.env ]; then
     echo "✓ Created bot_service/.env"
 fi
 
-if [ ! -f F5_tts/.env ]; then
-    cp F5_tts/.env.example F5_tts/.env
-    echo "✓ Created F5_tts/.env"
+if [ ! -f <f5-tts-service-repo>/.env ]; then
+    cp <f5-tts-service-repo>/.env.example <f5-tts-service-repo>/.env
+    echo "✓ Created <f5-tts-service-repo>/.env"
 fi
 
 if [ ! -f frontend/.env ]; then
@@ -693,7 +694,7 @@ python -c "import torch; print(torch.cuda.is_available())"
 
 ### Bot Service не подключается к TTS
 
-**Проблема:** `Connection refused to TTS_SERVICE_URL`
+**Проблема:** `Connection refused to F5_TTS_SERVICE_URL`
 
 **Решение:**
 ```bash
@@ -704,7 +705,7 @@ curl http://localhost:8001/health
 curl https://tts.yourdomain.com/health
 
 # Проверка .env
-cat bot_service/.env | grep TTS_SERVICE_URL
+cat bot_service/.env | grep F5_TTS_SERVICE_URL
 ```
 
 ---
@@ -800,3 +801,4 @@ sudo systemctl restart cloudflared
 **Статус:** Production Ready - Optimized  
 **Последнее обновление:** 14 ноября 2025  
 **Версия:** 0.03
+

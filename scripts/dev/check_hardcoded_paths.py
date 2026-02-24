@@ -31,7 +31,7 @@ TEXT_SUFFIXES = {
     ".sh",
 }
 
-SCAN_ROOTS = ("bot_service", "frontend", "F5_tts", "scripts")
+SCAN_ROOTS = ("bot_service", "frontend", "scripts")
 SKIP_DIRS = {
     ".git",
     ".venv",

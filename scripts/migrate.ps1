@@ -7,7 +7,6 @@ Write-Host ""
 # Check if .env files exist
 $envFiles = @(
     "bot_service\.env",
-    "F5_tts\\.env",
     "frontend\.env"
 )
 
@@ -25,11 +24,6 @@ if ($missingEnv.Count -gt 0) {
     if (-not (Test-Path "bot_service\.env")) {
         Copy-Item "bot_service\.env.example" "bot_service\.env"
         Write-Host "✓ Created bot_service\.env" -ForegroundColor Green
-    }
-    
-    if (-not (Test-Path "F5_tts\\.env")) {
-        Copy-Item "F5_tts\\.env.example" "F5_tts\\.env"
-        Write-Host "✓ Created F5_tts\\.env" -ForegroundColor Green
     }
     
     if (-not (Test-Path "frontend\.env")) {
@@ -69,11 +63,6 @@ print(Fernet.generate_key().decode())
         $botEnv = $botEnv -replace "your-encryption-key-here-generate-with-fernet", $encryptionKey
         $botEnv | Set-Content "bot_service\.env"
         
-        # Update F5_tts/.env
-        $ttsEnv = Get-Content "F5_tts\\.env" -Raw
-        $ttsEnv = $ttsEnv -replace "your-secret-key-here-must-match-bot-service", $secretKey
-        $ttsEnv | Set-Content "F5_tts\\.env"
-        
         Write-Host "[OK] Generated security keys" -ForegroundColor Green
     } else {
         Write-Host "[ERROR] Failed to generate encryption key. Please install cryptography:" -ForegroundColor Red
@@ -99,10 +88,7 @@ $directories = @(
     "voices",
     "audio",
     "bot_service\data",
-    "bot_service\logs",
-    "F5_tts\\data",
-    "F5_tts\\logs",
-    "F5_tts\\audio"
+    "bot_service\logs"
 )
 
 foreach ($dir in $directories) {
@@ -162,7 +148,7 @@ Write-Host "3. Run: docker-compose up -d (or npm run dev for development)" -Fore
 Write-Host ""
 Write-Host "Development commands:" -ForegroundColor Cyan
 Write-Host "  cd bot_service; python main.py   - Start bot service" -ForegroundColor White
-Write-Host "  cd F5_tts; python main.py       - Start TTS service" -ForegroundColor White
+Write-Host "  # Run F5 TTS from standalone repository or external host" -ForegroundColor White
 Write-Host "  cd frontend; npm run dev        - Start frontend" -ForegroundColor White
 Write-Host ""
 

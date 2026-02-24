@@ -5,7 +5,7 @@
  */
 import { useCallback, useState } from 'react';
 
-import { API_BASE_URL, TTS_SERVICE_URL } from '@/constants';
+import { API_BASE_URL, F5_TTS_SERVICE_URL } from '@/constants';
 import { useTtsPlayer } from '@/context/TtsPlayerContext';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
@@ -127,12 +127,12 @@ export function useChatWebSocket({
 
             // Convert relative URL to full URL
             if (audioUrl && !audioUrl.startsWith('http://') && !audioUrl.startsWith('https://')) {
-                if (audioUrl.startsWith('/audio/') && TTS_SERVICE_URL) {
-                    audioUrl = `${TTS_SERVICE_URL}${audioUrl}`;
+                if (audioUrl.startsWith('/audio/') && F5_TTS_SERVICE_URL) {
+                    audioUrl = `${F5_TTS_SERVICE_URL}${audioUrl}`;
                 } else if (audioUrl.startsWith('/')) {
                     audioUrl = `${API_BASE_URL}${audioUrl}`;
-                } else if (TTS_SERVICE_URL) {
-                    audioUrl = `${TTS_SERVICE_URL}/${audioUrl.replace(/^\/+/, '')}`;
+                } else if (F5_TTS_SERVICE_URL) {
+                    audioUrl = `${F5_TTS_SERVICE_URL}/${audioUrl.replace(/^\/+/, '')}`;
                 } else {
                     logger.warn(`[WARN] Audio URL is relative but could not convert: ${audioUrl}`);
                 }

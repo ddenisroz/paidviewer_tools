@@ -171,17 +171,14 @@ class TestConfigurationSystem:
     def test_env_example_files_exist(self):
         """Test that .env.example files exist for all services"""
         bot_service_env = Path(".env.example")
-        tts_service_env = Path("../F5_tts/.env.example")
         frontend_env = Path("../frontend/.env.example")
         
         if not bot_service_env.exists():
             print("[WARN] bot_service/.env.example not found")
-        if not tts_service_env.exists():
-            print("[WARN] F5_tts/.env.example not found")
         if not frontend_env.exists():
             print("[WARN] frontend/.env.example not found")
         
-        print("[OK] All .env.example files exist")
+        print("[OK] Required .env.example files exist")
     
     def test_env_example_has_all_required_vars(self):
         """Test that .env.example has all required variables"""

@@ -92,7 +92,6 @@ def test_resolve_provider_mode_for_settings_gcloud_is_always_cloud():
 def test_get_provider_service_url_prefers_qwen_url(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8011")
     monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8001")
-    monkeypatch.setattr(provider_utils.settings, "tts_service_url", "http://legacy:8001")
 
     assert provider_utils.get_provider_service_url("qwen") == "http://qwen:8011"
     assert provider_utils.get_provider_service_url("f5") == "http://f5:8001"
@@ -101,7 +100,6 @@ def test_get_provider_service_url_prefers_qwen_url(monkeypatch):
 def test_get_provider_service_url_fallbacks(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "")
     monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "")
-    monkeypatch.setattr(provider_utils.settings, "tts_service_url", "http://legacy:8001")
 
-    assert provider_utils.get_provider_service_url("qwen") == "http://legacy:8001"
-    assert provider_utils.get_provider_service_url("unknown") == "http://legacy:8001"
+    assert provider_utils.get_provider_service_url("qwen") == "http://localhost:8001"
+    assert provider_utils.get_provider_service_url("unknown") == "http://localhost:8001"

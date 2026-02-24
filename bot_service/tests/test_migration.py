@@ -36,7 +36,8 @@ class TestMigrationScript:
             'TWITCH_CLIENT_SECRET',
             'VK_CLIENT_ID',
             'VK_CLIENT_SECRET',
-            'TTS_SERVICE_URL',
+            'F5_TTS_SERVICE_URL',
+            'QWEN_TTS_SERVICE_URL',
             'FRONTEND_URL',
             'CORS_ORIGINS'
         ]
@@ -46,29 +47,6 @@ class TestMigrationScript:
                 print(f"[WARN] {var} not found in bot_service/.env.example")
         
         print("[OK] bot_service/.env.example check complete")
-        
-        # TTS service .env.example
-        tts_env_path = Path("../F5_tts/.env.example")
-        if not tts_env_path.exists():
-            print("[WARN] F5_tts/.env.example not found")
-            return
-        
-        with open(tts_env_path, 'r') as f:
-            tts_env_content = f.read()
-        
-        required_tts_vars = [
-            'SECRET_KEY',
-            'TTS_HOST',
-            'TTS_PORT',
-            'BOT_SERVICE_URL',
-            'DATABASE_URL',
-            'TTS_CFG_STRENGTH',
-        ]
-        
-        for var in required_tts_vars:
-            assert var in tts_env_content, f"{var} not found in F5_tts/.env.example"
-        
-        print("[OK] F5_tts/.env.example is complete")
         
         # Frontend .env.example
         frontend_env_path = Path("../frontend/.env.example")
@@ -192,7 +170,6 @@ class TestMigrationScript:
         """Test that required directory structure is documented"""
         required_structure = {
             'bot_service': ['data', 'logs'],
-            'F5_tts': ['data', 'logs', 'audio'],
             'frontend': [],
             'logs': ['access', 'app', 'audit', 'errors', 'monitoring']
         }

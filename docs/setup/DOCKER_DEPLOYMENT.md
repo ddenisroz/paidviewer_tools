@@ -30,15 +30,15 @@ docker compose -f deploy/docker/docker-compose.tts-advanced.yml up -d
 
 **Machine 2 (Server):**
 ```bash
-# Configure TTS_SERVICE_URL in bot_service/.env
-# TTS_SERVICE_URL=https://tts.yourdomain.com
+# Configure F5_TTS_SERVICE_URL in bot_service/.env
+# F5_TTS_SERVICE_URL=https://tts.yourdomain.com
 
 # Start bot service and frontend
 docker compose -f deploy/docker/docker-compose.bot.yml up -d
 ```
 
 ### Scenario 3: Distributed with Single-Node F5 TTS (Personal Use)
-- **Machine 1 (GPU PC)**: `F5_tts` (single-node profile, compose service name `tts_service`) + Cloudflare Tunnel
+- **Machine 1 (GPU PC)**: standalone `f5-tts-service` (single-node profile, compose service name `tts_service`) + Cloudflare Tunnel
 - **Machine 2 (Server)**: Bot Service + Frontend + Database
 
 **Machine 1 (GPU PC):**
@@ -77,11 +77,11 @@ docker compose -f deploy/docker/docker-compose.bot.yml up -d
 Copy .env.example files to .env:
 ```bash
 cp bot_service/.env.example bot_service/.env
-cp F5_tts/.env.example F5_tts/.env
 cp frontend/.env.example frontend/.env
 ```
 
-Edit each .env file with your credentials.
+Edit each `.env` file with your credentials.
+If F5 runs from a separate repository/host, configure it there and point `F5_TTS_SERVICE_URL` to that endpoint.
 
 ### 2. Generate Security Keys
 

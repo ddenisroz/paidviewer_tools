@@ -2,30 +2,47 @@ import pytest
 import json
 import sys
 import importlib.util
+import os
 from pathlib import Path
 
-F5_TTS_ROOT = Path(__file__).resolve().parents[2] / "F5_tts"
-if str(F5_TTS_ROOT) not in sys.path:
-    sys.path.insert(0, str(F5_TTS_ROOT))
+_f5_root_env = (os.getenv("F5_TTS_REPO_ROOT") or "").strip()
+F5_TTS_ROOT = Path(_f5_root_env) if _f5_root_env else (Path(__file__).resolve().parents[2] / "F5_tts")
+_HAS_F5_TEST_MODULES = False
+_F5_TEST_SKIP_REASON = "F5 service sources are unavailable for cross-repo security regression tests."
+tts_media_router = None
+tts_control_api = None
 
-_f5_auth_spec = importlib.util.spec_from_file_location("f5_tts_auth", F5_TTS_ROOT / "auth.py")
-if _f5_auth_spec is None or _f5_auth_spec.loader is None:
-    raise RuntimeError("Unable to load F5_tts auth module for security regression tests")
-_f5_auth = importlib.util.module_from_spec(_f5_auth_spec)
-_f5_auth_spec.loader.exec_module(_f5_auth)
+if F5_TTS_ROOT.exists():
+    try:
+        if str(F5_TTS_ROOT) not in sys.path:
+            sys.path.insert(0, str(F5_TTS_ROOT))
 
-_prev_auth = sys.modules.get("auth")
-try:
-    sys.modules["auth"] = _f5_auth
-    from routers import media as tts_media_router
-    import tts_control_api
-finally:
-    if _prev_auth is not None:
-        sys.modules["auth"] = _prev_auth
-    else:
-        sys.modules.pop("auth", None)
+        _f5_auth_spec = importlib.util.spec_from_file_location("f5_tts_auth", F5_TTS_ROOT / "auth.py")
+        if _f5_auth_spec is None or _f5_auth_spec.loader is None:
+            raise ImportError("Unable to load auth.py from F5 service repository")
+        _f5_auth = importlib.util.module_from_spec(_f5_auth_spec)
+        _f5_auth_spec.loader.exec_module(_f5_auth)
+
+        _prev_auth = sys.modules.get("auth")
+        try:
+            sys.modules["auth"] = _f5_auth
+            from routers import media as tts_media_router
+            import tts_control_api
+            _HAS_F5_TEST_MODULES = True
+        finally:
+            if _prev_auth is not None:
+                sys.modules["auth"] = _prev_auth
+            else:
+                sys.modules.pop("auth", None)
+    except Exception as exc:
+        _F5_TEST_SKIP_REASON = f"Failed to import F5 service modules: {exc}"
+else:
+    _F5_TEST_SKIP_REASON = (
+        "F5 service source path is not found. Set F5_TTS_REPO_ROOT to run cross-repo security tests."
+    )
 
 from fastapi import HTTPException
+from fastapi import Response
 from starlette.requests import Request
 
 from middleware.csrf_protection import CSRFProtectionMiddleware
@@ -182,7 +199,11 @@ def test_error_payload_serialization_truncates_large_payload():
 @pytest.mark.asyncio
 async def test_session_admin_endpoints_require_admin():
     with pytest.raises(HTTPException) as e1:
-        await clear_legacy_sessions(user={"id": 10, "role": "user", "is_admin": False}, db=None)
+        await clear_legacy_sessions(
+            response=Response(),
+            user={"id": 10, "role": "user", "is_admin": False},
+            db=None,
+        )
     assert e1.value.status_code == 403
 
     with pytest.raises(HTTPException) as e2:
@@ -454,6 +475,7 @@ def test_get_or_create_obs_token_requires_existing_user(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _HAS_F5_TEST_MODULES, reason=_F5_TEST_SKIP_REASON)
 async def test_tts_media_delete_returns_404_for_missing_file(monkeypatch):
     monkeypatch.setattr(tts_media_router, "_sanitize_voice_name", lambda value: "missing.wav")
     monkeypatch.setattr(
@@ -588,6 +610,7 @@ async def test_system_metrics_returns_500_on_failure(monkeypatch):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _HAS_F5_TEST_MODULES, reason=_F5_TEST_SKIP_REASON)
 async def test_tts_control_returns_401_for_invalid_auth_payload():
     with pytest.raises(HTTPException) as exc_info:
         await tts_control_api.enable_tts(current_user={"id": "not-int"})

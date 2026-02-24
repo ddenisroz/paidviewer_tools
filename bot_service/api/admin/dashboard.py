@@ -10,10 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
-from core.config import settings
 from core.database import get_db
 from core.datetime_utils import utcnow_naive
 from services.admin import get_admin_stats_service
+from services.tts.provider_utils import get_provider_service_url
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +163,7 @@ async def get_tts_status(
     try:
         require_admin(user)
 
-        tts_service_url = settings.tts_service_url
+        tts_service_url = get_provider_service_url("f5")
 
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:

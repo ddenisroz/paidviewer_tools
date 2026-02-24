@@ -17,7 +17,6 @@ except ImportError:
 # URL constants
 DEFAULT_FRONTEND_URL = settings.frontend_url
 DEFAULT_BACKEND_URL = settings.backend_url
-DEFAULT_TTS_SERVICE_URL = settings.tts_service_url
 
 # OAuth redirects
 OAUTH_REDIRECT_URLS = {
@@ -159,7 +158,8 @@ class EnvVars(StrEnum):
     VK_REDIRECT_URI = "VK_REDIRECT_URI"
     VK_AUTH_BASE_URL = "VK_AUTH_BASE_URL"
 
-    TTS_SERVICE_URL = "TTS_SERVICE_URL"
+    F5_TTS_SERVICE_URL = "F5_TTS_SERVICE_URL"
+    QWEN_TTS_SERVICE_URL = "QWEN_TTS_SERVICE_URL"
 
     ADMIN_USERS = "ADMIN_USERS"
 

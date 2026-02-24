@@ -35,8 +35,7 @@ services:
     environment:
       # Override with PostgreSQL
       - DATABASE_URL=postgresql://${DB_USER:-tts_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-tts_bot}
-      # TTS service via Cloudflare Tunnel
-      - TTS_SERVICE_URL=${TTS_SERVICE_URL:-https://tts.yourdomain.com}
+      # TTS service endpoints
       - F5_TTS_SERVICE_URL=${F5_TTS_SERVICE_URL:-https://tts.yourdomain.com}
       - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-https://qwen-tts.yourdomain.com}
     volumes:
@@ -61,7 +60,7 @@ services:
       args:
         - VITE_BOT_SERVICE_URL=${BACKEND_URL:-https://api.yourdomain.com}
         - VITE_BOT_SERVICE_WS_URL=${BACKEND_WS_URL:-wss://api.yourdomain.com}
-        - VITE_TTS_SERVICE_URL=${TTS_SERVICE_URL:-https://tts.yourdomain.com}
+        - VITE_TTS_SERVICE_URL=${F5_TTS_SERVICE_URL:-https://tts.yourdomain.com}
     container_name: tts_frontend
     ports:
       - "80:80"
@@ -81,4 +80,3 @@ networks:
   default:
     name: tts_bot_network
     driver: bridge
-

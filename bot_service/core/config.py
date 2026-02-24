@@ -44,14 +44,17 @@ class Settings(BaseSettings):
     bot_service_port: int = Field(default=8000, description="Bot service port")
     backend_url: str = Field(default="http://localhost:8000", description="Backend URL")
     frontend_url: str = Field(default="http://localhost:5173", description="Frontend URL")
-    tts_service_url: str = Field(default="http://localhost:8001", description="TTS service URL")
     f5_tts_service_url: str = Field(
         default="http://localhost:8001",
-        description="F5 TTS service URL (legacy fallback for TTS_SERVICE_URL)",
+        description="F5 TTS service URL",
     )
     qwen_tts_service_url: str = Field(
         default="http://localhost:8011",
         description="Qwen TTS service URL",
+    )
+    f5_tts_storage_root: Optional[str] = Field(
+        default=None,
+        description="Optional path to local F5 storage root when running maintenance in split deployment",
     )
     tts_internal_api_key: Optional[str] = Field(
         default=None,
@@ -67,7 +70,7 @@ class Settings(BaseSettings):
     )
     internal_service_jwt_audience_tts: str = Field(
         default="f5_tts",
-        description="Audience claim for bot_service -> F5_tts JWT",
+        description="Audience claim for bot_service -> F5 TTS service JWT",
     )
     internal_service_jwt_secret: Optional[str] = Field(
         default=None,

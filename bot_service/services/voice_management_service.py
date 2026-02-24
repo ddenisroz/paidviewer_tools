@@ -20,7 +20,7 @@ class VoiceManagementService:
     def __init__(self, db: Session):
         self.db = db
         self.repository = UserVoiceSettingsRepository(db)
-        self.tts_url = settings.tts_service_url
+        self.tts_url = settings.f5_tts_service_url
         self.tts_api_base = f"{self.tts_url.rstrip('/')}/api/tts"
 
     def _resolve_provider(self, provider: str = "f5") -> str:

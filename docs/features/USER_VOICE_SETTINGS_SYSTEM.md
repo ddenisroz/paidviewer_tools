@@ -307,7 +307,7 @@ if user_voice_config:
         tts_settings_dict["voice_settings"] = voice_settings_dict
 ```
 
-В `F5_tts/tts_engine.py` при синтезе:
+В `f5-tts-service/tts_engine.py` при синтезе:
 
 ```python
 # Извлекаем voice_settings из tts_settings
@@ -381,6 +381,7 @@ TTS Service:
    - `cfg_strength` → из `UserVoiceSettings.cfg_strength` (если не NULL) или из `Voice.cfg_strength`
    - `speed_preset` → из `UserVoiceSettings.speed_preset` (если не NULL) или из `Voice.speed_preset`
    - `volume` → из `UserVoiceSettings.volume` (если не NULL) или из `AudioSettings`
+
 
 
 

@@ -7,9 +7,7 @@ from pydantic import BaseModel
 from core.database import get_db
 from auth.auth import get_current_user
 from core.permissions import require_permission, Permission
-from core.config import settings
 from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
-from constants import DEFAULT_TTS_SERVICE_URL
 from services.tts.tts_core import check_user_whitelisted
 from services.voice_management_service import VoiceManagementService
 from repositories.user_repository import UserRepository
@@ -51,7 +49,7 @@ def _normalize_voice_provider(provider: Optional[str]) -> str:
 
 def _provider_base_url(provider: str) -> str:
     resolved_provider = _normalize_voice_provider(provider)
-    return get_provider_service_url(resolved_provider) or settings.tts_service_url or DEFAULT_TTS_SERVICE_URL
+    return get_provider_service_url(resolved_provider)
 
 @voices_router.get('/whitelist-status')
 async def check_whitelist_status(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
@@ -141,7 +139,7 @@ async def get_user_enabled_voices(user_id: int, user: dict=Depends(get_current_u
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation failed.')
         resolved_provider = _normalize_voice_provider(provider)
-        tts_service_url = get_provider_service_url(resolved_provider) or settings.tts_service_url or DEFAULT_TTS_SERVICE_URL
+        tts_service_url = get_provider_service_url(resolved_provider)
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.get(f'{tts_service_url}/api/tts/user/voices/enabled/{user_id}', headers=_tts_auth_headers())
         if response.status_code == 200:
@@ -161,7 +159,7 @@ async def update_user_enabled_voices(user_id: int, voice_ids: List[int], user: d
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation failed.')
         resolved_provider = _normalize_voice_provider(provider)
-        tts_service_url = get_provider_service_url(resolved_provider) or settings.tts_service_url or DEFAULT_TTS_SERVICE_URL
+        tts_service_url = get_provider_service_url(resolved_provider)
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(f'{tts_service_url}/api/tts/user/voices/enabled/{user_id}', json=voice_ids, headers=_tts_auth_headers())
         if response.status_code == 200:

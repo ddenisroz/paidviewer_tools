@@ -2,9 +2,9 @@
 from sqlalchemy.orm import Session
 from core.database import get_db
 from auth.auth import get_current_user
-from core.config import settings
 from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from repositories.user_voice_settings_repository import UserVoiceSettingsRepository
+from services.tts.provider_utils import get_provider_service_url
 from typing import Optional
 import logging
 import httpx
@@ -27,6 +27,10 @@ def _tts_unavailable_error(tts_url: str) -> HTTPException:
 
 def _tts_auth_headers() -> dict:
     return build_tts_auth_headers()
+
+
+def _f5_tts_service_url() -> str:
+    return get_provider_service_url("f5")
 
 
 def _raise_tts_upstream_error(response: httpx.Response, operation: str) -> None:
@@ -71,7 +75,7 @@ async def update_voice_settings(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         user_id = user['id']
         
@@ -79,7 +83,7 @@ async def update_voice_settings(
         # РћС‚РїСЂР°РІР»СЏРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service РґР»СЏ РѕР±РЅРѕРІР»РµРЅРёСЏ РЅР°СЃС‚СЂРѕРµРє РіРѕР»РѕСЃР°
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.put(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/settings",
+                f"{tts_service_url}/api/admin/voices/{voice_id}/settings",
                 json=settings_dict,
                 headers=_tts_auth_headers(),
             )
@@ -107,7 +111,7 @@ async def update_voice_settings(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while updating voice settings: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Update voice settings error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -132,7 +136,7 @@ async def test_voice(
         if user.get('id') != user_id:
             raise HTTPException(status_code=403, detail="User ID mismatch")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџРѕРґРіРѕС‚Р°РІР»РёРІР°РµРј РґР°РЅРЅС‹Рµ РґР»СЏ FormData РІ TTS Service
         data = {
@@ -148,7 +152,7 @@ async def test_voice(
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
         async with httpx.AsyncClient(timeout=30.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
-                f"{TTS_SERVICE_URL}/api/admin/voices/test",
+                f"{tts_service_url}/api/admin/voices/test",
                 data=data,
                 headers=_tts_auth_headers(),
             )
@@ -162,7 +166,7 @@ async def test_voice(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while testing voice: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Test voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -178,12 +182,12 @@ async def get_admin_voices(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.get(
-                f"{TTS_SERVICE_URL}/api/admin/voices",
+                f"{tts_service_url}/api/admin/voices",
                 headers=_tts_auth_headers(),
             )
             
@@ -196,27 +200,27 @@ async def get_admin_voices(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         # TTS СЃРµСЂРІРёСЃ РЅРµРґРѕСЃС‚СѓРїРµРЅ - РІРѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє СЃ РїСЂРµРґСѓРїСЂРµР¶РґРµРЅРёРµРј
-        TTS_SERVICE_URL = settings.tts_service_url
-        logger.warning(f"TTS Service РЅРµРґРѕСЃС‚СѓРїРµРЅ ({TTS_SERVICE_URL}): {e}. Р’РѕР·РІСЂР°С‰Р°СЋ РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє РіРѕР»РѕСЃРѕРІ.")
+        tts_service_url = _f5_tts_service_url()
+        logger.warning(f"TTS Service РЅРµРґРѕСЃС‚СѓРїРµРЅ ({tts_service_url}): {e}. Р’РѕР·РІСЂР°С‰Р°СЋ РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє РіРѕР»РѕСЃРѕРІ.")
         return {
             "success": True,
             "voices": [],
             "global_voices": [],
             "user_voices": [],
-            "warning": f"TTS СЃРµСЂРІРёСЃ РЅРµРґРѕСЃС‚СѓРїРµРЅ ({TTS_SERVICE_URL}). РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ TTS СЃРµСЂРІРёСЃ Р·Р°РїСѓС‰РµРЅ.",
-            "tts_service_url": TTS_SERVICE_URL
+            "warning": f"TTS СЃРµСЂРІРёСЃ РЅРµРґРѕСЃС‚СѓРїРµРЅ ({tts_service_url}). РЈР±РµРґРёС‚РµСЃСЊ, С‡С‚Рѕ TTS СЃРµСЂРІРёСЃ Р·Р°РїСѓС‰РµРЅ.",
+            "tts_service_url": tts_service_url
         }
     except Exception:
         logger.exception("Get admin voices error")
         # Р”Р»СЏ РґСЂСѓРіРёС… РѕС€РёР±РѕРє С‚РѕР¶Рµ РІРѕР·РІСЂР°С‰Р°РµРј РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє РІРјРµСЃС‚Рѕ 500
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         return {
             "success": True,
             "voices": [],
             "global_voices": [],
             "user_voices": [],
             "warning": "TTS service connection error",
-            "tts_service_url": TTS_SERVICE_URL
+            "tts_service_url": tts_service_url
         }
 
 @router.post("/voices/upload")
@@ -238,7 +242,7 @@ async def upload_voice_proxy(
         # [OK] SECURITY: Р’Р°Р»РёРґР°С†РёСЏ С„Р°Р№Р»Р° (СЂР°Р·РјРµСЂ, С‚РёРї, РёРјСЏ)
         validate_voice_file(file)
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # Р§РёС‚Р°РµРј С„Р°Р№Р»
         file_content = await file.read()
@@ -273,7 +277,7 @@ async def upload_voice_proxy(
                 data['name'] = name
             
             response = await client.post(
-                f"{TTS_SERVICE_URL}/api/admin/voices/upload",
+                f"{tts_service_url}/api/admin/voices/upload",
                 files=files,
                 data=data,
                 headers=_tts_auth_headers(),
@@ -288,7 +292,7 @@ async def upload_voice_proxy(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while uploading voice: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Upload voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -312,12 +316,12 @@ async def delete_voice_proxy(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.delete(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}",
+                f"{tts_service_url}/api/admin/voices/{voice_id}",
                 headers=_tts_auth_headers(),
             )
             
@@ -330,7 +334,7 @@ async def delete_voice_proxy(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while deleting voice: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Delete voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -348,12 +352,12 @@ async def rename_voice_proxy(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service СЃ query РїР°СЂР°РјРµС‚СЂРѕРј
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.put(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/rename",
+                f"{tts_service_url}/api/admin/voices/{voice_id}/rename",
                 params={'new_name': new_name},
                 headers=_tts_auth_headers(),
             )
@@ -367,7 +371,7 @@ async def rename_voice_proxy(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while renaming voice: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Rename voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -384,7 +388,7 @@ async def transcribe_voice_proxy(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
         # РџСЂРѕРІРµСЂСЏРµРј, РµСЃС‚СЊ Р»Рё С‚Р°РєРѕР№ endpoint РІ TTS Service
@@ -393,7 +397,7 @@ async def transcribe_voice_proxy(
             # РџРѕРїСЂРѕР±СѓРµРј РЅР°Р№С‚Рё endpoint РґР»СЏ С‚СЂР°РЅСЃРєСЂРёР±Р°С†РёРё РІ TTS Service
             # Р•СЃР»Рё РµРіРѕ РЅРµС‚, РёСЃРїРѕР»СЊР·СѓРµРј retranscribe
             response = await client.post(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/retranscribe",
+                f"{tts_service_url}/api/admin/voices/{voice_id}/retranscribe",
                 headers=_tts_auth_headers(),
             )
             
@@ -406,7 +410,7 @@ async def transcribe_voice_proxy(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while transcribing voice: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Transcribe voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -423,12 +427,12 @@ async def retranscribe_voice_proxy(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
         async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/retranscribe",
+                f"{tts_service_url}/api/admin/voices/{voice_id}/retranscribe",
                 headers=_tts_auth_headers(),
             )
             
@@ -441,7 +445,7 @@ async def retranscribe_voice_proxy(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while retranscribing voice: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Retranscribe voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -458,12 +462,12 @@ async def toggle_voice_proxy(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
-                f"{TTS_SERVICE_URL}/api/admin/voices/{voice_id}/toggle",
+                f"{tts_service_url}/api/admin/voices/{voice_id}/toggle",
                 headers=_tts_auth_headers(),
             )
             
@@ -476,7 +480,7 @@ async def toggle_voice_proxy(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while toggling voice: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Toggle voice error")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -492,12 +496,12 @@ async def get_tts_stats(
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        TTS_SERVICE_URL = settings.tts_service_url
+        tts_service_url = _f5_tts_service_url()
         
         # РџСЂРѕРєСЃРёСЂСѓРµРј Р·Р°РїСЂРѕСЃ РІ TTS Service
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             response = await client.get(
-                f"{TTS_SERVICE_URL}/api/admin/stats",
+                f"{tts_service_url}/api/admin/stats",
                 headers=_tts_auth_headers(),
             )
             
@@ -510,10 +514,12 @@ async def get_tts_stats(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as e:
         logger.warning("TTS service unavailable while loading TTS stats: %s", e)
-        raise _tts_unavailable_error(settings.tts_service_url)
+        raise _tts_unavailable_error(_f5_tts_service_url())
     except Exception:
         logger.exception("Get TTS stats error")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
 
 
 

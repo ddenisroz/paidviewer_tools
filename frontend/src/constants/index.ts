@@ -5,7 +5,7 @@ import { getApiBaseUrl, getTtsServiceUrl, getWebSocketBaseUrl } from '@/shared/u
 
 export const API_BASE_URL: string = getApiBaseUrl();
 export const WS_BASE_URL: string = getWebSocketBaseUrl();
-export const TTS_SERVICE_URL: string = getTtsServiceUrl();
+export const F5_TTS_SERVICE_URL: string = getTtsServiceUrl();
 
 export const ROUTES = {
   HOME: '/',

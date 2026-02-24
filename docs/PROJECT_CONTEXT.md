@@ -13,7 +13,7 @@ This document gives automation agents a compact, current snapshot of the reposit
 
 ## Repository Naming
 
-- Advanced TTS service source directory is `F5_tts/`.
+- Advanced F5 TTS service is externalized into a separate repository/deployment.
 - Legacy root directory `tts_service/` has been removed.
 - Docker compose files may still use legacy service-name aliases (`tts_service`) for network compatibility.
 

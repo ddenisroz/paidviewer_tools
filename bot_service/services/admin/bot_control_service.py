@@ -7,12 +7,12 @@ import logging
 
 import httpx
 
-from core.config import settings
 from core.datetime_utils import utcnow_naive
 from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
 from core.connection_manager import get_connection_manager
 from core.database import get_db
 from startup.bot_registry import get_bot_registry
+from services.tts.provider_utils import get_provider_service_url
 
 logger = logging.getLogger(__name__)
 
@@ -156,9 +156,9 @@ class BotControlService:
     async def restart_tts_engine(self) -> dict:
         """РџРµСЂРµР·Р°РіСЂСѓР·РёС‚СЊ TTS РґРІРёР¶РѕРє."""
         try:
-            tts_service_url = settings.tts_service_url
+            tts_service_url = get_provider_service_url("f5")
             if not tts_service_url:
-                raise ValueError("TTS_SERVICE_URL is not configured")
+                raise ValueError("F5_TTS_SERVICE_URL is not configured")
 
             async with httpx.AsyncClient(timeout=30.0, **build_tts_httpx_client_kwargs()) as client:
                 headers = build_tts_auth_headers()

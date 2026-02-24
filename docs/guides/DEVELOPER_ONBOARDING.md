@@ -128,7 +128,7 @@ TTS_TTV_0.02/
 │   │   └── utils/       # Utilities
 │   └── package.json
 │
-├── F5_tts/         # TTS service (optional)
+├── <external f5-tts-service repo>  # TTS service (optional, standalone)
 ├── docs/                # Documentation
 └── scripts/             # Utility scripts
 ```

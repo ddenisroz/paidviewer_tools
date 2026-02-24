@@ -25,7 +25,6 @@ Connect user-owned local TTS instances (F5 or Qwen) to `bot_service` so chat mes
 In `bot_service/.env`:
 
 ```env
-TTS_SERVICE_URL=http://localhost:8001
 F5_TTS_SERVICE_URL=http://localhost:8001
 QWEN_TTS_SERVICE_URL=http://localhost:8011
 ```

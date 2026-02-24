@@ -103,27 +103,25 @@ class TestAllSystems:
     # ===== 13.5 Test TTS Services =====
     
     def test_tts_service_config_exists(self):
-        """Test that TTS service configuration exists"""
-        tts_env = PROJECT_ROOT / "F5_tts/.env.example"
+        """Test that bot_service has provider-specific TTS configuration"""
+        tts_env = BOT_SERVICE_DIR / ".env.example"
         
         if not tts_env.exists():
-            print("[WARN]  TTS service .env.example not found, skipping test")
+            print("[WARN]  bot_service/.env.example not found, skipping test")
             return
         
         with open(tts_env, 'r') as f:
             content = f.read()
         
-        # Check required TTS variables
+        # Check provider-specific TTS variables
         required_vars = [
-            'TTS_ENGINE',
-            'F5_TTS_DEVICE',
-            'TTS_HOST',
-            'TTS_PORT'
+            'F5_TTS_SERVICE_URL',
+            'QWEN_TTS_SERVICE_URL',
         ]
         
         for var in required_vars:
-            assert var in content, f"{var} not in TTS .env.example"
-        
+            assert var in content, f"{var} not in bot_service/.env.example"
+
         print("[OK] TTS service configuration exists")
     
     def test_tts_client_uses_config(self):
@@ -131,20 +129,20 @@ class TestAllSystems:
         from core.config import settings
         
         # Check TTS service URL is configurable
-        assert hasattr(settings, 'tts_service_url')
-        assert settings.tts_service_url is not None
+        assert hasattr(settings, 'f5_tts_service_url')
+        assert settings.f5_tts_service_url is not None
+        assert hasattr(settings, 'qwen_tts_service_url')
+        assert settings.qwen_tts_service_url is not None
         
         print("[OK] TTS client uses configuration")
     
     def test_tts_service_files_exist(self):
-        """Test that TTS service files exist"""
-        tts_main = PROJECT_ROOT / "F5_tts/main.py"
-        
-        if not tts_main.exists():
-            print("[WARN]  TTS service main.py not found, skipping test")
+        """Test that provider integration files exist in bot_service"""
+        provider_utils = BOT_SERVICE_DIR / "services/tts/provider_utils.py"
+        if not provider_utils.exists():
+            print("[WARN]  provider_utils.py not found, skipping test")
             return
-        
-        print("[OK] TTS service files exist")
+        print("[OK] Provider integration files exist")
     
     # ===== 13.6 Test WebSocket Optimization =====
     
@@ -346,8 +344,8 @@ class TestAllSystems:
         """Test that all .env.example files are complete"""
         env_files = [
             (PROJECT_ROOT / '.env.example', ['SECRET_KEY', 'DATABASE_URL', 'TWITCH_CLIENT_ID']),
-            (PROJECT_ROOT / 'F5_tts/.env.example', ['TTS_ENGINE', 'TTS_HOST', 'TTS_PORT']),
             (PROJECT_ROOT / 'frontend/.env.example', ['VITE_BOT_SERVICE_URL', 'VITE_TTS_SERVICE_URL']),
+            (PROJECT_ROOT / 'bot_service/.env.example', ['F5_TTS_SERVICE_URL', 'QWEN_TTS_SERVICE_URL']),
         ]
         
         for file_path, required_vars in env_files:

@@ -25,7 +25,8 @@ class TestTTSManager:
         
         manager = TTSManager()
         # Verify it uses settings instead of hardcoded values
-        assert manager.tts_service_url == settings.tts_service_url
+        assert manager.f5_tts_service_url == settings.f5_tts_service_url
+        assert manager.qwen_tts_service_url == settings.qwen_tts_service_url
         assert manager.backend_url == settings.backend_url
         assert manager.basic_tts is not None
     

@@ -42,7 +42,7 @@ if ($RemoveOutput -and (Test-Path "output")) {
 if ($RemoveTempAudio) {
     $tempAudioPaths = @(
         "bot_service/temp/tts_audio",
-        "F5_tts/audio"
+        "audio"
     )
     foreach ($audioPath in $tempAudioPaths) {
         if (Test-Path $audioPath) {
