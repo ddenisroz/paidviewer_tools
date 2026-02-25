@@ -1,81 +1,52 @@
-# Стандарты цветов UI
+﻿# UI Color Standards
 
-> Создан: 2025-12-17
+Status: active.
 
-## Цветовая схема кнопок
+This guide defines semantic color usage for admin and user interfaces.
 
-### Основные действия (Primary)
-- **Цвет:** `bg-primary` (синий по умолчанию в shadcn/ui)
-- **Использование:** Основные действия (Сохранить, Подключить, Отправить)
-- **Пример:** `<Button>Сохранить</Button>`
+## Primary Rule
 
-### Успешные действия (Success)
-- **Цвет:** `bg-green-600 hover:bg-green-700`
-- **Использование:** 
-  - Полная авторизация
-  - Успешные состояния
-  - Подтверждения
-- **Пример:** Кнопка "Полная авторизация"
+Use semantic tokens first. Avoid hardcoded gray/white combinations when a semantic token exists.
 
-### Предупреждения (Warning)
-- **Цвет:** `bg-amber-600 hover:bg-amber-700`
-- **Использование:**
-  - Упрощенная авторизация
-  - Предупреждающие действия
-- **Пример:** Баннер упрощенной авторизации
+## Buttons
 
-### Опасные действия (Destructive)
-- **Цвет:** `bg-red-600 hover:bg-red-700`
-- **Использование:** Удаление, отключение
-- **Пример:** Кнопка "Удалить аккаунт"
+1. Primary action
+- token: `bg-primary` + `text-primary-foreground`
+- use for save/apply/confirm actions
 
-### Вторичные действия (Secondary)
-- **Цвет:** `variant="outline"` или `variant="ghost"`
-- **Использование:** Отмена, дополнительные действия
+2. Secondary action
+- variant: `outline` or `ghost`
+- use for non-destructive helper actions
 
-## Индикаторы состояния
+3. Success state
+- token family: green semantic styles
+- use only for successful status and confirmations
 
-### Активное состояние
-- **Цвет:** `text-green-500` или `bg-green-500/10`
-- **Использование:** Включенные интеграции, активные функции
+4. Destructive action
+- token family: destructive/red semantic styles
+- use for delete/reset/revoke actions
 
-### Неактивное состояние
-- **Цвет:** `text-gray-400` или `bg-gray-500/10`
-- **Использование:** Отключенные функции
+## Text And Surfaces
 
-### Загрузка
-- **Цвет:** `text-blue-400` или `bg-blue-500/10`
-- **Использование:** Процессы загрузки
+1. Main text: `text-foreground`
+2. Secondary text: `text-muted-foreground`
+3. Card/background: `bg-card`
+4. Borders/dividers: `border-border`
 
-## Применение
+## Accessibility
 
-### ✅ Правильно
-```tsx
-// Основное действие
-<Button>Сохранить</Button>
+1. Keep contrast ratio readable for all state badges.
+2. Do not encode critical state by color alone.
+3. Provide icon/label support for state meaning.
 
-// Успешное действие
-<Button className="bg-green-600 hover:bg-green-700">Полная авторизация</Button>
+## Admin UI Consistency
 
-// Опасное действие
-<Button variant="destructive">Удалить</Button>
-```
+1. Keep heading hierarchy stable.
+2. Keep action button heights consistent (`h-8`/`h-9`).
+3. Keep spacing rhythm consistent between admin pages.
 
-### ❌ Неправильно
-```tsx
-// Смешение цветов для одинаковых действий
-<Button className="bg-blue-600">Сохранить</Button>
-<Button className="bg-green-600">Сохранить</Button>
-```
+## Open Checklist
 
-## Текущие несоответствия
-
-1. **LoginPage** - кнопка "Полная авторизация" зеленая ✅ (правильно)
-2. **SettingsPage** - индикатор полной авторизации зеленый ✅ (правильно)
-3. **Кнопки сохранения** - должны быть primary (синие) по умолчанию
-
-## TODO
-
-- [ ] Проверить все кнопки "Сохранить" - должны быть primary
-- [ ] Убедиться, что зеленый используется только для success/full auth
-- [ ] Синий - только для информационных индикаторов
+- Review all save buttons and enforce primary style.
+- Ensure green styles are used only for success/full-auth indicators.
+- Ensure informational indicators use non-success semantic colors.

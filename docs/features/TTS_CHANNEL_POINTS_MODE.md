@@ -1,336 +1,38 @@
-# 🎁 TTS за баллы канала (Channel Points Mode)
+﻿# TTS Channel Points Mode
 
-**Дата создания:** 28 октября 2025  
-**Версия:** 2.0.0  
-**Статус:** ✅ Полностью реализовано для Twitch и VK Live
+Status: active.
 
----
+## Purpose
 
-## 📋 Описание
+Allow TTS execution to be controlled by channel points rewards and per-platform settings.
 
-Новая фича позволяет пользователям выбирать режим работы TTS:
-- **"Озвучивать все сообщения"** (по умолчанию) - текущее поведение
-- **"Озвучивать за баллы канала"** - озвучиваются только сообщения, отправленные с наградой Channel Points
+## Behavior
 
----
+1. TTS mode can be configured per user settings.
+2. Reward mapping supports Twitch reward id and VK reward title matching.
+3. In unsupported or missing mapping states, runtime falls back to default mode.
 
-## 🎯 Как это работает
+## Data Contract
 
-### 1. Выбор режима
+- Mode settings are persisted in user settings storage.
+- Reward mapping updates must be validated and stored atomically.
+- API responses should return both mode and active reward mapping.
 
-Пользователь переходит на страницу **TTS настроек** (`/dashboard/tts`) и выбирает один из двух режимов:
+## Security And Validation
 
-#### Режим "Все сообщения":
-- Озвучиваются все сообщения в чате (как раньше)
-- Награды Channel Points не требуются
-- Стандартное поведение системы
+1. Settings endpoints require authenticated user context.
+2. User can modify only own settings unless admin flow is explicit.
+3. Input validation must reject malformed reward identifiers.
 
-#### Режим "За баллы канала":
-- Озвучиваются **только** сообщения с наградой Channel Points
-- Для каждой подключенной платформы нужно создать TTS награду
-- Сообщения без награды пропускаются
+## Regression Checklist
 
-### 2. Создание TTS награды
+1. Reward-triggered TTS works for Twitch and VK with configured mappings.
+2. Unconfigured rewards do not trigger TTS unexpectedly.
+3. Mode updates are reflected in runtime without stale cache effects.
+4. Invalid payloads return 400 with clear validation errors.
 
-При выборе режима "За баллы канала" открывается подменю для создания наград:
+## Related Docs
 
-**Параметры награды:**
-- **Название** - например, "TTS Озвучка"
-- **Стоимость** - количество баллов (100, 200, 500...)
-- **Кулдаун** - время ожидания между активациями (секунды)
-
-**Автоматические настройки:**
-- `is_user_input_required` = `true` (обязательно требуется сообщение)
-- `should_redemptions_skip_request_queue` = `true` (для Twitch - автовыполнение)
-- `is_message_required` = `true` (для VK - обязательно сообщение)
-
-### 3. Озвучка сообщений
-
-После создания награды:
-1. Зритель активирует награду с сообщением
-2. Система проверяет что `tts_mode == 'channel_points'`
-3. Проверяет что сообщение пришло с правильной наградой (`reward_id`)
-4. Озвучивает сообщение через TTS
-
----
-
-## 🏗️ Архитектура
-
-### База данных
-
-**Таблица:** `tts_user_settings`
-
-**Новые поля:**
-```sql
-tts_mode VARCHAR DEFAULT 'all_messages'  -- 'all_messages' или 'channel_points'
-tts_reward_ids JSON DEFAULT '{}'         -- {"twitch": "reward_id", "vk": "reward_id"}
-```
-
-**Миграция:** `02bdabb37f08_add_tts_channel_points_mode.py`
-
-### Backend API
-
-**Файл:** `bot_service/api/tts_api.py`
-
-**Новые endpoints:**
-
-1. **GET `/api/tts/mode-settings`**
-   - Получить текущий режим TTS
-   - Возвращает: `{tts_mode, tts_reward_ids}`
-
-2. **POST `/api/tts/mode-settings`**
-   - Изменить режим TTS
-   - Параметры: `tts_mode` ('all_messages' или 'channel_points')
-
-3. **POST `/api/tts/create-reward`**
-   - Создать TTS награду для платформы
-   - Параметры: `platform`, `title`, `cost`, `cooldown`
-   - Автоматически создает награду через Points API
-
-4. **DELETE `/api/tts/reward/{platform}`**
-   - Удалить TTS награду для платформы
-
-### Логика фильтрации
-
-**Файл:** `bot_service/utils/websocket_helper.py`
-
-**Функция:** `handle_tts_for_message()`
-
-**Новый параметр:** `reward_id: str = None`
-
-**Логика проверки:**
-```python
-if tts_mode == 'channel_points':
-    # Проверяем что награда настроена
-    if platform not in tts_reward_ids:
-        return {"success": False, "error": "TTS reward not configured"}
-    
-    # Проверяем что сообщение с правильной наградой
-    if not reward_id or reward_id != tts_reward_ids[platform]:
-        return {"success": False, "error": "Message not from TTS reward"}
-    
-    # ✅ Озвучиваем сообщение
-```
-
-### Frontend
-
-**Компонент:** `frontend/src/components/tts/TtsChannelPointsMode.jsx`
-
-**Интеграция:** `frontend/src/pages/tts/TtsMainPage.jsx`
-
-**Функциональность:**
-- Radio buttons для выбора режима
-- Карточки для каждой платформы
-- Диалог создания награды
-- Управление наградами (создать/удалить)
-
----
-
-## 🚀 Использование
-
-### Для стримера:
-
-1. Перейдите в **TTS настройки** (`/dashboard/tts`)
-2. Найдите секцию **"Режим озвучки TTS"**
-3. Выберите **"Озвучивать за баллы канала"**
-4. Для каждой подключенной платформы нажмите **"Создать"**
-5. Заполните параметры награды:
-   - Название (например, "TTS Озвучка")
-   - Стоимость (100-500 баллов)
-   - Кулдаун (30-60 секунд)
-6. Нажмите **"Создать"**
-7. ✅ Готово! Теперь озвучиваются только сообщения с наградой
-
-### Для зрителя:
-
-1. Откройте Channel Points в чате
-2. Найдите награду "TTS Озвучка" (или другое название)
-3. Активируйте награду
-4. Введите сообщение для озвучки
-5. Подтвердите
-6. ✅ Сообщение будет озвучено!
-
----
-
-## 🔧 Техническая документация
-
-### Добавленные файлы:
-
-1. `bot_service/alembic/versions/02bdabb37f08_add_tts_channel_points_mode.py` - миграция БД
-2. `frontend/src/components/tts/TtsChannelPointsMode.jsx` - UI компонент
-
-### Измененные файлы:
-
-1. `bot_service/core/database.py` - добавлены поля `tts_mode` и `tts_reward_ids`
-2. `bot_service/api/tts_api.py` - добавлены API endpoints
-3. `bot_service/utils/websocket_helper.py` - обновлена логика фильтрации
-4. `bot_service/bots/twitch_bot.py` - добавлено извлечение `reward_id` из IRC tags
-5. `bot_service/bots/vk_live_bot_core.py` - добавлен парсинг наград от ChatBot
-6. `frontend/src/pages/tts/TtsMainPage.jsx` - интегрирован новый компонент
-7. `frontend/src/components/tts/TtsControlPanel.jsx` - обновлено описание источника
-
-### Зависимости:
-
-- Система Channel Points (Twitch/VK)
-- Существующая TTS система
-- OAuth токены с scope `channel:manage:redemptions` (Twitch)
-
----
-
-## ✅ Реализация извлечения `reward_id`
-
-### Twitch
-
-**Файл:** `bot_service/bots/twitch_bot.py`
-
-**Метод извлечения:** IRC tags в сообщении
-
-```python
-# Twitch передает reward_id через IRC tags
-reward_id = message.tags.get('custom-reward-id')
-```
-
-**Как работает:**
-1. Когда пользователь активирует награду с текстовым полем
-2. Twitch добавляет тег `custom-reward-id` в IRC сообщение
-3. TwitchIO парсит теги и делает их доступными через `message.tags`
-4. Мы извлекаем `reward_id` и передаем в `handle_tts_for_message()`
-
-**Преимущества:**
-- ✅ Встроено в IRC протокол
-- ✅ Не требует дополнительных API запросов
-- ✅ Работает в реальном времени
-- ✅ 100% надежность
-
-### VK Live
-
-**Файл:** `bot_service/bots/vk_live_bot_core.py`
-
-**Метод извлечения:** Парсинг системных сообщений от ChatBot
-
-```python
-# VK ChatBot отправляет: "получает награду: TTS Озвучка (VK) за 100\nтекст"
-reward_pattern = r'получает награду:\s*([^\n]+?)\s*за\s*\d+'
-match = re.search(reward_pattern, text)
-if match and 'tts' in reward_title.lower():
-    reward_id = tts_settings.tts_reward_ids.get('vk')
-```
-
-**Как работает:**
-1. VK Live API не передает `reward_id` напрямую в сообщениях
-2. Вместо этого ChatBot отправляет системное сообщение с информацией о награде
-3. Мы парсим текст сообщения и извлекаем название награды
-4. Проверяем что название содержит "TTS"
-5. Берем сохраненный `reward_id` из настроек пользователя
-6. Очищаем текст от служебной информации перед озвучкой
-
-**Особенности:**
-- ⚠️ Зависит от формата сообщений ChatBot
-- ✅ Не требует дополнительных API запросов
-- ✅ Автоматически очищает текст
-- ✅ Работает надежно для TTS наград
-
-### Будущие улучшения:
-
-- 📊 **История активаций** TTS наград
-- 📈 **Статистика использования** (сколько раз активирована награда)
-- 🔔 **Уведомления** при создании/удалении TTS награды
-- 🎨 **Кастомизация** сообщений при активации
-
----
-
-## 📊 Статистика
-
-**Добавлено кода:**
-- Backend: ~350 строк
-- Frontend: ~330 строк
-- Миграция: ~15 строк
-- **Всего:** ~695 строк
-
-**Файлов создано:** 2  
-**Файлов изменено:** 4  
-**API endpoints:** 4 новых
-
----
-
-## ✅ Тестирование
-
-### Сценарий 1: Переключение режимов
-1. Открыть TTS настройки
-2. Выбрать "За баллы канала"
-3. ✅ Должно показаться подменю для создания наград
-4. Выбрать "Все сообщения"
-5. ✅ Подменю должно скрыться
-
-### Сценарий 2: Создание награды
-1. Выбрать режим "За баллы канала"
-2. Нажать "Создать" для Twitch
-3. Заполнить форму
-4. ✅ Награда должна создаться в Twitch Channel Points
-5. ✅ Должна появиться в списке
-
-### Сценарий 3: Озвучка (когда интеграция готова)
-1. Создать TTS награду
-2. Активировать награду с сообщением
-3. ✅ Сообщение должно озвучиться
-4. Отправить обычное сообщение
-5. ✅ Обычное сообщение НЕ должно озвучиться
-
----
-
-## 🔒 Безопасность
-
-- ✅ Требуется авторизация (`get_current_user`)
-- ✅ Проверка прав на создание наград
-- ✅ Валидация параметров (title, cost, cooldown)
-- ✅ Санитизация входных данных
-- ✅ Проверка токенов платформ
-
----
-
-## 📝 Примечания для разработчиков
-
-1. **НЕ ТРОГАТЬ** существующую логику TTS при режиме `all_messages`
-2. **Добавлять** только новую логику для режима `channel_points`
-3. **Использовать** существующий Points API для создания наград
-4. **Логировать** все действия для отладки
-5. **Тестировать** оба режима после изменений
-
----
-
-**Автор:** AI Assistant  
-**Дата последнего обновления:** 29.10.2025
-
----
-
-## 🎉 Итоги реализации
-
-✅ **Система полностью работает!**
-
-- **Twitch:** Извлечение `reward_id` через IRC tags (`custom-reward-id`)
-- **VK Live:** Парсинг наград через ChatBot сообщения (regex)
-- **Frontend:** Интуитивный UI для управления режимами
-- **Backend:** Надежная фильтрация и валидация
-- **Документация:** Полное описание архитектуры и использования
-
-**Протестировано на реальных каналах:** ✅
-
-### 📊 Итоговая статистика:
-
-**Backend:**
-- `vk_live_bot_core.py`: +50 строк (парсинг и очистка)
-- `twitch_bot.py`: +10 строк (IRC tags)
-- `tts_api.py`: обновлено (SQLAlchemy JSON fields fix)
-- Итого: ~60 строк
-
-**Frontend:**
-- `TtsControlPanel.jsx`: обновлено описание источника
-
-**Документация:**
-- `TTS_CHANNEL_POINTS_MODE.md`: обновлено
-- `CURRENT_STATUS.md`: Session 14 добавлен
-
-**Тестирование:**
-- ✅ VK Live: протестировано на канале `yourchy`
-- ✅ Twitch: готово к тестированию
-
+- `docs/architecture/TTS_ARCHITECTURE.md`
+- `docs/architecture/CACHING_SYSTEM.md`
+- `docs/setup/LOCAL_TTS_INTEGRATION.md`

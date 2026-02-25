@@ -1,23 +1,30 @@
-# Docs Index
+# Documentation Index
 
-## Start here
-- `QUICKSTART.md`: local setup and first run.
-- `REPO_STRUCTURE.md`: what folders are core logic vs generated artifacts.
-- `ARCHITECTURE.md`: high-level system overview.
-- `architecture/ARCHITECTURE_GUIDE.md`: deeper architecture details.
+This page separates current source-of-truth docs from historical notes.
 
-## By topic
-- `setup/`: deployment and infrastructure guides.
-- `architecture/`: auth, caching, TTS, websocket deep dives.
-- `features/`: feature-specific implementation notes.
-- `guides/`: troubleshooting and developer how-to.
-  - `guides/REPO_CLEANUP_PLAN.md`: cleanup status and technical debt queue.
-- `api/`: API references.
-- `backlog/`: historical notes and temporary audit artifacts (not current source of truth).
+## Source Of Truth (Read First)
 
-## Repo split and service extraction
-- `setup/F5_TTS_EXTRACTION_CHECKLIST.md`
-- `setup/REPO_SPLIT_GUIDE.md`
+1. `QUICKSTART.md` - local bootstrap and first run.
+2. `REPO_STRUCTURE.md` - what is product code vs generated noise.
+3. `architecture/ARCHITECTURE_GUIDE.md` - current architecture contracts.
+4. `setup/DEPLOYMENT.md` - production deployment procedure.
+5. `guides/DEVELOPER_ONBOARDING.md` - developer setup and first contribution.
+6. `guides/DEVELOPER_GUIDE.md` - coding contracts and non-negotiable rules.
 
-## History
-- `CHANGELOG.md`
+## Topic Folders
+
+- `setup/` - deployment, infra, environment contracts.
+- `architecture/` - auth, websocket, caching, roles, TTS architecture.
+- `features/` - feature-level behavior and constraints.
+- `guides/` - operational and developer guides.
+- `api/` - API references.
+
+## Historical / Non-Authoritative
+
+- `backlog/` contains historical audits, temporary plans, and point-in-time notes.
+- Files in `backlog/` are not release source of truth.
+- If a backlog note becomes relevant, rewrite it into one of the active folders.
+
+## Hygiene Rule
+
+- If a doc contains obsolete file paths, removed endpoints, or mojibake text, it must be rewritten or moved to `backlog/`.

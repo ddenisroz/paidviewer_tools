@@ -1,6 +1,6 @@
 ﻿# Deployment Guide - TTS_TTV_0.03
 
-**Последнее обновление:** 14 ноября 2025  
+**Последнее обновление:** February 2026  
 **Версия:** 0.03
 
 ---
@@ -791,13 +791,12 @@ sudo systemctl restart cloudflared
 
 - **[README.md](../README.md)** - Главный README
 - **[QUICKSTART.md](../QUICKSTART.md)** - Быстрый старт
-- **[CURRENT_STATUS.md](CURRENT_STATUS.md)** - Текущий статус
-- **[ARCHITECTURE_GUIDE.md](architecture/ARCHITECTURE_GUIDE.md)** - Архитектура
+- **[ARCHITECTURE_GUIDE.md](../architecture/ARCHITECTURE_GUIDE.md)** - Архитектура
 - **[DEVELOPER_GUIDE.md](../guides/DEVELOPER_GUIDE.md)** - Руководство разработчика
 
 ---
 
-**Статус:** Production Ready - Optimized  
-**Последнее обновление:** 14 ноября 2025  
+**Статус:** Maintained  
+**Последнее обновление:** February 2026  
 **Версия:** 0.03
 

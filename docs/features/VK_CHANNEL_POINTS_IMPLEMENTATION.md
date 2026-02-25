@@ -273,5 +273,5 @@
    - Неэффективное использование пространства
    - **Исправлено:** Полностью переработан дизайн страницы
 
-См. подробности в [`CHANNEL_POINTS_FIXES_2025_10_28.md`](./CHANNEL_POINTS_FIXES_2025_10_28.md)
+См. подробности в [`TTS_CHANNEL_POINTS_MODE.md`](./TTS_CHANNEL_POINTS_MODE.md)
 

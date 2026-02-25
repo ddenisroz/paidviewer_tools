@@ -14,3 +14,8 @@ If a document here becomes relevant for current implementation, move or rewrite 
 - `docs/architecture/`
 - `docs/guides/`
 - `docs/features/`
+
+Current historical examples:
+- `DEV_LOG_2025_HISTORY.md`
+- `DB_TABLE_USAGE_AUDIT_2026-02-23.md`
+- `DOCS_TECH_DEBT_2026-02-25.md`

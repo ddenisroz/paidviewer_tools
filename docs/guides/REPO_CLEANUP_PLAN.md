@@ -12,6 +12,9 @@ This plan tracks what is already cleaned and what remains as technical debt.
 - Removed unused duplicate frontend components:
   - `frontend/src/components/chatbox/*`
   - active source remains in `frontend/src/features/chatbox/components/*`
+- Moved historical docs out of active root:
+  - `docs/DEV_LOG.md` -> `docs/backlog/DEV_LOG_2025_HISTORY.md`
+  - `docs/DB_TABLE_USAGE_AUDIT_2026-02-23.md` -> `docs/backlog/DB_TABLE_USAGE_AUDIT_2026-02-23.md`
 
 ## Keep (Intentional)
 

@@ -1,186 +1,38 @@
-# 🔗 Унифицированные команды !game и !title
+﻿# Unified Commands
 
-**Версия:** 1.0  
-**Дата:** 27 октября 2025  
-**Статус:** ✅ Реализовано и протестировано
+Status: active.
 
----
+## Purpose
 
-## 📋 Описание
+Keep command behavior consistent across Twitch and VK bot integrations.
 
-Команды `!game` и `!title` теперь поддерживают **автоматическую синхронизацию между Twitch и VK Live**, если пользователь включил соответствующие настройки объединения полей на главной странице.
+## Command Model
 
----
+1. Commands are parsed through a shared command handling layer.
+2. Platform-specific adapters normalize message metadata before execution.
+3. Permissions and role checks are applied uniformly.
 
-## ⚙️ Как это работает
+## Expected Guarantees
 
-### 🎮 Команда `!game`
+1. Same command intent yields equivalent behavior on Twitch and VK.
+2. Alias handling is deterministic.
+3. Error responses are explicit and logged for debugging.
 
-**Синтаксис:** `!game <название игры>`
+## Security Requirements
 
-**Логика:**
-1. Пользователь вызывает `!game` на любой платформе (Twitch или VK Live)
-2. Система проверяет настройку `User.combine_categories` в БД
-3. Если настройка **включена** и обе платформы подключены:
-   - Обновляет категорию на **обеих** платформах
-   - Использует кросс-платформенный маппинг из `utils/category_search.py`
-   - Возвращает: `✅ Игра изменена на: {название} (Twitch и VK Live)`
-4. Если настройка **выключена** или подключена только одна платформа:
-   - Обновляет категорию только на текущей платформе
-   - Возвращает: `✅ Игра изменена на: {название} (Twitch)` или `(VK Live)`
+1. Command actions requiring elevated rights must verify admin/mod roles.
+2. Input parameters must be validated before side effects.
+3. External API calls from commands must use timeouts and bounded retries.
 
-**Примеры:**
+## Regression Checklist
 
-```bash
-# Пользователь с включенным объединением категорий
-!game dbd
-→ ✅ Игра изменена на: Dead by Daylight (Twitch и VK Live)
+1. Core commands execute on both Twitch and VK.
+2. Permission-restricted commands reject unauthorized users.
+3. Command parsing handles malformed input without crashing handlers.
+4. Logging does not leak tokens or secrets from command context.
 
-!game Just Chatting
-→ ✅ Игра изменена на: Just Chatting (Twitch и VK Live)
+## Related Docs
 
-# Пользователь БЕЗ объединения категорий (только Twitch)
-!game cs2
-→ ✅ Игра изменена на: Counter-Strike 2 (Twitch)
-```
-
----
-
-### 📝 Команда `!title`
-
-**Синтаксис:** `!title <новое название>`
-
-**Логика:**
-1. Пользователь вызывает `!title` на любой платформе
-2. Система проверяет настройку `User.combine_titles` в БД
-3. Если настройка **включена** и обе платформы подключены:
-   - Обновляет название на **обеих** платформах
-   - Возвращает: `✅ Название изменено на: {название} (Twitch и VK Live)`
-4. Если настройка **выключена** или подключена только одна платформа:
-   - Обновляет название только на текущей платформе
-   - Возвращает: `✅ Название изменено на: {название} (Twitch)` или `(VK Live)`
-
-**Примеры:**
-
-```bash
-# Пользователь с включенным объединением названий
-!title Субботний стрим! Играем в DBD
-→ ✅ Название изменено на: Субботний стрим! Играем в DBD (Twitch и VK Live)
-
-# Пользователь БЕЗ объединения названий (только VK)
-!title Тестовый стрим
-→ ✅ Название изменено на: Тестовый стрим (VK Live)
-```
-
----
-
-## 🗄️ База данных
-
-### Используемые поля
-
-**Таблица:** `users`
-
-| Поле | Тип | По умолчанию | Описание |
-|------|-----|--------------|----------|
-| `combine_categories` | Boolean | `False` | Объединять поля категорий при команде `!game` |
-| `combine_titles` | Boolean | `False` | Объединять поля названий при команде `!title` |
-| `twitch_username` | String | `NULL` | Никнейм на Twitch (для проверки подключения) |
-| `vk_username` | String | `NULL` | Никнейм на VK Live (для проверки подключения) |
-
-**Примечание:** Эти поля также дублируются в таблице `user_settings` для UI-настроек.
-
----
-
-## 🔧 Технические детали
-
-### Файлы
-
-**Backend:**
-- `bot_service/bots/universal_command_handler.py`:
-  - `_handle_game()` - обработчик для Twitch
-  - `_handle_game_vk()` - обработчик для VK Live
-  - `_handle_title()` - обработчик для Twitch
-  - `_handle_title_vk()` - обработчик для VK Live
-
-**Зависимости:**
-- `bot_service/api/twitch_api.py` → `TwitchAPI.search_categories()`, `TwitchAPI.update_stream_category()`, `TwitchAPI.update_stream_title()`
-- `bot_service/api/vk_api.py` → `VKLiveAPI.get_categories()`, `VKLiveAPI.update_stream_category()`, `VKLiveAPI.update_stream_title()`
-- `bot_service/utils/category_search.py` → `expand_query_with_aliases()` (320+ алиасов)
-
-### Алгоритм (псевдокод)
-
-```python
-async def _handle_game(ctx, user, args):
-    # 1. Проверка настройки объединения
-    combine = user.combine_categories
-    
-    # 2. Поиск категории на основной платформе (Twitch)
-    categories = await twitch_api.search_categories(args)
-    
-    # 3. Обновление основной платформы
-    success_twitch = await twitch_api.update_stream_category(user.id, categories[0]['id'])
-    
-    # 4. Если включено объединение И есть вторая платформа
-    if combine and user.vk_username:
-        # Поиск категории на VK используя те же алиасы
-        vk_categories = await vk_api.get_categories(args, user.id)
-        success_vk = await vk_api.update_stream_category(user.id, vk_categories[0])
-    
-    # 5. Формирование ответа
-    platforms = ["Twitch"] + (["VK Live"] if success_vk else [])
-    return f"✅ Игра изменена на: {name} ({' и '.join(platforms)})"
-```
-
----
-
-## 🎯 Преимущества
-
-1. ✅ **Удобство:** Одна команда обновляет обе платформы
-2. ✅ **Гибкость:** Пользователь сам решает, нужна ли синхронизация (через UI)
-3. ✅ **Умный маппинг:** Использует существующий словарь с 320+ алиасами
-4. ✅ **Прозрачность:** Бот сообщает, на каких платформах прошло обновление
-5. ✅ **Безопасность:** Не сломает существующий функционал (fallback на одну платформу)
-
----
-
-## 🧪 Тестирование
-
-### Тест-кейсы
-
-| # | Условие | Команда | Ожидаемый результат |
-|---|---------|---------|---------------------|
-| 1 | `combine_categories=True`, Twitch+VK подключены | `!game dbd` | Обновлены обе платформы, ответ `(Twitch и VK Live)` |
-| 2 | `combine_categories=False`, Twitch+VK подключены | `!game dbd` | Обновлен только Twitch, ответ `(Twitch)` |
-| 3 | `combine_categories=True`, только Twitch | `!game dbd` | Обновлен только Twitch, ответ `(Twitch)` |
-| 4 | `combine_titles=True`, Twitch+VK подключены | `!title Test` | Обновлены обе платформы, ответ `(Twitch и VK Live)` |
-| 5 | `combine_titles=False`, VK подключен | `!title Test` | Обновлен только VK, ответ `(VK Live)` |
-
----
-
-## 📚 Связанная документация
-
-- **Система категорий:** `docs/CATEGORY_MAPPING_GUIDE.md`
-- **Кросс-платформенный маппинг:** `bot_service/utils/category_search.py`
-- **Команды бота:** `docs/ROLES_REFERENCE.md`
-- **Общий статус:** `docs/guides/CURRENT_STATUS.md`
-
----
-
-## 🚀 Использование для стримеров
-
-**Как включить кросс-платформенную синхронизацию:**
-
-1. Перейти на главную страницу дашборда (`/dashboard`)
-2. В карточке "Управление стримом" найти:
-   - **Toggle "Объединить категории"** - для синхронизации `!game`
-   - **Toggle "Объединить названия"** - для синхронизации `!title`
-3. Включить нужные toggles
-4. Теперь команды из чата будут применяться к обеим платформам автоматически!
-
-**Примечание:** Для работы синхронизации оба канала (Twitch и VK Live) должны быть подключены в настройках интеграций.
-
----
-
-**Автор:** AI Agent (Session 8, 27.10.2025)  
-**Проверено:** ✅ Код протестирован, документирован, закоммичен
-
+- `docs/architecture/ROLES_REFERENCE.md`
+- `docs/architecture/BOT_TOKEN_MANAGEMENT.md`
+- `docs/guides/BOT_OAUTH_SETUP_GUIDE.md`

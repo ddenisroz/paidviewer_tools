@@ -4,6 +4,7 @@ Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, Donat
 
 ## Start Here
 - [docs/QUICKSTART.md](docs/QUICKSTART.md): fastest local setup.
+- [docs/README.md](docs/README.md): authoritative docs index (active vs historical).
 - [docs/REPO_STRUCTURE.md](docs/REPO_STRUCTURE.md): what each top-level folder is for.
 - [docs/guides/REPO_CLEANUP_PLAN.md](docs/guides/REPO_CLEANUP_PLAN.md): what is already cleaned and what remains.
 - [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md): production deployment.
@@ -48,6 +49,7 @@ These are local or generated artifacts, not business logic.
 | `**/__pycache__/` | Python bytecode cache | No | Yes |
 | `bot_service/.ruff_cache/` | ruff lint cache | No | Yes |
 | `bot_service/.pytest_cache/` | pytest cache | No | Yes |
+| `bot_service/pytest-cache-files-*` | pytest temporary cache dirs | No | Yes |
 | `frontend/dist/` | frontend build output | No | Yes |
 | `logs/` | local logs | No | Yes (if logs not needed) |
 | `.venv/` | local Python environment and package bytecode | No | Yes (recreate with venv/pip install) |

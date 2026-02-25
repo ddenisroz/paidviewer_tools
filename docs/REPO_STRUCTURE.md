@@ -30,6 +30,7 @@ This page explains what is part of the product and what is local noise.
 | `**/__pycache__/` | Python runtime/import cache | No |
 | `.ruff_cache/` | Ruff | No |
 | `.pytest_cache/` | Pytest | No |
+| `pytest-cache-files-*` | Pytest temporary file cache directories | No |
 | `.benchmarks/` | pytest-benchmark output | No |
 | `artifacts/` | local run outputs | No |
 | `frontend/dist/` | `vite build` output | No |

@@ -138,33 +138,33 @@
 @admin_router.delete("/voices/{voice_id}")
 async def delete_voice(voice_id: int, db: Session = Depends(get_db)):
     """Удалить голос"""
-    # TODO: Реализовать
+    # Not implemented in this snapshot
 
 @admin_router.put("/voices/{voice_id}/rename")
 async def rename_voice(voice_id: int, new_name: str = Form(...), db: Session = Depends(get_db)):
     """Переименовать голос"""
-    # TODO: Реализовать
+    # Not implemented in this snapshot
 
 @admin_router.post("/voices/{voice_id}/retranscribe")
 async def retranscribe_voice(voice_id: int, reference_text: str = Form(...), db: Session = Depends(get_db)):
     """Перетранскрибировать голос"""
-    # TODO: Реализовать
+    # Not implemented in this snapshot
 ```
 
 ### Bot Service
 
 ```python
-# bot_service/api/tts_api.py или новый файл voice_api.py
+# bot_service/api/tts/local_routes.py или новый файл voice_api.py
 
 @router.put("/api/voices/{voice_id}/settings")
 async def update_voice_settings(voice_id: int, settings: dict, db: Session = Depends(get_db)):
     """Обновить настройки голоса"""
-    # TODO: Реализовать
+    # Not implemented in this snapshot
 
 @router.post("/api/admin/voices/{voice_id}/transcribe")
 async def transcribe_voice(voice_id: int, db: Session = Depends(get_db)):
     """Транскрибировать голос"""
-    # TODO: Реализовать
+    # Not implemented in this snapshot
 ```
 
 ---
@@ -173,7 +173,7 @@ async def transcribe_voice(voice_id: int, db: Session = Depends(get_db)):
 
 1. **`/api/tts/test`** - проверить, работает ли тестирование голосов
 2. **Frontend VoiceManagement** - проверить, использует ли правильные endpoint'ы
-3. **Permissions** - проверить, что все endpoint'ы требуют `is_admin = True`
+3. **Permissions** - проверить, что все endpoint'ы требуют `users.role='admin'`
 
 ---
 
@@ -299,5 +299,7 @@ MP3, WAV, OGG, FLAC, M4A, AAC, WMA, AIFF, AU
 - Обновлённый endpoint `/api/voices/{voice_id}/upload` (строка 645)
 
 **Приоритет:** ✅ **ЗАВЕРШЕНО**
+
+
 
 
