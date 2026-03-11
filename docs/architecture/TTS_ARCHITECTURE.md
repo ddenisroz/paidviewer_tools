@@ -1,128 +1,91 @@
 ﻿# TTS Architecture
 
-Last updated: 2026-02-24
+Last updated: 2026-02-25
 
-## 1. Current Provider Model
+## 1. Runtime Topology
 
-The project uses one runtime manager (`bot_service/services/tts/tts_manager.py`) with four synthesis paths:
+- `frontend`: talks only to `bot_service` API/WS.
+- `bot_service`: control plane (auth, settings, routing policy, fallback, websocket delivery).
+- `tts-gateway`: advanced synthesis orchestrator for `f5` and `qwen`.
+- `f5-tts-service`: provider-owned F5 synthesis + voice/admin APIs.
+- `nano-qwen3tts-vllm`: provider-owned Qwen synthesis engine.
 
-- `gtts` (basic Google TTS): always available fallback.
-- `gcloud` (Google Cloud TTS): advanced cloud provider with voice pool + mood.
-- `f5` (advanced provider): cloud or local endpoint.
-- `qwen` (advanced provider): cloud or local endpoint.
+## 2. Provider Routing Rules
 
-Advanced provider selection is done in the frontend and stored in user settings.
+### Synthesis
 
-## 2. Routing and Fallback Logic
+- `gcloud`: internal path in `bot_service`.
+- `f5`: gateway-first (`TTS_GATEWAY_URL`), direct fallback if gateway is not configured.
+- `qwen`: gateway-only in cloud mode; without gateway, route is unavailable and runtime falls back to basic TTS.
 
-Runtime order:
+### Voice/Admin
 
-1. Resolve engine/provider from user settings.
-2. Try selected advanced provider (`gcloud` or `f5/qwen`).
-3. If advanced synthesis fails, fallback to basic `gtts`.
+- `f5`: routed to provider voice/admin API.
+- `qwen`: disabled by default (`501`) until `QWEN_VOICE_SERVICE_URL` is configured.
+- `gcloud`: no custom voice CRUD in core.
 
-Fallback is mandatory. If local endpoint is selected but unavailable, runtime falls back to `gtts`.
+## 3. Auth Model
 
-## 3. User Settings Contract
+Strict API-key for TTS upstream calls.
 
-Main settings fields (table `tts_user_settings`):
+`bot_service` sends:
 
-- `engine`: `gtts | gcloud | f5tts | qwen`
-- `advanced_provider`: `f5 | gcloud | qwen`
-- `f5_mode`: `cloud | local`
-- `qwen_mode`: `cloud | local`
-- `use_local_tts`: boolean override for local mode
-- `voice`: active voice name for provider-based engines
-- `gcloud_voices`: selected Google Cloud voices
-- `gcloud_mood`: `neutral | sad | happy`
-- `qwen_voice`, `qwen_model`: optional Qwen runtime preferences
+- `Authorization: Bearer <key>`
+- `X-API-Key: <key>`
 
-## 4. Local Endpoint Model
+Keys are resolved by upstream type:
 
-Local endpoints are provider-scoped in `local_tts_endpoints`:
+- gateway: `TTS_GATEWAY_API_KEY`
+- f5 direct: `F5_TTS_SERVICE_API_KEY`
+- qwen direct/voice: `QWEN_TTS_SERVICE_API_KEY` (reserved for staged qwen voice integration)
+- local endpoint: per-user saved `api_key` from `local_tts_endpoints`
 
-- `provider = f5` for local F5 instance
-- `provider = qwen` for local Qwen instance
+## 4. DB Ownership
 
-This allows one user to configure both local providers independently.
+`bot_service` DB stores:
 
-## 5. Voice Storage and Separation
+- user/provider settings (`engine`, `advanced_provider`, `f5_mode`, `qwen_mode`, `use_local_tts`)
+- provider-specific settings (`voice`, `qwen_voice`, `qwen_model`, gcloud voice pool/mood)
+- local endpoint configs and endpoint API keys
+- user voice overrides metadata (`tts_provider`-aware)
 
-Voice management is provider-aware:
+Provider services store provider-local operational state (voice catalogs, provider internals).
 
-- User voice overrides are stored in `user_voice_settings.tts_provider`.
-- API calls support `provider=f5|qwen` and route to provider-specific services.
-- Sample and voice operations are isolated by provider upstream.
+## 5. Public Backend Surface
 
-Google Cloud (`gcloud`) is not part of uploadable custom voice flow. It uses provider-managed cloud voices (`gcloud_voices`).
+- `GET /api/tts/health?provider=f5|qwen|gcloud`
+- `GET /api/voices/providers/capabilities`
+- existing voice/admin routes remain stable (`/api/voices/*`, `/api/admin/voices*`)
 
-## 6. API Surface (Core)
+Capability behavior:
 
-Settings and status:
+- qwen voice CRUD unavailable -> explicit `501` with machine-readable detail
+- frontend uses capabilities to disable unsupported actions
 
-- `GET /api/tts/settings`
-- `POST /api/tts/settings`
-- `POST /api/tts/engine`
-- `GET /api/tts/status`
+## 6. Frontend Boundary Hardening
 
-Google Cloud:
+- `VITE_TTS_SERVICE_URL` is deprecated and not required for runtime startup.
+- No direct `ttsApiClient`; all runtime calls go through backend API client.
+- Audio URL normalization is backend-safe (absolute passthrough, relative -> backend base URL).
+- WebSocket fallback hardcodes to `:8000` were removed (`window.location.host` used).
 
-- `GET /api/tts/gcloud/voices`
-- `POST /api/tts/gcloud/voices`
-- `POST /api/tts/gcloud/preview`
+## 7. Fallback Chain
 
-Voice management (provider-aware):
+1. Try selected advanced provider path.
+2. If unavailable/error/timeout, use basic `gtts` fallback.
+3. For local mode, missing/unhealthy local endpoint immediately enters fallback path.
 
-- `GET /api/voices/global?provider=f5|qwen`
-- `GET /api/voices/user/custom?provider=f5|qwen`
-- `POST /api/user/voices/upload?provider=f5|qwen`
-- `PUT /api/voices/user/settings/{voice_id}?provider=f5|qwen`
+## 8. Operational Runbook Ports
 
-## 7. Docker Profiles
+Recommended local ports:
 
-Available compose profiles in `deploy/docker/`:
+- gateway: `8010`
+- f5 service: `8011`
+- qwen engine: `8000`
+- bot_service: `8000`
 
-- `docker-compose.tts-advanced.yml`: `tts_service` + Redis + workers.
-- `docker-compose.tts-simple.yml`: single-node `tts_service` (no Redis/worker pool).
-- `docker-compose.bot.yml`: backend/frontend/database side.
+## 9. Known Prerequisites
 
-## 8. Inter-Service Auth and Health
-
-Internal auth for `bot_service -> f5-tts-service` supports:
-
-- primary: short-lived service JWT in `Authorization: Bearer <token>`
-- compatibility fallback: `X-Internal-Service-Key`
-- optional transport hardening: mTLS client certs for internal HTTPS calls (`INTERNAL_SERVICE_MTLS_*` in `bot_service`)
-
-Health endpoints:
-
-- `GET /health/live` for liveness
-- `GET /health/ready` for readiness
-
-Legacy alias `/health` remains for compatibility where still used.
-
-## 9. F5 Service Extraction Status
-
-`f5-tts-service` is treated as standalone service and should not rely on monorepo-local paths.
-
-For post-extraction stability, keep:
-
-- hardcoded project-relative paths removed or configurable,
-- clear `.env.example` and Docker startup path,
-- dependency list in sync (`requirements*.txt`),
-- external API contract stable (`/api/tts/*`, `/api/admin/*`).
-
-## 10. Frontend Behavior (Advanced TTS)
-
-Advanced provider dropdown has three options:
-
-- `F5 TTS`
-- `Qwen 3 TTS`
-- `Google Cloud TTS`
-
-Sub-settings by provider:
-
-- `gcloud`: voice pool + mood.
-- `f5` / `qwen`: cloud vs local mode.
-
-Browser vs OBS sink behavior remains shared across providers.
+- `tts-gateway` requires Redis configured (`TTS_GATEWAY_REDIS_URL`).
+- `f5-tts-service` startup requires populated upstream/model assets (`vendor/F5-TTS`, weights).
+- `nano-qwen3tts-vllm` practical runtime requires Linux/WSL2 toolchain (Triton/Flash-Attention).

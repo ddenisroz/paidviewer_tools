@@ -1,57 +1,102 @@
-"""Helpers for bot_service -> internal services authentication headers."""
+"""Helpers for bot_service -> TTS upstream authentication headers."""
+
+from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
-
-from jose import jwt
+from typing import Any, Dict, Literal, Optional
 
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+TTSUpstreamKind = Literal["synthesis", "voice", "gateway", "local"]
 
-def create_internal_service_jwt(
-    *,
-    audience: str,
-    subject: str = "bot_service",
-) -> str:
-    """Create a short-lived JWT for internal service-to-service requests."""
-    now = datetime.now(timezone.utc)
-    expires_at = now + timedelta(seconds=settings.internal_service_jwt_ttl_seconds)
-    payload = {
-        "iss": settings.internal_service_jwt_issuer,
-        "sub": subject,
-        "service": subject,
-        "aud": audience,
-        "type": "service",
-        "iat": int(now.timestamp()),
-        "nbf": int(now.timestamp()),
-        "exp": int(expires_at.timestamp()),
+
+class TTSAuthConfigError(RuntimeError):
+    """Raised when strict TTS upstream auth is requested but key is missing."""
+
+
+def _normalize_api_key(value: Optional[str]) -> str:
+    return str(value or "").strip()
+
+
+def _build_api_key_headers(api_key: str) -> Dict[str, str]:
+    return {
+        "Authorization": f"Bearer {api_key}",
+        "X-API-Key": api_key,
     }
-    signing_key = settings.internal_service_jwt_secret or settings.secret_key
-    return jwt.encode(payload, signing_key, algorithm=settings.algorithm)
 
 
-def build_tts_auth_headers() -> Dict[str, str]:
+def _normalize_provider(provider: str) -> str:
+    candidate = (provider or "").strip().lower()
+    if candidate == "qwen":
+        return "qwen"
+    return "f5"
+
+
+def _resolve_gateway_api_key(*, strict: bool) -> str:
+    api_key = _normalize_api_key(settings.tts_gateway_api_key)
+    if api_key:
+        return api_key
+    if strict:
+        raise TTSAuthConfigError(
+            "TTS_GATEWAY_API_KEY is required for gateway upstream requests."
+        )
+    return ""
+
+
+def _resolve_provider_api_key(provider: str, *, strict: bool) -> str:
+    normalized_provider = _normalize_provider(provider)
+    if normalized_provider == "qwen":
+        api_key = _normalize_api_key(settings.qwen_tts_service_api_key)
+        if not api_key and strict:
+            raise TTSAuthConfigError(
+                "QWEN_TTS_SERVICE_API_KEY is required for qwen upstream requests."
+            )
+        return api_key
+
+    api_key = _normalize_api_key(settings.f5_tts_service_api_key)
+    if not api_key and strict:
+        raise TTSAuthConfigError(
+            "F5_TTS_SERVICE_API_KEY is required for f5 upstream requests."
+        )
+    return api_key
+
+
+def build_tts_auth_headers(
+    *,
+    provider: str = "f5",
+    upstream: TTSUpstreamKind = "voice",
+    local_api_key: Optional[str] = None,
+    use_gateway: Optional[bool] = None,
+    strict: bool = True,
+) -> Dict[str, str]:
     """
-    Build auth headers for bot_service -> TTS calls.
+    Build strict API-key headers for bot_service -> TTS calls.
 
-    Includes service JWT and keeps legacy X-Internal-Service-Key for transition.
+    Contract:
+    - `Authorization: Bearer <key>`
+    - `X-API-Key: <key>`
     """
-    headers: Dict[str, str] = {}
+    if upstream == "local" or local_api_key is not None:
+        local_key = _normalize_api_key(local_api_key)
+        if not local_key:
+            # Local endpoints may intentionally run without auth.
+            return {}
+        return _build_api_key_headers(local_key)
 
-    if settings.internal_service_jwt_enabled:
-        try:
-            service_token = create_internal_service_jwt(audience=settings.internal_service_jwt_audience_tts)
-            headers["Authorization"] = f"Bearer {service_token}"
-        except Exception:
-            logger.exception("Failed to generate internal service JWT for TTS call")
+    gateway_enabled = bool(_normalize_api_key(settings.tts_gateway_url))
+    route_via_gateway = (
+        upstream == "gateway"
+        or (upstream == "synthesis" and (gateway_enabled if use_gateway is None else bool(use_gateway)))
+    )
 
-    if settings.tts_internal_api_key:
-        headers["X-Internal-Service-Key"] = settings.tts_internal_api_key
+    if route_via_gateway:
+        gateway_key = _resolve_gateway_api_key(strict=strict)
+        return _build_api_key_headers(gateway_key) if gateway_key else {}
 
-    return headers
+    provider_key = _resolve_provider_api_key(provider, strict=strict)
+    return _build_api_key_headers(provider_key) if provider_key else {}
 
 
 def build_tts_httpx_client_kwargs() -> Dict[str, Any]:

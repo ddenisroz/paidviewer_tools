@@ -4,7 +4,7 @@
  */
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
-import { API_BASE_URL, F5_TTS_SERVICE_URL } from '@/constants';
+import { API_BASE_URL } from '@/constants';
 import { shouldRetryRequest } from '@/shared/utils/apiErrorHandler';
 import { logger } from '@/shared/utils/prodLogger';
 
@@ -158,15 +158,6 @@ export const apiClient = createApiClient({
   baseURL: API_BASE_URL,
   withCredentials: true,
   timeout: 30000,
-});
-
-/**
- * API клиент для TTS сервиса
- */
-export const ttsApiClient = createApiClient({
-  baseURL: F5_TTS_SERVICE_URL,
-  withCredentials: true,
-  timeout: 10000, // TTS сервис может быть медленным
 });
 
 // Экспортируем для обратной совместимости

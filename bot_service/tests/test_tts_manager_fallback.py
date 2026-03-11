@@ -103,6 +103,35 @@ async def test_gcloud_failure_falls_back_to_basic(manager):
 
 
 @pytest.mark.asyncio
+async def test_qwen_cloud_without_gateway_falls_back_to_basic(manager, monkeypatch):
+    monkeypatch.setattr("services.tts.provider_utils.settings.tts_gateway_url", "")
+    manager.check_tts_service_health = AsyncMock(return_value=False)
+    manager._synthesize_via_tts_service = AsyncMock(return_value={"success": True})
+    manager._synthesize_via_basic_tts = AsyncMock(
+        return_value={"success": True, "tts_type": "basic_gtts"}
+    )
+
+    result = await manager.synthesize_tts(
+        channel_name="chan",
+        text="hello",
+        author="user",
+        user_id=5,
+        use_ai_tts=True,
+        engine="qwen",
+        tts_settings={
+            "advanced_provider": "qwen",
+            "qwen_mode": "cloud",
+            "use_local_tts": False,
+        },
+    )
+
+    assert result["success"] is True
+    manager.check_tts_service_health.assert_awaited_once()
+    manager._synthesize_via_tts_service.assert_not_awaited()
+    manager._synthesize_via_basic_tts.assert_awaited_once()
+
+
+@pytest.mark.asyncio
 async def test_health_cache_scoped_by_endpoint(manager, monkeypatch):
     calls: list[str] = []
     responses = {
@@ -131,7 +160,8 @@ async def test_health_cache_scoped_by_endpoint(manager, monkeypatch):
         async def __aexit__(self, exc_type, exc, tb):
             return False
 
-        def get(self, url: str):
+        def get(self, url: str, **kwargs):
+            _ = kwargs
             calls.append(url)
             status, payload = responses[url]
             return _FakeResponse(status, payload)
@@ -169,3 +199,39 @@ async def test_health_cache_scoped_by_endpoint(manager, monkeypatch):
     )
     assert cached_result is True
     assert len(calls) == calls_before_cached
+
+
+@pytest.mark.asyncio
+async def test_get_user_tts_endpoint_returns_saved_api_key(manager, monkeypatch):
+    class _LocalConfig:
+        endpoint_url = "http://endpoint-a"
+        api_key = "local-secret-key"
+
+    class _FakeRepo:
+        def __init__(self, db_session):
+            _ = db_session
+
+        def get_healthy(self, user_id: int, provider: str):
+            _ = (user_id, provider)
+            return _LocalConfig()
+
+    monkeypatch.setattr("repositories.local_tts_repository.LocalTTSRepository", _FakeRepo)
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_hosts",
+        "endpoint-a",
+    )
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_cidrs",
+        "",
+    )
+
+    endpoint_payload = await manager.get_user_tts_endpoint(
+        user_id=1,
+        db_session=object(),
+        provider="f5",
+    )
+
+    assert endpoint_payload == {
+        "endpoint_url": "http://endpoint-a",
+        "api_key": "local-secret-key",
+    }

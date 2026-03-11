@@ -1,140 +1,127 @@
-﻿# Repo Split Guide (ttv-core + f5-tts-service + qwen3-tts-service)
+﻿# Repo Split Guide (core + gateway + F5 + Qwen)
 
-This guide describes how to split the monorepo into independent repositories while keeping runtime compatibility.
+Last updated: 2026-02-25
 
-## 1. Target repositories
+## 1. Target Repositories
 
-1. `ttv-core`
-- Contains: `bot_service/`, `frontend/`, shared docs, integration docker files.
-- Owns provider routing (gcloud / f5 / qwen), fallback logic, admin UI, and moderation settings.
+1. `ttv-core` (this repo)
+- `bot_service/`, `frontend/`, shared docs, deploy overlays.
+- Control-plane responsibilities: auth, moderation, queue orchestration, settings, provider routing policy.
 
-2. `f5-tts-service`
-- Contains only the F5 TTS service code, service docs, Dockerfiles, and CI.
-- Owns F5 synthesis, voice storage, health checks, and worker pool.
+2. `tts-gateway`
+- Advanced synthesis orchestrator for `f5` + `qwen`.
+- Scheduler/fairness, provider adapters, async job polling.
 
-3. `qwen3-tts-service` (or external upstream + adapter)
-- Contains Qwen runtime service and API adapter expected by `ttv-core`.
-- If using upstream directly, keep a thin adapter with stable API contract.
+3. `f5-tts-service` (`phase1-bootstrap`)
+- F5 provider runtime + provider-owned voice/admin APIs.
 
-## 2. Naming baseline
+4. `nano-qwen3tts-vllm`
+- Qwen inference engine.
+- Voice CRUD API is out of scope in current phase; add separate qwen voice service later.
 
-- Keep extracted service naming as `f5-tts-service`.
-- If backward compatibility is needed in Docker networks, keep service name `tts_service`.
+## 2. Contract Freeze (Core <-> Upstreams)
 
-## 3. Contract freeze before split
+### Synthesis
 
-Freeze and version endpoints used by `ttv-core`:
+- Core calls gateway endpoint:
+  - `POST /api/tts/synthesize-channel`
+- Health:
+  - `GET /health/live`
+  - `GET /health/ready`
+  - `GET /health` (compat)
 
-- `POST /api/tts/synthesize-channel`
-- `GET /api/tts/voices`
-- `POST /api/admin/voices/upload`
-- `GET /health/live`
-- `GET /health/ready`
-- `GET /health` (compatibility alias)
-- `GET /api/health` (compatibility alias)
+### Voice/Admin
 
-Security contract:
+- F5 voice/admin API stays provider-owned (`/api/tts/*`, `/api/admin/*`).
+- Qwen voice/admin in core returns `501` until `QWEN_VOICE_SERVICE_URL` is configured.
 
-- Primary: `Authorization: Bearer <service JWT>` with audience `f5_tts`
-- Compatibility fallback: `X-Internal-Service-Key: <TTS_INTERNAL_API_KEY>`
-- Shared signing secret where required: `SECRET_KEY` or dedicated `INTERNAL_SERVICE_JWT_SECRET`
+### Auth
 
-## 4. Extract `f5-tts-service`
+Strict API-key mode only for TTS upstreams.
 
-1. Create a new empty repository `f5-tts-service`.
-2. Copy F5 service files from current source into repo root.
-3. Ensure repo includes:
-- service runtime code
-- `deploy/docker-compose.simple.yml`
-- `deploy/docker-compose.advanced.yml`
-- `README.md`, `docs/RUNBOOK.md`, `.env.example`, `.dockerignore`
-4. Normalize compose paths to local repo root (no monorepo-relative links).
-5. Add CI checks:
-- `ruff check .`
-- `ruff format --check .`
-- smoke test (`/health/live`, `/health/ready`, synthesis dry-run)
-6. Publish first image tag: `ghcr.io/<org>/f5-tts-service:<tag>`.
+Core sends both headers:
 
-## 5. Prepare `ttv-core` after extraction
+- `Authorization: Bearer <key>`
+- `X-API-Key: <key>`
 
-1. Remove local F5 build dependency from core compose files.
-2. Point `F5_TTS_SERVICE_URL` to deployed `f5-tts-service` URL.
-3. Keep fallback chain in `bot_service`:
-- provider (`f5` or `qwen`) fails -> fallback to base gcloud/basic TTS.
-4. Keep provider-specific settings in core DB:
-- gcloud voices/mood
-- f5 mode (`local` / `cloud`) + endpoint
-- qwen mode (`local` / `cloud`) + endpoint
+Legacy JWT/key settings are compatibility-only and not part of target TTS contract.
 
-## 6. Storage and DB boundaries
+## 3. Core API Stability for Frontend
 
-Minimum separation:
+Frontend keeps stable backend-only boundary:
 
-- F5 samples and voice metadata are stored in F5 domain only.
-- Qwen samples and voice metadata are stored in Qwen domain only.
-- Core DB stores routing and settings, not provider-internal filesystem paths.
+- no direct runtime dependency on `VITE_TTS_SERVICE_URL`
+- health checks only via backend: `GET /api/tts/health`
+- provider capability gating via backend: `GET /api/voices/providers/capabilities`
+- audio URL resolution must be backend-safe (relative -> backend base URL)
 
-Recommended schema split in core DB:
+## 4. Environment Ownership
 
-- `local_tts_providers` (provider type, mode, endpoint, auth)
-- `local_tts_voices` (provider-scoped voice metadata)
-- include `provider` in unique constraints to avoid F5/Qwen collisions.
+### `ttv-core` (`bot_service`)
 
-## 7. Environment variables by repo
-
-`ttv-core`:
-
+- `TTS_GATEWAY_URL`
+- `TTS_GATEWAY_API_KEY`
 - `F5_TTS_SERVICE_URL`
+- `F5_TTS_SERVICE_API_KEY`
 - `QWEN_TTS_SERVICE_URL`
-- `F5_TTS_STORAGE_ROOT` (optional; only for local maintenance tasks)
-- `TTS_INTERNAL_API_KEY`
-- `INTERNAL_SERVICE_JWT_ENABLED`
-- `INTERNAL_SERVICE_JWT_ISSUER`
-- `INTERNAL_SERVICE_JWT_AUDIENCE_TTS`
-- `INTERNAL_SERVICE_JWT_SECRET`
-- `INTERNAL_SERVICE_JWT_TTL_SECONDS`
-- `INTERNAL_SERVICE_MTLS_ENABLED`
-- `INTERNAL_SERVICE_CA_CERT_PATH`
-- `INTERNAL_SERVICE_CLIENT_CERT_PATH`
-- `INTERNAL_SERVICE_CLIENT_KEY_PATH`
+- `QWEN_TTS_SERVICE_API_KEY` (reserved)
+- `QWEN_VOICE_SERVICE_URL` (optional, enables qwen voice CRUD routing)
 
-`f5-tts-service`:
+### `tts-gateway`
 
-- `DATABASE_URL` (required)
-- `SECRET_KEY`
-- `TTS_INTERNAL_API_KEY`
-- `INTERNAL_SERVICE_JWT_SECRET` (optional; defaults to `SECRET_KEY`)
-- `INTERNAL_SERVICE_JWT_ISSUER`
-- `INTERNAL_SERVICE_JWT_AUDIENCE`
-- `INTERNAL_SERVICE_JWT_ALLOWED_SUBJECTS`
-- optional Redis/worker settings
+- `TTS_GATEWAY_API_KEYS`
+- `TTS_GATEWAY_REDIS_URL`
+- `TTS_GATEWAY_F5_URL`
+- `TTS_GATEWAY_F5_API_KEY`
+- `TTS_GATEWAY_QWEN_URL`
+- `TTS_GATEWAY_QWEN_API_KEY`
 
-`qwen3-tts-service`:
+### `f5-tts-service`
 
-- runtime keys and bind vars
-- `TTS_INTERNAL_API_KEY` (if shared auth model is used)
+- `F5_TTS_SERVICE_API_KEYS`
+- `F5_TTS_DATABASE_URL`
+- optional model/runtime vars (`F5_TTS_*`)
 
-## 8. Cutover plan (no downtime)
+### `nano-qwen3tts-vllm`
 
-1. Deploy `f5-tts-service` in parallel with current runtime.
-2. Run smoke checks from core host:
-- `/health/live`
-- `/health/ready`
-- voice list endpoint
-- one synthesis request
-3. Switch only `F5_TTS_SERVICE_URL` to new endpoint.
-4. Monitor error rate and latency for 24h.
-5. Remove old local F5 runtime after stable window.
+- runtime/model vars from repo docs
+- runs as inference engine behind gateway
 
-Rollback:
+## 5. Current Phase Behavior
 
-- Restore previous `F5_TTS_SERVICE_URL`.
-- Restart `bot_service`.
+1. Synthesis routing:
+- `f5` -> gateway (preferred) or direct fallback if gateway missing.
+- `qwen` -> gateway only; without gateway core returns controlled unavailable status and falls back to basic TTS runtime path.
 
-## 9. Validation checklist
+2. Voice routing:
+- `f5` -> provider voice/admin endpoints.
+- `qwen` -> `501` by default.
+- if `QWEN_VOICE_SERVICE_URL` is set, qwen voice/admin routes switch automatically without frontend API changes.
 
-- No hardcoded absolute paths.
-- `DATABASE_URL` is required and explicit.
-- Docker build works from service repo root.
-- Core fallback to base TTS is confirmed when F5/Qwen are unavailable.
-- Admin voice upload routes map to correct provider storage.
+## 6. Cutover Sequence
+
+1. Deploy `f5-tts-service` + `nano-qwen3tts-vllm`.
+2. Deploy `tts-gateway` with Redis and API keys.
+3. Set core env (`TTS_GATEWAY_URL`, `TTS_GATEWAY_API_KEY`, provider URLs/keys).
+4. Run smoke:
+- synth `provider=f5` through gateway
+- synth `provider=qwen` through gateway
+- F5 voice CRUD via core
+- qwen voice CRUD returns expected `501`
+5. Enable optional qwen voice service later and set `QWEN_VOICE_SERVICE_URL`.
+
+## 7. Rollback
+
+1. Keep frontend unchanged (still backend-only).
+2. For synthesis rollback:
+- switch `TTS_GATEWAY_URL` off if needed.
+- `f5` can still run direct.
+- `qwen` cloud synthesis becomes unavailable until gateway returns.
+3. Restart `bot_service` to apply env changes.
+
+## 8. Validation Checklist
+
+- No direct frontend runtime usage of `F5_TTS_SERVICE_URL`/`VITE_TTS_SERVICE_URL`.
+- Backend exposes `GET /api/tts/health` and `GET /api/voices/providers/capabilities`.
+- Qwen voice CRUD is capability-gated and returns explicit `501` detail when disabled.
+- Compose/env files use strict API-key variable names for gateway/F5 upstreams.

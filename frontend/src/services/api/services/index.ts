@@ -16,5 +16,5 @@ export { adminService } from './adminService';
 export { userSettingsService } from './userSettingsService';
 
 // Экспорт API клиентов для прямого доступа (если необходимо)
-export { apiClient, ttsApiClient } from '../client';
+export { apiClient } from '../client';
 

@@ -49,13 +49,29 @@ class Settings(BaseSettings):
         default="",
         description="Optional unified TTS gateway URL for provider routing (f5/qwen)",
     )
+    tts_gateway_api_key: Optional[str] = Field(
+        default=None,
+        description="Strict API key for bot_service -> tts-gateway requests",
+    )
     f5_tts_service_url: str = Field(
-        default="http://localhost:8001",
+        default="http://localhost:8011",
         description="F5 TTS service URL",
     )
+    f5_tts_service_api_key: Optional[str] = Field(
+        default=None,
+        description="Strict API key for bot_service -> f5-tts-service requests",
+    )
     qwen_tts_service_url: str = Field(
-        default="http://localhost:8011",
+        default="http://localhost:8000",
         description="Qwen TTS service URL",
+    )
+    qwen_tts_service_api_key: Optional[str] = Field(
+        default=None,
+        description="Strict API key for bot_service -> qwen upstream requests",
+    )
+    qwen_voice_service_url: str = Field(
+        default="",
+        description="Optional dedicated Qwen voice-management API URL (enables qwen voice CRUD when set)",
     )
     f5_tts_storage_root: Optional[str] = Field(
         default=None,
@@ -63,7 +79,7 @@ class Settings(BaseSettings):
     )
     tts_internal_api_key: Optional[str] = Field(
         default=None,
-        description="Shared internal API key for bot_service -> tts_service admin calls",
+        description="Legacy internal key (compatibility only; strict API-key contract uses *_TTS_SERVICE_API_KEY vars)",
     )
     internal_service_jwt_enabled: bool = Field(
         default=True,

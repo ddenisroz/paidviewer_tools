@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
+from core.config import settings
 from core.database import get_db
 from core.datetime_utils import utcnow_naive
 from repositories.user_repository import UserRepository
@@ -79,7 +80,7 @@ async def get_prometheus_metrics():
     try:
         return {
             "success": True,
-            "prometheus_url": "http://localhost:8000/api/metrics",
+            "prometheus_url": f"{settings.backend_url.rstrip('/')}/api/metrics",
             "note": "Access Prometheus metrics at the provided URL",
         }
     except HTTPException:

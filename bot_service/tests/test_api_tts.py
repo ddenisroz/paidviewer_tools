@@ -75,9 +75,13 @@ class TestTTSAPI:
         assert response.status_code == 400
 
     def test_tts_health_check(self, authenticated_client):
-        response = authenticated_client.get("/api/tts/health")
-        # Endpoint may not be exposed by bot_service in all profiles.
-        assert response.status_code in [200, 404, 500]
+        f5_response = authenticated_client.get("/api/tts/health", params={"provider": "f5"})
+        qwen_response = authenticated_client.get("/api/tts/health", params={"provider": "qwen"})
+        gcloud_response = authenticated_client.get("/api/tts/health", params={"provider": "gcloud"})
+
+        assert f5_response.status_code in [200, 500]
+        assert qwen_response.status_code in [200, 500]
+        assert gcloud_response.status_code in [200, 500]
 
     def test_youtube_settings_endpoints_absent_or_legacy(self, authenticated_client):
         get_response = authenticated_client.get("/api/tts/youtube-settings")

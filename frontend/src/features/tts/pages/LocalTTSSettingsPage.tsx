@@ -58,6 +58,7 @@ interface ProviderMeta {
     label: string;
     defaultEndpoint: string;
     folder: string;
+    installCommand: string;
     runCommand: string;
     apiKeyHint: string;
     docsUrl?: string;
@@ -66,16 +67,19 @@ interface ProviderMeta {
 const PROVIDER_META: Record<LocalTtsProvider, ProviderMeta> = {
     f5: {
         label: 'F5 TTS',
-        defaultEndpoint: 'http://localhost:8001',
+        defaultEndpoint: 'http://localhost:8011',
         folder: 'f5-tts-service',
-        runCommand: 'python main.py',
-        apiKeyHint: 'Если включена авторизация, укажите API ключ из .env или config сервиса.'
+        installCommand: 'uv sync',
+        runCommand: 'uv run uvicorn app.main:app --port 8011',
+        apiKeyHint: 'Если включена авторизация, укажите API ключ из .env или config сервиса.',
+        docsUrl: 'https://github.com/ddenisroz/f5-tts-service/tree/phase1-bootstrap',
     },
     qwen: {
         label: 'Qwen 3 TTS',
-        defaultEndpoint: 'http://localhost:8002',
+        defaultEndpoint: 'http://localhost:8000',
         folder: 'nano-qwen3tts-vllm',
-        runCommand: 'python <entrypoint>.py',
+        installCommand: 'python -m pip install -r requirements.txt',
+        runCommand: 'python api_server.py',
         apiKeyHint: 'API ключ обязателен только если в Qwen включена авторизация.',
         docsUrl: 'https://github.com/calldatfate/nano-qwen3tts-vllm'
     }
@@ -541,7 +545,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <div>
                                         <p className="font-medium">Установите зависимости:</p>
                                         <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            python -m pip install -r requirements.txt
+                                            {providerMeta.installCommand}
                                         </code>
                                     </div>
                                 </div>
@@ -612,6 +616,11 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <p className="text-xs text-muted-foreground">
                                     По умолчанию: {providerMeta.defaultEndpoint}
                                 </p>
+                                {provider === 'qwen' && (
+                                    <p className="text-xs text-blue-200/80">
+                                        Для cloud-синтеза Qwen используется `tts-gateway`; этот endpoint нужен для локального режима и проверки доступности движка.
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -891,7 +900,15 @@ const LocalTTSSettingsPage: React.FC = () => {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {loadingVoices ? (
+                            {provider === 'qwen' ? (
+                                <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 text-sm text-blue-100">
+                                    <p className="font-medium">Локальный voice CRUD для Qwen здесь отключен.</p>
+                                    <p className="mt-2 text-blue-100/80">
+                                        Управление голосами выполняется через `bot_service` админку и capability-aware API.
+                                        Для текущей фазы Qwen voice CRUD вернет 501, пока не настроен `QWEN_VOICE_SERVICE_URL`.
+                                    </p>
+                                </div>
+                            ) : loadingVoices ? (
                                 <div className="flex items-center justify-center py-8">
                                     <Loader2 className="w-6 h-6 animate-spin" />
                                 </div>

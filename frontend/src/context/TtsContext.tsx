@@ -80,12 +80,18 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     const ttsStatusInterval = isTtsPage ? 30 * 1000 : 120 * 1000;
 
     const channelName = null;
-    const shouldCheckF5Health = !!user && (
-        selectedEngineType === 'cloud'
-        || selectedEngineType === 'local'
-        || selectedEngineType === 'f5_cloud'
-        || selectedEngineType === 'f5_local'
-    );
+    const healthProvider: 'f5' | 'qwen' | null =
+        selectedEngineType === 'qwen_cloud' || selectedEngineType === 'qwen_local'
+            ? 'qwen'
+            : (
+                selectedEngineType === 'cloud'
+                || selectedEngineType === 'local'
+                || selectedEngineType === 'f5_cloud'
+                || selectedEngineType === 'f5_local'
+            )
+                ? 'f5'
+                : null;
+    const shouldCheckProviderHealth = !!user && healthProvider !== null;
 
     const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
         enabled: !!user,
@@ -155,40 +161,50 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         }
     }, [statusData]);
 
-    const runF5HealthCheck = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
+    const runProviderHealthCheck = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
         if (isCheckingHealth) {
             return { isHealthy: engineStatus.loaded, isChecking: true };
         }
 
-        if (!shouldCheckF5Health) {
+        if (!shouldCheckProviderHealth || !healthProvider) {
             setEngineStatus({ loaded: true, error: null });
             return { isHealthy: true, isChecking: false };
         }
 
         setIsCheckingHealth(true);
         try {
-            const response = await ttsService.getHealth();
+            const response = await ttsService.getHealth(healthProvider);
             const payload = (response.data?.data || response.data) as {
+                healthy?: boolean;
                 tts_engine_loaded?: boolean;
                 status?: string;
             };
-            const isHealthy = payload?.tts_engine_loaded === true || payload?.status === 'healthy';
+            const isHealthy =
+                payload?.healthy === true
+                || payload?.tts_engine_loaded === true
+                || payload?.status === 'healthy';
 
             if (isHealthy) {
                 setEngineStatus({ loaded: true, error: null });
             } else {
-                setEngineStatus({ loaded: false, error: 'F5 TTS сервис недоступен' });
+                const providerLabel = healthProvider.toUpperCase();
+                setEngineStatus({ loaded: false, error: `${providerLabel} TTS service is unavailable` });
             }
 
             return { isHealthy, isChecking: false };
         } catch (error) {
             logger.error('TTS Health check failed:', error);
-            setEngineStatus({ loaded: false, error: 'Не удается подключиться к F5 TTS сервису' });
+            setEngineStatus({
+                loaded: false,
+                error: healthProvider === 'qwen'
+                    ? 'Unable to connect to Qwen TTS service'
+                    : 'Unable to connect to F5 TTS service',
+            });
             return { isHealthy: false, isChecking: false };
         } finally {
             setIsCheckingHealth(false);
         }
-    }, [isCheckingHealth, engineStatus.loaded, shouldCheckF5Health]);
+    }, [isCheckingHealth, engineStatus.loaded, shouldCheckProviderHealth, healthProvider]);
 
     const { data: voicesData } = useGlobalVoices({
         enabled: !!user && engineStatus.loaded && isVoiceManagementPage,
@@ -250,8 +266,8 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
     }, [user, refetchStatus]);
 
     const checkTtsHealth = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
-        return runF5HealthCheck();
-    }, [runF5HealthCheck]);
+        return runProviderHealthCheck();
+    }, [runProviderHealthCheck]);
 
     useEffect(() => {
         const handleTtsStatusChange = (event: CustomEvent<{ enabled: boolean }>) => {
@@ -277,10 +293,10 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         }
 
         const nextEnabled = !ttsEnabled;
-        if (nextEnabled && shouldCheckF5Health) {
-            const healthState = await runF5HealthCheck();
+        if (nextEnabled && shouldCheckProviderHealth) {
+            const healthState = await runProviderHealthCheck();
             if (!healthState.isHealthy) {
-                const message = 'F5 TTS недоступен. Включение озвучки отменено.';
+                const message = 'Selected TTS provider is unavailable. Enabling TTS was cancelled.';
                 if (notificationCallback) {
                     notificationCallback(message, 'error');
                 }
@@ -289,7 +305,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         }
 
         toggleTtsMutation.mutate(nextEnabled);
-    }, [ttsEnabled, isToggling, toggleTtsMutation, isCheckingHealth, shouldCheckF5Health, runF5HealthCheck, notificationCallback]);
+    }, [ttsEnabled, isToggling, toggleTtsMutation, isCheckingHealth, shouldCheckProviderHealth, runProviderHealthCheck, notificationCallback]);
 
     const initializeTts = useCallback(async (): Promise<void> => {
         if (!isInitialized && user) {
@@ -334,5 +350,3 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         </TtsContext.Provider>
     );
 };
-
-

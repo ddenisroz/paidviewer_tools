@@ -7,16 +7,40 @@ from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
 from core.database import get_db
-from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
+from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
 from repositories.user_repository import UserRepository
-from services.tts.provider_utils import get_provider_service_url
+from services.tts.provider_utils import (
+    ProviderRoutingError,
+    get_synthesis_upstream_url,
+    get_voice_management_upstream_url,
+    should_route_provider_via_gateway,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
-def _tts_auth_headers() -> dict:
-    return build_tts_auth_headers()
+def _tts_auth_headers(
+    provider: str = "f5",
+    *,
+    upstream: str = "voice",
+    use_gateway: bool | None = None,
+) -> dict:
+    try:
+        return build_tts_auth_headers(
+            provider=provider,
+            upstream=upstream,  # type: ignore[arg-type]
+            use_gateway=use_gateway,
+            strict=True,
+        )
+    except TTSAuthConfigError as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "tts_upstream_auth_not_configured",
+                "message": str(error),
+            },
+        ) from error
 
 
 def _is_admin(user: dict) -> bool:
@@ -143,11 +167,16 @@ async def restart_tts_engine(
             raise HTTPException(status_code=403, detail="Admin access required")
 
         logger.info("[REFRESH] [ADMIN] TTS engine restart requested by user %s", user.get("id"))
-        tts_service_url = get_provider_service_url("f5")
+        try:
+            tts_service_url = get_synthesis_upstream_url("f5").rstrip("/")
+        except ProviderRoutingError as error:
+            raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
+        use_gateway = should_route_provider_via_gateway("f5")
+        headers = _tts_auth_headers("f5", upstream="synthesis", use_gateway=use_gateway)
 
         try:
             async with httpx.AsyncClient(timeout=5.0, **build_tts_httpx_client_kwargs()) as client:
-                response = await client.get(f"{tts_service_url}/health", headers=_tts_auth_headers())
+                response = await client.get(f"{tts_service_url}/health", headers=headers)
                 if response.status_code != 200:
                     raise HTTPException(status_code=502, detail=f"TTS unhealthy (status={response.status_code})")
 
@@ -178,10 +207,15 @@ async def get_tts_system_status(
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
 
-        tts_service_url = get_provider_service_url("f5")
+        _ = db
+        try:
+            tts_service_url = get_voice_management_upstream_url("f5").rstrip("/")
+        except ProviderRoutingError as error:
+            raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
+        headers = _tts_auth_headers("f5", upstream="voice")
 
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.get(f"{tts_service_url}/api/admin/system/status", headers=_tts_auth_headers())
+            response = await client.get(f"{tts_service_url}/api/admin/system/status", headers=headers)
 
             if response.status_code != 200:
                 logger.warning(
@@ -210,10 +244,15 @@ async def restart_tts_system(
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
 
-        tts_service_url = get_provider_service_url("f5")
+        _ = db
+        try:
+            tts_service_url = get_voice_management_upstream_url("f5").rstrip("/")
+        except ProviderRoutingError as error:
+            raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
+        headers = _tts_auth_headers("f5", upstream="voice")
 
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.post(f"{tts_service_url}/api/admin/system/restart", headers=_tts_auth_headers())
+            response = await client.post(f"{tts_service_url}/api/admin/system/restart", headers=headers)
 
             if response.status_code != 200:
                 logger.warning(

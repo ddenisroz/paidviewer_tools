@@ -1,11 +1,10 @@
 ﻿/**
  * Константы для frontend приложения (TypeScript)
  */
-import { getApiBaseUrl, getTtsServiceUrl, getWebSocketBaseUrl } from '@/shared/utils/urlUtils';
+import { getApiBaseUrl, getWebSocketBaseUrl } from '@/shared/utils/urlUtils';
 
 export const API_BASE_URL: string = getApiBaseUrl();
 export const WS_BASE_URL: string = getWebSocketBaseUrl();
-export const F5_TTS_SERVICE_URL: string = getTtsServiceUrl();
 
 export const ROUTES = {
   HOME: '/',

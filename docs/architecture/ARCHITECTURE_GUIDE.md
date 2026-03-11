@@ -2,48 +2,77 @@
 
 ## Overview
 
-The project consists of three runtime zones:
+Runtime zones:
 
-- `frontend`: React + Vite UI.
-- `bot_service`: FastAPI backend, auth, business logic, orchestration.
-- external `f5-tts-service`: advanced F5 TTS execution service.
+- `frontend`: React + Vite UI (API/WS client only for `bot_service`).
+- `bot_service`: FastAPI control plane (auth, settings, permissions, routing, fallback).
+- `tts-gateway`: advanced synthesis orchestrator (`f5`, `qwen`).
+- external provider engines:
+  - `f5-tts-service`
+  - `nano-qwen3tts-vllm`
 
-The backend also integrates with external/local providers for Qwen and F5 where configured.
+## TTS Routing Model
 
-## TTS Model
+- `gcloud`: backend-internal provider path.
+- `f5`: gateway-first for synthesis; direct fallback if gateway is absent.
+- `qwen`: gateway-only for cloud synthesis.
+- provider voice/admin API remains provider-owned (`f5` now, qwen later).
 
-Provider-aware advanced TTS now supports:
-
-- `gcloud`: Google Cloud TTS (voice selection settings).
-- `f5`: F5 provider (cloud/local mode).
-- `qwen`: Qwen 3 provider (cloud/local mode).
-
-If advanced synthesis fails, runtime falls back to basic Google TTS.
-
-## Data and Ownership
-
-- Primary runtime database: PostgreSQL.
-- SQLite is test-only.
-- Voice settings and usage are provider-aware.
-- Local endpoint configs are separated by provider (`f5`, `qwen`).
+Fallback policy remains mandatory: advanced failure -> basic `gtts`.
 
 ## Service Boundaries
 
-- `bot_service` is the control plane (permissions, whitelist, safety filters, queueing).
-- `f5-tts-service` is an execution plane for F5 synthesis and voice operations.
-- Qwen local/cloud endpoints are treated as external execution planes and called through `bot_service` integration endpoints.
+- `bot_service` is the source of truth for user settings and runtime policy.
+- `tts-gateway` is orchestration-only; it does not own app user settings.
+- `f5-tts-service` owns F5 provider runtime and voice/admin operations.
+- `nano-qwen3tts-vllm` is qwen inference runtime.
+
+## Auth Contract (TTS Upstreams)
+
+Strict API-key mode:
+
+- `Authorization: Bearer <key>`
+- `X-API-Key: <key>`
+
+`bot_service` env contract:
+
+- `TTS_GATEWAY_URL`, `TTS_GATEWAY_API_KEY`
+- `F5_TTS_SERVICE_URL`, `F5_TTS_SERVICE_API_KEY`
+- `QWEN_TTS_SERVICE_URL`, `QWEN_TTS_SERVICE_API_KEY` (reserved)
+- `QWEN_VOICE_SERVICE_URL` (optional extension point)
+
+## Backend API Additions
+
+- `GET /api/tts/health?provider=f5|qwen|gcloud`
+- `GET /api/voices/providers/capabilities`
+
+Voice endpoints remain backward-compatible in path names.
+
+## Qwen Voice CRUD Phase Policy
+
+- Current phase: qwen voice CRUD disabled by default.
+- Core returns explicit `501` with machine-readable `detail`.
+- When `QWEN_VOICE_SERVICE_URL` is set, qwen voice/admin requests are routed there without frontend API changes.
+
+## Frontend Split Preparation
+
+- Frontend runtime no longer requires `VITE_TTS_SERVICE_URL`.
+- Health checks and voice capability checks are backend-routed.
+- Direct runtime coupling to provider URLs is removed from websocket/player paths.
 
 ## Deployment Notes
 
-- Compose profiles support both integrated and split deployment strategies.
-- Provider endpoints are explicit:
-  - `F5_TTS_SERVICE_URL` (F5 provider endpoint)
-  - `QWEN_TTS_SERVICE_URL` (Qwen provider endpoint)
+Recommended local ports:
+
+- gateway `8010`
+- f5 `8011`
+- qwen `8000`
+- bot_service `8000`
+
+Gateway requires Redis connectivity in deployment profiles.
 
 ## Repository Split Readiness
 
-F5 TTS is extracted into a separate repository with minimal coupling.
-See:
-
-- `docs/setup/F5_TTS_EXTRACTION_CHECKLIST.md`
 - `docs/setup/REPO_SPLIT_GUIDE.md`
+- `docs/architecture/TTS_ARCHITECTURE.md`
+- `docs/setup/LOCAL_TTS_INTEGRATION.md`

@@ -10,10 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
+from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
 from core.database import get_db
 from core.datetime_utils import utcnow_naive
 from services.admin import get_admin_stats_service
-from services.tts.provider_utils import get_provider_service_url
+from services.tts.provider_utils import (
+    ProviderRoutingError,
+    get_synthesis_upstream_url,
+    should_route_provider_via_gateway,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +29,24 @@ def require_admin(user: dict):
     """Check whether current user has admin role."""
     if not (user.get("role") == "admin" or user.get("is_admin", False)):
         raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def _tts_auth_headers(provider: str = "f5", *, use_gateway: bool | None = None) -> dict:
+    try:
+        return build_tts_auth_headers(
+            provider=provider,
+            upstream="synthesis",
+            use_gateway=use_gateway,
+            strict=True,
+        )
+    except TTSAuthConfigError as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "tts_upstream_auth_not_configured",
+                "message": str(error),
+            },
+        ) from error
 
 
 @router.get("/dashboard/stats")
@@ -163,11 +186,16 @@ async def get_tts_status(
     try:
         require_admin(user)
 
-        tts_service_url = get_provider_service_url("f5")
+        try:
+            tts_service_url = get_synthesis_upstream_url("f5").rstrip("/")
+        except ProviderRoutingError as error:
+            raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
+        use_gateway = should_route_provider_via_gateway("f5")
+        headers = _tts_auth_headers("f5", use_gateway=use_gateway)
 
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(f"{tts_service_url}/health", timeout=5.0)
+            async with httpx.AsyncClient(timeout=5.0, **build_tts_httpx_client_kwargs()) as client:
+                response = await client.get(f"{tts_service_url}/health", timeout=5.0, headers=headers)
                 tts_data = response.json()
 
                 service_status = tts_data.get("status", "unknown")
@@ -180,6 +208,7 @@ async def get_tts_status(
                     "available": True,
                     "status": service_status,
                     "url": tts_service_url,
+                    "via": "gateway" if use_gateway else "direct",
                 },
             }
         except Exception:

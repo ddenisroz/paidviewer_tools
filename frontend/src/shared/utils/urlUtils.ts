@@ -7,15 +7,7 @@ export const getApiBaseUrl = (): string => {
   if (!url) {
     throw new Error('VITE_BOT_SERVICE_URL environment variable is required');
   }
-  return url;
-};
-
-export const getTtsServiceUrl = (): string => {
-  const url = import.meta.env.VITE_TTS_SERVICE_URL as string | undefined;
-  if (!url) {
-    throw new Error('VITE_TTS_SERVICE_URL environment variable is required');
-  }
-  return url;
+  return url.replace(/\/+$/, '');
 };
 
 export const getWebSocketBaseUrl = (): string => {
@@ -58,6 +50,21 @@ export const getYoutubeObsWebSocketUrl = (token: string): string => {
 export const getAudioUrl = (filename: string): string => {
   const apiUrl = getApiBaseUrl();
   return `${apiUrl}/audio/${filename}`;
+};
+
+export const resolveAudioUrl = (audioUrl: string, apiBaseUrl?: string): string => {
+  const normalized = (audioUrl || '').trim();
+  if (!normalized) {
+    return normalized;
+  }
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return normalized;
+  }
+  const apiUrl = (apiBaseUrl || getApiBaseUrl()).replace(/\/+$/, '');
+  if (normalized.startsWith('/')) {
+    return `${apiUrl}${normalized}`;
+  }
+  return `${apiUrl}/${normalized.replace(/^\/+/, '')}`;
 };
 
 export const getTtsApiUrl = (endpoint: string): string => {

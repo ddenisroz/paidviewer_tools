@@ -14,7 +14,11 @@ Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, Donat
 1. Configure env files:
 - `bot_service/.env`
 - `frontend/.env`
-- optional external TTS service env (if used): separate `F5_tts` repository.
+- optional external TTS stack (recommended split):
+  - `TTS_GATEWAY_URL` + `TTS_GATEWAY_API_KEY` -> `tts-gateway`
+  - `F5_TTS_SERVICE_URL` + `F5_TTS_SERVICE_API_KEY` -> `f5-tts-service`
+  - `QWEN_TTS_SERVICE_URL` + `QWEN_TTS_SERVICE_API_KEY` -> `nano-qwen3tts-vllm`
+  - optional qwen voice CRUD extension: `QWEN_VOICE_SERVICE_URL`
 
 2. Run DB bootstrap:
 - Windows: `.\scripts\migrate.ps1`
@@ -23,6 +27,10 @@ Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, Donat
 3. Start app:
 - Backend: `cd bot_service; python main.py`
 - Frontend: `cd frontend; npm install; npm run dev`
+
+Frontend runtime contract:
+- frontend should know only backend API/WS URLs (`VITE_BOT_SERVICE_URL`, `VITE_BOT_SERVICE_WS_URL`).
+- direct runtime `VITE_TTS_SERVICE_URL` usage is deprecated.
 
 ## What Is Core vs Noise
 

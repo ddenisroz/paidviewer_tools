@@ -4,7 +4,7 @@
  */
 import { logger } from '@/shared/utils/prodLogger';
 
-import { apiClient, ttsApiClient } from '../client';
+import { apiClient } from '../client';
 
 import type { ApiResponse, BlockedUser, FilteredWord, LocalTtsConfig, TtsSettings, TtsStatus, TtsVoice } from '../../../types';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
@@ -174,22 +174,34 @@ export const ttsService = {
    * Получить health статус TTS сервиса
    * @returns Promise с ответом API
    */
-  async getHealth(): Promise<AxiosResponse<ApiResponse>> {
+  async getHealth(provider: 'f5' | 'qwen' | 'gcloud' = 'f5'): Promise<AxiosResponse<ApiResponse>> {
     try {
-      return await ttsApiClient.get('/health', {
+      return await apiClient.get('/api/tts/health', {
+        params: { provider },
         timeout: 3000,
         skipRetry: true,
       } as AxiosRequestConfig & { skipRetry: boolean });
     } catch (error) {
       logger.error('Error fetching TTS health:', error);
       return {
-        data: { success: false, data: { status: 'unhealthy', tts_engine_loaded: false } },
+        data: {
+          success: false,
+          data: {
+            status: 'unhealthy',
+            healthy: false,
+            provider,
+          }
+        },
         status: 500,
         statusText: 'Internal Server Error',
         headers: {},
         config: {} as unknown,
       } as AxiosResponse<ApiResponse>;
     }
+  },
+
+  async getProviderCapabilities(): Promise<AxiosResponse<ApiResponse<Record<string, unknown>>>> {
+    return apiClient.get('/api/voices/providers/capabilities');
   },
 
   /**

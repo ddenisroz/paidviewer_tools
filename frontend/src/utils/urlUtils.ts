@@ -10,9 +10,6 @@ export const getApiUrl = (): string => {
     if (import.meta.env.VITE_API_URL) {
         return import.meta.env.VITE_API_URL;
     }
-    if (import.meta.env.DEV) {
-        return 'http://localhost:8000';
-    }
     return window.location.origin;
 };
 
@@ -22,9 +19,6 @@ export const getApiUrl = (): string => {
 export const getWsUrl = (): string => {
     if (import.meta.env.VITE_WS_BASE_URL) {
         return import.meta.env.VITE_WS_BASE_URL;
-    }
-    if (import.meta.env.DEV) {
-        return 'ws://localhost:8000';
     }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     return `${protocol}//${window.location.host}`;

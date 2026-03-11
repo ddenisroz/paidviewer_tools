@@ -40,8 +40,8 @@ class TestVoiceRoutesAuthenticated:
         self, authenticated_client: TestClient, provider: str
     ):
         response = authenticated_client.get(f"/api/voices/global?provider={provider}")
-        # External TTS dependency may be unavailable in CI/local runs.
-        assert response.status_code in (200, 500)
+        # Qwen CRUD is disabled unless QWEN_VOICE_SERVICE_URL is configured.
+        assert response.status_code in (200, 500, 501)
 
     @pytest.mark.parametrize("provider", ["f5", "qwen"])
     def test_get_custom_voices_authenticated(
@@ -50,7 +50,7 @@ class TestVoiceRoutesAuthenticated:
         response = authenticated_client.get(
             f"/api/voices/user/custom?provider={provider}"
         )
-        assert response.status_code in (200, 500)
+        assert response.status_code in (200, 500, 501)
 
     @pytest.mark.parametrize("provider", ["f5", "qwen"])
     def test_update_user_voice_settings_authenticated(
@@ -61,7 +61,7 @@ class TestVoiceRoutesAuthenticated:
             json={"cfg_strength": 2.5, "speed_preset": "normal", "volume": 70},
         )
         # 404 is valid when voice does not exist in provider service.
-        assert response.status_code in (200, 404, 500)
+        assert response.status_code in (200, 404, 500, 501)
 
     @pytest.mark.parametrize("provider", ["f5", "qwen"])
     def test_admin_global_routes_authenticated(
@@ -70,24 +70,33 @@ class TestVoiceRoutesAuthenticated:
         list_response = admin_client.get(
             f"/api/voices/admin/global?provider={provider}"
         )
-        assert list_response.status_code in (200, 500)
+        assert list_response.status_code in (200, 500, 501)
 
         update_response = admin_client.put(
             f"/api/voices/admin/global/1?provider={provider}",
             json={"cfg_strength": 3.0},
         )
-        assert update_response.status_code in (200, 404, 500)
+        assert update_response.status_code in (200, 404, 500, 501)
 
         rename_response = admin_client.put(
             f"/api/voices/admin/global/1/rename?provider={provider}",
             json={"new_name": "new_voice_name"},
         )
-        assert rename_response.status_code in (200, 404, 500)
+        assert rename_response.status_code in (200, 404, 500, 501)
 
         delete_response = admin_client.delete(
             f"/api/voices/admin/global/1?provider={provider}"
         )
-        assert delete_response.status_code in (200, 404, 500)
+        assert delete_response.status_code in (200, 404, 500, 501)
+
+    def test_provider_capabilities_endpoint(self, authenticated_client: TestClient):
+        response = authenticated_client.get("/api/voices/providers/capabilities")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload.get("success") is True
+        providers = payload.get("providers") or {}
+        assert "f5" in providers
+        assert "qwen" in providers
 
 
 class TestVoiceInputValidation:

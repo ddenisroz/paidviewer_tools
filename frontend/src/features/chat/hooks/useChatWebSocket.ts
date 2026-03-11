@@ -5,10 +5,10 @@
  */
 import { useCallback, useState } from 'react';
 
-import { API_BASE_URL, F5_TTS_SERVICE_URL } from '@/constants';
 import { useTtsPlayer } from '@/context/TtsPlayerContext';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
+import { resolveAudioUrl } from '@/shared/utils/urlUtils';
 
 import type { PlatformFilter } from './useChatMessages';
 import type { BotStatusType } from '@/features/admin/hooks/useBotConnection';
@@ -123,21 +123,8 @@ export function useChatWebSocket({
         }
 
         try {
-            let audioUrl = audioData.audio_url;
-
-            // Convert relative URL to full URL
-            if (audioUrl && !audioUrl.startsWith('http://') && !audioUrl.startsWith('https://')) {
-                if (audioUrl.startsWith('/audio/') && F5_TTS_SERVICE_URL) {
-                    audioUrl = `${F5_TTS_SERVICE_URL}${audioUrl}`;
-                } else if (audioUrl.startsWith('/')) {
-                    audioUrl = `${API_BASE_URL}${audioUrl}`;
-                } else if (F5_TTS_SERVICE_URL) {
-                    audioUrl = `${F5_TTS_SERVICE_URL}/${audioUrl.replace(/^\/+/, '')}`;
-                } else {
-                    logger.warn(`[WARN] Audio URL is relative but could not convert: ${audioUrl}`);
-                }
-                logger.debug(`[LINK] Resolved audio URL: ${audioUrl}`);
-            }
+            const audioUrl = resolveAudioUrl(audioData.audio_url);
+            logger.debug(`[LINK] Resolved audio URL: ${audioUrl}`);
 
             // Add to TTS player queue
             addToQueue({

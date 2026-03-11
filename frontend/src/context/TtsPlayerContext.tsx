@@ -2,8 +2,9 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 
 import { useLocation } from 'react-router-dom';
 
-import { API_BASE_URL, F5_TTS_SERVICE_URL, STORAGE_KEYS, WS_BASE_URL } from '@/constants';
+import { STORAGE_KEYS, WS_BASE_URL } from '@/constants';
 import { logger } from '@/shared/utils/prodLogger';
+import { resolveAudioUrl as resolveBackendAudioUrl } from '@/shared/utils/urlUtils';
 
 import { useAuth } from './AuthContext';
 
@@ -157,24 +158,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     }, []);
 
     const resolveAudioUrl = useCallback((rawAudioUrl: string): string => {
-        const audioUrl = rawAudioUrl;
-        if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
-            return audioUrl;
-        }
-
-        if (audioUrl.startsWith('/audio/') && F5_TTS_SERVICE_URL) {
-            return `${F5_TTS_SERVICE_URL}${audioUrl}`;
-        }
-
-        if (audioUrl.startsWith('/')) {
-            return `${API_BASE_URL}${audioUrl}`;
-        }
-
-        if (F5_TTS_SERVICE_URL) {
-            return `${F5_TTS_SERVICE_URL}/${audioUrl.replace(/^\/+/, '')}`;
-        }
-
-        return audioUrl;
+        return resolveBackendAudioUrl(rawAudioUrl);
     }, []);
 
     const enqueueSocketAudio = useCallback((payload: {
@@ -420,7 +404,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         }
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.hostname}:8000`;
+        const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.host}`;
 
         const connectPresenceSocket = () => {
             if (!presenceShouldReconnectRef.current || !user?.id) {

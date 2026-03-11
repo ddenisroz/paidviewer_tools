@@ -10,7 +10,7 @@ from typing import List, Optional
 from core.database import get_db
 from auth.auth import get_current_user
 from core.config import settings
-from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
+from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
 from constants import DEFAULT_ENABLED_PLATFORMS
 from services.tts.tts_service import TTSService
 from services.tts.google_cloud_tts import (
@@ -19,10 +19,16 @@ from services.tts.google_cloud_tts import (
     normalize_gcloud_mood,
 )
 from services.tts.provider_utils import (
-    get_provider_service_url,
+    ProviderRoutingError,
+    get_synthesis_upstream_url,
+    get_voice_management_upstream_params,
+    get_voice_management_upstream_url,
     infer_provider_from_engine,
     normalize_provider,
+    qwen_voice_crud_not_available_detail,
+    should_route_provider_via_gateway,
 )
+from services.tts.tts_manager import get_tts_manager
 from services.tts.tts_core import (
     AudioSettingsRequest,
     TtsSettingsRequest,
@@ -57,12 +63,54 @@ def get_tts_service(db: Session = Depends(get_db)) -> TTSService:
     return TTSService(db)
 
 
-def _tts_auth_headers() -> dict:
-    return build_tts_auth_headers()
+def _tts_auth_headers(
+    provider: str,
+    *,
+    upstream: str = "voice",
+    use_gateway: Optional[bool] = None,
+) -> dict:
+    try:
+        return build_tts_auth_headers(
+            provider=provider,
+            upstream=upstream,  # type: ignore[arg-type]
+            use_gateway=use_gateway,
+            strict=True,
+        )
+    except TTSAuthConfigError as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "tts_upstream_auth_not_configured",
+                "message": str(error),
+            },
+        ) from error
 
 
 def _is_admin(user: dict) -> bool:
     return user.get("role") == "admin" or bool(user.get("is_admin", False))
+
+
+def _normalize_voice_provider(provider: str) -> str:
+    normalized_provider = normalize_provider(provider)
+    if normalized_provider == "gcloud":
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "gcloud_voice_management_not_supported",
+                "message": "Google Cloud provider does not support voice CRUD in bot_service.",
+            },
+        )
+    return "qwen" if normalized_provider == "qwen" else "f5"
+
+
+def _voice_management_base_url(provider: str) -> str:
+    resolved_provider = _normalize_voice_provider(provider)
+    try:
+        return get_voice_management_upstream_url(resolved_provider).rstrip("/")
+    except ProviderRoutingError as error:
+        if str(error) == "qwen_voice_crud_not_available":
+            raise HTTPException(status_code=501, detail=qwen_voice_crud_not_available_detail()) from error
+        raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
 
 
 _CANONICAL_ENGINE_TYPES = {
@@ -227,6 +275,75 @@ async def get_tts_status(
     if result.get('error'):
         raise HTTPException(status_code=404, detail="TTS status not found")
     return result
+
+
+@router.get("/health")
+async def get_tts_upstream_health(
+    provider: str = "f5",
+    user: dict = Depends(get_current_user),
+):
+    """Provider-aware health check routed through bot_service."""
+    _ = user
+    normalized_provider = normalize_provider(provider)
+
+    if normalized_provider == "gcloud":
+        gcloud = get_google_cloud_tts()
+        gcloud_result = await gcloud.list_voices(language_code="ru-RU")
+        is_healthy = bool(gcloud_result.get("success"))
+        response_payload = {
+            "success": True,
+            "provider": "gcloud",
+            "healthy": is_healthy,
+            "status": "healthy" if is_healthy else "unhealthy",
+            "auth_mode": gcloud_result.get("auth_mode"),
+            "cached": bool(gcloud_result.get("cached", False)),
+        }
+        if not is_healthy:
+            response_payload["detail"] = {
+                "code": "gcloud_unhealthy",
+                "message": gcloud_result.get("error") or "Google Cloud TTS is unavailable.",
+                "hint": gcloud_result.get("hint"),
+                "status_code": gcloud_result.get("status_code"),
+            }
+        return response_payload
+
+    try:
+        synthesis_url = get_synthesis_upstream_url(normalized_provider).rstrip("/")
+    except ProviderRoutingError as error:
+        if str(error) == "qwen_gateway_required":
+            return {
+                "success": True,
+                "provider": "qwen",
+                "healthy": False,
+                "status": "unavailable",
+                "detail": {
+                    "code": "qwen_gateway_required",
+                    "message": "Qwen synthesis is available only via tts-gateway.",
+                    "hint": "Configure TTS_GATEWAY_URL and TTS_GATEWAY_API_KEY.",
+                },
+            }
+        raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
+
+    use_gateway = should_route_provider_via_gateway(normalized_provider)
+    _tts_auth_headers(
+        normalized_provider,
+        upstream="synthesis",
+        use_gateway=use_gateway,
+    )
+
+    manager = get_tts_manager()
+    is_healthy = await manager.check_tts_service_health(force_check=True, provider=normalized_provider)
+    return {
+        "success": True,
+        "provider": normalized_provider,
+        "healthy": bool(is_healthy),
+        "status": "healthy" if is_healthy else "unhealthy",
+        "upstream": {
+            "url": synthesis_url,
+            "via": "gateway" if use_gateway else "direct",
+        },
+    }
+
 
 @router.post("/engine")
 async def set_tts_engine(
@@ -420,16 +537,19 @@ async def get_global_voices(
     if resolved_provider == "gcloud":
         return {"voices": [], "provider": "gcloud", "hint": "Use /api/tts/gcloud/voices"}
 
-    tts_url = get_provider_service_url(resolved_provider)
+    tts_url = _voice_management_base_url(resolved_provider)
     try:
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             resp = await client.get(
                 f"{tts_url}/api/tts/voices/global",
-                headers=_tts_auth_headers(),
+                headers=_tts_auth_headers(resolved_provider, upstream="voice"),
+                params=get_voice_management_upstream_params(resolved_provider),
             )
             if resp.status_code == 200:
                 return resp.json()
-            return {"voices": []}
+            if resp.status_code == 404:
+                return {"voices": []}
+            raise HTTPException(status_code=resp.status_code, detail="Failed to fetch provider voices")
     except HTTPException:
         raise
     except httpx.TimeoutException:
@@ -462,16 +582,19 @@ async def get_user_voices(
     if resolved_provider == "gcloud":
         return {"voices": [], "provider": "gcloud", "hint": "Use /api/tts/gcloud/voices"}
 
-    tts_url = get_provider_service_url(resolved_provider)
+    tts_url = _voice_management_base_url(resolved_provider)
     try:
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             resp = await client.get(
                 f"{tts_url}/api/tts/user/voices/{target_user_id}",
-                headers=_tts_auth_headers(),
+                headers=_tts_auth_headers(resolved_provider, upstream="voice"),
+                params=get_voice_management_upstream_params(resolved_provider),
             )
             if resp.status_code == 200:
                 return resp.json()
-            return {"voices": []}
+            if resp.status_code == 404:
+                return {"voices": []}
+            raise HTTPException(status_code=resp.status_code, detail="Failed to fetch user voices")
     except HTTPException:
         raise
     except httpx.TimeoutException:

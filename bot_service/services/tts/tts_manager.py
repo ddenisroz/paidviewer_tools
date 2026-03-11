@@ -16,7 +16,7 @@ import random
 import re
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import aiohttp
 
@@ -27,6 +27,7 @@ from constants import (
     TTS_RETRY_DELAY,
 )
 from core.config import settings
+from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers
 from services.tts.basic_tts import get_basic_tts
 from services.tts.google_cloud_tts import (
     get_google_cloud_tts,
@@ -34,11 +35,15 @@ from services.tts.google_cloud_tts import (
     normalize_gcloud_mood,
 )
 from services.tts.provider_utils import (
+    ProviderRoutingError,
     get_provider_service_url,
+    get_synthesis_upstream_params,
+    get_synthesis_upstream_url,
     infer_provider_from_engine,
     normalize_local_tts_endpoint_url,
     normalize_provider,
     normalize_provider_mode,
+    should_route_provider_via_gateway,
 )
 
 logger = logging.getLogger(__name__)
@@ -94,8 +99,8 @@ class TTSManager:
         user_id: int,
         db_session,
         provider: str = "f5",
-    ) -> Optional[str]:
-        """Return healthy local endpoint for provider if configured."""
+    ) -> Optional[Dict[str, Optional[str]]]:
+        """Return healthy local endpoint payload for provider if configured."""
         try:
             from repositories.local_tts_repository import LocalTTSRepository
 
@@ -121,7 +126,10 @@ class TTSManager:
                     normalized_provider,
                     normalized_endpoint,
                 )
-                return normalized_endpoint
+                return {
+                    "endpoint_url": normalized_endpoint,
+                    "api_key": str(local_config.api_key or "").strip() or None,
+                }
 
             return None
         except Exception:
@@ -133,9 +141,11 @@ class TTSManager:
         force_check: bool = False,
         provider: str = "f5",
         endpoint_override: Optional[str] = None,
+        endpoint_api_key: Optional[str] = None,
     ) -> bool:
         """Health check for remote/local provider endpoint with endpoint-aware cache."""
         normalized_provider = normalize_provider(provider)
+        use_gateway = False
         if endpoint_override:
             try:
                 endpoint = normalize_local_tts_endpoint_url(endpoint_override)
@@ -147,8 +157,58 @@ class TTSManager:
                         error,
                     )
                 return False
+            request_headers = build_tts_auth_headers(
+                provider=normalized_provider,
+                upstream="local",
+                local_api_key=endpoint_api_key,
+                strict=False,
+            )
+            request_params: Dict[str, str] = {}
         else:
-            endpoint = get_provider_service_url(normalized_provider).rstrip("/")
+            try:
+                endpoint = get_synthesis_upstream_url(normalized_provider).rstrip("/")
+            except ProviderRoutingError as error:
+                if not force_check:
+                    if str(error) == "qwen_gateway_required":
+                        logger.warning(
+                            "[WARN] Qwen health check skipped: qwen synthesis requires configured gateway."
+                        )
+                    else:
+                        logger.warning(
+                            "[WARN] %s health check routing error: %s",
+                            normalized_provider,
+                            error,
+                        )
+                cache_key = (normalized_provider, "routing_error")
+                self._provider_health[cache_key] = False
+                self._provider_last_health_check[cache_key] = time.time()
+                return False
+
+            use_gateway = should_route_provider_via_gateway(normalized_provider)
+            try:
+                request_headers = build_tts_auth_headers(
+                    provider=normalized_provider,
+                    upstream="synthesis",
+                    use_gateway=use_gateway,
+                    strict=True,
+                )
+            except TTSAuthConfigError as error:
+                if not force_check:
+                    logger.warning(
+                        "[WARN] %s health check auth configuration error: %s",
+                        normalized_provider,
+                        error,
+                    )
+                cache_key = (normalized_provider, endpoint)
+                self._provider_health[cache_key] = False
+                self._provider_last_health_check[cache_key] = time.time()
+                return False
+
+            request_params = (
+                get_synthesis_upstream_params(normalized_provider)
+                if use_gateway
+                else {}
+            )
         cache_key = (normalized_provider, endpoint)
         current_time = time.time()
         last_check = self._provider_last_health_check.get(cache_key, 0.0)
@@ -161,12 +221,24 @@ class TTSManager:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 health_payload = None
                 last_status = None
-                for health_path in ("/api/health", "/health"):
-                    async with session.get(f"{endpoint}{health_path}") as response:
+                health_paths = (
+                    ("/health/ready", "/api/health", "/health")
+                    if use_gateway
+                    else ("/api/health", "/health", "/health/ready")
+                )
+                for health_path in health_paths:
+                    async with session.get(
+                        f"{endpoint}{health_path}",
+                        headers=request_headers,
+                        params=request_params,
+                    ) as response:
                         last_status = response.status
                         if response.status != 200:
                             continue
-                        health_payload = await response.json()
+                        try:
+                            health_payload = await response.json()
+                        except Exception:
+                            health_payload = {"status": "healthy"}
                         break
 
                 if health_payload is None:
@@ -268,17 +340,19 @@ class TTSManager:
             resolved_mode = "local" if use_local_flag else preferred_mode
 
             endpoint = get_provider_service_url(provider)
+            endpoint_api_key: Optional[str] = None
             has_explicit_local_endpoint = False
 
             if resolved_mode == "local":
                 if user_id and db_session:
-                    local_endpoint = await self.get_user_tts_endpoint(
+                    local_endpoint_payload = await self.get_user_tts_endpoint(
                         user_id=user_id,
                         db_session=db_session,
                         provider=provider,
                     )
-                    if local_endpoint:
-                        endpoint = local_endpoint
+                    if local_endpoint_payload:
+                        endpoint = str(local_endpoint_payload.get("endpoint_url") or endpoint)
+                        endpoint_api_key = local_endpoint_payload.get("api_key")
                         has_explicit_local_endpoint = True
                 if not has_explicit_local_endpoint:
                     logger.warning(
@@ -287,13 +361,20 @@ class TTSManager:
                         user_id,
                     )
 
+            if resolved_mode != "local" and provider == "qwen" and (not should_route_provider_via_gateway(provider)):
+                logger.warning(
+                    "[WARN] Qwen synthesis requires configured gateway; fallback to basic TTS"
+                )
+                resolved_mode = "cloud_gateway_unavailable"
+
             if resolved_mode != "local" or has_explicit_local_endpoint:
                 max_retries = TTS_MAX_RETRIES
                 base_retry_delay = TTS_RETRY_DELAY
 
                 is_healthy = await self.check_tts_service_health(
                     provider=provider,
-                    endpoint_override=endpoint,
+                    endpoint_override=endpoint if has_explicit_local_endpoint else None,
+                    endpoint_api_key=endpoint_api_key,
                 )
                 if not is_healthy:
                     logger.warning(
@@ -315,7 +396,8 @@ class TTSManager:
                                 word_filter=word_filter,
                                 blocked_users=blocked_users,
                                 provider=provider,
-                                tts_endpoint=endpoint,
+                                tts_endpoint=endpoint if has_explicit_local_endpoint else None,
+                                tts_endpoint_api_key=endpoint_api_key,
                             )
                             if result.get("success"):
                                 logger.info(
@@ -392,12 +474,14 @@ class TTSManager:
         blocked_users: list = None,
         provider: str = "f5",
         tts_endpoint: str = None,
+        tts_endpoint_api_key: Optional[str] = None,
     ) -> Dict:
         """Synthesize through remote provider service endpoint."""
         normalized_provider = normalize_provider(provider)
         tts_type = "ai_qwen" if normalized_provider == "qwen" else "ai_f5"
 
         try:
+            query_params: Dict[str, Any]
             if tts_endpoint:
                 try:
                     endpoint = normalize_local_tts_endpoint_url(tts_endpoint)
@@ -408,12 +492,35 @@ class TTSManager:
                         error,
                     )
                     return {"success": False, "error": "Invalid local endpoint configuration"}
+                headers = build_tts_auth_headers(
+                    provider=normalized_provider,
+                    upstream="local",
+                    local_api_key=tts_endpoint_api_key,
+                    strict=False,
+                )
+                query_params = {}
             else:
-                gateway_url = (settings.tts_gateway_url or "").strip()
-                if gateway_url and normalized_provider in {"f5", "qwen"}:
-                    endpoint = gateway_url.rstrip("/")
-                else:
-                    endpoint = get_provider_service_url(normalized_provider).rstrip("/")
+                try:
+                    endpoint = get_synthesis_upstream_url(normalized_provider).rstrip("/")
+                except ProviderRoutingError as error:
+                    if str(error) == "qwen_gateway_required":
+                        return {
+                            "success": False,
+                            "error": "Qwen synthesis requires configured tts-gateway",
+                        }
+                    return {
+                        "success": False,
+                        "error": f"Provider routing error: {error}",
+                    }
+
+                use_gateway = should_route_provider_via_gateway(normalized_provider)
+                headers = build_tts_auth_headers(
+                    provider=normalized_provider,
+                    upstream="synthesis",
+                    use_gateway=use_gateway,
+                    strict=True,
+                )
+                query_params = get_synthesis_upstream_params(normalized_provider)
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
 
             request_settings = dict(tts_settings or {})
@@ -447,7 +554,12 @@ class TTSManager:
                     "voice_map": voice_map,
                 }
 
-                async with session.post(url, json=payload) as response:
+                async with session.post(
+                    url,
+                    json=payload,
+                    headers=headers,
+                    params=query_params,
+                ) as response:
                     if response.status != 200:
                         error_text = await response.text()
                         logger.error(
@@ -481,7 +593,13 @@ class TTSManager:
                         priority_volume = connection_manager.get_voice_volume(channel_name, selected_voice)
                         if priority_volume != TTS_DEFAULT_VOLUME:
                             payload["volume_level"] = priority_volume
-                            async with session.post(url, json=payload, timeout=timeout) as priority_response:
+                            async with session.post(
+                                url,
+                                json=payload,
+                                headers=headers,
+                                params=query_params,
+                                timeout=timeout,
+                            ) as priority_response:
                                 if priority_response.status == 200:
                                     await priority_response.json()
                                     return {
@@ -503,6 +621,13 @@ class TTSManager:
         except asyncio.TimeoutError:
             logger.warning("[WARN] Provider request timeout provider=%s", normalized_provider)
             return {"success": False, "error": "Request timeout"}
+        except TTSAuthConfigError as error:
+            logger.warning(
+                "[WARN] Provider request auth configuration error provider=%s error=%s",
+                normalized_provider,
+                error,
+            )
+            return {"success": False, "error": str(error)}
         except aiohttp.ClientError as error:
             logger.warning("[WARN] Provider request connection error provider=%s error=%s", normalized_provider, error)
             return {"success": False, "error": f"Connection error: {error}"}
@@ -641,7 +766,16 @@ class TTSManager:
                 data = aiohttp.FormData()
                 data.add_field("file", audio_data, filename=filename, content_type="audio/wav")
 
-                async with session.post(f"{target_url}/api/upload-audio", data=data) as response:
+                headers = build_tts_auth_headers(
+                    provider="f5",
+                    upstream="voice",
+                    strict=True,
+                )
+                async with session.post(
+                    f"{target_url}/api/upload-audio",
+                    data=data,
+                    headers=headers,
+                ) as response:
                     if response.status != 200:
                         logger.warning("[WARN] Could not upload audio to F5 service status=%s", response.status)
                         return None
@@ -649,6 +783,9 @@ class TTSManager:
                     await response.json()
                     return f"{target_url}/api/audio/{filename}"
 
+        except TTSAuthConfigError as error:
+            logger.warning("[WARN] Upload to provider skipped due to auth configuration error: %s", error)
+            return None
         except Exception:
             logger.exception("[ERROR] Upload to provider service failed")
             return None

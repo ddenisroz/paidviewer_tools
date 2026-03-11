@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import httpx
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Form, File, UploadFile, Body
@@ -7,12 +7,19 @@ from pydantic import BaseModel
 from core.database import get_db
 from auth.auth import get_current_user
 from core.permissions import require_permission, Permission
-from core.internal_service_auth import build_tts_auth_headers, build_tts_httpx_client_kwargs
+from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
 from services.tts.tts_core import check_user_whitelisted
 from services.voice_management_service import VoiceManagementService
 from repositories.user_repository import UserRepository
 from repositories.local_tts_repository import LocalTTSRepository
-from services.tts.provider_utils import get_provider_service_url, normalize_provider
+from services.tts.provider_utils import (
+    ProviderRoutingError,
+    get_all_provider_capabilities,
+    get_voice_management_upstream_params,
+    get_voice_management_upstream_url,
+    normalize_provider,
+    qwen_voice_crud_not_available_detail,
+)
 logger = logging.getLogger('bot_service')
 voices_router = APIRouter(prefix='/api/voices', tags=['voices'])
 user_voices_router = APIRouter(prefix='/api/user/voices', tags=['user_voices'])
@@ -37,19 +44,50 @@ def _current_user_id(user: dict) -> int:
         raise HTTPException(status_code=401, detail='Authentication required')
     return user_id
 
-def _tts_auth_headers() -> dict:
-    return build_tts_auth_headers()
+def _tts_auth_headers(provider: str) -> dict:
+    try:
+        return build_tts_auth_headers(
+            provider=provider,
+            upstream='voice',
+            strict=True,
+        )
+    except TTSAuthConfigError as error:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                'code': 'tts_upstream_auth_not_configured',
+                'message': str(error),
+            },
+        ) from error
 
 def _is_admin(user: dict) -> bool:
     return user.get('role') == 'admin' or bool(user.get('is_admin', False))
 
 def _normalize_voice_provider(provider: Optional[str]) -> str:
     normalized = normalize_provider(provider or 'f5')
+    if normalized == 'gcloud':
+        raise HTTPException(
+            status_code=400,
+            detail={
+                'code': 'gcloud_voice_management_not_supported',
+                'message': 'Google Cloud provider does not support voice CRUD in bot_service.',
+            },
+        )
     return 'qwen' if normalized == 'qwen' else 'f5'
 
 def _provider_base_url(provider: str) -> str:
     resolved_provider = _normalize_voice_provider(provider)
-    return get_provider_service_url(resolved_provider)
+    try:
+        return get_voice_management_upstream_url(resolved_provider)
+    except ProviderRoutingError as error:
+        if str(error) == 'qwen_voice_crud_not_available':
+            raise HTTPException(status_code=501, detail=qwen_voice_crud_not_available_detail()) from error
+        raise HTTPException(status_code=400, detail={'code': str(error), 'message': str(error)}) from error
+
+
+def _provider_upstream_params(provider: str, extra_params: Optional[dict] = None) -> dict:
+    resolved_provider = _normalize_voice_provider(provider)
+    return get_voice_management_upstream_params(resolved_provider, extra_params=extra_params)
 
 @voices_router.get('/whitelist-status')
 async def check_whitelist_status(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
@@ -90,6 +128,14 @@ async def check_whitelist_status(user: dict=Depends(get_current_user), db: Sessi
     except Exception:
         logger.exception('Error checking whitelist status')
         raise HTTPException(status_code=500, detail='Internal server error')
+
+@voices_router.get('/providers/capabilities')
+async def get_provider_capabilities(current_user: dict=Depends(get_current_user)):
+    _ = current_user
+    return {
+        'success': True,
+        'providers': get_all_provider_capabilities(),
+    }
 
 @voices_router.get('/', response_model=List[VoiceSchema])
 async def get_all_voices(request: Request, user: dict=Depends(get_current_user), service: VoiceManagementService=Depends(get_voice_service), provider: str='f5'):
@@ -139,9 +185,13 @@ async def get_user_enabled_voices(user_id: int, user: dict=Depends(get_current_u
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation failed.')
         resolved_provider = _normalize_voice_provider(provider)
-        tts_service_url = get_provider_service_url(resolved_provider)
+        tts_service_url = _provider_base_url(resolved_provider)
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.get(f'{tts_service_url}/api/tts/user/voices/enabled/{user_id}', headers=_tts_auth_headers())
+            response = await client.get(
+                f'{tts_service_url}/api/tts/user/voices/enabled/{user_id}',
+                headers=_tts_auth_headers(resolved_provider),
+                params=_provider_upstream_params(resolved_provider),
+            )
         if response.status_code == 200:
             return response.json()
         else:
@@ -159,9 +209,14 @@ async def update_user_enabled_voices(user_id: int, voice_ids: List[int], user: d
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation failed.')
         resolved_provider = _normalize_voice_provider(provider)
-        tts_service_url = get_provider_service_url(resolved_provider)
+        tts_service_url = _provider_base_url(resolved_provider)
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.post(f'{tts_service_url}/api/tts/user/voices/enabled/{user_id}', json=voice_ids, headers=_tts_auth_headers())
+            response = await client.post(
+                f'{tts_service_url}/api/tts/user/voices/enabled/{user_id}',
+                json=voice_ids,
+                headers=_tts_auth_headers(resolved_provider),
+                params=_provider_upstream_params(resolved_provider),
+            )
         if response.status_code == 200:
             return response.json()
         else:
@@ -261,7 +316,12 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
         if payload.get('speed_preset') is not None:
             upstream_data['speed_preset'] = str(payload['speed_preset'])
         async with httpx.AsyncClient(timeout=30.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.post(f'{_provider_base_url(resolved_provider)}/api/admin/voices/test', data=upstream_data, headers=_tts_auth_headers())
+            response = await client.post(
+                f'{_provider_base_url(resolved_provider)}/api/admin/voices/test',
+                data=upstream_data,
+                headers=_tts_auth_headers(resolved_provider),
+                params=_provider_upstream_params(resolved_provider),
+            )
         if response.status_code == 200:
             return response.json()
         detail = 'Failed to synthesize test voice'
@@ -289,8 +349,14 @@ async def rename_user_voice(voice_id: int, payload: dict=Body(default={}), curre
         new_name = str(payload.get('new_name') or '').strip()
         if not new_name:
             raise HTTPException(status_code=400, detail='new_name is required')
+        resolved_provider = _normalize_voice_provider(provider)
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.put(f'{_provider_base_url(provider)}/api/tts/user/voices/{voice_id}/rename', params={'user_id': user_id}, data={'new_name': new_name}, headers=_tts_auth_headers())
+            response = await client.put(
+                f'{_provider_base_url(resolved_provider)}/api/tts/user/voices/{voice_id}/rename',
+                params=_provider_upstream_params(resolved_provider, {'user_id': user_id}),
+                data={'new_name': new_name},
+                headers=_tts_auth_headers(resolved_provider),
+            )
         if response.status_code == 200:
             return response.json()
         detail = 'Failed to rename voice'
@@ -314,8 +380,13 @@ async def retranscribe_user_voice(voice_id: int, payload: dict=Body(default={}),
         user_id = payload_user_id if isinstance(payload_user_id, int) else actor_id
         if actor_id != user_id and (not _is_admin(current_user)):
             raise HTTPException(status_code=403, detail='Access denied')
+        resolved_provider = _normalize_voice_provider(provider)
         async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.post(f'{_provider_base_url(provider)}/api/tts/user/voices/{voice_id}/retranscribe', params={'user_id': user_id}, headers=_tts_auth_headers())
+            response = await client.post(
+                f'{_provider_base_url(resolved_provider)}/api/tts/user/voices/{voice_id}/retranscribe',
+                params=_provider_upstream_params(resolved_provider, {'user_id': user_id}),
+                headers=_tts_auth_headers(resolved_provider),
+            )
         if response.status_code == 200:
             return response.json()
         detail = 'Failed to retranscribe user voice'
@@ -393,8 +464,13 @@ async def admin_rename_global_voice(voice_id: int, payload: dict=Body(default={}
 async def admin_transcribe_global_voice(voice_id: int, current_user: dict=Depends(get_current_user), provider: str='f5'):
     """Admin: transcribe a global voice (alias to retranscribe)."""
     try:
+        resolved_provider = _normalize_voice_provider(provider)
         async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.post(f'{_provider_base_url(provider)}/api/admin/voices/{voice_id}/retranscribe', headers=_tts_auth_headers())
+            response = await client.post(
+                f'{_provider_base_url(resolved_provider)}/api/admin/voices/{voice_id}/retranscribe',
+                headers=_tts_auth_headers(resolved_provider),
+                params=_provider_upstream_params(resolved_provider),
+            )
         if response.status_code == 200:
             return response.json()
         detail = 'Failed to transcribe voice'
@@ -414,8 +490,13 @@ async def admin_transcribe_global_voice(voice_id: int, current_user: dict=Depend
 async def admin_retranscribe_global_voice(voice_id: int, current_user: dict=Depends(get_current_user), provider: str='f5'):
     """Admin: retranscribe a global voice."""
     try:
+        resolved_provider = _normalize_voice_provider(provider)
         async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
-            response = await client.post(f'{_provider_base_url(provider)}/api/admin/voices/{voice_id}/retranscribe', headers=_tts_auth_headers())
+            response = await client.post(
+                f'{_provider_base_url(resolved_provider)}/api/admin/voices/{voice_id}/retranscribe',
+                headers=_tts_auth_headers(resolved_provider),
+                params=_provider_upstream_params(resolved_provider),
+            )
         if response.status_code == 200:
             return response.json()
         detail = 'Failed to retranscribe voice'
@@ -443,4 +524,5 @@ async def admin_upload_voice(request: Request, file: UploadFile=File(...), voice
     except Exception:
         logger.exception('Error uploading global voice')
         raise HTTPException(status_code=500, detail='Internal server error')
+
 

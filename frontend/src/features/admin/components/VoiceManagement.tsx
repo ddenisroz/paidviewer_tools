@@ -5,8 +5,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Edit, Globe, Loader2, Mic, RefreshCw, Settings, TestTube2, Trash2, Upload, User as UserIcon, Users, Volume2, X } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
-import { F5_TTS_SERVICE_URL } from '@/constants';
 import { useAuth } from '@/context/AuthContext';
+import { ttsService } from '@/services/api/services';
 import { deleteVoice, getAdminVoices, getUsers, renameVoice, retranscribeVoice, testVoice, updateVoiceSettings, uploadVoice } from '@/services/unified-api';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -19,6 +19,7 @@ import { Slider } from '@/shared/components/ui/slider';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
+import { resolveAudioUrl } from '@/shared/utils/urlUtils';
 
 import type { TtsVoice } from '@/types/tts';
 
@@ -30,6 +31,15 @@ interface VoiceManagementUser {
 type SpeedPreset = 'very_slow' | 'slow' | 'normal' | 'fast' | 'very_fast';
 type OwnerType = 'global' | 'user';
 type VoiceProvider = 'f5' | 'qwen';
+
+interface ProviderCapability {
+    provider?: string;
+    voice_crud?: boolean;
+    voice_detail?: {
+        message?: string;
+        hint?: string;
+    };
+}
 
 interface ApiResponse {
     data?: unknown;
@@ -100,10 +110,35 @@ const VoiceManagement: React.FC = () => {
     void audioContext;
     void audioSource;
 
+    const { data: providerCapabilities = {} } = useQuery<Record<string, ProviderCapability>>({
+        queryKey: ['voice-provider-capabilities'],
+        queryFn: async (): Promise<Record<string, ProviderCapability>> => {
+            const response = await ttsService.getProviderCapabilities();
+            const payload = response.data as {
+                providers?: Record<string, ProviderCapability>;
+                data?: { providers?: Record<string, ProviderCapability> };
+            };
+            return payload.providers || payload.data?.providers || {};
+        },
+        staleTime: 60 * 1000,
+        refetchOnWindowFocus: false,
+    });
+
+    const selectedProviderCapabilities = providerCapabilities[voiceProvider];
+    const isVoiceCrudAvailable = selectedProviderCapabilities?.voice_crud !== false;
+    const providerCapabilityMessage =
+        selectedProviderCapabilities?.voice_detail?.message
+        || (voiceProvider === 'qwen' ? 'Voice CRUD for Qwen is not available in this deployment.' : null);
+    const providerCapabilityHint = selectedProviderCapabilities?.voice_detail?.hint;
+
     // React Query: загружаем голоса для админа
     const { data: voicesData = [], isLoading: voicesLoading, error: voicesError } = useQuery<TtsVoice[]>({
-        queryKey: ['admin-voices', voiceProvider],
+        queryKey: ['admin-voices', voiceProvider, isVoiceCrudAvailable],
         queryFn: async (): Promise<TtsVoice[]> => {
+            if (!isVoiceCrudAvailable) {
+                setTtsServiceWarning(null);
+                return [];
+            }
             logger.log('[DEBUG] [ADMIN] Fetching voices...');
             const response = await getAdminVoices(voiceProvider);
             logger.log('[DEBUG] [ADMIN] Raw response:', response);
@@ -168,6 +203,7 @@ const VoiceManagement: React.FC = () => {
         staleTime: 5 * 60 * 1000,
         refetchOnMount: true,
         refetchOnWindowFocus: false,
+        enabled: isVoiceCrudAvailable,
     });
 
     // Handle errors from the query
@@ -300,6 +336,15 @@ const VoiceManagement: React.FC = () => {
     };
 
     const handleUpload = async (_event: React.MouseEvent<HTMLButtonElement>): Promise<void> => {
+        if (!isVoiceCrudAvailable) {
+            addToast({
+                type: 'warning',
+                title: 'Недоступно',
+                message: providerCapabilityMessage || 'Voice CRUD недоступен для выбранного провайдера.',
+            });
+            return;
+        }
+
         if (!uploadFile || !voiceName.trim()) {
             addToast({ type: 'error', title: 'Ошибка', message: 'Выберите файл и введите имя голоса.' });
             return;
@@ -343,6 +388,15 @@ const VoiceManagement: React.FC = () => {
     };
 
     const handleDelete = async (voiceId: number, _event: React.MouseEvent<HTMLButtonElement>): Promise<void> => {
+        if (!isVoiceCrudAvailable) {
+            addToast({
+                type: 'warning',
+                title: 'Недоступно',
+                message: providerCapabilityMessage || 'Voice CRUD недоступен для выбранного провайдера.',
+            });
+            return;
+        }
+
         const voiceToDelete = voices.find(v => v.id === voiceId);
         if (!voiceToDelete || !window.confirm(`Вы уверены, что хотите удалить голос "${voiceToDelete.name}"?`)) {
             return;
@@ -371,6 +425,14 @@ const VoiceManagement: React.FC = () => {
     };
 
     const handleRenameVoice = async (): Promise<void> => {
+        if (!isVoiceCrudAvailable) {
+            addToast({
+                type: 'warning',
+                title: 'Недоступно',
+                message: providerCapabilityMessage || 'Voice CRUD недоступен для выбранного провайдера.',
+            });
+            return;
+        }
         if (!currentVoice) return;
 
         const newName = prompt('Введите новое имя голоса:', currentVoice.name);
@@ -395,6 +457,14 @@ const VoiceManagement: React.FC = () => {
     };
 
     const handleSaveSettings = async (): Promise<void> => {
+        if (!isVoiceCrudAvailable) {
+            addToast({
+                type: 'warning',
+                title: 'Недоступно',
+                message: providerCapabilityMessage || 'Voice CRUD недоступен для выбранного провайдера.',
+            });
+            return;
+        }
         if (!currentVoice) return;
 
         try {
@@ -425,6 +495,14 @@ const VoiceManagement: React.FC = () => {
 
 
     const handleTestVoice = async (): Promise<void> => {
+        if (!isVoiceCrudAvailable) {
+            addToast({
+                type: 'warning',
+                title: 'Недоступно',
+                message: providerCapabilityMessage || 'Voice CRUD недоступен для выбранного провайдера.',
+            });
+            return;
+        }
         if (!currentVoice || !user) return;
 
         setIsTestingVoice(true);
@@ -434,9 +512,7 @@ const VoiceManagement: React.FC = () => {
             const audioResponse = response as AudioResponse;
             const audioUrl = audioResponse.data?.audio_url || audioResponse.audio_url;
             if (audioUrl) {
-                const fullAudioUrl = audioUrl.startsWith('http') ? audioUrl : `${F5_TTS_SERVICE_URL}${audioUrl}`;
-
-                const audio = new Audio(fullAudioUrl);
+                const audio = new Audio(resolveAudioUrl(audioUrl));
 
                 audio.oncanplay = () => {
                     setIsTestingVoice(false);
@@ -507,6 +583,14 @@ const VoiceManagement: React.FC = () => {
 
 
     const handleRetranscribeVoice = async (): Promise<void> => {
+        if (!isVoiceCrudAvailable) {
+            addToast({
+                type: 'warning',
+                title: 'Недоступно',
+                message: providerCapabilityMessage || 'Voice CRUD недоступен для выбранного провайдера.',
+            });
+            return;
+        }
         if (!currentVoice || !currentVoice.reference_text?.trim()) return;
 
         setIsTranscribing(true);
@@ -558,6 +642,7 @@ const VoiceManagement: React.FC = () => {
                     <Button
                         className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
                         onClick={() => setUploadDialogOpen(true)}
+                        disabled={!isVoiceCrudAvailable}
                     >
                         <Upload className="h-4 w-4 mr-2" />
                         Загрузить голос
@@ -583,6 +668,24 @@ const VoiceManagement: React.FC = () => {
                     </div>
                 </CardHeader>
                 <CardContent>
+                    {!isVoiceCrudAvailable && (
+                        <div className="mb-6 rounded-lg border border-sky-500/40 bg-sky-500/10 p-4">
+                            <div className="flex items-start gap-3">
+                                <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-sky-300" />
+                                <div className="flex-1">
+                                    <p className="mb-1 font-semibold text-sky-200">Операции с голосами недоступны</p>
+                                    <p className="text-sm text-sky-100/90">
+                                        {providerCapabilityMessage || 'Для выбранного провайдера операции CRUD недоступны.'}
+                                    </p>
+                                    {providerCapabilityHint && (
+                                        <p className="mt-2 text-xs text-sky-100/70">
+                                            {providerCapabilityHint}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     {ttsServiceWarning && (
                         <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
                             <div className="flex items-start gap-3">
@@ -591,7 +694,7 @@ const VoiceManagement: React.FC = () => {
                                     <p className="mb-1 font-semibold text-amber-200">TTS сервис недоступен</p>
                                     <p className="text-sm text-amber-100/90">{ttsServiceWarning}</p>
                                     <p className="mt-2 text-xs text-amber-100/70">
-                                        Убедитесь, что TTS сервис запущен и доступен по адресу, указанному в `VITE_TTS_SERVICE_URL` (F5 endpoint).
+                                        Проверьте upstream-конфигурацию в `bot_service` и доступность выбранного провайдера/шлюза.
                                     </p>
                                 </div>
                                 <Button
@@ -680,6 +783,7 @@ const VoiceManagement: React.FC = () => {
                                                                     className="h-8 flex-1 border-border/70 bg-background/60 text-foreground hover:bg-accent/70"
                                                                     variant="outline"
                                                                     size="sm"
+                                                                    disabled={!isVoiceCrudAvailable}
                                                                 >
                                                                     <Settings className="h-4 w-4 mr-1" />
                                                                     Настроить
@@ -688,6 +792,7 @@ const VoiceManagement: React.FC = () => {
                                                                     onClick={(e) => handleDelete(voice.id, e)}
                                                                     variant="destructive"
                                                                     size="sm"
+                                                                    disabled={!isVoiceCrudAvailable}
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -755,6 +860,7 @@ const VoiceManagement: React.FC = () => {
                                                                     className="h-8 flex-1 border-border/70 bg-background/60 text-foreground hover:bg-accent/70"
                                                                     variant="outline"
                                                                     size="sm"
+                                                                    disabled={!isVoiceCrudAvailable}
                                                                 >
                                                                     <Settings className="h-4 w-4 mr-1" />
                                                                     Настроить
@@ -764,6 +870,7 @@ const VoiceManagement: React.FC = () => {
                                                                     variant="destructive"
                                                                     size="sm"
                                                                     title="Удалить глобальный голос"
+                                                                    disabled={!isVoiceCrudAvailable}
                                                                 >
                                                                     <Trash2 className="h-4 w-4" />
                                                                 </Button>
@@ -906,7 +1013,7 @@ const VoiceManagement: React.FC = () => {
                                 </Button>
                                 <Button
                                     onClick={(e) => handleUpload(e)}
-                                    disabled={isUploading || !uploadFile || !voiceName.trim() || (ownerId === 'user' && !selectedUserId)}
+                                    disabled={!isVoiceCrudAvailable || isUploading || !uploadFile || !voiceName.trim() || (ownerId === 'user' && !selectedUserId)}
                                     className="h-9 w-36 bg-primary text-primary-foreground hover:bg-primary/90"
                                 >
                                     {isUploading ? (
@@ -960,7 +1067,7 @@ const VoiceManagement: React.FC = () => {
                                             <div className="w-full mt-2">
                                                 <Button
                                                     onClick={handleRetranscribeVoice}
-                                                    disabled={isTranscribing || !currentVoice?.reference_text?.trim()}
+                                                    disabled={!isVoiceCrudAvailable || isTranscribing || !currentVoice?.reference_text?.trim()}
                                                     variant="outline"
                                                     size="sm"
                                                     className="w-full justify-center items-center whitespace-nowrap"
@@ -1067,7 +1174,7 @@ const VoiceManagement: React.FC = () => {
                                 <Button
                                     onClick={handleTestVoice}
                                     variant="outline"
-                                    disabled={isTestingVoice}
+                                    disabled={!isVoiceCrudAvailable || isTestingVoice}
                                     className="h-9 w-32 overflow-hidden text-ellipsis whitespace-nowrap border-border/70 bg-background/60 text-foreground hover:bg-accent/70"
                                 >
                                     {isTestingVoice ? (
@@ -1090,6 +1197,7 @@ const VoiceManagement: React.FC = () => {
                                 <Button
                                     onClick={handleRenameVoice}
                                     variant="outline"
+                                    disabled={!isVoiceCrudAvailable}
                                     className="h-9 w-32 overflow-hidden text-ellipsis whitespace-nowrap border-amber-500/50 text-amber-200 hover:bg-amber-500/15 hover:text-amber-100"
                                 >
                                     <Edit className="h-4 w-4 mr-2 flex-shrink-0" />
@@ -1097,6 +1205,7 @@ const VoiceManagement: React.FC = () => {
                                 </Button>
                                 <Button
                                     onClick={handleSaveSettings}
+                                    disabled={!isVoiceCrudAvailable}
                                     className="h-9 w-32 overflow-hidden text-ellipsis whitespace-nowrap bg-primary text-primary-foreground hover:bg-primary/90"
                                 >
                                     <Settings className="h-4 w-4 mr-2 flex-shrink-0" />

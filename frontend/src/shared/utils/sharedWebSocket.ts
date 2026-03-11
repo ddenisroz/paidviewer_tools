@@ -222,7 +222,7 @@ class SharedWebSocketManager {
 
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.hostname}:8000`;
+      const wsBaseUrl = WS_BASE_URL || `${protocol}//${window.location.host}`;
       const wsUrl = `${wsBaseUrl}/ws/chat/${this.userId}`;
 
       this.logger.info(`[${this.tabId}] [CONNECT] Connecting WebSocket: ${wsUrl}`);

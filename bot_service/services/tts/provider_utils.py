@@ -6,10 +6,11 @@ Supported advanced providers:
 - gcloud
 - qwen
 """
+
 from __future__ import annotations
 
 import ipaddress
-from typing import Optional, Literal
+from typing import Any, Dict, Literal, Optional
 from urllib.parse import urlparse
 
 from core.config import settings
@@ -31,6 +32,18 @@ _DEFAULT_LOCAL_TTS_ALLOWED_HOSTS = (
     "qwen_service",
 )
 _DEFAULT_LOCAL_TTS_ALLOWED_CIDRS = ("127.0.0.0/8", "::1/128")
+
+
+class ProviderRoutingError(ValueError):
+    """Raised when provider routing is invalid for current deployment contract."""
+
+
+def qwen_voice_crud_not_available_detail() -> Dict[str, str]:
+    return {
+        "code": "qwen_voice_crud_not_available",
+        "message": "Qwen voice CRUD is not available in this deployment.",
+        "hint": "Configure QWEN_VOICE_SERVICE_URL to enable qwen voice/admin endpoints.",
+    }
 
 
 def normalize_provider(provider: Optional[str]) -> TTSProvider:
@@ -97,7 +110,13 @@ def resolve_provider_mode_for_settings(
     return provider, preferred
 
 
+def get_tts_gateway_url() -> str:
+    """Return normalized gateway URL when configured."""
+    return (settings.tts_gateway_url or "").strip().rstrip("/")
+
+
 def get_provider_service_url(provider: Optional[str]) -> str:
+    """Direct provider URL (not gateway) for synthesis fallback/local compatibility."""
     normalized_provider = normalize_provider(provider)
     if normalized_provider == "qwen":
         qwen_url = (settings.qwen_tts_service_url or "").strip()
@@ -107,7 +126,148 @@ def get_provider_service_url(provider: Optional[str]) -> str:
     f5_url = (settings.f5_tts_service_url or "").strip()
     if f5_url:
         return f5_url
-    return "http://localhost:8001"
+    return "http://localhost:8011"
+
+
+def get_qwen_voice_service_url() -> str:
+    return (settings.qwen_voice_service_url or "").strip().rstrip("/")
+
+
+def is_qwen_voice_service_enabled() -> bool:
+    return bool(get_qwen_voice_service_url())
+
+
+def should_route_provider_via_gateway(provider: Optional[str]) -> bool:
+    """True when advanced synthesis traffic should go through gateway."""
+    normalized_provider = normalize_provider(provider)
+    return normalized_provider in {"f5", "qwen"} and bool(get_tts_gateway_url())
+
+
+def get_synthesis_upstream_url(provider: Optional[str]) -> str:
+    """Resolve synthesis upstream URL according to gateway-first contract."""
+    normalized_provider = normalize_provider(provider)
+
+    if normalized_provider == "gcloud":
+        raise ProviderRoutingError("gcloud_synthesis_is_internal")
+
+    gateway_url = get_tts_gateway_url()
+    if normalized_provider == "qwen":
+        if not gateway_url:
+            raise ProviderRoutingError("qwen_gateway_required")
+        return gateway_url
+
+    if gateway_url:
+        return gateway_url
+
+    return get_provider_service_url(normalized_provider)
+
+
+def get_synthesis_upstream_params(
+    provider: Optional[str],
+    extra_params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Build synthesis query params. Gateway mode requires explicit provider."""
+    normalized_provider = normalize_provider(provider)
+    params: Dict[str, Any] = dict(extra_params or {})
+    if should_route_provider_via_gateway(normalized_provider):
+        params.setdefault("provider", normalized_provider)
+    return params
+
+
+def get_voice_management_upstream_url(provider: Optional[str]) -> str:
+    """Resolve voice/admin upstream URL (provider-owned, no gateway routing)."""
+    normalized_provider = normalize_provider(provider)
+
+    if normalized_provider == "gcloud":
+        raise ProviderRoutingError("gcloud_voice_management_not_supported")
+
+    if normalized_provider == "qwen":
+        qwen_voice_url = get_qwen_voice_service_url()
+        if not qwen_voice_url:
+            raise ProviderRoutingError("qwen_voice_crud_not_available")
+        return qwen_voice_url
+
+    return get_provider_service_url("f5")
+
+
+def get_voice_management_upstream_params(
+    provider: Optional[str],
+    extra_params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Voice/admin requests are provider direct and do not require provider query param."""
+    _ = provider
+    return dict(extra_params or {})
+
+
+def get_provider_capabilities(provider: Optional[str]) -> Dict[str, Any]:
+    normalized_provider = normalize_provider(provider)
+    gateway_configured = bool(get_tts_gateway_url())
+    qwen_voice_enabled = is_qwen_voice_service_enabled()
+
+    if normalized_provider == "gcloud":
+        return {
+            "provider": "gcloud",
+            "synthesis_supported": True,
+            "synthesis_available": True,
+            "synthesis_requires_gateway": False,
+            "synthesis_via": "internal",
+            "voice_crud": False,
+            "voice_admin": False,
+            "voice_reason": "gcloud_managed_voices_only",
+        }
+
+    if normalized_provider == "qwen":
+        payload: Dict[str, Any] = {
+            "provider": "qwen",
+            "synthesis_supported": True,
+            "synthesis_available": gateway_configured,
+            "synthesis_requires_gateway": True,
+            "synthesis_via": "gateway" if gateway_configured else "unavailable",
+            "voice_crud": qwen_voice_enabled,
+            "voice_admin": qwen_voice_enabled,
+            "voice_upstream_configured": qwen_voice_enabled,
+        }
+        if not qwen_voice_enabled:
+            payload["voice_detail"] = qwen_voice_crud_not_available_detail()
+        if not gateway_configured:
+            payload["synthesis_detail"] = {
+                "code": "qwen_gateway_required",
+                "message": "Qwen synthesis is available only via tts-gateway.",
+                "hint": "Configure TTS_GATEWAY_URL and TTS_GATEWAY_API_KEY.",
+            }
+        return payload
+
+    return {
+        "provider": "f5",
+        "synthesis_supported": True,
+        "synthesis_available": True,
+        "synthesis_requires_gateway": False,
+        "synthesis_via": "gateway" if gateway_configured else "direct",
+        "voice_crud": True,
+        "voice_admin": True,
+        "voice_upstream_configured": True,
+    }
+
+
+def get_all_provider_capabilities() -> Dict[str, Dict[str, Any]]:
+    return {
+        "f5": get_provider_capabilities("f5"),
+        "qwen": get_provider_capabilities("qwen"),
+        "gcloud": get_provider_capabilities("gcloud"),
+    }
+
+
+def get_provider_upstream_url(provider: Optional[str]) -> str:
+    """Backward-compatible alias for synthesis upstream resolver."""
+    return get_synthesis_upstream_url(provider)
+
+
+def get_provider_upstream_params(
+    provider: Optional[str],
+    extra_params: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Backward-compatible alias for synthesis upstream params."""
+    return get_synthesis_upstream_params(provider, extra_params=extra_params)
 
 
 def get_local_tts_allowed_hosts() -> set[str]:

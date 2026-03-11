@@ -1,117 +1,126 @@
-﻿# Local TTS Integration (F5 + Qwen)
+﻿# Local TTS Integration (Gateway + F5 + Qwen)
 
-Last updated: 2026-02-23
+Last updated: 2026-02-25
 
 ## Goal
 
-Connect user-owned local TTS instances (F5 or Qwen) to `bot_service` so chat messages can be synthesized through local endpoints.
+Connect external/local TTS providers to `bot_service` while keeping a single frontend boundary:
 
-## What Is Supported
+- frontend -> `bot_service` only
+- `f5`/`qwen` synthesis -> `tts-gateway` (gateway-first)
+- voice/admin CRUD -> provider-owned APIs (`f5` now, `qwen` later)
 
-- Per-user local endpoint configuration.
-- Provider split: `f5` and `qwen` are configured independently.
-- Cloud/local mode switch in Advanced TTS settings.
-- Automatic fallback to basic `gtts` if local/cloud advanced synthesis fails.
+## Runtime Contract
 
-## Prerequisites
+1. Auth mode for upstreams is strict API-key.
+2. `bot_service` sends both headers:
+   - `Authorization: Bearer <key>`
+   - `X-API-Key: <key>`
+3. `qwen` cloud synthesis requires configured gateway (`TTS_GATEWAY_URL`).
+4. If `QWEN_VOICE_SERVICE_URL` is empty, qwen voice/admin CRUD returns `501` with machine-readable detail.
+5. Local per-user endpoints (`local_tts_endpoints`) can still be used for `f5` and `qwen` local mode; saved endpoint `api_key` is used for health/synthesis.
 
-- Running backend: `bot_service`.
-- Running frontend.
-- Local provider endpoint reachable from backend host.
-- User/channel in whitelist (required for advanced provider synthesis when not using an explicitly healthy local endpoint).
-
-## 1. Configure backend URLs
+## Required Backend Env
 
 In `bot_service/.env`:
 
 ```env
-F5_TTS_SERVICE_URL=http://localhost:8001
-QWEN_TTS_SERVICE_URL=http://localhost:8011
+TTS_GATEWAY_URL=http://localhost:8010
+TTS_GATEWAY_API_KEY=<gateway-key>
+
+F5_TTS_SERVICE_URL=http://localhost:8011
+F5_TTS_SERVICE_API_KEY=<f5-key>
+
+QWEN_TTS_SERVICE_URL=http://localhost:8000
+QWEN_TTS_SERVICE_API_KEY=<qwen-key-or-empty>
+
+# optional (enables qwen voice CRUD routing)
+QWEN_VOICE_SERVICE_URL=
+
 LOCAL_TTS_ALLOWED_HOSTS=localhost,127.0.0.1,::1,host.docker.internal,f5_tts,tts_service,qwen_tts,qwen_service
 LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 ```
 
-Notes:
+## Upstream Repositories and Runbook
 
-- `F5_TTS_SERVICE_URL` is the cloud/default F5 provider endpoint.
-- `QWEN_TTS_SERVICE_URL` is the cloud/default Qwen provider endpoint.
-- Per-user local endpoints are configured via API/UI and override cloud endpoint in local mode.
-- User-defined local endpoint URLs are accepted only for hosts/CIDRs from `LOCAL_TTS_ALLOWED_HOSTS` / `LOCAL_TTS_ALLOWED_CIDRS`.
-- Endpoint URL must be an origin only (`http(s)://host[:port]`), without path/query/credentials.
+- Gateway: https://github.com/ddenisroz/tts-gateway.git
+- F5 service (`phase1-bootstrap`): https://github.com/ddenisroz/f5-tts-service/tree/phase1-bootstrap
+- Qwen engine: https://github.com/calldatfate/nano-qwen3tts-vllm.git
 
-## 2. Configure local endpoint in UI
+### 1) `tts-gateway` (port `8010`)
 
-Open Local TTS settings and save endpoint for selected provider:
+```bash
+uv sync
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8010
+```
 
-- Provider: `F5` or `Qwen`
-- Endpoint URL: e.g. `http://127.0.0.1:8001` (F5) or `http://127.0.0.1:8011` (Qwen)
-- Optional API key
-- Enable local usage
+Required env before startup:
 
-## 3. Select provider and mode in Advanced TTS
+- `TTS_GATEWAY_API_KEYS`
+- `TTS_GATEWAY_REDIS_URL` (Redis must be reachable)
+- `TTS_GATEWAY_F5_URL` / `TTS_GATEWAY_F5_API_KEY`
+- `TTS_GATEWAY_QWEN_URL` / `TTS_GATEWAY_QWEN_API_KEY`
 
-In TTS main page:
+### 2) `f5-tts-service` (port `8011`)
 
-1. Set Advanced provider: `F5 TTS` or `Qwen 3 TTS`.
-2. Select mode: `Local`.
-3. Ensure local endpoint health is green.
+```bash
+uv sync
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8011
+```
 
-For Google Cloud provider, local mode is not applicable.
+Required env before startup:
 
-## 4. API endpoints used
+- `F5_TTS_SERVICE_API_KEYS`
+- `F5_TTS_DATABASE_URL`
+- optional but typical: `HUGGINGFACE_TOKEN`
 
-Local endpoint management:
+Note: service startup also expects populated upstream engine assets (`vendor/F5-TTS`, model files).
 
-- `GET /api/local-tts/config?provider=f5|qwen`
-- `POST /api/local-tts/config`
-- `POST /api/local-tts/test-connection`
-- `POST /api/local-tts/toggle?provider=f5|qwen`
-- Endpoints above require authenticated user session.
+### 3) `nano-qwen3tts-vllm` (port `8000`)
 
-Provider-aware voice management:
+Recommended install flow:
 
-- `GET /api/voices/global?provider=f5|qwen`
-- `GET /api/voices/user/custom?provider=f5|qwen`
-- `POST /api/user/voices/upload?provider=f5|qwen`
+```bash
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install -e .
+.venv\Scripts\python api_server.py
+```
 
-## 5. Runtime behavior summary
+Important: the project requires Linux/WSL2 runtime for Triton/Flash-Attention in practical deployments.
 
-- If engine is `f5tts` or `qwen` and mode is `local`, runtime tries per-user local endpoint for that provider.
-- If local endpoint is not healthy or missing, runtime falls back to basic `gtts`.
-- If advanced provider request fails (timeout/upstream error), runtime falls back to basic `gtts`.
+## UI/API Usage
 
-## 6. Troubleshooting
+### Health checks (through backend)
 
-### Local endpoint saved, but synthesis still cloud/fallback
+- `GET /api/tts/health?provider=f5|qwen|gcloud`
 
-Check:
+### Provider capabilities (for UI gating)
 
-- `provider` matches selected advanced provider (`f5` vs `qwen`).
-- local endpoint health status is `healthy`.
-- user/channel whitelist status.
-- backend logs for provider resolution and fallback reason.
+- `GET /api/voices/providers/capabilities`
 
-### Voice list is empty
+### Voice endpoints (stable API paths)
 
-Check:
+- `GET/POST/PUT/DELETE /api/voices/*`
+- `/api/admin/voices*`
 
-- correct provider query (`provider=f5|qwen`).
-- upstream provider service responds to `/api/tts/voices/global`.
-- service JWT contract (`INTERNAL_SERVICE_JWT_*`) or compatibility key (`TTS_INTERNAL_API_KEY`).
-- when using internal HTTPS/mTLS, verify `INTERNAL_SERVICE_MTLS_*` certificate paths in `bot_service`.
+Behavior now:
 
-### Google Cloud not working
+- `provider=f5`: normal CRUD
+- `provider=qwen`: `501` until `QWEN_VOICE_SERVICE_URL` is configured
 
-Use dedicated endpoints:
+## Local Endpoint UI Flow
 
-- `GET /api/tts/gcloud/voices`
-- `POST /api/tts/gcloud/preview`
+1. Open Local TTS settings.
+2. Choose provider (`f5` or `qwen`).
+3. Save endpoint (`http(s)://host[:port]`, no path/query/credentials).
+4. Optionally save endpoint API key.
+5. Enable local mode in TTS settings (`f5_local` / `qwen_local`).
 
-And verify credentials (ADC or API key) on backend side.
+## Smoke Checklist
 
-## 7. Security recommendations
-
-- Keep local endpoints private (LAN/VPN/Tunnel), not public without auth.
-- Prefer short-lived service JWT (`Authorization: Bearer`) for service-to-service auth.
-- Keep `TTS_INTERNAL_API_KEY` only for transition compatibility.
-- Rotate tokens/API keys periodically.
+1. `GET /api/tts/health?provider=f5` returns healthy.
+2. `GET /api/tts/health?provider=qwen` returns healthy (or explicit gateway-required status).
+3. Synthesis via backend/gateway works for `provider=f5` and `provider=qwen`.
+4. F5 voice CRUD works via backend routes.
+5. Qwen voice CRUD is blocked with explicit `501` UX until qwen voice upstream is configured.
