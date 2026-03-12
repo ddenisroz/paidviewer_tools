@@ -82,7 +82,7 @@ class CommandService:
         Get all commands for user (global + overrides + custom).
         
         Args:
-            user_id: User ID or None for guest
+            user_id: User ID or None for anonymous/public access
             db: Database session
             
         Returns:
@@ -90,13 +90,13 @@ class CommandService:
         """
         try:
             repo = self._get_repo(db)
-            is_guest = (user_id is None or user_id == -1)
+            is_public_request = user_id is None or user_id == -1
             
             # 1. Global commands (available to everyone)
             global_commands = repo.get_global_commands()
             
-            # 2. For guests - no overrides or custom commands
-            if is_guest:
+            # 2. Anonymous/public access gets only global commands.
+            if is_public_request:
                 override_commands = []
                 custom_commands = []
             else:

@@ -22,6 +22,7 @@ interface IntegrationsState {
 }
 
 interface UseChatHistoryOptions {
+    enabled: boolean;
     isAuthenticated: boolean;
     isConnected: boolean;
     integrationsLoading: boolean;
@@ -31,6 +32,7 @@ interface UseChatHistoryOptions {
 }
 
 export function useChatHistory({
+    enabled,
     isAuthenticated,
     isConnected,
     integrationsLoading,
@@ -51,6 +53,7 @@ export function useChatHistory({
 
     useEffect(() => {
         const loadChatHistory = async (): Promise<void> => {
+            if (!enabled) return;
             // Skip if not authenticated
             if (!isAuthenticated) return;
             if (integrationsLoading) return;
@@ -116,6 +119,6 @@ export function useChatHistory({
 
         loadChatHistory();
         // Removed onHistoryLoaded from deps - using ref instead to prevent re-triggers
-    }, [isAuthenticated, integrationsLoading, isConnected, integrations, historyLoaded]);
+    }, [enabled, isAuthenticated, integrationsLoading, isConnected, integrations, historyLoaded]);
 }
 

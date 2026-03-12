@@ -1,7 +1,7 @@
 # bot_service/repositories/user_settings_repository.py
 """
 Repository for UserSettings CRUD operations.
-Handles settings for both authenticated users and guests.
+Handles settings for authenticated users and legacy session-scoped records.
 """
 from typing import Optional, Dict, Any, List
 from sqlalchemy import func
@@ -52,12 +52,12 @@ class UserSettingsRepository(BaseRepository[UserSettings]):
         ).first()
 
     def get_by_session_id(self, session_id: str) -> Optional[UserSettings]:
-        """Get settings by session ID (for guests)."""
+        """Get settings by legacy session ID."""
         return self.db.query(UserSettings).filter(UserSettings.session_id == session_id).first()
 
     def create_default(self, user_data: Dict[str, Any]) -> UserSettings:
         """
-        Create default settings for user/guest.
+        Create default settings for an authenticated user or legacy session scope.
         user_data should contain 'user_id' or 'session_id'.
         """
         settings = UserSettings(**user_data)

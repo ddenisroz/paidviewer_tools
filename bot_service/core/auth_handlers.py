@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from core.log_sanitizer import mask_session_id
 from auth.auth import get_current_user
-from services.user_identity_service import UserIdentityService, UserType
+from services.user_identity_service import UserIdentityService
 logger = logging.getLogger(__name__)
 
 class AuthHandlers:
@@ -167,13 +167,12 @@ class AuthHandlers:
         from core.session_manager import session_manager
         if not UserIdentityService.validate_user_data(current_user):
             raise HTTPException(status_code=400, detail='Invalid user data')
-        user_type = UserIdentityService.get_user_type(current_user)
         user_id = current_user.get('id')
         owns_db_session = db is None
         db_session = db or next(get_db())
         try:
             if user_id:
-                if user_type == UserType.AUTHENTICATED and user_id > 0:
+                if user_id > 0:
                     logger.info(f'[BOT] Logout: Disconnecting bot from user {user_id} channels')
                     user = db_session.query(User).filter(User.id == user_id).first()
                     if user:
@@ -197,7 +196,7 @@ class AuthHandlers:
                                     logger.info(f'[OK] VK Live bot disconnected from {user.vk_channel_name}')
                             except Exception as e:
                                 logger.error(f'[ERROR] Error disconnecting VK Live bot: {e}')
-                if user_type == UserType.AUTHENTICATED and user_id > 0:
+                if user_id > 0:
                     logger.info(f'[DELETE] Logout: Deleting ALL tokens for user {user_id}')
                     session_manager.clear_all_user_tokens(user_id)
                     logger.info(f'[OK] Tokens deleted. User {user_id} will need to re-authenticate')
@@ -210,8 +209,7 @@ class AuthHandlers:
         finally:
             if owns_db_session:
                 db_session.close()
-        is_guest = user_type == UserType.GUEST
-        response = JSONResponse(content={'success': True, 'message': 'Logged out successfully', 'tokens_deleted': not is_guest})
+        response = JSONResponse(content={'success': True, 'message': 'Logged out successfully', 'tokens_deleted': True})
         response.delete_cookie(key='session_id', httponly=True, samesite='lax')
         logger.info(f'[LOGOUT] User {user_id} logged out successfully')
         return response

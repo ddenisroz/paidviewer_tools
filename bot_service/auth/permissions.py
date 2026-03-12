@@ -1,87 +1,69 @@
-"""
-Система проверки прав доступа для различных типов пользователей
-"""
-from typing import Dict, Any
-from fastapi import HTTPException, status
-from services.user_identity_service import UserIdentityService, UserType
+﻿"""Authorization helpers for authenticated users."""
+
 import logging
+from typing import Any, Dict, Optional
+
+from fastapi import HTTPException, status
+
+from services.user_identity_service import UserIdentityService
 
 logger = logging.getLogger(__name__)
 
-def require_platform_token(user: Dict[str, Any], platform: str = None) -> None:
-    """
-    Проверяет, что у пользователя есть токен платформы.
-    Гости не могут использовать функции, требующие токены платформ.
-    
-    Args:
-        user: Данные пользователя из get_current_user
-        platform: Конкретная платформа (twitch, vk) или None для любой
-    """
-    # Валидируем данные пользователя
-    if not UserIdentityService.validate_user_data(user):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid user data"
-        )
 
-    user_type = UserIdentityService.get_user_type(user)
-    if user_type == UserType.GUEST:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Эта функция недоступна для гостей. Требуется авторизация через платформу."
-        )
+def require_platform_token(user: Dict[str, Any], platform: Optional[str] = None) -> None:
+    """Ensure the authenticated user has at least one required platform token."""
+    if not UserIdentityService.validate_user_data(user):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid user data")
 
     integrations = user.get("integrations", {})
     if not integrations:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуется авторизация через платформу для использования этой функции"
+            detail="Platform authorization is required for this action",
         )
 
     if platform and platform not in integrations:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Требуется авторизация через {platform} для использования этой функции"
+            detail=f"{platform} authorization is required for this action",
         )
+
 
 def require_admin(user: Dict[str, Any]) -> None:
-    """Проверяет, что пользователь является администратором."""
-    if not user.get("is_admin", False):
+    """Ensure the user has admin privileges."""
+    if not (user.get("role") == "admin" or user.get("is_admin", False)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Требуются права администратора"
+            detail="Administrator privileges are required",
         )
+
 
 def require_auth(user: Dict[str, Any]) -> None:
-    """Проверяет, что пользователь авторизован (не анонимный)."""
-    if not user:
+    """Ensure a valid authenticated user payload is present."""
+    if not user or not UserIdentityService.validate_user_data(user):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Требуется авторизация"
+            detail="Authentication required",
         )
 
-def is_guest(user: Dict[str, Any]) -> bool:
-    """Проверяет, является ли пользователь гостем."""
-    if not UserIdentityService.validate_user_data(user):
-        return False
-    return UserIdentityService.get_user_type(user) == UserType.GUEST
 
 def has_platform_token(user: Dict[str, Any], platform: str) -> bool:
-    """Проверяет, есть ли у пользователя токен конкретной платформы."""
-    if is_guest(user):
+    """Return `True` when the authenticated user has the requested integration."""
+    if not UserIdentityService.validate_user_data(user):
         return False
 
     integrations = user.get("integrations", {})
     return platform in integrations
 
+
 def can_manage_stream(user: Dict[str, Any]) -> bool:
-    """Проверяет, может ли пользователь управлять стримом (изменять название, категорию)."""
-    return not is_guest(user) and has_platform_token(user, "twitch")
+    return has_platform_token(user, "twitch")
+
 
 def can_manage_channel_points(user: Dict[str, Any]) -> bool:
-    """Проверяет, может ли пользователь управлять баллами канала."""
-    return not is_guest(user) and has_platform_token(user, "twitch")
+    return has_platform_token(user, "twitch")
+
 
 def can_manage_vk_live(user: Dict[str, Any]) -> bool:
-    """Проверяет, может ли пользователь управлять VK Live."""
-    return not is_guest(user) and has_platform_token(user, "vk")
+    return has_platform_token(user, "vk")
+

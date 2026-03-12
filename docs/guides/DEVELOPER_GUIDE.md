@@ -14,8 +14,18 @@ Use this guide for:
 
 - `bot_service/` - FastAPI API, auth, business logic, repositories.
 - `frontend/` - React + Vite UI.
-- `F5_tts/` - external advanced TTS service repository (optional runtime).
+- external upstreams:
+  - `tts-gateway`
+  - `f5-tts-service`
+  - `nano-qwen3tts-vllm`
 - `deploy/` - docker compose and infra files.
+
+## Dependency Manifests
+
+- `bot_service/requirements.txt` - backend runtime only.
+- `bot_service/requirements_dev.txt` - backend dev/test/tooling on top of runtime.
+- `bot_service/requirements_celery.txt` - runtime + optional celery worker extras.
+- `bot_service/requirements_no_torch.txt` - legacy alias to runtime requirements.
 
 ## Mandatory Auth Contracts
 
@@ -28,7 +38,7 @@ Use this guide for:
 3. Session auth is cookie-based (`session_id`).
 4. Protected API auth source of truth is DB user state.
 5. Admin authority source is `users.role='admin'`; `users.is_admin` is legacy compatibility only.
-6. Guest mode is deprecated/removed. Do not add new anonymous flows.
+6. Guest mode is removed. Do not add anonymous auth flows or guest-only session branches.
 
 ## Bot OAuth Contracts
 

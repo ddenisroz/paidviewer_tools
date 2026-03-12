@@ -1,6 +1,15 @@
 ﻿# Repo Split Guide (core + gateway + F5 + Qwen)
 
-Last updated: 2026-02-25
+Last updated: 2026-03-11
+
+Current implementation status lives in `docs/STATUS_TRACKER.md`.
+
+Terminology used in this document:
+
+- `self-hosted endpoint`: пользователь сам поднимает TTS и задает URL через `local_tts_endpoints`.
+- `project-hosted worker`: отдельный runtime-воркер проекта.
+- `gateway-managed`: `bot_service -> tts-gateway -> project-hosted workers`.
+- Existing runtime names `use_local`, `f5_local`, `qwen_local` are legacy naming for the self-hosted path.
 
 ## 1. Target Repositories
 
@@ -90,8 +99,9 @@ Frontend keeps stable backend-only boundary:
 ## 5. Current Phase Behavior
 
 1. Synthesis routing:
-- `f5` -> gateway (preferred) or direct fallback if gateway missing.
-- `qwen` -> gateway only; without gateway core returns controlled unavailable status and falls back to basic TTS runtime path.
+- `f5` -> gateway-managed (preferred) or project-hosted direct fallback if gateway missing.
+- `qwen` -> gateway-managed only in managed mode; without gateway core returns controlled unavailable status and falls back to basic TTS runtime path.
+- self-hosted endpoints remain a separate user-configured path and are not the same as project-hosted workers.
 
 2. Voice routing:
 - `f5` -> provider voice/admin endpoints.

@@ -15,11 +15,12 @@ This guide is for a first productive day in the repository.
 Backend:
 
 ```powershell
-cd bot_service
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-cp .env.example .env
+python -m pip install -r bot_service/requirements.txt
+python -m pip install -r bot_service/requirements_dev.txt
+Copy-Item bot_service/.env.example bot_service/.env
+cd bot_service
 alembic upgrade head
 python main.py
 ```

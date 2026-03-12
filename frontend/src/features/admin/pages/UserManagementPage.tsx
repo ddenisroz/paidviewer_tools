@@ -41,7 +41,6 @@ interface UsersApiResponse {
         pages?: number;
         total?: number;
         total_users?: number;
-        total_guests?: number;
     };
 }
 
@@ -341,21 +340,10 @@ const UserManagementPage: React.FC = () => {
 
                 return (
                     <div className="flex flex-col items-center justify-center gap-1">
-                        {user.is_guest ? (
-                            <>
-                                <Badge variant="outline" className="text-xs border-amber-500/40 bg-amber-500/10 text-amber-200">
-                                    [GUEST]
-                                </Badge>
-                                <span className="font-mono text-xs text-muted-foreground">
-                                    {user.session_id?.substring(0, 8) || 'N/A'}
-                                </span>
-                            </>
-                        ) : (
-                            <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-200">
-                                [KEY] #{user.id}
-                            </Badge>
-                        )}
-                        {!user.is_guest && <span className="text-xs text-muted-foreground">{displayName}</span>}
+                        <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-200">
+                            [KEY] #{user.id}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{displayName}</span>
                         {hasActiveSession && <Wifi className="w-3 h-3 text-sky-300" />}
                     </div>
                 );
@@ -367,7 +355,6 @@ const UserManagementPage: React.FC = () => {
                 user.twitch_username || '',
                 user.vk_username || '',
                 user.vk_channel_name || '',
-                user.session_id || '',
             ].join(' ').toLowerCase(),
             sortValue: (user) => Number(user.id || 0),
             sortable: true,
@@ -511,56 +498,52 @@ const UserManagementPage: React.FC = () => {
             align: 'center',
             accessor: (user) => (
                 <div className="flex items-center justify-center gap-1 rounded-md border border-border/60 bg-card/50 p-1">
-                    {!user.is_guest && (
-                        <>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className={TABLE_ICON_BUTTON_CLASS}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditDialog(user);
-                                }}
-                                title="Редактировать"
-                            >
-                                <Edit className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className={TABLE_ICON_BUTTON_CLASS}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (user.is_blocked) {
-                                        unblockUserMutation.mutate(user.id);
-                                    } else {
-                                        openBlockDialog(user);
-                                    }
-                                }}
-                                title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
-                            >
-                                {user.is_blocked ? (
-                                    <CheckCircle className="w-4 h-4 text-emerald-400" />
-                                ) : (
-                                    <Ban className="w-4 h-4 text-destructive" />
-                                )}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className={TABLE_ICON_BUTTON_CLASS}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-                                        deleteUserMutation.mutate(user.id);
-                                    }
-                                }}
-                                title="Удалить"
-                            >
-                                <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                        </>
-                    )}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className={TABLE_ICON_BUTTON_CLASS}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            openEditDialog(user);
+                        }}
+                        title="Редактировать"
+                    >
+                        <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className={TABLE_ICON_BUTTON_CLASS}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (user.is_blocked) {
+                                unblockUserMutation.mutate(user.id);
+                            } else {
+                                openBlockDialog(user);
+                            }
+                        }}
+                        title={user.is_blocked ? "Разблокировать" : "Заблокировать"}
+                    >
+                        {user.is_blocked ? (
+                            <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                            <Ban className="w-4 h-4 text-destructive" />
+                        )}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className={TABLE_ICON_BUTTON_CLASS}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
+                                deleteUserMutation.mutate(user.id);
+                            }
+                        }}
+                        title="Удалить"
+                    >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
                     <Button
                         size="sm"
                         variant="ghost"
@@ -715,9 +698,9 @@ const UserManagementPage: React.FC = () => {
                     </h1>
                     <p className="text-muted-foreground text-sm mt-1">
                         Всего пользователей: <span className="text-foreground font-medium">{usersResponse.pagination.total || 0}</span>
-                        {usersResponse.pagination.total_users !== undefined && usersResponse.pagination.total_guests !== undefined && (
+                        {usersResponse.pagination.total_users !== undefined && (
                             <span className="ml-2 text-sm text-muted-foreground">
-                                (Аккаунты: {usersResponse.pagination.total_users}, Гости: {usersResponse.pagination.total_guests})
+                                (Аккаунты: {usersResponse.pagination.total_users})
                             </span>
                         )}
                     </p>
@@ -797,7 +780,7 @@ const UserManagementPage: React.FC = () => {
             <DataTable
                 data={usersResponse.users}
                 columns={columns}
-                getRowId={(user) => String(user.id || user.session_id)}
+                getRowId={(user) => String(user.id)}
                 searchable
                 searchPlaceholder="Поиск по имени (Twitch, VK Live)..."
                 filterable

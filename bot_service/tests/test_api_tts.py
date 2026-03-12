@@ -2,6 +2,11 @@
 """
 API tests for current TTS routes.
 """
+from services.tts.tts_service import (
+    BlockTargetNotFoundError,
+    BlockTargetVerificationUnavailableError,
+    TTSService,
+)
 
 
 def _csrf_headers(authenticated_client):
@@ -95,3 +100,33 @@ class TestTTSAPI:
             headers=headers,
         )
         assert post_response.status_code in [200, 404]
+
+    def test_block_user_returns_404_for_unknown_username(self, authenticated_client, monkeypatch):
+        async def _raise_not_found(self, **_kwargs):
+            raise BlockTargetNotFoundError("Twitch user 'ghost' does not exist")
+
+        monkeypatch.setattr(TTSService, "ensure_block_target_exists", _raise_not_found)
+
+        response = authenticated_client.post(
+            "/api/tts/block",
+            json={"username": "ghost", "platform": "twitch"},
+            headers=_csrf_headers(authenticated_client),
+        )
+
+        assert response.status_code == 404
+        assert "does not exist" in response.json()["detail"]
+
+    def test_block_user_returns_503_when_verification_unavailable(self, authenticated_client, monkeypatch):
+        async def _raise_unavailable(self, **_kwargs):
+            raise BlockTargetVerificationUnavailableError("Failed to verify Twitch user right now. Try again later.")
+
+        monkeypatch.setattr(TTSService, "ensure_block_target_exists", _raise_unavailable)
+
+        response = authenticated_client.post(
+            "/api/tts/block",
+            json={"username": "ghost", "platform": "twitch"},
+            headers=_csrf_headers(authenticated_client),
+        )
+
+        assert response.status_code == 503
+        assert "Try again later" in response.json()["detail"]

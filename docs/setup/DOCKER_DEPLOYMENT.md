@@ -1,195 +1,124 @@
-﻿# Docker Deployment Guide
+# Docker Deployment Guide
 
-## Overview
+Last updated: 2026-03-12
 
-This guide explains how to deploy the TTS Bot using Docker Compose in different configurations.
+This file describes current compose entrypoints only.
 
-## Deployment Scenarios
+## Topology
 
-### Scenario 1: All-in-One (Development)
-Run everything on one machine for development.
+- frontend talks only to `bot_service`
+- `tts-gateway` handles advanced synthesis for `f5` and `qwen`
+- `f5-tts-service` keeps provider-owned voice/admin APIs
+- qwen voice CRUD is not enabled in this repo until `QWEN_VOICE_SERVICE_URL` exists
+
+## Compose Entry Points
+
+### Full Local Stack
 
 ```bash
 docker compose -f deploy/docker/docker-compose.dev.yml up -d
 ```
 
-### Scenario 2: Distributed with Advanced TTS (Production)
-- **Machine 1 (GPU PC)**: TTS Service with F5-TTS + Cloudflare Tunnel
-- **Machine 2 (Server)**: Bot Service + Frontend + Database
+Starts:
 
-**Machine 1 (GPU PC):**
+- `postgres`
+- `redis`
+- `bot_service`
+- `frontend`
+- `tts_gateway`
+- `tts_service`
+- `qwen_tts`
+
+### Production-Like Single Host
+
 ```bash
-# Setup Cloudflare Tunnel first
-# 1. Create tunnel: cloudflared tunnel create tts-tunnel
-# 2. Copy credentials to cloudflared-credentials.json
-# 3. Configure cloudflared-config.yml with your domain
+docker compose -f deploy/docker/docker-compose.prod.yml up -d
+```
 
-# Start TTS service
+Minimum env required for config/startup:
+
+```env
+POSTGRES_USER=...
+POSTGRES_PASSWORD=...
+POSTGRES_DB=...
+REDIS_PASSWORD=...
+SECRET_KEY=...
+```
+
+### Bot/Frontend Host Only
+
+Use when TTS upstreams live elsewhere:
+
+```bash
+docker compose -f deploy/docker/docker-compose.bot.yml up -d
+```
+
+Required env on this host:
+
+```env
+DB_PASSWORD=...
+TTS_GATEWAY_URL=...
+TTS_GATEWAY_API_KEY=...
+F5_TTS_SERVICE_URL=...
+F5_TTS_SERVICE_API_KEY=...
+QWEN_TTS_SERVICE_URL=...
+QWEN_TTS_SERVICE_API_KEY=...
+QWEN_VOICE_SERVICE_URL=
+```
+
+### Remote Dedicated F5 Host
+
+Compatibility overlay for a dedicated `f5-tts-service` machine:
+
+```bash
 docker compose -f deploy/docker/docker-compose.tts-advanced.yml up -d
 ```
 
-**Machine 2 (Server):**
-```bash
-# Configure F5_TTS_SERVICE_URL in bot_service/.env
-# F5_TTS_SERVICE_URL=https://tts.yourdomain.com
+Required env:
 
-# Start bot service and frontend
-docker compose -f deploy/docker/docker-compose.bot.yml up -d
+```env
+F5_DB_PASSWORD=...
+F5_TTS_SERVICE_API_KEY=...
+HUGGINGFACE_TOKEN=
 ```
 
-### Scenario 3: Distributed with Single-Node F5 TTS (Personal Use)
-- **Machine 1 (GPU PC)**: standalone `f5-tts-service` (single-node profile, compose service name `tts_service`) + Cloudflare Tunnel
-- **Machine 2 (Server)**: Bot Service + Frontend + Database
+### Local Single-Node F5 Host
 
-**Machine 1 (GPU PC):**
+Compatibility overlay for direct F5 testing:
+
 ```bash
-# Setup Cloudflare Tunnel (same as Scenario 2)
-
-# Start single-node TTS profile
 docker compose -f deploy/docker/docker-compose.tts-simple.yml up -d
 ```
 
-**Machine 2 (Server):**
-```bash
-# Same as Scenario 2
-docker compose -f deploy/docker/docker-compose.bot.yml up -d
+Required env:
+
+```env
+F5_DB_PASSWORD=...
+F5_TTS_SERVICE_API_KEY=...
+HUGGINGFACE_TOKEN=
 ```
 
-## Prerequisites
-
-### All Machines
-- Docker 20.10+
-- Docker Compose 2.0+
-
-### GPU Machine (for TTS)
-- NVIDIA GPU with 8GB+ VRAM
-- NVIDIA Docker runtime
-- CUDA 11.8+
-
-### Server Machine
-- 2GB+ RAM
-- PostgreSQL (included in `deploy/docker/docker-compose.bot.yml`)
-
-## Setup Steps
-
-### 1. Configure Environment Variables
-
-Copy .env.example files to .env:
-```bash
-cp bot_service/.env.example bot_service/.env
-cp frontend/.env.example frontend/.env
-```
-
-Edit each `.env` file with your credentials.
-If F5 runs from a separate repository/host, configure it there and point `F5_TTS_SERVICE_URL` to that endpoint.
-
-### 2. Generate Security Keys
+## Verification
 
 ```bash
-# SECRET_KEY
-openssl rand -hex 32
-
-# TOKEN_ENCRYPTION_KEY
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-### 3. Setup Cloudflare Tunnel (for TTS)
-
-```bash
-# Install cloudflared
-# Windows: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
-# Linux: curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
-
-# Login
-cloudflared tunnel login
-
-# Create tunnel
-cloudflared tunnel create tts-tunnel
-
-# Copy credentials
-cp ~/.cloudflared/<tunnel-id>.json cloudflared-credentials.json
-
-# Configure
-cp cloudflared-config.example.yml cloudflared-config.yml
-# Edit cloudflared-config.yml with your tunnel ID and domain
-```
-
-### 4. Start Services
-
-Choose your deployment scenario and run the appropriate docker-compose command.
-
-## Monitoring
-
-### Check Service Status
-```bash
-docker-compose ps
-```
-
-### View Logs
-```bash
-# All services
-docker-compose logs -f
-
-# Specific service
-docker-compose logs -f bot_service
-docker-compose logs -f tts_service
-```
-
-### Health Checks
-```bash
-# Bot Service
+docker compose -f deploy/docker/docker-compose.dev.yml config -q
+docker compose -f deploy/docker/docker-compose.bot.yml config -q
+docker compose -f deploy/docker/docker-compose.dev.yml ps
 curl http://localhost:8000/health
-
-# TTS Service
-curl http://localhost:8001/health
+curl "http://localhost:8000/api/tts/health?provider=f5"
+curl "http://localhost:8000/api/tts/health?provider=qwen"
+curl http://localhost:8011/health/ready
 ```
 
-## Troubleshooting
+## Notes
 
-### GPU Not Detected
-```bash
-# Check NVIDIA Docker runtime
-docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
-```
+- `tts-gateway` requires Redis.
+- `f5-tts-service` requires PostgreSQL and model/vendor assets.
+- `nano-qwen3tts-vllm` is practically a Linux or WSL2 target.
+- Direct frontend runtime dependency on `VITE_TTS_SERVICE_URL` is not allowed.
+- `docker-compose.bot.yml` validates with unset-var warnings until `DB_PASSWORD` and upstream API keys are supplied.
+- `docker-compose.prod.yml` does not pass config validation until required DB/Redis/app env values are set, including `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`, and `SECRET_KEY`.
 
-### Cloudflare Tunnel Not Working
-```bash
-# Check tunnel status
-cloudflared tunnel info tts-tunnel
+## Legacy Material
 
-# Test connection
-docker-compose logs cloudflared
-```
-
-### Database Connection Issues
-```bash
-# Check PostgreSQL
-docker-compose exec postgres psql -U tts_user -d tts_bot -c "SELECT 1;"
-```
-
-## Updating
-
-```bash
-# Pull latest changes
-git pull
-
-# Rebuild containers
-docker-compose build
-
-# Restart services
-docker-compose down
-docker-compose up -d
-```
-
-## Backup
-
-### Database Backup
-```bash
-docker-compose exec postgres pg_dump -U tts_user tts_bot > backup.sql
-```
-
-### Restore Database
-```bash
-docker-compose exec -T postgres psql -U tts_user tts_bot < backup.sql
-```
-
+Historical Docker notes were moved to `docs/backlog/DOCKER_DEPLOYMENT_LEGACY_2026-03-11.md`.

@@ -1,71 +1,90 @@
-#!/usr/bin/env python3
-"""
-Скрипт для проверки активных сессий и подключений
-"""
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from core.database import SessionLocal, UserSession, User, UserToken
-from core.connection_manager import get_connection_manager
-from datetime import datetime
-import json
+﻿#!/usr/bin/env python3
+"""Diagnostic helper for active sessions and websocket connections."""
 
-def check_sessions():
-    """Проверить активные сессии и подключения"""
-    print('[DEBUG] Проверка активных сессий и подключений...')
+from __future__ import annotations
+
+import json
+import os
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from core.connection_manager import get_connection_manager
+from core.database import SessionLocal, User, UserSession, UserToken
+
+
+def _format_device_info(device_info: object) -> str:
+    if not device_info:
+        return "{}"
+    if isinstance(device_info, dict):
+        return json.dumps(device_info, ensure_ascii=True, sort_keys=True)
+    return str(device_info)
+
+
+def check_sessions() -> None:
+    """Print a compact diagnostic summary for session-related state."""
+    print("[INFO] Inspecting active authenticated sessions and connections...")
     db = SessionLocal()
+
     try:
-        print('Text cleaned.')
-        active_sessions = db.query(UserSession).filter(UserSession.is_active == True).all()
-        if not active_sessions:
-            print('[ERROR] Нет активных сессий в базе данных')
-        else:
-            for session in active_sessions:
-                print(f'   User ID: {session.user_id}')
-                print(f'Text cleaned.{session.session_id}')
-                device_info = session.device_info or {}
-                channel = device_info.get('monitored_channel', 'Не указан')
-                print(f'   Channel: {channel}')
-                print(f'   Device: {session.device_info}')
-                print(f'  [TIMEOUT] Created: {session.created_at}')
-                print('  ' + '-' * 50)
-        print('Text cleaned.')
-        users_with_tokens = db.query(User).join(UserToken).filter(UserToken.access_token.isnot(None)).all()
-        if not users_with_tokens:
-            print('[ERROR] Нет пользователей с токенами')
-        else:
-            for user in users_with_tokens:
-                username = user.twitch_username or user.vk_username or f'User_{user.id}'
-                print(f'   User: {username} (ID: {user.id})')
-                tokens = db.query(UserToken).filter(UserToken.user_id == user.id).all()
-                for token in tokens:
-                    print(f'    [LINK] {token.platform}: {token.platform_user_id}')
-                print('  ' + '-' * 30)
-        print('\n[BOT] CONNECTION MANAGER:')
+        active_sessions = (
+            db.query(UserSession)
+            .filter(UserSession.is_active.is_(True), UserSession.user_id.isnot(None), UserSession.user_id > 0)
+            .all()
+        )
+        print(f"[INFO] Active authenticated DB sessions: {len(active_sessions)}")
+        for session in active_sessions:
+            device_info = session.device_info or {}
+            channel = device_info.get("monitored_channel", "n/a") if isinstance(device_info, dict) else "n/a"
+            print(f"  - user_id={session.user_id} session_id={session.session_id}")
+            print(f"    channel={channel}")
+            print(f"    created_at={session.created_at}")
+            print(f"    device_info={_format_device_info(device_info)}")
+
+        users_with_tokens = (
+            db.query(User)
+            .join(UserToken)
+            .filter(UserToken.access_token.isnot(None))
+            .distinct()
+            .all()
+        )
+        print(f"[INFO] Users with stored OAuth tokens: {len(users_with_tokens)}")
+        for user in users_with_tokens:
+            username = user.twitch_username or user.vk_username or f"user_{user.id}"
+            print(f"  - {username} (id={user.id})")
+            tokens = db.query(UserToken).filter(UserToken.user_id == user.id).all()
+            for token in tokens:
+                print(f"    token platform={token.platform} platform_user_id={token.platform_user_id}")
+
+        print("[INFO] Connection manager state:")
         connection_manager = get_connection_manager()
         active_channels = connection_manager.get_active_channels()
         active_sessions_dict = connection_manager.get_active_sessions()
         if not active_channels:
-            print('[ERROR] Нет активных каналов в connection manager')
+            print("  - no active channels")
         else:
-            print(f'[OK] Активные каналы: {active_channels}')
-            for (channel, sessions) in active_sessions_dict.items():
-                print(f'   {channel}: {len(sessions)} сессий')
-        print('Text cleaned.')
-        guest_sessions = db.query(UserSession).filter(UserSession.user_id == -1, UserSession.is_active == True).all()
-        if not guest_sessions:
-            print('[ERROR] Нет активных гостевых сессий')
-        else:
-            for session in guest_sessions:
-                print(f'Text cleaned.{session.session_id}')
-                device_info = session.device_info or {}
-                channel = device_info.get('monitored_channel', 'Не указан')
-                print(f'   Channel: {channel}')
-                print(f'   Device: {session.device_info}')
-                print('  ' + '-' * 30)
-    except Exception as e:
-        print(f'[ERROR] Ошибка при проверке сессий: {e}')
+            print(f"  - channels={active_channels}")
+            for channel, sessions in active_sessions_dict.items():
+                print(f"    {channel}: {len(sessions)} session(s)")
+
+        legacy_sessions = (
+            db.query(UserSession)
+            .filter(UserSession.user_id == -1, UserSession.is_active.is_(True))
+            .all()
+        )
+        print(f"[INFO] Legacy session-scoped leftovers (user_id = -1): {len(legacy_sessions)}")
+        for session in legacy_sessions:
+            device_info = session.device_info or {}
+            channel = device_info.get("monitored_channel", "n/a") if isinstance(device_info, dict) else "n/a"
+            print(f"  - session_id={session.session_id} channel={channel}")
+            print(f"    device_info={_format_device_info(device_info)}")
+
+    except Exception as exc:
+        print(f"[ERROR] Failed to inspect session state: {exc}")
+        raise
     finally:
         db.close()
-if __name__ == '__main__':
+
+
+if __name__ == "__main__":
     check_sessions()

@@ -129,6 +129,18 @@ export interface LocalTtsConfig {
   test_connection?: boolean;
   configured?: boolean;
   healthy?: boolean;
+  provider_contract?: {
+    upstream_parity_ready?: boolean;
+    requires_compatibility_adapter?: boolean;
+    managed_topology?: 'project_hosted_worker' | 'gateway_managed';
+    project_hosted_direct_supported?: boolean;
+    supports_native_strict_api_key?: boolean;
+    supports_native_health_endpoint?: boolean;
+    supports_native_status_endpoint?: boolean;
+    supports_local_voice_management?: boolean;
+    warning?: string | null;
+  };
+  warnings?: string[];
   data?: {
     configured?: boolean;
     healthy?: boolean;

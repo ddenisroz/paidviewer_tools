@@ -39,7 +39,6 @@ export interface User {
   vk_username?: string;
   vk_channel_name?: string;
   is_admin?: boolean;
-  is_guest?: boolean;
   is_blocked?: boolean;
   is_whitelisted?: boolean;
   platform?: 'twitch' | 'vk' | 'youtube';
@@ -52,7 +51,6 @@ export interface User {
     twitch?: string;
     vk?: string;
   };
-  session_id?: string;
   [key: string]: string | number | boolean | string[] | UserIntegrations | { twitch?: string; vk?: string } | undefined;
 }
 

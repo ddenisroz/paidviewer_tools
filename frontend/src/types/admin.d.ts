@@ -11,7 +11,7 @@ import { User } from './user';
 export interface UserSession {
   id: string;
   user_id: number;
-  session_type: 'active_user' | 'guest';
+  session_type: 'active_user';
   created_at?: string;
   expires_at?: string;
   [key: string]: string | number | undefined;
@@ -41,7 +41,6 @@ export interface UsersResponse {
     total: number;
     pages: number;
     total_users?: number;
-    total_guests?: number;
   };
 }
 

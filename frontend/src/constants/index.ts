@@ -24,8 +24,6 @@ export const API_ENDPOINTS = {
   TWITCH_LOGIN: '/api/auth/twitch/login',
   TWITCH_AUTH: '/auth/twitch/login',
   VK_AUTH: '/auth/vk/login',
-  VK_GUEST_START: '/auth/vk/guest/start',
-  VK_GUEST_VERIFY: '/auth/vk/guest/verify',
   BOT_CONNECT: '/api/chat/connect',
   BOT_DISCONNECT: '/api/chat/disconnect',
   BOT_STATUS: '/api/chat/status',
@@ -59,7 +57,6 @@ export const PLATFORMS = {
 
 export const USER_MODES = {
   AUTH: 'auth',
-  GUEST: 'guest',
 } as const;
 
 export const STATUS = {

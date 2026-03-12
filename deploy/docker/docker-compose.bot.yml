@@ -1,6 +1,6 @@
 # docker-compose.bot.yml
 # Bot Service deployment (Machine 2 - Remote Server)
-# Connects to remote TTS service via Cloudflare Tunnel
+# Connects to remote gateway/provider upstreams managed outside this host
 
 services:
   # PostgreSQL Database

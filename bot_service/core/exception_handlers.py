@@ -83,9 +83,10 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
             },
         )
 
-    # Do not expose internal exception details on 5xx responses.
+    # Preserve 503 details for actionable dependency/runtime availability messages.
+    # Other 5xx responses stay sanitized.
     response_detail = exc.detail
-    if exc.status_code >= 500:
+    if exc.status_code >= 500 and exc.status_code != 503:
         response_detail = "Внутренняя ошибка сервера"
 
     return JSONResponse(

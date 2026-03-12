@@ -4,6 +4,7 @@ Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, Donat
 
 ## Start Here
 - [docs/QUICKSTART.md](docs/QUICKSTART.md): fastest local setup.
+- [docs/STATUS_TRACKER.md](docs/STATUS_TRACKER.md): current delivery status, closed work, and open tasks.
 - [docs/README.md](docs/README.md): authoritative docs index (active vs historical).
 - [docs/REPO_STRUCTURE.md](docs/REPO_STRUCTURE.md): what each top-level folder is for.
 - [docs/guides/REPO_CLEANUP_PLAN.md](docs/guides/REPO_CLEANUP_PLAN.md): what is already cleaned and what remains.
@@ -11,7 +12,16 @@ Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, Donat
 - [docs/architecture/ARCHITECTURE_GUIDE.md](docs/architecture/ARCHITECTURE_GUIDE.md): architecture deep dive.
 
 ## Minimal Local Run (required path)
-1. Configure env files:
+1. Create and activate a project venv:
+- `python -m venv .venv`
+- Windows PowerShell: `.\.venv\Scripts\Activate.ps1`
+
+2. Install project dependencies:
+- Backend runtime: `python -m pip install -r bot_service/requirements.txt`
+- Backend contributor extras: `python -m pip install -r bot_service/requirements_dev.txt`
+- Frontend: `cd frontend; npm install`
+
+3. Configure env files:
 - `bot_service/.env`
 - `frontend/.env`
 - optional external TTS stack (recommended split):
@@ -20,13 +30,13 @@ Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, Donat
   - `QWEN_TTS_SERVICE_URL` + `QWEN_TTS_SERVICE_API_KEY` -> `nano-qwen3tts-vllm`
   - optional qwen voice CRUD extension: `QWEN_VOICE_SERVICE_URL`
 
-2. Run DB bootstrap:
+4. Run DB bootstrap:
 - Windows: `.\scripts\migrate.ps1`
 - Linux/Mac: `./scripts/migrate.sh`
 
-3. Start app:
+5. Start app:
 - Backend: `cd bot_service; python main.py`
-- Frontend: `cd frontend; npm install; npm run dev`
+- Frontend: `cd frontend; npm run dev`
 
 Frontend runtime contract:
 - frontend should know only backend API/WS URLs (`VITE_BOT_SERVICE_URL`, `VITE_BOT_SERVICE_WS_URL`).

@@ -48,7 +48,7 @@ class UserManagementService:
                 user.role = 'user'
                 changes.append("role: admin -> user")
 
-        if 'role' in request and request['role'] in ('admin', 'user', 'guest'):
+        if 'role' in request and request['role'] in ('admin', 'user'):
             if user.role != request['role']:
                 old_role = user.role
                 user.role = request['role']

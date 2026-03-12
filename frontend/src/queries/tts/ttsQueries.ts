@@ -486,7 +486,14 @@ export const useLocalTtsConfig = (
     queryKey: queryKeys.tts.localTtsConfig(provider),
     queryFn: async () => {
       const response = await unwrapResponse(ttsService.getLocalTtsConfig(provider)) as ApiResponse<LocalTtsConfig> & { config?: LocalTtsConfig };
-      return response?.config || response?.data || null;
+      const mergedConfig = response?.config || response?.data || null;
+      if (!mergedConfig && !response) {
+        return null;
+      }
+      return {
+        ...(response || {}),
+        ...(mergedConfig || {}),
+      } as LocalTtsConfig;
     },
     staleTime: 5 * 60 * 1000, // 5 минут
     gcTime: 10 * 60 * 1000, // 10 минут

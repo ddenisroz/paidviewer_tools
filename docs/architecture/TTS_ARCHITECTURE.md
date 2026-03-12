@@ -1,6 +1,6 @@
 ﻿# TTS Architecture
 
-Last updated: 2026-02-25
+Last updated: 2026-03-12
 
 ## 1. Runtime Topology
 
@@ -10,13 +10,21 @@ Last updated: 2026-02-25
 - `f5-tts-service`: provider-owned F5 synthesis + voice/admin APIs.
 - `nano-qwen3tts-vllm`: provider-owned Qwen synthesis engine.
 
-## 2. Provider Routing Rules
+## 2. Deployment Topologies
+
+- `self-hosted endpoint`: пользователь сам поднимает TTS-сервис и подключает его через `local_tts_endpoints`.
+- `project-hosted direct worker`: отдельный воркер проекта, хостится вашей инфраструктурой и подключается по фиксированному upstream URL.
+- `gateway-managed`: `bot_service -> tts-gateway -> project-hosted workers`.
+
+Existing runtime flags `use_local`, `f5_local`, `qwen_local` are legacy naming for the self-hosted path and are intentionally preserved for now.
+
+## 3. Provider Routing Rules
 
 ### Synthesis
 
 - `gcloud`: internal path in `bot_service`.
-- `f5`: gateway-first (`TTS_GATEWAY_URL`), direct fallback if gateway is not configured.
-- `qwen`: gateway-only in cloud mode; without gateway, route is unavailable and runtime falls back to basic TTS.
+- `f5`: gateway-managed first (`TTS_GATEWAY_URL`), project-hosted direct fallback if gateway is not configured, self-hosted endpoint optional.
+- `qwen`: gateway-managed in managed mode; self-hosted endpoint is optional via compatibility adapter; without gateway, managed route is unavailable and runtime falls back to basic TTS.
 
 ### Voice/Admin
 
@@ -24,7 +32,7 @@ Last updated: 2026-02-25
 - `qwen`: disabled by default (`501`) until `QWEN_VOICE_SERVICE_URL` is configured.
 - `gcloud`: no custom voice CRUD in core.
 
-## 3. Auth Model
+## 4. Auth Model
 
 Strict API-key for TTS upstream calls.
 
@@ -36,11 +44,11 @@ Strict API-key for TTS upstream calls.
 Keys are resolved by upstream type:
 
 - gateway: `TTS_GATEWAY_API_KEY`
-- f5 direct: `F5_TTS_SERVICE_API_KEY`
-- qwen direct/voice: `QWEN_TTS_SERVICE_API_KEY` (reserved for staged qwen voice integration)
-- local endpoint: per-user saved `api_key` from `local_tts_endpoints`
+- f5 project-hosted direct worker: `F5_TTS_SERVICE_API_KEY`
+- qwen project-hosted direct worker / voice: `QWEN_TTS_SERVICE_API_KEY` (reserved for staged qwen voice integration)
+- self-hosted endpoint: per-user saved `api_key` from `local_tts_endpoints`
 
-## 4. DB Ownership
+## 5. DB Ownership
 
 `bot_service` DB stores:
 
@@ -49,9 +57,11 @@ Keys are resolved by upstream type:
 - local endpoint configs and endpoint API keys
 - user voice overrides metadata (`tts_provider`-aware)
 
+`use_local_tts` and provider `*_local` naming in runtime settings still refer to the self-hosted endpoint path.
+
 Provider services store provider-local operational state (voice catalogs, provider internals).
 
-## 5. Public Backend Surface
+## 6. Public Backend Surface
 
 - `GET /api/tts/health?provider=f5|qwen|gcloud`
 - `GET /api/voices/providers/capabilities`
@@ -62,20 +72,20 @@ Capability behavior:
 - qwen voice CRUD unavailable -> explicit `501` with machine-readable detail
 - frontend uses capabilities to disable unsupported actions
 
-## 6. Frontend Boundary Hardening
+## 7. Frontend Boundary Hardening
 
 - `VITE_TTS_SERVICE_URL` is deprecated and not required for runtime startup.
 - No direct `ttsApiClient`; all runtime calls go through backend API client.
 - Audio URL normalization is backend-safe (absolute passthrough, relative -> backend base URL).
 - WebSocket fallback hardcodes to `:8000` were removed (`window.location.host` used).
 
-## 7. Fallback Chain
+## 8. Fallback Chain
 
 1. Try selected advanced provider path.
 2. If unavailable/error/timeout, use basic `gtts` fallback.
-3. For local mode, missing/unhealthy local endpoint immediately enters fallback path.
+3. For self-hosted endpoint mode, missing/unhealthy endpoint immediately enters fallback path.
 
-## 8. Operational Runbook Ports
+## 9. Operational Runbook Ports
 
 Recommended local ports:
 
@@ -84,7 +94,7 @@ Recommended local ports:
 - qwen engine: `8000`
 - bot_service: `8000`
 
-## 9. Known Prerequisites
+## 10. Known Prerequisites
 
 - `tts-gateway` requires Redis configured (`TTS_GATEWAY_REDIS_URL`).
 - `f5-tts-service` startup requires populated upstream/model assets (`vendor/F5-TTS`, weights).

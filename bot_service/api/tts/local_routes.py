@@ -36,6 +36,48 @@ def _redact_api_key(api_key: Optional[str]) -> Optional[str]:
     return f"{api_key[:3]}***{api_key[-2:]}"
 
 
+def _provider_contract(provider: str) -> dict:
+    if provider == "qwen":
+        return {
+            "upstream_parity_ready": False,
+            "requires_compatibility_adapter": True,
+            "managed_topology": "gateway_managed",
+            "project_hosted_direct_supported": False,
+            "supports_native_strict_api_key": False,
+            "supports_native_health_endpoint": False,
+            "supports_native_status_endpoint": False,
+            "supports_local_voice_management": False,
+            "warning": (
+                "Этот экран настраивает self-hosted endpoint пользователя. "
+                "Managed path для Qwen в проекте сейчас gateway-managed: bot_service -> tts-gateway -> project-hosted worker. "
+                "Текущий upstream nano-qwen3tts-vllm еще не доведен до полного контракта bot_service, поэтому для self-hosted endpoint "
+                "bot_service использует compatibility adapter поверх /api/prepare -> /api/stream/{id}."
+            ),
+        }
+
+    return {
+        "upstream_parity_ready": True,
+        "requires_compatibility_adapter": False,
+        "managed_topology": "gateway_managed",
+        "project_hosted_direct_supported": True,
+        "supports_native_strict_api_key": True,
+        "supports_native_health_endpoint": True,
+        "supports_native_status_endpoint": True,
+        "supports_local_voice_management": True,
+        "warning": None,
+    }
+
+
+def _qwen_local_contract_detail() -> str:
+    return (
+        "Этот endpoint трактуется как self-hosted Qwen endpoint пользователя. "
+        "Managed path в проекте остается gateway-managed через project-hosted worker. "
+        "Текущий upstream Qwen еще не доведен до полного bot_service contract, поэтому для self-hosted path "
+        "в этом репозитории используется compatibility adapter; для native parity upstream должен получить "
+        "health/auth/status/synthesis contract."
+    )
+
+
 # ============================================================================
 # LOCAL TTS CONFIG
 # ============================================================================
@@ -50,6 +92,7 @@ async def get_local_tts_config(
     """Get local TTS config for selected provider."""
     try:
         resolved_provider = _normalize_local_provider(provider)
+        provider_contract = _provider_contract(resolved_provider)
 
         if not user:
             raise HTTPException(status_code=401, detail="Authentication required")
@@ -66,8 +109,9 @@ async def get_local_tts_config(
                 "configured": False,
                 "config": None,
                 "provider": resolved_provider,
+                "provider_contract": provider_contract,
                 "healthy": False,
-                "can_manage_voices": True,
+                "can_manage_voices": bool(provider_contract["supports_local_voice_management"]),
                 "endpoint_url": None,
                 "api_key": None,
                 "api_key_redacted": None,
@@ -81,8 +125,9 @@ async def get_local_tts_config(
             "success": True,
             "configured": True,
             "provider": resolved_provider,
+            "provider_contract": provider_contract,
             "healthy": config.is_healthy,
-            "can_manage_voices": True,
+            "can_manage_voices": bool(provider_contract["supports_local_voice_management"]),
             "endpoint_url": config.endpoint_url,
             "api_key": None,
             "api_key_redacted": api_key_redacted,
@@ -99,6 +144,7 @@ async def get_local_tts_config(
                 "is_active": config.is_active,
                 "use_local": config.use_local,
                 "is_healthy": config.is_healthy,
+                "provider_contract": provider_contract,
             },
         }
     except HTTPException:
@@ -123,6 +169,7 @@ async def save_local_tts_config(
             raise HTTPException(status_code=401, detail="Authentication required")
 
         resolved_provider = _normalize_local_provider(request.provider)
+        provider_contract = _provider_contract(resolved_provider)
         repo = LocalTTSRepository(db)
         config = repo.create_or_update(
             endpoint_url=request.endpoint_url,
@@ -132,13 +179,18 @@ async def save_local_tts_config(
             provider=resolved_provider,
         )
 
-        health_status = await check_local_tts_health(config.endpoint_url, config.api_key)
+        health_status = await check_local_tts_health(
+            config.endpoint_url,
+            config.api_key,
+            provider=resolved_provider,
+        )
         repo.update_health_status(config, health_status.get("healthy", False))
 
         return {
             "success": True,
             "provider": resolved_provider,
             "message": "Configuration saved",
+            "provider_contract": provider_contract,
             "config": {
                 "id": config.id,
                 "provider": config.provider,
@@ -147,6 +199,7 @@ async def save_local_tts_config(
                 "api_key_redacted": _redact_api_key(config.api_key),
                 "has_api_key": bool(config.api_key),
                 "use_local": config.use_local,
+                "provider_contract": provider_contract,
             },
         }
     except HTTPException:
@@ -170,6 +223,7 @@ async def toggle_local_tts(
     """Toggle use_local flag for selected local provider."""
     try:
         resolved_provider = _normalize_local_provider(provider)
+        provider_contract = _provider_contract(resolved_provider)
         repo = LocalTTSRepository(db)
 
         db_user = repo.get_user_by_id(user["id"])
@@ -190,12 +244,20 @@ async def toggle_local_tts(
         config = repo.toggle_use_local(config)
 
         if config.use_local:
-            health_status = await check_local_tts_health(config.endpoint_url, config.api_key)
+            health_status = await check_local_tts_health(
+                config.endpoint_url,
+                config.api_key,
+                provider=resolved_provider,
+            )
             if not health_status.get("healthy", False):
                 repo.disable_local(config)
                 raise HTTPException(
                     status_code=503,
-                    detail="Local TTS is unavailable. Check your connection.",
+                    detail=(
+                        _qwen_local_contract_detail()
+                        if resolved_provider == "qwen"
+                        else "Local TTS is unavailable. Check your connection."
+                    ),
                 )
 
         return {
@@ -203,6 +265,7 @@ async def toggle_local_tts(
             "provider": resolved_provider,
             "message": f"Local TTS {'enabled' if config.use_local else 'disabled'}",
             "use_local": config.use_local,
+            "provider_contract": provider_contract,
         }
     except HTTPException:
         raise
@@ -228,32 +291,45 @@ async def test_local_tts_connection(
 
     try:
         resolved_provider = _normalize_local_provider(request.provider)
-        endpoint = normalize_local_tts_endpoint_url(request.endpoint_url)
-        headers = {}
-        if request.api_key:
-            headers["Authorization"] = f"Bearer {request.api_key}"
+        provider_contract = _provider_contract(resolved_provider)
+        health_result = await check_local_tts_health(
+            request.endpoint_url,
+            request.api_key,
+            provider=resolved_provider,
+            fetch_status=True,
+        )
+        if not health_result.get("healthy", False):
+            if resolved_provider == "qwen":
+                raise HTTPException(status_code=502, detail=_qwen_local_contract_detail())
+            raise HTTPException(
+                status_code=502,
+                detail=health_result.get("error") or "Connection check failed",
+            )
 
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            health_response = await client.get(f"{endpoint}/health", headers=headers)
+        health_data = {
+            key: value
+            for key, value in health_result.items()
+            if key not in {"healthy", "status_data", "error"}
+        }
+        warnings = []
+        status_data = health_result.get("status_data")
 
-            if health_response.status_code != 200:
-                raise HTTPException(status_code=502, detail=f"Server returned status code {health_response.status_code}")
+        if resolved_provider == "qwen":
+            warnings.append(provider_contract["warning"])
 
-            health_data = health_response.json()
-
-            try:
-                status_response = await client.get(f"{endpoint}/api/status", headers=headers)
-                status_data = status_response.json() if status_response.status_code == 200 else None
-            except Exception:
-                status_data = None
-
-            return {
-                "success": True,
-                "provider": resolved_provider,
-                "message": "Connection successful",
-                "health_data": health_data,
-                "status_data": status_data,
-            }
+        return {
+            "success": True,
+            "provider": resolved_provider,
+            "message": (
+                "Self-hosted Qwen endpoint is reachable via compatibility path"
+                if resolved_provider == "qwen"
+                else "Connection successful"
+            ),
+            "provider_contract": provider_contract,
+            "warnings": warnings,
+            "health_data": health_data,
+            "status_data": status_data,
+        }
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
     except httpx.TimeoutException:

@@ -31,7 +31,6 @@ async def get_admin_users(
     page: int = 1,
     limit: int = 50,
     search: str = None,
-    include_guests: bool = True,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -150,7 +149,6 @@ async def unblock_user(
 async def get_sessions(
     page: int = 1,
     limit: int = 50,
-    include_guests: bool = True,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

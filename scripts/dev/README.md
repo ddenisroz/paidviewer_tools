@@ -16,6 +16,7 @@ Current scripts:
 - `list_users.py`
 - `setup_public_domain.ps1`
 - `test_memealerts_auth.py`
+- `tts-smoke-preflight.ps1`
 - `verify_api.py`
 
 Run from repo root, for example:
@@ -38,4 +39,10 @@ Workspace cleanup (dry-run by default):
 ```powershell
 .\scripts\dev\cleanup_workspace_caches.ps1
 .\scripts\dev\cleanup_workspace_caches.ps1 -Apply
+```
+
+Live smoke preflight:
+
+```powershell
+.\scripts\dev\tts-smoke-preflight.ps1 -Scenario all
 ```

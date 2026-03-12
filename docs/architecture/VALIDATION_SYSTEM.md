@@ -29,7 +29,8 @@ The validation system follows a **defense in depth** approach:
 
 ### Zod Schemas
 
-Location: `frontend/src/utils/validationSchemas.ts`
+Primary location: `frontend/src/shared/utils/validationSchemas.ts`
+Legacy compatibility re-export: `frontend/src/utils/validationSchemas.ts`
 
 #### Available Schemas
 
@@ -64,8 +65,8 @@ userSettingsSchema         // User preferences
 // Support
 supportTicketSchema        // Support ticket creation
 
-// Guest Mode
-guestModeSchema            // Guest connection
+// Authentication
+loginSchema                // OAuth/login form validation
 
 // YouTube
 youtubeSettingsSchema      // YouTube integration settings
@@ -199,9 +200,6 @@ SupportTicketRequest
 
 # User Settings
 UserSettingsUpdateRequest
-
-# Guest Mode
-GuestConnectRequest
 
 # YouTube
 YouTubeSettingsUpdateRequest

@@ -12,6 +12,7 @@ Features:
 - Log rotation
 """
 import logging
+import os
 import re
 import sys
 from pathlib import Path
@@ -198,6 +199,53 @@ def _configure_console_streams_for_utf8() -> None:
             continue
 
 
+def _should_use_plain_file_handler() -> bool:
+    """
+    Windows + development mode usually means uvicorn reload with multiple processes.
+
+    RotatingFileHandler is not safe in that setup because rollover renames the active
+    log file and frequently fails with WinError 32 when another process still holds it.
+    """
+    return os.name == "nt" and settings.is_development
+
+
+def _create_file_log_handler(log_file: Path, file_log_level: int) -> logging.Handler | None:
+    """Create the file log handler with a Windows-safe development fallback."""
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)-8s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    if _should_use_plain_file_handler():
+        handler = logging.FileHandler(log_file, encoding="utf-8")
+        module_logger.info(
+            "Using plain FileHandler for '%s' on Windows development runtime to avoid reload rotation conflicts.",
+            log_file,
+        )
+    else:
+        from logging.handlers import RotatingFileHandler
+
+        try:
+            handler = RotatingFileHandler(
+                log_file,
+                maxBytes=5 * 1024 * 1024,  # 5 MB max
+                backupCount=5,  # Keep 5 files = 25 MB total max
+                encoding="utf-8",
+            )
+        except (PermissionError, OSError) as exc:
+            module_logger.warning(
+                "Log rotation disabled for '%s': %s",
+                log_file,
+                exc,
+            )
+            return None
+
+    handler.setFormatter(formatter)
+    handler.setLevel(file_log_level)
+    handler.addFilter(SensitiveDataFilter())
+    return handler
+
+
 def setup_structured_logging():
     """
     Configure structured logging for the application.
@@ -319,41 +367,16 @@ def setup_log_rotation():
 
     File log level is configurable via settings.log_file_level.
     """
-    from logging.handlers import RotatingFileHandler
-    
     log_file = Path(getattr(settings, 'log_file', 'logs/bot_service.log'))
     if not log_file.is_absolute():
         repo_root = Path(__file__).resolve().parents[2]
         log_file = repo_root / log_file
     log_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Formatter with timestamp
-    formatter = logging.Formatter(
-        '%(asctime)s | %(levelname)-8s | %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    
+
     file_log_level = _resolve_log_level(getattr(settings, "log_file_level", "WARNING"), logging.WARNING)
-
-    # Single rotating file handler with configurable level
-    try:
-        handler = RotatingFileHandler(
-            log_file,
-            maxBytes=5 * 1024 * 1024,  # 5 MB max
-            backupCount=5,  # Keep 5 files = 25 MB total max
-            encoding="utf-8",
-        )
-    except (PermissionError, OSError) as exc:
-        module_logger.warning(
-            "Log rotation disabled for '%s': %s",
-            log_file,
-            exc,
-        )
+    handler = _create_file_log_handler(log_file, file_log_level)
+    if handler is None:
         return
-
-    handler.setFormatter(formatter)
-    handler.setLevel(file_log_level)
-    handler.addFilter(SensitiveDataFilter())
 
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)

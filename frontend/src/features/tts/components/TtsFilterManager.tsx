@@ -228,10 +228,10 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
     const availablePlatforms = getAvailablePlatforms();
 
     return (
-        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-4 ${className || ''}`} data-testid="tts-filter-card">
+        <div className={`grid grid-cols-1 gap-3 lg:grid-cols-2 ${className || ''}`} data-testid="tts-filter-card">
             {/* ========== ЧЕРНЫЙ СПИСОК ========== */}
             <Card className="card-glass flex flex-col h-full border-gray-800/60">
-                <CardHeader className="pb-3 border-b border-white/5">
+                <CardHeader className="border-b border-white/5 pb-2.5">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-base font-bold flex items-center gap-2">
                             <div className="p-1.5 rounded-lg bg-red-500/10 text-red-400">
@@ -247,7 +247,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                     </div>
                 </CardHeader>
 
-                <CardContent className="flex-1 p-4 space-y-4">
+                <CardContent className="flex-1 space-y-3 p-3.5">
                     {/* Форма добавления */}
                     <div className="flex gap-2">
                         <div className="relative flex-1 group">
@@ -288,14 +288,14 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                     </div>
 
                     {/* Список */}
-                    <div className="space-y-1.5 max-h-[min(160px,30vh)] overflow-y-auto custom-scrollbar pr-1">
+                    <div className="max-h-[min(132px,24vh)] space-y-1.5 overflow-y-auto pr-1 custom-scrollbar">
                         {loadingUsers ? (
-                            <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+                            <div className="flex flex-col items-center justify-center py-6 text-gray-500">
                                 <div className="w-5 h-5 border-2 border-gray-600 border-t-red-400 rounded-full animate-spin mb-2" />
                                 <span className="text-xs">Загрузка...</span>
                             </div>
                         ) : blacklist.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-8 text-gray-500/50 border border-dashed border-gray-800/50 rounded-lg">
+                            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-800/50 py-6 text-gray-500/50">
                                 <UserX className="w-8 h-8 mb-2 opacity-30" />
                                 <span className="text-xs">Нет заблокированных</span>
                             </div>
@@ -347,7 +347,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
 
             {/* ========== ЗАПРЕЩЕННЫЕ СЛОВА ========== */}
             <Card className="card-glass flex flex-col h-full border-gray-800/60">
-                <CardHeader className="pb-3 border-b border-white/5">
+                <CardHeader className="border-b border-white/5 pb-2.5">
                     <div className="flex items-center justify-between">
                         <CardTitle className="text-base font-bold flex items-center gap-2">
                             <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
@@ -363,7 +363,7 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                     </div>
                 </CardHeader>
 
-                <CardContent className="flex-1 p-4 space-y-4">
+                <CardContent className="flex-1 space-y-3 p-3.5">
                     {/* Форма добавления */}
                     <div className="flex gap-2">
                         <Input
@@ -385,14 +385,14 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
                     </div>
 
                     {/* Список слов - тегами */}
-                    <div className="flex flex-wrap gap-2 max-h-[min(160px,30vh)] overflow-y-auto custom-scrollbar content-start pr-1">
+                    <div className="flex max-h-[min(132px,24vh)] flex-wrap content-start gap-2 overflow-y-auto pr-1 custom-scrollbar">
                         {loadingWords ? (
-                            <div className="w-full flex flex-col items-center justify-center py-8 text-gray-500">
+                            <div className="flex w-full flex-col items-center justify-center py-6 text-gray-500">
                                 <div className="w-5 h-5 border-2 border-gray-600 border-t-indigo-400 rounded-full animate-spin mb-2" />
                                 <span className="text-xs">Загрузка...</span>
                             </div>
                         ) : !Array.isArray(words) || words.length === 0 ? (
-                            <div className="w-full flex flex-col items-center justify-center py-8 text-gray-500/50 border border-dashed border-gray-800/50 rounded-lg">
+                            <div className="flex w-full flex-col items-center justify-center rounded-lg border border-dashed border-gray-800/50 py-6 text-gray-500/50">
                                 <AlertCircle className="w-8 h-8 mb-2 opacity-30" />
                                 <span className="text-xs">Нет запрещенных слов</span>
                             </div>

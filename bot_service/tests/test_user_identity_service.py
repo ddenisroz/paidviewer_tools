@@ -1,188 +1,61 @@
-"""
-Тесты для UserIdentityService
-"""
+﻿"""Tests for authenticated-only UserIdentityService helpers."""
+
 import pytest
+
 from services.user_identity_service import UserIdentityService, UserType
 
+
 class TestUserIdentityService:
-    """Тесты для сервиса идентификации пользователей"""
-    
-    def test_get_user_type_guest(self):
-        """Тест определения типа гостя"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True,
-            "session_id": "abc-123-def"
-        }
-        
-        user_type = UserIdentityService.get_user_type(guest_user)
-        assert user_type == UserType.GUEST
-    
     def test_get_user_type_authenticated(self):
-        """Тест определения типа авторизованного пользователя"""
-        auth_user = {
-            "id": 1,
-            "is_guest": False,
-            "username": "testuser"
-        }
-        
+        auth_user = {"id": 1, "username": "testuser"}
         user_type = UserIdentityService.get_user_type(auth_user)
         assert user_type == UserType.AUTHENTICATED
-    
-    def test_get_user_identifier_guest(self):
-        """Тест получения идентификатора гостя"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True,
-            "session_id": "abc-123-def"
-        }
-        
-        identifier = UserIdentityService.get_user_identifier(guest_user)
-        assert identifier == "abc-123-def"
-    
+
     def test_get_user_identifier_authenticated(self):
-        """Тест получения идентификатора авторизованного пользователя"""
-        auth_user = {
-            "id": 1,
-            "is_guest": False,
-            "username": "testuser"
-        }
-        
-        identifier = UserIdentityService.get_user_identifier(auth_user)
-        assert identifier == "1"
-    
-    def test_get_database_filters_guest(self):
-        """Тест получения фильтров БД для гостя"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True,
-            "session_id": "abc-123-def"
-        }
-        
-        filters = UserIdentityService.get_database_filters(guest_user)
-        expected = {"session_id": "abc-123-def"}
-        assert filters == expected
-    
+        auth_user = {"id": 1, "username": "testuser"}
+        assert UserIdentityService.get_user_identifier(auth_user) == "1"
+
     def test_get_database_filters_authenticated(self):
-        """Тест получения фильтров БД для авторизованного пользователя"""
-        auth_user = {
-            "id": 1,
-            "is_guest": False,
-            "username": "testuser"
-        }
-        
-        filters = UserIdentityService.get_database_filters(auth_user)
-        expected = {"user_id": 1}
-        assert filters == expected
-    
-    def test_create_settings_record_data_guest(self):
-        """Тест создания данных записи настроек для гостя"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True,
-            "session_id": "abc-123-def"
-        }
-        
-        data = UserIdentityService.create_settings_record_data(guest_user)
-        expected = {"session_id": "abc-123-def", "user_id": None}
-        assert data == expected
-    
+        auth_user = {"id": 1, "username": "testuser"}
+        assert UserIdentityService.get_database_filters(auth_user) == {"user_id": 1}
+
     def test_create_settings_record_data_authenticated(self):
-        """Тест создания данных записи настроек для авторизованного пользователя"""
-        auth_user = {
-            "id": 1,
-            "is_guest": False,
-            "username": "testuser"
-        }
-        
-        data = UserIdentityService.create_settings_record_data(auth_user)
-        expected = {"user_id": 1, "session_id": None}
-        assert data == expected
-    
-    def test_get_tts_channel_name_guest(self):
-        """Тест получения имени канала TTS для гостя"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True,
-            "session_id": "abc-123-def"
-        }
-        
-        channel_name = UserIdentityService.get_tts_channel_name(guest_user)
-        assert channel_name == "guest_abc-123-def"
-    
+        auth_user = {"id": 1, "username": "testuser"}
+        assert UserIdentityService.create_settings_record_data(auth_user) == {"user_id": 1, "session_id": None}
+
+    def test_get_websocket_user_id_authenticated(self):
+        auth_user = {"id": 7, "username": "testuser"}
+        assert UserIdentityService.get_websocket_user_id(auth_user) == "7"
+
+    def test_get_rate_limit_id_authenticated(self):
+        auth_user = {"id": 9, "username": "testuser"}
+        assert UserIdentityService.get_rate_limit_id(auth_user) == "9"
+
     def test_get_tts_channel_name_authenticated(self):
-        """Тест получения имени канала TTS для авторизованного пользователя"""
-        auth_user = {
-            "id": 1,
-            "is_guest": False,
-            "username": "testuser"
-        }
-        
-        channel_name = UserIdentityService.get_tts_channel_name(auth_user)
-        assert channel_name == "user_1"
-    
-    def test_validate_user_data_guest_valid(self):
-        """Тест валидации данных гостя (валидные данные)"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True,
-            "session_id": "abc-123-def"
-        }
-        
-        is_valid = UserIdentityService.validate_user_data(guest_user)
-        assert is_valid == True
-    
+        auth_user = {"id": 1, "username": "testuser"}
+        assert UserIdentityService.get_tts_channel_name(auth_user) == "user_1"
+
     def test_validate_user_data_authenticated_valid(self):
-        """Тест валидации данных авторизованного пользователя (валидные данные)"""
-        auth_user = {
-            "id": 1,
-            "is_guest": False,
-            "username": "testuser"
-        }
-        
-        is_valid = UserIdentityService.validate_user_data(auth_user)
-        assert is_valid == True
-    
-    def test_validate_user_data_guest_invalid(self):
-        """Тест валидации данных гостя (невалидные данные - нет session_id)"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True
-            # Отсутствует session_id
-        }
-        
-        is_valid = UserIdentityService.validate_user_data(guest_user)
-        assert is_valid == False
-    
+        auth_user = {"id": 1, "username": "testuser"}
+        assert UserIdentityService.validate_user_data(auth_user) is True
+
     def test_validate_user_data_authenticated_invalid(self):
-        """Тест валидации данных авторизованного пользователя (невалидные данные - нет id)"""
-        auth_user = {
-            "is_guest": False,
-            "username": "testuser"
-            # Отсутствует id
-        }
-        
-        is_valid = UserIdentityService.validate_user_data(auth_user)
-        assert is_valid == False
-    
-    def test_get_user_identifier_guest_missing_session_id(self):
-        """Тест получения идентификатора гостя без session_id (должна быть ошибка)"""
-        guest_user = {
-            "id": -1,
-            "is_guest": True
-            # Отсутствует session_id
-        }
-        
-        with pytest.raises(ValueError, match="Guest user must have session_id"):
-            UserIdentityService.get_user_identifier(guest_user)
-    
-    def test_get_user_identifier_authenticated_missing_id(self):
-        """Тест получения идентификатора авторизованного пользователя без id (должна быть ошибка)"""
-        auth_user = {
-            "is_guest": False,
-            "username": "testuser"
-            # Отсутствует id
-        }
-        
+        auth_user = {"username": "testuser"}
+        assert UserIdentityService.validate_user_data(auth_user) is False
+
+    def test_validate_user_data_rejects_non_positive_id(self):
+        assert UserIdentityService.validate_user_data({"id": 0}) is False
+        assert UserIdentityService.validate_user_data({"id": -1}) is False
+
+    def test_get_user_identifier_missing_id(self):
         with pytest.raises(ValueError, match="Authenticated user must have id"):
-            UserIdentityService.get_user_identifier(auth_user)
+            UserIdentityService.get_user_identifier({"username": "testuser"})
+
+    def test_get_user_identifier_non_numeric_id(self):
+        with pytest.raises(ValueError, match="Authenticated user must have numeric id"):
+            UserIdentityService.get_user_identifier({"id": "abc"})
+
+    def test_get_user_identifier_non_positive_id(self):
+        with pytest.raises(ValueError, match="Authenticated user must have positive id"):
+            UserIdentityService.get_user_identifier({"id": -1})
+

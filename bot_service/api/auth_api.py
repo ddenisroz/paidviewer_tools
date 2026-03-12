@@ -22,7 +22,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 # Reserved usernames
-RESERVED_NAMES = {'admin', 'root', 'system', 'bot', 'moderator', 'mod', 'guest'}
+RESERVED_NAMES = {'admin', 'root', 'system', 'bot', 'moderator', 'mod'}
 
 
 @router.get("/me")

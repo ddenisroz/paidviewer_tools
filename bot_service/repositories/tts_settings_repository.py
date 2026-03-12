@@ -23,7 +23,7 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
         ).first()
     
     def get_by_session_id(self, session_id: str) -> Optional[TTSUserSettings]:
-        """Get TTS settings by session ID (for guests)."""
+        """Get TTS settings by legacy session ID."""
         return self.db.query(TTSUserSettings).filter(
             TTSUserSettings.session_id == session_id
         ).first()

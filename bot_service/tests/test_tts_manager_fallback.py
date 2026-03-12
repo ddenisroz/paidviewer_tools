@@ -1,3 +1,5 @@
+import shutil
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -28,7 +30,7 @@ async def test_f5_cloud_unhealthy_falls_back_to_basic(manager):
     )
 
     result = await manager.synthesize_tts(
-        channel_name="chan",
+            channel_name="chan",
         text="hello",
         author="user",
         user_id=1,
@@ -57,7 +59,7 @@ async def test_qwen_local_without_endpoint_falls_back_to_basic(manager):
     )
 
     result = await manager.synthesize_tts(
-        channel_name="chan",
+            channel_name="chan",
         text="hello",
         author="user",
         user_id=7,
@@ -235,3 +237,134 @@ async def test_get_user_tts_endpoint_returns_saved_api_key(manager, monkeypatch)
         "endpoint_url": "http://endpoint-a",
         "api_key": "local-secret-key",
     }
+
+
+@pytest.mark.asyncio
+async def test_qwen_local_health_check_uses_compat_probe(manager, monkeypatch):
+    calls: list[str] = []
+
+    class _FakeResponse:
+        def __init__(self, status: int):
+            self.status = status
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def json(self):
+            return {}
+
+    class _FakeClientSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url: str, **kwargs):
+            _ = kwargs
+            calls.append(url)
+            if url.endswith("/api/prepare"):
+                return _FakeResponse(405)
+            return _FakeResponse(404)
+
+    monkeypatch.setattr(
+        "services.tts.tts_manager.aiohttp.ClientSession",
+        lambda timeout=None: _FakeClientSession(),
+    )
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_hosts",
+        "endpoint-qwen",
+    )
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_cidrs",
+        "",
+    )
+
+    result = await manager.check_tts_service_health(
+        provider="qwen",
+        endpoint_override="http://endpoint-qwen",
+    )
+
+    assert result is True
+    assert "http://endpoint-qwen/api/prepare" in calls
+
+
+@pytest.mark.asyncio
+async def test_qwen_local_compat_synthesis_saves_audio(manager, monkeypatch):
+    class _FakeResponse:
+        def __init__(self, status: int, payload: dict | None = None, body: bytes = b""):
+            self.status = status
+            self._payload = payload or {}
+            self._body = body
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def json(self):
+            return self._payload
+
+        async def text(self):
+            return self._body.decode("utf-8", errors="ignore")
+
+        async def read(self):
+            return self._body
+
+    class _FakeClientSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url: str, **kwargs):
+            _ = kwargs
+            assert url.endswith("/api/prepare")
+            return _FakeResponse(200, payload={"stream_id": "stream-1"})
+
+        def get(self, url: str, **kwargs):
+            _ = kwargs
+            assert url.endswith("/api/stream/stream-1")
+            return _FakeResponse(200, body=b"RIFFfake-wav")
+
+    monkeypatch.setattr(
+        "services.tts.tts_manager.aiohttp.ClientSession",
+        lambda timeout=None: _FakeClientSession(),
+    )
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_hosts",
+        "endpoint-qwen",
+    )
+    monkeypatch.setattr(
+        "services.tts.provider_utils.settings.local_tts_allowed_cidrs",
+        "",
+    )
+    temp_root = Path("H:/Programming/raw_code/AI/Python/TTS_TTV_0.02/.pytest_tmp/qwen_local_compat")
+    shutil.rmtree(temp_root, ignore_errors=True)
+    temp_root.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr("services.tts.tts_manager.TEMP_DIR", temp_root)
+    manager.basic_tts = SimpleNamespace(detect_language=lambda text: "ru", cleanup_old_files=lambda: None)
+
+    try:
+        result = await manager._synthesize_via_qwen_local_compat(
+        channel_name="chan",
+            text="Привет",
+            author="tester",
+            user_id=42,
+            volume_level=50.0,
+            tts_settings={"qwen_mode": "local"},
+            tts_endpoint="http://endpoint-qwen",
+            tts_endpoint_api_key=None,
+        )
+
+        assert result["success"] is True
+        assert result["tts_type"] == "ai_qwen"
+        assert result["audio_url"].endswith(".wav")
+        assert (temp_root / "tts_audio").exists()
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)

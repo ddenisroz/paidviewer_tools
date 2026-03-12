@@ -28,7 +28,7 @@ def update_user_role(user_id: int, new_role: str, db: Session):
     
     Args:
         user_id: ID пользователя
-        new_role: Новая роль ('admin', 'user', 'guest')
+        new_role: Новая роль ('admin', 'user')
         db: Database session
     """
     from core.database import User

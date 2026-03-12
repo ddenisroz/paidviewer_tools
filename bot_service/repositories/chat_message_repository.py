@@ -105,6 +105,28 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         if platform:
             query = query.filter(ChatMessage.platform == platform)
         return query.order_by(ChatMessage.timestamp.desc()).limit(limit).all()
+
+    def author_exists_in_channel(
+        self,
+        user_id: int,
+        author_username: str,
+        channel_name: str,
+        platform: Optional[str] = None,
+    ) -> bool:
+        """Return True when the author already exists in stored chat history for the channel."""
+        if not author_username or not channel_name:
+            return False
+
+        query = self.db.query(ChatMessage.id).filter(
+            ChatMessage.user_id == user_id,
+            ChatMessage.is_deleted.is_(False),
+            func.lower(ChatMessage.author_username) == author_username.lower(),
+            func.lower(ChatMessage.channel_name) == channel_name.lower(),
+        )
+        if platform:
+            query = query.filter(ChatMessage.platform == platform)
+
+        return query.first() is not None
     
     def create(
         self,

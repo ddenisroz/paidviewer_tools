@@ -15,6 +15,8 @@ This plan tracks what is already cleaned and what remains as technical debt.
 - Moved historical docs out of active root:
   - `docs/DEV_LOG.md` -> `docs/backlog/DEV_LOG_2025_HISTORY.md`
   - `docs/DB_TABLE_USAGE_AUDIT_2026-02-23.md` -> `docs/backlog/DB_TABLE_USAGE_AUDIT_2026-02-23.md`
+- Removed guest-mode references from active developer/runtime docs.
+- Split `bot_service` Python dependencies into runtime-only and dev/test manifests.
 
 ## Keep (Intentional)
 
@@ -30,12 +32,7 @@ This plan tracks what is already cleaned and what remains as technical debt.
 - Risk: medium (broad import graph).
 - Action: migrate to one namespace in small batches with type-check after each batch.
 
-2. Legacy guest/auth residues:
-- Guest-related constants and fallback paths remain in parts of backend/frontend.
-- Risk: medium/high (auth contract).
-- Action: remove only after explicit contract decision and migration notes.
-
-3. Docs reduction:
+2. Docs reduction:
 - Move stale historical implementation details from active guides to `docs/backlog/`.
 - Risk: low.
 - Action: keep only current contracts in active docs.

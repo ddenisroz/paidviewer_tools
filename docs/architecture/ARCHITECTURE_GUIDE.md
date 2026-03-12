@@ -11,11 +11,18 @@ Runtime zones:
   - `f5-tts-service`
   - `nano-qwen3tts-vllm`
 
+Topology terms:
+
+- `self-hosted endpoint`: пользователь сам поднимает TTS-сервис и настраивает URL через `local_tts_endpoints`.
+- `project-hosted worker`: отдельный runtime-воркер проекта.
+- `gateway-managed`: `bot_service` идет в `tts-gateway`, а gateway маршрутизирует запросы в project-hosted workers.
+- Existing `local`/`use_local` names are legacy runtime naming for the self-hosted path.
+
 ## TTS Routing Model
 
 - `gcloud`: backend-internal provider path.
-- `f5`: gateway-first for synthesis; direct fallback if gateway is absent.
-- `qwen`: gateway-only for cloud synthesis.
+- `f5`: gateway-managed for synthesis; project-hosted direct fallback if gateway is absent.
+- `qwen`: gateway-managed for managed synthesis; self-hosted path exists separately through local endpoint configuration.
 - provider voice/admin API remains provider-owned (`f5` now, qwen later).
 
 Fallback policy remains mandatory: advanced failure -> basic `gtts`.

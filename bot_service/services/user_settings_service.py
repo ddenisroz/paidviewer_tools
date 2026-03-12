@@ -1,7 +1,7 @@
 # bot_service/services/user_settings_service.py
 """
 Service for managing user interface settings.
-Handles logic for authenticated users and guests, including cache invalidation.
+Handles authenticated user settings and related cache invalidation.
 """
 import logging
 from typing import Dict, Any, Optional, List
@@ -162,10 +162,7 @@ class UserSettingsService:
             from services.memory_websocket_manager import get_memory_websocket_manager
             
             user_id = user.get("id")
-            # Only send if we have a real user_id (not just session_id, though manager handles sessions too?)
-            # Manager expects integer user_id. 
-            # If user is guest, we might need session based sending, 
-            # but memory_websocket_manager seems to be user_id based (int).
+            # Cache invalidation is delivered only to authenticated user channels.
             
             if user_id:
                 cache_invalidation_event = {

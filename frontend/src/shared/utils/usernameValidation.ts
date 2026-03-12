@@ -16,7 +16,7 @@ export const USERNAME_RULES = {
   minLength: 3,
   maxLength: 25,
   pattern: /^[a-zA-Z0-9_]+$/,
-  reservedNames: ['admin', 'root', 'system', 'bot', 'moderator', 'mod', 'guest'],
+  reservedNames: ['admin', 'root', 'system', 'bot', 'moderator', 'mod'],
 };
 
 /**

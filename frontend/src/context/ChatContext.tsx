@@ -74,6 +74,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         location.pathname.startsWith('/dashboard/chat-analysis') ||
         location.pathname.startsWith('/dashboard/dolbaebadmintts');
     const botStatusPollInterval = isBotStatusPage ? 30000 : 120000;
+    const shouldLoadChatHistory = location.pathname.startsWith('/chat-window');
 
     // State
     const [error, setError] = useState<string | null>(null);
@@ -133,6 +134,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     // Chat history loading
     useChatHistory({
+        enabled: shouldLoadChatHistory,
         isAuthenticated: !!isAuthenticated,
         isConnected,
         integrationsLoading,

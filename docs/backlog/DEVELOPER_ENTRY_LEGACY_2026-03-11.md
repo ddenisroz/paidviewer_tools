@@ -1,4 +1,4 @@
-# Developer Setup (Deprecated Entry)
+# Legacy Developer Entry
 
 This file is kept only for backward compatibility with old links.
 

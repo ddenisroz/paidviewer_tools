@@ -54,7 +54,7 @@ class TestUserSettingsRepository:
         assert fetched_filter.id == settings.id
 
     def test_create_and_get_by_session_id(self, user_settings_repo):
-        """Test creating and retrieving settings for guest session."""
+        """Test creating and retrieving legacy session-scoped settings."""
         session_id = "test-session-uuid-123"
         
         # Create

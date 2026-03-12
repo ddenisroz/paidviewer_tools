@@ -344,7 +344,7 @@ class TestAllSystems:
         """Test that all .env.example files are complete"""
         env_files = [
             (PROJECT_ROOT / '.env.example', ['SECRET_KEY', 'DATABASE_URL', 'TWITCH_CLIENT_ID']),
-            (PROJECT_ROOT / 'frontend/.env.example', ['VITE_BOT_SERVICE_URL', 'VITE_TTS_SERVICE_URL']),
+            (PROJECT_ROOT / 'frontend/.env.example', ['VITE_BOT_SERVICE_URL', 'VITE_BOT_SERVICE_WS_URL']),
             (PROJECT_ROOT / 'bot_service/.env.example', ['F5_TTS_SERVICE_URL', 'QWEN_TTS_SERVICE_URL']),
         ]
         
@@ -376,8 +376,8 @@ class TestAllSystems:
         ]
         
         base_files = [
-            'migrate.sh',
-            'migrate.ps1',
+            'scripts/migrate.sh',
+            'scripts/migrate.ps1',
         ]
         
         for file_path in critical_files:
@@ -396,8 +396,8 @@ class TestAllSystems:
         """Test that documentation exists"""
         doc_files = [
             'README.md',
-            'docs/CURRENT_STATUS.md',
-            'docs/DEVELOPER_GUIDE.md',
+            'docs/STATUS_TRACKER.md',
+            'docs/guides/DEVELOPER_GUIDE.md',
         ]
         
         for file_path in doc_files:

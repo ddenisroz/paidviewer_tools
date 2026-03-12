@@ -1,14 +1,24 @@
 ﻿# Local TTS Integration (Gateway + F5 + Qwen)
 
-Last updated: 2026-02-25
+Last updated: 2026-03-12
+
+Current implementation status lives in `docs/STATUS_TRACKER.md`.
 
 ## Goal
 
-Connect external/local TTS providers to `bot_service` while keeping a single frontend boundary:
+Зафиксировать три topology-модели TTS вокруг `bot_service`, сохраняя единый frontend boundary:
 
 - frontend -> `bot_service` only
-- `f5`/`qwen` synthesis -> `tts-gateway` (gateway-first)
+- self-hosted endpoint -> пользователь сам поднимает TTS и подключает URL через `local_tts_endpoints`
+- project-hosted worker -> отдельный воркер проекта, хостится вашей инфраструктурой и подключается как фиксированный upstream URL
+- gateway-managed -> `bot_service -> tts-gateway -> project-hosted workers`
 - voice/admin CRUD -> provider-owned APIs (`f5` now, `qwen` later)
+
+## Terminology
+
+- `self-hosted endpoint`: пользовательский endpoint, который настраивается через экран Local TTS. Флаги `use_local`, `f5_local`, `qwen_local` пока остаются legacy naming именно для этого режима.
+- `project-hosted worker`: отдельный runtime-воркер проекта. Это не self-hosted режим пользователя.
+- `gateway-managed`: управляемый путь через `tts-gateway`; gateway маршрутизирует запросы в project-hosted workers.
 
 ## Runtime Contract
 
@@ -16,9 +26,11 @@ Connect external/local TTS providers to `bot_service` while keeping a single fro
 2. `bot_service` sends both headers:
    - `Authorization: Bearer <key>`
    - `X-API-Key: <key>`
-3. `qwen` cloud synthesis requires configured gateway (`TTS_GATEWAY_URL`).
+3. Managed `qwen` synthesis requires configured gateway (`TTS_GATEWAY_URL`).
 4. If `QWEN_VOICE_SERVICE_URL` is empty, qwen voice/admin CRUD returns `501` with machine-readable detail.
-5. Local per-user endpoints (`local_tts_endpoints`) can still be used for `f5` and `qwen` local mode; saved endpoint `api_key` is used for health/synthesis.
+5. `local_tts_endpoints` в runtime означают self-hosted endpoints пользователей. Provider parity differs:
+   - `f5`: saved endpoint `api_key` is used for health/synthesis and matches the upstream service contract.
+   - `qwen`: current upstream engine accepts synthesis traffic, but native contract parity is not finished yet; `bot_service` uses a compatibility adapter for the self-hosted path until upstream auth/health/status/synthesis parity is implemented.
 
 ## Required Backend Env
 
@@ -89,6 +101,20 @@ python -m venv .venv
 
 Important: the project requires Linux/WSL2 runtime for Triton/Flash-Attention in practical deployments.
 
+Current upstream gaps relevant to this repo:
+
+- no strict API-key auth in repo code
+- no `GET /health`, `/health/live`, or `/health/ready`
+- no summary `GET /api/status` without `stream_id`
+- current code does not read `API_KEY` or `PORT` env
+
+Practical implication:
+
+- gateway-managed Qwen remains the primary managed production path
+- the project-hosted Qwen worker is expected behind gateway-managed routing
+- self-hosted Qwen works through a backend compatibility adapter in this repo
+- native upstream parity is still pending and tracked separately
+
 ## UI/API Usage
 
 ### Health checks (through backend)
@@ -115,7 +141,11 @@ Behavior now:
 2. Choose provider (`f5` or `qwen`).
 3. Save endpoint (`http(s)://host[:port]`, no path/query/credentials).
 4. Optionally save endpoint API key.
-5. Enable local mode in TTS settings (`f5_local` / `qwen_local`).
+   - For `f5` this maps to a real upstream auth contract.
+   - For current `qwen` upstream code the key is effectively reserved, because auth is not enforced there yet.
+   - The UI marks current `qwen` self-hosted path as a compatibility path and shows provider-specific warnings instead of presenting it as native parity with `f5`.
+5. Enable self-hosted mode in TTS settings.
+   - Backend/runtime flags remain `f5_local` / `qwen_local` for now as legacy naming.
 
 ## Smoke Checklist
 
@@ -124,3 +154,6 @@ Behavior now:
 3. Synthesis via backend/gateway works for `provider=f5` and `provider=qwen`.
 4. F5 voice CRUD works via backend routes.
 5. Qwen voice CRUD is blocked with explicit `501` UX until qwen voice upstream is configured.
+6. Self-hosted Qwen connection checks use a compatibility probe because the upstream repo does not yet provide native `/health`.
+7. Current backend/UI return Qwen-specific contract warnings when native parity is missing and the compatibility adapter is being used.
+8. Upstream completion work is tracked in `docs/backlog/QWEN_UPSTREAM_PARITY_TASKS_2026-03-12_RU.md`.

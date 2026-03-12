@@ -1,7 +1,7 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, CheckCircle2, Play, RefreshCw, Settings } from 'lucide-react';
+import { AlertCircle, Play, RefreshCw, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { STORAGE_KEYS } from '@/constants';
@@ -103,6 +103,8 @@ interface ParsedGcloudVoiceMeta {
 }
 
 type AdvancedProvider = 'f5' | 'qwen' | 'gcloud';
+type PlatformSource = 'twitch' | 'vk';
+type BooleanTtsSettingKey = 'enable7TV' | 'enableTwitch' | 'filterReplies' | 'filterMentions';
 
 type GcloudMood = 'neutral' | 'sad' | 'happy';
 
@@ -111,6 +113,134 @@ const GCLOUD_MOOD_OPTIONS: Array<{ value: GcloudMood; label: string }> = [
     { value: 'sad', label: 'Грустная' },
     { value: 'happy', label: 'Веселая' },
 ];
+
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
+const SECTION_PANEL_CLASS = 'rounded-xl border border-border/70 bg-card/60 p-4';
+const SECTION_EYEBROW_CLASS = 'mb-2 text-xs font-semibold text-muted-foreground';
+const SEGMENT_BUTTON_CLASS = 'rounded-lg border-0 px-3 py-2 text-xs font-semibold transition-colors duration-200 shadow-none';
+
+interface ProviderOptionButtonProps {
+    provider: AdvancedProvider;
+    title: string;
+    active: boolean;
+    available: boolean;
+    disabled: boolean;
+    onSelect: (provider: AdvancedProvider) => void;
+}
+
+const ProviderOptionButton = React.memo(function ProviderOptionButton({
+    provider,
+    title,
+    active,
+    disabled,
+    onSelect,
+}: ProviderOptionButtonProps) {
+    return (
+        <button
+            type="button"
+            onClick={() => onSelect(provider)}
+            disabled={disabled}
+            className={`rounded-lg px-3 py-3 text-left transition-colors ${active
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                } ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}
+        >
+            <div className="text-sm font-semibold">{title}</div>
+        </button>
+    );
+});
+
+interface SourcePlatformCardProps {
+    platform: PlatformSource;
+    isConnected: boolean;
+    isEnabled: boolean;
+    onToggle: (platform: PlatformSource) => void;
+}
+
+const SourcePlatformCard = React.memo(function SourcePlatformCard({
+    platform,
+    isConnected,
+    isEnabled,
+    onToggle,
+}: SourcePlatformCardProps) {
+    const title = platform === 'twitch' ? 'Twitch' : 'VK Live';
+    const iconTone = platform === 'twitch'
+        ? 'bg-violet-500/15 text-violet-200'
+        : 'bg-rose-500/15 text-rose-200';
+    const rootTone = !isConnected
+        ? 'bg-background/50 hover:bg-background/60'
+        : isEnabled
+            ? 'bg-primary/10 hover:bg-primary/15'
+            : 'bg-background/60 hover:bg-primary/8';
+    const connectionTone = isConnected
+        ? 'bg-emerald-500/10 text-emerald-300'
+        : 'bg-rose-500/10 text-rose-300';
+    const ttsTone = isEnabled
+        ? 'bg-sky-500/12 text-sky-300'
+        : 'bg-background/70 text-muted-foreground';
+
+    return (
+        <button
+            type="button"
+            onClick={() => onToggle(platform)}
+            className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left transition-colors ${rootTone}`}
+        >
+            <div className="flex min-w-0 items-center gap-3">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconTone}`}>
+                    {platform === 'twitch' ? <TwitchIcon className="h-5 w-5" /> : <VKIcon className="h-5 w-5" />}
+                </div>
+                <div className="min-w-0">
+                    <div className="text-sm font-semibold text-foreground">{title}</div>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${connectionTone}`}>
+                            {isConnected ? 'Подключена' : 'Не подключена'}
+                        </span>
+                        {isConnected && (
+                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${ttsTone}`}>
+                                {isEnabled ? 'Озвучка вкл.' : 'Озвучка выкл.'}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+            <span
+                className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${!isConnected
+                    ? 'bg-rose-400'
+                    : isEnabled
+                        ? 'bg-sky-400'
+                        : 'bg-muted-foreground/45'
+                    }`}
+            />
+        </button>
+    );
+});
+
+interface TtsFilterSwitchRowProps {
+    label: string;
+    settingKey: BooleanTtsSettingKey;
+    checked: boolean;
+    invert?: boolean;
+    onToggle: (key: BooleanTtsSettingKey, value: boolean) => void;
+}
+
+const TtsFilterSwitchRow = React.memo(function TtsFilterSwitchRow({
+    label,
+    settingKey,
+    checked,
+    invert = false,
+    onToggle,
+}: TtsFilterSwitchRowProps) {
+    return (
+        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-background/60 px-4 py-3">
+            <div className="text-sm font-medium text-foreground">{label}</div>
+            <Switch
+                checked={checked}
+                onCheckedChange={(nextChecked) => onToggle(settingKey, invert ? !Boolean(nextChecked) : Boolean(nextChecked))}
+                className="data-[state=checked]:bg-emerald-600"
+            />
+        </div>
+    );
+});
 
 const normalizeGcloudMood = (value?: string): GcloudMood => {
     const normalized = (value || '').trim().toLowerCase();
@@ -678,7 +808,7 @@ const TtsMainPageContent: React.FC = () => {
         }
     }, [listeningMode, isAuthenticated, user?.id]);
 
-    const handleTtsModeChange = (mode: 'all_messages' | 'channel_points'): void => {
+    const handleTtsModeChange = useCallback((mode: 'all_messages' | 'channel_points'): void => {
         if (isSavingMode || saveTtsModeSettingsMutation.isPending) return;
 
         setIsSavingMode(true);
@@ -697,7 +827,7 @@ const TtsMainPageContent: React.FC = () => {
                 setIsSavingMode(false);
             },
         });
-    };
+    }, [isSavingMode, saveTtsModeSettingsMutation]);
 
     const resolveAvailableF5Mode = useCallback((preferredMode: 'cloud' | 'local'): 'cloud' | 'local' | null => {
         if (preferredMode === 'cloud' && canUseF5Cloud) {
@@ -850,7 +980,7 @@ const TtsMainPageContent: React.FC = () => {
         }
     }, [ttsEnabled, advancedProvider, qwenMode, resolveAvailableQwenMode]);
 
-    const handleGlobalTtsToggle = (): void => {
+    const handleGlobalTtsToggle = useCallback((): void => {
         if (isEngineActionPending) {
             return;
         }
@@ -878,9 +1008,18 @@ const TtsMainPageContent: React.FC = () => {
                 toast.error('Ошибка переключения TTS');
             },
         });
-    };
+    }, [
+        advancedProvider,
+        applySelectedProviderEngine,
+        isAnyTtsEnabled,
+        isEngineActionPending,
+        isTwitchConnected,
+        isVkConnected,
+        queryClient,
+        toggleTtsMutation,
+    ]);
 
-    const handleF5ModeChange = async (mode: 'cloud' | 'local'): Promise<void> => {
+    const handleF5ModeChange = useCallback(async (mode: 'cloud' | 'local'): Promise<void> => {
         if (isEngineActionPending) {
             return;
         }
@@ -908,9 +1047,19 @@ const TtsMainPageContent: React.FC = () => {
             return;
         }
         await applySelectedProviderEngine('f5');
-    };
+    }, [
+        advancedProvider,
+        applySelectedProviderEngine,
+        canUseF5Cloud,
+        canUseF5Local,
+        ensureF5CloudIsHealthy,
+        f5Mode,
+        isEngineActionPending,
+        saveTtsSettingsMutation,
+        ttsEnabled,
+    ]);
 
-    const handleQwenModeChange = async (mode: 'cloud' | 'local'): Promise<void> => {
+    const handleQwenModeChange = useCallback(async (mode: 'cloud' | 'local'): Promise<void> => {
         if (isEngineActionPending) {
             return;
         }
@@ -931,9 +1080,18 @@ const TtsMainPageContent: React.FC = () => {
             return;
         }
         await applySelectedProviderEngine('qwen');
-    };
+    }, [
+        advancedProvider,
+        applySelectedProviderEngine,
+        canUseQwenCloud,
+        canUseQwenLocal,
+        isEngineActionPending,
+        qwenMode,
+        saveTtsSettingsMutation,
+        ttsEnabled,
+    ]);
 
-    const handleAdvancedProviderChange = async (provider: AdvancedProvider): Promise<void> => {
+    const handleAdvancedProviderChange = useCallback(async (provider: AdvancedProvider): Promise<void> => {
         if (provider === advancedProvider) return;
         setAdvancedProvider(provider);
         saveTtsSettingsMutation.mutate({ advancedProvider: provider });
@@ -942,7 +1100,13 @@ const TtsMainPageContent: React.FC = () => {
             return;
         }
         await applySelectedProviderEngine(provider);
-    };
+    }, [
+        advancedProvider,
+        applySelectedProviderEngine,
+        isEngineActionPending,
+        saveTtsSettingsMutation,
+        ttsEnabled,
+    ]);
 
     const openPlayerTab = useCallback((): void => {
         if (typeof window === 'undefined') return;
@@ -956,10 +1120,10 @@ const TtsMainPageContent: React.FC = () => {
         playerWindow.focus();
     }, []);
 
-    const handleListeningModeChange = (mode: 'website' | 'obs'): void => {
+    const handleListeningModeChange = useCallback((mode: 'website' | 'obs'): void => {
         setListeningMode(mode);
         saveListeningModeMutation.mutate(mode);
-    };
+    }, [saveListeningModeMutation]);
 
     const persistGcloudVoices = useCallback((voices: string[]): void => {
         if (gcloudSaveDebounceRef.current) {
@@ -1147,6 +1311,156 @@ const TtsMainPageContent: React.FC = () => {
         });
     }, [isTwitchConnected, isVkConnected, platformSettings.enabled_platforms, savePlatformSettingsMutation]);
 
+    const handleBooleanTtsSettingChange = useCallback((key: BooleanTtsSettingKey, value: boolean): void => {
+        handleTtsSettingChange(key, value);
+    }, [handleTtsSettingChange]);
+
+    const providerOptions = useMemo(() => ([
+        {
+            provider: 'f5' as const,
+            title: 'F5 TTS',
+            active: advancedProvider === 'f5',
+            available: canUseF5TTS || isF5TTSDataLoading,
+        },
+        {
+            provider: 'qwen' as const,
+            title: 'Qwen 3 TTS',
+            active: advancedProvider === 'qwen',
+            available: canUseQwenTTS,
+        },
+        {
+            provider: 'gcloud' as const,
+            title: 'Google Cloud',
+            active: advancedProvider === 'gcloud',
+            available: canUseGcloudTTS || isLoadingGcloudVoices,
+        },
+    ]), [
+        advancedProvider,
+        canUseF5TTS,
+        canUseGcloudTTS,
+        canUseQwenTTS,
+        isF5TTSDataLoading,
+        isLoadingGcloudVoices,
+    ]);
+
+    const providerOptionButtons = useMemo(() => (
+        providerOptions.map((option) => (
+            <ProviderOptionButton
+                key={option.provider}
+                provider={option.provider}
+                title={option.title}
+                active={option.active}
+                available={option.available}
+                disabled={isEngineActionPending}
+                onSelect={(provider) => {
+                    void handleAdvancedProviderChange(provider);
+                }}
+            />
+        ))
+    ), [handleAdvancedProviderChange, isEngineActionPending, providerOptions]);
+
+    const sourcePlatformCards = useMemo(() => (
+        (['twitch', 'vk'] as const).map((platform) => (
+            <SourcePlatformCard
+                key={platform}
+                platform={platform}
+                isConnected={platform === 'twitch' ? isTwitchConnected : isVkConnected}
+                isEnabled={Boolean(platformSettings.enabled_platforms?.includes(platform))}
+                onToggle={handlePlatformToggle}
+            />
+        ))
+    ), [handlePlatformToggle, isTwitchConnected, isVkConnected, platformSettings.enabled_platforms]);
+
+    const filterToggleRows = useMemo(() => ([
+        {
+            key: 'enable7TV' as const,
+            label: '7TV смайлы',
+            checked: ttsSettings.enable7TV,
+        },
+        {
+            key: 'enableTwitch' as const,
+            label: 'Twitch смайлы',
+            checked: ttsSettings.enableTwitch,
+        },
+        {
+            key: 'filterMentions' as const,
+            label: 'Озвучивать «@»',
+            checked: !ttsSettings.filterMentions,
+            invert: true,
+        },
+    ].map((row) => (
+        <TtsFilterSwitchRow
+            key={row.key}
+            label={row.label}
+            settingKey={row.key}
+            checked={row.checked}
+            invert={row.invert}
+            onToggle={handleBooleanTtsSettingChange}
+        />
+    ))), [handleBooleanTtsSettingChange, ttsSettings.enable7TV, ttsSettings.enableTwitch, ttsSettings.filterMentions]);
+
+    const gcloudVoiceRows = useMemo(() => {
+        if (isLoadingGcloudVoices) {
+            return <div className="text-xs text-muted-foreground">Загрузка голосов...</div>;
+        }
+
+        if (gcloudVoices.length === 0) {
+            return <div className="text-xs text-amber-300/90">{getGcloudUnavailableReason()}</div>;
+        }
+
+        return gcloudVoices.map((voice) => {
+            const isSelected = selectedGcloudVoices.includes(voice.name);
+            const voiceMeta = gcloudVoiceMetaMap.get(voice.name) || getGcloudVoiceMeta(voice);
+
+            return (
+                <div
+                    key={voice.name}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/60 px-3 py-2"
+                >
+                    <div className="flex items-center gap-3">
+                        <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={(val) => handleGcloudVoiceToggle(voice.name, Boolean(val))}
+                        />
+                        <div className="space-y-1">
+                            <span className="block text-sm text-foreground" title={voice.name}>
+                                {getGcloudVoiceDisplayName(voice.name)}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5">
+                                    {voiceMeta.modelFamily}
+                                </span>
+                                <span className="rounded-full border border-border/60 bg-background/70 px-2 py-0.5">
+                                    {voiceMeta.genderLabel}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => void handleGcloudPreview(voice.name)}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+                    >
+                        {previewingGcloudVoice === voice.name ? (
+                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                            <Play className="h-3.5 w-3.5" />
+                        )}
+                    </button>
+                </div>
+            );
+        });
+    }, [
+        gcloudVoiceMetaMap,
+        gcloudVoices,
+        getGcloudUnavailableReason,
+        handleGcloudPreview,
+        handleGcloudVoiceToggle,
+        isLoadingGcloudVoices,
+        previewingGcloudVoice,
+        selectedGcloudVoices,
+    ]);
+
     const regenerateObsUrlMutation = useRegenerateTtsObsUrl({
         onSuccess: (response) => {
             const responseData = response?.data as ObsTokenResponse | undefined;
@@ -1166,7 +1480,7 @@ const TtsMainPageContent: React.FC = () => {
         },
     });
 
-    const handleRegenerateObsUrl = (): void => {
+    const handleRegenerateObsUrl = useCallback((): void => {
         if (regenerateObsUrlMutation.isPending) return;
         setIsRegeneratingUrl(true);
         regenerateObsUrlMutation.mutate(undefined, {
@@ -1174,7 +1488,18 @@ const TtsMainPageContent: React.FC = () => {
                 setIsRegeneratingUrl(false);
             },
         });
-    };
+    }, [regenerateObsUrlMutation]);
+
+    useEffect(() => {
+        return () => {
+            if (settingsDebounceRef.current) {
+                clearTimeout(settingsDebounceRef.current);
+            }
+            if (gcloudSaveDebounceRef.current) {
+                clearTimeout(gcloudSaveDebounceRef.current);
+            }
+        };
+    }, []);
 
     if (!isAuthenticated) {
         return (
@@ -1235,42 +1560,46 @@ const TtsMainPageContent: React.FC = () => {
     }
 
     return (
-        <PageWrapper title="Text to Speech">
-            <div className="space-y-4 w-full">
-                {/* Главный переключатель TTS */}
-                <div
-                    className={`flex items-center justify-between p-4 rounded-xl card-glass ${isEngineActionPending ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+        <PageWrapper title="Text to Speech" className="min-h-0 px-0 py-0">
+            <div className="mx-auto w-full max-w-6xl space-y-3">
+                <Card
+                    className={`${SURFACE_CARD_CLASS} ${isEngineActionPending ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                     onClick={isEngineActionPending ? undefined : handleGlobalTtsToggle}
                 >
-                    <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full transition-all duration-300 ${isAnyTtsEnabled ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-gray-600'}`} />
-                        <div>
-                            <div className="text-sm font-bold text-foreground">Озвучка сообщений</div>
-                            <div className="text-xs text-muted-foreground">
-                                {isAnyTtsEnabled ? 'Включена' : 'Выключена'}
+                    <CardContent className="flex items-center justify-between gap-4 p-3.5">
+                        <div className="flex items-center gap-3">
+                            <div className={`h-3 w-3 rounded-full transition-all duration-300 ${isAnyTtsEnabled ? 'bg-emerald-500 shadow-lg shadow-emerald-500/40' : 'bg-muted-foreground/50'}`} />
+                            <div>
+                                <div className="text-sm font-semibold text-foreground">Озвучка сообщений</div>
+                                <div className="text-xs text-muted-foreground">
+                                    {advancedProvider === 'f5'
+                                        ? `F5 • ${f5EngineLabel}`
+                                        : advancedProvider === 'qwen'
+                                            ? `Qwen • ${qwenEngineLabel}`
+                                            : 'Google Cloud'}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <Switch
-                        checked={isAnyTtsEnabled}
-                        onCheckedChange={handleGlobalTtsToggle}
-                        className="data-[state=checked]:bg-green-600 pointer-events-none"
-                        disabled={isEngineActionPending}
-                    />
-                </div>
+                        <Switch
+                            checked={isAnyTtsEnabled}
+                            onCheckedChange={handleGlobalTtsToggle}
+                            className="pointer-events-none data-[state=checked]:bg-emerald-600"
+                            disabled={isEngineActionPending}
+                        />
+                    </CardContent>
+                </Card>
 
                 {isAnyTtsEnabled && (
                     <>
-                        <div className="grid grid-cols-1 gap-4">
-                            {/* Настройки голоса */}
-                            <Card className="card-glass flex flex-col">
-                                <CardHeader className="pb-3">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base font-bold">Озвучка</CardTitle>
-                                    </div>
+                        <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2">
+                            <Card className={`${SURFACE_CARD_CLASS} flex flex-col`}>
+                                <CardHeader className="border-b border-border/50 pb-3.5">
+                                    <CardTitle className="text-base font-bold text-foreground">Озвучка</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-4 flex-1 flex flex-col">
-                                    <div>
+                                <CardContent className="flex flex-1 flex-col space-y-3.5 pt-4">
+                                    <div className={SECTION_PANEL_CLASS}>
+                                        <div className={SECTION_EYEBROW_CLASS}>Режим триггера</div>
+                                        <div className="mt-2.5">
                                         <TtsChannelPointsMode
                                             ttsMode={ttsTriggerMode}
                                             onModeChange={handleTtsModeChange}
@@ -1278,140 +1607,111 @@ const TtsMainPageContent: React.FC = () => {
                                             showModeSelector={true}
                                             showRewards={true}
                                         />
+                                        </div>
                                     </div>
 
-                                    <div className="rounded-xl border border-gray-700/40 bg-gray-900/30 p-4 space-y-4">
-                                        <div className="flex flex-wrap items-start justify-between gap-3">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-300">Провайдер озвучки</label>
-                                                <div className="text-xs text-gray-400 mt-1">
-                                                    Google TTS всегда активен как fallback, когда основной провайдер недоступен.
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                                                {advancedProvider === 'f5' ? (
-                                                    isF5TTSDataLoading ? (
-                                                        <>
-                                                            <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                                                            Проверка F5...
-                                                        </>
-                                                    ) : canUseF5TTS ? (
-                                                        <>
-                                                            <CheckCircle2 className="w-3 h-3 text-green-400" />
-                                                            F5 доступен
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <AlertCircle className="w-3 h-3 text-yellow-400" />
-                                                            F5 недоступен
-                                                        </>
-                                                    )
-                                                ) : advancedProvider === 'qwen' ? (
-                                                    canUseQwenTTS ? (
-                                                        <>
-                                                            <CheckCircle2 className="w-3 h-3 text-green-400" />
-                                                            Qwen доступен
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <AlertCircle className="w-3 h-3 text-yellow-400" />
-                                                            Qwen недоступен
-                                                        </>
-                                                    )
-                                                ) : isLoadingGcloudVoices ? (
-                                                    <>
-                                                        <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-                                                        Проверка Google Cloud...
-                                                    </>
-                                                ) : canUseGcloudTTS ? (
-                                                    <>
-                                                        <CheckCircle2 className="w-3 h-3 text-green-400" />
-                                                        Google Cloud доступен
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <AlertCircle className="w-3 h-3 text-yellow-400" />
-                                                        Google Cloud недоступен
-                                                    </>
-                                                )}
-                                            </div>
+                                    <div className={`${SECTION_PANEL_CLASS} space-y-3.5`}>
+                                        <div className={SECTION_EYEBROW_CLASS}>Провайдер</div>
+
+                                        <div className="grid gap-2 sm:grid-cols-3">
+                                            {providerOptionButtons}
                                         </div>
 
-                                        <select
-                                            value={advancedProvider}
-                                            onChange={(event) => void handleAdvancedProviderChange(event.target.value as AdvancedProvider)}
-                                            disabled={isEngineActionPending}
-                                            className="h-11 w-full rounded-md border border-gray-700/60 bg-gray-900/60 px-3 text-sm text-gray-200 focus:border-blue-500/70 focus:outline-none"
-                                        >
-                                            <option value="f5">F5 TTS</option>
-                                            <option value="qwen">Qwen 3 TTS</option>
-                                            <option value="gcloud">Google Cloud TTS</option>
-                                        </select>
-
                                         {advancedProvider === 'f5' && (
-                                            <div className="space-y-2 rounded-lg border border-gray-700/40 bg-gray-900/40 p-3">
-                                                <div className="text-xs text-gray-400">
-                                                    {canUseF5TTS ? `Текущий режим: ${f5EngineLabel}` : getF5UnavailableReason()}
+                                            <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+                                                <div>
+                                                    <div className="text-sm font-semibold text-foreground">Режим F5</div>
+                                                    {!canUseF5TTS && (
+                                                        <p className="mt-1 text-xs text-muted-foreground">{getF5UnavailableReason()}</p>
+                                                    )}
                                                 </div>
-                                                <select
-                                                    value={f5Mode}
-                                                    onChange={(event) => void handleF5ModeChange(event.target.value as 'cloud' | 'local')}
-                                                    disabled={isEngineActionPending}
-                                                    className="h-10 w-full rounded-md border border-gray-700/60 bg-gray-900/60 px-3 text-sm text-gray-200 focus:border-blue-500/70 focus:outline-none"
-                                                >
-                                                    <option value="cloud" disabled={!canUseF5Cloud}>
-                                                        {canUseF5Cloud ? 'F5: облако' : 'F5: облако (недоступно)'}
-                                                    </option>
-                                                    <option value="local" disabled={!canUseF5Local}>
-                                                        {canUseF5Local ? 'F5: локально' : 'F5: локально (недоступно)'}
-                                                    </option>
-                                                </select>
+                                                <div className="inline-flex rounded-lg bg-background/70 p-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void handleF5ModeChange('cloud')}
+                                                            disabled={!canUseF5Cloud || isEngineActionPending}
+                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${f5Mode === 'cloud'
+                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                } ${!canUseF5Cloud ? 'cursor-not-allowed opacity-45' : ''}`}
+                                                        >
+                                                            Облако
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void handleF5ModeChange('local')}
+                                                            disabled={!canUseF5Local || isEngineActionPending}
+                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${f5Mode === 'local'
+                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                } ${!canUseF5Local ? 'cursor-not-allowed opacity-45' : ''}`}
+                                                        >
+                                                            Self-hosted
+                                                        </button>
+                                                </div>
                                             </div>
                                         )}
 
                                         {advancedProvider === 'qwen' && (
-                                            <div className="space-y-2 rounded-lg border border-gray-700/40 bg-gray-900/40 p-3">
-                                                <div className="text-xs text-gray-400">
-                                                    {canUseQwenTTS ? `Текущий режим: ${qwenEngineLabel}` : getQwenUnavailableReason()}
+                                            <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
+                                                <div>
+                                                    <div className="text-sm font-semibold text-foreground">Режим Qwen</div>
+                                                    {!canUseQwenTTS && (
+                                                        <p className="mt-1 text-xs text-muted-foreground">{getQwenUnavailableReason()}</p>
+                                                    )}
                                                 </div>
-                                                <select
-                                                    value={qwenMode}
-                                                    onChange={(event) => void handleQwenModeChange(event.target.value as 'cloud' | 'local')}
-                                                    disabled={isEngineActionPending}
-                                                    className="h-10 w-full rounded-md border border-gray-700/60 bg-gray-900/60 px-3 text-sm text-gray-200 focus:border-blue-500/70 focus:outline-none"
-                                                >
-                                                    <option value="cloud" disabled={!canUseQwenCloud}>
-                                                        {canUseQwenCloud ? 'Qwen: облако' : 'Qwen: облако (недоступно)'}
-                                                    </option>
-                                                    <option value="local" disabled={!canUseQwenLocal}>
-                                                        {canUseQwenLocal ? 'Qwen: локально' : 'Qwen: локально (недоступно)'}
-                                                    </option>
-                                                </select>
+                                                <div className="inline-flex rounded-lg bg-background/70 p-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void handleQwenModeChange('cloud')}
+                                                            disabled={!canUseQwenCloud || isEngineActionPending}
+                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${qwenMode === 'cloud'
+                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                } ${!canUseQwenCloud ? 'cursor-not-allowed opacity-45' : ''}`}
+                                                        >
+                                                            Облако
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void handleQwenModeChange('local')}
+                                                            disabled={!canUseQwenLocal || isEngineActionPending}
+                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${qwenMode === 'local'
+                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                } ${!canUseQwenLocal ? 'cursor-not-allowed opacity-45' : ''}`}
+                                                        >
+                                                            Self-hosted
+                                                        </button>
+                                                </div>
                                             </div>
                                         )}
 
                                         {advancedProvider === 'gcloud' && (
-                                            <div className="space-y-2 rounded-lg border border-gray-700/40 bg-gray-900/40 p-3">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="text-[10px] text-gray-500">Случайный голос из выбранных</div>
-                                                    <div className="text-[10px] text-gray-500">
-                                                        {isSavingGcloudVoices ? 'Сохранение...' : `${selectedGcloudVoices.length}/${gcloudVoices.length || 0}`}
+                                            <div className="space-y-3 rounded-lg border border-border/70 bg-background/50 p-4">
+                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-foreground">Голоса Google Cloud</div>
+                                                        {!canUseGcloudTTS && (
+                                                            <p className="mt-1 text-xs text-muted-foreground">{getGcloudUnavailableReason()}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] text-muted-foreground">
+                                                        {isSavingGcloudVoices ? 'Сохранение...' : `${selectedGcloudVoices.length}/${gcloudVoices.length || 0} выбрано`}
                                                     </div>
                                                 </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {canUseGcloudTTS ? 'Выберите голоса и настроение для Google Cloud' : getGcloudUnavailableReason()}
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <div className="block text-[10px] text-gray-400">Настроение озвучки</div>
-                                                    <div className="inline-flex overflow-hidden rounded-md border border-gray-700/60 bg-gray-900/60">
+
+                                                <div className="space-y-2">
+                                                    <div className={SECTION_EYEBROW_CLASS}>Настроение</div>
+                                                    <div className="inline-flex flex-wrap gap-2">
                                                         {GCLOUD_MOOD_OPTIONS.map((option) => (
                                                             <button
                                                                 key={option.value}
                                                                 type="button"
                                                                 onClick={() => handleGcloudMoodChange(option.value)}
-                                                                className={`h-7 px-2 text-[10px] transition-colors ${gcloudMood === option.value
-                                                                    ? 'bg-emerald-600/30 text-emerald-200'
-                                                                    : 'text-gray-300 hover:bg-gray-800/70'
+                                                                className={`${SEGMENT_BUTTON_CLASS} ${gcloudMood === option.value
+                                                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                                    : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
                                                                     }`}
                                                             >
                                                                 {option.label}
@@ -1419,225 +1719,114 @@ const TtsMainPageContent: React.FC = () => {
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <div className="mt-2 space-y-2 max-h-48 overflow-auto pr-1">
-                                                    {isLoadingGcloudVoices ? (
-                                                        <div className="text-xs text-gray-500">Загрузка голосов...</div>
-                                                    ) : gcloudVoices.length === 0 ? (
-                                                        <div className="text-xs text-amber-300/90">{getGcloudUnavailableReason()}</div>
-                                                    ) : (
-                                                        gcloudVoices.map((voice) => {
-                                                            const isSelected = selectedGcloudVoices.includes(voice.name);
-                                                            const voiceMeta = gcloudVoiceMetaMap.get(voice.name) || getGcloudVoiceMeta(voice);
-                                                            return (
-                                                                <div
-                                                                    key={voice.name}
-                                                                    className="flex items-center justify-between rounded-md border border-gray-700/40 bg-gray-800/40 px-2 py-1.5"
-                                                                >
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Checkbox
-                                                                            checked={isSelected}
-                                                                            onCheckedChange={(val) => handleGcloudVoiceToggle(voice.name, Boolean(val))}
-                                                                        />
-                                                                        <div className="flex flex-col gap-1">
-                                                                            <span className="text-xs text-gray-200" title={voice.name}>{getGcloudVoiceDisplayName(voice.name)}</span>
-                                                                            <div className="flex flex-wrap items-center gap-1">
-                                                                                <span className="rounded border border-gray-700/50 bg-gray-900/60 px-1.5 py-0.5 text-[10px] text-gray-300">
-                                                                                    Модель: {voiceMeta.modelFamily}
-                                                                                </span>
-                                                                                <span className="rounded border border-gray-700/50 bg-gray-900/60 px-1.5 py-0.5 text-[10px] text-gray-300">
-                                                                                    Пол: {voiceMeta.genderLabel}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => void handleGcloudPreview(voice.name)}
-                                                                        className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-700/60 bg-gray-900/40 text-gray-300 hover:bg-gray-800/60 hover:text-white"
-                                                                    >
-                                                                        {previewingGcloudVoice === voice.name ? (
-                                                                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                                                                        ) : (
-                                                                            <Play className="h-3.5 w-3.5" />
-                                                                        )}
-                                                                    </button>
-                                                                </div>
-                                                            );
-                                                        })
-                                                    )}
+
+                                                <div className="space-y-2 max-h-56 overflow-auto pr-1">
+                                                    {gcloudVoiceRows}
                                                 </div>
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Режим прослушивания (Website/OBS) */}
-                                    <div className="rounded-xl border border-gray-700/40 bg-gray-900/30 p-4">
-                                        <div className="flex flex-col gap-3">
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-400 mb-2">Режим вывода звука</label>
-                                                <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                                    <button
-                                                        onClick={() => handleListeningModeChange('website')}
-                                                        className={`py-2 px-3 rounded-lg border text-xs font-semibold transition-all duration-200 ${listeningMode === 'website'
-                                                            ? 'border-blue-600 bg-blue-600 text-white'
-                                                            : 'border-blue-500/40 bg-transparent text-blue-200 hover:bg-blue-500/15'
-                                                            }`}
-                                                    >
-                                                        Браузер
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleListeningModeChange('obs')}
-                                                        className={`py-2 px-3 rounded-lg border text-xs font-semibold transition-all duration-200 ${listeningMode === 'obs'
-                                                            ? 'border-blue-600 bg-blue-600 text-white'
-                                                            : 'border-blue-500/40 bg-transparent text-blue-200 hover:bg-blue-500/15'
-                                                            }`}
-                                                    >
-                                                        OBS
-                                                    </button>
-                                                </div>
-                                            </div>
+                                    <div className={`${SECTION_PANEL_CLASS} space-y-3.5`}>
+                                        <div className={SECTION_EYEBROW_CLASS}>Вывод звука</div>
 
-                                            {/* Website mode: управление только через отдельный TTS Player */}
-                                            {listeningMode === 'website' && (
-                                                <div>
-                                                    <Button
-                                                        onClick={openPlayerTab}
-                                                        className="h-9 w-full border border-blue-700 bg-blue-700 text-xs font-semibold text-white hover:bg-blue-800"
-                                                    >
+                                        <div className="inline-flex w-full flex-wrap gap-2 rounded-lg bg-background/70 p-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleListeningModeChange('website')}
+                                                className={`${SEGMENT_BUTTON_CLASS} flex-1 ${listeningMode === 'website'
+                                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                    : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                    }`}
+                                            >
+                                                Браузер
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleListeningModeChange('obs')}
+                                                className={`${SEGMENT_BUTTON_CLASS} flex-1 ${listeningMode === 'obs'
+                                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                                                    : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                    }`}
+                                            >
+                                                OBS
+                                            </button>
+                                        </div>
+
+                                        <div className="relative min-h-[152px] pt-1">
+                                            <div
+                                                className={`${listeningMode === 'website' ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'} transition-opacity`}
+                                                aria-hidden={listeningMode !== 'website'}
+                                            >
+                                                <div className="flex h-full min-h-[152px] flex-col justify-center gap-5 py-2">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                                                            <Play className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="text-sm font-semibold text-foreground">TTS Player</div>
+                                                            <div className="mt-1 text-xs text-muted-foreground">Отдельная вкладка для браузерного воспроизведения</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <Button onClick={openPlayerTab} className="h-10 w-full max-w-[260px] self-center px-5">
+                                                        <Play className="mr-2 h-4 w-4" />
                                                         Открыть TTS Player
                                                     </Button>
                                                 </div>
-                                            )}
+                                            </div>
 
-                                            {/* Настроить OBS */}
-                                            {listeningMode === 'obs' && (
-                                                <div className="bg-gray-800/30 rounded-lg p-3 border border-gray-700/30 flex flex-col gap-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-xs font-medium text-gray-300">OBS URL</span>
-                                                        <button
-                                                            onClick={handleRegenerateObsUrl}
-                                                            className="h-7 rounded-md border border-blue-500/35 bg-transparent px-2 text-[10px] font-semibold text-blue-200 hover:bg-blue-500/15"
-                                                            disabled={isRegeneratingUrl}
-                                                        >
-                                                            {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
-                                                        </button>
-                                                    </div>
-
-                                                    <div
-                                                        className="relative group cursor-pointer"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(obsUrl);
-                                                            toast.success('Скопировано');
-                                                        }}
+                                            <div
+                                                className={`${listeningMode === 'obs' ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'} space-y-2.5 transition-opacity`}
+                                                aria-hidden={listeningMode !== 'obs'}
+                                            >
+                                                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                                    <div className="text-sm font-semibold text-foreground">OBS endpoint</div>
+                                                    <button
+                                                        onClick={handleRegenerateObsUrl}
+                                                        className="h-9 rounded-lg border-0 bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                                        disabled={isRegeneratingUrl}
                                                     >
-                                                        <div className="w-full bg-black/40 border border-gray-700/50 rounded px-2 py-1.5 text-[10px] font-mono text-gray-400 truncate pr-8 select-all">
-                                                            {obsUrl || 'Генерация URL...'}
-                                                        </div>
-                                                        <div className="absolute right-1 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 bg-gray-800/80 px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            Copy
-                                                        </div>
+                                                        {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
+                                                    </button>
+                                                </div>
+
+                                                <div
+                                                    className="group relative cursor-pointer rounded-lg border border-border/70 bg-background/70 px-3 py-2.5"
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(obsUrl);
+                                                        toast.success('Скопировано');
+                                                    }}
+                                                >
+                                                    <div className="truncate pr-14 font-mono text-xs text-muted-foreground">
+                                                        {obsUrl || 'Генерация URL...'}
+                                                    </div>
+                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                                                        Copy
                                                     </div>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {/* Платформы */}
-                                <Card className="card-glass">
-                                    <CardHeader className="pb-3">
+                            <div className="flex h-full flex-col gap-3">
+                                <Card className={SURFACE_CARD_CLASS}>
+                                    <CardHeader className="border-b border-border/50 pb-3.5">
                                         <CardTitle className="text-base font-bold text-foreground">Источники озвучки</CardTitle>
                                     </CardHeader>
-                                    <CardContent className="grid grid-cols-2 gap-3">
-                                        {(['twitch', 'vk'] as const).map(platform => {
-                                            const isConnected = platform === 'twitch' ? isTwitchConnected : isVkConnected;
-                                            const isActive = platformSettings.enabled_platforms?.includes(platform);
-                                            const shouldGlow = isActive && isConnected;
-
-                                            // Determine status text and color
-                                            let statusText = 'Отключено';
-                                            let statusColor = 'text-gray-500';
-
-                                            if (!isConnected) {
-                                                statusText = 'Не подключено';
-                                                statusColor = 'text-red-400';
-                                            } else if (isActive) {
-                                                statusText = 'Активно';
-                                                statusColor = 'text-green-400';
-                                            }
-
-                                            return (
-                                                <div
-                                                    key={platform}
-                                                    onClick={() => handlePlatformToggle(platform)}
-                                                    className={`
-                                                    cursor-pointer relative overflow-hidden rounded-xl border bg-transparent transition-all duration-300
-                                                    ${platform === 'twitch'
-                                                            ? 'border-purple-500/35 hover:border-purple-400/70'
-                                                            : 'border-rose-500/35 hover:border-rose-400/70'
-                                                        }
-                                                `}
-                                                >
-                                                    <div className="p-4 flex flex-col items-center gap-3">
-                                                        <div className={`
-                                                        w-10 h-10 rounded-full flex items-center justify-center transition-transform duration-300 group-hover:scale-110
-                                                        ${shouldGlow
-                                                                ? platform === 'twitch' ? 'bg-purple-500/20 text-purple-300' : 'bg-rose-500/20 text-rose-300'
-                                                                : 'bg-transparent text-gray-400'
-                                                            }
-                                                    `}>
-                                                            {platform === 'twitch' ? <TwitchIcon className="w-5 h-5" /> : <VKIcon className="w-5 h-5" />}
-                                                        </div>
-                                                        <div className="text-center">
-                                                            <div className={`text-sm font-semibold capitalize ${platform === 'twitch' ? 'text-purple-300' : 'text-rose-300'}`}>{platform}</div>
-                                                            <div className={`text-xs ${statusColor}`}>
-                                                                {statusText}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                    <CardContent className="space-y-2.5 pt-4">
+                                        {sourcePlatformCards}
                                     </CardContent>
                                 </Card>
 
-                                {/* Фильтры озвучки */}
-                                <Card className="card-glass">
-                                    <CardHeader className="pb-3">
+                                <Card className={`${SURFACE_CARD_CLASS} flex-1`}>
+                                    <CardHeader className="border-b border-border/50 pb-3.5">
                                         <CardTitle className="text-base font-bold text-foreground">Фильтры озвучки</CardTitle>
                                     </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        {/* 7TV Emotes */}
-                                        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-transparent p-3 transition-colors hover:border-sky-500/35 hover:bg-sky-500/5">
-                                            <span className="text-sm font-medium text-gray-200">7TV смайлы</span>
-                                            <Switch
-                                                checked={ttsSettings.enable7TV}
-                                                onCheckedChange={(val) => handleTtsSettingChange('enable7TV', val)}
-                                                className="data-[state=checked]:bg-green-600"
-                                            />
-                                        </div>
-
-                                        {/* Twitch Emotes */}
-                                        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-transparent p-3 transition-colors hover:border-sky-500/35 hover:bg-sky-500/5">
-                                            <span className="text-sm font-medium text-gray-200">Twitch смайлы</span>
-                                            <Switch
-                                                checked={ttsSettings.enableTwitch}
-                                                onCheckedChange={(val) => handleTtsSettingChange('enableTwitch', val)}
-                                                className="data-[state=checked]:bg-green-600"
-                                            />
-                                        </div>
-
-                                        {/* Filter Mentions */}
-                                        <div className="flex items-center justify-between rounded-lg border border-border/70 bg-transparent p-3 transition-colors hover:border-sky-500/35 hover:bg-sky-500/5">
-                                            <span className="text-sm font-medium text-gray-200">Озвучивать «@»</span>
-                                            <Switch
-                                                checked={!ttsSettings.filterMentions}
-                                                onCheckedChange={(val) => handleTtsSettingChange('filterMentions', !val)}
-                                                className="data-[state=checked]:bg-green-600"
-                                            />
-                                        </div>
+                                    <CardContent className="flex h-full flex-col gap-2.5 pt-4">
+                                        {filterToggleRows}
                                     </CardContent>
                                 </Card>
                             </div>

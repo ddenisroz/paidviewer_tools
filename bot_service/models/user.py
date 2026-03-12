@@ -23,7 +23,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
 
-    # Application role (admin, user, guest)
+    # Application role (admin, user)
     role = Column(String, default='user', nullable=False, index=True)
 
     # Platform-specific roles (Twitch)

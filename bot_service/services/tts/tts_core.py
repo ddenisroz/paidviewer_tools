@@ -119,11 +119,27 @@ class BlockUserRequest(BaseModel):
     platform: str = Field(..., pattern="^(twitch|vk)$")
     username: str = Field(..., min_length=1, max_length=100)
 
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str) -> str:
+        normalized = (value or "").strip().lstrip("@").strip().lower()
+        if not normalized:
+            raise ValueError("username is required")
+        return normalized
+
 
 class UnblockUserRequest(BaseModel):
     channel_name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     platform: str = Field(..., pattern="^(twitch|vk)$")
     username: str = Field(..., min_length=1, max_length=100)
+
+    @field_validator("username")
+    @classmethod
+    def normalize_username(cls, value: str) -> str:
+        normalized = (value or "").strip().lstrip("@").strip().lower()
+        if not normalized:
+            raise ValueError("username is required")
+        return normalized
 
 
 class ListeningModeRequest(BaseModel):
@@ -282,24 +298,78 @@ def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session =
     )
 
 
-async def check_local_tts_health(endpoint_url: str, api_key: Optional[str] = None) -> dict:
+async def check_local_tts_health(
+    endpoint_url: str,
+    api_key: Optional[str] = None,
+    provider: str = "f5",
+    fetch_status: bool = False,
+) -> dict:
     """Проверить здоровье локального TTS сервиса"""
     try:
         endpoint = normalize_local_tts_endpoint_url(endpoint_url)
+        normalized_provider = (provider or "f5").strip().lower()
         headers = {}
         if api_key:
             headers['Authorization'] = f'Bearer {api_key}'
 
         async with httpx.AsyncClient(timeout=5.0) as client:
+            if normalized_provider == "qwen":
+                compatibility_note = (
+                    "Этот endpoint трактуется как self-hosted Qwen endpoint пользователя. "
+                    "Managed path в проекте остается gateway-managed через project-hosted worker. "
+                    "Текущий upstream Qwen еще не доведен до полного bot_service contract, "
+                    "поэтому для self-hosted path используется compatibility path через /api/prepare -> /api/stream/{id}."
+                )
+                try:
+                    prepare_probe = await client.get(f"{endpoint}/api/prepare", headers=headers)
+                    if prepare_probe.status_code in {405, 422}:
+                        result = {
+                            "healthy": True,
+                            "status": "healthy",
+                            "compatibility_mode": "qwen_prepare_stream",
+                            "warning": compatibility_note,
+                        }
+                        if fetch_status:
+                            try:
+                                status_probe = await client.get(f"{endpoint}/api/status/__healthcheck__", headers=headers)
+                                result["status_data"] = status_probe.json() if status_probe.status_code == 200 else None
+                            except Exception:
+                                result["status_data"] = None
+                        return result
+                except httpx.RequestError:
+                    pass
+
+                root_response = await client.get(f"{endpoint}/", headers=headers)
+                if root_response.status_code == 200:
+                    result = {
+                        "healthy": True,
+                        "status": "healthy",
+                        "compatibility_mode": "qwen_prepare_stream",
+                        "warning": compatibility_note,
+                    }
+                    if fetch_status:
+                        result["status_data"] = None
+                    return result
+
+                return {"healthy": False, "error": f"HTTP {root_response.status_code}"}
+
             response = await client.get(f"{endpoint}/health", headers=headers)
 
             if response.status_code == 200:
                 data = response.json()
-                return {
+                result = {
                     "healthy": True,
+                    "status": data.get('status', 'healthy'),
                     "version": data.get('version'),
                     "gpu_info": data.get('gpu_info')
                 }
+                if fetch_status:
+                    try:
+                        status_response = await client.get(f"{endpoint}/api/status", headers=headers)
+                        result["status_data"] = status_response.json() if status_response.status_code == 200 else None
+                    except Exception:
+                        result["status_data"] = None
+                return result
             else:
                 return {"healthy": False, "error": f"HTTP {response.status_code}"}
 

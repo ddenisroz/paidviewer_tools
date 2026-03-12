@@ -139,7 +139,7 @@ async def get_commands(
     log_request("/api/commands", "GET", None, user_id)
     commands_logger.info(
         "Getting commands for %s",
-        "guest" if not user_id or user_id == -1 else f"user {user_id}",
+        "anonymous request" if not user_id or user_id == -1 else f"user {user_id}",
     )
 
     try:

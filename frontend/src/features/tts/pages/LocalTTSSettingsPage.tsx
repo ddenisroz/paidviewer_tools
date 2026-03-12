@@ -80,9 +80,46 @@ const PROVIDER_META: Record<LocalTtsProvider, ProviderMeta> = {
         folder: 'nano-qwen3tts-vllm',
         installCommand: 'python -m pip install -r requirements.txt',
         runCommand: 'python api_server.py',
-        apiKeyHint: 'API ключ обязателен только если в Qwen включена авторизация.',
+        apiKeyHint: 'Поле API ключа пока резервное: текущий upstream Qwen не применяет strict auth contract, как F5.',
         docsUrl: 'https://github.com/calldatfate/nano-qwen3tts-vllm'
     }
+};
+
+interface ProviderContract {
+    upstream_parity_ready?: boolean;
+    requires_compatibility_adapter?: boolean;
+    managed_topology?: 'project_hosted_worker' | 'gateway_managed';
+    project_hosted_direct_supported?: boolean;
+    supports_native_strict_api_key?: boolean;
+    supports_native_health_endpoint?: boolean;
+    supports_native_status_endpoint?: boolean;
+    supports_local_voice_management?: boolean;
+    warning?: string | null;
+}
+
+const DEFAULT_PROVIDER_CONTRACT: Record<LocalTtsProvider, ProviderContract> = {
+    f5: {
+        upstream_parity_ready: true,
+        requires_compatibility_adapter: false,
+        managed_topology: 'gateway_managed',
+        project_hosted_direct_supported: true,
+        supports_native_strict_api_key: true,
+        supports_native_health_endpoint: true,
+        supports_native_status_endpoint: true,
+        supports_local_voice_management: true,
+        warning: null,
+    },
+    qwen: {
+        upstream_parity_ready: false,
+        requires_compatibility_adapter: true,
+        managed_topology: 'gateway_managed',
+        project_hosted_direct_supported: false,
+        supports_native_strict_api_key: false,
+        supports_native_health_endpoint: false,
+        supports_native_status_endpoint: false,
+        supports_local_voice_management: false,
+        warning: 'Этот экран настраивает self-hosted endpoint пользователя. Managed path для Qwen в проекте сейчас gateway-managed: bot_service -> tts-gateway -> project-hosted worker. Для self-hosted endpoint bot_service использует compatibility adapter поверх /api/prepare -> /api/stream/{id}, пока upstream не закроет native parity.',
+    },
 };
 
 interface LocalTtsConfigState {
@@ -94,6 +131,7 @@ interface LocalTtsConfigState {
 interface TestResult {
     success: boolean;
     message: string;
+    warnings?: string[];
 }
 
 interface HealthData {
@@ -133,6 +171,11 @@ interface NewVoice {
 const TAB_TRIGGER_CLASS =
     'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-400 data-[state=active]:shadow-none';
 
+const MANAGED_TOPOLOGY_LABELS: Record<NonNullable<ProviderContract['managed_topology']>, string> = {
+    gateway_managed: 'gateway-managed',
+    project_hosted_worker: 'project-hosted worker',
+};
+
 const LocalTTSSettingsPage: React.FC = () => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
@@ -171,6 +214,7 @@ const LocalTTSSettingsPage: React.FC = () => {
     const uploadingFile = uploadSampleMutation.isPending;
     const [currentTab, setCurrentTab] = useState<'connection' | 'voices'>('connection');
     const { data: configData, isLoading: configLoading, error: configError } = useLocalTtsConfig(provider);
+    const providerContract = configData?.provider_contract || DEFAULT_PROVIDER_CONTRACT[provider];
 
     useEffect(() => {
         setTestResult(null);
@@ -182,7 +226,7 @@ const LocalTTSSettingsPage: React.FC = () => {
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
         if (configLoading) return;
-        if (!configData) {
+        if (!configData || configData.configured === false) {
             setConfig({
                 endpoint_url: providerMeta.defaultEndpoint,
                 api_key: '',
@@ -223,15 +267,23 @@ const LocalTTSSettingsPage: React.FC = () => {
             };
             const nested = payload.data || {};
             const success = payload.success ?? nested.success ?? false;
+            const warnings = Array.isArray((payload as { warnings?: string[] }).warnings)
+                ? ((payload as { warnings?: string[] }).warnings || []).filter(Boolean)
+                : [];
             if (success) {
-                setTestResult({ success: true, message: payload.message || nested.message || 'Соединение успешно!' });
+                setTestResult({
+                    success: true,
+                    message: payload.message || nested.message || 'Соединение успешно!',
+                    warnings,
+                });
                 setHealthData(payload.health_data || nested.health_data || null);
                 setStatusData(payload.status_data || nested.status_data || null);
                 return;
             }
             setTestResult({
                 success: false,
-                message: payload.error || nested.error || payload.message || nested.message || 'Не удалось подключиться'
+                message: payload.error || nested.error || payload.message || nested.message || 'Не удалось подключиться',
+                warnings,
             });
             setHealthData(null);
             setStatusData(null);
@@ -465,10 +517,17 @@ const LocalTTSSettingsPage: React.FC = () => {
             <Card className="card-glass border-blue-500/20">
                 <CardHeader className="pb-3">
                     <CardTitle className="flex items-center justify-between gap-3 text-base">
-                        <span>Провайдер локального TTS</span>
-                        <Badge variant="secondary" className="bg-blue-500/15 text-blue-200 border border-blue-500/30">
-                            {providerMeta.label}
-                        </Badge>
+                        <span>Self-hosted TTS endpoint</span>
+                        <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="bg-blue-500/15 text-blue-200 border border-blue-500/30">
+                                {providerMeta.label}
+                            </Badge>
+                            {providerContract.requires_compatibility_adapter && (
+                                <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-200">
+                                    Compat
+                                </Badge>
+                            )}
+                        </div>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -497,8 +556,37 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        Конфигурация, локальный режим и список голосов разделены по провайдеру.
+                        Этот экран управляет именно self-hosted endpoint пользователя. Флаги `use_local`, `f5_local` и `qwen_local`
+                        пока сохранены как legacy naming для self-hosted режима.
                     </p>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-100">
+                            <div className="mb-2 flex items-center gap-2 text-blue-200">
+                                <HardDrive className="h-4 w-4" />
+                                <span className="font-medium">Self-hosted endpoint</span>
+                            </div>
+                            <p>Пользователь сам поднимает TTS-сервис и указывает его URL в этой форме.</p>
+                        </div>
+                        <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-100">
+                            <div className="mb-2 flex items-center gap-2 text-blue-200">
+                                <Server className="h-4 w-4" />
+                                <span className="font-medium">Project-hosted worker</span>
+                            </div>
+                            <p>Отдельный воркер проекта, хостится вашей инфраструктурой и подключается как managed upstream.</p>
+                        </div>
+                        <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-100">
+                            <div className="mb-2 flex items-center gap-2 text-blue-200">
+                                <Zap className="h-4 w-4" />
+                                <span className="font-medium">Gateway-managed</span>
+                            </div>
+                            <p>`bot_service` ходит в `tts-gateway`, а gateway уже маршрутизирует трафик в project-hosted workers.</p>
+                        </div>
+                    </div>
+                    {providerContract.warning && (
+                        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                            {providerContract.warning}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
@@ -525,7 +613,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         <CardHeader>
                             <CardTitle className="text-blue-400 flex items-center gap-2">
                                 <ExternalLink className="w-5 h-5" />
-                                Как запустить локальный {providerMeta.label}?
+                                Как запустить self-hosted {providerMeta.label}?
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -567,6 +655,20 @@ const LocalTTSSettingsPage: React.FC = () => {
                                         <p className="text-muted-foreground text-xs mt-1">
                                             {providerMeta.apiKeyHint}
                                         </p>
+                                        {providerContract.managed_topology === 'gateway_managed' && (
+                                            <p className="text-amber-200 text-xs mt-1">
+                                                Managed production path для {providerMeta.label} сейчас:
+                                                <code className="mx-1 rounded bg-gray-900 px-1.5 py-0.5 text-[11px]">
+                                                    bot_service -&gt; tts-gateway -&gt; project-hosted worker
+                                                </code>
+                                                а этот экран нужен именно для self-hosted endpoint.
+                                            </p>
+                                        )}
+                                        {providerContract.project_hosted_direct_supported && (
+                                            <p className="text-blue-200 text-xs mt-1">
+                                                Для {providerMeta.label} также допускается direct project-hosted worker fallback, если gateway временно недоступен.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -588,9 +690,12 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="text-sm text-yellow-200">
                                     <p className="font-medium">Рекомендации:</p>
                                     <ul className="list-disc list-inside mt-1 space-y-1 text-xs text-yellow-200/80">
-                                        <li>Используйте отдельный порт для каждого локального провайдера</li>
-                                        <li>Перед включением локального режима выполняйте тест подключения</li>
+                                        <li>Используйте отдельный порт для каждого self-hosted провайдера</li>
+                                        <li>Перед включением self-hosted режима выполняйте тест подключения</li>
                                         <li>Если используется Docker, проверьте доступность порта из bot_service</li>
+                                        {providerContract.requires_compatibility_adapter && (
+                                            <li>Для Qwen self-hosted path сейчас используется backend compatibility adapter, пока upstream не закроет native contract parity</li>
+                                        )}
                                     </ul>
                                 </div>
                             </div>
@@ -601,7 +706,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Server className="w-5 h-5" />
-                                Настройки подключения {providerMeta.label}
+                                Настройки self-hosted endpoint {providerMeta.label}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
@@ -618,7 +723,8 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 </p>
                                 {provider === 'qwen' && (
                                     <p className="text-xs text-blue-200/80">
-                                        Для cloud-синтеза Qwen используется `tts-gateway`; этот endpoint нужен для локального режима и проверки доступности движка.
+                                        Managed Qwen path в проекте идет через `tts-gateway` к project-hosted worker. Этот URL нужен для self-hosted endpoint
+                                        пользователя и проверки доступности движка.
                                     </p>
                                 )}
                             </div>
@@ -647,6 +753,11 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <p className="text-xs text-muted-foreground">
                                     {providerMeta.apiKeyHint}
                                 </p>
+                                {!providerContract.supports_native_strict_api_key && (
+                                    <p className="text-xs text-amber-300">
+                                        Этот upstream пока не подтверждает native strict API-key проверку на health/synthesis-роутах так же, как `f5`.
+                                    </p>
+                                )}
                                 {hasStoredApiKey && !config.api_key.trim() && (
                                     <p className="text-xs text-amber-300">
                                         Ключ сохранён на сервере. Оставьте поле пустым, чтобы не менять его.
@@ -691,18 +802,27 @@ const LocalTTSSettingsPage: React.FC = () => {
                             </div>
 
                             {testResult && (
-                                <div className={`p-4 rounded-lg flex items-center gap-3 ${testResult.success
-                                    ? 'bg-green-500/10 border border-green-500/30'
-                                    : 'bg-red-500/10 border border-red-500/30'
+                                <div className={`rounded-lg border p-4 ${testResult.success
+                                    ? 'bg-green-500/10 border-green-500/30'
+                                    : 'bg-red-500/10 border-red-500/30'
                                     }`}>
-                                    {testResult.success ? (
-                                        <CheckCircle className="w-5 h-5 text-green-400" />
-                                    ) : (
-                                        <XCircle className="w-5 h-5 text-red-400" />
+                                    <div className="flex items-center gap-3">
+                                        {testResult.success ? (
+                                            <CheckCircle className="w-5 h-5 text-green-400" />
+                                        ) : (
+                                            <XCircle className="w-5 h-5 text-red-400" />
+                                        )}
+                                        <span className={testResult.success ? 'text-green-300' : 'text-red-300'}>
+                                            {testResult.message}
+                                        </span>
+                                    </div>
+                                    {testResult.warnings && testResult.warnings.length > 0 && (
+                                        <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                                            {testResult.warnings.map((warning) => (
+                                                <p key={warning}>{warning}</p>
+                                            ))}
+                                        </div>
                                     )}
-                                    <span className={testResult.success ? 'text-green-300' : 'text-red-300'}>
-                                        {testResult.message}
-                                    </span>
                                 </div>
                             )}
                         </CardContent>
@@ -761,7 +881,13 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {statusData?.stats && (
+                                {providerContract.supports_native_status_endpoint === false && (
+                                    <div className="mt-4 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3 text-xs text-blue-100">
+                                        У текущего upstream для {providerMeta.label} нет native summary `/api/status`, поэтому расширенная статистика здесь может отсутствовать даже при рабочем синтезе.
+                                    </div>
+                                )}
+
+                                {statusData?.stats && providerContract.supports_native_status_endpoint !== false && (
                                     <div className="mt-4 pt-4 border-t border-gray-700">
                                         <h4 className="text-sm font-medium mb-3">Статистика</h4>
                                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -806,18 +932,23 @@ const LocalTTSSettingsPage: React.FC = () => {
                     {testResult?.success && (
                         <Card className="card-glass">
                             <CardHeader>
-                                <CardTitle>Использование локального TTS</CardTitle>
+                                <CardTitle>Использование self-hosted endpoint</CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                                     <div>
-                                        <p className="font-medium">Использовать локальный {providerMeta.label}</p>
+                                        <p className="font-medium">Использовать self-hosted {providerMeta.label}</p>
                                         <p className="text-sm text-muted-foreground">
                                             {config.use_local
-                                                ? 'Запросы выбранного провайдера идут через локальный сервис'
-                                                : 'Выбранный провайдер работает в облачном режиме или через фолбэк'
+                                                ? 'Запросы выбранного провайдера идут через self-hosted endpoint пользователя'
+                                                : `Запросы идут через ${MANAGED_TOPOLOGY_LABELS[providerContract.managed_topology || 'gateway_managed']} или через fallback`
                                             }
                                         </p>
+                                        {providerContract.requires_compatibility_adapter && (
+                                            <p className="mt-2 text-xs text-amber-300">
+                                                Для Qwen self-hosted mode здесь используется compatibility adapter. После native parity в upstream этот слой можно будет убрать.
+                                            </p>
+                                        )}
                                     </div>
                                     <Button
                                         onClick={toggleService}

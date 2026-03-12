@@ -24,7 +24,7 @@ class FilteredWordRepository(BaseRepository[FilteredWord]):
         ).all()
     
     def get_by_session_id(self, session_id: str) -> List[FilteredWord]:
-        """Get all filtered words for a session (guest)."""
+        """Get all filtered words for a legacy session scope."""
         return self.db.query(FilteredWord).filter(
             FilteredWord.session_id == session_id,
             FilteredWord.is_active

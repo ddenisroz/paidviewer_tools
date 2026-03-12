@@ -15,6 +15,7 @@ import logging
 import random
 import re
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -28,6 +29,7 @@ from constants import (
 )
 from core.config import settings
 from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers
+from core.project_paths import TEMP_DIR
 from services.tts.basic_tts import get_basic_tts
 from services.tts.google_cloud_tts import (
     get_google_cloud_tts,
@@ -48,6 +50,19 @@ from services.tts.provider_utils import (
 
 logger = logging.getLogger(__name__)
 _GEMINI_SPEAKER_PATTERN = re.compile(r"^[A-Z][A-Za-z0-9_]{1,63}$")
+_QWEN_LOCAL_DEFAULT_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
+_QWEN_LOCAL_DEFAULT_SPEAKER = "serena"
+_QWEN_LOCAL_DEFAULT_INSTRUCTION = "Нейтральный естественный голос."
+_QWEN_LOCAL_MODEL_ALIASES = {
+    "0.6b-customvoice": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    "1.7b-customvoice": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+    "1.7b-voicedesign": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+    "0.6b-base": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "1.7b-base": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    "customvoice": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    "voicedesign": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+    "base": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+}
 
 
 def _gcloud_voice_quality_rank(voice_name: Optional[str]) -> int:
@@ -136,6 +151,197 @@ class TTSManager:
             logger.exception("Error getting user local TTS endpoint")
             return None
 
+    def _normalize_qwen_local_model(self, raw_model: Optional[str]) -> str:
+        candidate = str(raw_model or "").strip()
+        if not candidate or candidate.lower() == "default":
+            return _QWEN_LOCAL_DEFAULT_MODEL
+
+        if candidate.startswith("Qwen/"):
+            return candidate
+
+        normalized = candidate.lower().replace("_", "").replace(" ", "").replace("/", "")
+        for alias, resolved in _QWEN_LOCAL_MODEL_ALIASES.items():
+            compact_alias = alias.lower().replace("_", "").replace(" ", "").replace("/", "")
+            if normalized == compact_alias:
+                return resolved
+
+        return candidate
+
+    def _normalize_qwen_local_speaker(self, raw_speaker: Optional[str]) -> str:
+        candidate = str(raw_speaker or "").strip()
+        if not candidate or candidate.lower() == "default":
+            return _QWEN_LOCAL_DEFAULT_SPEAKER
+        return candidate
+
+    def _build_qwen_local_prepare_payload(
+        self,
+        *,
+        channel_name: str,
+        text: str,
+        author: str,
+        user_id: Optional[int],
+        tts_settings: Optional[Dict[str, Any]],
+    ) -> tuple[aiohttp.FormData, str]:
+        request_settings = dict(tts_settings or {})
+
+        model = self._normalize_qwen_local_model(request_settings.get("qwen_model"))
+        speaker = self._normalize_qwen_local_speaker(
+            request_settings.get("qwen_voice") or request_settings.get("voice")
+        )
+        language = "Russian" if self.basic_tts.detect_language(text) == "ru" else "English"
+
+        raw_temperature = request_settings.get("qwen_temperature", request_settings.get("temperature", 0.9))
+        try:
+            temperature = float(raw_temperature)
+        except (TypeError, ValueError):
+            temperature = 0.9
+        if temperature <= 0:
+            temperature = 0.9
+
+        if "Base" in model:
+            logger.warning(
+                "[WARN] Qwen local Base model requires ref_audio; falling back to CustomVoice compatibility model"
+            )
+            model = _QWEN_LOCAL_DEFAULT_MODEL
+
+        instruction = ""
+        if "VoiceDesign" in model:
+            raw_instruction = str(request_settings.get("qwen_instruction") or "").strip()
+            instruction = raw_instruction or _QWEN_LOCAL_DEFAULT_INSTRUCTION
+            speaker = ""
+
+        tenant_id = f"user:{user_id}" if user_id else f"channel:{channel_name.lower()}" if channel_name else "bot_service"
+
+        form = aiohttp.FormData()
+        form.add_field("model", model)
+        form.add_field("text", text)
+        form.add_field("language", language)
+        form.add_field("temperature", str(temperature))
+        form.add_field("instruction", instruction)
+        form.add_field("speaker", speaker)
+        form.add_field("tenant_id", tenant_id)
+        form.add_field("channel_name", channel_name or "")
+        form.add_field("author", author or "")
+        form.add_field("user_id", str(user_id or ""))
+
+        selected_voice = instruction if instruction else speaker or _QWEN_LOCAL_DEFAULT_SPEAKER
+        return form, selected_voice
+
+    async def _check_qwen_local_compat_health(
+        self,
+        *,
+        session: aiohttp.ClientSession,
+        endpoint: str,
+        headers: Dict[str, str],
+    ) -> bool:
+        probe_specs = (
+            ("/api/prepare", {405, 422}),
+            ("/api/status/__healthcheck__", {200, 404}),
+            ("/", {200}),
+        )
+
+        for path, expected_statuses in probe_specs:
+            try:
+                async with session.get(f"{endpoint}{path}", headers=headers) as response:
+                    if response.status in expected_statuses:
+                        return True
+            except aiohttp.ClientError:
+                continue
+
+        return False
+
+    async def _synthesize_via_qwen_local_compat(
+        self,
+        *,
+        channel_name: str,
+        text: str,
+        author: str,
+        user_id: Optional[int],
+        volume_level: float,
+        tts_settings: Optional[Dict[str, Any]],
+        tts_endpoint: str,
+        tts_endpoint_api_key: Optional[str],
+    ) -> Dict[str, Any]:
+        try:
+            endpoint = normalize_local_tts_endpoint_url(tts_endpoint).rstrip("/")
+        except ValueError as error:
+            logger.warning("[WARN] Invalid qwen local endpoint during synthesis: %s", error)
+            return {"success": False, "error": "Invalid local endpoint configuration"}
+
+        headers = build_tts_auth_headers(
+            provider="qwen",
+            upstream="local",
+            local_api_key=tts_endpoint_api_key,
+            strict=False,
+        )
+        form, selected_voice = self._build_qwen_local_prepare_payload(
+            channel_name=channel_name,
+            text=text,
+            author=author,
+            user_id=user_id,
+            tts_settings=tts_settings,
+        )
+
+        timeout = aiohttp.ClientTimeout(total=90, connect=10, sock_read=90)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(f"{endpoint}/api/prepare", data=form, headers=headers) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.error(
+                            "[ERROR] Qwen local prepare failed status=%s body=%s endpoint=%s",
+                            response.status,
+                            error_text,
+                            endpoint,
+                        )
+                        return {"success": False, "error": f"Qwen local prepare failed: {response.status}"}
+
+                    prepare_payload = await response.json()
+                    stream_id = str(prepare_payload.get("stream_id") or "").strip()
+                    if not stream_id:
+                        return {"success": False, "error": "Qwen local prepare returned no stream_id"}
+
+                async with session.get(f"{endpoint}/api/stream/{stream_id}", headers=headers) as stream_response:
+                    if stream_response.status != 200:
+                        error_text = await stream_response.text()
+                        logger.error(
+                            "[ERROR] Qwen local stream failed status=%s body=%s endpoint=%s stream_id=%s",
+                            stream_response.status,
+                            error_text,
+                            endpoint,
+                            stream_id,
+                        )
+                        return {"success": False, "error": f"Qwen local stream failed: {stream_response.status}"}
+
+                    audio_bytes = await stream_response.read()
+
+            if not audio_bytes:
+                return {"success": False, "error": "Qwen local stream returned empty audio"}
+
+            output_dir = TEMP_DIR / "tts_audio"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"qwen_local_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}.wav"
+            output_path = output_dir / filename
+            await asyncio.to_thread(output_path.write_bytes, audio_bytes)
+
+            return {
+                "success": True,
+                "voice": selected_voice,
+                "volume": volume_level,
+                "tts_type": "ai_qwen",
+                "audio_url": f"{self.backend_url}/api/tts/audio/{filename}",
+                "audio_path": str(output_path.resolve()),
+            }
+        except asyncio.TimeoutError:
+            logger.warning("[WARN] Qwen local compatibility synthesis timeout endpoint=%s", endpoint)
+            return {"success": False, "error": "Request timeout"}
+        except aiohttp.ClientError as error:
+            logger.warning("[WARN] Qwen local compatibility synthesis connection error: %s", error)
+            return {"success": False, "error": f"Connection error: {error}"}
+        except Exception:
+            logger.exception("[ERROR] Qwen local compatibility synthesis failed")
+            return {"success": False, "error": "Internal server error"}
+
     async def check_tts_service_health(
         self,
         force_check: bool = False,
@@ -219,6 +425,16 @@ class TTSManager:
         try:
             timeout = aiohttp.ClientTimeout(total=5, connect=2)
             async with aiohttp.ClientSession(timeout=timeout) as session:
+                if endpoint_override and normalized_provider == "qwen":
+                    is_healthy = await self._check_qwen_local_compat_health(
+                        session=session,
+                        endpoint=endpoint,
+                        headers=request_headers,
+                    )
+                    self._provider_health[cache_key] = is_healthy
+                    self._provider_last_health_check[cache_key] = current_time
+                    return is_healthy
+
                 health_payload = None
                 last_status = None
                 health_paths = (
@@ -521,6 +737,19 @@ class TTSManager:
                     strict=True,
                 )
                 query_params = get_synthesis_upstream_params(normalized_provider)
+
+            if normalized_provider == "qwen" and tts_endpoint:
+                return await self._synthesize_via_qwen_local_compat(
+                    channel_name=channel_name,
+                    text=text,
+                    author=author,
+                    user_id=user_id,
+                    volume_level=volume_level,
+                    tts_settings=tts_settings,
+                    tts_endpoint=endpoint,
+                    tts_endpoint_api_key=tts_endpoint_api_key,
+                )
+
             timeout = aiohttp.ClientTimeout(total=30, connect=10)
 
             request_settings = dict(tts_settings or {})

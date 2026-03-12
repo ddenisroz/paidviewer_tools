@@ -86,9 +86,9 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - Keep auth endpoint rate limits (`limiter`) on login/callback/refresh/status routes.
 - `/api/auth/status` is optimized: do not restore synchronous external token validation in this endpoint; validation should occur when token is actually used.
 - Admin authorization source is `users.role='admin'`; `users.is_admin` is legacy compatibility only.
-- Inter-service auth for `bot_service -> F5_tts` uses short-lived service JWT in `Authorization: Bearer ...` with audience `f5_tts`; keep `X-Internal-Service-Key` only as temporary compatibility fallback.
-- If internal HTTPS is used, `bot_service` can enable mTLS client cert mode via `INTERNAL_SERVICE_MTLS_*` env settings for TTS upstream calls.
-- `F5_tts` internal dependencies must accept service JWT first, then legacy internal key fallback (for transition period only).
+- Inter-service auth for external TTS upstreams uses strict API-key headers. `bot_service` sends both `Authorization: Bearer <key>` and `X-API-Key: <key>` where supported.
+- Do not reintroduce service-JWT or `X-Internal-Service-Key` expectations into the current external TTS upstream contract unless a dedicated migration plan is documented.
+- If internal HTTPS is used, `bot_service` may additionally enable mTLS client cert mode via `INTERNAL_SERVICE_MTLS_*`, but mTLS does not replace the API-key contract for current TTS upstreams.
 
 ## Behavior Notes
 

@@ -26,7 +26,7 @@ class LocalTTSRepository(BaseRepository[LocalTTSEndpoint]):
         ).first()
     
     def get_by_session_id(self, session_id: str, provider: str = "f5") -> Optional[LocalTTSEndpoint]:
-        """Get local TTS endpoint by session ID (for guests)."""
+        """Get local TTS endpoint by legacy session ID."""
         return self.db.query(LocalTTSEndpoint).filter(
             LocalTTSEndpoint.session_id == session_id,
             LocalTTSEndpoint.provider == provider,

@@ -1,4 +1,4 @@
-# Architecture Overview
+# Legacy Architecture Overview
 
 TTS_TTV follows a clean architecture split into API, services, repositories, and integrations.
 

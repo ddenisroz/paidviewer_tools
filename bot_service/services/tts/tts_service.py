@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 from core.database import User
 from core.connection_manager import get_connection_manager
 from core.datetime_utils import utcnow_naive
+from integrations.base import IntegrationError
 
 from repositories.tts_settings_repository import TTSSettingsRepository
 from repositories.filtered_word_repository import FilteredWordRepository
 from repositories.blocked_user_repository import BlockedUserRepository
 from repositories.audio_settings_repository import AudioSettingsRepository
+from repositories.chat_message_repository import ChatMessageRepository
 from repositories.user_repository import UserRepository
 from repositories.user_token_repository import UserTokenRepository
 from repositories.local_tts_repository import LocalTTSRepository
@@ -28,6 +30,18 @@ from services.tts.provider_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+class BlockTargetValidationError(Exception):
+    """Base exception for blocked-user validation failures."""
+
+
+class BlockTargetNotFoundError(BlockTargetValidationError):
+    """Raised when the target username cannot be resolved to a real/known user."""
+
+
+class BlockTargetVerificationUnavailableError(BlockTargetValidationError):
+    """Raised when upstream verification is temporarily unavailable."""
 
 
 
@@ -46,8 +60,101 @@ class TTSService:
         self.filter_repo = FilteredWordRepository(db)
         self.blocked_user_repo = BlockedUserRepository(db)
         self.audio_repo = AudioSettingsRepository(db)
+        self.chat_repo = ChatMessageRepository(db)
         self.user_repo = UserRepository(db)
         self.token_repo = UserTokenRepository(db)
+
+    @staticmethod
+    def normalize_blocked_username(username: str) -> str:
+        """Normalize usernames entered in blocked-user forms."""
+        return (username or "").strip().lstrip("@").strip().lower()
+
+    def _is_known_user_locally(
+        self,
+        *,
+        user_id: int,
+        channel_name: str,
+        platform: str,
+        username: str,
+    ) -> bool:
+        if platform == "twitch" and self.user_repo.get_by_twitch_username(username):
+            return True
+
+        if platform == "vk":
+            if self.user_repo.get_by_vk_username(username) or self.user_repo.get_by_vk_channel_name(username):
+                return True
+
+        return self.chat_repo.author_exists_in_channel(
+            user_id=user_id,
+            author_username=username,
+            channel_name=channel_name,
+            platform=platform,
+        )
+
+    async def _resolve_twitch_username_exists(self, username: str) -> Optional[bool]:
+        twitch_client = None
+        try:
+            from integrations.twitch.client import TwitchClient
+            from integrations.twitch.oauth import TwitchOAuth
+
+            twitch_client = TwitchClient(TwitchOAuth.from_settings())
+            result = await twitch_client.get("users", params={"login": username})
+            return bool((result or {}).get("data", []))
+        except IntegrationError:
+            logger.exception("Failed to validate Twitch username=%s", username)
+            return None
+        except Exception:
+            logger.exception("Failed to validate Twitch username=%s", username)
+            return None
+        finally:
+            if twitch_client is not None:
+                try:
+                    await twitch_client.close()
+                except Exception:
+                    logger.debug("Failed to close Twitch client after username validation", exc_info=True)
+
+    async def ensure_block_target_exists(
+        self,
+        *,
+        user_id: int,
+        channel_name: str,
+        platform: str,
+        username: str,
+    ) -> str:
+        normalized_username = self.normalize_blocked_username(username)
+        if not normalized_username:
+            raise BlockTargetNotFoundError("Username is required")
+
+        platform_name = platform.lower()
+        local_match = self._is_known_user_locally(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=platform_name,
+            username=normalized_username,
+        )
+
+        if platform_name == "twitch":
+            exists = await self._resolve_twitch_username_exists(normalized_username)
+            if exists is True:
+                return normalized_username
+            if exists is False:
+                if local_match:
+                    return normalized_username
+                raise BlockTargetNotFoundError(
+                    f"Twitch user '{normalized_username}' does not exist"
+                )
+            if local_match:
+                return normalized_username
+            raise BlockTargetVerificationUnavailableError(
+                "Failed to verify Twitch user right now. Try again later."
+            )
+
+        if local_match:
+            return normalized_username
+
+        raise BlockTargetNotFoundError(
+            f"VK user '{normalized_username}' was not found in known channel users"
+        )
 
     # === Synthesis Management ===
 
@@ -143,11 +250,11 @@ class TTSService:
 
     # === Settings Management ===
 
-    async def get_audio_settings(self, user_id: int = None, session_id: str = None) -> dict:
+    async def get_audio_settings(self, user_id: int) -> dict:
         settings = self.audio_repo.get_or_create(user_id)
         return {"websiteVolume": settings.website_volume}
 
-    async def save_audio_settings(self, website_volume: int, user_id: int = None, session_id: str = None) -> bool:
+    async def save_audio_settings(self, website_volume: int, user_id: int) -> bool:
         try:
             settings = self.audio_repo.get_or_create(user_id)
             self.audio_repo.update(settings, {"website_volume": website_volume})
@@ -156,7 +263,7 @@ class TTSService:
             logger.exception("Error saving audio settings")
             return False
 
-    async def get_tts_settings(self, user_id: int = None, session_id: str = None) -> dict:
+    async def get_tts_settings(self, user_id: int) -> dict:
         settings = self.settings_repo.get_or_create(user_id)
         return self.settings_repo.get_settings_dict(settings)
 
@@ -164,9 +271,10 @@ class TTSService:
         """Save TTS settings with validation."""
         try:
             user_id = kwargs.get('user_id')
-            session_id = kwargs.get('session_id')
-            
-            settings = self.settings_repo.get_or_create(user_id=user_id, session_id=session_id)
+            if not user_id:
+                return {"success": False, "error": "Authentication required"}
+
+            settings = self.settings_repo.get_or_create(user_id=user_id)
             
             # Version check logic if needed (can be added to repo or here)
             client_version = kwargs.get('client_version')
@@ -224,28 +332,12 @@ class TTSService:
         username: str,
         session_id: Optional[str] = None,
     ) -> bool:
-        # Validate user existence on platform (best-effort only).
-        # Blocking must still work even if upstream OAuth/token validation is temporarily broken.
-        if platform.lower() == 'twitch':
-            from startup.bot_registry import get_bot_registry
-            registry = get_bot_registry()
-            if registry.is_twitch_running() and registry.twitch_bot:
-                try:
-                    # Use TwitchIO's fetch_users to validate user existence
-                    users = await registry.twitch_bot.fetch_users(names=[username])
-                    if not users:
-                        logger.warning(
-                            f"User {username} was not resolved via Twitch API, proceeding with local username block"
-                        )
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to validate user {username} on Twitch API, proceeding with local username block: {e}"
-                    )
+        normalized_username = self.normalize_blocked_username(username)
 
         return self.blocked_user_repo.block_user(
             channel_name=channel_name, 
             platform=platform, 
-            username=username, 
+            username=normalized_username, 
             user_id=user_id,
             session_id=session_id,
         ) is not None
@@ -348,16 +440,16 @@ class TTSService:
 
     # === Status Management (Enable/Disable) ===
 
-    async def enable_tts(self, user_id: int = None, session_id: str = None) -> bool:
+    async def enable_tts(self, user_id: int) -> bool:
         """Enable TTS and register in ConnectionManager."""
         try:
-            if session_id: return True # Guests always enabled
-            
-            if not user_id: return False
-            
+            if not user_id:
+                return False
+
             user = self.user_repo.get_by_id(user_id)
-            if not user: return False
-            
+            if not user:
+                return False
+
             # Use repository for update
             self.user_repo.update(user, {'tts_enabled': True})
             
@@ -380,16 +472,16 @@ class TTSService:
             logger.exception("Error enabling TTS")
             return False
 
-    async def disable_tts(self, user_id: int = None, session_id: str = None) -> bool:
+    async def disable_tts(self, user_id: int) -> bool:
         """Disable TTS and unregister from ConnectionManager."""
         try:
-            if session_id: return True
-            
-            if not user_id: return False
-            
+            if not user_id:
+                return False
+
             user = self.user_repo.get_by_id(user_id)
-            if not user: return False
-            
+            if not user:
+                return False
+
             # Use repository for update
             self.user_repo.update(user, {'tts_enabled': False})
             

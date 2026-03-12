@@ -83,8 +83,7 @@ async def connect_donationalerts(
     """Подключить DonationAlerts"""
     try:
         # Проверяем что пользователь авторизован
-        # NOTE: get_current_user_optional might return None or a guest user dict?
-        # Assuming we only want real users now
+        # NOTE: optional auth may return None for unauthenticated requests.
         if not user or not user.get('id') or user.get('id') <= 0:
             logger.error("User not authenticated")
             raise HTTPException(status_code=401, detail="Not authenticated")

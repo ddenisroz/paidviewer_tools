@@ -1,19 +1,49 @@
 # docker-compose.tts-simple.yml
-# Single-node F5 TTS deployment (no worker pool / no Redis).
-# Kept as compatibility compose profile for personal setups.
+# Compatibility overlay for a local single-node f5-tts-service host.
+# Useful for direct F5 voice/admin testing without the full gateway stack.
 
 services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: f5_tts_postgres_simple
+    environment:
+      POSTGRES_DB: ${F5_DB_NAME:-f5_tts}
+      POSTGRES_USER: ${F5_DB_USER:-f5_tts}
+      POSTGRES_PASSWORD: ${F5_DB_PASSWORD:?F5_DB_PASSWORD is required}
+    volumes:
+      - f5_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${F5_DB_USER:-f5_tts} -d ${F5_DB_NAME:-f5_tts}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   tts_service:
     image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
-    container_name: tts_service_single
+    container_name: f5_tts_service_simple
     ports:
-      - "8001:8001"
+      - "8011:8011"
+    environment:
+      - F5_TTS_SERVICE_PORT=8011
+      - F5_TTS_SERVICE_PUBLIC_BASE_URL=http://tts_service:8011
+      - F5_TTS_SERVICE_API_KEYS=${F5_TTS_SERVICE_API_KEY:?F5_TTS_SERVICE_API_KEY is required}
+      - F5_TTS_DATABASE_URL=postgresql://${F5_DB_USER:-f5_tts}:${F5_DB_PASSWORD:?F5_DB_PASSWORD is required}@postgres:5432/${F5_DB_NAME:-f5_tts}
+      - F5_TTS_DATABASE_ECHO=false
+      - F5_TTS_BASE_DIR=/app
+      - F5_TTS_ENGINE_MODE=real
+      - F5_TTS_ENABLE_PREWARM=false
+      - F5_TTS_MAX_INPUT_TEXT_LENGTH=${F5_TTS_MAX_INPUT_TEXT_LENGTH:-2000}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-}
+      - HF_HOME=/app/f5_tts_cache
     volumes:
-      - tts_models:/app/models
-      - tts_voices:/app/voices
-      - tts_audio:/app/audio
-      - tts_logs:/app/logs
-      - tts_cache:/app/f5_tts_cache
+      - f5_audio:/app/audio
+      - f5_logs:/app/logs
+      - f5_backups:/app/backups
+      - f5_cache:/app/f5_tts_cache
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     deploy:
       resources:
@@ -23,38 +53,27 @@ services:
               count: 1
               capabilities: [gpu]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
-    command: tunnel --config /etc/cloudflared/config.yml run
-    volumes:
-      - ../../cloudflared-config.yml:/etc/cloudflared/config.yml:ro
-      - ../../cloudflared-credentials.json:/etc/cloudflared/credentials.json:ro
-    restart: unless-stopped
-    depends_on:
-      - tts_service
-
 volumes:
-  tts_models:
+  f5_postgres_data:
     driver: local
-  tts_voices:
+  f5_audio:
     driver: local
-  tts_audio:
+  f5_logs:
     driver: local
-  tts_logs:
+  f5_backups:
     driver: local
-  tts_cache:
+  f5_cache:
     driver: local
 
 networks:
   default:
-    name: tts_single_network
+    name: f5_tts_simple_network
     driver: bridge
 
 

@@ -3,7 +3,7 @@
 Normalize admin-related data across legacy and current tables.
 
 Source of truth:
-- users.role ('admin' | 'user' | 'guest')
+- users.role ('admin' | 'user')
 
 Compatibility:
 - users.is_admin is kept in sync with users.role.
@@ -50,7 +50,7 @@ def show_summary(db) -> None:
         db,
         """
         SELECT COUNT(*) FROM users
-        WHERE role IS NULL OR role NOT IN ('admin', 'user', 'guest')
+        WHERE role IS NULL OR role NOT IN ('admin', 'user')
         """,
     )
     legacy_admin_rows = _scalar(db, "SELECT COUNT(*) FROM admin_users")
@@ -78,7 +78,7 @@ def normalize_admin_tables(apply_changes: bool) -> None:
                 WHEN is_admin IS TRUE THEN 'admin'
                 ELSE 'user'
             END
-            WHERE role IS NULL OR role NOT IN ('admin', 'user', 'guest')
+            WHERE role IS NULL OR role NOT IN ('admin', 'user')
             """
         )
 
