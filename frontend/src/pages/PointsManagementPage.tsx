@@ -1067,9 +1067,12 @@ const PointsManagementPage: React.FC = () => {
                                     className={cn(
                                         'h-8 gap-1.5 px-2.5 text-xs sm:text-sm',
                                         selectedPlatform === 'twitch'
-                                            ? 'bg-background text-foreground shadow-sm hover:bg-background'
-                                            : 'text-muted-foreground hover:text-foreground hover:bg-background/60'
+                                            ? 'text-white shadow-sm hover:text-white'
+                                            : 'text-muted-foreground hover:bg-background/60 hover:text-[#9146FF]'
                                     )}
+                                    style={selectedPlatform === 'twitch'
+                                        ? { backgroundColor: PLATFORM_COLORS.TWITCH }
+                                        : undefined}
                                 >
                                     <TwitchIcon className="w-3.5 h-3.5" />
                                     Twitch
@@ -1083,9 +1086,12 @@ const PointsManagementPage: React.FC = () => {
                                     className={cn(
                                         'h-8 gap-1.5 px-2.5 text-xs sm:text-sm',
                                         selectedPlatform === 'vk'
-                                            ? 'bg-background text-foreground shadow-sm hover:bg-background'
+                                            ? 'text-white shadow-sm hover:text-white'
                                             : 'text-muted-foreground hover:text-foreground hover:bg-background/60'
                                     )}
+                                    style={selectedPlatform === 'vk'
+                                        ? { backgroundColor: PLATFORM_COLORS.VK_LIVE }
+                                        : undefined}
                                 >
                                     <VKIcon className="w-3.5 h-3.5" />
                                     VK Live

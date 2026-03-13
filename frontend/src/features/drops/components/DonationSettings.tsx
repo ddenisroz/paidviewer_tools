@@ -286,24 +286,24 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
       {!hasRewards && (
         <Card className="border-amber-500/35 bg-amber-500/10 backdrop-blur-sm shadow-sm shadow-black/20">
           <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-400/40 flex-shrink-0">
-                <AlertTriangle className="h-4 w-4 text-amber-300" />
-              </div>
-              <div className="flex-1 space-y-2">
-                <p className="text-sm text-amber-100/90">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-400/40 flex-shrink-0">
+                  <AlertTriangle className="h-4 w-4 text-amber-300" />
+                </div>
+                <p className="text-sm text-amber-100/90 break-words">
                   Сначала добавьте награды на вкладке <strong className="text-amber-50">"Награды"</strong>.
                 </p>
-                <Button
-                  onClick={() => navigate('/dashboard/drops?tab=rewards')}
-                  variant="outline"
-                  size="sm"
-                  className="h-8 text-xs border-amber-300/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
-                >
-                  <Package className="w-3.5 h-3.5 mr-1.5" />
-                  Настроить награды
-                </Button>
               </div>
+              <Button
+                onClick={() => navigate('/dashboard/drops?tab=rewards')}
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs flex-shrink-0 border-amber-300/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
+              >
+                <Package className="w-3.5 h-3.5 mr-1.5" />
+                Настроить награды
+              </Button>
             </div>
           </CardContent>
         </Card>

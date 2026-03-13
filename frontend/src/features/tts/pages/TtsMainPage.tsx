@@ -118,6 +118,9 @@ const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur
 const SECTION_PANEL_CLASS = 'rounded-xl border border-border/70 bg-card/60 p-4';
 const SECTION_EYEBROW_CLASS = 'mb-2 text-xs font-semibold text-muted-foreground';
 const SEGMENT_BUTTON_CLASS = 'rounded-lg border-0 px-3 py-2 text-xs font-semibold transition-colors duration-200 shadow-none';
+const PROJECT_BLUE_SOLID_CLASS = 'bg-blue-700 text-white hover:bg-blue-800';
+const PROJECT_BLUE_SUBTLE_CLASS = 'bg-blue-700/10 text-blue-400';
+const PROJECT_BLUE_TEXT_HOVER_CLASS = 'bg-background/60 text-muted-foreground hover:bg-background/60 hover:text-blue-400';
 
 interface ProviderOptionButtonProps {
     provider: AdvancedProvider;
@@ -141,8 +144,8 @@ const ProviderOptionButton = React.memo(function ProviderOptionButton({
             onClick={() => onSelect(provider)}
             disabled={disabled}
             className={`rounded-lg px-3 py-3 text-left transition-colors ${active
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                ? PROJECT_BLUE_SOLID_CLASS
+                : PROJECT_BLUE_TEXT_HOVER_CLASS
                 } ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}
         >
             <div className="text-sm font-semibold">{title}</div>
@@ -150,68 +153,47 @@ const ProviderOptionButton = React.memo(function ProviderOptionButton({
     );
 });
 
-interface SourcePlatformCardProps {
+interface SourcePlatformToggleRowProps {
     platform: PlatformSource;
     isConnected: boolean;
     isEnabled: boolean;
     onToggle: (platform: PlatformSource) => void;
 }
 
-const SourcePlatformCard = React.memo(function SourcePlatformCard({
+const SourcePlatformToggleRow = React.memo(function SourcePlatformToggleRow({
     platform,
     isConnected,
     isEnabled,
     onToggle,
-}: SourcePlatformCardProps) {
+}: SourcePlatformToggleRowProps) {
     const title = platform === 'twitch' ? 'Twitch' : 'VK Live';
     const iconTone = platform === 'twitch'
         ? 'bg-violet-500/15 text-violet-200'
         : 'bg-rose-500/15 text-rose-200';
-    const rootTone = !isConnected
-        ? 'bg-background/50 hover:bg-background/60'
-        : isEnabled
-            ? 'bg-primary/10 hover:bg-primary/15'
-            : 'bg-background/60 hover:bg-primary/8';
-    const connectionTone = isConnected
-        ? 'bg-emerald-500/10 text-emerald-300'
-        : 'bg-rose-500/10 text-rose-300';
-    const ttsTone = isEnabled
-        ? 'bg-sky-500/12 text-sky-300'
-        : 'bg-background/70 text-muted-foreground';
 
     return (
-        <button
-            type="button"
-            onClick={() => onToggle(platform)}
-            className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-3 text-left transition-colors ${rootTone}`}
-        >
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/60 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconTone}`}>
                     {platform === 'twitch' ? <TwitchIcon className="h-5 w-5" /> : <VKIcon className="h-5 w-5" />}
                 </div>
                 <div className="min-w-0">
                     <div className="text-sm font-semibold text-foreground">{title}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${connectionTone}`}>
-                            {isConnected ? 'Подключена' : 'Не подключена'}
-                        </span>
-                        {isConnected && (
-                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${ttsTone}`}>
-                                {isEnabled ? 'Озвучка вкл.' : 'Озвучка выкл.'}
-                            </span>
-                        )}
+                    <div className="mt-1 text-xs text-muted-foreground">
+                        {isConnected
+                            ? (isEnabled ? 'Озвучка включена' : 'Озвучка выключена')
+                            : 'Не подключена'}
                     </div>
                 </div>
             </div>
-            <span
-                className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${!isConnected
-                    ? 'bg-rose-400'
-                    : isEnabled
-                        ? 'bg-sky-400'
-                        : 'bg-muted-foreground/45'
-                    }`}
+
+            <Switch
+                checked={Boolean(isConnected && isEnabled)}
+                onCheckedChange={() => onToggle(platform)}
+                disabled={!isConnected}
+                className="data-[state=checked]:bg-emerald-600"
             />
-        </button>
+        </div>
     );
 });
 
@@ -239,6 +221,40 @@ const TtsFilterSwitchRow = React.memo(function TtsFilterSwitchRow({
                 className="data-[state=checked]:bg-emerald-600"
             />
         </div>
+    );
+});
+
+interface TtsMasterToggleCardProps {
+    enabled: boolean;
+    isPending: boolean;
+    onToggle: () => void;
+}
+
+const TtsMasterToggleCard = React.memo(function TtsMasterToggleCard({
+    enabled,
+    isPending,
+    onToggle,
+}: TtsMasterToggleCardProps) {
+    return (
+        <Card
+            className={`${SURFACE_CARD_CLASS} ${isPending ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+            onClick={isPending ? undefined : onToggle}
+        >
+            <CardContent className="flex items-center justify-between gap-4 p-3.5">
+                <div className="flex items-center gap-3">
+                    <div className={`h-3 w-3 rounded-full transition-all duration-300 ${enabled ? 'bg-emerald-500 shadow-lg shadow-emerald-500/40' : 'bg-muted-foreground/50'}`} />
+                    <div>
+                        <div className="text-sm font-semibold text-foreground">Озвучка сообщений</div>
+                    </div>
+                </div>
+                <Switch
+                    checked={enabled}
+                    onCheckedChange={onToggle}
+                    className="pointer-events-none data-[state=checked]:bg-emerald-600"
+                    disabled={isPending}
+                />
+            </CardContent>
+        </Card>
     );
 });
 
@@ -410,9 +426,6 @@ const TtsMainPageContent: React.FC = () => {
     const isVkConnected = integrations.vk?.enabled;
     const hasLocalSetupFromStorage = localStorage.getItem('tts_has_local_setup') === 'true';
     const isAnyTtsEnabled = ttsEnabled;
-    const f5EngineLabel = f5Mode === 'local' ? 'Локально' : 'Облачно';
-    const qwenEngineLabel = qwenMode === 'local' ? 'Локально' : 'Облачно';
-
     const toggleTtsMutation = useToggleTts({
         onSuccess: () => {
             logger.log('TTS state saved');
@@ -980,7 +993,9 @@ const TtsMainPageContent: React.FC = () => {
         }
     }, [ttsEnabled, advancedProvider, qwenMode, resolveAvailableQwenMode]);
 
-    const handleGlobalTtsToggle = useCallback((): void => {
+    const handleGlobalTtsToggleRef = useRef<() => void>(() => { });
+
+    handleGlobalTtsToggleRef.current = (): void => {
         if (isEngineActionPending) {
             return;
         }
@@ -1008,16 +1023,11 @@ const TtsMainPageContent: React.FC = () => {
                 toast.error('Ошибка переключения TTS');
             },
         });
-    }, [
-        advancedProvider,
-        applySelectedProviderEngine,
-        isAnyTtsEnabled,
-        isEngineActionPending,
-        isTwitchConnected,
-        isVkConnected,
-        queryClient,
-        toggleTtsMutation,
-    ]);
+    };
+
+    const handleGlobalTtsToggle = useCallback((): void => {
+        handleGlobalTtsToggleRef.current();
+    }, []);
 
     const handleF5ModeChange = useCallback(async (mode: 'cloud' | 'local'): Promise<void> => {
         if (isEngineActionPending) {
@@ -1359,9 +1369,9 @@ const TtsMainPageContent: React.FC = () => {
         ))
     ), [handleAdvancedProviderChange, isEngineActionPending, providerOptions]);
 
-    const sourcePlatformCards = useMemo(() => (
+    const sourcePlatformToggles = useMemo(() => (
         (['twitch', 'vk'] as const).map((platform) => (
-            <SourcePlatformCard
+            <SourcePlatformToggleRow
                 key={platform}
                 platform={platform}
                 isConnected={platform === 'twitch' ? isTwitchConnected : isVkConnected}
@@ -1439,7 +1449,7 @@ const TtsMainPageContent: React.FC = () => {
                     <button
                         type="button"
                         onClick={() => void handleGcloudPreview(voice.name)}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg border-0 bg-primary text-primary-foreground transition-colors hover:bg-primary/90"
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg border-0 transition-colors ${PROJECT_BLUE_SOLID_CLASS}`}
                     >
                         {previewingGcloudVoice === voice.name ? (
                             <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -1562,32 +1572,11 @@ const TtsMainPageContent: React.FC = () => {
     return (
         <PageWrapper title="Text to Speech" className="min-h-0 px-0 py-0">
             <div className="mx-auto w-full max-w-6xl space-y-3">
-                <Card
-                    className={`${SURFACE_CARD_CLASS} ${isEngineActionPending ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                    onClick={isEngineActionPending ? undefined : handleGlobalTtsToggle}
-                >
-                    <CardContent className="flex items-center justify-between gap-4 p-3.5">
-                        <div className="flex items-center gap-3">
-                            <div className={`h-3 w-3 rounded-full transition-all duration-300 ${isAnyTtsEnabled ? 'bg-emerald-500 shadow-lg shadow-emerald-500/40' : 'bg-muted-foreground/50'}`} />
-                            <div>
-                                <div className="text-sm font-semibold text-foreground">Озвучка сообщений</div>
-                                <div className="text-xs text-muted-foreground">
-                                    {advancedProvider === 'f5'
-                                        ? `F5 • ${f5EngineLabel}`
-                                        : advancedProvider === 'qwen'
-                                            ? `Qwen • ${qwenEngineLabel}`
-                                            : 'Google Cloud'}
-                                </div>
-                            </div>
-                        </div>
-                        <Switch
-                            checked={isAnyTtsEnabled}
-                            onCheckedChange={handleGlobalTtsToggle}
-                            className="pointer-events-none data-[state=checked]:bg-emerald-600"
-                            disabled={isEngineActionPending}
-                        />
-                    </CardContent>
-                </Card>
+                <TtsMasterToggleCard
+                    enabled={isAnyTtsEnabled}
+                    isPending={isEngineActionPending}
+                    onToggle={handleGlobalTtsToggle}
+                />
 
                 {isAnyTtsEnabled && (
                     <>
@@ -1631,8 +1620,8 @@ const TtsMainPageContent: React.FC = () => {
                                                             onClick={() => void handleF5ModeChange('cloud')}
                                                             disabled={!canUseF5Cloud || isEngineActionPending}
                                                             className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${f5Mode === 'cloud'
-                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                ? PROJECT_BLUE_SOLID_CLASS
+                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
                                                                 } ${!canUseF5Cloud ? 'cursor-not-allowed opacity-45' : ''}`}
                                                         >
                                                             Облако
@@ -1642,8 +1631,8 @@ const TtsMainPageContent: React.FC = () => {
                                                             onClick={() => void handleF5ModeChange('local')}
                                                             disabled={!canUseF5Local || isEngineActionPending}
                                                             className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${f5Mode === 'local'
-                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                ? PROJECT_BLUE_SOLID_CLASS
+                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
                                                                 } ${!canUseF5Local ? 'cursor-not-allowed opacity-45' : ''}`}
                                                         >
                                                             Self-hosted
@@ -1666,8 +1655,8 @@ const TtsMainPageContent: React.FC = () => {
                                                             onClick={() => void handleQwenModeChange('cloud')}
                                                             disabled={!canUseQwenCloud || isEngineActionPending}
                                                             className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${qwenMode === 'cloud'
-                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                ? PROJECT_BLUE_SOLID_CLASS
+                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
                                                                 } ${!canUseQwenCloud ? 'cursor-not-allowed opacity-45' : ''}`}
                                                         >
                                                             Облако
@@ -1677,8 +1666,8 @@ const TtsMainPageContent: React.FC = () => {
                                                             onClick={() => void handleQwenModeChange('local')}
                                                             disabled={!canUseQwenLocal || isEngineActionPending}
                                                             className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${qwenMode === 'local'
-                                                                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                                : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                ? PROJECT_BLUE_SOLID_CLASS
+                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
                                                                 } ${!canUseQwenLocal ? 'cursor-not-allowed opacity-45' : ''}`}
                                                         >
                                                             Self-hosted
@@ -1710,8 +1699,8 @@ const TtsMainPageContent: React.FC = () => {
                                                                 type="button"
                                                                 onClick={() => handleGcloudMoodChange(option.value)}
                                                                 className={`${SEGMENT_BUTTON_CLASS} ${gcloudMood === option.value
-                                                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                                    : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                                    ? PROJECT_BLUE_SOLID_CLASS
+                                                                    : PROJECT_BLUE_TEXT_HOVER_CLASS
                                                                     }`}
                                                             >
                                                                 {option.label}
@@ -1735,8 +1724,8 @@ const TtsMainPageContent: React.FC = () => {
                                                 type="button"
                                                 onClick={() => handleListeningModeChange('website')}
                                                 className={`${SEGMENT_BUTTON_CLASS} flex-1 ${listeningMode === 'website'
-                                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                    : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                    ? PROJECT_BLUE_SOLID_CLASS
+                                                    : PROJECT_BLUE_TEXT_HOVER_CLASS
                                                     }`}
                                             >
                                                 Браузер
@@ -1745,22 +1734,25 @@ const TtsMainPageContent: React.FC = () => {
                                                 type="button"
                                                 onClick={() => handleListeningModeChange('obs')}
                                                 className={`${SEGMENT_BUTTON_CLASS} flex-1 ${listeningMode === 'obs'
-                                                    ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                                                    : 'bg-background/60 text-muted-foreground hover:bg-primary/10 hover:text-primary'
+                                                    ? PROJECT_BLUE_SOLID_CLASS
+                                                    : PROJECT_BLUE_TEXT_HOVER_CLASS
                                                     }`}
                                             >
                                                 OBS
                                             </button>
                                         </div>
 
-                                        <div className="relative min-h-[152px] pt-1">
+                                        <div className="relative min-h-[196px] pt-1">
                                             <div
-                                                className={`${listeningMode === 'website' ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'} transition-opacity`}
+                                                className={`${listeningMode === 'website'
+                                                    ? 'translate-y-0 opacity-100'
+                                                    : 'pointer-events-none absolute inset-0 translate-y-1 opacity-0'
+                                                    } transition-all duration-200 ease-out`}
                                                 aria-hidden={listeningMode !== 'website'}
                                             >
-                                                <div className="flex h-full min-h-[152px] flex-col justify-center gap-5 py-2">
+                                                <div className="flex h-full min-h-[196px] flex-col gap-4 rounded-xl border border-border/50 bg-background/35 px-4 py-4">
                                                     <div className="flex items-start gap-3">
-                                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
                                                             <Play className="h-4 w-4" />
                                                         </div>
                                                         <div className="min-w-0">
@@ -1769,40 +1761,56 @@ const TtsMainPageContent: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    <Button onClick={openPlayerTab} className="h-10 w-full max-w-[260px] self-center px-5">
-                                                        <Play className="mr-2 h-4 w-4" />
-                                                        Открыть TTS Player
-                                                    </Button>
+                                                    <div className="flex flex-1 items-center justify-center">
+                                                        <Button onClick={openPlayerTab} className="h-10 w-full max-w-[260px] px-5">
+                                                            <Play className="mr-2 h-4 w-4" />
+                                                            Открыть TTS Player
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
 
                                             <div
-                                                className={`${listeningMode === 'obs' ? 'opacity-100' : 'pointer-events-none absolute inset-0 opacity-0'} space-y-2.5 transition-opacity`}
+                                                className={`${listeningMode === 'obs'
+                                                    ? 'translate-y-0 opacity-100'
+                                                    : 'pointer-events-none absolute inset-0 translate-y-1 opacity-0'
+                                                    } transition-all duration-200 ease-out`}
                                                 aria-hidden={listeningMode !== 'obs'}
                                             >
-                                                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                                    <div className="text-sm font-semibold text-foreground">OBS endpoint</div>
-                                                    <button
-                                                        onClick={handleRegenerateObsUrl}
-                                                        className="h-9 rounded-lg border-0 bg-primary px-3 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                                                        disabled={isRegeneratingUrl}
-                                                    >
-                                                        {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
-                                                    </button>
-                                                </div>
-
-                                                <div
-                                                    className="group relative cursor-pointer rounded-lg border border-border/70 bg-background/70 px-3 py-2.5"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(obsUrl);
-                                                        toast.success('Скопировано');
-                                                    }}
-                                                >
-                                                    <div className="truncate pr-14 font-mono text-xs text-muted-foreground">
-                                                        {obsUrl || 'Генерация URL...'}
+                                                <div className="flex h-full min-h-[196px] flex-col gap-4 rounded-xl border border-border/50 bg-background/35 px-4 py-4">
+                                                    <div className="flex items-start gap-3">
+                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
+                                                            <Settings className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="text-sm font-semibold text-foreground">OBS endpoint</div>
+                                                            <div className="mt-1 text-xs text-muted-foreground">Ссылка для подключения OBS-плеера</div>
+                                                        </div>
                                                     </div>
-                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                                                        Copy
+
+                                                    <div
+                                                        className="group relative cursor-pointer rounded-lg border border-border/70 bg-background/70 px-3 py-2.5"
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(obsUrl);
+                                                            toast.success('Скопировано');
+                                                        }}
+                                                    >
+                                                        <div className="truncate pr-14 font-mono text-xs text-muted-foreground">
+                                                            {obsUrl || 'Генерация URL...'}
+                                                        </div>
+                                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                                                            Copy
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex flex-1 items-center justify-center">
+                                                        <Button
+                                                            onClick={handleRegenerateObsUrl}
+                                                            className="h-10 w-full max-w-[260px] px-5"
+                                                            disabled={isRegeneratingUrl}
+                                                        >
+                                                            {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1817,7 +1825,7 @@ const TtsMainPageContent: React.FC = () => {
                                         <CardTitle className="text-base font-bold text-foreground">Источники озвучки</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-2.5 pt-4">
-                                        {sourcePlatformCards}
+                                        {sourcePlatformToggles}
                                     </CardContent>
                                 </Card>
 

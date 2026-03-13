@@ -122,7 +122,7 @@ const AnalyticsPage: React.FC = () => {
 
               <div className="flex gap-2 pt-2 border-t border-border/30">
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
                   onClick={() => navigate('/dashboard/commands')}
                   className="flex-1 h-8 text-xs"

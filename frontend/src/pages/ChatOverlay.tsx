@@ -137,7 +137,9 @@ const ChatMessageItem = memo<ChatMessageItemProps>(({
         };
 
         if (isNewMessage) {
-            const animationType = settings?.animation_type || 'fade';
+            const animationType = settings?.chat_direction === 'horizontal'
+                ? (settings?.animation_type === 'none' ? 'none' : 'slide-left')
+                : (settings?.animation_type || 'fade');
             const animationDuration = settings?.animation_duration || 300;
             const shouldAnimate = animationType !== 'none' && animationDuration > 0;
 

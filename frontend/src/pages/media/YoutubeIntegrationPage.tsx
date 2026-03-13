@@ -34,6 +34,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useChat } from '@/context/ChatContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { usePlayer } from '@/context/PlayerContext';
+import { cn } from '@/lib/utils';
 import { youtubeService } from '@/services/api/services/youtubeService';
 import { pointsApi } from '@/services/pointsApi';
 import PageWrapper from '@/shared/components/PageWrapper';
@@ -51,6 +52,13 @@ import { toast } from '@/utils/toastManager';
 import QueueList from './components/QueueList';
 
 import type { YoutubeVideo } from '@/types/youtube';
+
+const PLAYER_CONTROL_BUTTON_CLASS =
+    'border-border/60 bg-background/60 text-muted-foreground hover:bg-background/60 hover:text-blue-400';
+const PLAYER_DANGER_BUTTON_CLASS =
+    'border-red-500/30 bg-background/60 text-red-400 hover:bg-background/60 hover:text-red-300';
+const PLAYER_STATUS_BUTTON_CLASS =
+    'h-10 px-3 gap-2 border-border/60 bg-background/60 disabled:opacity-60 hover:bg-background/60';
 
 const YoutubeIntegrationPage: React.FC = () => {
     const navigate = useNavigate();
@@ -683,7 +691,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     size="icon"
                                                     title={isPlaying ? "Пауза" : "Плей"}
                                                     aria-label={isPlaying ? "Пауза" : "Плей"}
-                                                    className="h-12 w-12 bg-emerald-600 hover:bg-emerald-500 text-white"
+                                                    className="h-12 w-12"
                                                 >
                                                     {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                                                 </Button>
@@ -694,7 +702,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     disabled={!hasVideo}
                                                     title="Следующее"
                                                     aria-label="Следующее"
-                                                    className="h-12 w-12 border-border/60 hover:border-emerald-500/60"
+                                                    className={cn('h-12 w-12', PLAYER_CONTROL_BUTTON_CLASS)}
                                                 >
                                                     <SkipForward className="w-5 h-5" />
                                                 </Button>
@@ -706,7 +714,12 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     disabled={isOrdersSaving}
                                                     title={ordersClosed ? "Заказы off" : "Заказы on"}
                                                     aria-label={ordersClosed ? "Заказы off" : "Заказы on"}
-                                                    className={`h-10 px-3 gap-2 border-border/60 disabled:opacity-60 ${ordersClosed ? 'text-red-300 border-red-500/40 hover:bg-red-500/10' : 'text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10'}`}
+                                                    className={cn(
+                                                        PLAYER_STATUS_BUTTON_CLASS,
+                                                        ordersClosed
+                                                            ? 'text-red-300 border-red-500/40 hover:text-red-200'
+                                                            : 'text-emerald-300 border-emerald-500/40 hover:text-emerald-200'
+                                                    )}
                                                 >
                                                     {ordersClosed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                                     <span className="text-xs font-medium">{ordersClosed ? 'Заказы off' : 'Заказы on'}</span>
@@ -717,14 +730,14 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     onClick={() => setIsSettingsDialogOpen(true)}
                                                     title="Настройки заказа"
                                                     aria-label="Настройки заказа"
-                                                    className="h-10 w-10 border-border/60"
+                                                    className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
                                                 >
                                                     <Settings className="h-4 w-4" />
                                                 </Button>
                                                 <Button
                                                     variant="outline"
                                                     size="icon"
-                                                    className="h-10 w-10"
+                                                    className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
                                                     onClick={handleToggleTheater}
                                                     title={isTheaterMode ? "Выйти из режима театра" : "Театральный режим"}
                                                     aria-label={isTheaterMode ? "Выйти из режима театра" : "Театральный режим"}
@@ -738,7 +751,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                     disabled={!hasVideo}
                                                     title="Очистить очередь"
                                                     aria-label="Очистить очередь"
-                                                    className="h-10 w-10 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                                    className={cn('h-10 w-10', PLAYER_DANGER_BUTTON_CLASS)}
                                                 >
                                                     <Trash2 className="w-4 h-4" />
                                                 </Button>
@@ -752,7 +765,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                                 disabled={!hasVideo}
                                                 title={isMuted ? "Включить звук" : "Выключить звук"}
                                                 aria-label={isMuted ? "Включить звук" : "Выключить звук"}
-                                                className="h-10 w-10 border-border/60"
+                                                className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
                                             >
                                                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                                             </Button>
@@ -828,7 +841,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                     <div className="flex items-center gap-2">
                                         <Button
-                                            variant="outline"
+                                            variant="default"
                                             size="icon"
                                             onClick={togglePlayPause}
                                             disabled={!hasVideo}
@@ -845,7 +858,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             disabled={!hasVideo}
                                             title="Следующее"
                                             aria-label="Следующее"
-                                            className="h-11 w-11"
+                                            className={cn('h-11 w-11', PLAYER_CONTROL_BUTTON_CLASS)}
                                         >
                                             <SkipForward className="w-5 h-5" />
                                         </Button>
@@ -857,7 +870,12 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             disabled={isOrdersSaving}
                                             title={ordersClosed ? "Заказы off" : "Заказы on"}
                                             aria-label={ordersClosed ? "Заказы off" : "Заказы on"}
-                                            className={`h-10 px-3 gap-2 disabled:opacity-60 ${ordersClosed ? 'text-red-300 border-red-500/40 hover:bg-red-500/10' : 'text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/10'}`}
+                                            className={cn(
+                                                PLAYER_STATUS_BUTTON_CLASS,
+                                                ordersClosed
+                                                    ? 'text-red-300 border-red-500/40 hover:text-red-200'
+                                                    : 'text-emerald-300 border-emerald-500/40 hover:text-emerald-200'
+                                            )}
                                         >
                                             {ordersClosed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                             <span className="text-xs font-medium">{ordersClosed ? 'Заказы off' : 'Заказы on'}</span>
@@ -868,7 +886,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             onClick={() => setIsSettingsDialogOpen(true)}
                                             title="Настройки заказа"
                                             aria-label="Настройки заказа"
-                                            className="h-10 w-10"
+                                            className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
                                         >
                                             <Settings className="w-4 h-4" />
                                         </Button>
@@ -879,7 +897,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             disabled={!hasVideo}
                                             title="Очистить очередь"
                                             aria-label="Очистить очередь"
-                                            className="h-10 w-10 text-red-400 border-red-500/30 hover:bg-red-500/10"
+                                            className={cn('h-10 w-10', PLAYER_DANGER_BUTTON_CLASS)}
                                         >
                                             <Trash2 className="w-4 h-4" />
                                         </Button>
@@ -889,7 +907,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                             onClick={handleToggleTheater}
                                             title="Выйти из режима театра"
                                             aria-label="Выйти из режима театра"
-                                            className="h-10 w-10"
+                                            className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
                                         >
                                             <Minimize className="w-4 h-4" />
                                         </Button>
@@ -903,7 +921,7 @@ const YoutubeIntegrationPage: React.FC = () => {
                                         disabled={!hasVideo}
                                         title={isMuted ? "Включить звук" : "Выключить звук"}
                                         aria-label={isMuted ? "Включить звук" : "Выключить звук"}
-                                        className="h-10 w-10"
+                                        className={cn('h-10 w-10', PLAYER_CONTROL_BUTTON_CLASS)}
                                     >
                                         {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                                     </Button>

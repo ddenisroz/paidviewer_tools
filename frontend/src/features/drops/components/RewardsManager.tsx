@@ -4,7 +4,6 @@ import {
   Edit,
   Loader2,
   Music,
-  Plus,
   Power,
   Save,
   Trash2
@@ -98,7 +97,6 @@ const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur
 const CONTROL_TRIGGER_CLASS = 'h-9 border-border/70 bg-transparent shadow-none';
 const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const MAX_REWARD_WEIGHT = 2000;
-const PROFILE_STORAGE_KEY_PREFIX = 'drops_rewards_profile_';
 const BLUE_TEXT_BUTTON_CLASS = 'border-border/70 bg-transparent text-sky-300 hover:bg-transparent hover:text-sky-200';
 
 const dedupeRewards = (items: Reward[]): Reward[] => {
@@ -141,7 +139,6 @@ const emptyForm = (platform: string, qualityId: number | null): RewardForm => ({
 });
 
 const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channelName, onRewardsCountChange, integrations }) => {
-  const [activeProfile, setActiveProfile] = useState<'A' | 'B'>('A');
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
   const [selectedRewardId, setSelectedRewardId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -232,54 +229,6 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
     setDeleteConfirmId(null);
   };
 
-  const saveCurrentProfile = (profile: 'A' | 'B') => {
-    try {
-      const snapshot = rewards.map((reward) => ({
-        id: Number(reward.id),
-        weight: Number(reward.weight ?? 100),
-        is_active: Boolean(reward.is_active),
-      }));
-      localStorage.setItem(`${PROFILE_STORAGE_KEY_PREFIX}${channelName}_${profile}`, JSON.stringify(snapshot));
-      toast.success(`Профиль ${profile} сохранен`);
-    } catch {
-      toast.error('Не удалось сохранить профиль');
-    }
-  };
-
-  const applyProfile = (profile: 'A' | 'B') => {
-    try {
-      const raw = localStorage.getItem(`${PROFILE_STORAGE_KEY_PREFIX}${channelName}_${profile}`);
-      if (!raw) {
-        toast.error(`Профиль ${profile} пуст`);
-        return;
-      }
-      const snapshot = JSON.parse(raw) as Array<{ id: number; weight: number; is_active: boolean }>;
-      for (const item of snapshot) {
-        const current = rewards.find((reward) => Number(reward.id) === item.id);
-        if (!current) continue;
-
-        const needWeightUpdate = Number(current.weight ?? 100) !== Number(item.weight);
-        const needActiveUpdate = Boolean(current.is_active) !== Boolean(item.is_active);
-
-        if (needWeightUpdate) {
-          updateRewardMutation.mutate({
-            rewardId: item.id,
-            reward: { weight: Math.max(1, Math.min(MAX_REWARD_WEIGHT, Number(item.weight))) } as Partial<DropsReward>,
-          });
-        }
-
-        if (needActiveUpdate) {
-          toggleRewardMutation.mutate({ rewardId: item.id, isActive: item.is_active });
-        }
-      }
-
-      setActiveProfile(profile);
-      toast.success(`Применен профиль ${profile}`);
-    } catch {
-      toast.error('Не удалось применить профиль');
-    }
-  };
-
   const handleToggleReward = (reward: Reward): void => {
     toggleRewardMutation.mutate({
       rewardId: Number(reward.id),
@@ -352,41 +301,6 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => applyProfile('A')}
-            className={activeProfile === 'A' ? 'border-sky-500/50 bg-transparent text-sky-200' : BLUE_TEXT_BUTTON_CLASS}
-          >
-            Профиль A
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => applyProfile('B')}
-            className={activeProfile === 'B' ? 'border-sky-500/50 bg-transparent text-sky-200' : BLUE_TEXT_BUTTON_CLASS}
-          >
-            Профиль B
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => saveCurrentProfile(activeProfile)} className={BLUE_TEXT_BUTTON_CLASS}>
-            Сохранить текущий
-          </Button>
-        </div>
-        <Button
-          onClick={switchToCreate}
-          variant="outline"
-          size="default"
-          className={`font-medium gap-2 ${BLUE_TEXT_BUTTON_CLASS}`}
-        >
-          <Plus className="w-4 h-4" />
-          Создать награду
-        </Button>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-4">
           {QUALITIES.map((qualityItem) => {
@@ -418,7 +332,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                         return (
                           <div
                             key={reward.id}
-                            className={`rounded-xl border p-3 transition-colors ${isSelected ? 'border-sky-500/50' : 'border-border/70'} ${reward.is_active ? 'bg-transparent' : 'bg-transparent opacity-70'}`}
+                            className={`rounded-xl border p-3 transition-colors ${reward.is_active ? (isSelected ? 'border-sky-500/50' : 'border-border/70') : 'border-red-500/40'} ${reward.is_active ? 'bg-transparent' : 'bg-transparent opacity-70'}`}
                           >
                             <div className="mb-2 flex items-start justify-between gap-2">
                               <h4 className="line-clamp-2 text-sm font-semibold text-foreground">{reward.name}</h4>
@@ -548,49 +462,6 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="reward_image">Ссылка на изображение</Label>
-              <Input
-                id="reward_image"
-                value={form.image_url}
-                onChange={(e) => setForm((prev) => ({ ...prev, image_url: e.target.value }))}
-                className="border-border/70 bg-transparent"
-                placeholder="https://..."
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1.5">
-                <Label htmlFor="reward_sound_volume">Громкость</Label>
-                <Input
-                  id="reward_sound_volume"
-                  type="number"
-                  min="0"
-                  max="2"
-                  step="0.1"
-                  value={form.sound_volume}
-                  onChange={(e) => setForm((prev) => ({ ...prev, sound_volume: Math.max(0, Math.min(2, parseFloat(e.target.value) || 1)) }))}
-                  className="border-border/70 bg-transparent"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reward_platform">Платформа</Label>
-                <Select
-                  value={form.platform}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, platform: value }))}
-                >
-                  <SelectTrigger id="reward_platform" className={CONTROL_TRIGGER_CLASS}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className={CONTROL_CONTENT_CLASS}>
-                    {availablePlatforms.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
             <div className="flex items-center justify-between rounded-md border border-border/70 px-3 py-2">
               <Label htmlFor="reward_active" className="text-sm">Активна</Label>
               <Switch
@@ -628,7 +499,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                 variant="outline"
                 className="w-full border-border/70 bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
               >
-                Новый шаблон
+                Отмена редактирования
               </Button>
             ) : null}
 

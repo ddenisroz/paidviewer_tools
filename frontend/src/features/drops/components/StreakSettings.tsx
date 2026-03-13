@@ -303,7 +303,7 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
                 className="h-8 text-xs flex-shrink-0 border-amber-300/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
               >
                 <Package className="w-3.5 h-3.5 mr-1.5" />
-                Настроить
+                Настроить награды
               </Button>
             </div>
           </CardContent>
@@ -376,58 +376,59 @@ const StreakSettings: React.FC<StreakSettingsProps> = ({ user, channelName, hasR
               step={1}
             />
           </div>
+
+          <div className="space-y-3 rounded-xl border border-border/70 bg-transparent p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label className="text-sm font-medium">Сброс при пропуске</Label>
+                <p className="text-xs text-muted-foreground">Обнулять стрик при неактивности во время стрима</p>
+              </div>
+              <Switch
+                checked={formData.streak_reset_on_skip}
+                onCheckedChange={(checked) => {
+                  setFormData({ ...formData, streak_reset_on_skip: checked });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-3">
+              {showResetConfirm ? (
+                <>
+                  <Button
+                    onClick={handleResetStatistics}
+                    disabled={resetStatsMutation.isPending}
+                    size="sm"
+                    variant="outline"
+                    className="gap-2 border-red-500/40 bg-transparent text-red-300 hover:bg-transparent hover:text-red-200"
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    {resetStatsMutation.isPending ? 'Сброс...' : 'Подтвердить сброс'}
+                  </Button>
+                  <Button
+                    onClick={() => setShowResetConfirm(false)}
+                    size="sm"
+                    variant="outline"
+                    className={BLUE_TEXT_BUTTON_CLASS}
+                  >
+                    Отмена
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  onClick={handleResetStatistics}
+                  disabled={resetStatsMutation.isPending}
+                  size="sm"
+                  variant="outline"
+                  className={BLUE_TEXT_BUTTON_CLASS}
+                >
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Сбросить статистику стриков
+                </Button>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
-
-      <div className="flex items-center justify-between rounded-xl border border-border/70 bg-transparent p-3">
-        <div>
-          <Label className="text-sm font-medium">Сброс при пропуске</Label>
-          <p className="text-xs text-muted-foreground">Обнулять стрик при неактивности во время стрима</p>
-        </div>
-        <Switch
-          checked={formData.streak_reset_on_skip}
-          onCheckedChange={(checked) => {
-            setFormData({ ...formData, streak_reset_on_skip: checked });
-          }}
-        />
-      </div>
-
-      {/* Кнопка сброса статистики */}
-      <div className="flex items-center justify-end gap-2">
-        {showResetConfirm ? (
-          <>
-            <Button
-              onClick={handleResetStatistics}
-              disabled={resetStatsMutation.isPending}
-              size="sm"
-              variant="outline"
-              className="gap-2 border-red-500/40 bg-transparent text-red-300 hover:bg-transparent hover:text-red-200"
-            >
-              <AlertTriangle className="w-4 h-4" />
-              {resetStatsMutation.isPending ? 'Сброс...' : 'Подтвердить сброс'}
-            </Button>
-            <Button
-              onClick={() => setShowResetConfirm(false)}
-              size="sm"
-              variant="outline"
-              className={BLUE_TEXT_BUTTON_CLASS}
-            >
-              Отмена
-            </Button>
-          </>
-        ) : (
-          <Button
-            onClick={handleResetStatistics}
-            disabled={resetStatsMutation.isPending}
-            size="sm"
-            variant="outline"
-            className={BLUE_TEXT_BUTTON_CLASS}
-          >
-            <AlertTriangle className="w-4 h-4 mr-2" />
-            Сбросить статистику стриков
-          </Button>
-        )}
-      </div>
     </div>
   );
 };

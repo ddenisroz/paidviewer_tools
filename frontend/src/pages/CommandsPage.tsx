@@ -334,7 +334,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                         variant="default"
                         size="sm"
                         onClick={() => onEdit(command)}
-                        className="flex-1 h-8 text-xs bg-none bg-primary hover:bg-primary/90"
+                        className="flex-1 h-8 text-xs"
                     >
                         <Edit2 className="h-3 w-3 mr-1" />
                         Настроить
@@ -1101,7 +1101,7 @@ const CommandsPage: React.FC = () => {
                                         <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                                             Отмена
                                         </Button>
-                                        <Button onClick={handleCreateCommand} className="h-9 bg-none bg-primary hover:bg-primary/90 shadow-none">
+                                        <Button onClick={handleCreateCommand} className="h-9 shadow-none">
                                             <Save className="h-4 w-4 mr-2" />
                                             Создать
                                         </Button>
@@ -1481,7 +1481,7 @@ const CommandsPage: React.FC = () => {
                         </Button>
                         <Button
                             onClick={() => handleUpdateCommand(editingCommand?.id ? Number(editingCommand.id) : undefined)}
-                            className="h-9 bg-none bg-primary hover:bg-primary/90 shadow-none"
+                            className="h-9 shadow-none"
                         >
                             <Save className="h-4 w-4 mr-2" />
                             Сохранить

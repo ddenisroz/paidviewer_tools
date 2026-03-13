@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { API_BASE_URL } from '@/constants';
 import MessageContent from '@/features/chat/components/MessageContent';
+import { loadGoogleFont } from '@/features/chatbox/utils/chatboxHelpers';
 import { getGlobalEmotes } from '@/features/chat/utils/emotes';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
@@ -94,6 +95,9 @@ const PREVIEW_TWITCH_BADGE_FALLBACKS: Record<string, string> = {
     'vip/1': 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/1'
 };
 
+const sanitizeFontFamily = (fontFamily: string): string =>
+    fontFamily.replace(/[^a-zA-Z0-9,\s-]/g, '').trim();
+
 const normalizeVkAssetUrl = (url?: string): string => {
     if (!url) return '';
     if (url.startsWith('//')) return `https:${url}`;
@@ -148,10 +152,22 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
     const [globalEmotes, setGlobalEmotes] = useState<Map<string, EmoteData>>(new Map());
     const [simulatedMessages, setSimulatedMessages] = useState<RenderedPreviewMessage[]>([]);
     const [lastAnimatedMessageKey, setLastAnimatedMessageKey] = useState<string | null>(null);
+    const [fontLoadVersion, setFontLoadVersion] = useState(0);
     const nextTemplateIndexRef = useRef(0);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
     const isHorizontal = settings.chat_direction === 'horizontal';
+    const effectiveAnimationType = isHorizontal
+        ? (settings.animation_type === 'none' ? 'none' : 'slide-left')
+        : settings.animation_type;
     const chatWidth = Math.max(20, Math.min(100, settings.chat_width || 100));
+    const resolvedFontFamily = useMemo(() => {
+        const safeFontFamily = settings.font_family ? sanitizeFontFamily(settings.font_family) : '';
+        if (!safeFontFamily) return 'Inter, sans-serif';
+        return safeFontFamily.includes(',')
+            ? safeFontFamily
+            : `${safeFontFamily}, sans-serif`;
+    }, [settings.font_family]);
     const previewLimit = useMemo(() => {
         if (isHorizontal) return Math.max(1, settings.max_messages);
         const estimatedLineHeight = settings.font_size * 1.35 + 8 + settings.message_spacing;
@@ -201,6 +217,62 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         if (words.length <= maxWords) return text;
         return `${words.slice(0, maxWords).join(' ')}...`;
     };
+
+    useEffect(() => {
+        let isActive = true;
+        const fontFamily = sanitizeFontFamily(settings.font_family);
+
+        if (!fontFamily) return undefined;
+
+        loadGoogleFont(fontFamily);
+
+        if (typeof document === 'undefined' || !('fonts' in document)) {
+            setFontLoadVersion((prev) => prev + 1);
+            return undefined;
+        }
+
+        const primaryFont = fontFamily.split(',')[0]?.trim() || fontFamily;
+        Promise.allSettled([
+            document.fonts.load(`${settings.font_weight || 'normal'} ${settings.font_size}px "${primaryFont}"`),
+            document.fonts.ready,
+        ]).finally(() => {
+            if (isActive) {
+                setFontLoadVersion((prev) => prev + 1);
+            }
+        });
+
+        return () => {
+            isActive = false;
+        };
+    }, [settings.font_family, settings.font_size, settings.font_weight]);
+
+    useEffect(() => {
+        if (!isHorizontal) return undefined;
+
+        const container = scrollContainerRef.current;
+        if (!container) return undefined;
+
+        const frame = requestAnimationFrame(() => {
+            container.scrollTo({
+                left: container.scrollWidth,
+                behavior: 'smooth',
+            });
+        });
+
+        return () => cancelAnimationFrame(frame);
+    }, [
+        fontLoadVersion,
+        isHorizontal,
+        simulatedMessages,
+        settings.chat_width,
+        settings.font_size,
+        settings.message_spacing,
+        settings.show_avatars,
+        settings.show_badges,
+        settings.show_links,
+        settings.show_platform_icons,
+        settings.show_roles,
+    ]);
 
     useEffect(() => {
         let active = true;
@@ -263,7 +335,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
     }, [previewMessages, previewLimit]);
 
     useEffect(() => {
-        if (settings.animation_type === 'none' || settings.animation_duration <= 0) return undefined;
         if (previewMessages.length === 0) return undefined;
 
         const interval = setInterval(() => {
@@ -274,11 +345,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
             const limit = previewLimit;
 
             setSimulatedMessages((prev) => [...prev, nextMessage].slice(-limit));
-            setLastAnimatedMessageKey(nextMessage.preview_key);
+            setLastAnimatedMessageKey(
+                effectiveAnimationType !== 'none' && settings.animation_duration > 0
+                    ? nextMessage.preview_key
+                    : null
+            );
         }, Math.max(1800, settings.animation_duration + 600));
 
         return () => clearInterval(interval);
-    }, [previewMessages, settings.animation_type, settings.animation_duration, previewLimit]);
+    }, [previewMessages, effectiveAnimationType, settings.animation_duration, previewLimit]);
 
     return (
         <div className="h-full flex flex-col">
@@ -305,17 +380,13 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                         60% { opacity: 1; transform: translateY(-6px) scale(1.02); }
                         100% { opacity: 1; transform: translateY(0) scale(1); }
                     }
-                    @keyframes previewMarquee {
-                        0% { transform: translateX(0); }
-                        100% { transform: translateX(-50%); }
-                    }
                 `}
             </style>
             <div
                 className="flex-1 overflow-hidden border border-white/10 rounded-md"
                 style={{
                     background: panelBackground,
-                    fontFamily: settings.font_family,
+                    fontFamily: resolvedFontFamily,
                     fontSize: `${settings.font_size}px`,
                     fontWeight: settings.font_weight || 'normal'
                 }}
@@ -330,12 +401,14 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                     }}
                 >
                     <div
-                        className={`${isHorizontal ? 'overflow-x-hidden' : 'overflow-hidden'} chatbox-preview-scroll`}
+                        ref={scrollContainerRef}
+                        className={`${isHorizontal ? 'overflow-x-auto overflow-y-hidden' : 'overflow-hidden'} chatbox-preview-scroll`}
                         style={{
                             width: `${chatWidth}%`,
                             maxWidth: '100%',
                             height: '100%',
-                            paddingBottom: isHorizontal ? '8px' : '0'
+                            paddingBottom: isHorizontal ? '8px' : '0',
+                            scrollbarWidth: isHorizontal ? 'thin' : undefined
                         }}
                     >
                         <div
@@ -344,15 +417,13 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                 flexDirection: isHorizontal ? 'row' : 'column',
                                 alignItems: isHorizontal ? 'center' : 'stretch',
                                 gap: isHorizontal ? '8px' : `${settings.message_spacing}px`,
-                                paddingRight: isHorizontal ? '40%' : '0',
-                                width: isHorizontal ? 'max-content' : '100%',
-                                animation: isHorizontal ? 'previewMarquee 18s linear infinite' : undefined
+                                width: isHorizontal ? 'max-content' : '100%'
                             }}
                         >
                             {!isHorizontal && <div style={{ flexGrow: 1 }} />}
                             {simulatedMessages.map((msg) => {
-                            const animationName = getAnimationName(settings.animation_type);
-                            const shouldAnimate = settings.animation_type !== 'none'
+                            const animationName = getAnimationName(effectiveAnimationType);
+                            const shouldAnimate = effectiveAnimationType !== 'none'
                                 && settings.animation_duration > 0
                                 && animationName
                                 && msg.preview_key === lastAnimatedMessageKey;
@@ -402,6 +473,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                 />
                             );
                             const baseMessageStyle: React.CSSProperties = {
+                                fontFamily: resolvedFontFamily,
                                 borderRadius: `${settings.border_radius ?? 8}px`,
                                 whiteSpace: isHorizontal ? 'nowrap' : 'normal',
                                 wordBreak: isHorizontal ? 'normal' : 'break-word',
@@ -507,6 +579,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                     )}
                                     <span
                                         style={{
+                                            fontFamily: resolvedFontFamily,
                                             color: settings.username_color || (msg.platform === 'twitch' ? '#9146FF' : '#FF4444'),
                                             fontWeight: 600
                                         }}
@@ -536,7 +609,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                             [{msg.role}]
                                         </span>
                                     )}
-                                    <span>{displayMessage}</span>
+                                    <span style={{ fontFamily: resolvedFontFamily }}>{displayMessage}</span>
                                 </div>
                             );
                             })}

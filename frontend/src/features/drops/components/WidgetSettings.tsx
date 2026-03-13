@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useRef, useState } from 'react';
 
-import { Copy, ExternalLink, Loader2, Monitor, Settings2 } from 'lucide-react';
+import { Copy, ExternalLink, Loader2, Monitor, Settings2, TestTube2 } from 'lucide-react';
 
 import { DROPS_CONSTANTS } from '@/constants/drops';
 import { useDropsConfig, useGenerateDropsWidgetUrl, useUpdateDropsConfig } from '@/queries/drops/dropsQueries';
@@ -146,6 +146,21 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
   const handleRegenerateWidgetUrl = () => {
     generateWidgetUrlMutation.mutate(true);
+  };
+
+  const getPreviewWidgetUrl = (): string | null => {
+    if (!widgetUrl) return null;
+
+    const safeUrl = getSafeNavigationUrl(widgetUrl);
+    if (!safeUrl) return null;
+
+    try {
+      const previewUrl = new URL(safeUrl);
+      previewUrl.searchParams.set('preview', 'true');
+      return previewUrl.toString();
+    } catch {
+      return null;
+    }
   };
 
   const copyWidgetUrl = () => {
@@ -317,7 +332,26 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                   <ExternalLink className="w-4 h-4" />
                   Открыть виджет
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const previewUrl = getPreviewWidgetUrl();
+                    if (!previewUrl) {
+                      toast.error('Не удалось подготовить тестовый URL виджета');
+                      return;
+                    }
+                    window.open(previewUrl, '_blank', 'noopener,noreferrer');
+                  }}
+                  className={BLUE_ACTION_CLASS}
+                >
+                  <TestTube2 className="w-4 h-4" />
+                  Тестовые награды
+                </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Тестовый режим открывает виджет с кнопками запуска наград по качествам, без реальных событий из чата.
+              </p>
             </div>
           ) : (
             <div className="p-4 border border-border/70 rounded-lg bg-card/60">

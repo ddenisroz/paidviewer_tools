@@ -104,7 +104,7 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
         id: 3,
         platform: 'twitch',
         author: 'arolkish',
-        message: 'Ребят, а что выграло на ауке?',
+        message: 'Ребят, а что выграло на ауке? https://example.com',
         time: '12:02',
         role: 'Moderator',
         badges: ['moderator/1'],
@@ -187,8 +187,8 @@ const ANIMATION_OPTIONS = [
 ];
 
 const CHAT_DIRECTION_OPTIONS = [
-    { value: 'vertical', label: 'Вертикально (снизу вверх)' },
-    { value: 'horizontal', label: 'Горизонтально (бегущая строка)' }
+    { value: 'vertical', label: 'Вертикально' },
+    { value: 'horizontal', label: 'Горизонтально' }
 ];
 
 const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onClose, onSave }) => {
@@ -263,8 +263,35 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         }
     };
 
+    const availableAnimationOptions = settings.chat_direction === 'horizontal'
+        ? [
+            { value: 'slide-left', label: 'Слайд справа' },
+            { value: 'none', label: 'Без анимации' }
+        ]
+        : ANIMATION_OPTIONS;
+
     const handleChange = (key: keyof ChatBoxSettings, value: string | number | boolean) => {
-        setSettings(prev => ({ ...prev, [key]: value }));
+        setSettings(prev => {
+            if (key === 'chat_direction') {
+                const nextDirection = String(value);
+                return {
+                    ...prev,
+                    chat_direction: nextDirection,
+                    animation_type: nextDirection === 'horizontal'
+                        ? (prev.animation_type === 'none' ? 'none' : 'slide-left')
+                        : prev.animation_type
+                };
+            }
+
+            if (key === 'animation_type' && prev.chat_direction === 'horizontal') {
+                return {
+                    ...prev,
+                    animation_type: value === 'none' ? 'none' : 'slide-left'
+                };
+            }
+
+            return { ...prev, [key]: value };
+        });
     };
 
     const resetToDefaults = () => {
@@ -532,7 +559,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-card border-border/60 z-[11000] font-base">
-                                                    {ANIMATION_OPTIONS.map(option => (
+                                                    {availableAnimationOptions.map(option => (
                                                         <SelectItem key={option.value} value={option.value}>
                                                             {option.label}
                                                         </SelectItem>
