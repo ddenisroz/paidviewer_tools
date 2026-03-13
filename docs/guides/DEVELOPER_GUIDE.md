@@ -114,5 +114,5 @@ Before release-oriented PRs:
 - auth/session changes -> `docs/architecture/AUTH_TYPE_SYSTEM.md`
 - websocket behavior -> `docs/architecture/SHARED_WEBSOCKET.md`
 - deployment/env -> `docs/setup/DEPLOYMENT.md`
-- repo hygiene -> `docs/REPO_STRUCTURE.md` and `docs/guides/REPO_CLEANUP_PLAN.md`
+- repo hygiene -> `docs/REPO_STRUCTURE.md` and `scripts/prepare-release.ps1`
 

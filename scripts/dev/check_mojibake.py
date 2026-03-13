@@ -55,10 +55,7 @@ SKIP_DIRS = {
     ".vscode",
 }
 
-# Legacy archive scripts may intentionally preserve historical broken text
-# and should not block current release checks.
 DEFAULT_SKIP_CONTAINS = [
-    "bot_service/scripts/archive/legacy/",
     "frontend/lint_output.txt",
 ]
 
@@ -98,7 +95,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--include-legacy",
         action="store_true",
-        help="Include legacy archive paths that are skipped by default",
+        help="Include any extra skip paths passed via --skip-contains",
     )
     return parser.parse_args()
 

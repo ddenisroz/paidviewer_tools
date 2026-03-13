@@ -3,7 +3,6 @@
 Allowed zones:
 - bot_service/tests/**
 - bot_service/alembic/**
-- bot_service/scripts/archive/**
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ BOT_SERVICE = ROOT / "bot_service"
 ALLOWED_PREFIXES = (
     (BOT_SERVICE / "tests").resolve(),
     (BOT_SERVICE / "alembic").resolve(),
-    (BOT_SERVICE / "scripts" / "archive").resolve(),
 )
 
 SCAN_SUFFIXES = {".py", ".env", ".example", ".md", ".txt", ".yaml", ".yml"}

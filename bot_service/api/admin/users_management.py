@@ -15,6 +15,7 @@ from pydantic import BaseModel
 import logging
 
 from services.admin import get_admin_stats_service, user_management_service
+from services.user_cleanup_service import user_cleanup_service
 
 logger = logging.getLogger(__name__)
 
@@ -228,19 +229,23 @@ async def delete_user(
         if user_id == current_user.get('id'):
             raise HTTPException(status_code=403, detail="Cannot delete yourself")
         
-        result = await user_management_service.delete_user(user_id, db)
-        
-        if "error" in result:
-            if result["error"] == "User not found":
-                raise HTTPException(status_code=404, detail="User not found")
-            raise HTTPException(status_code=400, detail=_safe_user_error_message(result["error"]))
+        result = await user_cleanup_service.permanently_delete_user(
+            user_id,
+            db,
+            actor_user_id=current_user.get("id"),
+        )
         
         logger.warning(f"User {user_id} deleted by admin {current_user.get('id')}")
         
         return {
             "success": True,
-            "message": f"User {user_id} has been deleted"
+            "message": result.message,
+            "deleted_data": result.deleted_counts,
         }
+    except ValueError as exc:
+        if "not found" in str(exc).lower():
+            raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=400, detail=_safe_user_error_message(str(exc)))
     except HTTPException:
         raise
     except Exception:

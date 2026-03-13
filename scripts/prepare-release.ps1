@@ -221,6 +221,8 @@ $targetMap = New-Object 'System.Collections.Generic.Dictionary[string, object]'
 $fixedRelativePaths = @(
     "artifacts",
     ".benchmarks",
+    ".pytest_tmp",
+    "tmp",
     "playwright-report",
     ".playwright",
     ".playwright-cli",
@@ -236,7 +238,9 @@ $fixedRelativePaths = @(
     "bot_service/.pytest_cache",
     "bot_service/.ruff_cache",
     "bot_service/.mypy_cache",
-    "bot_service/htmlcov"
+    "bot_service/htmlcov",
+    "bot_service/.benchmarks",
+    "bot_service/tmp"
 )
 
 if ($IncludeNodeModules) {
@@ -270,6 +274,7 @@ Add-HarFiles -Map $targetMap -RepoRoot $repoRoot
 
 $targets = $targetMap.Values | Sort-Object Path
 $targets = Compress-Targets -Targets $targets
+$targets = @($targets)
 
 if (-not $targets -or $targets.Count -eq 0) {
     Write-Host ""

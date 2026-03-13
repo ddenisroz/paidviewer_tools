@@ -19,6 +19,7 @@ from auth.auth import get_current_user, get_current_user_optional
 from services.integration_management_service import integration_management_service
 from services.chat_history_service import chat_history_service
 from services.account_deletion_service import account_deletion_service
+from services.user_cleanup_service import user_cleanup_service
 
 import logging
 
@@ -213,12 +214,18 @@ async def permanently_delete_user(
         raise HTTPException(status_code=403, detail="Admin access required")
     
     try:
-        result = await account_deletion_service.hard_delete_account(
-            user_id, current_user.get("id"), db
+        if user_id == current_user.get("id"):
+            raise HTTPException(status_code=403, detail="Cannot delete yourself")
+
+        result = await user_cleanup_service.permanently_delete_user(
+            user_id,
+            db,
+            actor_user_id=current_user.get("id"),
         )
         return JSONResponse(content={
             "success": result.success,
             "message": result.message,
+            "deleted_data": result.deleted_counts,
         })
     except ValueError:
         raise HTTPException(status_code=404, detail="Resource not found")

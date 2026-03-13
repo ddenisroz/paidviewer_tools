@@ -1,9 +1,9 @@
-﻿# bot_service/core/background_tasks.py
+# bot_service/core/background_tasks.py
 """Р¤РѕРЅРѕРІС‹Рµ Р·Р°РґР°С‡Рё"""
 import asyncio
 import logging
 from datetime import timedelta
-from core.database import get_db, User, UserSession
+from core.database import get_db, User
 from core.connection_manager import get_connection_manager
 from core.datetime_utils import utcnow_naive
 from core.config import settings
@@ -61,26 +61,24 @@ class BackgroundTasks:
                 await asyncio.sleep(300)  # РџСЂРё РѕС€РёР±РєРµ РїРѕРІС‚РѕСЂРёС‚СЊ С‡РµСЂРµР· 5 РјРёРЅСѓС‚
 
     async def cleanup_expired_sessions(self):
-        """РћС‡РёСЃС‚РєР° РёСЃС‚РµРєС€РёС… СЃРµСЃСЃРёР№"""
+        """Retention cleanup for old inactive sessions."""
         while True:
             await asyncio.sleep(300)  # Каждые 5 минут
             db = None
             try:
                 db = next(get_db())
+                from services.database_cleanup_service import DatabaseCleanupService
 
-                # РЈРґР°Р»СЏРµРј СЃРµСЃСЃРёРё РЅРµР°РєС‚РёРІРЅС‹Рµ Р±РѕР»РµРµ 30 РґРЅРµР№
-                expired_time = utcnow_naive() - timedelta(days=30)
-                expired_sessions = db.query(UserSession).filter(
-                    UserSession.last_activity < expired_time
-                ).all()
+                cleanup_service = DatabaseCleanupService(db)
+                cleanup_result = cleanup_service.cleanup_inactive_sessions(days_old=7)
+                deleted_sessions = cleanup_result.get("deleted_sessions", 0)
 
-                for session in expired_sessions:
-                    db.delete(session)
-
-                db.commit()
-
-                if expired_sessions:
-                    logger.info(f"Cleaned up {len(expired_sessions)} expired sessions")
+                if deleted_sessions:
+                    logger.info(
+                        "[SESSION CLEANUP] Deleted %s inactive sessions older than %s days",
+                        deleted_sessions,
+                        cleanup_result.get("retention_days", 7),
+                    )
 
             except Exception as e:
                 logger.error(f"Error in cleanup_expired_sessions: {e}")
@@ -250,7 +248,7 @@ class BackgroundTasks:
         """Р—Р°РїСѓСЃРє РІСЃРµС… С„РѕРЅРѕРІС‹С… Р·Р°РґР°С‡"""
         self.tasks = [
             asyncio.create_task(self.cleanup_old_chat_messages()),      # РћС‡РёСЃС‚РєР° РёСЃС‚РѕСЂРёРё С‡Р°С‚Р° (РєР°Р¶РґС‹Р№ С‡Р°СЃ)
-            asyncio.create_task(self.cleanup_expired_sessions()),       # РћС‡РёСЃС‚РєР° РёСЃС‚РµРєС€РёС… СЃРµСЃСЃРёР№ (РєР°Р¶РґС‹Рµ 5 РјРёРЅСѓС‚)
+            asyncio.create_task(self.cleanup_expired_sessions()),       # Cleanup old inactive sessions (every 5 minutes)
             asyncio.create_task(self.refresh_bot_oauth_tokens()),      # РћР±РЅРѕРІР»РµРЅРёРµ OAuth С‚РѕРєРµРЅРѕРІ Р±РѕС‚РѕРІ (РєР°Р¶РґС‹Р№ С‡Р°СЃ)
             asyncio.create_task(self.refresh_user_oauth_tokens()),     # РћР±РЅРѕРІР»РµРЅРёРµ OAuth С‚РѕРєРµРЅРѕРІ (РєР°Р¶РґС‹Рµ 2 С‡Р°СЃР°)
             asyncio.create_task(self.cleanup_task()),                  # РћС‡РёСЃС‚РєР° РЅРµР°РєС‚РёРІРЅС‹С… РєР°РЅР°Р»РѕРІ (РєР°Р¶РґСѓСЋ РјРёРЅСѓС‚Сѓ)
@@ -259,7 +257,7 @@ class BackgroundTasks:
 
         logger.info("[OK] [BACKGROUND] Started 6 background tasks:")
         logger.info("   - cleanup_old_chat_messages (every 1 hour)")
-        logger.info("   - cleanup_expired_sessions (every 5 minutes)")
+        logger.info("   - cleanup_expired_sessions (inactive-session retention, every 5 minutes)")
         logger.info("   - refresh_bot_oauth_tokens (every 1 hour)")
         logger.info("   - refresh_user_oauth_tokens (every 2 hours)")
         logger.info("   - cleanup_task (every 1 minute)")

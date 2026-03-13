@@ -36,7 +36,7 @@ Older summary files and historical notes belong in `docs/backlog/`.
 - `architecture/` - auth, websocket, caching, roles, TTS architecture.
 - `features/` - feature-level behavior and constraints.
 - `guides/` - operational and developer guides.
-- `api/` - API references.
+- `api/` - external/provider reference material only; avoid status snapshots here.
 
 ## Historical / Non-Authoritative
 
@@ -47,3 +47,4 @@ Older summary files and historical notes belong in `docs/backlog/`.
 ## Hygiene Rule
 
 - If a doc contains obsolete file paths, removed endpoints, or mojibake text, it must be rewritten or moved to `backlog/`.
+- Plan files, one-time audit snapshots, and removed-feature notes do not stay in active folders.

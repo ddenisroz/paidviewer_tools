@@ -1,6 +1,6 @@
-# Status Tracker
+﻿# Status Tracker
 
-Last updated: 2026-03-12
+Last updated: 2026-03-13
 
 This file is the handoff summary for active development. Update it after each substantial implementation session.
 
@@ -18,6 +18,9 @@ This file is the handoff summary for active development. Update it after each su
 | External upstream code audit | Done for current phase | Direct clone/code audit completed for `tts-gateway`, `f5-tts-service`, and `nano-qwen3tts-vllm`; Qwen upstream gaps were documented. |
 | Qwen self-hosted compatibility path | Done for current phase | `bot_service` now exposes compatibility warnings and supports self-hosted `qwen` endpoints through a backend adapter while native upstream parity is still pending. |
 | Live smoke preflight tooling | Done | Added runbook + env/prereq preflight before first full live smoke. |
+| Safe selective user cleanup | Done | Added transactional deletion preview + CLI maintenance script for targeted user cleanup without raw SQL. |
+| Docs and legacy hygiene cleanup | Done for current phase | Active docs surface was reduced; stale plan/snapshot docs were moved to `docs/backlog/`, legacy account/user cleanup code was removed, and workspace cleanup now covers temp/log/cache artifacts. |
+| Database hygiene tooling | Done for current phase | Added preview/cleanup path for orphan user-owned rows and retention cleanup for inactive sessions; background cleanup now uses the same retention policy. |
 | Full live stack smoke | Pending | Requires Redis, F5 model assets, and Linux/WSL2 runtime for Qwen. |
 | Frontend repo split | Not started | This repo is prepared for split, but extraction has not happened. |
 
@@ -44,6 +47,9 @@ This file is the handoff summary for active development. Update it after each su
 | Guest-mode runtime cleanup | Closed | `bot_service` auth/admin flows and frontend admin types/UI no longer carry guest-only runtime branches. |
 | Compose entrypoint validation | Closed | `docker-compose.dev.yml` and `docker-compose.bot.yml` pass `docker compose config -q`; prod-like compose docs now call out the baseline required env set. |
 | Live smoke runbook and preflight script | Closed | `docs/setup/LIVE_SMOKE_RUNBOOK.md` and `scripts/dev/tts-smoke-preflight.ps1` define pre-testing topology matrix and env checks. |
+| Safe user deletion tooling | Closed | `bot_service/scripts/delete_users.py` supports `--list`, dry-run preview, and explicit `--yes`; admin hard-delete routes now use the same cleanup plan. |
+| Docs and legacy hygiene cleanup | Closed for current phase | `REPO_CLEANUP_PLAN`, admin endpoint status snapshot, and removed audio-priority note were moved to `docs/backlog/`; obsolete cleanup/account files were removed; release cleanup covers temp/log/cache dirs. |
+| Database hygiene preview/cleanup tooling | Closed | `bot_service/scripts/database_hygiene.py` previews and cleans orphan `user_id` rows plus old inactive sessions; `DatabaseCleanupCore` and background session cleanup now share the same retention logic. |
 
 ## Verified Checks
 
@@ -53,6 +59,8 @@ Run backend commands from the project venv.
 |---|---|
 | `pytest -q tests/test_internal_service_auth.py tests/test_tts_provider_utils.py tests/test_tts_manager_fallback.py tests/test_api_tts.py tests/test_voice_functionality.py` | Passed |
 | `pytest -q tests/test_api_tts.py tests/test_voice_functionality.py tests/test_all_systems.py` | Passed |
+| `pytest -q tests/test_user_cleanup_service.py` | Passed |
+| `pytest -q tests/test_database_cleanup_core.py` | Passed |
 | `docker compose -f deploy/docker/docker-compose.dev.yml config -q` | Passed |
 | `docker compose -f deploy/docker/docker-compose.bot.yml config -q` | Passed with unset-var warnings |
 | `docker compose -f deploy/docker/docker-compose.prod.yml config -q` | Blocked until baseline prod env is set (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `REDIS_PASSWORD`, `SECRET_KEY`) |
@@ -75,13 +83,13 @@ Run backend commands from the project venv.
 | Task | Priority | Status | Notes |
 |---|---|---|---|
 | Run full local smoke for `gateway + redis + f5 + bot_service + frontend` | High | Ready | Needs real env values and running upstream services. |
-| Remove remaining legacy `session_id` compat tails from feature domains | High | Open | Do separately after schema/data review; active TTS/auth runtime is already user-only. |
+| Remove remaining legacy `session_id` compat tails from feature domains | High | Open | Migration plan is tracked in `docs/backlog/SESSION_ID_LEGACY_REMOVAL_PLAN_2026-03-13.md`; active TTS/auth runtime is already user-only. |
 | Complete Qwen upstream native contract parity | High | Open | Task list is tracked in `docs/backlog/QWEN_UPSTREAM_PARITY_TASKS_2026-03-12_RU.md`; current repo has a compatibility adapter, but upstream still needs native auth/health/status/synthesis parity. |
 | Validate synth through gateway for `provider=f5` and `provider=qwen` | High | Blocked by upstream runtime | Depends on gateway/F5/Qwen stack being live. |
 | Validate F5 voice CRUD end-to-end through `bot_service` | High | Blocked by F5 runtime | Requires working F5 service assets and DB. |
 | Implement Qwen voice CRUD upstream | High | External dependency | Must be done in Qwen repo or separate qwen voice service, then wired via `QWEN_VOICE_SERVICE_URL`. |
 | Decide and document `TTS_GATEWAY_QWEN_URL_POLICY=proxy` for browser-facing deployments | Medium | Open | Current gateway `auto` mode can return direct Qwen audio URLs when upstream host looks public. |
-| Audit non-active historical docs for optional cleanup | Low | Open | Backlog docs are isolated from the active source-of-truth set and can be cleaned later if needed. |
+| Audit non-active historical docs for optional cleanup | Low | Open | Active surface is reduced; backlog can still be trimmed further later if desired. |
 | Extract frontend into separate repo | Medium | Not started | API boundary is prepared; packaging, CI, and deployment split still need design. |
 
 ## Known Constraints
@@ -113,10 +121,10 @@ Run backend commands from the project venv.
 
 ## Naming Clarification
 
-- `self-hosted endpoint`: пользователь сам поднимает TTS-сервис и задает URL через `local_tts_endpoints`.
-- `project-hosted worker`: отдельный runtime-воркер проекта, хостится вашей инфраструктурой.
-- `gateway-managed`: `bot_service` ходит в `tts-gateway`, а gateway маршрутизирует запросы в project-hosted workers.
-- Existing runtime flags `use_local`, `f5_local`, `qwen_local` are legacy naming for the self-hosted path and are intentionally preserved for now.
+- `self-hosted endpoint`: the user runs the TTS service on their own hardware and stores its URL in `local_tts_endpoints`.
+- `project-hosted worker`: a separate runtime worker hosted by project infrastructure.
+- `gateway-managed`: `bot_service` calls `tts-gateway`, and the gateway routes requests to project-hosted workers.
+- Existing runtime flags `use_local`, `f5_local`, and `qwen_local` are legacy naming for the self-hosted path and are intentionally preserved for now.
 
 ## Handoff Notes For Other Agents
 
@@ -124,3 +132,4 @@ Run backend commands from the project venv.
 - Then read `docs/setup/LOCAL_TTS_INTEGRATION.md` and `docs/setup/REPO_SPLIT_GUIDE.md`.
 - Treat current uncommitted repository changes as baseline unless the user says otherwise.
 - If you change runtime contracts, update this file in the same session.
+

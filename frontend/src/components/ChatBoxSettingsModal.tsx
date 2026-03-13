@@ -166,8 +166,18 @@ const SETTINGS_SELECT_TRIGGER_CLASS = 'h-9 bg-background/70 border-border/60 tex
 const BLUE_ACTIVE_CLASS = 'data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:border-sky-500/60';
 
 const FONT_OPTIONS = [
-    'Inter', 'Roboto', 'Open Sans', 'Montserrat', 'Lato', 'Oswald',
-    'Raleway', 'Poppins', 'Ubuntu', 'Nunito', 'Rubik', 'Fira Sans'
+    'Inter',
+    'IBM Plex Sans',
+    'Fira Sans',
+    'Montserrat',
+    'Rubik',
+    'Oswald',
+    'Merriweather',
+    'PT Serif',
+    'Playfair Display',
+    'Comfortaa',
+    'Russo One',
+    'JetBrains Mono'
 ];
 
 const FONT_WEIGHT_OPTIONS = [

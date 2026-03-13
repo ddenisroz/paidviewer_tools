@@ -3,7 +3,7 @@
 Detect hardcoded local absolute filesystem paths in runtime-oriented source files.
 
 The check ignores URLs and focuses on likely local machine paths:
-- Windows style: C:\... or C:/...
+- Windows style: C:\\... or C:/...
 - Unix style: /home/... /Users/... /var/... /tmp/... /opt/... /etc/... /srv/... /mnt/... /app/...
 """
 
@@ -48,7 +48,6 @@ SKIP_DIRS = {
 }
 DEFAULT_SKIP_CONTAINS = [
     "bot_service/tests/",
-    "bot_service/scripts/archive/",
     "scripts/dev/",
     "frontend/package-lock.json",
 ]

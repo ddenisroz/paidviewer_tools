@@ -1,16 +1,35 @@
 # services/database_maintenance/database_cleanup_core.py
-"""Service for core cleanup logic - refactored to use repositories."""
+"""Service for core database cleanup logic."""
 
 import logging
-import os
 from datetime import timedelta
 from typing import Dict, Any
 from pathlib import Path
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, delete, func, select
 
 from core.database import User
+from models import (
+    AudioSettings,
+    BotCommand,
+    ChatBoxSettings,
+    DropsConfig,
+    DropsHistory,
+    DropsReward,
+    FilteredWord,
+    LocalTTSEndpoint,
+    MythicalDropsSession,
+    StreamSession,
+    TTSBlockedUser,
+    TTSUserSettings,
+    UserSession,
+    UserSettings,
+    UserStreak,
+    UserToken,
+    UserVoiceSettings,
+    YouTubeQueue,
+)
 from core.datetime_utils import utcnow_naive
 from repositories.database_stats_repository import DatabaseStatsRepository
 
@@ -43,6 +62,35 @@ class DatabaseCleanupCore:
         if self.f5_storage_root:
             cache_dirs.append(self.f5_storage_root / 'audio' / 'cache')
         return cache_dirs
+
+    def _orphan_cleanup_models(self) -> list[tuple[str, object]]:
+        """Return user-owned tables that may contain orphaned ``user_id`` rows."""
+        return [
+            ("user_settings", UserSettings),
+            ("tts_user_settings", TTSUserSettings),
+            ("audio_settings", AudioSettings),
+            ("user_voice_settings", UserVoiceSettings),
+            ("local_tts_endpoints", LocalTTSEndpoint),
+            ("filtered_words", FilteredWord),
+            ("tts_blocked_users", TTSBlockedUser),
+            ("user_tokens", UserToken),
+            ("youtube_queue", YouTubeQueue),
+            ("drops_configs", DropsConfig),
+            ("drops_rewards", DropsReward),
+            ("user_streaks", UserStreak),
+            ("drops_history", DropsHistory),
+            ("mythical_drops_sessions", MythicalDropsSession),
+            ("stream_sessions", StreamSession),
+            ("chatbox_settings", ChatBoxSettings),
+            ("bot_commands", BotCommand),
+        ]
+
+    def _orphan_user_condition(self, model: object) -> object:
+        """Build a correlated condition for rows whose ``user_id`` no longer exists."""
+        return and_(
+            model.user_id.is_not(None),
+            ~select(User.id).where(User.id == model.user_id).exists(),
+        )
 
     def cleanup_old_data(self) -> Dict[str, int]:
         """Clean old data: expired messages and over-limit messages."""
@@ -119,6 +167,138 @@ class DatabaseCleanupCore:
         except Exception:
             logger.exception("Error cleaning up user message limits")
             return 0
+
+    def preview_orphan_user_records(self) -> Dict[str, Any]:
+        """Preview orphaned user-owned rows that reference missing users."""
+        try:
+            counts: Dict[str, int] = {}
+            for table_name, model in self._orphan_cleanup_models():
+                condition = self._orphan_user_condition(model)
+                counts[table_name] = int(
+                    self.db.execute(
+                        select(func.count()).select_from(model).where(condition)
+                    ).scalar_one()
+                )
+
+            total_rows = sum(counts.values())
+            return {
+                "tables": counts,
+                "total_rows": total_rows,
+            }
+        except Exception:
+            logger.exception("Error previewing orphan user records")
+            self.db.rollback()
+            return {"tables": {}, "total_rows": 0, "error": "Internal server error"}
+
+    def cleanup_orphan_user_records(self) -> Dict[str, Any]:
+        """Delete orphaned user-owned rows that reference missing users."""
+        try:
+            deleted_counts: Dict[str, int] = {}
+
+            for table_name, model in self._orphan_cleanup_models():
+                condition = self._orphan_user_condition(model)
+                result = self.db.execute(delete(model).where(condition))
+                deleted_counts[table_name] = int(result.rowcount or 0)
+
+            total_rows = sum(deleted_counts.values())
+            self.db.commit()
+
+            if total_rows:
+                logger.info(
+                    "[DB CLEANUP] Deleted %s orphan user-owned rows: %s",
+                    total_rows,
+                    {name: count for name, count in deleted_counts.items() if count},
+                )
+            else:
+                logger.info("[DB CLEANUP] No orphan user-owned rows found")
+
+            return {
+                "tables": deleted_counts,
+                "total_rows": total_rows,
+            }
+        except Exception:
+            logger.exception("Error cleaning orphan user records")
+            self.db.rollback()
+            return {"tables": {}, "total_rows": 0, "error": "Internal server error"}
+
+    def preview_inactive_session_cleanup(self, days_old: int = 7) -> Dict[str, int]:
+        """Preview inactive session retention cleanup."""
+        try:
+            cutoff_date = utcnow_naive() - timedelta(days=days_old)
+            total_sessions = int(
+                self.db.execute(select(func.count()).select_from(UserSession)).scalar_one()
+            )
+            active_sessions = int(
+                self.db.execute(
+                    select(func.count()).select_from(UserSession).where(UserSession.is_active.is_(True))
+                ).scalar_one()
+            )
+            old_inactive_sessions = int(
+                self.db.execute(
+                    select(func.count())
+                    .select_from(UserSession)
+                    .where(
+                        UserSession.is_active.is_(False),
+                        UserSession.last_activity < cutoff_date,
+                    )
+                ).scalar_one()
+            )
+            return {
+                "retention_days": days_old,
+                "total_sessions": total_sessions,
+                "active_sessions": active_sessions,
+                "inactive_sessions": total_sessions - active_sessions,
+                "old_inactive_sessions": old_inactive_sessions,
+            }
+        except Exception:
+            logger.exception("Error previewing inactive session cleanup")
+            self.db.rollback()
+            return {
+                "retention_days": days_old,
+                "total_sessions": 0,
+                "active_sessions": 0,
+                "inactive_sessions": 0,
+                "old_inactive_sessions": 0,
+                "error": "Internal server error",
+            }
+
+    def cleanup_inactive_sessions(self, days_old: int = 7) -> Dict[str, int]:
+        """Delete inactive sessions older than the retention window."""
+        try:
+            cutoff_date = utcnow_naive() - timedelta(days=days_old)
+            result = self.db.execute(
+                delete(UserSession).where(
+                    UserSession.is_active.is_(False),
+                    UserSession.last_activity < cutoff_date,
+                )
+            )
+            deleted_count = int(result.rowcount or 0)
+            self.db.commit()
+
+            if deleted_count:
+                logger.info(
+                    "[DB CLEANUP] Deleted %s inactive sessions older than %s days",
+                    deleted_count,
+                    days_old,
+                )
+            else:
+                logger.debug(
+                    "[DB CLEANUP] No inactive sessions older than %s days found",
+                    days_old,
+                )
+
+            return {
+                "retention_days": days_old,
+                "deleted_sessions": deleted_count,
+            }
+        except Exception:
+            logger.exception("Error cleaning inactive sessions")
+            self.db.rollback()
+            return {
+                "retention_days": days_old,
+                "deleted_sessions": 0,
+                "error": "Internal server error",
+            }
 
     def cleanup_user_data(self, username: str, platform: str, keep_days: int = 30) -> int:
         """Clean old data for a specific user."""

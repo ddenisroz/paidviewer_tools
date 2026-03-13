@@ -32,9 +32,12 @@ This page explains what is part of the product and what is local noise.
 | `.pytest_cache/` | Pytest | No |
 | `pytest-cache-files-*` | Pytest temporary file cache directories | No |
 | `.benchmarks/` | pytest-benchmark output | No |
+| `.pytest_tmp/` | local smoke/runtime scratch space | No |
+| `tmp/`, `bot_service/tmp/` | temporary logs, upstream dumps, pytest temp dirs | No |
 | `artifacts/` | local run outputs | No |
 | `frontend/dist/` | `vite build` output | No |
 | `logs/*.log` | local service logging | No |
+| `logs/*.json` | local debug/chat history dumps | No |
 | `.venv/` | local Python packages and bytecode | No |
 | `.playwright*/`, `playwright-report/`, `*.har` | browser/e2e diagnostics | No |
 

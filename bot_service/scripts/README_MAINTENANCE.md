@@ -1,11 +1,10 @@
-# Maintenance Scripts
+# Скрипты обслуживания
 
-This folder contains **active operational scripts** for backend diagnostics,
-admin/bootstrap tasks, and DB maintenance.
+В этой папке лежат только актуальные операционные скрипты для backend: диагностика, администрирование, безопасные действия с БД и служебные проверки.
 
-## Active Categories
+## Основные категории
 
-### Access and Admin
+### Доступ и администрирование
 - `check_admin.py`
 - `make_admin.py`
 - `update_session_role.py`
@@ -13,59 +12,106 @@ admin/bootstrap tasks, and DB maintenance.
 - `check_user_whitelist.py`
 - `normalize_admin_tables.py`
 
-### Token and Auth Diagnostics
+### Диагностика токенов и авторизации
 - `check_tokens.py`
 - `check_bot_token.py`
 - `check_twitch_token.py`
 - `get_vk_token_manual.py`
 
-### TTS Diagnostics
+### Диагностика TTS
 - `check_tts_enabled.py`
 - `check_tts_status.py`
 - `init_blocked_bots.py`
 
-### Database and Session Utilities
+### БД и сессии
 - `db_console.py`
+- `delete_users.py`
+- `database_hygiene.py`
 - `show_db_structure.py`
 - `check_postgresql_data.py`
 - `check_sessions.py`
 - `find_n_plus_one.py`
 - `fix_admin_session.py`
 
-### Dangerous Maintenance (use with caution)
+### Разрушительные служебные операции
 - `clear_database.py`
-- `cleanup_users.py`
 - `reset_db.py`
 - `setup_postgresql.ps1`
 - `reset_postgres_password.ps1`
 - `check_postgres_connection.ps1`
 - `fix_postgres_setup.ps1`
 
-Safe CLI options for destructive DB scripts:
-- `python scripts/clear_database.py clear --dry-run`
-- `python scripts/clear_database.py clear --yes`
-- `python scripts/clear_database.py restore --dry-run`
-- `python scripts/reset_db.py --dry-run`
-- `python scripts/reset_db.py --yes`
+## Безопасное удаление пользователей
 
-## Unified Checks Launcher
+Используй `delete_users.py` вместо старых bulk-cleanup сценариев.
 
-Use `run_check.py` to avoid memorizing exact script names:
+Просмотр списка:
 
-```bash
+```powershell
+python scripts/delete_users.py --list
+```
+
+Dry-run preview:
+
+```powershell
+python scripts/delete_users.py --user-id 42
+python scripts/delete_users.py --twitch some_channel
+python scripts/delete_users.py --vk some_vk_channel
+```
+
+Фактическое удаление:
+
+```powershell
+python scripts/delete_users.py --user-id 42 --yes
+```
+
+## Гигиена БД: orphan user-записи и старые неактивные сессии
+
+Используй `database_hygiene.py`, если нужно:
+- убрать записи с `user_id`, которого уже нет в `users`;
+- почистить старые неактивные сессии по retention-политике.
+
+Preview:
+
+```powershell
+python scripts/database_hygiene.py
+python scripts/database_hygiene.py --orphan-users
+python scripts/database_hygiene.py --inactive-sessions --inactive-session-days 7
+```
+
+Фактическая очистка:
+
+```powershell
+python scripts/database_hygiene.py --yes
+python scripts/database_hygiene.py --orphan-users --yes
+python scripts/database_hygiene.py --inactive-sessions --inactive-session-days 7 --yes
+```
+
+## Dangerous DB-скрипты
+
+Перед запуском destructive-скриптов сначала делай preview/dry-run, если он есть:
+
+```powershell
+python scripts/clear_database.py clear --dry-run
+python scripts/reset_db.py --dry-run
+```
+
+Фактический destructive запуск делай только осознанно:
+
+```powershell
+python scripts/clear_database.py clear --yes
+python scripts/reset_db.py --yes
+```
+
+## Единый launcher для проверок
+
+Если нужно быстро запускать типовые проверки, используй `run_check.py`:
+
+```powershell
 cd bot_service
 python scripts/run_check.py --list
 python scripts/run_check.py tts-status 1
 python scripts/run_check.py admin
 ```
 
-This launcher is non-destructive and only proxies `check_*` diagnostics.
-
-## Archived Scripts
-
-One-off migration/fix scripts are moved under:
-- `bot_service/scripts/archive/`
-- `bot_service/scripts/archive/legacy/`
-
-These are kept for reference and forensic rollback only; they are not part of
-normal operations.
+Этот launcher не делает destructive-операций и только проксирует диагностические `check_*` сценарии.

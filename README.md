@@ -7,7 +7,6 @@ Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, Donat
 - [docs/STATUS_TRACKER.md](docs/STATUS_TRACKER.md): current delivery status, closed work, and open tasks.
 - [docs/README.md](docs/README.md): authoritative docs index (active vs historical).
 - [docs/REPO_STRUCTURE.md](docs/REPO_STRUCTURE.md): what each top-level folder is for.
-- [docs/guides/REPO_CLEANUP_PLAN.md](docs/guides/REPO_CLEANUP_PLAN.md): what is already cleaned and what remains.
 - [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md): production deployment.
 - [docs/architecture/ARCHITECTURE_GUIDE.md](docs/architecture/ARCHITECTURE_GUIDE.md): architecture deep dive.
 
@@ -81,6 +80,7 @@ These are local or generated artifacts, not business logic.
 
 By default this script targets generated artifacts only:
 - `artifacts/`, `.benchmarks/`, `playwright-report/`, `.playwright*/`
+- `.pytest_tmp/`, `tmp/`, `bot_service/tmp/`
 - `frontend/dist`, `frontend/coverage`, `frontend/.vite`, `frontend/.vitest`
 - `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `htmlcov`
 - `**/__pycache__/`, `*.pyc`, `*.pyo` (project roots; optional `.venv` via flag)

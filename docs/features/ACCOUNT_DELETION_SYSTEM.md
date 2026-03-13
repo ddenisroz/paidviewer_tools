@@ -21,6 +21,8 @@ Provide a safe account deletion flow with controlled data lifecycle.
 3. Admin delete (privileged)
 - explicit admin action for support/compliance cases
 - bypasses normal waiting period when policy allows
+- runs through a deletion plan that cleans known dependent rows before removing `users`
+- should be previewed first via operational tooling before destructive execution
 
 ## Security Requirements
 
@@ -35,6 +37,16 @@ Provide a safe account deletion flow with controlled data lifecycle.
 2. Related OAuth tokens are deactivated.
 3. Background cleanup does not remove protected audit rows.
 4. Admin delete path is role-gated and returns 403 for non-admin.
+
+## Operational Notes
+
+- For maintenance cleanup, prefer `python bot_service/scripts/delete_users.py --list`.
+- Preview first:
+  - `python bot_service/scripts/delete_users.py --user-id 42`
+  - `python bot_service/scripts/delete_users.py --twitch some_channel`
+- Execute only with explicit confirmation:
+  - `python bot_service/scripts/delete_users.py --user-id 42 --yes`
+- Do not use direct `DELETE FROM users ...` without clearing dependent rows.
 
 ## Related Docs
 
