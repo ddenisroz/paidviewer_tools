@@ -10,15 +10,15 @@ from pathlib import Path
 
 
 CHECK_SCRIPTS = {
-    "admin": "check_admin.py",
-    "bot-token": "check_bot_token.py",
+    "admin": "dev/check_admin.py",
+    "bot-token": "dev/check_bot_token.py",
     "postgres-data": "check_postgresql_data.py",
-    "sessions": "check_sessions.py",
-    "tokens": "check_tokens.py",
-    "tts-enabled": "check_tts_enabled.py",
-    "tts-status": "check_tts_status.py",
-    "twitch-token": "check_twitch_token.py",
-    "user-whitelist": "check_user_whitelist.py",
+    "sessions": "dev/check_sessions.py",
+    "tokens": "dev/check_tokens.py",
+    "tts-enabled": "dev/check_tts_enabled.py",
+    "tts-status": "dev/check_tts_status.py",
+    "twitch-token": "dev/check_twitch_token.py",
+    "user-whitelist": "dev/check_user_whitelist.py",
 }
 
 

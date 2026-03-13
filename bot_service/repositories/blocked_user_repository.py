@@ -24,20 +24,15 @@ class BlockedUserRepository(BaseRepository[TTSBlockedUser]):
     
     def get_blocked_list(
         self,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None
+        user_id: int,
     ) -> List[Dict[str, Any]]:
         """Get blocked users as list of dicts."""
-        query = self.db.query(TTSBlockedUser)
-        
-        if user_id:
-            query = query.filter(TTSBlockedUser.user_id == user_id)
-        elif session_id:
-            query = query.filter(TTSBlockedUser.session_id == session_id)
-        else:
+        if not user_id:
             return []
-        
-        blocked = query.all()
+
+        blocked = self.db.query(TTSBlockedUser).filter(
+            TTSBlockedUser.user_id == user_id
+        ).all()
         return [
             {
                 "id": b.id,
@@ -56,7 +51,6 @@ class BlockedUserRepository(BaseRepository[TTSBlockedUser]):
         platform: str,
         username: str,
         user_id: Optional[int] = None,
-        session_id: Optional[str] = None
     ) -> bool:
         """Check if a user is blocked from TTS."""
         query = self.db.query(TTSBlockedUser).filter(
@@ -65,10 +59,8 @@ class BlockedUserRepository(BaseRepository[TTSBlockedUser]):
             TTSBlockedUser.username == username.lower()
         )
         
-        if user_id:
+        if user_id is not None:
             query = query.filter(TTSBlockedUser.user_id == user_id)
-        elif session_id:
-            query = query.filter(TTSBlockedUser.session_id == session_id)
         
         return query.first() is not None
     
@@ -77,18 +69,16 @@ class BlockedUserRepository(BaseRepository[TTSBlockedUser]):
         channel_name: str,
         platform: str,
         username: str,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
+        user_id: int,
         blocked_by: Optional[int] = None,
         reason: Optional[str] = None
     ) -> Optional[TTSBlockedUser]:
         """Block a user from TTS. Returns None if already blocked."""
-        if self.is_blocked(channel_name, platform, username, user_id, session_id):
+        if self.is_blocked(channel_name, platform, username, user_id):
             return None
         
         blocked = TTSBlockedUser(
             user_id=user_id,
-            session_id=session_id,
             channel_name=channel_name.lower(),
             platform=platform,
             username=username.lower(),
@@ -105,8 +95,7 @@ class BlockedUserRepository(BaseRepository[TTSBlockedUser]):
         channel_name: str,
         platform: str,
         username: str,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None
+        user_id: int,
     ) -> bool:
         """Unblock a user from TTS. Returns True if successful."""
         query = self.db.query(TTSBlockedUser).filter(
@@ -115,10 +104,7 @@ class BlockedUserRepository(BaseRepository[TTSBlockedUser]):
             TTSBlockedUser.username == username.lower()
         )
         
-        if user_id:
-            query = query.filter(TTSBlockedUser.user_id == user_id)
-        elif session_id:
-            query = query.filter(TTSBlockedUser.session_id == session_id)
+        query = query.filter(TTSBlockedUser.user_id == user_id)
         
         blocked = query.first()
         if not blocked:

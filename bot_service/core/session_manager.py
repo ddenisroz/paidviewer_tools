@@ -448,54 +448,25 @@ class SessionManager:
             logger.error(f"Error in _notify_all_sessions_terminated_for_channel: {e}")
 
     def cleanup_old_sessions(self, days_old: int = 7) -> int:
-        """Удаляет старые неактивные сессии старше указанного количества дней."""
-        from core.database import (
-            UserSettings, TTSUserSettings, AudioSettings,
-            LocalTTSEndpoint, FilteredWord, TTSBlockedUser,
-            YouTubeQueue, DropsConfig, DropsReward,
-            UserStreak, DropsHistory, MythicalDropsSession,
-            UserToken
-        )
-
-        # Таблицы для очистки гостевых сессий
-        legacy_session_tables = [
-            UserSettings, TTSUserSettings, AudioSettings, LocalTTSEndpoint,
-            FilteredWord, TTSBlockedUser, YouTubeQueue, UserToken,
-            DropsConfig, DropsReward, UserStreak, DropsHistory, MythicalDropsSession
-        ]
-
+        """Удаляет старые неактивные сессии по retention-политике."""
         try:
             with db_session() as db:
-                cutoff_date = utcnow_naive() - timedelta(days=days_old)
+                from services.database_cleanup_service import DatabaseCleanupService
 
-                old_sessions = db.query(UserSession).filter(
-                    UserSession.is_active.is_(False),
-                    UserSession.last_activity < cutoff_date
-                ).all()
+                cleanup_service = DatabaseCleanupService(db)
+                cleanup_result = cleanup_service.cleanup_inactive_sessions(days_old=days_old)
+                deleted_sessions = cleanup_result.get("deleted_sessions", 0)
 
-                count = len(old_sessions)
-                if count == 0:
-                    logger.debug(f"No old sessions to clean up (older than {days_old} days)")
-                    return 0
+                if deleted_sessions:
+                    logger.info(
+                        "[BROOM] Cleaned up %s old inactive sessions (older than %s days)",
+                        deleted_sessions,
+                        cleanup_result.get("retention_days", days_old),
+                    )
+                else:
+                    logger.debug("No old sessions to clean up (older than %s days)", days_old)
 
-                total_settings_deleted = 0
-
-                for session in old_sessions:
-                    # Для гостевых сессий удаляем связанные настройки
-                    if session.user_id == -1:
-                        for table in legacy_session_tables:
-                            if hasattr(table, 'session_id'):
-                                total_settings_deleted += db.query(table).filter(
-                                    table.session_id == session.session_id
-                                ).delete()
-
-                    db.delete(session)
-
-                logger.info(f"[BROOM] Cleaned up {count} old inactive sessions (older than {days_old} days)")
-                if total_settings_deleted > 0:
-                    logger.info(f"[BROOM] Also deleted {total_settings_deleted} associated legacy session-scoped records")
-
-                return count
+                return deleted_sessions
         except Exception as e:
             logger.error(f"Error cleaning up old sessions: {e}")
             return 0

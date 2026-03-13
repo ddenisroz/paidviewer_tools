@@ -25,42 +25,20 @@ class LocalTTSRepository(BaseRepository[LocalTTSEndpoint]):
             LocalTTSEndpoint.provider == provider,
         ).first()
     
-    def get_by_session_id(self, session_id: str, provider: str = "f5") -> Optional[LocalTTSEndpoint]:
-        """Get local TTS endpoint by legacy session ID."""
+    def get_active(self, user_id: int, provider: str = "f5") -> Optional[LocalTTSEndpoint]:
+        """Get active local TTS endpoint for an authenticated user."""
+        if not user_id:
+            return None
+
         return self.db.query(LocalTTSEndpoint).filter(
-            LocalTTSEndpoint.session_id == session_id,
-            LocalTTSEndpoint.provider == provider,
-        ).first()
-    
-    def get_active(
-        self,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
-        provider: str = "f5",
-    ) -> Optional[LocalTTSEndpoint]:
-        """Get active local TTS endpoint."""
-        query = self.db.query(LocalTTSEndpoint).filter(
             LocalTTSEndpoint.is_active,
             LocalTTSEndpoint.provider == provider,
-        )
-        
-        if user_id:
-            query = query.filter(LocalTTSEndpoint.user_id == user_id)
-        elif session_id:
-            query = query.filter(LocalTTSEndpoint.session_id == session_id)
-        else:
-            return None
-        
-        return query.first()
-    
-    def get_healthy(
-        self,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
-        provider: str = "f5",
-    ) -> Optional[LocalTTSEndpoint]:
+            LocalTTSEndpoint.user_id == user_id,
+        ).first()
+
+    def get_healthy(self, user_id: int, provider: str = "f5") -> Optional[LocalTTSEndpoint]:
         """Get healthy and active local TTS endpoint."""
-        endpoint = self.get_active(user_id, session_id, provider=provider)
+        endpoint = self.get_active(user_id, provider=provider)
         if endpoint and endpoint.is_healthy:
             return endpoint
         return None
@@ -70,19 +48,16 @@ class LocalTTSRepository(BaseRepository[LocalTTSEndpoint]):
         endpoint_url: str,
         api_key: Optional[str] = None,
         use_local: bool = False,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None,
+        user_id: int = None,
         provider: str = "f5",
     ) -> LocalTTSEndpoint:
-        """Create or update local TTS endpoint."""
+        """Create or update local TTS endpoint for an authenticated user."""
         normalized_endpoint_url = normalize_local_tts_endpoint_url(endpoint_url)
 
-        if user_id:
-            endpoint = self.get_by_user_id(user_id, provider=provider)
-        elif session_id:
-            endpoint = self.get_by_session_id(session_id, provider=provider)
-        else:
-            raise ValueError("Either user_id or session_id must be provided")
+        if not user_id:
+            raise ValueError("user_id is required")
+
+        endpoint = self.get_by_user_id(user_id, provider=provider)
 
         if endpoint:
             endpoint.endpoint_url = normalized_endpoint_url
@@ -92,7 +67,6 @@ class LocalTTSRepository(BaseRepository[LocalTTSEndpoint]):
         else:
             endpoint = LocalTTSEndpoint(
                 user_id=user_id,
-                session_id=session_id,
                 provider=provider,
                 endpoint_url=normalized_endpoint_url,
                 api_key=api_key,

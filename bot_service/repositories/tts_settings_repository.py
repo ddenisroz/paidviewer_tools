@@ -22,30 +22,15 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
             TTSUserSettings.user_id == user_id
         ).first()
     
-    def get_by_session_id(self, session_id: str) -> Optional[TTSUserSettings]:
-        """Get TTS settings by legacy session ID."""
-        return self.db.query(TTSUserSettings).filter(
-            TTSUserSettings.session_id == session_id
-        ).first()
-    
-    def get_or_create(
-        self,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None
-    ) -> TTSUserSettings:
-        """Get existing settings or create defaults."""
-        if user_id:
-            settings = self.get_by_user_id(user_id)
-        elif session_id:
-            settings = self.get_by_session_id(session_id)
-        else:
-            raise ValueError("Either user_id or session_id must be provided")
+    def get_or_create(self, user_id: int) -> TTSUserSettings:
+        """Get existing settings or create defaults for an authenticated user."""
+        if not user_id:
+            raise ValueError("user_id is required")
+
+        settings = self.get_by_user_id(user_id)
         
         if not settings:
-            settings = TTSUserSettings(
-                user_id=user_id,
-                session_id=session_id
-            )
+            settings = TTSUserSettings(user_id=user_id)
             self.db.add(settings)
             self.db.commit()
             self.db.refresh(settings)

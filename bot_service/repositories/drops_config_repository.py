@@ -18,6 +18,23 @@ class DropsConfigRepository(BaseRepository[DropsConfig]):
     def get_by_user(self, user_id: int) -> Optional[DropsConfig]:
         """Get drops config by user ID."""
         return self.db.query(DropsConfig).filter(DropsConfig.user_id == user_id).first()
+
+    def get_by_user_channel_platform(
+        self,
+        user_id: int,
+        channel_name: Optional[str] = None,
+        platform: str = "global",
+    ) -> Optional[DropsConfig]:
+        """Get config for an authenticated user by channel and platform."""
+        query = self.db.query(DropsConfig).filter(
+            DropsConfig.user_id == user_id,
+            DropsConfig.platform == platform,
+        )
+
+        if channel_name:
+            query = query.filter(DropsConfig.channel_name == channel_name)
+
+        return query.first()
     
     def get_by_widget_token(self, token: str) -> Optional[DropsConfig]:
         """Get drops config by widget token."""
@@ -58,6 +75,22 @@ class DropsConfigRepository(BaseRepository[DropsConfig]):
             query = query.filter(DropsConfig.session_id == session_id)
             
         return query.filter(DropsConfig.platform.in_(['twitch', 'vk'])).all()
+
+    def get_existing_configs_for_user_compat(
+        self,
+        channel_name: str,
+        user_id: int,
+    ) -> List[DropsConfig]:
+        """Get existing Twitch/VK configs for a user during global-config migration."""
+        return (
+            self.db.query(DropsConfig)
+            .filter(
+                DropsConfig.channel_name == channel_name,
+                DropsConfig.user_id == user_id,
+                DropsConfig.platform.in_(["twitch", "vk"]),
+            )
+            .all()
+        )
 
     # === DropsQuality ===
 

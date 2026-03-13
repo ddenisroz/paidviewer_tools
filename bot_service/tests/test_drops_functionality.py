@@ -574,6 +574,58 @@ class TestCrossPlatformRewards:
             f"[OK] Cross-platform rewards work: {len(twitch_rewards)} rewards available on all platforms"
         )
 
+    def test_user_only_dashboard_helpers(self, drops_service, test_config, test_rewards):
+        """Dashboard-facing drops helpers should work through user-only APIs."""
+        config = drops_service.get_user_config(user_id=1, channel_name="test_channel")
+        assert config is not None
+        assert config.user_id == 1
+        assert config.platform == "global"
+
+        updated = drops_service.create_or_update_user_config(
+            user_id=1,
+            channel_name="test_channel",
+            config_data={"streak_messages_required": 7},
+        )
+        assert updated.streak_messages_required == 7
+
+        rewards = drops_service.get_user_rewards(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+        )
+        assert len(rewards) == len(test_rewards)
+
+        reward = drops_service._get_random_user_reward(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            quality_id=1,
+        )
+        assert reward is not None
+        assert reward.user_id == 1
+
+        streak = drops_service.increment_viewer_message_count_for_user(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer-user-only",
+            viewer_name="ViewerUserOnly",
+        )
+        assert streak is not None
+        assert streak.user_id == 1
+        assert streak.session_id is None
+
+        donation_result = drops_service.process_donation_drops_for_user(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer-user-only",
+            viewer_name="ViewerUserOnly",
+            donation_amount=100.0,
+        )
+        assert donation_result is not None
+        assert donation_result["type"] == "donation"
+
 
 def run_all_tests():
     """Run all tests"""

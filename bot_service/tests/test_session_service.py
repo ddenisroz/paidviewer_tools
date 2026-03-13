@@ -68,12 +68,6 @@ class TestSessionService:
         assert result is True
         mock_connection_manager.remove_active_session.assert_called_with("channel1", "admin_disconnect")
 
-    def test_clear_legacy_sessions(self, session_service, mock_connection_manager):
-        session_service.clear_legacy_sessions()
-        
-        # Expect 2 calls for known legacy channels
-        assert mock_connection_manager.remove_active_session.call_count == 2
-
     def test_get_user_tokens(self, session_service, mock_token_repo):
         # Mock tokens
         t1 = Mock(spec=UserToken)

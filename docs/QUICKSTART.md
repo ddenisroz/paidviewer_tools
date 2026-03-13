@@ -1,6 +1,6 @@
 # Быстрый запуск
 
-Если структура репозитория кажется неочевидной, сначала открой `docs/REPO_STRUCTURE.md`. Если перед изменениями нужно понять текущее состояние проекта, открой `docs/STATUS_TRACKER.md`.
+Если сначала нужно понять структуру репозитория, открой [REPO_STRUCTURE.md](REPO_STRUCTURE.md). Если нужно понять текущее состояние проекта, открой [STATUS_TRACKER.md](STATUS_TRACKER.md).
 
 ## Требования
 
@@ -12,7 +12,7 @@
   - `f5-tts-service`
   - `nano-qwen3tts-vllm`
 
-## 1. Подготовка репозитория
+## 1. Подготовь репозиторий
 
 ```powershell
 git clone <repo>
@@ -21,18 +21,19 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-## 2. Установка зависимостей
+## 2. Установи зависимости
 
 ```powershell
 python -m pip install --upgrade pip
 python -m pip install -r bot_service/requirements.txt
 python -m pip install -r bot_service/requirements_dev.txt
+
 cd frontend
 npm install
 cd ..
 ```
 
-## 3. Настройка окружения
+## 3. Подготовь `.env`
 
 ```powershell
 Copy-Item bot_service/.env.example bot_service/.env
@@ -56,7 +57,7 @@ Copy-Item frontend/.env.example frontend/.env
 - `QWEN_TTS_SERVICE_API_KEY`
 - опционально `QWEN_VOICE_SERVICE_URL`
 
-## 4. Миграции
+## 4. Прогони миграции
 
 ```powershell
 cd bot_service
@@ -64,49 +65,35 @@ alembic upgrade head
 cd ..
 ```
 
-## 5. Запуск
+## 5. Запусти сервисы
 
 ```powershell
-# Терминал 1: backend
+# Терминал 1
 cd bot_service
 python main.py
 
-# Терминал 2: frontend
+# Терминал 2
 cd frontend
 npm run dev
 ```
 
-## 6. Внешний TTS-контур
-
-Подробный runbook лежит в `docs/setup/LOCAL_TTS_INTEGRATION.md`.
-
-Базовая схема портов:
-
-```text
-tts-gateway: 8010
-f5-tts-service: 8011
-nano-qwen3tts-vllm: 8000
-bot_service: 8000
-frontend: 5173
-```
-
-## 7. Проверка
+## 6. Проверь базовый контур
 
 1. Открой `http://localhost:5173`
 2. Проверь backend: `http://localhost:8000/health`
-3. Проверь provider health через backend:
+3. Если подключён внешний TTS-контур:
    - `http://localhost:8000/api/tts/health?provider=f5`
    - `http://localhost:8000/api/tts/health?provider=qwen`
-4. Авторизуйся и открой dashboard
 
-## Troubleshooting
+## 7. Если нужен live smoke TTS
 
-- `ModuleNotFoundError` — не активировано `.venv`
-- ошибка БД — проверь `DATABASE_URL` и статус PostgreSQL
-- OAuth redirect mismatch — проверь callback URL в консоли Twitch/VK
-- проблемы с внешним TTS — смотри `docs/setup/LOCAL_TTS_INTEGRATION.md`
+Читай:
 
-## Очистка workspace перед релизом
+- [setup/LOCAL_TTS_INTEGRATION.md](setup/LOCAL_TTS_INTEGRATION.md)
+- [setup/LIVE_SMOKE_RUNBOOK.md](setup/LIVE_SMOKE_RUNBOOK.md)
+- [setup/LIVE_SMOKE_BEGINNER_GUIDE_RU.md](setup/LIVE_SMOKE_BEGINNER_GUIDE_RU.md)
+
+## Очистка перед отгрузкой
 
 Preview:
 
@@ -118,10 +105,4 @@ Preview:
 
 ```powershell
 .\scripts\prepare-release.ps1 -ApplyCleanup
-```
-
-Очистка + проверки:
-
-```powershell
-.\scripts\prepare-release.ps1 -ApplyCleanup -RunChecks
 ```

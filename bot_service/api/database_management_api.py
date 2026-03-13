@@ -20,6 +20,7 @@ class CleanupRequest(BaseModel):
 
 class HygieneCleanupRequest(BaseModel):
     clean_orphan_users: bool = True
+    clean_legacy_session_records: bool = True
     clean_inactive_sessions: bool = True
     inactive_session_days: int = Field(default=7, ge=1, le=365)
 
@@ -149,6 +150,7 @@ async def preview_database_hygiene(
             "success": True,
             "data": {
                 "orphan_user_records": cleanup_service.preview_orphan_user_records(),
+                "legacy_session_records": cleanup_service.preview_legacy_session_records(),
                 "inactive_sessions": cleanup_service.preview_inactive_session_cleanup(inactive_session_days),
             },
             "timestamp": utcnow_naive().isoformat(),
@@ -181,6 +183,10 @@ async def cleanup_database_hygiene(
         if request.clean_orphan_users:
             orphan_result = cleanup_service.cleanup_orphan_user_records()
             result["data"]["orphan_user_records"] = orphan_result
+
+        if request.clean_legacy_session_records:
+            legacy_session_result = cleanup_service.cleanup_legacy_session_records()
+            result["data"]["legacy_session_records"] = legacy_session_result
 
         if request.clean_inactive_sessions:
             session_result = cleanup_service.cleanup_inactive_sessions(request.inactive_session_days)

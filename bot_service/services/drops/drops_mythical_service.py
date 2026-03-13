@@ -44,6 +44,72 @@ class DropsMythicalMixin:
         # config_repo might be present or not
         return self.history_repo, self.token_repo
 
+    def process_mythical_drops_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+        viewer_name: str = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Active user-only wrapper for mythical drops processing."""
+        return self.process_mythical_drops(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+        )
+
+    def check_mythical_drops_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+    ) -> bool:
+        """Active user-only wrapper for mythical readiness checks."""
+        return self.check_mythical_drops(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+        )
+
+    def start_mythical_drops_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+    ) -> Optional[MythicalDropsSession]:
+        """Active user-only wrapper for mythical session start."""
+        return self.start_mythical_drops(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+        )
+
+    def process_mythical_drops_with_active_user_session(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+        viewer_name: str = None,
+        amount: float = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Active user-only wrapper for mythical donation window processing."""
+        return self.process_mythical_drops_with_session(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+            amount=amount,
+        )
+
     def process_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
         """Обрабатывает мифические Drops"""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)

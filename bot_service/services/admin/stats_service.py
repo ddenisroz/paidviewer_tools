@@ -1,4 +1,4 @@
-"""Text cleaned."""
+"""Рабочий маршрут API."""
 import logging
 import shutil
 import os
@@ -10,7 +10,7 @@ from repositories.admin_stats_repository import AdminStatsRepository
 logger = logging.getLogger(__name__)
 
 class AdminStatsService:
-    """Сервис для получения статистики админ-панели."""
+    """РЎРµСЂРІРёСЃ РґР»СЏ РїРѕР»СѓС‡РµРЅРёСЏ СЃС‚Р°С‚РёСЃС‚РёРєРё Р°РґРјРёРЅ-РїР°РЅРµР»Рё."""
 
     def __init__(self, db: Session):
         self.db = db

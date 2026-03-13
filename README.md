@@ -1,108 +1,75 @@
 # TTS_TTV
 
-Платформа для стримеров: dashboard, `bot_service`, TTS-интеграции, YouTube queue, drops, DonationAlerts, MemeAlerts и сопутствующие инструменты.
+Платформа для стримеров с `bot_service`, dashboard, TTS, YouTube queue, drops и интеграциями.
 
 ## С чего начать
 
-- [docs/QUICKSTART.md](docs/QUICKSTART.md) — быстрый локальный запуск.
-- [docs/STATUS_TRACKER.md](docs/STATUS_TRACKER.md) — текущее состояние проекта и что ещё открыто.
-- [docs/README.md](docs/README.md) — индекс актуальной документации.
-- [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) — короткий снимок текущей архитектуры.
-- [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md) — активный контракт деплоя.
-- [docs/architecture/ARCHITECTURE_GUIDE.md](docs/architecture/ARCHITECTURE_GUIDE.md) — архитектурная карта проекта.
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) — быстрый локальный запуск
+- [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) — текущая архитектура и границы
+- [docs/STATUS_TRACKER.md](docs/STATUS_TRACKER.md) — что стабильно, что ещё открыто
+- [docs/README.md](docs/README.md) — индекс активной документации
+
+## Кратко про архитектуру
+
+- `frontend` общается только с `bot_service`
+- `bot_service` — центральный backend, auth, orchestration и бизнес-логика
+- `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm` — внешние TTS-сервисы
+- browser TTS работает только через отдельную вкладку `/tts-player`
 
 ## Быстрый локальный запуск
-
-1. Создай и активируй виртуальное окружение:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-2. Установи зависимости:
-
-```powershell
 python -m pip install --upgrade pip
 python -m pip install -r bot_service/requirements.txt
 python -m pip install -r bot_service/requirements_dev.txt
+
 cd frontend
 npm install
 cd ..
 ```
 
-3. Подготовь `.env`:
+Подготовь:
 
 - `bot_service/.env`
 - `frontend/.env`
 
-Минимум для backend:
-- `DATABASE_URL`
-- `SECRET_KEY`
-- `TWITCH_CLIENT_ID`
-- `TWITCH_CLIENT_SECRET`
-
-Если поднимаешь внешний TTS-контур:
-- `TTS_GATEWAY_URL`
-- `TTS_GATEWAY_API_KEY`
-- `F5_TTS_SERVICE_URL`
-- `F5_TTS_SERVICE_API_KEY`
-- `QWEN_TTS_SERVICE_URL`
-- `QWEN_TTS_SERVICE_API_KEY`
-- опционально `QWEN_VOICE_SERVICE_URL`
-
-4. Прогони миграции:
+Запуск:
 
 ```powershell
 cd bot_service
 alembic upgrade head
-cd ..
-```
-
-5. Запусти сервисы:
-
-```powershell
-# backend
-cd bot_service
 python main.py
 
-# frontend
-cd frontend
+cd ..\frontend
 npm run dev
 ```
 
-## Ключевой runtime-контракт
+## Полезные команды
 
-- `frontend` общается только с `bot_service`.
-- Продвинутый TTS для `f5` и `qwen` идёт через внешние upstream-сервисы.
-- Прямое runtime-использование `VITE_TTS_SERVICE_URL` не допускается.
-- Browser TTS работает через отдельную вкладку `/tts-player`.
+Гигиена базы данных:
 
-## Очистка перед коммитом и релизной отгрузкой
+```powershell
+.\.venv\Scripts\python.exe bot_service\scripts\database_hygiene.py
+```
 
-Preview:
+Безопасное удаление пользователей:
+
+```powershell
+.\.venv\Scripts\python.exe bot_service\scripts\delete_users.py --list
+```
+
+Очистка репозитория перед commit или release:
 
 ```powershell
 .\scripts\prepare-release.ps1
-```
-
-Очистка:
-
-```powershell
 .\scripts\prepare-release.ps1 -ApplyCleanup
 ```
 
-Очистка + проверки:
+## Документация
 
-```powershell
-.\scripts\prepare-release.ps1 -ApplyCleanup -RunChecks
-```
-
-## База данных и maintenance
-
-- Безопасное удаление пользователей: `bot_service/scripts/delete_users.py`
-- Гигиена БД: `bot_service/scripts/database_hygiene.py`
-- Maintenance-справка: `bot_service/scripts/README_MAINTENANCE.md`
+В `docs/` лежит только активный короткий слой. История, аудиты, временные планы и снятые с поддержки заметки живут в `docs/backlog/`.
 
 ## Лицензия
 

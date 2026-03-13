@@ -125,17 +125,6 @@ export const useAuthStore = create<AuthState>()(devtools(
 
                     logger.log('[AuthStore] Auth success');
 
-                    // Best-effort admin cleanup only. Endpoint is admin-gated and should not
-                    // generate expected 403 noise for regular authenticated users.
-                    const isAdminUser = userWithIntegrations.role === 'admin' || Boolean(userWithIntegrations.is_admin);
-                    if (isAdminUser && userWithIntegrations.id && userWithIntegrations.id > 0) {
-                        try {
-                            await authService.clearLegacySessions();
-                            logger.debug('[AuthStore] Legacy sessions cleared');
-                        } catch {
-                            logger.debug('[AuthStore] Legacy sessions cleanup skipped');
-                        }
-                    }
                 } else {
                     set({
                         user: null,

@@ -1,77 +1,68 @@
 # Контекст проекта
 
-Last updated: 2026-03-13
+Последнее обновление: 2026-03-13
 
-Этот файл нужен как короткий актуальный снимок проекта перед крупными изменениями.
+## Что это за репозиторий
 
-## Что читать сначала
+Репозиторий содержит основной пользовательский продукт вокруг стримерских инструментов:
 
-- `docs/STATUS_TRACKER.md`
-- `docs/setup/LOCAL_TTS_INTEGRATION.md`
-- `docs/setup/LIVE_SMOKE_RUNBOOK.md`
-- `docs/setup/REPO_SPLIT_GUIDE.md`
-- `docs/setup/DOCKER_DEPLOYMENT.md`
-- `docs/architecture/TTS_ARCHITECTURE.md`
+- `frontend` — dashboard и пользовательский интерфейс;
+- `bot_service` — центральный backend, orchestration и бизнес-логика;
+- внешние TTS-сервисы — `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm`.
 
-## Текущая стадия
+`frontend` общается только с `bot_service`. Прямые runtime URL внешних TTS-сервисов во frontend не допускаются.
 
-- Контракт `frontend -> bot_service -> external TTS upstreams` внедрён.
-- Runtime работает только для авторизованных пользователей. Guest mode удалён.
-- `frontend` готовится к split, но пока остаётся в этом репозитории.
-- `docker compose config -q` уже зелёный для `dev` и `bot`.
-- Полный live smoke всё ещё зависит от внешних prereq:
-  - Redis для `tts-gateway`
-  - vendor/assets/weights для `f5-tts-service`
-  - Linux/WSL2 runtime для `nano-qwen3tts-vllm`
+## Актуальная модель TTS
 
-## Актуальная TTS-модель
+В проекте поддерживаются три режима:
 
-- `tts-gateway` — основной orchestrator для advanced synthesis.
-- `f5` и `qwen` живут как внешние upstream-сервисы.
-- `gcloud` остаётся встроенным managed fallback.
+- `self-hosted endpoint` — пользователь сам поднимает TTS-сервис и подключает URL через настройки;
+- `project-hosted worker` — отдельный внешний воркер под инфраструктурой проекта;
+- `gateway-managed` — путь `bot_service -> tts-gateway -> project-hosted worker`.
 
-## Термины topology
+Старые флаги `use_local`, `f5_local`, `qwen_local` пока сохранены только как совместимые имена для self-hosted режима.
 
-- `self-hosted endpoint` — пользователь сам поднимает TTS-сервис и сохраняет свой URL в `local_tts_endpoints`.
-- `project-hosted worker` — отдельный worker под инфраструктурой проекта.
-- `gateway-managed` — `bot_service -> tts-gateway -> project-hosted workers`.
-
-Флаги `use_local`, `f5_local`, `qwen_local` — это legacy naming для self-hosted режима и пока сохраняются.
-
-## Текущий контракт провайдеров
+## Провайдеры
 
 - `f5`
-  - managed synth: сначала через gateway
-  - self-hosted: поддерживается
-  - voice/admin CRUD: поддерживается через backend
-
+  - managed synth: через `tts-gateway`;
+  - self-hosted: поддерживается;
+  - voice/admin CRUD: поддерживается через backend.
 - `qwen`
-  - managed synth: через gateway
-  - self-hosted: работает через compatibility adapter
-  - voice/admin CRUD: пока `501`, пока не настроен `QWEN_VOICE_SERVICE_URL`
+  - managed synth: через `tts-gateway`;
+  - self-hosted: работает через compatibility adapter;
+  - voice/admin CRUD: пока `501`, если не задан `QWEN_VOICE_SERVICE_URL`.
+- `gcloud`
+  - встроенный backend fallback-путь.
 
-## Политика БД
+## Auth и runtime-границы
 
-- Runtime и production БД — PostgreSQL.
-- SQLite допустим только в тестовом контуре.
-- Orphan user-записи и старые inactive sessions чистятся через `bot_service/scripts/database_hygiene.py`.
+- protected API использует cookie `session_id`;
+- guest mode удалён из active runtime;
+- browser TTS работает только через отдельную вкладку `/tts-player`;
+- только одна активная вкладка `/tts-player` реально воспроизводит звук.
 
-## Важные ограничения
+## База данных
 
-- Frontend должен общаться только с `bot_service` API/WS.
-- Нельзя возвращать прямое runtime-использование `VITE_TTS_SERVICE_URL`.
-- Upstream TTS auth — strict API-key (`Authorization` + `X-API-Key`).
-- TTS blocked-users валидируют существование целевого пользователя.
+- runtime и production работают на PostgreSQL;
+- SQLite допустим только в тестах;
+- orphan user-записи, legacy session-scoped хвосты и старые inactive sessions чистятся через `bot_service/scripts/database_hygiene.py`;
+- точечное удаление пользователей делается через `bot_service/scripts/delete_users.py`.
 
-## Что уже закрыто
+## Что уже очищено
 
-- безопасное selective удаление пользователей через `bot_service/scripts/delete_users.py`
-- preview и cleanup orphan user-записей и inactive sessions через `bot_service/scripts/database_hygiene.py`
-- background cleanup inactive sessions использует ту же retention-логику
+- frontend больше не ходит напрямую к TTS runtime;
+- guest mode удалён из active runtime;
+- active user-only слой не должен создавать новые session-scoped записи в `user_settings`, `tts_user_settings`, `local_tts_endpoints`, `filtered_words`, `tts_blocked_users`;
+- YouTube queue переведён на user-only path в dashboard и runtime;
+- active `drops` runtime переведён на user-only wrappers в bot, webhook и history entrypoints;
+- `QueueHandlerMixin` — единственный активный путь для YouTube-команд `!sr`, `!skip`, `!clear`, `!queue`, `!wronglink`;
+- голосование за `!skip` вынесено в `services/youtube/skip_vote_store.py`;
+- пакет `bot_service/bots/command_handlers/*` больше не используется активным runtime.
 
-## Что ещё остаётся
+## Что ещё открыто
 
-- добить legacy `session_id` хвосты в dual-mode таблицах
-- довести Qwen upstream до native parity
-- пройти полный live smoke контур
-- завершить docs и release hygiene
+- добить remaining compat-хвосты в dual-mode доменах;
+- довести Qwen upstream до native parity;
+- полностью пройти live smoke по всем topology-путям;
+- продолжать сжимать active docs до короткого русского source of truth.

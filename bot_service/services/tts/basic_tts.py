@@ -86,7 +86,7 @@ class BasicTTS:
         if not processed_text.strip():
             logger.warning('После удаления длинных последовательностей текст пустой')
             return ''
-        if not processed_text.endswith(('.', '!', '?', 'Text cleaned.')):
+        if not processed_text.endswith(('.', '!', '?', '...')):
             processed_text += '.'
         processed_text = re.sub('\\s+', ' ', processed_text).strip()
         return processed_text

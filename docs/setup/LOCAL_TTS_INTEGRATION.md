@@ -1,8 +1,8 @@
-# Local TTS integration
+# Локальная интеграция TTS
 
-Last updated: 2026-03-13
+Последнее обновление: 2026-03-13
 
-Этот документ фиксирует активный контракт внешнего TTS-стека вокруг `bot_service`.
+Документ фиксирует активный контракт внешнего TTS-стека вокруг `bot_service`.
 
 ## Цель
 
@@ -12,7 +12,7 @@ Last updated: 2026-03-13
 - `self-hosted endpoint` -> пользователь поднимает TTS у себя и подключает URL через `local_tts_endpoints`
 - `project-hosted worker` -> отдельный воркер проекта, хостится вашей инфраструктурой
 - `gateway-managed` -> `bot_service -> tts-gateway -> project-hosted workers`
-- voice/admin CRUD -> provider-owned APIs (`f5` сейчас, `qwen` позже)
+- voice/admin CRUD -> API провайдера (`f5` сейчас, `qwen` позже)
 
 ## Термины
 
@@ -20,7 +20,7 @@ Last updated: 2026-03-13
 - `project-hosted worker` — отдельный runtime-воркер проекта. Это не self-hosted режим пользователя.
 - `gateway-managed` — управляемый путь через `tts-gateway`.
 
-Флаги `use_local`, `f5_local`, `qwen_local` пока сохраняются как legacy naming для self-hosted path.
+Флаги `use_local`, `f5_local`, `qwen_local` пока сохраняются как старые имена для self-hosted path.
 
 ## Runtime-контракт
 
@@ -64,17 +64,20 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 ## Важные ограничения по upstream
 
 ### `tts-gateway`
-- требует Redis
-- должен знать URL и API key для F5/Qwen upstreams
+
+- требует Redis;
+- должен знать URL и API key для F5 и Qwen upstreams.
 
 ### `f5-tts-service`
-- требует свои env и БД
-- для старта нужны `vendor/F5-TTS`, веса модели и prewarm dependencies
+
+- требует свои env и БД;
+- для старта нужны `vendor/F5-TTS`, веса модели и prewarm dependencies.
 
 ### `nano-qwen3tts-vllm`
-- practically Linux/WSL2 runtime
-- в текущем upstream нет native parity по auth/health/status
-- self-hosted path в этом репозитории работает через compatibility adapter
+
+- практически требует Linux или WSL2 runtime;
+- в текущем upstream нет native parity по auth, health и status;
+- self-hosted path в этом репозитории работает через слой совместимости.
 
 ## Стабильные backend entrypoints
 
@@ -89,8 +92,8 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 
 ## Поведение voice/admin
 
-- `provider=f5` — нормальный CRUD
-- `provider=qwen` — `501`, пока не задан `QWEN_VOICE_SERVICE_URL`
+- `provider=f5` — нормальный CRUD;
+- `provider=qwen` — `501`, пока не задан `QWEN_VOICE_SERVICE_URL`.
 
 ## Базовый UI flow для self-hosted
 
@@ -104,7 +107,7 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 
 1. `GET /api/tts/health?provider=f5` возвращает healthy.
 2. `GET /api/tts/health?provider=qwen` возвращает healthy или контролируемый gateway-required статус.
-3. Synth через backend/gateway работает для `f5` и `qwen`.
+3. Synth через backend и gateway работает для `f5` и `qwen`.
 4. F5 voice CRUD работает через backend routes.
 5. Qwen voice CRUD даёт ожидаемый `501`.
 6. Self-hosted Qwen connection checks используют compatibility probe.

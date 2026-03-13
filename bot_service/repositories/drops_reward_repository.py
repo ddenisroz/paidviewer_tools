@@ -59,6 +59,22 @@ class DropsRewardRepository(BaseRepository[DropsReward]):
             query = query.filter(DropsReward.quality_id == quality_id)
         return query.all()
 
+    def get_active_by_user_and_channel(
+        self,
+        user_id: int,
+        channel_name: str,
+        quality_id: Optional[int] = None,
+    ) -> List[DropsReward]:
+        """Get active rewards for an authenticated user's channel."""
+        query = self.db.query(DropsReward).filter(
+            DropsReward.user_id == user_id,
+            DropsReward.channel_name == channel_name,
+            DropsReward.is_active.is_(True),
+        )
+        if quality_id:
+            query = query.filter(DropsReward.quality_id == quality_id)
+        return query.all()
+
     def get_by_filters(
         self,
         channel_name: str,

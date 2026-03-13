@@ -21,6 +21,82 @@ class StreamSessionService:
         self.session_repo = StreamSessionRepository(db)
         self.streak_repo = DropsHistoryRepository(db)
 
+    def get_or_create_active_user_session(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        title: str = None,
+    ) -> Optional[StreamSession]:
+        """Active user-only wrapper for stream session lifecycle."""
+        return self.get_or_create_active_session(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            title=title,
+        )
+
+    def get_last_user_session(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+    ) -> Optional[StreamSession]:
+        """Active user-only wrapper for previous stream session lookup."""
+        return self.get_last_session(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+        )
+
+    def get_active_user_session(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+    ) -> Optional[StreamSession]:
+        """Active user-only wrapper for current stream session lookup."""
+        return self.get_active_session(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+        )
+
+    def mark_viewer_attended_user_stream(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+    ) -> bool:
+        """Active user-only wrapper for attendance tracking."""
+        return self.mark_viewer_attended_stream(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+        )
+
+    def check_viewer_attended_last_user_stream(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+    ) -> bool:
+        """Active user-only wrapper for previous attendance checks."""
+        return self.check_viewer_attended_last_stream(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+        )
+
     def get_or_create_active_session(
         self,
         user_id: int = None,

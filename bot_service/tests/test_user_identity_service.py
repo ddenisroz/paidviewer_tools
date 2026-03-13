@@ -21,7 +21,7 @@ class TestUserIdentityService:
 
     def test_create_settings_record_data_authenticated(self):
         auth_user = {"id": 1, "username": "testuser"}
-        assert UserIdentityService.create_settings_record_data(auth_user) == {"user_id": 1, "session_id": None}
+        assert UserIdentityService.create_settings_record_data(auth_user) == {"user_id": 1}
 
     def test_get_websocket_user_id_authenticated(self):
         auth_user = {"id": 7, "username": "testuser"}

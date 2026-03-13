@@ -12,7 +12,7 @@ from repositories.user_repository import UserRepository
 logger = logging.getLogger(__name__)
 
 class PsychologyService:
-    """Сервис для психологического анализа пользователей на основе их сообщений"""
+    """РЎРµСЂРІРёСЃ РґР»СЏ РїСЃРёС…РѕР»РѕРіРёС‡РµСЃРєРѕРіРѕ Р°РЅР°Р»РёР·Р° РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ РЅР° РѕСЃРЅРѕРІРµ РёС… СЃРѕРѕР±С‰РµРЅРёР№"""
     _analysis_in_progress = False
     _last_analysis_time: dict = {}
 
@@ -21,16 +21,16 @@ class PsychologyService:
 
     async def analyze_user_psychology(self, target_username: str, platform: str, analyzed_by_user_id: int, analyzed_by_username: str, channel_name: str) -> Optional[str]:
         """
-        Анализирует психологический портрет пользователя на основе его сообщений
+        РђРЅР°Р»РёР·РёСЂСѓРµС‚ РїСЃРёС…РѕР»РѕРіРёС‡РµСЃРєРёР№ РїРѕСЂС‚СЂРµС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅР° РѕСЃРЅРѕРІРµ РµРіРѕ СЃРѕРѕР±С‰РµРЅРёР№
         
         Args:
-            target_username: Ник пользователя для анализа
-            platform: Платформа (twitch/vk)
-            analyzed_by_user_id: ID пользователя, который запросил анализ
-            analyzed_by_username: Ник пользователя, который запросил анализ
+            target_username: РќРёРє РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РґР»СЏ Р°РЅР°Р»РёР·Р°
+            platform: РџР»Р°С‚С„РѕСЂРјР° (twitch/vk)
+            analyzed_by_user_id: ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ, РєРѕС‚РѕСЂС‹Р№ Р·Р°РїСЂРѕСЃРёР» Р°РЅР°Р»РёР·
+            analyzed_by_username: РќРёРє РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ, РєРѕС‚РѕСЂС‹Р№ Р·Р°РїСЂРѕСЃРёР» Р°РЅР°Р»РёР·
             
         Returns:
-            Результат анализа или None при ошибке
+            Р РµР·СѓР»СЊС‚Р°С‚ Р°РЅР°Р»РёР·Р° РёР»Рё None РїСЂРё РѕС€РёР±РєРµ
         """
         try:
             current_time = utcnow_naive()
@@ -38,32 +38,32 @@ class PsychologyService:
                 time_diff = current_time - self.__class__._last_analysis_time[analyzed_by_user_id]
                 if time_diff.total_seconds() < 30:
                     remaining = 30 - int(time_diff.total_seconds())
-                    return f'[TIMEOUT] Подождите {remaining} секунд перед следующим анализом'
+                    return f'[TIMEOUT] РџРѕРґРѕР¶РґРёС‚Рµ {remaining} СЃРµРєСѓРЅРґ РїРµСЂРµРґ СЃР»РµРґСѓСЋС‰РёРј Р°РЅР°Р»РёР·РѕРј'
             if self.__class__._analysis_in_progress:
-                return '[REFRESH] Анализ уже выполняется, подождите...'
+                return '[REFRESH] РђРЅР°Р»РёР· СѓР¶Рµ РІС‹РїРѕР»РЅСЏРµС‚СЃСЏ, РїРѕРґРѕР¶РґРёС‚Рµ...'
             if not self._check_database_health():
-                return '[WARN] База данных перегружена, анализ временно недоступен'
+                return '[WARN] Р‘Р°Р·Р° РґР°РЅРЅС‹С… РїРµСЂРµРіСЂСѓР¶РµРЅР°, Р°РЅР°Р»РёР· РІСЂРµРјРµРЅРЅРѕ РЅРµРґРѕСЃС‚СѓРїРµРЅ'
             self.__class__._analysis_in_progress = True
             self.__class__._last_analysis_time[analyzed_by_user_id] = current_time
             target_username = (target_username or '').strip().lstrip('@')
             if not target_username:
                 self.__class__._analysis_in_progress = False
-                return '[ERROR] Укажите пользователя для анализа'
+                return '[ERROR] РЈРєР°Р¶РёС‚Рµ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РґР»СЏ Р°РЅР°Р»РёР·Р°'
             channel_limit = settings.chat_analysis_channel_limit
             global_limit = settings.chat_analysis_global_limit
             min_messages = settings.chat_analysis_min_messages
             (channel_messages, global_messages) = self._get_user_messages(owner_user_id=analyzed_by_user_id, username=target_username, platform=platform, channel_name=channel_name, channel_limit=channel_limit, global_limit=global_limit)
             if not global_messages:
                 self.__class__._analysis_in_progress = False
-                return f'[ERROR] Не найдено сообщений от пользователя {target_username}'
+                return f'[ERROR] РќРµ РЅР°Р№РґРµРЅРѕ СЃРѕРѕР±С‰РµРЅРёР№ РѕС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ {target_username}'
             (channel_text, channel_count) = self._prepare_messages_for_analysis(channel_messages)
             (global_text, global_count) = self._prepare_messages_for_analysis(global_messages)
             if global_count < min_messages:
                 self.__class__._analysis_in_progress = False
-                return f'[ERROR] Недостаточно сообщений для анализа (найдено: {global_count}, нужно минимум {min_messages})'
+                return f'[ERROR] РќРµРґРѕСЃС‚Р°С‚РѕС‡РЅРѕ СЃРѕРѕР±С‰РµРЅРёР№ РґР»СЏ Р°РЅР°Р»РёР·Р° (РЅР°Р№РґРµРЅРѕ: {global_count}, РЅСѓР¶РЅРѕ РјРёРЅРёРјСѓРј {min_messages})'
             if not channel_text and (not global_text):
                 self.__class__._analysis_in_progress = False
-                return '[ERROR] Не удалось подготовить сообщения для анализа'
+                return '[ERROR] РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРіРѕС‚РѕРІРёС‚СЊ СЃРѕРѕР±С‰РµРЅРёСЏ РґР»СЏ Р°РЅР°Р»РёР·Р°'
             analysis_result = await self._request_ai_analysis(target_username=target_username, platform=platform, channel_name=channel_name, channel_text=channel_text, channel_count=channel_count, global_text=global_text, global_count=global_count)
             if analysis_result:
                 if analysis_result.startswith('[ERROR]'):
@@ -78,14 +78,14 @@ class PsychologyService:
                 return analysis_result
             else:
                 self.__class__._analysis_in_progress = False
-                return '[ERROR] Ошибка при анализе. Попробуйте позже.'
+                return '[ERROR] РћС€РёР±РєР° РїСЂРё Р°РЅР°Р»РёР·Рµ. РџРѕРїСЂРѕР±СѓР№С‚Рµ РїРѕР·Р¶Рµ.'
         except Exception:
             logger.exception('Error in analyze_user_psychology')
             self.__class__._analysis_in_progress = False
-            return '[ERROR] Произошла ошибка при анализе'
+            return '[ERROR] РџСЂРѕРёР·РѕС€Р»Р° РѕС€РёР±РєР° РїСЂРё Р°РЅР°Р»РёР·Рµ'
 
     def _get_user_messages(self, owner_user_id: int, username: str, platform: str, channel_name: str, channel_limit: int, global_limit: int) -> Tuple[List[ChatMessage], List[ChatMessage]]:
-        """Получает сообщения пользователя по каналу и глобально по всем каналам."""
+        """РџРѕР»СѓС‡Р°РµС‚ СЃРѕРѕР±С‰РµРЅРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕ РєР°РЅР°Р»Сѓ Рё РіР»РѕР±Р°Р»СЊРЅРѕ РїРѕ РІСЃРµРј РєР°РЅР°Р»Р°Рј."""
         try:
             repo = ChatMessageRepository(self.db)
             channel_messages = repo.get_recent_by_author_in_channel(user_id=owner_user_id, author_username=username, channel_name=channel_name, platform=platform, limit=channel_limit)
@@ -96,7 +96,7 @@ class PsychologyService:
             return ([], [])
 
     def _check_database_health(self) -> bool:
-        """Проверяет здоровье базы данных."""
+        """РџСЂРѕРІРµСЂСЏРµС‚ Р·РґРѕСЂРѕРІСЊРµ Р±Р°Р·С‹ РґР°РЅРЅС‹С…."""
         try:
             from services.database_cleanup_service import DatabaseCleanupService
             cleanup_service = DatabaseCleanupService(self.db)
@@ -116,7 +116,7 @@ class PsychologyService:
             return True
 
     def _prepare_messages_for_analysis(self, messages: List[ChatMessage], max_chars: int=2000) -> Tuple[str, int]:
-        """Подготавливает сообщения для отправки в нейросеть."""
+        """РџРѕРґРіРѕС‚Р°РІР»РёРІР°РµС‚ СЃРѕРѕР±С‰РµРЅРёСЏ РґР»СЏ РѕС‚РїСЂР°РІРєРё РІ РЅРµР№СЂРѕСЃРµС‚СЊ."""
         try:
             message_texts = []
             for msg in messages:
@@ -125,11 +125,11 @@ class PsychologyService:
                     continue
                 text = ' '.join(text.split())
                 if len(text) > 200:
-                    text = text[:200] + 'Text cleaned.'
+                    text = text[:200] + '...'
                 message_texts.append(text)
             combined_text = ' | '.join(message_texts)
             if len(combined_text) > max_chars:
-                combined_text = combined_text[:max_chars] + 'Text cleaned.'
+                combined_text = combined_text[:max_chars] + '...'
             return (combined_text, len(message_texts))
         except Exception:
             logger.exception('Error preparing messages')
@@ -164,21 +164,21 @@ class PsychologyService:
 
     def _has_required_labels(self, text: str) -> bool:
         lower = text.lower()
-        required = ['агрессивность', 'димплинг', 'чувство юмора', 'вниманиеблядство']
+        required = ['Р°РіСЂРµСЃСЃРёРІРЅРѕСЃС‚СЊ', 'РґРёРјРїР»РёРЅРі', 'С‡СѓРІСЃС‚РІРѕ СЋРјРѕСЂР°', 'РІРЅРёРјР°РЅРёРµР±Р»СЏРґСЃС‚РІРѕ']
         return all((label in lower for label in required))
 
     async def _request_ai_analysis(self, target_username: str, platform: str, channel_name: str, channel_text: str, channel_count: int, global_text: str, global_count: int) -> Optional[str]:
-        """Отправляет запрос к ИИ для анализа личности."""
+        """РћС‚РїСЂР°РІР»СЏРµС‚ Р·Р°РїСЂРѕСЃ Рє РР РґР»СЏ Р°РЅР°Р»РёР·Р° Р»РёС‡РЅРѕСЃС‚Рё."""
         try:
             if not settings.deepseek_api_key:
-                return '[ERROR] DeepSeek API key не настроен'
-            system_prompt = "Ты анализируешь стиль общения пользователя по сообщениям чата. Дай краткий психологический портрет без медицинских диагнозов и без оскорблений. Ответ строго одной строкой, 100-150 символов. Сначала короткий портрет (20-40 символов), затем оценки. В конце обязательно оценки по критериям: агрессивность, димплинг, чувство юмора, вниманиеблядство. Формат оценок: 'агрессивность 3/10, димплинг 2/10, чувство юмора 7/10, вниманиеблядство 4/10'. Не добавляй ничего кроме этого."
-            user_prompt = f"Пользователь: {target_username}\nПлатформа: {platform}\nКанал: {channel_name} (сообщений: {channel_count})\nCHANNEL_MESSAGES: {channel_text or 'нет'}\nGLOBAL_MESSAGES (все каналы, сообщений: {global_count}): {global_text or 'нет'}\nCHANNEL_MESSAGES важнее, но учитывай оба блока."
+                return '[ERROR] DeepSeek API key РЅРµ РЅР°СЃС‚СЂРѕРµРЅ'
+            system_prompt = "РўС‹ Р°РЅР°Р»РёР·РёСЂСѓРµС€СЊ СЃС‚РёР»СЊ РѕР±С‰РµРЅРёСЏ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РїРѕ СЃРѕРѕР±С‰РµРЅРёСЏРј С‡Р°С‚Р°. Р”Р°Р№ РєСЂР°С‚РєРёР№ РїСЃРёС…РѕР»РѕРіРёС‡РµСЃРєРёР№ РїРѕСЂС‚СЂРµС‚ Р±РµР· РјРµРґРёС†РёРЅСЃРєРёС… РґРёР°РіРЅРѕР·РѕРІ Рё Р±РµР· РѕСЃРєРѕСЂР±Р»РµРЅРёР№. РћС‚РІРµС‚ СЃС‚СЂРѕРіРѕ РѕРґРЅРѕР№ СЃС‚СЂРѕРєРѕР№, 100-150 СЃРёРјРІРѕР»РѕРІ. РЎРЅР°С‡Р°Р»Р° РєРѕСЂРѕС‚РєРёР№ РїРѕСЂС‚СЂРµС‚ (20-40 СЃРёРјРІРѕР»РѕРІ), Р·Р°С‚РµРј РѕС†РµРЅРєРё. Р’ РєРѕРЅС†Рµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ РѕС†РµРЅРєРё РїРѕ РєСЂРёС‚РµСЂРёСЏРј: Р°РіСЂРµСЃСЃРёРІРЅРѕСЃС‚СЊ, РґРёРјРїР»РёРЅРі, С‡СѓРІСЃС‚РІРѕ СЋРјРѕСЂР°, РІРЅРёРјР°РЅРёРµР±Р»СЏРґСЃС‚РІРѕ. Р¤РѕСЂРјР°С‚ РѕС†РµРЅРѕРє: 'Р°РіСЂРµСЃСЃРёРІРЅРѕСЃС‚СЊ 3/10, РґРёРјРїР»РёРЅРі 2/10, С‡СѓРІСЃС‚РІРѕ СЋРјРѕСЂР° 7/10, РІРЅРёРјР°РЅРёРµР±Р»СЏРґСЃС‚РІРѕ 4/10'. РќРµ РґРѕР±Р°РІР»СЏР№ РЅРёС‡РµРіРѕ РєСЂРѕРјРµ СЌС‚РѕРіРѕ."
+            user_prompt = f"РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ: {target_username}\nРџР»Р°С‚С„РѕСЂРјР°: {platform}\nРљР°РЅР°Р»: {channel_name} (СЃРѕРѕР±С‰РµРЅРёР№: {channel_count})\nCHANNEL_MESSAGES: {channel_text or 'РЅРµС‚'}\nGLOBAL_MESSAGES (РІСЃРµ РєР°РЅР°Р»С‹, СЃРѕРѕР±С‰РµРЅРёР№: {global_count}): {global_text or 'РЅРµС‚'}\nCHANNEL_MESSAGES РІР°Р¶РЅРµРµ, РЅРѕ СѓС‡РёС‚С‹РІР°Р№ РѕР±Р° Р±Р»РѕРєР°."
             max_chars = settings.chat_analysis_output_max_chars
             analysis = await self._call_deepseek(system_prompt, user_prompt, max_tokens=120)
             analysis = self._normalize_analysis_output(analysis or '')
             if analysis and (len(analysis) > max_chars or not self._has_required_labels(analysis)):
-                short_prompt = system_prompt + ' Ответ должен быть еще короче и строго по формату.'
+                short_prompt = system_prompt + ' РћС‚РІРµС‚ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РµС‰Рµ РєРѕСЂРѕС‡Рµ Рё СЃС‚СЂРѕРіРѕ РїРѕ С„РѕСЂРјР°С‚Сѓ.'
                 analysis = await self._call_deepseek(short_prompt, user_prompt, max_tokens=80)
                 analysis = self._normalize_analysis_output(analysis or '')
             if analysis and len(analysis) > max_chars:
@@ -189,7 +189,7 @@ class PsychologyService:
             return None
 
     def _save_analysis_result(self, target_username: str, platform: str, analyzed_by_user_id: int, analyzed_by_username: str, analysis_text: str, messages_count: int):
-        """Сохраняет результат анализа в базу данных."""
+        """РЎРѕС…СЂР°РЅСЏРµС‚ СЂРµР·СѓР»СЊС‚Р°С‚ Р°РЅР°Р»РёР·Р° РІ Р±Р°Р·Сѓ РґР°РЅРЅС‹С…."""
         try:
             user_repo = UserRepository(self.db)
             if platform == 'vk':
@@ -207,7 +207,7 @@ class PsychologyService:
             pass
 
     def get_recent_analysis(self, target_username: str, platform: str, hours: int=24) -> Optional[str]:
-        """Получает недавний анализ пользователя (если есть)."""
+        """РџРѕР»СѓС‡Р°РµС‚ РЅРµРґР°РІРЅРёР№ Р°РЅР°Р»РёР· РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (РµСЃР»Рё РµСЃС‚СЊ)."""
         try:
             cutoff_time = utcnow_naive() - timedelta(hours=hours)
             repo = PsychologyRepository(self.db)

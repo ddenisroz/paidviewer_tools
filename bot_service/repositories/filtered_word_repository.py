@@ -23,25 +23,9 @@ class FilteredWordRepository(BaseRepository[FilteredWord]):
             FilteredWord.is_active
         ).all()
     
-    def get_by_session_id(self, session_id: str) -> List[FilteredWord]:
-        """Get all filtered words for a legacy session scope."""
-        return self.db.query(FilteredWord).filter(
-            FilteredWord.session_id == session_id,
-            FilteredWord.is_active
-        ).all()
-    
-    def get_words_list(
-        self,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+    def get_words_list(self, user_id: int) -> List[Dict[str, Any]]:
         """Get filtered words as list of dicts."""
-        if user_id:
-            words = self.get_by_user_id(user_id)
-        elif session_id:
-            words = self.get_by_session_id(session_id)
-        else:
-            return []
+        words = self.get_by_user_id(user_id)
         
         return [
             {
@@ -57,30 +41,25 @@ class FilteredWordRepository(BaseRepository[FilteredWord]):
         self,
         word: str,
         platform: str = "all",
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None
+        user_id: int = None,
     ) -> Optional[FilteredWord]:
         """Add a new filtered word. Returns None if word already exists."""
+        if not user_id:
+            raise ValueError("user_id is required")
+
         # Check for existing word
         query = self.db.query(FilteredWord).filter(
             FilteredWord.word == word.lower(),
             FilteredWord.platform == platform,
-            FilteredWord.is_active
+            FilteredWord.is_active,
+            FilteredWord.user_id == user_id,
         )
-        
-        if user_id:
-            query = query.filter(FilteredWord.user_id == user_id)
-        elif session_id:
-            query = query.filter(FilteredWord.session_id == session_id)
-        else:
-            return None
         
         if query.first():
             return None  # Word already exists
         
         new_word = FilteredWord(
             user_id=user_id,
-            session_id=session_id,
             word=word.lower(),
             platform=platform
         )
@@ -92,18 +71,16 @@ class FilteredWordRepository(BaseRepository[FilteredWord]):
     def remove_word(
         self,
         word_id: int,
-        user_id: Optional[int] = None,
-        session_id: Optional[str] = None
+        user_id: int = None,
     ) -> bool:
         """Remove a filtered word. Returns True if successful."""
-        query = self.db.query(FilteredWord).filter(FilteredWord.id == word_id)
-        
-        if user_id:
-            query = query.filter(FilteredWord.user_id == user_id)
-        elif session_id:
-            query = query.filter(FilteredWord.session_id == session_id)
-        else:
+        if not user_id:
             return False
+
+        query = self.db.query(FilteredWord).filter(
+            FilteredWord.id == word_id,
+            FilteredWord.user_id == user_id,
+        )
         
         word = query.first()
         if not word:

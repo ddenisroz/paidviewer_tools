@@ -92,6 +92,30 @@ class DatabaseCleanupCore:
             ~select(User.id).where(User.id == model.user_id).exists(),
         )
 
+    def _legacy_session_scope_models(self) -> list[tuple[str, object]]:
+        """Return active user-only tables that should no longer keep session-scoped rows."""
+        return [
+            ("user_settings", UserSettings),
+            ("tts_user_settings", TTSUserSettings),
+            ("local_tts_endpoints", LocalTTSEndpoint),
+            ("filtered_words", FilteredWord),
+            ("tts_blocked_users", TTSBlockedUser),
+            ("youtube_queue", YouTubeQueue),
+            ("drops_configs", DropsConfig),
+            ("drops_rewards", DropsReward),
+            ("user_streaks", UserStreak),
+            ("drops_history", DropsHistory),
+            ("mythical_drops_sessions", MythicalDropsSession),
+            ("stream_sessions", StreamSession),
+        ]
+
+    def _legacy_session_scope_condition(self, model: object) -> object:
+        """Build a condition for legacy session-scoped rows in user-only tables."""
+        return and_(
+            model.user_id.is_(None),
+            model.session_id.is_not(None),
+        )
+
     def cleanup_old_data(self) -> Dict[str, int]:
         """Clean old data: expired messages and over-limit messages."""
         try:
@@ -218,6 +242,59 @@ class DatabaseCleanupCore:
             }
         except Exception:
             logger.exception("Error cleaning orphan user records")
+            self.db.rollback()
+            return {"tables": {}, "total_rows": 0, "error": "Internal server error"}
+
+    def preview_legacy_session_records(self) -> Dict[str, Any]:
+        """Preview legacy session-scoped rows in active user-only tables."""
+        try:
+            counts: Dict[str, int] = {}
+            for table_name, model in self._legacy_session_scope_models():
+                condition = self._legacy_session_scope_condition(model)
+                counts[table_name] = int(
+                    self.db.execute(
+                        select(func.count()).select_from(model).where(condition)
+                    ).scalar_one()
+                )
+
+            total_rows = sum(counts.values())
+            return {
+                "tables": counts,
+                "total_rows": total_rows,
+            }
+        except Exception:
+            logger.exception("Error previewing legacy session-scoped records")
+            self.db.rollback()
+            return {"tables": {}, "total_rows": 0, "error": "Internal server error"}
+
+    def cleanup_legacy_session_records(self) -> Dict[str, Any]:
+        """Delete legacy session-scoped rows from active user-only tables."""
+        try:
+            deleted_counts: Dict[str, int] = {}
+
+            for table_name, model in self._legacy_session_scope_models():
+                condition = self._legacy_session_scope_condition(model)
+                result = self.db.execute(delete(model).where(condition))
+                deleted_counts[table_name] = int(result.rowcount or 0)
+
+            total_rows = sum(deleted_counts.values())
+            self.db.commit()
+
+            if total_rows:
+                logger.info(
+                    "[DB CLEANUP] Deleted %s legacy session-scoped rows: %s",
+                    total_rows,
+                    {name: count for name, count in deleted_counts.items() if count},
+                )
+            else:
+                logger.info("[DB CLEANUP] No legacy session-scoped rows found")
+
+            return {
+                "tables": deleted_counts,
+                "total_rows": total_rows,
+            }
+        except Exception:
+            logger.exception("Error cleaning legacy session-scoped records")
             self.db.rollback()
             return {"tables": {}, "total_rows": 0, "error": "Internal server error"}
 

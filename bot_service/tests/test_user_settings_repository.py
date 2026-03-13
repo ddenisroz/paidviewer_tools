@@ -53,28 +53,6 @@ class TestUserSettingsRepository:
         assert fetched_filter is not None
         assert fetched_filter.id == settings.id
 
-    def test_create_and_get_by_session_id(self, user_settings_repo):
-        """Test creating and retrieving legacy session-scoped settings."""
-        session_id = "test-session-uuid-123"
-        
-        # Create
-        data = {"session_id": session_id, "obs_width": 500}
-        settings = user_settings_repo.create_default(data)
-        
-        assert settings.id is not None
-        assert settings.session_id == session_id
-        assert settings.obs_width == 500
-        
-        # Get by session_id
-        fetched = user_settings_repo.get_by_session_id(session_id)
-        assert fetched is not None
-        assert fetched.id == settings.id
-        
-        # Get by filters
-        fetched_filter = user_settings_repo.get_by_filters({"session_id": session_id})
-        assert fetched_filter is not None
-        assert fetched_filter.id == settings.id
-
     def test_update_settings(self, user_settings_repo, db_session):
         """Test updating existing settings."""
         # Setup
@@ -97,4 +75,3 @@ class TestUserSettingsRepository:
     def test_get_non_existent(self, user_settings_repo):
         """Test getting non-existent settings returns None."""
         assert user_settings_repo.get_by_user_id(99999) is None
-        assert user_settings_repo.get_by_session_id("non-existent") is None

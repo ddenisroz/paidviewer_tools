@@ -4,7 +4,7 @@ API для управления сессиями.
 Refactored to use SessionService (Clean Architecture).
 """
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from core.database import get_db
@@ -19,33 +19,6 @@ router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 def _is_admin(user: dict) -> bool:
     """Role-based admin check with legacy compatibility."""
     return user.get("role") == "admin" or bool(user.get("is_admin", False))
-
-
-def _set_legacy_deprecation_headers(response: Response) -> None:
-    response.headers["Deprecation"] = "true"
-    response.headers["Sunset"] = "Wed, 31 Dec 2026 23:59:59 GMT"
-    response.headers["Link"] = '</api/sessions/active-sessions>; rel="successor-version"'
-
-
-@router.post("/clear-legacy")
-async def clear_legacy_sessions(
-    response: Response,
-    user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Очистить legacy сессии (test_channel, старые VK ID)"""
-    try:
-        _set_legacy_deprecation_headers(response)
-        if not _is_admin(user):
-            raise HTTPException(status_code=403, detail="Admin access required")
-        service = SessionService(db)
-        cleared = service.clear_legacy_sessions()
-        return {"success": True, "cleared": cleared}
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Error clearing legacy sessions")
-        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/active-channels")

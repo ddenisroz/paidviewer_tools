@@ -21,6 +21,51 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
 
     # === Queue Item Queries ===
 
+    def _scope_filters(
+        self,
+        user_id: int | None = None,
+        session_id: str | None = None,
+    ) -> list[object]:
+        """Build queue scope filters for user or legacy session compat."""
+        filters: list[object] = []
+        if user_id is not None:
+            filters.append(YouTubeQueue.user_id == user_id)
+        if session_id is not None:
+            filters.append(YouTubeQueue.session_id == session_id)
+        return filters
+
+    def get_pending_by_video_id_for_user(
+        self,
+        video_id: str,
+        user_id: int,
+    ) -> Optional[YouTubeQueue]:
+        """Check if video already exists in pending queue for a user."""
+        return self.get_pending_by_video_id(video_id=video_id, user_id=user_id)
+
+    def get_banned_by_video_id_for_user(
+        self,
+        video_id: str,
+        user_id: int,
+    ) -> Optional[YouTubeQueue]:
+        """Check if video is banned for a user queue."""
+        return self.get_banned_by_video_id(video_id=video_id, user_id=user_id)
+
+    def get_pending_by_video_id_all_for_user(
+        self,
+        video_id: str,
+        user_id: int,
+    ) -> List[YouTubeQueue]:
+        """Get all pending queue items for a user by video id."""
+        return self.get_pending_by_video_id_all(video_id=video_id, user_id=user_id)
+
+    def count_pending_for_user(self, user_id: int) -> int:
+        """Count pending queue items for a user."""
+        return self.count_pending(user_id=user_id)
+
+    def get_pending_queue_for_user(self, user_id: int) -> List[YouTubeQueue]:
+        """Get pending queue for a user ordered by position."""
+        return self.get_pending_queue(user_id=user_id)
+
     def get_pending_by_video_id(
         self,
         video_id: str,
@@ -32,11 +77,8 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
             YouTubeQueue.video_id == video_id,
             YouTubeQueue.status == 'pending'
         ]
-        if user_id:
-            filters.append(YouTubeQueue.user_id == user_id)
-        if session_id:
-            filters.append(YouTubeQueue.session_id == session_id)
-        
+        filters.extend(self._scope_filters(user_id=user_id, session_id=session_id))
+
         return self.db.query(YouTubeQueue).filter(and_(*filters)).first()
 
     def get_banned_by_video_id(
@@ -50,10 +92,7 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
             YouTubeQueue.video_id == video_id,
             YouTubeQueue.status == 'banned'
         ]
-        if user_id:
-            filters.append(YouTubeQueue.user_id == user_id)
-        if session_id:
-            filters.append(YouTubeQueue.session_id == session_id)
+        filters.extend(self._scope_filters(user_id=user_id, session_id=session_id))
 
         return self.db.query(YouTubeQueue).filter(and_(*filters)).first()
 
@@ -68,10 +107,7 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
             YouTubeQueue.video_id == video_id,
             YouTubeQueue.status == 'pending'
         ]
-        if user_id:
-            filters.append(YouTubeQueue.user_id == user_id)
-        if session_id:
-            filters.append(YouTubeQueue.session_id == session_id)
+        filters.extend(self._scope_filters(user_id=user_id, session_id=session_id))
 
         return self.db.query(YouTubeQueue).filter(and_(*filters)).all()
 
@@ -82,11 +118,8 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
     ) -> int:
         """Count pending items in queue."""
         filters = [YouTubeQueue.status == 'pending']
-        if user_id:
-            filters.append(YouTubeQueue.user_id == user_id)
-        if session_id:
-            filters.append(YouTubeQueue.session_id == session_id)
-        
+        filters.extend(self._scope_filters(user_id=user_id, session_id=session_id))
+
         return self.db.query(YouTubeQueue).filter(and_(*filters)).count()
 
     def get_pending_queue(
@@ -96,11 +129,8 @@ class YouTubeQueueRepository(BaseRepository[YouTubeQueue]):
     ) -> List[YouTubeQueue]:
         """Get pending queue items ordered by position."""
         filters = [YouTubeQueue.status == 'pending']
-        if user_id:
-            filters.append(YouTubeQueue.user_id == user_id)
-        if session_id:
-            filters.append(YouTubeQueue.session_id == session_id)
-        
+        filters.extend(self._scope_filters(user_id=user_id, session_id=session_id))
+
         return (
             self.db.query(YouTubeQueue)
             .filter(and_(*filters))

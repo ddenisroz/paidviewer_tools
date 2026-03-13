@@ -1,71 +1,48 @@
-# Developer guide
+# Руководство разработчика
 
-Этот документ фиксирует стабильные инженерные контракты для ежедневной разработки.
+Это короткий набор стабильных инженерных правил.
 
-## Границы runtime
+## Границы системы
 
-- `bot_service/` — FastAPI API, auth, services, repositories, models
+- `bot_service/` — backend, auth, services, repositories, models
 - `frontend/` — React + Vite UI
-- внешние upstream-сервисы:
-  - `tts-gateway`
-  - `f5-tts-service`
-  - `nano-qwen3tts-vllm`
-- `deploy/` — compose и инфраструктурные файлы
+- `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm` — внешние TTS upstream-сервисы
+- `deploy/` — compose и deployment assets
 
-## Манифесты зависимостей
+## Зависимости
 
-- `bot_service/requirements.txt` — только runtime backend
+- `bot_service/requirements.txt` — runtime backend
 - `bot_service/requirements_dev.txt` — dev/test/tooling поверх runtime
-- `bot_service/requirements_celery.txt` — runtime + optional celery extras
+- `bot_service/requirements_celery.txt` — optional celery extras
 - `bot_service/requirements_no_torch.txt` — legacy alias на runtime requirements
 
-## Обязательные auth-контракты
+## Нельзя ломать
 
-1. User OAuth entrypoints:
-   - `/auth/twitch/login`
-   - `/auth/vk/login` и alias `/auth/vk`
-2. User OAuth callbacks:
-   - `/auth/twitch/callback`
-   - `/auth/vk/callback`
-3. Session auth — cookie-based (`session_id`)
-4. Source of truth для protected API — состояние пользователя в БД
-5. Admin authority — `users.role = 'admin'`
-6. Guest mode удалён и не должен возвращаться
-
-## Bot OAuth-контракт
-
-1. Login endpoints:
-   - `/auth/twitch/bot/login`
-   - `/auth/vk/bot/login`
-2. Callback endpoints:
-   - `/auth/twitch/bot/callback`
-   - `/auth/vk/bot/callback`
-3. Bot login требует admin session или short-lived `bot_oauth_token`
-4. Runtime bot tokens читаются из БД, а не из legacy env fallback
-
-## WebSocket-контракт
-
-1. Real-time sync использует WebSocket, а не SSE
-2. Frontend держит один leader socket на пользователя между вкладками
-3. Browser TTS playback работает через отдельную вкладку `/tts-player`
-4. Sink-aware TTS поведение нельзя ломать:
-   - website mode требует активную вкладку `/tts-player`
-   - OBS mode требует активный OBS socket
+- user OAuth:
+  - `/auth/twitch/login`
+  - `/auth/vk/login`
+  - `/auth/twitch/callback`
+  - `/auth/vk/callback`
+- cookie-based auth через `session_id`
+- источник admin-прав — `users.role = 'admin'`
+- real-time sync через WebSocket
+- single-leader логика shared WebSocket между вкладками
+- browser TTS только через `/tts-player`
 
 ## Правила backend
 
-1. Роуты остаются тонкими, логика живёт в `services/`
-2. Работа с БД идёт через `repositories/`
-3. Ошибки async-задач обрабатываются явно
-4. Валидация запросов должна быть строгой
-5. Нельзя логировать секреты, токены и пароли
+- роуты должны оставаться тонкими;
+- логика живёт в `services/`;
+- доступ к БД идёт через `repositories/`;
+- секреты, токены и пароли не логируются;
+- новые guest или anonymous auth flows не добавляются.
 
 ## Правила frontend
 
-1. API-вызовы держим в service/query-слое
-2. Не плодим дублирующие запросы
-3. Сохраняем single-leader WebSocket logic
-4. В UI используем semantic design tokens, а не случайные цвета
+- UI не ходит напрямую к TTS runtime;
+- сетевые вызовы держим в service/query слое;
+- не плодим дублирующие запросы;
+- используем semantic design tokens вместо случайных цветов.
 
 ## Quality gates
 
@@ -88,14 +65,13 @@ npm run build
 
 ## Repo hygiene
 
-Canonical cleanup:
+Перед PR, который готовит отгрузку:
+
+- очистить generated caches и artifacts;
+- убедиться, что нет временных файлов;
+- обновить документацию, если менялся контракт или поведение.
 
 ```powershell
 .\scripts\prepare-release.ps1
 .\scripts\prepare-release.ps1 -ApplyCleanup
 ```
-
-Перед release-oriented PR:
-- удалить generated caches и artifacts
-- убедиться, что нет временных файлов
-- обновить docs, если менялся контракт или поведение

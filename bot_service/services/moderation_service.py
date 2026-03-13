@@ -55,14 +55,19 @@ class ModerationService:
             from repositories.blocked_user_repository import BlockedUserRepository
             repo = BlockedUserRepository(db)
             
-            existing_block = repo.get_block_record(user_id, username, platform, channel_name)
+            is_blocked = repo.is_blocked(channel_name, platform, username, user_id=user_id)
 
             platform_mute_applied = False
 
-            if existing_block:
+            if is_blocked:
                 # UNMUTE
                 logger.info(f"[UNMUTE] [MODERATION] Unmuting user {username} on {platform}")
-                repo.remove_block(existing_block)
+                repo.unblock_user(
+                    channel_name=channel_name,
+                    platform=platform,
+                    username=username,
+                    user_id=user_id,
+                )
 
                 if platform == 'twitch':
                     try:
@@ -127,11 +132,11 @@ class ModerationService:
             else:
                 # MUTE
                 logger.info(f"[MUTE] [MODERATION] Muting user {username} on {platform}")
-                repo.add_block(
-                    user_id=user_id,
-                    username=username,
-                    platform=platform,
+                repo.block_user(
                     channel_name=channel_name,
+                    platform=platform,
+                    username=username,
+                    user_id=user_id,
                     blocked_by=user_id,
                     reason=reason
                 )

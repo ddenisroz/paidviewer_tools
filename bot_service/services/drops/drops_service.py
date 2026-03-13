@@ -224,3 +224,15 @@ class DropsService(DropsConfigMixin, DropsStreakMixin, DropsMythicalMixin):
             "time_remaining_minutes": int(time_remaining / 60),
             "time_remaining_formatted": f"{int(time_remaining / 60)}:{time_remaining % 60:02d}",
         }
+
+    def get_active_user_mythical_session(
+        self,
+        user_id: int,
+        channel_name: str = None,
+    ) -> Optional[Dict]:
+        """Active user-only wrapper for mythical session lookup."""
+        return self.get_active_mythical_session(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+        )

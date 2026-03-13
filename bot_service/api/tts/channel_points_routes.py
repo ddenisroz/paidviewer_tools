@@ -16,7 +16,7 @@ channel_points_router = APIRouter(prefix='/api/tts', tags=['tts-channel-points']
 
 @channel_points_router.get('/mode-settings')
 async def get_tts_mode_settings(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         repo = TTSSettingsRepository(db)
         settings = repo.get_or_create(user_id=user['id'])
@@ -37,7 +37,7 @@ async def get_tts_mode_settings(user: dict=Depends(get_current_user), db: Sessio
 
 @channel_points_router.post('/mode-settings')
 async def update_tts_mode_settings(request: UpdateTtsModeRequest, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         if request.tts_mode not in ['all_messages', 'channel_points']:
             raise HTTPException(status_code=400, detail='Invalid TTS mode')
@@ -55,7 +55,7 @@ async def update_tts_mode_settings(request: UpdateTtsModeRequest, user: dict=Dep
 
 @channel_points_router.post('/rewards/create')
 async def create_tts_reward(request: CreateTtsRewardRequest, starlette_request: Request, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         from platforms.registry import platform_registry
         if request.platform not in ['twitch', 'vk']:
@@ -93,7 +93,7 @@ async def create_tts_reward(request: CreateTtsRewardRequest, starlette_request: 
 
 @channel_points_router.delete('/rewards/{platform}')
 async def delete_tts_reward(platform: str, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         from platforms.registry import platform_registry
         if platform not in ['twitch', 'vk']:

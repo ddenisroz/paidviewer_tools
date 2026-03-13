@@ -150,6 +150,29 @@ class TestSessionManager:
         assert len(active_sessions) == 0
 
 
+    def test_cleanup_old_sessions_uses_database_hygiene_retention(self):
+        """Retention cleanup сессий должен идти через DatabaseCleanupService без legacy session cleanup."""
+        mock_db = MagicMock()
+        mock_context_manager = MagicMock()
+        mock_context_manager.__enter__.return_value = mock_db
+        mock_context_manager.__exit__.return_value = False
+
+        with patch("core.session_manager.db_session", return_value=mock_context_manager), patch(
+            "services.database_cleanup_service.DatabaseCleanupService"
+        ) as cleanup_service_cls:
+            cleanup_service = cleanup_service_cls.return_value
+            cleanup_service.cleanup_inactive_sessions.return_value = {
+                "deleted_sessions": 3,
+                "retention_days": 7,
+            }
+
+            result = session_manager.cleanup_old_sessions(days_old=7)
+
+        assert result == 3
+        cleanup_service_cls.assert_called_once_with(mock_db)
+        cleanup_service.cleanup_inactive_sessions.assert_called_once_with(days_old=7)
+
+
 class TestJWT:
     """Тесты для JWT токенов"""
 
@@ -370,5 +393,4 @@ class TestAuthIntegration:
 
         # terminate_session использует свою БД, поэтому просто проверяем что метод выполнился
         assert result is True or result is False
-
 

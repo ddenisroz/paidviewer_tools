@@ -85,21 +85,6 @@ class SessionService:
             logger.exception("Error disconnecting channel {channel_name}")
             raise
 
-    def clear_legacy_sessions(self) -> List[str]:
-        """Clear legacy test sessions."""
-        legacy_channels = ["test_channel", "75969278"]
-        cleared = []
-        try:
-            for channel in legacy_channels:
-                self.connection_manager.remove_active_session(channel, 'legacy_cleanup')
-                cleared.append(channel)
-            
-            logger.info(f"Cleared legacy sessions: {cleared}")
-            return cleared
-        except Exception:
-            logger.exception("Error clearing legacy sessions")
-            raise
-
     # === Token Management ===
 
     def get_user_tokens(self, user_id: int) -> List[Dict[str, Any]]:

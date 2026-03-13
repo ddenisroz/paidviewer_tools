@@ -19,7 +19,7 @@ router = APIRouter(prefix='/api/drops', tags=['drops'])
 DROPS_REWARDS_CACHE_TTL = 60
 
 class DropsRewardCreate(BaseModel):
-    """Text cleaned."""
+    """Маршрут API."""
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     quality_id: int = Field(..., ge=1)
@@ -31,7 +31,7 @@ class DropsRewardCreate(BaseModel):
     is_active: bool = True
 
 class DropsRewardUpdate(BaseModel):
-    """Text cleaned."""
+    """Маршрут API."""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     quality_id: Optional[int] = Field(None, ge=1)
@@ -47,7 +47,7 @@ class DropsRewardToggle(BaseModel):
     is_active: bool
 
 def sanitize_html(text: str) -> str:
-    """Text cleaned."""
+    """Маршрут API."""
     if not text:
         return text
     clean = re.compile('<.*?>')
@@ -59,7 +59,7 @@ def _reward_to_dict(reward, quality_info: dict) -> dict:
 
 @router.get('/rewards/{channel_name}')
 async def get_drops_rewards(channel_name: str, platform: str='twitch', quality: Optional[str]=None, widget_token: Optional[str]=None, current_user: dict=Depends(get_current_user_optional), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         repo = DropsRewardRepository(db)
         user_id = None
@@ -97,7 +97,7 @@ async def get_drops_rewards(channel_name: str, platform: str='twitch', quality: 
 
 @router.post('/rewards/{channel_name}')
 async def create_drops_reward(channel_name: str, reward_data: DropsRewardCreate, platform: str='twitch', current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         repo = DropsRewardRepository(db)
         quality = repo.get_quality_by_id(reward_data.quality_id)
@@ -105,7 +105,7 @@ async def create_drops_reward(channel_name: str, reward_data: DropsRewardCreate,
             available_qualities = repo.get_all_qualities()
             available_ids = [q.id for q in available_qualities]
             logger.warning(f'Quality with id {reward_data.quality_id} not found. Available: {available_ids}')
-            raise HTTPException(status_code=400, detail=f'Operation failed.{reward_data.quality_id}Operation failed.')
+            raise HTTPException(status_code=400, detail=f'Качество с id {reward_data.quality_id} не найдено')
         reward = repo.create(user_id=current_user['id'], channel_name=channel_name, platform=platform, name=sanitize_html(reward_data.name), description=sanitize_html(reward_data.description) if reward_data.description else None, quality_id=reward_data.quality_id, weight=reward_data.weight, reward_type=reward_data.reward_type, reward_value=reward_data.reward_value, image_url=reward_data.image_url, sound_volume=reward_data.sound_volume, is_active=reward_data.is_active)
         invalidate_cache(f"drops_rewards:{current_user['id']}:{channel_name}:")
         try:
@@ -125,12 +125,12 @@ async def create_drops_reward(channel_name: str, reward_data: DropsRewardCreate,
 
 @router.put('/rewards/{reward_id}')
 async def update_drops_reward(reward_id: int, reward_data: DropsRewardUpdate, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         repo = DropsRewardRepository(db)
         reward = repo.get_by_id_and_user(reward_id, current_user['id'])
         if not reward:
-            raise HTTPException(status_code=404, detail='Operation failed.')
+            raise HTTPException(status_code=404, detail='Награда не найдена')
         update_data = reward_data.model_dump(exclude_unset=True)
         if 'name' in update_data and update_data['name']:
             update_data['name'] = sanitize_html(update_data['name'])
@@ -180,12 +180,12 @@ async def toggle_drops_reward(reward_id: int, toggle_data: DropsRewardToggle, cu
 
 @router.delete('/rewards/{reward_id}')
 async def delete_drops_reward(reward_id: int, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         repo = DropsRewardRepository(db)
         reward = repo.get_by_id_and_user(reward_id, current_user['id'])
         if not reward:
-            raise HTTPException(status_code=404, detail='Operation failed.')
+            raise HTTPException(status_code=404, detail='Награда не найдена')
         channel_name = repo.delete(reward)
         invalidate_cache(f"drops_rewards:{current_user['id']}:{channel_name}:")
         try:
@@ -205,15 +205,15 @@ async def delete_drops_reward(reward_id: int, current_user: dict=Depends(get_cur
 
 @router.post('/rewards/{reward_id}/image')
 async def upload_reward_image(reward_id: int, image_file: UploadFile=File(...), current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         import os
         repo = DropsRewardRepository(db)
         reward = repo.get_by_id_and_user(reward_id, current_user['id'])
         if not reward:
-            raise HTTPException(status_code=404, detail='Operation failed.')
+            raise HTTPException(status_code=404, detail='Награда не найдена')
         if not image_file.content_type or not image_file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail='Operation failed.')
+            raise HTTPException(status_code=400, detail='Награда не найдена')
         upload_dir = f"uploads/drops/{current_user['id']}/images"
         os.makedirs(upload_dir, exist_ok=True)
         safe_source_name = Path(image_file.filename or '').name
@@ -240,13 +240,13 @@ async def upload_reward_image(reward_id: int, image_file: UploadFile=File(...), 
 
 @router.post('/rewards/{reward_id}/sound')
 async def upload_reward_sound(reward_id: int, sound_file: UploadFile=File(...), current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         import os
         repo = DropsRewardRepository(db)
         reward = repo.get_by_id_and_user(reward_id, current_user['id'])
         if not reward:
-            raise HTTPException(status_code=404, detail='Operation failed.')
+            raise HTTPException(status_code=404, detail='Награда не найдена')
         from validators.file_validators import validate_sound_file
         validate_sound_file(sound_file)
         upload_dir = f"uploads/sounds/{current_user['id']}"
@@ -262,7 +262,7 @@ async def upload_reward_sound(reward_id: int, sound_file: UploadFile=File(...), 
             buffer.write(content)
         repo.update_sound(reward, file_path)
         invalidate_cache(f"drops_rewards:{current_user['id']}:{reward.channel_name}:")
-        return {'success': True, 'message': 'Звук загружен', 'data': {'sound_file': file_path, 'filename': filename}}
+        return {'success': True, 'message': 'Р—РІСѓРє Р·Р°РіСЂСѓР¶РµРЅ', 'data': {'sound_file': file_path, 'filename': filename}}
     except HTTPException:
         raise
     except Exception:

@@ -1,22 +1,23 @@
-"""Text cleaned."""
+"""Service for managing the YouTube queue. Uses YouTubeQueueRepository and PointsRepository."""
+
 import asyncio
 import logging
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 from sqlalchemy.orm import Session
-from core.database import YouTubeQueue, ChannelPoints, PointsTransaction, get_db
+
+from core.database import ChannelPoints, PointsTransaction, YouTubeQueue, get_db
 from core.datetime_utils import utcnow_naive
-from repositories.youtube_queue_repository import YouTubeQueueRepository
 from repositories.points_repository import PointsRepository
+from repositories.youtube_queue_repository import YouTubeQueueRepository
 from utils.websocket_broadcast import broadcast_youtube_queue_update
+
 from .youtube_service import YouTubeService
-logger = logging.getLogger('bot_service')
+
+logger = logging.getLogger("bot_service")
+
 
 class QueueService:
-    """
-    Сервис для управления очередью YouTube видео.
-    Использует YouTubeQueueRepository и PointsRepository.
-    """
-
     def __init__(self, connection_manager=None):
         self.youtube_service = YouTubeService()
         self.connection_manager = connection_manager
@@ -38,8 +39,52 @@ class QueueService:
             return
         loop.create_task(broadcast_youtube_queue_update(user_id))
 
+    @staticmethod
+    def _normalize_scope_args(
+        user_id: int | None = None,
+        session_id: str | Session | None = None,
+        db: Session | None = None,
+    ) -> tuple[int | None, str | None, Session | None]:
+        """
+        Normalize legacy queue scope arguments.
+
+        Some older callers still pass ``get_queue(user_id, db)`` positionally.
+        Keep that path working while active runtime moves to explicit user-only methods.
+        """
+        if db is None and isinstance(session_id, Session):
+            db = session_id
+            session_id = None
+        return (user_id, session_id, db)
+
+    async def add_video_to_user_queue(
+        self,
+        user_id: int,
+        video_url: str,
+        channel_name: str | None = None,
+        platform: str | None = None,
+        requester_name: str | None = None,
+        requester_id: str | None = None,
+        is_paid: bool = False,
+        points_cost: int | None = None,
+        db: Session | None = None,
+    ) -> Dict[str, Any]:
+        """Active user-only queue path for dashboard and bot commands."""
+        return await self.add_video_to_queue(
+            user_id=user_id,
+            session_id=None,
+            video_url=video_url,
+            channel_name=channel_name,
+            platform=platform,
+            requester_name=requester_name,
+            requester_id=requester_id,
+            is_paid=is_paid,
+            points_cost=points_cost,
+            db=db,
+        )
+
     async def add_video_to_queue(self, user_id: int=None, session_id: str=None, video_url: str=None, channel_name: str=None, platform: str=None, requester_name: str=None, requester_id: str=None, is_paid: bool=False, points_cost: int=None, db: Session=None) -> Dict[str, Any]:
         """Добавление видео в очередь"""
+        user_id, session_id, db = self._normalize_scope_args(user_id=user_id, session_id=session_id, db=db)
         if db is None:
             db = next(get_db())
             should_close = True
@@ -80,7 +125,7 @@ class QueueService:
                 return {'success': False, 'error': 'Видео недоступно или удалено. Проверьте ссылку и попробуйте снова'}
             banned = queue_repo.get_banned_by_video_id(video_id=video_info['video_id'], user_id=user_id, session_id=session_id)
             if banned:
-                return {'success': False, 'error': 'Video is banned for this channel.'}
+                return {'success': False, 'error': '??? ????? ????????????? ??? ????? ??????.'}
             existing = queue_repo.get_pending_by_video_id(video_id=video_info['video_id'], user_id=user_id, session_id=session_id)
             if existing:
                 return {'success': False, 'error': 'Это видео уже есть в очереди! Выберите другое видео'}
@@ -112,7 +157,7 @@ class QueueService:
 
     async def add_video(self, user_id: int, url: str, requested_by: str, requester_id: str=None, platform: str=None, channel_name: str=None, is_paid: bool=False, points_cost: int=None, db: Session=None) -> Dict[str, Any]:
         """Backward-compatible wrapper for adding a video to the queue."""
-        return await self.add_video_to_queue(user_id=user_id, session_id=None, video_url=url, channel_name=channel_name, platform=platform, requester_name=requested_by, requester_id=requester_id, is_paid=is_paid, points_cost=points_cost, db=db)
+        return await self.add_video_to_user_queue(user_id=user_id, video_url=url, channel_name=channel_name, platform=platform, requester_name=requested_by, requester_id=requester_id, is_paid=is_paid, points_cost=points_cost, db=db)
 
     async def _deduct_points(self, user_id: int, viewer_id: str, viewer_name: str, platform: str, channel_name: str, cost: int, reason: str, db: Session) -> Dict[str, Any]:
         """Списание баллов за заказ с защитой от race condition"""
@@ -132,9 +177,13 @@ class QueueService:
             db.rollback()
             logger.exception('Error deducting points')
             return {'success': False, 'error': 'Ошибка списания баллов'}
+    def get_user_queue(self, user_id: int, db: Session=None) -> List[Dict[str, Any]]:
+        """Active user-only queue path for dashboard and bot commands."""
+        return self.get_queue(user_id=user_id, session_id=None, db=db)
 
     def get_queue(self, user_id: int=None, session_id: str=None, db: Session=None) -> List[Dict[str, Any]]:
-        """Получение очереди видео"""
+        """Get queue items for a user or legacy session scope."""
+        user_id, session_id, db = self._normalize_scope_args(user_id=user_id, session_id=session_id, db=db)
         if db is None:
             db = next(get_db())
             should_close = True

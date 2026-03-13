@@ -16,6 +16,112 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
     def __init__(self, db: Session):
         super().__init__(DropsHistory, db)
 
+    @staticmethod
+    def _owner_scope_filters(model, user_id: int = None, session_id: str = None) -> list[object]:
+        """Build user/session owner filters for legacy-compatible tables."""
+        filters: list[object] = []
+        if user_id is not None:
+            filters.append(model.user_id == user_id)
+        elif session_id is not None:
+            filters.append(model.session_id == session_id)
+        return filters
+
+    def get_user_streak_for_user_update(
+        self,
+        viewer_id: str,
+        channel_name: str,
+        platform: str,
+        user_id: int,
+    ) -> Optional[UserStreak]:
+        """Get user streak with lock for active user-only runtime."""
+        return self.get_user_streak_for_update(
+            viewer_id=viewer_id,
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=None,
+        )
+
+    def get_user_streak_for_user(
+        self,
+        viewer_id: str,
+        channel_name: str,
+        platform: str,
+        user_id: int,
+    ) -> Optional[UserStreak]:
+        """Get user streak for active user-only runtime."""
+        return self.get_user_streak(
+            viewer_id=viewer_id,
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=None,
+        )
+
+    def get_history_for_user(
+        self,
+        channel_name: str,
+        platform: str,
+        user_id: int,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[DropsHistory]:
+        """Get drops history for a concrete user-owned channel."""
+        return self.get_history(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=None,
+            limit=limit,
+            offset=offset,
+        )
+
+    def count_drops_for_user(
+        self,
+        channel_name: str,
+        platform: str,
+        user_id: int,
+        lootbox_type: str = None,
+        after_date=None,
+    ) -> int:
+        """Count drops for active user-only runtime."""
+        return self.count_drops(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=None,
+            lootbox_type=lootbox_type,
+            after_date=after_date,
+        )
+
+    def count_legendary_drops_for_user(
+        self,
+        channel_name: str,
+        platform: str,
+        user_id: int,
+    ) -> int:
+        """Count legendary drops for a user-owned channel."""
+        return self.count_legendary_drops(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=None,
+        )
+
+    def get_active_mythical_session_for_user(
+        self,
+        channel_name: str,
+        now_time,
+        user_id: int,
+    ):
+        """Get active mythical session for active user-only runtime."""
+        return self.get_active_mythical_session(
+            channel_name=channel_name,
+            now_time=now_time,
+            user_id=user_id,
+            session_id=None,
+        )
+
     # === UserStreak ===
 
     def get_user_streak_for_update(
@@ -33,12 +139,10 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
             UserStreak.platform == platform,
         ]
 
-        if user_id:
-            filters.append(UserStreak.user_id == user_id)
-        elif session_id:
-            filters.append(UserStreak.session_id == session_id)
-        else:
+        owner_filters = self._owner_scope_filters(UserStreak, user_id=user_id, session_id=session_id)
+        if not owner_filters:
             return None
+        filters.extend(owner_filters)
 
         return (
             self.db.query(UserStreak).filter(and_(*filters)).with_for_update().first()
@@ -59,12 +163,10 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
             UserStreak.platform == platform,
         ]
 
-        if user_id:
-            filters.append(UserStreak.user_id == user_id)
-        elif session_id:
-            filters.append(UserStreak.session_id == session_id)
-        else:
+        owner_filters = self._owner_scope_filters(UserStreak, user_id=user_id, session_id=session_id)
+        if not owner_filters:
             return None
+        filters.extend(owner_filters)
 
         return self.db.query(UserStreak).filter(and_(*filters)).first()
 
@@ -137,12 +239,10 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
             DropsHistory.channel_name == channel_name, DropsHistory.platform == platform
         )
 
-        if user_id:
-            query = query.filter(DropsHistory.user_id == user_id)
-        elif session_id:
-            query = query.filter(DropsHistory.session_id == session_id)
-        else:
+        owner_filters = self._owner_scope_filters(DropsHistory, user_id=user_id, session_id=session_id)
+        if not owner_filters:
             return []  # Requirement from service logic
+        query = query.filter(and_(*owner_filters))
 
         return (
             query.order_by(desc(DropsHistory.created_at))
@@ -163,11 +263,9 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
         query = self.db.query(func.count(DropsHistory.id)).filter(
             DropsHistory.channel_name == channel_name, DropsHistory.platform == platform
         )
-
-        if user_id:
-            query = query.filter(DropsHistory.user_id == user_id)
-        elif session_id:
-            query = query.filter(DropsHistory.session_id == session_id)
+        owner_filters = self._owner_scope_filters(DropsHistory, user_id=user_id, session_id=session_id)
+        if owner_filters:
+            query = query.filter(and_(*owner_filters))
 
         if lootbox_type:
             query = query.filter(DropsHistory.lootbox_type == lootbox_type)
@@ -208,10 +306,9 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
                 DropsQuality.name == "Legendary",
             )
         )
-        if user_id:
-            query = query.filter(DropsHistory.user_id == user_id)
-        elif session_id:
-            query = query.filter(DropsHistory.session_id == session_id)
+        owner_filters = self._owner_scope_filters(DropsHistory, user_id=user_id, session_id=session_id)
+        if owner_filters:
+            query = query.filter(and_(*owner_filters))
         return query.scalar() or 0
 
     def get_top_viewers(
@@ -285,12 +382,14 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
             MythicalDropsSession.expires_at > now_time,
         )
 
-        if user_id:
-            query = query.filter(MythicalDropsSession.user_id == user_id)
-        elif session_id:
-            query = query.filter(MythicalDropsSession.session_id == session_id)
-        else:
+        owner_filters = self._owner_scope_filters(
+            MythicalDropsSession,
+            user_id=user_id,
+            session_id=session_id,
+        )
+        if not owner_filters:
             return None
+        query = query.filter(and_(*owner_filters))
 
         return query.first()
 

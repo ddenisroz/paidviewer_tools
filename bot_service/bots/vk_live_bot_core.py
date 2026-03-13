@@ -285,7 +285,7 @@ class VKLiveBotCore:
 
                         # Увеличиваем счетчик только если стрик включен
                         if streak_enabled:
-                            drops_service.increment_viewer_message_count(
+                            drops_service.increment_viewer_message_count_for_user(
                                 user_id=channel_owner.id,
                                 channel_name=channel_id.lower(),
                                 platform="vk",
@@ -295,7 +295,7 @@ class VKLiveBotCore:
 
                             # [OK] Обрабатываем стрик Drops (проверяем награды)
                             try:
-                                result = drops_service.process_streak_drops(
+                                result = drops_service.process_streak_drops_for_user(
                                     user_id=channel_owner.id,
                                     channel_name=channel_id.lower(),
                                     platform="vk",

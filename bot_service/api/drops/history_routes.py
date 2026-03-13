@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/drops', tags=['drops'])
 
 class DropsOpenRequest(BaseModel):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     drops_type: str = Field(..., pattern='^(streak|donation|mythical)$')
     viewer_id: str = Field(..., min_length=1, max_length=100)
     viewer_name: str = Field(..., min_length=1, max_length=100)
@@ -25,7 +25,7 @@ class DropsOpenRequest(BaseModel):
     messages_count: Optional[int] = Field(None, ge=0)
 
 def get_user_id(current_user: dict) -> int:
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     if not current_user:
         return None
     user_id = current_user.get('id')
@@ -40,7 +40,7 @@ def get_drops_service(db: Session):
 
 @router.get('/qualities')
 async def get_drops_qualities(db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         service = get_drops_service(db)
         qualities = service.get_all_qualities()
@@ -53,7 +53,7 @@ async def get_drops_qualities(db: Session=Depends(get_db)):
 
 @router.get('/history/{channel_name}')
 async def get_drops_history(channel_name: str, platform: Optional[str]=None, viewer: Optional[str]=None, reward: Optional[str]=None, drops_type: Optional[str]=None, date_from: Optional[str]=None, date_to: Optional[str]=None, limit: int=50, offset: int=0, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         service = get_drops_service(db)
         history = service.get_drops_history(user_id=current_user['id'], channel_name=channel_name, platform=platform or 'twitch', limit=limit, offset=offset)
@@ -107,7 +107,7 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
             raise HTTPException(status_code=404, detail='Operation failed.')
         quality_name = None
         if request.drops_type == 'streak':
-            streak = drops_service.get_user_streak(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, viewer_id=request.viewer_id)
+            streak = drops_service.get_user_streak_for_user(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, viewer_id=request.viewer_id)
             if not streak or streak.current_streak < config.streak_days_common:
                 raise HTTPException(status_code=400, detail=f'Insufficient streak for drop. Required at least {config.streak_days_common} days.')
             if streak.current_streak >= config.streak_days_legendary:
@@ -160,7 +160,7 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
 
 @router.get('/stats/{channel_name}')
 async def get_drops_stats(channel_name: str, platform: str='twitch', current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         service = get_drops_service(db)
         stats = service.get_full_channel_stats(user_id=current_user['id'], channel_name=channel_name, platform=platform)
@@ -173,13 +173,13 @@ async def get_drops_stats(channel_name: str, platform: str='twitch', current_use
 
 @router.get('/streaks/{channel_name}')
 async def get_user_streaks(channel_name: str, platform: Optional[str]=None, limit: int=50, offset: int=0, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
         if not user_id:
             raise HTTPException(status_code=401, detail='Authentication required')
-        config = service.get_config(user_id=user_id, session_id=current_user.get('session_id'), channel_name=channel_name, platform=None)
+        config = service.get_user_config(user_id=user_id, channel_name=channel_name, platform=None)
         streak_enabled = False
         if config:
             streak_enabled = getattr(config, 'streak_enabled_twitch', False) or getattr(config, 'streak_enabled_vk', False)
@@ -195,17 +195,17 @@ async def get_user_streaks(channel_name: str, platform: Optional[str]=None, limi
 
 @router.post('/streak/reset/{channel_name}')
 async def reset_streak_statistics(channel_name: str, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
         if not user_id:
             raise HTTPException(status_code=401, detail='Authentication required')
-        config = service.get_config(user_id=user_id, session_id=current_user.get('session_id'), channel_name=channel_name, platform=None)
+        config = service.get_user_config(user_id=user_id, channel_name=channel_name, platform=None)
         if not config:
             raise HTTPException(status_code=404, detail='Operation failed.')
         deleted_count = service.reset_channel_streaks(user_id=user_id, channel_name=channel_name)
-        drops_logger.info(f'Text cleaned.{deleted_count}Text cleaned.{channel_name}')
+        drops_logger.info(f'...{deleted_count}...{channel_name}')
         return {'success': True, 'message': 'Operation completed.', 'data': {'channel_name': channel_name, 'platform': 'all', 'deleted_count': deleted_count}}
     except HTTPException:
         raise
@@ -216,7 +216,7 @@ async def reset_streak_statistics(channel_name: str, current_user: dict=Depends(
 
 @router.get('/mythical-session/{channel_name}')
 async def get_active_mythical_session(channel_name: str, widget_token: Optional[str]=None, current_user: Optional[dict]=Depends(get_current_user_optional), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         service = get_drops_service(db)
         if widget_token:
@@ -224,13 +224,11 @@ async def get_active_mythical_session(channel_name: str, widget_token: Optional[
             if not config:
                 raise HTTPException(status_code=404, detail='Invalid widget token')
             user_id = config.user_id
-            session_id = config.session_id
         elif current_user:
             user_id = current_user.get('id')
-            session_id = current_user.get('session_id')
         else:
             raise HTTPException(status_code=401, detail='Authentication required')
-        session_data = service.get_active_mythical_session(user_id=user_id, session_id=session_id, channel_name=channel_name)
+        session_data = service.get_active_user_mythical_session(user_id=user_id, channel_name=channel_name)
         return {'success': True, 'data': session_data}
     except HTTPException:
         raise

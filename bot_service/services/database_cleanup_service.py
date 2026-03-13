@@ -78,6 +78,14 @@ class DatabaseCleanupService:
         """Delete orphaned user-owned rows that reference missing users."""
         return self.cleanup_core.cleanup_orphan_user_records()
 
+    def preview_legacy_session_records(self) -> Dict[str, Any]:
+        """Preview legacy session-scoped rows in active user-only tables."""
+        return self.cleanup_core.preview_legacy_session_records()
+
+    def cleanup_legacy_session_records(self) -> Dict[str, Any]:
+        """Delete legacy session-scoped rows in active user-only tables."""
+        return self.cleanup_core.cleanup_legacy_session_records()
+
     def preview_inactive_session_cleanup(self, days_old: int = 7) -> Dict[str, int]:
         """Preview inactive sessions eligible for retention cleanup."""
         return self.cleanup_core.preview_inactive_session_cleanup(days_old)

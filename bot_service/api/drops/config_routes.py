@@ -19,7 +19,7 @@ def _build_config_response(config) -> dict:
     return {'success': True, 'data': {'id': config.id, 'channel_name': config.channel_name, 'platform': config.platform, 'streak_days_common': config.streak_days_common, 'streak_days_rare': config.streak_days_rare, 'streak_days_epic': config.streak_days_epic, 'streak_days_legendary': config.streak_days_legendary, 'streak_messages_required': config.streak_messages_required, 'streak_reset_on_skip': streak_reset_on_skip, 'streak_enabled_twitch': streak_enabled_twitch, 'streak_enabled_vk': streak_enabled_vk, 'donation_enabled': config.donation_enabled, 'donation_amount_common': config.donation_amount_common, 'donation_amount_rare': config.donation_amount_rare, 'donation_amount_epic': config.donation_amount_epic, 'donation_amount_legendary': config.donation_amount_legendary, 'mythical_enabled': config.mythical_enabled, 'mythical_min_interval_hours': config.mythical_min_interval_hours, 'mythical_max_interval_hours': config.mythical_max_interval_hours, 'mythical_window_duration_minutes': config.mythical_window_duration_minutes, 'mythical_donation_amount': config.mythical_donation_amount, 'mythical_last_appeared': config.mythical_last_appeared, 'widget_spinning_duration_ms': config.widget_spinning_duration_ms, 'widget_opening_duration_ms': config.widget_opening_duration_ms, 'widget_result_duration_ms': config.widget_result_duration_ms, 'widget_closing_duration_ms': config.widget_closing_duration_ms, 'widget_token': widget_token_val, 'created_at': config.created_at, 'updated_at': config.updated_at}}
 
 class DropsConfigCreate(BaseModel):
-    """Text cleaned."""
+    """Маршрут API."""
     channel_name: str = Field(..., min_length=1, max_length=100)
     platform: str = Field(..., pattern='^(twitch|vk)$')
     streak_enabled: bool = True
@@ -40,7 +40,7 @@ class DropsConfigCreate(BaseModel):
     mythical_donation_amount: float = Field(2000.0, ge=0.01, le=1000000)
 
 class DropsConfigUpdate(BaseModel):
-    """Text cleaned."""
+    """Маршрут API."""
     streak_days_common: Optional[int] = Field(None, ge=1, le=365)
     streak_days_rare: Optional[int] = Field(None, ge=1, le=365)
     streak_days_epic: Optional[int] = Field(None, ge=1, le=365)
@@ -66,7 +66,7 @@ class DropsConfigUpdate(BaseModel):
     widget_closing_duration_ms: Optional[int] = Field(None, ge=200, le=2000)
 
 def get_user_id(current_user: dict) -> int:
-    """Text cleaned."""
+    """Маршрут API."""
     if not current_user:
         return None
     user_id = current_user.get('id')
@@ -76,13 +76,11 @@ def get_user_id(current_user: dict) -> int:
 
 @router.get('/config/{channel_name}')
 async def get_drops_config(channel_name: str, platform: Optional[str]=None, widget_token: Optional[str]=None, current_user: dict=Depends(get_current_user_optional), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         user_id = None
-        session_id = None
         if current_user and current_user.get('id'):
             user_id = get_user_id(current_user)
-            session_id = current_user.get('session_id')
         elif widget_token:
             from repositories.drops_reward_repository import DropsRewardRepository
             drops_repo = DropsRewardRepository(db)
@@ -100,9 +98,18 @@ async def get_drops_config(channel_name: str, platform: Optional[str]=None, widg
             cache_key = f'{cache_key}:token:{widget_token}'
 
         def _load_config():
-            config = drops_service.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+            config = drops_service.get_user_config(
+                user_id=user_id,
+                channel_name=channel_name,
+                platform=platform,
+            )
             if not config:
-                config = drops_service.create_or_update_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, config_data={})
+                config = drops_service.create_or_update_user_config(
+                    user_id=user_id,
+                    channel_name=channel_name,
+                    platform=platform,
+                    config_data={},
+                )
             return _build_config_response(config)
         return get_cached(cache_key, _load_config, ttl=DROP_CONFIG_CACHE_TTL)
     except HTTPException:
@@ -113,21 +120,34 @@ async def get_drops_config(channel_name: str, platform: Optional[str]=None, widg
 
 @router.put('/config/{channel_name}')
 async def update_drops_config(channel_name: str, config_data: DropsConfigUpdate, platform: Optional[str]=None, current_user: dict=Depends(get_current_user_optional), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Маршрут API."""
     try:
         if not current_user:
             raise HTTPException(status_code=401, detail='Not authenticated')
         user_id = get_user_id(current_user)
-        session_id = current_user.get('session_id')
         if not user_id:
             raise HTTPException(status_code=401, detail='Authentication required')
         from services.drops.drops_service import DropsService
         drops_service = DropsService(db)
-        config = drops_service.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
+        config = drops_service.get_user_config(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=platform,
+        )
         if not config:
-            config = drops_service.create_or_update_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, config_data={})
+            config = drops_service.create_or_update_user_config(
+                user_id=user_id,
+                channel_name=channel_name,
+                platform=platform,
+                config_data={},
+            )
         update_data = config_data.dict(exclude_unset=True)
-        config = drops_service.create_or_update_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, config_data=update_data)
+        config = drops_service.create_or_update_user_config(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=platform,
+            config_data=update_data,
+        )
         try:
             from services.memory_websocket_manager import get_memory_websocket_manager
             if user_id and user_id != -1:

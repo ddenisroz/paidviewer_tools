@@ -338,7 +338,7 @@ class Bot(TwitchBotCore):
                 return
             
             # Обрабатываем стрик Drops
-            result = self.drops_service.process_streak_drops(
+            result = self.drops_service.process_streak_drops_for_user(
                 user_id=user_id,
                 channel_name=message.channel.name,
                 platform='twitch',
@@ -424,5 +424,4 @@ class Bot(TwitchBotCore):
             logger.info("[BOT] Twitch bot shutdown complete")
         except Exception as e:
             logger.error(f"[ERROR] Error during bot shutdown: {e}")
-
 

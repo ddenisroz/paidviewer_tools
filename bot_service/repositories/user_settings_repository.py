@@ -1,8 +1,5 @@
 # bot_service/repositories/user_settings_repository.py
-"""
-Repository for UserSettings CRUD operations.
-Handles settings for authenticated users and legacy session-scoped records.
-"""
+"""Repository for authenticated user settings."""
 from typing import Optional, Dict, Any, List
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -21,8 +18,8 @@ class UserSettingsRepository(BaseRepository[UserSettings]):
 
     def get_by_filters(self, filters: Dict[str, Any]) -> Optional[UserSettings]:
         """
-        Get settings by generic filters (e.g. from UserIdentityService).
-        Example filters: {'user_id': 1} or {'session_id': 'abc'}
+        Get settings by generic filters.
+        Used for authenticated user lookups and channel-scoped discovery.
         """
         return self.db.query(UserSettings).filter_by(**filters).first()
 
@@ -51,15 +48,8 @@ class UserSettingsRepository(BaseRepository[UserSettings]):
             func.lower(User.twitch_username) == normalized
         ).first()
 
-    def get_by_session_id(self, session_id: str) -> Optional[UserSettings]:
-        """Get settings by legacy session ID."""
-        return self.db.query(UserSettings).filter(UserSettings.session_id == session_id).first()
-
     def create_default(self, user_data: Dict[str, Any]) -> UserSettings:
-        """
-        Create default settings for an authenticated user or legacy session scope.
-        user_data should contain 'user_id' or 'session_id'.
-        """
+        """Create default settings for an authenticated user."""
         settings = UserSettings(**user_data)
         self.db.add(settings)
         self.db.commit()

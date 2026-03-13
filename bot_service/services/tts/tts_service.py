@@ -284,7 +284,6 @@ class TTSService:
 
             payload = dict(kwargs)
             payload.pop("user_id", None)
-            payload.pop("session_id", None)
             payload.pop("client_version", None)
 
             # Update
@@ -321,16 +320,15 @@ class TTSService:
 
     # === Blocked Users ===
     
-    async def get_blocked_users(self, user_id: Optional[int] = None, session_id: Optional[str] = None) -> List[dict]:
-        return self.blocked_user_repo.get_blocked_list(user_id=user_id, session_id=session_id)
+    async def get_blocked_users(self, user_id: int) -> List[dict]:
+        return self.blocked_user_repo.get_blocked_list(user_id=user_id)
         
     async def block_user(
         self,
-        user_id: Optional[int],
+        user_id: int,
         channel_name: str,
         platform: str,
         username: str,
-        session_id: Optional[str] = None,
     ) -> bool:
         normalized_username = self.normalize_blocked_username(username)
 
@@ -339,23 +337,20 @@ class TTSService:
             platform=platform, 
             username=normalized_username, 
             user_id=user_id,
-            session_id=session_id,
         ) is not None
         
     async def unblock_user(
         self,
-        user_id: Optional[int],
+        user_id: int,
         channel_name: str,
         platform: str,
         username: str,
-        session_id: Optional[str] = None,
     ) -> bool:
         return self.blocked_user_repo.unblock_user(
             channel_name=channel_name, 
             platform=platform, 
             username=username, 
             user_id=user_id,
-            session_id=session_id,
         )
 
     # === TTS Status ===

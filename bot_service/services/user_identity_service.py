@@ -48,10 +48,7 @@ class UserIdentityService:
 
     @staticmethod
     def create_settings_record_data(user: Dict[str, Any]) -> Dict[str, Any]:
-        return {
-            "user_id": UserIdentityService._require_user_id(user),
-            "session_id": None,
-        }
+        return {"user_id": UserIdentityService._require_user_id(user)}
 
     @staticmethod
     def get_websocket_user_id(user: Dict[str, Any]) -> str:

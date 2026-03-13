@@ -1,14 +1,14 @@
-# Developer onboarding
+# Онбординг разработчика
 
-Этот документ нужен для первого продуктивного дня в репозитории.
+Это короткий маршрут первого продуктивного дня в репозитории.
 
 ## Что читать по порядку
 
-1. `README.md`
-2. `docs/QUICKSTART.md`
-3. `docs/REPO_STRUCTURE.md`
-4. `docs/architecture/ARCHITECTURE_GUIDE.md`
-5. `docs/guides/DEVELOPER_GUIDE.md`
+1. [README.md](../../README.md)
+2. [docs/QUICKSTART.md](../QUICKSTART.md)
+3. [docs/REPO_STRUCTURE.md](../REPO_STRUCTURE.md)
+4. [docs/PROJECT_CONTEXT.md](../PROJECT_CONTEXT.md)
+5. [docs/guides/DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md)
 
 ## Локальная настройка
 
@@ -36,18 +36,10 @@ npm run dev
 
 ## Что проверить после старта
 
-- backend docs: `http://localhost:8000/docs`
+- backend: `http://localhost:8000/docs`
 - frontend: `http://localhost:5173`
 - backend tests: `cd bot_service; pytest -q`
 - frontend checks: `cd frontend; npm run lint; npm run type-check`
-
-## Ключевые runtime-контракты
-
-- User OAuth entrypoints: `/auth/twitch/login`, `/auth/vk/login`
-- User OAuth callbacks: `/auth/twitch/callback`, `/auth/vk/callback`
-- session auth использует cookie `session_id`
-- admin authority идёт из `users.role = 'admin'`
-- real-time sync использует WebSocket, а не SSE
 
 ## Чеклист первой правки
 
@@ -59,7 +51,7 @@ npm run dev
 
 ## Частые ошибки
 
-- не возвращай guest/anonymous auth flows
-- не доверяй auth-данным из client path/query
-- не хардкодь локальные URL и порты
-- не коммить кэш, build output и временные файлы
+- не возвращать guest mode;
+- не доверять auth-данным из client path или query;
+- не хардкодить локальные URL и порты;
+- не коммитить кэши, build output и временные файлы.

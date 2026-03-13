@@ -1,66 +1,68 @@
-# Architecture guide
+# Архитектурный обзор
 
 ## Обзор
 
-Runtime-зоны проекта:
+Основные зоны проекта:
 
-- `frontend` — React + Vite UI, который общается только с `bot_service`
-- `bot_service` — control plane: auth, permissions, settings, routing policy, fallback, websocket delivery
-- `tts-gateway` — advanced synthesis orchestrator для `f5` и `qwen`
-- внешние provider engines:
+- `frontend` — React + Vite UI, который общается только с `bot_service`;
+- `bot_service` — центральный backend: auth, permissions, settings, routing policy, fallback, websocket delivery;
+- `tts-gateway` — orchestrator синтеза для `f5` и `qwen`;
+- внешние TTS-движки:
   - `f5-tts-service`
   - `nano-qwen3tts-vllm`
 
 ## Термины topology
 
-- `self-hosted endpoint` — пользователь сам поднимает TTS-сервис и настраивает URL через `local_tts_endpoints`
-- `project-hosted worker` — отдельный runtime-воркер проекта
-- `gateway-managed` — `bot_service -> tts-gateway -> project-hosted workers`
+- `self-hosted endpoint` — пользователь сам поднимает TTS-сервис и настраивает URL через `local_tts_endpoints`;
+- `project-hosted worker` — отдельный runtime-воркер проекта;
+- `gateway-managed` — `bot_service -> tts-gateway -> project-hosted workers`.
 
-Названия `local`, `use_local`, `f5_local`, `qwen_local` остаются как legacy naming для self-hosted path.
+Названия `local`, `use_local`, `f5_local`, `qwen_local` пока сохраняются как старые имена для self-hosted path.
 
-## Модель TTS routing
+## Маршрутизация TTS
 
-- `gcloud` — встроенный backend path в `bot_service`
-- `f5` — gateway-managed synth, direct project-hosted fallback при необходимости, self-hosted optional
-- `qwen` — gateway-managed synth в managed mode, self-hosted через compatibility adapter
-- voice/admin API остаются provider-owned
+- `gcloud` — встроенный путь в `bot_service`;
+- `f5` — сначала gateway-managed synth, прямой project-hosted fallback при необходимости, self-hosted optional;
+- `qwen` — gateway-managed synth в управляемом режиме, self-hosted через слой совместимости;
+- voice/admin API остаются на стороне провайдера.
 
 ## Границы сервисов
 
-- `bot_service` — source of truth для пользовательских настроек и runtime policy
-- `tts-gateway` — только orchestration, без владения app user settings
-- `f5-tts-service` — F5 runtime и voice/admin операции
-- `nano-qwen3tts-vllm` — Qwen inference runtime
+- `bot_service` — основной источник истины для пользовательских настроек и runtime policy;
+- `tts-gateway` — только orchestration, без владения пользовательскими настройками приложения;
+- `f5-tts-service` — F5 runtime и voice/admin операции;
+- `nano-qwen3tts-vllm` — Qwen inference runtime.
 
-## Auth для TTS upstreams
+## Авторизация для TTS upstreams
 
-Используется strict API-key mode:
+Используется строгий режим API-key:
 
 - `Authorization: Bearer <key>`
 - `X-API-Key: <key>`
 
 Backend env-контракт:
+
 - `TTS_GATEWAY_URL`, `TTS_GATEWAY_API_KEY`
 - `F5_TTS_SERVICE_URL`, `F5_TTS_SERVICE_API_KEY`
 - `QWEN_TTS_SERVICE_URL`, `QWEN_TTS_SERVICE_API_KEY`
 - `QWEN_VOICE_SERVICE_URL`
 
-## Public backend surface
+## Публичный backend-контракт
 
 - `GET /api/tts/health?provider=f5|qwen|gcloud`
 - `GET /api/voices/providers/capabilities`
-- существующие voice/admin routes сохраняют path stability
+- существующие voice/admin routes сохраняют стабильные пути
 
-## Frontend boundary
+## Граница frontend
 
-- frontend не должен знать прямые provider URLs
-- direct runtime dependency on `VITE_TTS_SERVICE_URL` удалена
-- health/capabilities/audio URL resolution идут через backend
+- frontend не должен знать прямые provider URLs;
+- прямая runtime-зависимость от `VITE_TTS_SERVICE_URL` удалена;
+- health, capabilities и audio URL resolution идут через backend.
 
-## Deployment notes
+## Деплой
 
 Рекомендуемые локальные порты:
+
 - gateway `8010`
 - f5 `8011`
 - qwen `8000`

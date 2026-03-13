@@ -27,6 +27,187 @@ class DropsConfigMixin:
         from repositories.drops_reward_repository import DropsRewardRepository
         return DropsRewardRepository(self.db)
 
+    def get_user_config(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = None,
+    ) -> Optional[DropsConfig]:
+        """Получает конфигурацию Drops для авторизованного пользователя."""
+        target_platform = platform or "global"
+        repo = self._get_config_repo()
+
+        config = repo.get_by_user_channel_platform(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=target_platform,
+        )
+
+        if not config and not platform:
+            return self._create_global_config_from_user_configs(user_id, channel_name)
+
+        return config
+
+    def _create_global_config_from_user_configs(
+        self,
+        user_id: int,
+        channel_name: str = None,
+    ) -> Optional[DropsConfig]:
+        """Создаёт global-конфиг из существующих twitch/vk конфигов пользователя."""
+        repo = self._get_config_repo()
+        existing_configs = repo.get_existing_configs_for_user_compat(
+            channel_name=channel_name,
+            user_id=user_id,
+        )
+
+        if existing_configs:
+            base_config = next((c for c in existing_configs if c.platform == "twitch"), existing_configs[0])
+
+            streak_enabled_twitch = any(
+                getattr(c, "streak_enabled_twitch", getattr(c, "streak_enabled", False))
+                for c in existing_configs
+                if c.platform == "twitch"
+            )
+            streak_enabled_vk = any(
+                getattr(c, "streak_enabled_vk", getattr(c, "streak_enabled", False))
+                for c in existing_configs
+                if c.platform == "vk"
+            )
+
+            config = DropsConfig(
+                user_id=user_id,
+                channel_name=channel_name,
+                platform="global",
+                streak_days_common=base_config.streak_days_common,
+                streak_days_rare=base_config.streak_days_rare,
+                streak_days_epic=base_config.streak_days_epic,
+                streak_days_legendary=base_config.streak_days_legendary,
+                streak_messages_required=base_config.streak_messages_required,
+                streak_reset_on_skip=getattr(base_config, "streak_reset_on_skip", True),
+                streak_enabled_twitch=streak_enabled_twitch,
+                streak_enabled_vk=streak_enabled_vk,
+                donation_enabled=base_config.donation_enabled,
+                donation_amount_common=base_config.donation_amount_common,
+                donation_amount_rare=base_config.donation_amount_rare,
+                donation_amount_epic=base_config.donation_amount_epic,
+                donation_amount_legendary=base_config.donation_amount_legendary,
+                mythical_enabled=base_config.mythical_enabled,
+                mythical_min_interval_hours=base_config.mythical_min_interval_hours,
+                mythical_max_interval_hours=base_config.mythical_max_interval_hours,
+                mythical_window_duration_minutes=base_config.mythical_window_duration_minutes,
+                mythical_donation_amount=base_config.mythical_donation_amount,
+                widget_spinning_duration_ms=getattr(base_config, "widget_spinning_duration_ms", 1500),
+                widget_opening_duration_ms=getattr(base_config, "widget_opening_duration_ms", 1000),
+                widget_result_duration_ms=getattr(base_config, "widget_result_duration_ms", 5500),
+                widget_closing_duration_ms=getattr(base_config, "widget_closing_duration_ms", 500),
+                widget_token=getattr(base_config, "widget_token", None),
+            )
+            self.db.add(config)
+            self.db.commit()
+            self.db.refresh(config)
+            return config
+
+        return None
+
+    def create_or_update_user_config(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = None,
+        config_data: Dict[str, Any] = None,
+    ) -> DropsConfig:
+        """Создаёт или обновляет Drops-конфигурацию для авторизованного пользователя."""
+        target_platform = platform or "global"
+
+        config = self.get_user_config(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=target_platform,
+        )
+
+        if not config:
+            config = DropsConfig(
+                user_id=user_id,
+                channel_name=channel_name,
+                platform=target_platform,
+            )
+            self.db.add(config)
+
+        if config_data:
+            for field, value in config_data.items():
+                if hasattr(config, field):
+                    setattr(config, field, value)
+
+        config.updated_at = utcnow_naive()
+
+        try:
+            self.db.commit()
+            self.db.refresh(config)
+        except Exception:
+            logger.exception("[ERROR] Error saving drops config for %s", channel_name)
+            self.db.rollback()
+            raise
+
+        return config
+
+    def get_user_rewards(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        quality_id: Optional[int] = None,
+    ) -> List[DropsReward]:
+        """Получает активные награды для канала авторизованного пользователя."""
+        repo = self._get_reward_repo()
+        return repo.get_active_by_user_and_channel(
+            user_id=user_id,
+            channel_name=channel_name,
+            quality_id=quality_id,
+        )
+
+    def _get_random_user_reward(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        quality_id: int = None,
+    ) -> Optional[DropsReward]:
+        """Получает случайную активную награду для авторизованного пользователя."""
+        rewards = self.get_user_rewards(
+            user_id=user_id,
+            channel_name=channel_name,
+            platform=platform,
+            quality_id=quality_id,
+        )
+        if not rewards:
+            logger.warning("No rewards found for quality_id=%s, channel=%s", quality_id, channel_name)
+            return None
+
+        total_weight = sum(reward.weight for reward in rewards)
+        if total_weight == 0:
+            logger.warning(
+                "Total weight is 0 for rewards in channel %s, using uniform distribution",
+                channel_name,
+            )
+            return random.choice(rewards)
+
+        random_value = random.random() * total_weight
+        current_weight = 0
+
+        for reward in rewards:
+            current_weight += reward.weight
+            if random_value < current_weight:
+                logger.debug(
+                    "Selected reward '%s' (weight=%s/%s)",
+                    reward.name,
+                    reward.weight,
+                    total_weight,
+                )
+                return reward
+
+        logger.warning("Fallback to last reward for channel %s", channel_name)
+        return rewards[-1]
+
     def get_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = None) -> Optional[DropsConfig]:
         """Получает конфигурацию Drops для канала
         

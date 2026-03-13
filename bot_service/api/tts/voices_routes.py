@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import httpx
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Form, File, UploadFile, Body
@@ -151,7 +151,7 @@ async def get_all_voices(request: Request, user: dict=Depends(get_current_user),
 
 @user_voices_router.get('/{user_id}')
 async def get_user_voices(user_id: int, request: Request, user: dict=Depends(get_current_user), service: VoiceManagementService=Depends(get_voice_service), provider: str='f5'):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         actor_id = _current_user_id(user)
         if actor_id != user_id and (not _is_admin(user)):
@@ -166,7 +166,7 @@ async def get_user_voices(user_id: int, request: Request, user: dict=Depends(get
 
 @user_voices_router.post('/upload')
 async def upload_user_voice(request: Request, user_id: int, file: UploadFile=File(...), name: str=Form(...), user: dict=Depends(check_user_whitelisted), service: VoiceManagementService=Depends(get_voice_service), provider: str='f5'):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation failed.')
@@ -180,7 +180,7 @@ async def upload_user_voice(request: Request, user_id: int, file: UploadFile=Fil
 
 @user_voices_router.get('/enabled/{user_id}')
 async def get_user_enabled_voices(user_id: int, user: dict=Depends(get_current_user), db: Session=Depends(get_db), provider: str='f5'):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation failed.')
@@ -204,7 +204,7 @@ async def get_user_enabled_voices(user_id: int, user: dict=Depends(get_current_u
 
 @user_voices_router.post('/enabled/{user_id}')
 async def update_user_enabled_voices(user_id: int, voice_ids: List[int], user: dict=Depends(get_current_user), db: Session=Depends(get_db), provider: str='f5'):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation failed.')
@@ -524,5 +524,4 @@ async def admin_upload_voice(request: Request, file: UploadFile=File(...), voice
     except Exception:
         logger.exception('Error uploading global voice')
         raise HTTPException(status_code=500, detail='Internal server error')
-
 

@@ -51,7 +51,7 @@ from middleware.csrf_protection import CSRFProtectionMiddleware
 from services.voice_management_service import VoiceManagementService
 from core.exception_handlers import http_exception_handler
 from api.errors_api import _redact_sensitive, _serialize_safe_payload, report_frontend_error
-from api.session_api import clear_legacy_sessions, get_active_channels, get_active_sessions
+from api.session_api import get_active_channels, get_active_sessions
 from api import stream_history_api
 from api import obs_integration_api
 from api import platforms_api
@@ -267,14 +267,6 @@ def test_error_payload_serialization_truncates_large_payload():
 
 @pytest.mark.asyncio
 async def test_session_admin_endpoints_require_admin():
-    with pytest.raises(HTTPException) as e1:
-        await clear_legacy_sessions(
-            response=Response(),
-            user={"id": 10, "role": "user", "is_admin": False},
-            db=None,
-        )
-    assert e1.value.status_code == 403
-
     with pytest.raises(HTTPException) as e2:
         await get_active_channels(user={"id": 10, "role": "user", "is_admin": False}, db=None)
     assert e2.value.status_code == 403

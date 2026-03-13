@@ -38,6 +38,98 @@ class DropsStreakMixin:
              self.history_repo = DropsHistoryRepository(self.db)
         return self.history_repo
 
+    def get_user_streak_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+    ) -> Optional[UserStreak]:
+        """Active user-only wrapper for streak lookup."""
+        return self.get_user_streak(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+        )
+
+    def update_user_streak_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+        viewer_name: str = None,
+        is_streaming: bool = True,
+    ) -> UserStreak:
+        """Active user-only wrapper for streak updates."""
+        return self.update_user_streak(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+            is_streaming=is_streaming,
+        )
+
+    def increment_viewer_message_count_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+        viewer_name: str = None,
+    ) -> UserStreak:
+        """Active user-only wrapper for per-viewer message counters."""
+        return self.increment_viewer_message_count(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+        )
+
+    def process_streak_drops_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+        viewer_name: str = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Active user-only wrapper for streak drops processing."""
+        return self.process_streak_drops(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+        )
+
+    def process_donation_drops_for_user(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        viewer_id: str = None,
+        viewer_name: str = None,
+        donation_amount: float = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Active user-only wrapper for donation drops processing."""
+        return self.process_donation_drops(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+            donation_amount=donation_amount,
+        )
+
     def get_user_streak(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None) -> Optional[UserStreak]:
         """Получает стрик пользователя"""
         repo = self._ensure_repo()

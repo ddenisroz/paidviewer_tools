@@ -47,7 +47,7 @@ def _verify_donationalerts_webhook_secret(request: Request) -> None:
 
 @router.get('/triggers')
 async def get_drops_triggers(current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         logger.info(f"[PACKAGE] [DROPS] Getting triggers for user {current_user.get('id')}")
         return {'success': True, 'triggers': []}
@@ -59,7 +59,7 @@ async def get_drops_triggers(current_user: dict=Depends(get_current_user), db: S
 
 @router.post('/triggers')
 async def create_drops_trigger(request: dict, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         logger.info(f"[PACKAGE] [DROPS] Creating trigger for user {current_user.get('id')}")
         return {'success': True, 'message': 'Operation completed.', 'trigger_id': 1}
@@ -71,7 +71,7 @@ async def create_drops_trigger(request: dict, current_user: dict=Depends(get_cur
 
 @router.put('/triggers/{trigger_id}')
 async def update_drops_trigger(trigger_id: int, request: dict, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         logger.info(f'[PACKAGE] [DROPS] Updating trigger {trigger_id}')
         return {'success': True, 'message': 'Operation completed.'}
@@ -83,7 +83,7 @@ async def update_drops_trigger(trigger_id: int, request: dict, current_user: dic
 
 @router.delete('/triggers/{trigger_id}')
 async def delete_drops_trigger(trigger_id: int, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         logger.info(f'[PACKAGE] [DROPS] Deleting trigger {trigger_id}')
         return {'success': True, 'message': 'Operation completed.'}
@@ -95,7 +95,7 @@ async def delete_drops_trigger(trigger_id: int, current_user: dict=Depends(get_c
 
 @router.post('/triggers/test/{trigger_id}')
 async def test_drops_trigger(trigger_id: int, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         logger.info(f'[PACKAGE] [DROPS] Testing trigger {trigger_id}')
         return {'success': True, 'message': 'Operation completed.'}
@@ -107,7 +107,7 @@ async def test_drops_trigger(trigger_id: int, current_user: dict=Depends(get_cur
 
 @router.get('/user-from-token/{token}')
 async def get_user_from_token(token: str, db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         repo = DropsRewardRepository(db)
         config = repo.get_config_by_token(token)
@@ -123,7 +123,7 @@ async def get_user_from_token(token: str, db: Session=Depends(get_db)):
 
 @router.post('/widget-url')
 async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         user_repo = UserRepository(db)
         user = user_repo.get_by_id(current_user['id'])
@@ -134,7 +134,11 @@ async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends
             raise HTTPException(status_code=400, detail='Operation failed.')
         from services.drops.drops_service import DropsService
         drops_service = DropsService(db)
-        config = drops_service.get_config(user_id=current_user['id'], session_id=None, channel_name=channel_name, platform=None)
+        config = drops_service.get_user_config(
+            user_id=current_user['id'],
+            channel_name=channel_name,
+            platform=None,
+        )
         widget_token_value = None
         if config and hasattr(config, 'widget_token'):
             widget_token_value = config.widget_token
@@ -152,7 +156,12 @@ async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends
             except Exception:
                 logger.exception('Cannot set widget_token')
         if not config:
-            config = drops_service.create_or_update_config(user_id=current_user['id'], session_id=None, channel_name=channel_name, platform=None, config_data={})
+            config = drops_service.create_or_update_user_config(
+                user_id=current_user['id'],
+                channel_name=channel_name,
+                platform=None,
+                config_data={},
+            )
             try:
                 from sqlalchemy import text
                 db.execute(text('UPDATE drops_configs SET widget_token = :token WHERE id = :config_id'), {'token': token, 'config_id': config.id})
@@ -173,7 +182,7 @@ async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends
 
 @router.post('/donationalerts/webhook')
 async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
-    """Text cleaned."""
+    """Рабочий маршрут API."""
     try:
         _verify_donationalerts_webhook_secret(request)
 
@@ -185,7 +194,7 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
         donor_id = data.get('user_id', 'unknown')
         message = data.get('message', '')
         alert_id = data.get('id', '')
-        logger.info(f'[REWARD] [DONATION DROPS] Received donation: {donor_name} - {donation_amount}Text cleaned.')
+        logger.info(f'[REWARD] [DONATION DROPS] Received donation: {donor_name} - {donation_amount}...')
         user_repo = UserRepository(db)
         user_token = user_repo.get_token_by_platform('donationalerts', data.get('user_id', ''))
         if not user_token:
@@ -207,7 +216,7 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             else:
                 logger.info(f'[INFO] [DONATION RECORD] Donation {alert_id} already recorded')
             drops_service = DropsService(db)
-            result = drops_service.process_donation_drops(user_id=user_token.user_id, channel_name=channel_name, platform='donationalerts', viewer_id=donor_id, viewer_name=donor_name, donation_amount=donation_amount)
+            result = drops_service.process_donation_drops_for_user(user_id=user_token.user_id, channel_name=channel_name, platform='donationalerts', viewer_id=donor_id, viewer_name=donor_name, donation_amount=donation_amount)
             memealerts_service = MemeAlertsService(db)
             memealerts_result = await memealerts_service.process_donation_auto_grant(user_id=user_token.user_id, channel_name=channel_name, donor_name=donor_name, donation_amount=donation_amount)
             db.commit()
@@ -220,7 +229,7 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             else:
                 logger.warning('[MEMEALERTS] Donation auto-grant skipped/failed: %s', memealerts_result.get('error'))
         if result:
-            logger.info(f"[REWARD] [DONATION DROPS] {donor_name}Text cleaned.{result['reward']} ({result['quality']})")
+            logger.info(f"[REWARD] [DONATION DROPS] {donor_name}...{result['reward']} ({result['quality']})")
             from utils.websocket_helper import broadcast_drops_event
             await broadcast_drops_event(result)
             response_payload = {'success': True, 'message': 'Drops processed successfully', 'data': result}
