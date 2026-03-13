@@ -1,93 +1,118 @@
-#!/usr/bin/env python
-"""Скрипт для проверки данных в PostgreSQL"""
-import sys
+﻿#!/usr/bin/env python
+"""Краткая сводка по данным PostgreSQL для текущего backend."""
+
+from __future__ import annotations
+
 import os
+import sys
 from pathlib import Path
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-BOT_SERVICE_ROOT = Path(__file__).parent.parent
-sys.path.insert(0, str(BOT_SERVICE_ROOT))
+
 from dotenv import load_dotenv
-env_path = BOT_SERVICE_ROOT / '.env'
-load_dotenv(dotenv_path=env_path)
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from core.database import User, UserSettings, UserToken, UserSession, BotCommand, ChatMessage, DropsConfig, WhitelistedChannel, ChannelReward, RewardQueue
 
-def main():
-    """Проверяет данные в PostgreSQL"""
-    database_url = os.getenv('DATABASE_URL')
+BOT_SERVICE_ROOT = Path(__file__).resolve().parent.parent
+if str(BOT_SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(BOT_SERVICE_ROOT))
+
+load_dotenv(BOT_SERVICE_ROOT / ".env")
+
+from core.database import (  # noqa: E402
+    BotCommand,
+    ChannelReward,
+    ChatMessage,
+    DropsConfig,
+    RewardQueue,
+    User,
+    UserSession,
+    UserSettings,
+    UserToken,
+    WhitelistedChannel,
+)
+
+
+def _mask_database_url(database_url: str) -> str:
+    if "@" not in database_url:
+        return database_url
+    return database_url.split("@", maxsplit=1)[1]
+
+
+def main() -> int:
+    database_url = os.getenv("DATABASE_URL")
     if not database_url:
-        print('[ERROR] DATABASE_URL не установлен')
+        print("[ERROR] Не задан DATABASE_URL")
         return 1
-    print('=' * 60)
-    print('Text cleaned.')
-    print('=' * 60)
+
+    print("=" * 64)
+    print("СВОДКА ПО POSTGRESQL")
+    print("=" * 64)
+    print(f"База: {_mask_database_url(database_url)}")
     print()
-    print(f"База данных: {(database_url.split('@')[1] if '@' in database_url else database_url)}")
-    print()
+
     try:
         engine = create_engine(database_url)
         Session = sessionmaker(bind=engine)
         session = Session()
-        tables_to_check = [('Пользователи', User), ('Настройки пользователей', UserSettings), ('Токены пользователей', UserToken), ('Сессии пользователей', UserSession), ('Команды бота', BotCommand), ('Сообщения чата', ChatMessage), ('Конфигурация Drops', DropsConfig), ('Whitelisted каналы', WhitelistedChannel), ('Награды канала', ChannelReward), ('Очередь наград', RewardQueue)]
+
+        tables_to_check = [
+            ("Пользователи", User),
+            ("Настройки пользователей", UserSettings),
+            ("Токены пользователей", UserToken),
+            ("Сессии пользователей", UserSession),
+            ("Команды бота", BotCommand),
+            ("Сообщения чата", ChatMessage),
+            ("Конфигурация Drops", DropsConfig),
+            ("Whitelisted каналы", WhitelistedChannel),
+            ("Награды канала", ChannelReward),
+            ("Очередь наград", RewardQueue),
+        ]
+
         total_records = 0
-        print('[STATS] Статистика по таблицам:')
-        print('-' * 60)
-        for (table_name, model) in tables_to_check:
+        print("[СТАТИСТИКА ПО ТАБЛИЦАМ]")
+        print("-" * 64)
+        for table_name, model in tables_to_check:
             count = session.query(model).count()
             total_records += count
-            status = '[OK]' if count > 0 else 'Text cleaned.'
-            print(f'{status} {table_name:.<40} {count:>5} записей')
-        print('-' * 60)
-        print(f'Всего записей: {total_records}')
+            status = "[OK]" if count > 0 else "[EMPTY]"
+            print(f"{status} {table_name:.<40} {count:>6}")
+        print("-" * 64)
+        print(f"Всего записей: {total_records}")
         print()
-        print('=' * 60)
-        print('Text cleaned.')
-        print('=' * 60)
-        print()
-        users = session.query(User).limit(3).all()
+
+        users = session.query(User).limit(5).all()
         if users:
-            print(' Пользователи (первые 3):')
+            print("[ПОЛЬЗОВАТЕЛИ]")
             for user in users:
                 platforms = []
                 if user.twitch_username:
-                    platforms.append(f'Twitch: {user.twitch_username}')
+                    platforms.append(f"Twitch: {user.twitch_username}")
                 if user.vk_username:
-                    platforms.append(f'VK: {user.vk_username}')
-                admin_status = ' (Admin)' if user.is_admin else ''
-                active_status = '' if user.is_active else ' (Неактивен)'
-                print(f"   ID: {user.id}, {(', '.join(platforms) if platforms else 'Нет платформ')}{admin_status}{active_status}")
+                    platforms.append(f"VK: {user.vk_username}")
+                role = "admin" if user.role == "admin" else "user"
+                platform_label = ", ".join(platforms) if platforms else "без платформы"
+                print(f"- id={user.id} role={role} {platform_label}")
             print()
-        commands = session.query(BotCommand).limit(5).all()
-        if commands:
-            print('[BOT] Команды бота (первые 5):')
-            for cmd in commands:
-                print(f'   {cmd.command_name} -> {cmd.response_text[:50]}...')
+
+        recent_messages = session.query(ChatMessage).order_by(ChatMessage.timestamp.desc()).limit(5).all()
+        if recent_messages:
+            print("[ПОСЛЕДНИЕ СООБЩЕНИЯ]")
+            for message in recent_messages:
+                print(f"- [{message.timestamp}] {message.author_username}: {message.message[:60]}")
             print()
-        messages = session.query(ChatMessage).order_by(ChatMessage.timestamp.desc()).limit(5).all()
-        if messages:
-            print('[CHAT] Последние сообщения (5):')
-            for msg in messages:
-                print(f'   [{msg.timestamp}] {msg.author_username}: {msg.message[:50]}...')
-            print()
+
         with engine.connect() as conn:
-            result = conn.execute(text('SELECT version();'))
-            version = result.fetchone()[0]
-            print(f"[PACKAGE] PostgreSQL версия: {version.split(',')[0]}")
+            version = conn.execute(text("SELECT version();")).scalar()
+            version_label = str(version).split(",", maxsplit=1)[0]
+            print(f"PostgreSQL: {version_label}")
+
         session.close()
         engine.dispose()
-        print()
-        print('=' * 60)
-        print('[OK] Проверка завершена')
-        print('=' * 60)
+        print("\n[OK] Проверка завершена")
         return 0
-    except Exception as e:
-        print(f'[ERROR] Ошибка: {e}')
-        import traceback
-        traceback.print_exc()
+    except Exception as exc:
+        print(f"[ERROR] Ошибка: {exc}")
         return 1
-if __name__ == '__main__':
-    sys.exit(main())
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

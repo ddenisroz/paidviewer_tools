@@ -1,5 +1,5 @@
 # bot_service/core/background_tasks.py
-"""Р¤РѕРЅРѕРІС‹Рµ Р·Р°РґР°С‡Рё"""
+"""Фоновые задачи"""
 import asyncio
 import logging
 from datetime import timedelta
@@ -11,24 +11,24 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 class BackgroundTasks:
-    """РљР»Р°СЃСЃ РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ С„РѕРЅРѕРІС‹РјРё Р·Р°РґР°С‡Р°РјРё"""
+    """Класс для управления фоновыми задачами"""
 
     def __init__(self):
         self.tasks = []
 
     async def cleanup_old_chat_messages(self):
         """
-        РђРІС‚РѕРјР°С‚РёС‡РµСЃРєР°СЏ РѕС‡РёСЃС‚РєР° СЃРѕРѕР±С‰РµРЅРёР№ С‡Р°С‚Р° РїРѕ Р»РёРјРёС‚Р°Рј
+        Автоматическая очистка сообщений чата по лимитам
         
-        РЈРґР°Р»СЏРµС‚ РўРћР›Р¬РљРћ СЃР°РјС‹Рµ СЃС‚Р°СЂС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ РїСЂРё РїСЂРµРІС‹С€РµРЅРёРё Р»РёРјРёС‚РѕРІ:
-        - MAX_CHAT_MESSAGES_PER_USER: 3000 РЅР° РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ (default)
-        - MAX_TOTAL_CHAT_MESSAGES: 100000 РІСЃРµРіРѕ (default)
+        Удаляет ТОЛЬКО самые старые сообщения при превышении лимитов:
+        - MAX_CHAT_MESSAGES_PER_USER: 3000 на пользователя (default)
+        - MAX_TOTAL_CHAT_MESSAGES: 100000 всего (default)
         
-        РќР• СѓРґР°Р»СЏРµС‚ РїРѕ РІРѕР·СЂР°СЃС‚Сѓ! РўРѕР»СЊРєРѕ РїРѕ РєРѕР»РёС‡РµСЃС‚РІСѓ.
-        РџР°СЂР°РјРµС‚СЂ CHAT_MESSAGES_RETENTION_DAYS РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ С‚РѕР»СЊРєРѕ РґР»СЏ СЃС‚Р°С‚РёСЃС‚РёРєРё.
+        НЕ удаляет по возрасту! Только по количеству.
+        Параметр CHAT_MESSAGES_RETENTION_DAYS используется только для статистики.
         """
         while True:
-            await asyncio.sleep(3600)  # РџСЂРѕРІРµСЂСЏРµРј РєР°Р¶РґС‹Р№ С‡Р°СЃ
+            await asyncio.sleep(3600)  # Проверяем каждый час
 
             try:
                 db = next(get_db())
@@ -37,11 +37,11 @@ class BackgroundTasks:
 
                     cleanup_service = DatabaseCleanupService(db)
 
-                    # РџРѕР»СѓС‡Р°РµРј СЃС‚Р°С‚РёСЃС‚РёРєСѓ РґРѕ РѕС‡РёСЃС‚РєРё
+                    # Получаем статистику до очистки
                     stats_before = cleanup_service.get_database_stats()
                     total_before = stats_before.get('total_chat_messages', 0)
 
-                    # РћС‡РёС‰Р°РµРј СЃС‚Р°СЂС‹Рµ РґР°РЅРЅС‹Рµ
+                    # Очищаем старые данные
                     cleanup_stats = cleanup_service.cleanup_old_data()
 
                     deleted_count = cleanup_stats.get('messages_deleted', 0)
@@ -58,7 +58,7 @@ class BackgroundTasks:
 
             except Exception as e:
                 logger.error(f"[ERROR] [CHAT CLEANUP] Critical error in cleanup task: {e}")
-                await asyncio.sleep(300)  # РџСЂРё РѕС€РёР±РєРµ РїРѕРІС‚РѕСЂРёС‚СЊ С‡РµСЂРµР· 5 РјРёРЅСѓС‚
+                await asyncio.sleep(300)  # При ошибке повторить через 5 минут
 
     async def cleanup_expired_sessions(self):
         """Retention cleanup for old inactive sessions."""
@@ -87,10 +87,10 @@ class BackgroundTasks:
                     db.close()
 
     async def refresh_bot_oauth_tokens(self):
-        """РџР»Р°РЅРѕРІРѕРµ РѕР±РЅРѕРІР»РµРЅРёРµ OAuth С‚РѕРєРµРЅРѕРІ Р±РѕС‚РѕРІ (Twitch/VK)"""
+        """Плановое обновление OAuth токенов ботов (Twitch/VK)"""
         while True:
             try:
-                # РџСЂРѕРІРµСЂСЏРµРј СЂР°Р· РІ С‡Р°СЃ
+                # Проверяем раз в час
                 await asyncio.sleep(60 * 60)
 
                 logger.info("[REFRESH] [BOT TOKEN] Checking bot OAuth tokens...")
@@ -110,10 +110,10 @@ class BackgroundTasks:
                 await asyncio.sleep(60)
 
     async def cleanup_task(self):
-        """Р¤РѕРЅРѕРІР°СЏ Р·Р°РґР°С‡Р° РґР»СЏ РѕС‡РёСЃС‚РєРё РЅРµР°РєС‚РёРІРЅС‹С… РєР°РЅР°Р»РѕРІ Рё РєР»РёРµРЅС‚РѕРІ (РєР°Рє РІ РѕСЂРёРіРёРЅР°Р»Рµ)"""
+        """Фоновая задача для очистки неактивных каналов и клиентов (как в оригинале)"""
         while True:
             try:
-                await asyncio.sleep(60)  # РџСЂРѕРІРµСЂСЏРµРј РєР°Р¶РґСѓСЋ РјРёРЅСѓС‚Сѓ
+                await asyncio.sleep(60)  # Проверяем каждую минуту
                 connection_manager = get_connection_manager()
                 await connection_manager.cleanup_inactive_channels()
                 await connection_manager.cleanup_inactive_clients()
@@ -122,19 +122,19 @@ class BackgroundTasks:
 
     async def cleanup_deleted_accounts(self):
         """
-        РћРєРѕРЅС‡Р°С‚РµР»СЊРЅРѕРµ СѓРґР°Р»РµРЅРёРµ Р°РєРєР°СѓРЅС‚РѕРІ С‡РµСЂРµР· 30 РґРЅРµР№ РїРѕСЃР»Рµ soft delete
+        Окончательное удаление аккаунтов через 30 дней после soft delete
         
-        GDPR compliance: "right to be forgotten" - РѕРєРѕРЅС‡Р°С‚РµР»СЊРЅРѕРµ СѓРґР°Р»РµРЅРёРµ С‡РµСЂРµР· 30 РґРЅРµР№
+        GDPR compliance: "right to be forgotten" - окончательное удаление через 30 дней
         """
         while True:
-            await asyncio.sleep(86400)  # РџСЂРѕРІРµСЂСЏРµРј СЂР°Р· РІ РґРµРЅСЊ (24 С‡Р°СЃР°)
+            await asyncio.sleep(86400)  # Проверяем раз в день (24 часа)
 
             try:
                 db = next(get_db())
                 try:
                     from datetime import timedelta
 
-                    # РќР°С…РѕРґРёРј РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№ СѓРґР°Р»С‘РЅРЅС‹С… Р±РѕР»РµРµ 30 РґРЅРµР№ РЅР°Р·Р°Рґ
+                    # Находим пользователей удалённых более 30 дней назад
                     thirty_days_ago = utcnow_naive() - timedelta(days=30)
 
                     deleted_users = db.query(User).filter(
@@ -152,7 +152,7 @@ class BackgroundTasks:
                                 username = user.twitch_username or user.vk_username or f"user_{user_id}"
                                 blocked_date = user.blocked_at
 
-                                # РћРљРћРќР§РђРўР•Р›Р¬РќРћР• СѓРґР°Р»РµРЅРёРµ (hard delete)
+                                # ОКОНЧАТЕЛЬНОЕ удаление (hard delete)
                                 db.delete(user)
                                 db.commit()
 
@@ -171,17 +171,17 @@ class BackgroundTasks:
 
             except Exception as e:
                 logger.error(f"[ERROR] [CLEANUP] Critical error in cleanup task: {e}")
-                await asyncio.sleep(3600)  # РџСЂРё РѕС€РёР±РєРµ РїРѕРІС‚РѕСЂРёС‚СЊ С‡РµСЂРµР· С‡Р°СЃ
+                await asyncio.sleep(3600)  # При ошибке повторить через час
 
     async def refresh_user_oauth_tokens(self):
         """
-        РџСЂРѕР°РєС‚РёРІРЅРѕРµ РѕР±РЅРѕРІР»РµРЅРёРµ OAuth С‚РѕРєРµРЅРѕРІ РїРѕР»СЊР·РѕРІР°С‚РµР»РµР№
-        РџСЂРѕРІРµСЂСЏРµС‚ РєР°Р¶РґС‹Рµ 2 С‡Р°СЃР° Рё РѕР±РЅРѕРІР»СЏРµС‚ С‚РѕРєРµРЅС‹, РєРѕС‚РѕСЂС‹Рµ РёСЃС‚РµРєСѓС‚ РІ С‚РµС‡РµРЅРёРµ 1 С‡Р°СЃР°
+        Проактивное обновление OAuth токенов пользователей
+        Проверяет каждые 2 часа и обновляет токены, которые истекут в течение 1 часа
         
-        Twitch С‚РѕРєРµРЅС‹: Р¶РёРІСѓС‚ 4 С‡Р°СЃР°
-        VK С‚РѕРєРµРЅС‹: Р¶РёРІСѓС‚ 30 РґРЅРµР№
+        Twitch токены: живут 4 часа
+        VK токены: живут 30 дней
         
-        РџСЂРѕРІРµСЂРєР° РєР°Р¶РґС‹Рµ 2 С‡Р°СЃР° РіР°СЂР°РЅС‚РёСЂСѓРµС‚ С‡С‚Рѕ Twitch С‚РѕРєРµРЅС‹ (4С‡) Р±СѓРґСѓС‚ РѕР±РЅРѕРІР»РµРЅС‹ РІРѕРІСЂРµРјСЏ
+        Проверка каждые 2 часа гарантирует что Twitch токены (4ч) будут обновлены вовремя
         """
         from core.database import SessionLocal, UserToken
         from core.datetime_utils import utcnow_naive
@@ -190,9 +190,9 @@ class BackgroundTasks:
         first_run = True
         while True:
             try:
-                # РџРµСЂРІР°СЏ РїСЂРѕРІРµСЂРєР° СЃСЂР°Р·Сѓ РїСЂРё СЃС‚Р°СЂС‚Рµ, Р·Р°С‚РµРј РєР°Р¶РґС‹Рµ 2 С‡Р°СЃР°
+                # Первая проверка сразу при старте, затем каждые 2 часа
                 if not first_run:
-                    await asyncio.sleep(7200)  # 2 С‡Р°СЃР°
+                    await asyncio.sleep(7200)  # 2 часа
                 else:
                     first_run = False
                     logger.info("[STARTUP] [TOKEN REFRESH] Initial token check on startup...")
@@ -201,7 +201,7 @@ class BackgroundTasks:
 
                 db = SessionLocal()
                 try:
-                    # РќР°С…РѕРґРёРј С‚РѕРєРµРЅС‹ РєРѕС‚РѕСЂС‹Рµ РёСЃС‚РµРєР»Рё РР›Р РёСЃС‚РµРєСѓС‚ РІ С‚РµС‡РµРЅРёРµ СЃР»РµРґСѓСЋС‰РµРіРѕ С‡Р°СЃР°
+                    # Находим токены которые истекли ИЛИ истекут в течение следующего часа
                     now = utcnow_naive()
                     threshold = now + timedelta(hours=1)
 
@@ -230,7 +230,7 @@ class BackgroundTasks:
                             else:
                                 logger.error(f"[ERROR] [TOKEN REFRESH] Failed to refresh {token.platform} token for user {token.user_id}")
 
-                            # РќРµР±РѕР»СЊС€Р°СЏ РїР°СѓР·Р° РјРµР¶РґСѓ РѕР±РЅРѕРІР»РµРЅРёСЏРјРё
+                            # Небольшая пауза между обновлениями
                             await asyncio.sleep(1)
 
                         except Exception as e:
@@ -242,17 +242,17 @@ class BackgroundTasks:
 
             except Exception as e:
                 logger.error(f"[ERROR] [TOKEN REFRESH] Error in token refresh task: {e}")
-                await asyncio.sleep(60)  # РџСЂРё РѕС€РёР±РєРµ РїРѕРІС‚РѕСЂРёС‚СЊ С‡РµСЂРµР· РјРёРЅСѓС‚Сѓ
+                await asyncio.sleep(60)  # При ошибке повторить через минуту
 
     async def start_all_tasks(self):
-        """Р—Р°РїСѓСЃРє РІСЃРµС… С„РѕРЅРѕРІС‹С… Р·Р°РґР°С‡"""
+        """Запуск всех фоновых задач"""
         self.tasks = [
-            asyncio.create_task(self.cleanup_old_chat_messages()),      # РћС‡РёСЃС‚РєР° РёСЃС‚РѕСЂРёРё С‡Р°С‚Р° (РєР°Р¶РґС‹Р№ С‡Р°СЃ)
+            asyncio.create_task(self.cleanup_old_chat_messages()),      # Очистка истории чата (каждый час)
             asyncio.create_task(self.cleanup_expired_sessions()),       # Cleanup old inactive sessions (every 5 minutes)
-            asyncio.create_task(self.refresh_bot_oauth_tokens()),      # РћР±РЅРѕРІР»РµРЅРёРµ OAuth С‚РѕРєРµРЅРѕРІ Р±РѕС‚РѕРІ (РєР°Р¶РґС‹Р№ С‡Р°СЃ)
-            asyncio.create_task(self.refresh_user_oauth_tokens()),     # РћР±РЅРѕРІР»РµРЅРёРµ OAuth С‚РѕРєРµРЅРѕРІ (РєР°Р¶РґС‹Рµ 2 С‡Р°СЃР°)
-            asyncio.create_task(self.cleanup_task()),                  # РћС‡РёСЃС‚РєР° РЅРµР°РєС‚РёРІРЅС‹С… РєР°РЅР°Р»РѕРІ (РєР°Р¶РґСѓСЋ РјРёРЅСѓС‚Сѓ)
-            asyncio.create_task(self.cleanup_deleted_accounts())       # РћРєРѕРЅС‡Р°С‚РµР»СЊРЅРѕРµ СѓРґР°Р»РµРЅРёРµ Р°РєРєР°СѓРЅС‚РѕРІ (РєР°Р¶РґС‹Рµ 24 С‡Р°СЃР°)
+            asyncio.create_task(self.refresh_bot_oauth_tokens()),      # Обновление OAuth токенов ботов (каждый час)
+            asyncio.create_task(self.refresh_user_oauth_tokens()),     # Обновление OAuth токенов (каждые 2 часа)
+            asyncio.create_task(self.cleanup_task()),                  # Очистка неактивных каналов (каждую минуту)
+            asyncio.create_task(self.cleanup_deleted_accounts())       # Окончательное удаление аккаунтов (каждые 24 часа)
         ]
 
         logger.info("[OK] [BACKGROUND] Started 6 background tasks:")
@@ -264,13 +264,13 @@ class BackgroundTasks:
         logger.info("   - cleanup_deleted_accounts (every 24 hours)")
 
     async def stop_all_tasks(self):
-        """РћСЃС‚Р°РЅРѕРІРєР° РІСЃРµС… С„РѕРЅРѕРІС‹С… Р·Р°РґР°С‡"""
+        """Остановка всех фоновых задач"""
         for task in self.tasks:
             task.cancel()
 
         await asyncio.gather(*self.tasks, return_exceptions=True)
         logger.info("Background tasks stopped")
 
-# РЎРѕР·РґР°РµРј СЌРєР·РµРјРїР»СЏСЂ РґР»СЏ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёСЏ
+# Создаем экземпляр для использования
 background_tasks = BackgroundTasks()
 

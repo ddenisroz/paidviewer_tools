@@ -1,19 +1,18 @@
-# Quickstart
+# Быстрый запуск
 
-If repository layout is unclear, read `docs/REPO_STRUCTURE.md` first.
-If you need current migration status before making changes, read `docs/STATUS_TRACKER.md`.
+Если структура репозитория кажется неочевидной, сначала открой `docs/REPO_STRUCTURE.md`. Если перед изменениями нужно понять текущее состояние проекта, открой `docs/STATUS_TRACKER.md`.
 
-## Requirements
+## Требования
 
 - Python 3.10+
 - Node.js 22+
 - PostgreSQL
-- Optional external TTS stack:
+- для полного TTS-контура дополнительно:
   - `tts-gateway`
   - `f5-tts-service`
   - `nano-qwen3tts-vllm`
 
-## 1) Bootstrap
+## 1. Подготовка репозитория
 
 ```powershell
 git clone <repo>
@@ -22,7 +21,7 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-## 2) Install dependencies in venv
+## 2. Установка зависимостей
 
 ```powershell
 python -m pip install --upgrade pip
@@ -33,21 +32,21 @@ npm install
 cd ..
 ```
 
-## 3) Configure environment
+## 3. Настройка окружения
 
 ```powershell
 Copy-Item bot_service/.env.example bot_service/.env
 Copy-Item frontend/.env.example frontend/.env
 ```
 
-Minimum backend env values for a basic run:
+Минимально для backend:
 
 - `DATABASE_URL`
 - `SECRET_KEY`
 - `TWITCH_CLIENT_ID`
 - `TWITCH_CLIENT_SECRET`
 
-Advanced TTS env values when using the new upstream stack:
+Если используешь внешний TTS-контур:
 
 - `TTS_GATEWAY_URL`
 - `TTS_GATEWAY_API_KEY`
@@ -55,76 +54,74 @@ Advanced TTS env values when using the new upstream stack:
 - `F5_TTS_SERVICE_API_KEY`
 - `QWEN_TTS_SERVICE_URL`
 - `QWEN_TTS_SERVICE_API_KEY`
-- optional: `QWEN_VOICE_SERVICE_URL`
+- опционально `QWEN_VOICE_SERVICE_URL`
 
-## 4) Run migrations
+## 4. Миграции
 
 ```powershell
 cd bot_service
 alembic upgrade head
+cd ..
 ```
 
-## 5) Start services
+## 5. Запуск
 
 ```powershell
-# Terminal 1: backend
-.\.venv\Scripts\Activate.ps1
+# Терминал 1: backend
 cd bot_service
 python main.py
 
-# Terminal 2: frontend
+# Терминал 2: frontend
 cd frontend
 npm run dev
 ```
 
-## 6) Optional external TTS stack
+## 6. Внешний TTS-контур
 
-Use separate environments per external repo. Current upstream runbook is documented in `docs/setup/LOCAL_TTS_INTEGRATION.md`.
+Подробный runbook лежит в `docs/setup/LOCAL_TTS_INTEGRATION.md`.
 
-Supported runtime topology:
+Базовая схема портов:
 
-```powershell
-tts-gateway (8010) -> f5-tts-service (8011) + nano-qwen3tts-vllm (8000)
+```text
+tts-gateway: 8010
+f5-tts-service: 8011
+nano-qwen3tts-vllm: 8000
+bot_service: 8000
+frontend: 5173
 ```
 
-## 7) Verify
+## 7. Проверка
 
-1. Open `http://localhost:5173`
-2. Sign in with Twitch or VK
-3. Open settings and verify TTS controls are available
-4. Check backend health: `http://localhost:8000/health`
-5. Check provider health through backend:
+1. Открой `http://localhost:5173`
+2. Проверь backend: `http://localhost:8000/health`
+3. Проверь provider health через backend:
    - `http://localhost:8000/api/tts/health?provider=f5`
    - `http://localhost:8000/api/tts/health?provider=qwen`
+4. Авторизуйся и открой dashboard
 
 ## Troubleshooting
 
-- `ModuleNotFoundError`: activate venv (`.\.venv\Scripts\Activate.ps1`)
-- OAuth redirect mismatch: verify callback URLs in provider consoles
-- DB connection errors: check `DATABASE_URL` and PostgreSQL status
+- `ModuleNotFoundError` — не активировано `.venv`
+- ошибка БД — проверь `DATABASE_URL` и статус PostgreSQL
+- OAuth redirect mismatch — проверь callback URL в консоли Twitch/VK
+- проблемы с внешним TTS — смотри `docs/setup/LOCAL_TTS_INTEGRATION.md`
 
-## Workspace Cleanup (Release-Oriented)
+## Очистка workspace перед релизом
 
-Preview only:
+Preview:
 
 ```powershell
 .\scripts\prepare-release.ps1
 ```
 
-Apply cleanup:
+Очистка:
 
 ```powershell
 .\scripts\prepare-release.ps1 -ApplyCleanup
 ```
 
-Cleanup + checks:
+Очистка + проверки:
 
 ```powershell
 .\scripts\prepare-release.ps1 -ApplyCleanup -RunChecks
-```
-
-Also clean bytecode inside `.venv`:
-
-```powershell
-.\scripts\prepare-release.ps1 -ApplyCleanup -IncludeVenvCaches
 ```

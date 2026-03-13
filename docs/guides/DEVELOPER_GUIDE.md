@@ -1,46 +1,38 @@
-﻿# Developer Guide
+# Developer guide
 
-This document defines stable engineering contracts for daily development.
+Этот документ фиксирует стабильные инженерные контракты для ежедневной разработки.
 
-## Scope
+## Границы runtime
 
-Use this guide for:
-
-- backend/frontend contribution rules
-- security-sensitive auth contracts
-- runtime behavior constraints that must not regress
-
-## Runtime Surface
-
-- `bot_service/` - FastAPI API, auth, business logic, repositories.
-- `frontend/` - React + Vite UI.
-- external upstreams:
+- `bot_service/` — FastAPI API, auth, services, repositories, models
+- `frontend/` — React + Vite UI
+- внешние upstream-сервисы:
   - `tts-gateway`
   - `f5-tts-service`
   - `nano-qwen3tts-vllm`
-- `deploy/` - docker compose and infra files.
+- `deploy/` — compose и инфраструктурные файлы
 
-## Dependency Manifests
+## Манифесты зависимостей
 
-- `bot_service/requirements.txt` - backend runtime only.
-- `bot_service/requirements_dev.txt` - backend dev/test/tooling on top of runtime.
-- `bot_service/requirements_celery.txt` - runtime + optional celery worker extras.
-- `bot_service/requirements_no_torch.txt` - legacy alias to runtime requirements.
+- `bot_service/requirements.txt` — только runtime backend
+- `bot_service/requirements_dev.txt` — dev/test/tooling поверх runtime
+- `bot_service/requirements_celery.txt` — runtime + optional celery extras
+- `bot_service/requirements_no_torch.txt` — legacy alias на runtime requirements
 
-## Mandatory Auth Contracts
+## Обязательные auth-контракты
 
 1. User OAuth entrypoints:
    - `/auth/twitch/login`
-   - `/auth/vk/login` (plus `/auth/vk` alias)
+   - `/auth/vk/login` и alias `/auth/vk`
 2. User OAuth callbacks:
    - `/auth/twitch/callback`
    - `/auth/vk/callback`
-3. Session auth is cookie-based (`session_id`).
-4. Protected API auth source of truth is DB user state.
-5. Admin authority source is `users.role='admin'`; `users.is_admin` is legacy compatibility only.
-6. Guest mode is removed. Do not add anonymous auth flows or guest-only session branches.
+3. Session auth — cookie-based (`session_id`)
+4. Source of truth для protected API — состояние пользователя в БД
+5. Admin authority — `users.role = 'admin'`
+6. Guest mode удалён и не должен возвращаться
 
-## Bot OAuth Contracts
+## Bot OAuth-контракт
 
 1. Login endpoints:
    - `/auth/twitch/bot/login`
@@ -48,36 +40,36 @@ Use this guide for:
 2. Callback endpoints:
    - `/auth/twitch/bot/callback`
    - `/auth/vk/bot/callback`
-3. Bot login requires admin session or short-lived `bot_oauth_token`.
-4. Runtime bot tokens come from DB (`bot_tokens`), not legacy env fallback.
+3. Bot login требует admin session или short-lived `bot_oauth_token`
+4. Runtime bot tokens читаются из БД, а не из legacy env fallback
 
-## WebSocket Contracts
+## WebSocket-контракт
 
-1. Real-time sync uses WebSocket, not SSE.
-2. Frontend keeps one leader socket per user across tabs.
-3. Browser TTS playback works through dedicated `/tts-player` tab (`client_role=tts_player`).
-4. Sink-aware TTS behavior must be preserved:
-   - website mode requires active tts-player socket
-   - OBS mode requires active OBS socket
+1. Real-time sync использует WebSocket, а не SSE
+2. Frontend держит один leader socket на пользователя между вкладками
+3. Browser TTS playback работает через отдельную вкладку `/tts-player`
+4. Sink-aware TTS поведение нельзя ломать:
+   - website mode требует активную вкладку `/tts-player`
+   - OBS mode требует активный OBS socket
 
-## Backend Engineering Rules
+## Правила backend
 
-1. Routes should remain thin; business logic belongs in `services/`.
-2. DB access should go through `repositories/`.
-3. Handle async errors explicitly; avoid fire-and-forget tasks without guards.
-4. Keep request validation strict (Pydantic models, enums, bounded fields).
-5. Do not log secrets/tokens/passwords.
+1. Роуты остаются тонкими, логика живёт в `services/`
+2. Работа с БД идёт через `repositories/`
+3. Ошибки async-задач обрабатываются явно
+4. Валидация запросов должна быть строгой
+5. Нельзя логировать секреты, токены и пароли
 
-## Frontend Engineering Rules
+## Правила frontend
 
-1. Keep API calls in service/query layers, not in random components.
-2. Prevent duplicate requests (cache, memoization, debounce where needed).
-3. Preserve single-leader WebSocket logic and reconnect semantics.
-4. Keep admin pages aligned with semantic design tokens.
+1. API-вызовы держим в service/query-слое
+2. Не плодим дублирующие запросы
+3. Сохраняем single-leader WebSocket logic
+4. В UI используем semantic design tokens, а не случайные цвета
 
-## Quality Gates
+## Quality gates
 
-Backend:
+### Backend
 
 ```powershell
 cd bot_service
@@ -85,7 +77,7 @@ ruff check .
 pytest -q
 ```
 
-Frontend:
+### Frontend
 
 ```powershell
 cd frontend
@@ -94,25 +86,16 @@ npm run type-check
 npm run build
 ```
 
-## Cleanup And Repo Hygiene
+## Repo hygiene
 
-Canonical cleanup script:
+Canonical cleanup:
 
 ```powershell
 .\scripts\prepare-release.ps1
 .\scripts\prepare-release.ps1 -ApplyCleanup
 ```
 
-Before release-oriented PRs:
-
-- remove generated caches/artifacts
-- ensure no temporary files are tracked
-- update docs for any behavior or contract changes
-
-## Where To Update Docs When Changing Behavior
-
-- auth/session changes -> `docs/architecture/AUTH_TYPE_SYSTEM.md`
-- websocket behavior -> `docs/architecture/SHARED_WEBSOCKET.md`
-- deployment/env -> `docs/setup/DEPLOYMENT.md`
-- repo hygiene -> `docs/REPO_STRUCTURE.md` and `scripts/prepare-release.ps1`
-
+Перед release-oriented PR:
+- удалить generated caches и artifacts
+- убедиться, что нет временных файлов
+- обновить docs, если менялся контракт или поведение

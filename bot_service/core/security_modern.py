@@ -1,7 +1,7 @@
-﻿# bot_service/core/security_modern.py
+# bot_service/core/security_modern.py
 """
-РЎРѕРІСЂРµРјРµРЅРЅР°СЏ СЃРёСЃС‚РµРјР° Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё СЃ РёСЃРїРѕР»СЊР·РѕРІР°РЅРёРµРј РїСЂРѕС„РµСЃСЃРёРѕРЅР°Р»СЊРЅС‹С… Р±РёР±Р»РёРѕС‚РµРє
-Р—Р°РјРµРЅСЏРµС‚ СЃР°РјРѕРїРёСЃРЅС‹Рµ РєРѕСЃС‚С‹Р»Рё РЅР° РїСЂРѕРІРµСЂРµРЅРЅС‹Рµ СЂРµС€РµРЅРёСЏ
+Современная система безопасности с использованием профессиональных библиотек
+Заменяет самописные костыли на проверенные решения
 """
 import logging
 import secrets
@@ -9,7 +9,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
-# РЎРѕРІСЂРµРјРµРЅРЅС‹Рµ Р±РёР±Р»РёРѕС‚РµРєРё Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё
+# Современные библиотеки безопасности
 from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 from slowapi import Limiter
@@ -24,14 +24,14 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 
-# РќР°СЃС‚СЂРѕР№РєР° rate limiting
+# Настройка rate limiting
 limiter = Limiter(key_func=get_remote_address)
 
-# РќР°СЃС‚СЂРѕР№РєР° JWT
+# Настройка JWT
 security = HTTPBearer()
 
 class ModernSecurityManager:
-    """РЎРѕРІСЂРµРјРµРЅРЅС‹Р№ РјРµРЅРµРґР¶РµСЂ Р±РµР·РѕРїР°СЃРЅРѕСЃС‚Рё СЃ РїСЂРѕС„РµСЃСЃРёРѕРЅР°Р»СЊРЅС‹РјРё Р±РёР±Р»РёРѕС‚РµРєР°РјРё"""
+    """Современный менеджер безопасности с профессиональными библиотеками"""
 
     def __init__(self):
         self.secret_key = settings.secret_key
@@ -43,7 +43,7 @@ class ModernSecurityManager:
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """
-        РЎРѕР·РґР°РЅРёРµ JWT С‚РѕРєРµРЅР° РґРѕСЃС‚СѓРїР°
+        Создание JWT токена доступа
         """
         to_encode = data.copy()
         if expires_delta:
@@ -98,39 +98,39 @@ class ModernSecurityManager:
 
     def generate_session_id(self) -> str:
         """
-        Р“РµРЅРµСЂР°С†РёСЏ Р±РµР·РѕРїР°СЃРЅРѕРіРѕ ID СЃРµСЃСЃРёРё
+        Генерация безопасного ID сессии
         """
         return secrets.token_urlsafe(32)
 
     def generate_csrf_token(self) -> str:
         """
-        Р“РµРЅРµСЂР°С†РёСЏ CSRF С‚РѕРєРµРЅР°
+        Генерация CSRF токена
         """
         return secrets.token_urlsafe(32)
 
     def verify_csrf_token(self, token: str, session_token: str) -> bool:
         """
-        РџСЂРѕРІРµСЂРєР° CSRF С‚РѕРєРµРЅР°
+        Проверка CSRF токена
         """
-        # РџСЂРѕСЃС‚Р°СЏ РїСЂРѕРІРµСЂРєР° - РІ СЂРµР°Р»СЊРЅРѕРј РїСЂРѕРµРєС‚Рµ РјРѕР¶РЅРѕ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ Р±РѕР»РµРµ СЃР»РѕР¶РЅСѓСЋ Р»РѕРіРёРєСѓ
+        # Простая проверка - в реальном проекте можно использовать более сложную логику
         return token == session_token
 
-# Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ СЌРєР·РµРјРїР»СЏСЂ
+# Глобальный экземпляр
 modern_security_manager = ModernSecurityManager()
 
-# Р”РµРєРѕСЂР°С‚РѕСЂС‹ РґР»СЏ rate limiting
+# Декораторы для rate limiting
 def rate_limit(requests_per_minute: str):
-    """Р”РµРєРѕСЂР°С‚РѕСЂ РґР»СЏ rate limiting"""
+    """Декоратор для rate limiting"""
     return limiter.limit(requests_per_minute)
 
 def login_rate_limit():
-    """Р”РµРєРѕСЂР°С‚РѕСЂ РґР»СЏ rate limiting Р»РѕРіРёРЅР°"""
+    """Декоратор для rate limiting логина"""
     return limiter.limit(settings.rate_limit_login)
 
-# Р¤СѓРЅРєС†РёРё РґР»СЏ FastAPI
+# Функции для FastAPI
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
     """
-    РџРѕР»СѓС‡РµРЅРёРµ ID РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РёР· JWT С‚РѕРєРµРЅР°
+    Получение ID пользователя из JWT токена
     """
     token = credentials.credentials
     payload = modern_security_manager.verify_token(token)
@@ -144,17 +144,17 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
 
 def get_current_user_admin(credentials: HTTPAuthorizationCredentials = Depends(security)) -> bool:
     """
-    РџСЂРѕРІРµСЂРєР° Р°РґРјРёРЅСЃРєРёС… РїСЂР°РІ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ
+    Проверка админских прав пользователя
     """
     token = credentials.credentials
     payload = modern_security_manager.verify_token(token)
     is_admin: bool = payload.get("is_admin", False)
     return is_admin
 
-# РћР±СЂР°Р±РѕС‚С‡РёРє РѕС€РёР±РѕРє rate limiting
+# Обработчик ошибок rate limiting
 def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     """
-    РћР±СЂР°Р±РѕС‚С‡РёРє РѕС€РёР±РѕРє rate limiting
+    Обработчик ошибок rate limiting
     """
     return JSONResponse(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,

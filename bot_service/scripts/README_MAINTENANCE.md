@@ -1,10 +1,10 @@
-# Скрипты обслуживания
+﻿# Скрипты обслуживания backend
 
-В этой папке лежат только актуальные операционные скрипты для backend: диагностика, администрирование, безопасные действия с БД и служебные проверки.
+В корне `bot_service/scripts/` должны лежать только рабочие операционные скрипты: диагностика, администрирование, безопасная очистка БД и инфраструктурные команды. Исторические, одноразовые и опасные сценарии не держим здесь без необходимости.
 
 ## Основные категории
 
-### Доступ и администрирование
+### Администрирование и права
 - `check_admin.py`
 - `make_admin.py`
 - `update_session_role.py`
@@ -12,28 +12,26 @@
 - `check_user_whitelist.py`
 - `normalize_admin_tables.py`
 
-### Диагностика токенов и авторизации
+### Токены и авторизация
 - `check_tokens.py`
 - `check_bot_token.py`
 - `check_twitch_token.py`
 - `get_vk_token_manual.py`
 
-### Диагностика TTS
+### TTS и runtime-проверки
 - `check_tts_enabled.py`
 - `check_tts_status.py`
 - `init_blocked_bots.py`
 
-### БД и сессии
+### База данных и сессии
 - `db_console.py`
-- `delete_users.py`
-- `database_hygiene.py`
 - `show_db_structure.py`
 - `check_postgresql_data.py`
 - `check_sessions.py`
-- `find_n_plus_one.py`
-- `fix_admin_session.py`
+- `delete_users.py`
+- `database_hygiene.py`
 
-### Разрушительные служебные операции
+### Осознанно destructive-скрипты
 - `clear_database.py`
 - `reset_db.py`
 - `setup_postgresql.ps1`
@@ -43,7 +41,7 @@
 
 ## Безопасное удаление пользователей
 
-Используй `delete_users.py` вместо старых bulk-cleanup сценариев.
+Для точечного удаления пользователя используй `delete_users.py`. Этот скрипт делает preview по умолчанию и не требует ручного SQL.
 
 Просмотр списка:
 
@@ -51,7 +49,7 @@
 python scripts/delete_users.py --list
 ```
 
-Dry-run preview:
+Preview без удаления:
 
 ```powershell
 python scripts/delete_users.py --user-id 42
@@ -65,11 +63,11 @@ python scripts/delete_users.py --vk some_vk_channel
 python scripts/delete_users.py --user-id 42 --yes
 ```
 
-## Гигиена БД: orphan user-записи и старые неактивные сессии
+## Гигиена БД: orphan-записи и старые неактивные сессии
 
-Используй `database_hygiene.py`, если нужно:
-- убрать записи с `user_id`, которого уже нет в `users`;
-- почистить старые неактивные сессии по retention-политике.
+`database_hygiene.py` нужен для двух задач:
+- удалить записи с `user_id`, которого уже нет в `users`;
+- очистить старые неактивные сессии по retention-политике.
 
 Preview:
 
@@ -79,7 +77,7 @@ python scripts/database_hygiene.py --orphan-users
 python scripts/database_hygiene.py --inactive-sessions --inactive-session-days 7
 ```
 
-Фактическая очистка:
+Очистка:
 
 ```powershell
 python scripts/database_hygiene.py --yes
@@ -87,9 +85,9 @@ python scripts/database_hygiene.py --orphan-users --yes
 python scripts/database_hygiene.py --inactive-sessions --inactive-session-days 7 --yes
 ```
 
-## Dangerous DB-скрипты
+## Опасные DB-скрипты
 
-Перед запуском destructive-скриптов сначала делай preview/dry-run, если он есть:
+Перед запуском destructive-сценариев сначала используй preview/dry-run, если он есть:
 
 ```powershell
 python scripts/clear_database.py clear --dry-run
@@ -105,7 +103,7 @@ python scripts/reset_db.py --yes
 
 ## Единый launcher для проверок
 
-Если нужно быстро запускать типовые проверки, используй `run_check.py`:
+Для типовых безопасных проверок используй `run_check.py`:
 
 ```powershell
 cd bot_service
@@ -114,4 +112,4 @@ python scripts/run_check.py tts-status 1
 python scripts/run_check.py admin
 ```
 
-Этот launcher не делает destructive-операций и только проксирует диагностические `check_*` сценарии.
+Этот launcher не делает destructive-операций и только проксирует безопасные диагностические `check_*` сценарии.

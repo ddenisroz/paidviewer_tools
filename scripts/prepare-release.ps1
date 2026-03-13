@@ -270,6 +270,7 @@ if ($IncludeVenvCaches) { $roots += (Join-Path $repoRoot ".venv") }
 Add-ByPattern -Map $targetMap -Roots $roots -DirectoryName "__pycache__" -Reason "Python bytecode cache (__pycache__)" -RepoRoot $repoRoot
 Add-ByPattern -Map $targetMap -Roots $roots -DirectoryName "pytest-cache-files-*" -Reason "Pytest temporary cache directories" -RepoRoot $repoRoot
 Add-FilesByExtension -Map $targetMap -Roots $roots -Extensions @(".pyc", ".pyo") -Reason "Python bytecode files (.pyc/.pyo)" -RepoRoot $repoRoot
+Add-FilesByExtension -Map $targetMap -Roots $roots -Extensions @(".tmp", ".fixed") -Reason "Temporary editor/debug files (.tmp/.fixed)" -RepoRoot $repoRoot
 Add-HarFiles -Map $targetMap -RepoRoot $repoRoot
 
 $targets = $targetMap.Values | Sort-Object Path

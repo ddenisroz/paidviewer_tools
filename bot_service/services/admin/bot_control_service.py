@@ -1,6 +1,6 @@
-﻿# bot_service/services/admin/bot_control_service.py
+# bot_service/services/admin/bot_control_service.py
 """
-РЎРµСЂРІРёСЃ СѓРїСЂР°РІР»РµРЅРёСЏ Р±РѕС‚Р°РјРё (СЃС‚Р°С‚СѓСЃ, РїРµСЂРµР·Р°РїСѓСЃРє).
+Сервис управления ботами (статус, перезапуск).
 """
 
 import logging
@@ -18,10 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class BotControlService:
-    """РЎРµСЂРІРёСЃ РґР»СЏ СѓРїСЂР°РІР»РµРЅРёСЏ Р±РѕС‚Р°РјРё."""
+    """Сервис для управления ботами."""
 
     async def get_bots_status(self) -> dict:
-        """РџРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃ РІСЃРµС… Р±РѕС‚РѕРІ."""
+        """Получить статус всех ботов."""
         try:
             registry = get_bot_registry()
             connection_manager = get_connection_manager()
@@ -85,7 +85,7 @@ class BotControlService:
             }
 
     async def restart_bot(self, bot_name: str) -> dict:
-        """РџРµСЂРµР·Р°РїСѓСЃС‚РёС‚СЊ Р±РѕС‚Р°."""
+        """Перезапустить бота."""
         try:
             registry = get_bot_registry()
             connection_manager = get_connection_manager()
@@ -102,13 +102,13 @@ class BotControlService:
             return {"error": "Failed to restart bot"}
 
     async def _restart_twitch_bot(self, registry, connection_manager) -> dict:
-        """РџРµСЂРµР·Р°РїСѓСЃС‚РёС‚СЊ Twitch Р±РѕС‚Р°."""
+        """Перезапустить Twitch бота."""
         logger.info("[REFRESH] Restarting Twitch bot...")
 
-        # РћСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‚РµРєСѓС‰РёР№ Р±РѕС‚
+        # Останавливаем текущий бот
         await registry.stop_twitch_bot()
 
-        # РџРѕР»СѓС‡Р°РµРј Р°РєС‚РёРІРЅС‹Рµ РєР°РЅР°Р»С‹
+        # Получаем активные каналы
         db = next(get_db())
         try:
             active_channels = await connection_manager.get_twitch_channels_for_bot(db)
@@ -127,13 +127,13 @@ class BotControlService:
         }
 
     async def _restart_vk_bot(self, registry, connection_manager) -> dict:
-        """РџРµСЂРµР·Р°РїСѓСЃС‚РёС‚СЊ VK Live Р±РѕС‚Р°."""
+        """Перезапустить VK Live бота."""
         logger.info("[REFRESH] Restarting VK Live bot...")
 
-        # РћСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‚РµРєСѓС‰РёР№ Р±РѕС‚
+        # Останавливаем текущий бот
         await registry.stop_vk_bot()
 
-        # РџРѕР»СѓС‡Р°РµРј Р°РєС‚РёРІРЅС‹Рµ РєР°РЅР°Р»С‹
+        # Получаем активные каналы
         db = next(get_db())
         try:
             active_channels = await connection_manager.get_vk_channels_for_bot(db)
@@ -145,7 +145,7 @@ class BotControlService:
         if not success:
             return {"error": "VK bot OAuth token not configured. Use /auth/vk/bot/login"}
 
-        # РџРѕРґРєР»СЋС‡Р°РµРј Рє РєР°РЅР°Р»Р°Рј
+        # Подключаем к каналам
 
         logger.info(f"[OK] VK Live bot restarted with channels: {active_channels}")
         return {
@@ -154,7 +154,7 @@ class BotControlService:
         }
 
     async def restart_tts_engine(self) -> dict:
-        """РџРµСЂРµР·Р°РіСЂСѓР·РёС‚СЊ TTS РґРІРёР¶РѕРє."""
+        """Перезагрузить TTS движок."""
         try:
             tts_service_url = get_provider_service_url("f5")
             if not tts_service_url:

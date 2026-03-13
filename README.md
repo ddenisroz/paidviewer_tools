@@ -1,94 +1,109 @@
 # TTS_TTV
 
-Streamer platform: dashboard + bot service + TTS integrations (Twitch, VK, DonationAlerts, YouTube queue, drops).
+Платформа для стримеров: dashboard, `bot_service`, TTS-интеграции, YouTube queue, drops, DonationAlerts, MemeAlerts и сопутствующие инструменты.
 
-## Start Here
-- [docs/QUICKSTART.md](docs/QUICKSTART.md): fastest local setup.
-- [docs/STATUS_TRACKER.md](docs/STATUS_TRACKER.md): current delivery status, closed work, and open tasks.
-- [docs/README.md](docs/README.md): authoritative docs index (active vs historical).
-- [docs/REPO_STRUCTURE.md](docs/REPO_STRUCTURE.md): what each top-level folder is for.
-- [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md): production deployment.
-- [docs/architecture/ARCHITECTURE_GUIDE.md](docs/architecture/ARCHITECTURE_GUIDE.md): architecture deep dive.
+## С чего начать
 
-## Minimal Local Run (required path)
-1. Create and activate a project venv:
-- `python -m venv .venv`
-- Windows PowerShell: `.\.venv\Scripts\Activate.ps1`
+- [docs/QUICKSTART.md](docs/QUICKSTART.md) — быстрый локальный запуск.
+- [docs/STATUS_TRACKER.md](docs/STATUS_TRACKER.md) — текущее состояние проекта и что ещё открыто.
+- [docs/README.md](docs/README.md) — индекс актуальной документации.
+- [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) — короткий снимок текущей архитектуры.
+- [docs/setup/DEPLOYMENT.md](docs/setup/DEPLOYMENT.md) — активный контракт деплоя.
+- [docs/architecture/ARCHITECTURE_GUIDE.md](docs/architecture/ARCHITECTURE_GUIDE.md) — архитектурная карта проекта.
 
-2. Install project dependencies:
-- Backend runtime: `python -m pip install -r bot_service/requirements.txt`
-- Backend contributor extras: `python -m pip install -r bot_service/requirements_dev.txt`
-- Frontend: `cd frontend; npm install`
+## Быстрый локальный запуск
 
-3. Configure env files:
+1. Создай и активируй виртуальное окружение:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+2. Установи зависимости:
+
+```powershell
+python -m pip install --upgrade pip
+python -m pip install -r bot_service/requirements.txt
+python -m pip install -r bot_service/requirements_dev.txt
+cd frontend
+npm install
+cd ..
+```
+
+3. Подготовь `.env`:
+
 - `bot_service/.env`
 - `frontend/.env`
-- optional external TTS stack (recommended split):
-  - `TTS_GATEWAY_URL` + `TTS_GATEWAY_API_KEY` -> `tts-gateway`
-  - `F5_TTS_SERVICE_URL` + `F5_TTS_SERVICE_API_KEY` -> `f5-tts-service`
-  - `QWEN_TTS_SERVICE_URL` + `QWEN_TTS_SERVICE_API_KEY` -> `nano-qwen3tts-vllm`
-  - optional qwen voice CRUD extension: `QWEN_VOICE_SERVICE_URL`
 
-4. Run DB bootstrap:
-- Windows: `.\scripts\migrate.ps1`
-- Linux/Mac: `./scripts/migrate.sh`
+Минимум для backend:
+- `DATABASE_URL`
+- `SECRET_KEY`
+- `TWITCH_CLIENT_ID`
+- `TWITCH_CLIENT_SECRET`
 
-5. Start app:
-- Backend: `cd bot_service; python main.py`
-- Frontend: `cd frontend; npm run dev`
+Если поднимаешь внешний TTS-контур:
+- `TTS_GATEWAY_URL`
+- `TTS_GATEWAY_API_KEY`
+- `F5_TTS_SERVICE_URL`
+- `F5_TTS_SERVICE_API_KEY`
+- `QWEN_TTS_SERVICE_URL`
+- `QWEN_TTS_SERVICE_API_KEY`
+- опционально `QWEN_VOICE_SERVICE_URL`
 
-Frontend runtime contract:
-- frontend should know only backend API/WS URLs (`VITE_BOT_SERVICE_URL`, `VITE_BOT_SERVICE_WS_URL`).
-- direct runtime `VITE_TTS_SERVICE_URL` usage is deprecated.
+4. Прогони миграции:
 
-## What Is Core vs Noise
+```powershell
+cd bot_service
+alembic upgrade head
+cd ..
+```
 
-| Path | Role | Required for runtime |
-|---|---|---|
-| `bot_service/` | FastAPI backend (API, auth, services, repositories, models, bots) | Yes |
-| `frontend/` | React + Vite dashboard | Yes |
-| `deploy/` | Docker compose and nginx configs | Yes for container deploy |
-| `docs/` | Documentation | No runtime, but required for maintenance |
-| `scripts/` | Tooling and migrations | No runtime, operational |
-| `logs/` | Local runtime logs | No |
-| `.github/` | CI workflows | No local runtime |
-| `.husky/` | Git pre-commit hooks | No runtime, keep in repo |
-| `.venv/` | Local Python virtual environment | No runtime artifact in git |
+5. Запусти сервисы:
 
-## Why You See Folders Like `.benchmarks`, `artifacts`, `__pycache__`
+```powershell
+# backend
+cd bot_service
+python main.py
 
-These are local or generated artifacts, not business logic.
+# frontend
+cd frontend
+npm run dev
+```
 
-| Folder/File | Why it appears | Keep in git | Safe to delete |
-|---|---|---|---|
-| `.benchmarks/` | pytest benchmark output | No | Yes |
-| `artifacts/` | local test/CI-like output bundle | No | Yes |
-| `**/__pycache__/` | Python bytecode cache | No | Yes |
-| `bot_service/.ruff_cache/` | ruff lint cache | No | Yes |
-| `bot_service/.pytest_cache/` | pytest cache | No | Yes |
-| `bot_service/pytest-cache-files-*` | pytest temporary cache dirs | No | Yes |
-| `frontend/dist/` | frontend build output | No | Yes |
-| `logs/` | local logs | No | Yes (if logs not needed) |
-| `.venv/` | local Python environment and package bytecode | No | Yes (recreate with venv/pip install) |
+## Ключевой runtime-контракт
 
-## Cleanup Commands
-- Canonical script (single entrypoint): `.\scripts\prepare-release.ps1`
-- Dry-run (shows exactly what will be deleted): `.\scripts\prepare-release.ps1`
-- Apply cleanup: `.\scripts\prepare-release.ps1 -ApplyCleanup`
-- Apply cleanup + checks: `.\scripts\prepare-release.ps1 -ApplyCleanup -RunChecks`
-- Also clean `.venv` bytecode caches: `.\scripts\prepare-release.ps1 -ApplyCleanup -IncludeVenvCaches`
+- `frontend` общается только с `bot_service`.
+- Продвинутый TTS для `f5` и `qwen` идёт через внешние upstream-сервисы.
+- Прямое runtime-использование `VITE_TTS_SERVICE_URL` не допускается.
+- Browser TTS работает через отдельную вкладку `/tts-player`.
 
-By default this script targets generated artifacts only:
-- `artifacts/`, `.benchmarks/`, `playwright-report/`, `.playwright*/`
-- `.pytest_tmp/`, `tmp/`, `bot_service/tmp/`
-- `frontend/dist`, `frontend/coverage`, `frontend/.vite`, `frontend/.vitest`
-- `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `htmlcov`
-- `**/__pycache__/`, `*.pyc`, `*.pyo` (project roots; optional `.venv` via flag)
-- `*.har`
+## Очистка перед коммитом и релизной отгрузкой
 
-## Quality Gates Before Push
-- Backend: `cd bot_service; ruff check .; pytest -q`
-- Frontend: `cd frontend; npm run lint; npm run type-check; npm run build`
+Preview:
 
-## License
+```powershell
+.\scripts\prepare-release.ps1
+```
+
+Очистка:
+
+```powershell
+.\scripts\prepare-release.ps1 -ApplyCleanup
+```
+
+Очистка + проверки:
+
+```powershell
+.\scripts\prepare-release.ps1 -ApplyCleanup -RunChecks
+```
+
+## База данных и maintenance
+
+- Безопасное удаление пользователей: `bot_service/scripts/delete_users.py`
+- Гигиена БД: `bot_service/scripts/database_hygiene.py`
+- Maintenance-справка: `bot_service/scripts/README_MAINTENANCE.md`
+
+## Лицензия
+
 MIT

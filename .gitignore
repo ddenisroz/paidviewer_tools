@@ -232,6 +232,8 @@ dist
 tmp/
 temp/
 artifacts/
+*.tmp
+*.fixed
 
 # Logs
 logs

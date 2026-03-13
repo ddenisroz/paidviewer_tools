@@ -1,5 +1,5 @@
-﻿"""
-Twitch OAuth Р°РІС‚РѕСЂРёР·Р°С†РёСЏ
+"""
+Twitch OAuth авторизация
 """
 import httpx
 import logging
@@ -25,7 +25,7 @@ FRONTEND_URL = settings.frontend_url
 @router.get('/auth/twitch/login')
 @limiter.limit('10/minute')
 async def login_twitch(request: Request):
-    """Text cleaned."""
+    """Twitch OAuth login entrypoint."""
     try:
         if not TWITCH_CLIENT_ID:
             logger.error('TWITCH_CLIENT_ID not configured')
@@ -49,7 +49,7 @@ async def login_twitch(request: Request):
 @router.get('/auth/twitch/callback')
 @limiter.limit('20/minute')
 async def twitch_callback(request: Request, db: Session=Depends(get_db), code: str=None, state: str=None, error: str=None, error_description: str=None, current_user: Optional[Dict[str, Any]]=Depends(get_current_user_optional)):
-    """РћР±СЂР°Р±РѕС‚РєР° Twitch OAuth callback"""
+    """Обработка Twitch OAuth callback"""
     logger.info('Twitch callback received')
     if error:
         logger.warning(f'Twitch OAuth cancelled: {error} - {error_description}')

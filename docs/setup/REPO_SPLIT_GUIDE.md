@@ -1,83 +1,65 @@
-﻿# Repo Split Guide (core + gateway + F5 + Qwen)
+# Repo split guide
 
-Last updated: 2026-03-11
+Last updated: 2026-03-13
 
-Current implementation status lives in `docs/STATUS_TRACKER.md`.
+Этот документ фиксирует целевые границы между core repo и внешними TTS upstreams.
 
-Terminology used in this document:
+## Целевые репозитории
 
-- `self-hosted endpoint`: пользователь сам поднимает TTS и задает URL через `local_tts_endpoints`.
-- `project-hosted worker`: отдельный runtime-воркер проекта.
-- `gateway-managed`: `bot_service -> tts-gateway -> project-hosted workers`.
-- Existing runtime names `use_local`, `f5_local`, `qwen_local` are legacy naming for the self-hosted path.
-
-## 1. Target Repositories
-
-1. `ttv-core` (this repo)
-- `bot_service/`, `frontend/`, shared docs, deploy overlays.
-- Control-plane responsibilities: auth, moderation, queue orchestration, settings, provider routing policy.
+1. `ttv-core` — этот репозиторий
+   - `bot_service/`, `frontend/`, shared docs, deploy overlays
+   - control-plane ответственность: auth, moderation, orchestration, settings, provider routing policy
 
 2. `tts-gateway`
-- Advanced synthesis orchestrator for `f5` + `qwen`.
-- Scheduler/fairness, provider adapters, async job polling.
+   - advanced synthesis orchestrator для `f5` и `qwen`
+   - fairness/scheduling/provider adapters
 
-3. `f5-tts-service` (`phase1-bootstrap`)
-- F5 provider runtime + provider-owned voice/admin APIs.
+3. `f5-tts-service`
+   - F5 runtime + provider-owned voice/admin APIs
 
 4. `nano-qwen3tts-vllm`
-- Qwen inference engine.
-- Voice CRUD API is out of scope in current phase; add separate qwen voice service later.
+   - Qwen inference engine
+   - voice CRUD не входит в текущую фазу этого репозитория
 
-## 2. Contract Freeze (Core <-> Upstreams)
+## Термины
 
-### Synthesis
+- `self-hosted endpoint` — пользователь сам поднимает TTS и задаёт URL через `local_tts_endpoints`
+- `project-hosted worker` — отдельный runtime-воркер проекта
+- `gateway-managed` — `bot_service -> tts-gateway -> project-hosted workers`
 
-- Core calls gateway endpoint:
-  - `POST /api/tts/synthesize-channel`
-- Health:
-  - `GET /health/live`
-  - `GET /health/ready`
-  - `GET /health` (compat)
+## Что замораживается по контракту
+
+### Synth
+- core вызывает gateway synth endpoint
+- health идёт через backend `GET /api/tts/health`
 
 ### Voice/Admin
-
-- F5 voice/admin API stays provider-owned (`/api/tts/*`, `/api/admin/*`).
-- Qwen voice/admin in core returns `501` until `QWEN_VOICE_SERVICE_URL` is configured.
+- F5 voice/admin API остаётся provider-owned
+- Qwen voice/admin в core остаётся `501`, пока не задан `QWEN_VOICE_SERVICE_URL`
 
 ### Auth
+- только strict API-key mode для TTS upstreams
+- core отправляет `Authorization: Bearer <key>` и `X-API-Key: <key>`
 
-Strict API-key mode only for TTS upstreams.
+## Стабильная backend boundary для frontend
 
-Core sends both headers:
+- никакой прямой runtime зависимости от `VITE_TTS_SERVICE_URL`
+- health checks только через backend
+- capability gating только через backend
+- audio URL resolution должна оставаться backend-safe
 
-- `Authorization: Bearer <key>`
-- `X-API-Key: <key>`
+## Владение env
 
-Legacy JWT/key settings are compatibility-only and not part of target TTS contract.
-
-## 3. Core API Stability for Frontend
-
-Frontend keeps stable backend-only boundary:
-
-- no direct runtime dependency on `VITE_TTS_SERVICE_URL`
-- health checks only via backend: `GET /api/tts/health`
-- provider capability gating via backend: `GET /api/voices/providers/capabilities`
-- audio URL resolution must be backend-safe (relative -> backend base URL)
-
-## 4. Environment Ownership
-
-### `ttv-core` (`bot_service`)
-
+### `ttv-core`
 - `TTS_GATEWAY_URL`
 - `TTS_GATEWAY_API_KEY`
 - `F5_TTS_SERVICE_URL`
 - `F5_TTS_SERVICE_API_KEY`
 - `QWEN_TTS_SERVICE_URL`
-- `QWEN_TTS_SERVICE_API_KEY` (reserved)
-- `QWEN_VOICE_SERVICE_URL` (optional, enables qwen voice CRUD routing)
+- `QWEN_TTS_SERVICE_API_KEY`
+- `QWEN_VOICE_SERVICE_URL`
 
 ### `tts-gateway`
-
 - `TTS_GATEWAY_API_KEYS`
 - `TTS_GATEWAY_REDIS_URL`
 - `TTS_GATEWAY_F5_URL`
@@ -86,52 +68,15 @@ Frontend keeps stable backend-only boundary:
 - `TTS_GATEWAY_QWEN_API_KEY`
 
 ### `f5-tts-service`
-
 - `F5_TTS_SERVICE_API_KEYS`
 - `F5_TTS_DATABASE_URL`
-- optional model/runtime vars (`F5_TTS_*`)
 
 ### `nano-qwen3tts-vllm`
+- runtime/model vars из upstream repo
 
-- runtime/model vars from repo docs
-- runs as inference engine behind gateway
+## Текущая фаза
 
-## 5. Current Phase Behavior
-
-1. Synthesis routing:
-- `f5` -> gateway-managed (preferred) or project-hosted direct fallback if gateway missing.
-- `qwen` -> gateway-managed only in managed mode; without gateway core returns controlled unavailable status and falls back to basic TTS runtime path.
-- self-hosted endpoints remain a separate user-configured path and are not the same as project-hosted workers.
-
-2. Voice routing:
-- `f5` -> provider voice/admin endpoints.
-- `qwen` -> `501` by default.
-- if `QWEN_VOICE_SERVICE_URL` is set, qwen voice/admin routes switch automatically without frontend API changes.
-
-## 6. Cutover Sequence
-
-1. Deploy `f5-tts-service` + `nano-qwen3tts-vllm`.
-2. Deploy `tts-gateway` with Redis and API keys.
-3. Set core env (`TTS_GATEWAY_URL`, `TTS_GATEWAY_API_KEY`, provider URLs/keys).
-4. Run smoke:
-- synth `provider=f5` through gateway
-- synth `provider=qwen` through gateway
-- F5 voice CRUD via core
-- qwen voice CRUD returns expected `501`
-5. Enable optional qwen voice service later and set `QWEN_VOICE_SERVICE_URL`.
-
-## 7. Rollback
-
-1. Keep frontend unchanged (still backend-only).
-2. For synthesis rollback:
-- switch `TTS_GATEWAY_URL` off if needed.
-- `f5` can still run direct.
-- `qwen` cloud synthesis becomes unavailable until gateway returns.
-3. Restart `bot_service` to apply env changes.
-
-## 8. Validation Checklist
-
-- No direct frontend runtime usage of `F5_TTS_SERVICE_URL`/`VITE_TTS_SERVICE_URL`.
-- Backend exposes `GET /api/tts/health` and `GET /api/voices/providers/capabilities`.
-- Qwen voice CRUD is capability-gated and returns explicit `501` detail when disabled.
-- Compose/env files use strict API-key variable names for gateway/F5 upstreams.
+- `f5` synth: gateway-managed first, direct project-hosted fallback допустим
+- `qwen` synth: gateway-managed в managed mode
+- self-hosted endpoints остаются отдельным пользовательским path
+- `qwen` voice CRUD пока intentionally unavailable
