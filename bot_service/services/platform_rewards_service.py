@@ -50,7 +50,7 @@ class PlatformRewardsService:
         """Get rewards from platform."""
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
         if not token:
-            raise HTTPException(status_code=404, detail=f"Токен для платформы {platform} не найден")
+            raise HTTPException(status_code=404, detail=f"Token for platform {platform} not found")
 
         decrypted_token = self.user_service.decrypt_access_token(token.access_token) # Legacy decrypt? 
         # Wait, get_user_token returns model with likely encrypted token if stored encrypted.
@@ -75,7 +75,7 @@ class PlatformRewardsService:
 
     async def _get_twitch_rewards(self, broadcaster_id: str, token_info: TokenInfo) -> List[Dict[str, Any]]:
         if not broadcaster_id:
-             raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
+             raise HTTPException(status_code=404, detail="Twitch broadcaster ID not found")
         
         try:
             return await self.twitch_client.get_custom_rewards(broadcaster_id, token_info, only_manageable=True)
@@ -89,7 +89,7 @@ class PlatformRewardsService:
         if rewards is None:
             raise HTTPException(
                 status_code=400,
-                detail="Не удалось получить награды от VK (проверьте, что баллы включены и у токена есть нужные права)"
+                detail="Failed to fetch VK rewards. Verify that channel points are enabled and the token has the required scopes."
             )
         
         # Normalize VK rewards
@@ -108,14 +108,14 @@ class PlatformRewardsService:
         """Create a reward on the platform."""
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
         if not token:
-            raise HTTPException(status_code=404, detail=f"Токен для платформы {platform} не найден")
+            raise HTTPException(status_code=404, detail=f"Token for platform {platform} not found")
         
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
 
         if platform.lower() == 'twitch':
             broadcaster_id = token.platform_user_id
             if not broadcaster_id:
-                 raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
+                 raise HTTPException(status_code=404, detail="Twitch broadcaster ID not found")
             
             # Map data to Twitch format if needed (handled by caller or here?)
             # The API endpoint constructed specific dictionaries. 
@@ -147,7 +147,7 @@ class PlatformRewardsService:
             
             result = await vk_api.create_channel_reward(channel_name, decrypted_token, vk_data)
             if not result:
-                raise HTTPException(status_code=400, detail="Ошибка создания награды на VK Live API")
+                raise HTTPException(status_code=400, detail="VK Live API failed to create the reward")
             return result
         
         return None
@@ -225,7 +225,7 @@ class PlatformRewardsService:
     async def update_reward(self, user_id: int, platform: str, reward_id: str, reward_data: Dict[str, Any], db) -> Dict[str, Any]:
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
         if not token:
-            raise HTTPException(status_code=404, detail=f"Токен для платформы {platform} не найден")
+            raise HTTPException(status_code=404, detail=f"Token for platform {platform} not found")
 
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
 
@@ -248,13 +248,13 @@ class PlatformRewardsService:
             
             result = await vk_api.edit_channel_reward(channel_name, reward_id, decrypted_token, vk_data)
             if not result:
-                raise HTTPException(status_code=400, detail="Ошибка обновления награды на VK Live API")
+                raise HTTPException(status_code=400, detail="VK Live API failed to update the reward")
             return result
             
     async def delete_reward(self, user_id: int, platform: str, reward_id: str, db) -> bool:
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
         if not token:
-             raise HTTPException(status_code=404, detail=f"Токен для платформы {platform} не найден")
+             raise HTTPException(status_code=404, detail=f"Token for platform {platform} not found")
 
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
         
@@ -281,7 +281,7 @@ class PlatformRewardsService:
     async def get_redemptions(self, user_id: int, platform: str, reward_id: str, status: Optional[str], db) -> List[Dict[str, Any]]:
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
         if not token:
-             raise HTTPException(status_code=404, detail=f"Токен для платформы {platform} не найден")
+             raise HTTPException(status_code=404, detail=f"Token for platform {platform} not found")
         
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
         
@@ -317,7 +317,7 @@ class PlatformRewardsService:
     async def update_redemption_status(self, user_id: int, platform: str, reward_id: str, redemption_id: str, status: str, db) -> bool:
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
         if not token:
-             raise HTTPException(status_code=404, detail=f"Токен для платформы {platform} не найден")
+             raise HTTPException(status_code=404, detail=f"Token for platform {platform} not found")
              
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
         
@@ -383,7 +383,7 @@ class PlatformRewardsService:
     async def toggle_reward(self, user_id: int, platform: str, reward_id: str, is_enabled: bool, db) -> bool:
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
         if not token:
-             raise HTTPException(status_code=404, detail=f"Токен для платформы {platform} не найден")
+             raise HTTPException(status_code=404, detail=f"Token for platform {platform} not found")
         
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
         

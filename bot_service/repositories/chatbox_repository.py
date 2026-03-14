@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def generate_widget_token() -> str:
-    """Генерирует уникальный токен для виджета (32 символа)"""
+    """Generate a unique widget token (32 characters)."""
     return secrets.token_urlsafe(24)
 
 

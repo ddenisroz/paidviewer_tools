@@ -1,18 +1,18 @@
 # bot_service/integrations/__init__.py
 """
-Integrations Layer - изолированный слой для работы с внешними сервисами.
+Integrations layer - isolated interfaces for external services.
 
-Этот слой инкапсулирует всю логику взаимодействия с внешними API:
+This layer encapsulates all external API interaction logic:
 - Twitch API, OAuth, EventSub
 - VK Live API
 - DonationAlerts API
 - TTS Engines (Google, F5)
 
-Ключевые принципы:
-1. Ошибки внешних сервисов НЕ роняют приложение
-2. Retry логика и таймауты настроены
-3. Токены обновляются автоматически
-4. Каждая интеграция полностью изолирована
+Key principles:
+1. External-service failures must NOT crash the application
+2. Retry logic and timeouts are configured centrally
+3. Tokens are refreshed automatically
+4. Each integration is fully isolated
 """
 
 from .twitch import TwitchClient

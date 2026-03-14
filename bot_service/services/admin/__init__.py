@@ -1,14 +1,14 @@
 # bot_service/services/admin/__init__.py
 """
-Модуль административных сервисов.
+Administrative services package.
 
-Разделение AdminAPI на отдельные сервисы по принципу единственной ответственности:
-- whitelist_service: управление белым списком каналов
-- blocked_bots_service: управление заблокированными ботами
-- user_management_service: управление пользователями
-- bot_control_service: управление ботами (restart, status)
-- logs_service: работа с логами
-- stats_service: статистика для dashboard
+The former AdminAPI surface is split into focused services:
+- whitelist_service: channel whitelist management
+- blocked_bots_service: blocked bot management
+- user_management_service: user administration
+- bot_control_service: bot status and restart controls
+- logs_service: log access helpers
+- stats_service: dashboard statistics
 """
 
 from .whitelist_service import WhitelistService

@@ -21,7 +21,7 @@ async def get_twitch_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить награды Twitch канала"""
+    """Get Twitch channel rewards."""
     try:
         rewards = await get_platform_rewards_service().get_rewards(user['id'], 'twitch', db)
         
@@ -45,7 +45,7 @@ async def create_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать награду на Twitch"""
+    """Create a reward on Twitch."""
     try:
         result = await get_platform_rewards_service().create_reward(
             user['id'], 'twitch', reward_data.dict(), db
@@ -70,7 +70,7 @@ async def update_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить награду на Twitch"""
+    """Update a reward on Twitch."""
     try:
         result = await get_platform_rewards_service().update_reward(
             user['id'], 'twitch', reward_id, reward_data.dict(), db
@@ -94,14 +94,14 @@ async def delete_twitch_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить награду на Twitch"""
+    """Delete a reward on Twitch."""
     try:
         await get_platform_rewards_service().delete_reward(user['id'], 'twitch', reward_id, db)
 
         return JSONResponse(content={
             "success": True,
             "platform": "twitch",
-            "message": "Награда удалена"
+            "message": "Reward deleted."
         })
 
     except HTTPException:
@@ -116,7 +116,7 @@ async def get_platform_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить награды напрямую с платформы (Twitch или VK Live) - универсальный эндпоинт"""
+    """Get rewards directly from a platform (Twitch or VK Live)."""
     try:
         rewards = await get_platform_rewards_service().get_rewards(user['id'], platform, db)
 
@@ -139,7 +139,7 @@ async def create_platform_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать награду на платформе (Twitch или VK Live) - универсальный эндпоинт"""
+    """Create a reward on a platform (Twitch or VK Live)."""
     try:
         result = await get_platform_rewards_service().create_reward(
             user['id'], platform, reward_data, db
@@ -164,13 +164,13 @@ async def delete_platform_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить награду на платформе - универсальный эндпоинт"""
+    """Delete a reward on a platform."""
     try:
         await get_platform_rewards_service().delete_reward(user['id'], platform, reward_id, db)
 
         return {
             "success": True,
-            "message": "Награда удалена"
+            "message": "Reward deleted."
         }
 
     except HTTPException:
@@ -187,7 +187,7 @@ async def get_platform_redemptions(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список использований награды с платформы"""
+    """Get reward redemptions from the platform."""
     try:
         redemptions = await get_platform_rewards_service().get_redemptions(
             user['id'], platform, reward_id, status, db
@@ -214,18 +214,18 @@ async def update_platform_redemption(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить статус использования награды (одобрить/отклонить)"""
+    """Update reward-redemption status (approve or reject)."""
     try:
         success = await get_platform_rewards_service().update_redemption_status(
             user['id'], platform, reward_id, redemption_id, status, db
         )
 
         if not success:
-             raise HTTPException(status_code=500, detail="Ошибка обновления статуса")
+              raise HTTPException(status_code=500, detail="Failed to update the status.")
              
         return {
             "success": True,
-            "message": f"Статус обновлен: {status}"
+            "message": f"Status updated: {status}"
         }
 
     except HTTPException:

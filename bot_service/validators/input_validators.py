@@ -1,61 +1,65 @@
-"""
-Валидаторы входных данных для API
-"""
-import re
+﻿"""Input validators and sanitizers for the API layer."""
+
 import html
+import re
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, field_validator, Field, ConfigDict
+
 from fastapi import HTTPException, status
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+CYRILLIC_RANGE = "\\u0400-\\u04FF"
+ALPHANUMERIC_WITH_CYRILLIC = rf"^[a-zA-Z0-9{CYRILLIC_RANGE}\s\-_]+$"
+USERNAME_WITH_CYRILLIC = rf"^[a-zA-Z0-9{CYRILLIC_RANGE}_\-]+$"
+VOICE_NAME_WITH_CYRILLIC = rf"[^a-zA-Z{CYRILLIC_RANGE}0-9\s_-]"
+
 
 class BaseValidator(BaseModel):
-    """Базовый валидатор с общими правилами"""
+    """Base validator with common safety rules."""
 
-    model_config = ConfigDict(
-        # Запрещаем дополнительные поля
-        extra="forbid",
-        # Валидируем присваивание
-        validate_assignment=True
-    )
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
 
 class VoiceUploadValidator(BaseValidator):
-    """Валидатор для загрузки голосов"""
+    """Validator for uploaded voice files."""
+
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
-    file_size: int = Field(..., gt=0, le=10 * 1024 * 1024)  # Максимум 10MB
+    file_size: int = Field(..., gt=0, le=10 * 1024 * 1024)
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
-        if not re.match(r'^[a-zA-Z0-9а-яА-Я\s\-_]+$', v):
-            raise ValueError('Name contains invalid characters')
-        return v.strip()
+    def validate_name(cls, value: str) -> str:
+        if not re.match(ALPHANUMERIC_WITH_CYRILLIC, value):
+            raise ValueError("Name contains invalid characters")
+        return value.strip()
 
-    @field_validator('description')
+    @field_validator("description")
     @classmethod
-    def validate_description(cls, v):
-        if v is not None:
-            # Удаляем потенциально опасные символы
-            v = re.sub(r'[<>"\']', '', v)
-        return v
+    def validate_description(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            value = re.sub(r"[<>\"']", "", value)
+        return value
+
 
 class TTSMessageValidator(BaseValidator):
-    """Валидатор для TTS сообщений"""
+    """Validator for TTS synthesis requests."""
+
     text: str = Field(..., min_length=1, max_length=500)
     voice_id: Optional[int] = Field(None, gt=0)
     speed: Optional[float] = Field(1.0, ge=0.5, le=2.0)
 
-    @field_validator('text')
+    @field_validator("text")
     @classmethod
-    def validate_text(cls, v):
-        # Удаляем потенциально опасные символы
-        v = re.sub(r'[<>"\']', '', v)
-        # Ограничиваем длину
-        if len(v) > 500:
-            raise ValueError('Text too long')
-        return v.strip()
+    def validate_text(cls, value: str) -> str:
+        value = re.sub(r"[<>\"']", "", value)
+        if len(value) > 500:
+            raise ValueError("Text too long")
+        return value.strip()
+
 
 class UserSettingsValidator(BaseValidator):
-    """Валидатор для настроек пользователя"""
+    """Validator for user settings updates."""
+
     website_volume: int = Field(50, ge=0, le=100)
     obs_volume: int = Field(50, ge=0, le=100)
     enable_7tv: bool = Field(True)
@@ -63,83 +67,72 @@ class UserSettingsValidator(BaseValidator):
     enable_lexicon_filter: bool = Field(True)
     enable_custom_lexicon: bool = Field(False)
 
+
 class AdminUserValidator(BaseValidator):
-    """Валидатор для создания админов"""
-    platform: str = Field(..., pattern=r'^(twitch|vk)$')
+    """Validator for admin user creation payloads."""
+
+    platform: str = Field(..., pattern=r"^(twitch|vk)$")
     platform_user_id: str = Field(..., min_length=1, max_length=100)
     username: Optional[str] = Field(None, max_length=100)
     permissions: Optional[Dict[str, Any]] = Field(None)
 
-    @field_validator('platform_user_id')
+    @field_validator("platform_user_id")
     @classmethod
-    def validate_platform_user_id(cls, v):
-        if not re.match(r'^[a-zA-Z0-9_\-]+$', v):
-            raise ValueError('Invalid platform user ID format')
-        return v
+    def validate_platform_user_id(cls, value: str) -> str:
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", value):
+            raise ValueError("Invalid platform user ID format")
+        return value
+
 
 class FilteredWordValidator(BaseValidator):
-    """Валидатор для фильтрованных слов"""
+    """Validator for filtered words."""
+
     word: str = Field(..., min_length=1, max_length=50)
     is_regex: bool = Field(False)
 
-    @field_validator('word')
+    @field_validator("word")
     @classmethod
-    def validate_word(cls, v):
-        if not v.strip():
-            raise ValueError('Word cannot be empty')
-        return v.strip().lower()
+    def validate_word(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Word cannot be empty")
+        return value.strip().lower()
+
 
 def validate_file_upload(file: Any, max_size: int = 10 * 1024 * 1024) -> None:
-    """Валидирует загружаемый файл"""
+    """Validate a basic uploaded audio file object."""
+
     if not file:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No file provided"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No file provided")
 
     if file.size > max_size:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File too large. Maximum size: {max_size // (1024*1024)}MB"
+            detail=f"File too large. Maximum size: {max_size // (1024 * 1024)}MB",
         )
 
-    # Проверяем расширение файла
-    allowed_extensions = ['.wav', '.mp3', '.ogg', '.m4a']
-    file_extension = file.filename.lower().split('.')[-1] if '.' in file.filename else ''
+    allowed_extensions = [".wav", ".mp3", ".ogg", ".m4a"]
+    file_extension = file.filename.lower().split(".")[-1] if "." in file.filename else ""
 
-    if f'.{file_extension}' not in allowed_extensions:
+    if f".{file_extension}" not in allowed_extensions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
+            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}",
         )
 
+
 def sanitize_input(text: str, max_length: int = 1000, allow_special: bool = False) -> str:
-    """
-    Санитизирует пользовательский ввод против XSS и SQL Injection
-    
-    Args:
-        text: Текст для санитизации
-        max_length: Максимальная длина (по умолчанию 1000)
-        allow_special: Разрешить специальные символы (опасно)
-    
-    Returns:
-        Очищенный текст
-    """
+    """Sanitize user input against XSS and unsafe raw-SQL usage."""
+
     if not text:
         return ""
 
-    # HTML-кодируем для защиты от XSS
     text = html.escape(text)
 
-    # Если не разрешены специальные символы, удаляем их
     if not allow_special:
-        # Удаляем потенциально опасные символы
-        text = re.sub(r'[<>"\';\\`]', '', text)
+        text = re.sub(r"[<>\"';\\`]", "", text)
 
-    # Удаляем управляющие символы и невидимые символы
-    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+    text = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", text)
 
-    # Ограничиваем длину
     if len(text) > max_length:
         text = text[:max_length]
 
@@ -147,29 +140,16 @@ def sanitize_input(text: str, max_length: int = 1000, allow_special: bool = Fals
 
 
 def sanitize_stream_title(title: str) -> str:
-    """
-    Санитизирует название стрима
-    
-    Args:
-        title: Название стрима
-    
-    Returns:
-        Очищенное название
-    """
+    """Sanitize a stream title for safe storage and display."""
+
     if not title:
         return ""
 
-    # Удаляем HTML теги
-    title = re.sub(r'<[^>]*>', '', title)
+    title = re.sub(r"<[^>]*>", "", title)
+    title = re.sub(r"javascript:", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"on\w+\s*=", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", title)
 
-    # Удаляем script-подобный контент
-    title = re.sub(r'javascript:', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'on\w+\s*=', '', title, flags=re.IGNORECASE)
-
-    # Удаляем управляющие символы
-    title = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', title)
-
-    # Ограничиваем длину
     if len(title) > 140:
         title = title[:140]
 
@@ -177,25 +157,14 @@ def sanitize_stream_title(title: str) -> str:
 
 
 def sanitize_tts_message(message: str) -> str:
-    """
-    Санитизирует TTS сообщение
-    
-    Args:
-        message: TTS сообщение
-    
-    Returns:
-        Очищенное сообщение
-    """
+    """Sanitize a TTS message before synthesis."""
+
     if not message:
         return ""
 
-    # Удаляем HTML теги
-    message = re.sub(r'<[^>]*>', '', message)
+    message = re.sub(r"<[^>]*>", "", message)
+    message = re.sub(r"[\x00-\x1f\x7f-\x9f]", "", message)
 
-    # Удаляем управляющие символы
-    message = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', message)
-
-    # Ограничиваем длину
     if len(message) > 500:
         message = message[:500]
 
@@ -203,22 +172,13 @@ def sanitize_tts_message(message: str) -> str:
 
 
 def sanitize_voice_name(name: str) -> str:
-    """
-    Санитизирует название голоса
-    
-    Args:
-        name: Название голоса
-    
-    Returns:
-        Очищенное название
-    """
+    """Sanitize a voice display name."""
+
     if not name:
         return ""
 
-    # Разрешаем только буквы, цифры, пробелы, дефисы и подчеркивания
-    name = re.sub(r'[^a-zA-Zа-яА-ЯёЁ0-9\s_-]', '', name)
+    name = re.sub(VOICE_NAME_WITH_CYRILLIC, "", name)
 
-    # Ограничиваем длину
     if len(name) > 50:
         name = name[:50]
 
@@ -226,26 +186,15 @@ def sanitize_voice_name(name: str) -> str:
 
 
 def sanitize_file_name(filename: str) -> str:
-    """
-    Санитизирует имя файла
-    
-    Args:
-        filename: Имя файла
-    
-    Returns:
-        Очищенное имя файла
-    """
+    """Sanitize a filename for safe storage."""
+
     if not filename:
         return ""
 
-    # Удаляем попытки обхода пути
-    filename = filename.replace('..', '')
-    filename = re.sub(r'[/\\]', '', filename)
+    filename = filename.replace("..", "")
+    filename = re.sub(r"[/\\]", "", filename)
+    filename = re.sub(r"[<>:\"|?*\x00-\x1f]", "", filename)
 
-    # Удаляем опасные символы
-    filename = re.sub(r'[<>:"|?*\x00-\x1f]', '', filename)
-
-    # Ограничиваем длину
     if len(filename) > 255:
         filename = filename[:255]
 
@@ -253,25 +202,14 @@ def sanitize_file_name(filename: str) -> str:
 
 
 def sanitize_sql_string(text: str) -> str:
-    """
-    Санитизирует строку для использования в raw SQL (дополнение к ORM)
-    
-    Args:
-        text: Текст для санитизации
-    
-    Returns:
-        Очищенный текст, безопасный для SQL
-    """
+    """Sanitize a string before using it in raw SQL fragments."""
+
     if not text:
         return ""
 
-    # Экранируем одиночные кавычки
     text = text.replace("'", "''")
+    text = re.sub(r"(-{2}|/\*|\*/)|(;)", "", text)
 
-    # Удаляем потенциально опасные символы и комментарии
-    text = re.sub(r'(-{2}|/\*|\*/)|(;)', '', text)
-
-    # Ограничиваем длину
     if len(text) > 1000:
         text = text[:1000]
 
@@ -279,36 +217,35 @@ def sanitize_sql_string(text: str) -> str:
 
 
 def validate_username(username: str) -> str:
-    """Валидирует имя пользователя"""
+    """Validate a platform username."""
+
     if not username or len(username) < 1 or len(username) > 100:
         raise ValueError("Username must be between 1 and 100 characters")
 
-    # Только буквы, цифры, подчеркивание и дефис
-    if not re.match(r'^[a-zA-Z0-9а-яА-Я_\-]+$', username):
+    if not re.match(USERNAME_WITH_CYRILLIC, username):
         raise ValueError("Username contains invalid characters")
 
     return username.strip()
 
 
 def validate_email(email: str) -> str:
-    """Валидирует email адрес"""
-    # Простая валидация email
-    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+    """Validate an email address."""
+
+    if not re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email):
         raise ValueError("Invalid email format")
 
     return email.lower().strip()
 
 
 def validate_url(url: str) -> str:
-    """Валидирует URL"""
+    """Validate a URL string."""
+
     if not url:
         raise ValueError("URL cannot be empty")
 
-    # Проверяем что URL начинается с http:// или https://
-    if not url.startswith(('http://', 'https://')):
+    if not url.startswith(("http://", "https://")):
         raise ValueError("URL must start with http:// or https://")
 
-    # Ограничиваем длину URL
     if len(url) > 2048:
         raise ValueError("URL is too long")
 
@@ -316,31 +253,32 @@ def validate_url(url: str) -> str:
 
 
 def validate_command_name(name: str) -> str:
-    """Валидирует имя команды"""
+    """Validate a command name."""
+
     if not name or len(name) < 1 or len(name) > 50:
         raise ValueError("Command name must be between 1 and 50 characters")
 
-    # Только буквы, цифры, подчеркивание
-    if not re.match(r'^[a-zA-Z0-9_]+$', name):
+    if not re.match(r"^[a-zA-Z0-9_]+$", name):
         raise ValueError("Command name contains invalid characters")
 
     return name.lower().strip()
 
 
 def validate_json_key(key: str) -> str:
-    """Валидирует ключ JSON объекта"""
+    """Validate a JSON object key."""
+
     if not key or len(key) < 1 or len(key) > 100:
         raise ValueError("JSON key must be between 1 and 100 characters")
 
-    # Только буквы, цифры, подчеркивание и дефис
-    if not re.match(r'^[a-zA-Z0-9_\-]+$', key):
+    if not re.match(r"^[a-zA-Z0-9_\-]+$", key):
         raise ValueError("JSON key contains invalid characters")
 
     return key.strip()
 
 
 def validate_pagination(page: int = 1, limit: int = 20) -> tuple[int, int]:
-    """Валидирует параметры пагинации"""
+    """Normalize pagination parameters."""
+
     if page < 1:
         page = 1
     if limit < 1 or limit > 100:

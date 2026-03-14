@@ -28,14 +28,14 @@ class UserService:
         repo = self._get_repository(db)
         user = repo.get_by_id(user_id) # Using get_by_id from BaseRepository interface if available, or just get
         if not user:
-             raise HTTPException(status_code=404, detail="VK канал не настроен")
+             raise HTTPException(status_code=404, detail="VK channel is not configured.")
         channel_name = (user.vk_channel_name or "").strip()
         if not channel_name:
             fallback = (user.vk_username or "").strip()
             if fallback and " " not in fallback and "/" not in fallback:
                 channel_name = fallback
         if not channel_name:
-             raise HTTPException(status_code=404, detail="VK канал не настроен")
+             raise HTTPException(status_code=404, detail="VK channel is not configured.")
         return channel_name
 
     def decrypt_access_token(self, encrypted_token: str) -> str:
@@ -46,9 +46,9 @@ class UserService:
         """Get Twitch broadcaster ID (platform_user_id) for the user."""
         token = self.get_user_token(user_id, "twitch", db)
         if not token:
-             raise HTTPException(status_code=404, detail="Твич токен не найден. Пожалуйста, авторизуйтесь")
+             raise HTTPException(status_code=404, detail="Twitch token not found. Please sign in again.")
         
         if not token.platform_user_id:
-             raise HTTPException(status_code=404, detail="Twitch broadcaster ID не найден")
+             raise HTTPException(status_code=404, detail="Twitch broadcaster ID not found.")
              
         return token.platform_user_id

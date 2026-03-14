@@ -1,6 +1,6 @@
 # bot_service/repositories/user_token_repository.py
 """
-Репозиторий для работы с токенами пользователей.
+Repository for user-token operations.
 """
 
 import logging
@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 class UserTokenRepository(BaseRepository[UserToken]):
     """
-    Репозиторий для UserToken.
+    Repository for UserToken.
     
-    Использование:
+    Usage:
         repo = UserTokenRepository(db)
         token = repo.get_by_user_and_platform(user_id, "twitch")
     """
@@ -32,14 +32,14 @@ class UserTokenRepository(BaseRepository[UserToken]):
         user_id: int, 
         platform: str
     ) -> Optional[UserToken]:
-        """Получает токен пользователя для конкретной платформы."""
+        """Get a user token for the selected platform."""
         return self.db.query(UserToken).filter(
             UserToken.user_id == user_id,
             UserToken.platform == platform
         ).first()
 
     def get_active_token(self, user_id: int, platform: str) -> Optional[UserToken]:
-        """Получает активный токен пользователя для конкретной платформы."""
+        """Get an active user token for the selected platform."""
         return self.db.query(UserToken).filter(
             UserToken.user_id == user_id,
             UserToken.platform == platform,
@@ -47,13 +47,13 @@ class UserTokenRepository(BaseRepository[UserToken]):
         ).first()
     
     def get_all_by_user(self, user_id: int) -> List[UserToken]:
-        """Получает все токены пользователя."""
+        """Get all tokens for a user."""
         return self.db.query(UserToken).filter(
             UserToken.user_id == user_id
         ).all()
     
     def get_valid_tokens(self, user_id: int) -> List[UserToken]:
-        """Получает только валидные (не истёкшие) токены пользователя."""
+        """Get only valid, non-expired user tokens."""
         now = datetime.utcnow()
         return self.db.query(UserToken).filter(
             UserToken.user_id == user_id,
@@ -72,7 +72,7 @@ class UserTokenRepository(BaseRepository[UserToken]):
         scopes: Optional[List[str]] = None,
         avatar_url: Optional[str] = None,
     ) -> UserToken:
-        """Создаёт или обновляет токен."""
+        """Create or update a token."""
         token = self.get_by_user_and_platform(user_id, platform)
         
         if token:
@@ -111,7 +111,7 @@ class UserTokenRepository(BaseRepository[UserToken]):
         user_id: int, 
         platform: str
     ) -> bool:
-        """Удаляет токен пользователя для платформы."""
+        """Delete a user token for the selected platform."""
         result = self.db.query(UserToken).filter(
             UserToken.user_id == user_id,
             UserToken.platform == platform
@@ -123,7 +123,7 @@ class UserTokenRepository(BaseRepository[UserToken]):
         return result > 0
     
     def delete_all_by_user(self, user_id: int) -> int:
-        """Удаляет все токены пользователя. Возвращает количество удалённых."""
+        """Delete all user tokens and return the deleted row count."""
         result = self.db.query(UserToken).filter(
             UserToken.user_id == user_id
         ).delete()
@@ -133,21 +133,21 @@ class UserTokenRepository(BaseRepository[UserToken]):
         return result
     
     def get_first_by_platform(self, platform: str) -> Optional[UserToken]:
-        """Получает первый доступный токен для платформы (fallback)."""
+        """Get the first available token for a platform as a fallback."""
         return self.db.query(UserToken).filter(
             UserToken.platform == platform,
             UserToken.access_token.isnot(None)
         ).first()
     
     def get_active_by_user(self, user_id: int) -> List[UserToken]:
-        """Получает все активные токены пользователя."""
+        """Get all active tokens for a user."""
         return self.db.query(UserToken).filter(
             UserToken.user_id == user_id,
             UserToken.is_active == True
         ).all()
 
     def get_expiring_tokens(self, platform: str, threshold: datetime) -> List[UserToken]:
-        """Получает активные токены, которые истекают до указанного времени."""
+        """Get active tokens that expire before the specified time."""
         return self.db.query(UserToken).filter(
             UserToken.platform == platform,
             UserToken.is_active == True,
@@ -155,7 +155,7 @@ class UserTokenRepository(BaseRepository[UserToken]):
         ).all()
 
     def get_active_token_by_session(self, session_id: str, platform: str) -> Optional[UserToken]:
-        """Получает активный токен по session_id."""
+        """Get an active token by session_id."""
         return self.db.query(UserToken).filter(
             UserToken.session_id == session_id,
             UserToken.platform == platform,

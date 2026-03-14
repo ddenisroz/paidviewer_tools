@@ -1,5 +1,5 @@
 # bot_service/api/donationalerts_api.py
-"""API для DonationAlerts - Clean Architecture версия"""
+"""DonationAlerts API - Clean Architecture version."""
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -37,7 +37,7 @@ async def get_donationalerts_status(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Получить статус DonationAlerts"""
+    """Get the DonationAlerts status."""
     try:
         # Extract user_id from user dict
         user_id = user.get('id') if user else None
@@ -49,7 +49,7 @@ async def get_donationalerts_status(
                 "user_info": None
             }
 
-        # Проверяем наличие токена DonationAlerts через репозиторий
+        # Check whether a DonationAlerts token exists in the repository.
         token_repo = UserTokenRepository(db)
         token = token_repo.get_by_user_and_platform(user_id, "donationalerts")
 
@@ -80,9 +80,9 @@ async def connect_donationalerts(
     db: Session = Depends(get_db),
     response: Response = None,
 ):
-    """Подключить DonationAlerts"""
+    """Connect DonationAlerts."""
     try:
-        # Проверяем что пользователь авторизован
+        # Ensure that the user is authenticated.
         # NOTE: optional auth may return None for unauthenticated requests.
         if not user or not user.get('id') or user.get('id') <= 0:
             logger.error("User not authenticated")
@@ -90,16 +90,16 @@ async def connect_donationalerts(
             
         user_id = user.get('id')
 
-        # Получаем настройки
+        # Read the current settings.
         client_id = settings.donationalerts_client_id
         redirect_uri = settings.donationalerts_redirect_uri
 
-        # Проверяем настройки
+        # Validate the settings.
         if not client_id:
             logger.error("DONATIONALERTS_CLIENT_ID not set in environment variables")
             raise HTTPException(status_code=503, detail="DonationAlerts integration is not configured")
 
-        # Формируем URL авторизации
+        # Build the authorization URL.
         state = secrets.token_urlsafe(16)
         params = {
             "client_id": client_id,
@@ -143,14 +143,14 @@ async def disconnect_donationalerts(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    """Отключить DonationAlerts"""
+    """Disconnect DonationAlerts."""
     try:
         if not user or not user.get('id') or user.get('id') <= 0:
             raise HTTPException(status_code=401, detail="Not authenticated")
             
         user_id = user.get('id')
 
-        # Удаляем токен DonationAlerts через репозиторий
+        # Remove the DonationAlerts token through the repository.
         token_repo = UserTokenRepository(db)
         token_repo.delete_by_user_and_platform(user_id, "donationalerts")
 
@@ -174,12 +174,12 @@ async def get_donations_history(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить историю донатов пользователя"""
+    """Get the user's donation history."""
     try:
         user_id = user.get('id')
         donation_repo = DonationAlertRepository(db)
 
-        # Получаем данные через репозиторий
+        # Load the data through the repository.
         total = donation_repo.count_by_user_id(user_id)
         donations = donation_repo.get_by_user_id(user_id, limit=limit, offset=offset)
 
@@ -217,7 +217,7 @@ async def get_donations_stats(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить статистику по донатам"""
+    """Get donation statistics."""
     try:
         from datetime import timedelta
         from datetime import datetime as dt
@@ -225,16 +225,16 @@ async def get_donations_stats(
         user_id = user.get('id')
         donation_repo = DonationAlertRepository(db)
 
-        # За всё время
+        # All-time statistics
         total_donations = donation_repo.count_by_user_id(user_id)
         total_amount = donation_repo.sum_amount_by_user(user_id)
 
-        # За последний месяц
+        # Last-month statistics
         one_month_ago = dt.utcnow() - timedelta(days=30)
         month_donations = donation_repo.count_by_user_since(user_id, one_month_ago)
         month_amount = donation_repo.sum_amount_by_user_since(user_id, one_month_ago)
 
-        # За последнюю неделю
+        # Last-week statistics
         one_week_ago = dt.utcnow() - timedelta(days=7)
         week_donations = donation_repo.count_by_user_since(user_id, one_week_ago)
         week_amount = donation_repo.sum_amount_by_user_since(user_id, one_week_ago)

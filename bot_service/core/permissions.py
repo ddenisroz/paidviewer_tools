@@ -1,4 +1,4 @@
-﻿# bot_service/core/permissions.py
+# bot_service/core/permissions.py
 """Role- and permission-based access control helpers."""
 
 import logging
@@ -142,7 +142,7 @@ def require_permission(required_permission: Permission):
                         break
 
             if not current_user:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
             user_role_str = current_user.get("role", "user") if isinstance(current_user, dict) else getattr(current_user, "role", "user")
             user_id = current_user.get("id", "unknown") if isinstance(current_user, dict) else getattr(current_user, "id", "unknown")
@@ -161,7 +161,7 @@ def require_permission(required_permission: Permission):
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Permission denied: {required_permission.value} required",
+                    detail=f"Insufficient permissions: {required_permission.value} is required.",
                 )
 
             return await func(*args, **kwargs)
@@ -183,7 +183,7 @@ def require_role(required_role: AppRole):
                         break
 
             if not current_user:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
             user_role_str = current_user.get("role", "user") if isinstance(current_user, dict) else getattr(current_user, "role", "user")
             user_id = current_user.get("id", "unknown") if isinstance(current_user, dict) else getattr(current_user, "id", "unknown")
@@ -202,7 +202,7 @@ def require_role(required_role: AppRole):
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: {required_role.value} role required",
+                    detail=f"Access denied: role {required_role.value} is required.",
                 )
 
             return await func(*args, **kwargs)
@@ -224,7 +224,7 @@ def require_platform_role(required_role: PlatformRole, platform: str = "twitch")
                         break
 
             if not user:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
             if not has_platform_role(user, required_role, platform):
                 user_id = user.get("id", "unknown") if isinstance(user, dict) else getattr(user, "id", "unknown")
@@ -236,7 +236,7 @@ def require_platform_role(required_role: PlatformRole, platform: str = "twitch")
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Access denied: {required_role.value} role required on {platform}",
+                    detail=f"Access denied: role {required_role.value} is required on platform {platform}.",
                 )
 
             return await func(*args, **kwargs)
@@ -265,13 +265,13 @@ def require_ownership_or_admin(resource_user_id_param: str = "user_id"):
         async def wrapper(*args, **kwargs):
             current_user = kwargs.get("current_user")
             if not current_user:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
 
             resource_user_id = kwargs.get(resource_user_id_param)
             if resource_user_id is None:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Missing parameter: {resource_user_id_param}",
+                    detail=f"Required parameter is missing: {resource_user_id_param}.",
                 )
 
             if not check_resource_ownership(current_user, resource_user_id):
@@ -283,7 +283,7 @@ def require_ownership_or_admin(resource_user_id_param: str = "user_id"):
                 )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Access denied: You can only access your own resources",
+                    detail="Access denied: only owned resources can be accessed.",
                 )
 
             return await func(*args, **kwargs)
@@ -291,4 +291,3 @@ def require_ownership_or_admin(resource_user_id_param: str = "user_id"):
         return wrapper
 
     return decorator
-

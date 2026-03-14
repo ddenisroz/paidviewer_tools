@@ -1,6 +1,6 @@
 ﻿"""
-Продвинутый Rate Limiter с использованием limits библиотеки.
-Без slowapi для избежания проблем с .env.
+Advanced rate limiter built on the ``limits`` library.
+Uses ``limits`` directly without ``slowapi`` to avoid .env-related issues.
 """
 
 import logging
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class AdvancedRateLimiter:
-    """Продвинутый rate limiter с использованием limits библиотеки."""
+    """Advanced rate limiter built on the ``limits`` library."""
 
     def __init__(self):
         storage_backend = "memory"
@@ -63,7 +63,7 @@ class AdvancedRateLimiter:
         return getattr(request.client, "host", "unknown")
 
     def _get_identifier(self, request: Request = None, user_id: int = None) -> str:
-        """Получить идентификатор для rate limiting."""
+        """Build an identifier for rate limiting."""
         if user_id:
             return f"user:{user_id}"
         if request:
@@ -72,7 +72,7 @@ class AdvancedRateLimiter:
         return "global"
 
     def check_rate_limit(self, identifier: str, action: str = "default") -> bool:
-        """Проверка rate limit для идентификатора и действия."""
+        """Check whether the limit allows the requested action."""
         try:
             limit_str = self.limits.get(action, self.limits["default"])
             rate_limit_item = parse(limit_str)
@@ -86,7 +86,7 @@ class AdvancedRateLimiter:
             return True
 
     def get_remaining_requests(self, identifier: str, action: str = "default") -> int:
-        """Получить количество оставшихся запросов."""
+        """Return the remaining request count for the current window."""
         try:
             limit_str = self.limits.get(action, self.limits["default"])
             rate_limit_item = parse(limit_str)
@@ -107,7 +107,7 @@ class AdvancedRateLimiter:
             return 0
 
     def reset_rate_limit(self, identifier: str, action: str = "default") -> bool:
-        """Сбросить rate limit для идентификатора."""
+        """Reset rate limit state for an identifier."""
         try:
             logger.warning("Reset rate limit for %s, action '%s' (limited functionality)", identifier, action)
             return True
@@ -115,8 +115,19 @@ class AdvancedRateLimiter:
             logger.exception("Failed to reset rate limit")
             return False
 
+    def reset_state(self) -> bool:
+        """Fully reset in-memory limiter state for tests and cleanup."""
+        try:
+            self.storage = storage.MemoryStorage()
+            self.strategy = MovingWindowRateLimiter(self.storage)
+            self.storage_backend = "memory"
+            return True
+        except Exception:
+            logger.exception("Failed to reset rate limiter state")
+            return False
+
     def get_stats(self) -> Dict[str, Any]:
-        """Получить статистику rate limiter."""
+        """Return rate limiter statistics."""
         try:
             return {
                 "storage_type": self.storage_backend,
@@ -153,7 +164,7 @@ class AdvancedRateLimiter:
         return 60
 
     async def check_tts_rate_limit(self, user_id: int, text_length: int) -> Dict[str, int | bool]:
-        """Проверка TTS rate limit с унифицированным контрактом."""
+        """Check TTS rate limit using the unified contract."""
         identifier = self._get_identifier(user_id=user_id)
         allowed = self.check_rate_limit(identifier, "tts")
         remaining = self.get_remaining_requests(identifier, "tts")
@@ -165,11 +176,11 @@ class AdvancedRateLimiter:
         }
 
     async def add_tts_request(self, user_id: int, text_length: int):
-        """Добавить TTS запрос (совместимость)."""
+        """Record a TTS request (compatibility no-op)."""
         return None
 
     async def get_user_stats(self, user_id: int) -> Dict[str, Any]:
-        """Получить статистику пользователя (совместимость)."""
+        """Return per-user statistics (compatibility wrapper)."""
         identifier = self._get_identifier(user_id=user_id)
         return {
             "user_id": user_id,
@@ -179,7 +190,7 @@ class AdvancedRateLimiter:
         }
 
     async def reset_user_limits(self, user_id: int):
-        """Сбросить лимиты пользователя (совместимость)."""
+        """Reset per-user limits (compatibility wrapper)."""
         identifier = self._get_identifier(user_id=user_id)
         self.reset_rate_limit(identifier, "tts")
 
@@ -188,20 +199,20 @@ advanced_rate_limiter = AdvancedRateLimiter()
 
 
 def check_rate_limit(identifier: str, action: str = "default") -> bool:
-    """Проверка rate limit (совместимость)."""
+    """Compatibility wrapper for rate limit checks."""
     return advanced_rate_limiter.check_rate_limit(identifier, action)
 
 
 def record_failed_login(identifier: str) -> int:
-    """Записать неудачную попытку входа (совместимость)."""
+    """Compatibility stub for failed login tracking."""
     return 0
 
 
 def is_login_blocked(identifier: str) -> bool:
-    """Проверка блокировки логина (совместимость)."""
+    """Compatibility wrapper for login blocking checks."""
     return not advanced_rate_limiter.check_rate_limit(identifier, "login")
 
 
 def clear_failed_logins(identifier: str):
-    """Очистка неудачных попыток входа (совместимость)."""
+    """Compatibility wrapper for clearing failed login attempts."""
     advanced_rate_limiter.reset_rate_limit(identifier, "login")

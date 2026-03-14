@@ -1,23 +1,22 @@
-# models/points.py
-"""
-Модели системы баллов канала.
-"""
+﻿"""Channel points models."""
+
 from datetime import datetime
-from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey
-)
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
+
 from core.datetime_utils import utcnow_naive
 from models.base import Base
 
 
 class ChannelPoints(Base):
-    """Модель баллов канала для пользователей"""
-    __tablename__ = 'channel_points'
-    __table_args__ = {'extend_existing': True}
-    
+    """Stored channel points balances for viewers."""
+
+    __tablename__ = "channel_points"
+    __table_args__ = {"extend_existing": True}
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     viewer_id = Column(String, nullable=False, index=True)
     viewer_name = Column(String, nullable=False)
     platform = Column(String, nullable=False)
@@ -30,12 +29,13 @@ class ChannelPoints(Base):
 
 
 class ChannelReward(Base):
-    """Модель наград канала за баллы"""
-    __tablename__ = 'channel_rewards'
-    __table_args__ = {'extend_existing': True}
-    
+    """Channel point rewards configured by a user."""
+
+    __tablename__ = "channel_rewards"
+    __table_args__ = {"extend_existing": True}
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     platform = Column(String, nullable=False)
     channel_name = Column(String, nullable=False, index=True)
     title = Column(String, nullable=False)
@@ -49,18 +49,19 @@ class ChannelReward(Base):
     max_per_user_per_stream = Column(Integer, nullable=True)
     cooldown_expires_at = Column(DateTime, nullable=True)
     prompt = Column(String, nullable=True)
-    reward_type = Column(String, nullable=False, default='custom')
+    reward_type = Column(String, nullable=False, default="custom")
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
 
 class PointsTransaction(Base):
-    """Модель транзакций баллов"""
-    __tablename__ = 'points_transactions'
-    __table_args__ = {'extend_existing': True}
-    
+    """Channel points transaction log."""
+
+    __tablename__ = "points_transactions"
+    __table_args__ = {"extend_existing": True}
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     viewer_id = Column(String, nullable=False, index=True)
     viewer_name = Column(String, nullable=False)
     platform = Column(String, nullable=False)
@@ -68,24 +69,25 @@ class PointsTransaction(Base):
     transaction_type = Column(String, nullable=False)
     amount = Column(Integer, nullable=False)
     reason = Column(String, nullable=True)
-    reward_id = Column(Integer, ForeignKey('channel_rewards.id'), nullable=True)
+    reward_id = Column(Integer, ForeignKey("channel_rewards.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 class RewardQueue(Base):
-    """Модель очереди наград (для обработки модератором)"""
-    __tablename__ = 'reward_queue'
-    __table_args__ = {'extend_existing': True}
-    
+    """Pending reward queue for moderator processing."""
+
+    __tablename__ = "reward_queue"
+    __table_args__ = {"extend_existing": True}
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    reward_id = Column(Integer, ForeignKey('channel_rewards.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reward_id = Column(Integer, ForeignKey("channel_rewards.id"), nullable=False)
     viewer_id = Column(String, nullable=False, index=True)
     viewer_name = Column(String, nullable=False)
     platform = Column(String, nullable=False)
     channel_name = Column(String, nullable=False, index=True)
     user_input = Column(String, nullable=True)
-    status = Column(String, nullable=False, default='pending')
+    status = Column(String, nullable=False, default="pending")
     points_cost = Column(Integer, nullable=False)
     moderator_note = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Проверка TTS статуса пользователя"""
+"""Inspect the current TTS status for a user."""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -8,7 +8,7 @@ load_dotenv()
 from core.database import SessionLocal, User, TTSUserSettings, WhitelistedChannel
 
 def check_tts_status(user_id: int):
-    """Проверить TTS статус пользователя"""
+    """Print the current TTS status for a user."""
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.id == user_id).first()
@@ -28,7 +28,7 @@ def check_tts_status(user_id: int):
             print(f'Use Local TTS: {tts_settings.use_local_tts}')
             print(f'TTS Mode: {tts_settings.tts_mode}')
         else:
-            print(f'Text cleaned.')
+            print('TTS status is unavailable for the current user')
         print(f'\n=== Whitelist Status ===')
         is_whitelisted = False
         if user.twitch_username:
@@ -58,7 +58,7 @@ def check_tts_status(user_id: int):
             print(f'   Solution: Enable TTS in dashboard or run:')
             print(f'   UPDATE users SET tts_enabled = true WHERE id = {user_id};')
         elif not is_whitelisted and tts_settings and (tts_settings.engine == 'f5tts') and (not tts_settings.use_local_tts):
-            print(f'Text cleaned.')
+            print('[WARN] User is not in the whitelist for F5-TTS')
             print(f'   Will fallback to Google TTS')
             print(f'   To enable F5-TTS, add to whitelist:')
             if user.twitch_username:

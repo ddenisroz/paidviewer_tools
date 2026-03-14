@@ -19,8 +19,9 @@ logger = logging.getLogger('bot_service')
 
 class CommandService:
     """
-    Сервис для управления командами, проверки прав и кулдаунов.
-    Использует Repository pattern для доступа к данным.
+    Service for managing commands, permissions, and cooldowns.
+
+    Uses the repository pattern for data access.
     """
 
     def __init__(self, command_repo: Optional[CommandRepository] = None):
@@ -53,8 +54,7 @@ class CommandService:
         db: Session
     ) -> Optional[BotCommand]:
         """
-        Найти команду с приоритетом: custom → override → global.
-        Делегирует поиск репозиторию.
+        Find a command using priority: custom -> override -> global.
         """
         try:
             repo = self._get_repo(db)
@@ -220,13 +220,13 @@ class CommandService:
         custom_count = repo.get_custom_commands_count(user_id)
         if custom_count >= 5:
             raise ValueError(
-                "Достигнут лимит кастомных команд (максимум 5). "
-                "Удалите ненужные команды перед созданием новых."
+                "Custom command limit reached (maximum 5). "
+                "Delete unused commands before creating new ones."
             )
         
         # Check if command exists
         if repo.command_exists(command_name, user_id):
-            raise ValueError("Команда с таким именем уже существует")
+            raise ValueError("A command with this name already exists")
         
         # Sanitize input
         sanitized_name = sanitize_input(command_name, max_length=50, allow_special=False)
@@ -250,7 +250,7 @@ class CommandService:
         
         return {
             "success": True,
-            "message": "Команда создана успешно",
+            "message": "Command created successfully",
             "data": {
                 "id": created.id,
                 "command_name": created.command_name
@@ -274,14 +274,14 @@ class CommandService:
         
         command = repo.get_by_id(command_id)
         if not command:
-            raise ValueError("Команда не найдена")
+            raise ValueError("Command not found")
         
         # Check permissions
         if command.command_type == "global":
-            raise ValueError("Нельзя изменять глобальные команды. Создайте override.")
-        
+            raise ValueError("Global commands cannot be edited. Create an override instead.")
+
         if command.user_id != user_id:
-            raise ValueError("Нет прав для изменения этой команды")
+            raise ValueError("No permission to edit this command")
         
         # Update fields
         if "is_enabled" in update_data and update_data["is_enabled"] is not None:
@@ -303,7 +303,7 @@ class CommandService:
         
         repo.update_command(command)
         
-        return {"success": True, "message": "Команда обновлена успешно"}
+        return {"success": True, "message": "Command updated successfully"}
 
     def create_command_override(
         self,
@@ -328,7 +328,7 @@ class CommandService:
         # Check global command exists
         global_command = repo.get_global_command_by_name(command_name)
         if not global_command:
-            raise ValueError(f"Глобальная команда '{command_name}' не найдена")
+            raise ValueError(f"Global command '{command_name}' not found")
         
         # Check for existing override - update it if exists
         existing_override = repo.get_override_by_name(command_name, user_id)
@@ -354,7 +354,7 @@ class CommandService:
             
             return {
                 "success": True,
-                "message": f"Override для команды '{command_name}' обновлён",
+                "message": f"Override for command '{command_name}' updated",
                 "data": {
                     "id": existing_override.id,
                     "command_name": existing_override.command_name,
@@ -366,7 +366,7 @@ class CommandService:
         
         # Check alias not used
         if alias and repo.alias_exists(alias, user_id):
-            raise ValueError(f"Алиас '{alias}' уже используется")
+            raise ValueError(f"Alias '{alias}' is already in use")
         
         # Create override
         new_override = BotCommand(
@@ -392,7 +392,7 @@ class CommandService:
         
         return {
             "success": True,
-            "message": f"Override для команды '{command_name}' создан успешно",
+            "message": f"Override for command '{command_name}' created successfully",
             "data": {
                 "id": created.id,
                 "command_name": created.command_name,
@@ -418,18 +418,18 @@ class CommandService:
         
         command = repo.get_by_id(command_id)
         if not command:
-            raise ValueError("Команда не найдена")
+            raise ValueError("Command not found")
         
         # Check permissions
         if command.command_type == "basic":
-            raise ValueError("Нельзя удалить базовую команду")
-        
+            raise ValueError("Base command cannot be deleted")
+
         if command.user_id != user_id:
-            raise ValueError("Нет прав для удаления этой команды")
+            raise ValueError("No permission to delete this command")
         
         repo.delete_command(command)
         
-        return {"success": True, "message": "Команда удалена успешно"}
+        return {"success": True, "message": "Command deleted successfully"}
 
     # === Permission & Cooldown Methods ===
 
@@ -441,7 +441,7 @@ class CommandService:
         user_roles: List[str] = None
     ) -> bool:
         """
-        Проверить права пользователя на выполнение команды.
+        Check whether the user can execute the command.
         """
         try:
             if not command.allowed_roles or command.allowed_roles.strip() == '':
@@ -501,7 +501,7 @@ class CommandService:
             return False
 
     def check_cooldown(self, command: BotCommand, user_id: str) -> bool:
-        """Проверить кулдаун команды."""
+        """Check the command cooldown."""
         try:
             if command.cooldown_seconds <= 0:
                 return True
@@ -523,7 +523,7 @@ class CommandService:
             return True
 
     def update_cooldown(self, command: BotCommand, user_id: str):
-        """Обновить кулдаун после использования."""
+        """Update cooldown after command execution."""
         try:
             if command.cooldown_seconds <= 0:
                 return
@@ -538,6 +538,6 @@ class CommandService:
             self.logger.exception("Error updating cooldown")
 
     def get_command_response(self, command: BotCommand) -> str:
-        """Получить текст ответа."""
+        """Return the command response text."""
         return command.response_text or ""
 

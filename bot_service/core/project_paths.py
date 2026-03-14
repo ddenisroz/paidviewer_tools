@@ -1,51 +1,51 @@
 # core/project_paths.py
 """
-Централизованное управление путями проекта для обеспечения переносимости
+Centralized project path management for portable runtime behavior
 """
 from pathlib import Path
 
 def get_project_root() -> Path:
     """
-    Получить корневую директорию проекта.
-    Ищет файл .git или pyproject.toml для определения корня проекта.
+    Resolve the project root directory.
+    Searches for .git or pyproject.toml to detect the repository root.
     """
     current_file = Path(__file__).resolve()
 
-    # Поднимаемся по директориям, пока не найдем корень проекта
+    # Walk up the directory tree until a project root marker is found.
     for parent in current_file.parents:
-        # Проверяем наличие маркеров корня проекта
+        # Check known project root markers.
         if (parent / ".git").exists() or (parent / "pyproject.toml").exists() or (parent / "README.md").exists():
             return parent
 
-    # Если не нашли маркеры, используем директорию на 2 уровня выше от bot_service
+    # Fallback to the directory two levels above bot_service.
     return current_file.parent.parent.parent
 
 def get_bot_service_root() -> Path:
-    """Получить корневую директорию bot_service"""
+    """Return the bot_service root directory."""
     return Path(__file__).parent.parent
 
 def get_frontend_root() -> Path:
-    """Получить корневую директорию frontend"""
+    """Return the frontend root directory."""
     return get_project_root() / "frontend"
 
 def get_temp_dir() -> Path:
-    """Получить директорию для временных файлов"""
+    """Return the temporary-files directory."""
     return get_bot_service_root() / "temp"
 
 def get_data_dir() -> Path:
-    """Получить директорию для данных приложения"""
+    """Return the application-data directory."""
     return get_bot_service_root() / "data"
 
 def get_logs_dir() -> Path:
-    """Получить директорию для логов"""
+    """Return the logs directory."""
     return get_bot_service_root() / "logs"
 
 def get_backups_dir() -> Path:
-    """Получить директорию для бэкапов"""
+    """Return the backups directory."""
     return get_bot_service_root() / "backups"
 
 def ensure_directories():
-    """Создать необходимые директории, если они не существуют"""
+    """Create required directories if they do not exist."""
     directories = [
         get_temp_dir(),
         get_data_dir(),
@@ -57,7 +57,7 @@ def ensure_directories():
     for directory in directories:
         directory.mkdir(parents=True, exist_ok=True)
 
-# Глобальные переменные для быстрого доступа
+# Shared path shortcuts for runtime code.
 PROJECT_ROOT = get_project_root()
 BOT_SERVICE_ROOT = get_bot_service_root()
 FRONTEND_ROOT = get_frontend_root()
@@ -66,6 +66,6 @@ DATA_DIR = get_data_dir()
 LOGS_DIR = get_logs_dir()
 BACKUPS_DIR = get_backups_dir()
 
-# Создаем необходимые директории при импорте
+# Ensure required directories exist on import.
 ensure_directories()
 

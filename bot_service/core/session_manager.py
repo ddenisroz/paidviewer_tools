@@ -1,6 +1,4 @@
-"""
-Менеджер сессий для мультиплатформенной авторизации
-"""
+"""Session manager for multi-platform authentication."""
 import uuid
 import logging
 from datetime import timedelta
@@ -20,55 +18,45 @@ from core.database import (
 logger = logging.getLogger(__name__)
 
 class SessionManager:
-    """Менеджер для управления мультиплатформенными сессиями на основе единой учетной записи."""
+    """Manage multi-platform sessions for a single user account."""
 
     def __init__(self):
-        # Бесконечная сессия - сессия живет до явного логаута или логина с другого устройства
-        # Устанавливаем очень большой таймаут (10 лет) для проверки, но фактически сессия бесконечна
-        self.session_timeout = timedelta(days=3650)  # 10 лет (практически бесконечно)
-        # НЕ разлогиниваем пользователей при:
-        # - сворачивании браузера
-        # - смене вкладки
-        # - закрытии браузера
-        # - потере фокуса окна
-        # - долгом перерыве в использовании
-        # Сессия завершается ТОЛЬКО при:
-        # - явном логауте пользователя
-        # - логине с другого устройства (все старые сессии завершаются)
+        # Sessions are intentionally long-lived and end only on explicit logout or a new login.
+        self.session_timeout = timedelta(days=3650)  # 10 years, effectively infinite for runtime purposes.
 
 
     def _merge_user_accounts(self, source_user_id: int, target_user_id: int, db: Session):
-        """Объединяет два аккаунта: переносит все данные от source к target"""
+        """Merge two accounts by moving all data from source to target."""
         try:
             logger.info(f"Merging user {source_user_id} into user {target_user_id}")
 
-            # Получаем пользователей
+            # Load both users.
             source_user = db.query(User).filter(User.id == source_user_id).first()
             target_user = db.query(User).filter(User.id == target_user_id).first()
 
             if not source_user or not target_user:
                 raise ValueError("Source or target user not found")
 
-            # Переносим username'ы если их нет у target
+            # Copy platform usernames if they are missing on the target user.
             if not target_user.twitch_username and source_user.twitch_username:
                 target_user.twitch_username = source_user.twitch_username
             if not target_user.vk_username and source_user.vk_username:
                 target_user.vk_username = source_user.vk_username
 
-            # Переносим токены
+            # Move tokens.
             source_tokens = db.query(UserToken).filter(UserToken.user_id == source_user_id).all()
             for token in source_tokens:
-                # Проверяем, нет ли уже токена этой платформы у target
+                # Do not duplicate platform tokens on the target account.
                 existing_token = db.query(UserToken).filter(
                     UserToken.user_id == target_user_id,
                     UserToken.platform == token.platform
                 ).first()
 
                 if not existing_token:
-                    # Переносим токен
+                    # Reassign token ownership.
                     token.user_id = target_user_id
                 else:
-                    # Обновляем существующий токен
+                    # Update the existing target token with fresher source data.
                     existing_token.access_token = token.access_token
                     existing_token.refresh_token = token.refresh_token
                     existing_token.expires_at = token.expires_at
@@ -76,42 +64,41 @@ class SessionManager:
                     existing_token.avatar_url = token.avatar_url
                     existing_token.platform_user_id = token.platform_user_id
 
-                    # Удаляем старый токен
+                    # Remove the duplicate source token after merge.
                     db.delete(token)
 
-            # Переносим настройки пользователя
+            # Merge user settings.
             source_settings = db.query(UserSettings).filter(UserSettings.user_id == source_user_id).first()
             target_settings = db.query(UserSettings).filter(UserSettings.user_id == target_user_id).first()
 
             if source_settings and target_settings:
-                # Обновляем настройки target данными из source (приоритет у source)
+                # Source values override target values when present.
                 for column in UserSettings.__table__.columns:
                     if column.name not in ['id', 'user_id']:
                         source_value = getattr(source_settings, column.name)
                         if source_value is not None:
                             setattr(target_settings, column.name, source_value)
 
-            # Переносим TTS настройки
+            # Merge TTS settings.
             source_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == source_user_id).first()
             target_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == target_user_id).first()
 
             if source_tts_settings and target_tts_settings:
-                # Обновляем TTS настройки target данными из source
+                # Source values override target values when present.
                 for column in TTSUserSettings.__table__.columns:
                     if column.name not in ['id', 'user_id', 'created_at', 'updated_at']:
                         source_value = getattr(source_tts_settings, column.name)
                         if source_value is not None:
                             setattr(target_tts_settings, column.name, source_value)
 
-            # Обновляем сессии: меняем user_id с source на target
+            # Reassign sessions.
             db.query(UserSession).filter(UserSession.user_id == source_user_id).update({
                 UserSession.user_id: target_user_id
             })
 
-            # Переносим другие связанные данные (если есть)
-            # Здесь можно добавить перенос команд, голосов, истории и т.д.
+            # Extend this block if more user-scoped data needs explicit reassignment.
 
-            # Удаляем source_user, так как все данные перенесены
+            # Remove the source account after the merge is complete.
             db.delete(source_user)
             logger.info(f"[DELETE] Source user {source_user_id} deleted after merge")
 
@@ -124,11 +111,11 @@ class SessionManager:
             raise
 
     def terminate_user_sessions_for_channel(self, user_id: int, channel_name: str, reason: str = "user_logout"):
-        """Завершает все сессии пользователя для канала при логауте"""
+        """Terminate all user sessions for a specific channel during logout."""
         from sqlalchemy import text
 
         with db_session() as db:
-            # PostgreSQL использует оператор ->> для извлечения JSON значений
+            # PostgreSQL uses ->> to extract string values from JSON.
             json_query = "device_info->>'monitored_channel' = :channel"
 
             user_sessions = db.query(UserSession).filter(
@@ -159,14 +146,15 @@ class SessionManager:
                         refresh_token: str = None, expires_at = None,
                         scopes: list = None):
         """
-        Сохраняет или обновляет токены пользователя для платформы.
-        Используется только полная OAuth авторизация.
+        Save or update user tokens for a platform.
+
+        Used only for full OAuth authorization flows.
         """
         from core.token_encryption import encrypt_token
 
         logger.info(f"[SAVE] Saving tokens for user {user_id}, platform {platform}")
 
-        # Шифруем токены перед сохранением
+        # Encrypt tokens before saving them.
         encrypted_access_token = encrypt_token(access_token) if access_token else None
         encrypted_refresh_token = encrypt_token(refresh_token) if refresh_token else None
 
@@ -205,12 +193,12 @@ class SessionManager:
         logger.info(f"[OK] Successfully saved tokens for user {user_id}, platform {platform}")
 
     def create_session(self, user_id: int, device_info: Optional[Dict] = None) -> str:
-        """Создает новую сессию для пользователя, завершая все его предыдущие сессии."""
+        """Create a new session for a user after terminating all older sessions."""
         logger.info(f"[SESSION] create_session called for user_id: {user_id}")
 
         session_id = str(uuid.uuid4())
 
-        # SECURITY: В сессии доступна только платформа, через которую залогинились
+        # SECURITY: the session only exposes the platform used for login.
         if device_info:
             login_platform = device_info.get('platform')
             if login_platform:
@@ -235,7 +223,7 @@ class SessionManager:
         return session_id
 
     def update_session(self, session_id: int, device_info: Optional[Dict] = None) -> bool:
-        """Обновляет существующую сессию новыми данными"""
+        """Update an existing session with new data."""
         try:
             with db_session() as db:
                 session = db.query(UserSession).filter(UserSession.id == session_id).first()
@@ -254,7 +242,7 @@ class SessionManager:
             return False
 
     def get_user_tokens(self, user_id: int, platform: str) -> Optional[Dict]:
-        """Получает токены пользователя с расшифровкой"""
+        """Return decrypted user tokens for the requested platform."""
         from core.token_encryption import decrypt_token, is_token_encrypted
 
         try:
@@ -267,7 +255,7 @@ class SessionManager:
                 if not token_record:
                     return None
 
-                # Расшифровываем токены
+                # Decrypt stored tokens before returning them.
                 access_token = token_record.access_token
                 refresh_token = token_record.refresh_token
 
@@ -291,7 +279,7 @@ class SessionManager:
 
 
     def terminate_user_sessions(self, user_id: int, reason: str = "logout", db: Optional[Session] = None) -> None:
-        """Завершает все активные сессии указанного пользователя."""
+        """Terminate all active sessions for the specified user."""
         def _terminate(session_db: Session):
             sessions = session_db.query(UserSession).filter(
                 UserSession.user_id == user_id,
@@ -320,7 +308,7 @@ class SessionManager:
                 _terminate(new_db)
 
     def clear_user_tokens(self, user_id: int) -> bool:
-        """Удаляет все токены интеграций пользователя при logout"""
+        """Remove all integration tokens for a user during logout."""
         try:
             with db_session() as db:
                 tokens = db.query(UserToken).filter_by(user_id=user_id).all()
@@ -335,7 +323,7 @@ class SessionManager:
             return False
 
     def remove_platform_token(self, user_id: int, platform: str) -> bool:
-        """Удаляет токены конкретной платформы для пользователя"""
+        """Remove tokens for a specific platform."""
         try:
             with db_session() as db:
                 tokens = db.query(UserToken).filter_by(user_id=user_id, platform=platform).all()
@@ -354,7 +342,7 @@ class SessionManager:
             return False
 
     def terminate_session(self, session_id: str, reason: str = "logout") -> bool:
-        """Завершает конкретную сессию по ее ID."""
+        """Terminate a specific session by session ID."""
         try:
             device_info = None
             with db_session() as db:
@@ -367,7 +355,7 @@ class SessionManager:
 
             logger.info("Terminated session %s, reason: %s", mask_session_id(session_id), reason)
 
-            # Уведомляем connection_manager о завершении сессии
+            # Notify the connection manager that this session ended.
             try:
                 from core.connection_manager import get_connection_manager
                 connection_manager = get_connection_manager()
@@ -385,7 +373,7 @@ class SessionManager:
             return False
 
     def validate_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Проверяет валидность сессии и возвращает данные о пользователе."""
+        """Validate a session and return user data."""
         if not session_id or len(session_id) < 10:
             logger.warning("Invalid session_id format: %s", mask_session_id(session_id))
             return None
@@ -398,7 +386,7 @@ class SessionManager:
                     logger.debug("Invalid or inactive session: %s", mask_session_id(session_id))
                     return None
 
-                # Обновляем last_activity только если прошло больше 1 часа
+                # Update last_activity only if more than one hour has passed.
                 time_since_activity = utcnow_naive() - session.last_activity
                 if time_since_activity > timedelta(hours=1):
                     session.last_activity = utcnow_naive()
@@ -435,11 +423,11 @@ class SessionManager:
             return None
 
     def clear_all_user_tokens(self, user_id: int) -> bool:
-        """Удалить ВСЕ токены пользователя при логауте. Алиас для clear_user_tokens."""
+        """Delete all user tokens on logout. Alias for ``clear_user_tokens``."""
         return self.clear_user_tokens(user_id)
 
     async def _notify_all_sessions_terminated_for_channel(self, channel_name: str, reason: str):
-        """Вспомогательный метод для уведомлений"""
+        """Helper method for notification fan-out."""
         try:
             from core.connection_manager import get_connection_manager
             manager = get_connection_manager()
@@ -448,7 +436,7 @@ class SessionManager:
             logger.error(f"Error in _notify_all_sessions_terminated_for_channel: {e}")
 
     def cleanup_old_sessions(self, days_old: int = 7) -> int:
-        """Удаляет старые неактивные сессии по retention-политике."""
+        """Delete old inactive sessions according to the retention policy."""
         try:
             with db_session() as db:
                 from services.database_cleanup_service import DatabaseCleanupService
@@ -472,7 +460,7 @@ class SessionManager:
             return 0
 
     def get_session_stats(self) -> dict:
-        """Возвращает статистику по сессиям."""
+        """Return session statistics."""
         try:
             with db_session() as db:
                 total_sessions = db.query(UserSession).count()
@@ -495,5 +483,3 @@ class SessionManager:
             return {}
 
 session_manager = SessionManager()
-
-

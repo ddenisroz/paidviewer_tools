@@ -1,19 +1,9 @@
 # bot_service/integrations/tts/__init__.py
 """
-TTS Engines Integration Layer.
+Integration layer for TTS engines.
 
-Изолированные клиенты для TTS сервисов:
-- Google Cloud TTS
-- F5-TTS (advanced/single-node profile)
-- Qwen3-TTS (local/cloud provider)
-
-TODO: Выстроить единый интерфейс для всех TTS движков.
+This package serves as the entrypoint for future unified TTS clients,
+but the active project runtime still uses provider-aware services from `services/tts`.
 """
-
-# TODO: After migration
-# from .base import BaseTTSEngine
-# from .google import GoogleTTSEngine
-# from .f5_advanced import F5AdvancedTTSEngine
-# from .f5_simple import F5SimpleTTSEngine
 
 __all__ = []

@@ -1,9 +1,9 @@
 # bot_service/services/twitch_bot_oauth_service.py
 """
-Сервис для управления OAuth токеном Twitch бота с автообновлением.
+Service for managing the Twitch bot OAuth token with automatic refresh support.
 
-Вместо упрощенного TMI токена использует полноценный OAuth2 flow,
-который предоставляет refresh_token для автоматического обновления.
+Uses the full OAuth2 flow instead of a simplified TMI token so the runtime
+can persist and refresh tokens automatically.
 """
 
 import logging
@@ -24,30 +24,28 @@ logger = logging.getLogger(__name__)
 
 
 class TwitchBotOAuthService:
-    """Сервис для OAuth авторизации Twitch бота с refresh token"""
+    """Service for Twitch bot OAuth authorization with refresh-token support."""
     REFRESH_IF_NEEDED_THRESHOLD_SECONDS = 15 * 60
     
-    # Scopes для бота (минимальные права для чтения чата)
+    # Bot scopes required for runtime chat and moderation features.
     BOT_SCOPES = [
-        'chat:read',      # Чтение сообщений чата
-        'chat:edit',      # Отправка сообщений в чат
-        'channel:moderate',  # Модерация (опционально)
-        'moderation:read',  # Чтение модерационных данных
-        'channel:read:polls',  # Чтение опросов
-        'channel:manage:polls',  # Управление опросами
-        'channel:manage:predictions',  # Управление предсказаниями
-        'channel:manage:redemptions',  # Управление Channel Points redemption
-        'channel:manage:broadcast',  # Обновление title/category стрима
-        'clips:edit',  # Создание клипов
-        'whispers:read',  # Чтение whispers (опционально)
-        'whispers:edit'   # Отправка whispers (опционально)
+        'chat:read',      # Read chat messages.
+        'chat:edit',      # Send chat messages.
+        'channel:moderate',  # Moderation actions.
+        'moderation:read',  # Read moderation data.
+        'channel:read:polls',  # Read polls.
+        'channel:manage:polls',  # Manage polls.
+        'channel:manage:predictions',  # Manage predictions.
+        'channel:manage:redemptions',  # Manage Channel Points redemptions.
+        'channel:manage:broadcast',  # Update stream title/category.
+        'clips:edit',  # Create clips.
+        'whispers:read',  # Read whispers.
+        'whispers:edit'   # Send whispers.
     ]
     
     @staticmethod
     def get_authorization_url(state: str) -> str:
-        """
-        Получить URL для OAuth авторизации бота.
-        """
+        """Build the Twitch bot OAuth authorization URL."""
         if not settings.twitch_client_id:
             raise ValueError("TWITCH_CLIENT_ID not configured")
         
@@ -67,9 +65,7 @@ class TwitchBotOAuthService:
     
     @staticmethod
     async def exchange_code_for_token(code: str) -> Dict[str, Any]:
-        """
-        Обменять authorization code на access token и refresh token.
-        """
+        """Exchange an authorization code for access and refresh tokens."""
         if not all([settings.twitch_client_id, settings.twitch_client_secret]):
             raise ValueError("Twitch credentials not configured")
         
@@ -101,9 +97,7 @@ class TwitchBotOAuthService:
     
     @staticmethod
     async def get_bot_user_info(access_token: str) -> Dict[str, Any]:
-        """
-        Получить информацию о боте через API.
-        """
+        """Fetch bot account information from the Twitch API."""
         if not settings.twitch_client_id:
             raise ValueError("TWITCH_CLIENT_ID not configured")
         
@@ -140,19 +134,17 @@ class TwitchBotOAuthService:
         bot_login: str,
         db: Optional[Session] = None
     ) -> bool:
-        """
-        Сохранить токен бота в базу данных.
-        """
+        """Persist the bot token in the database."""
         def _save(session_db: Session) -> bool:
             try:
                 repo = BotTokenRepository(session_db)
-                # Ищем существующий токен бота
+                # Reuse an existing bot token row when available.
                 bot_token = repo.get_by_platform('twitch')
                 
                 expires_at = utcnow_naive() + timedelta(seconds=expires_in)
                 
                 if bot_token:
-                    # Обновляем существующий
+                    # Update the existing row.
                     bot_token.access_token = encrypt_token(access_token)
                     bot_token.refresh_token = encrypt_token(refresh_token)
                     bot_token.expires_at = expires_at
@@ -162,7 +154,7 @@ class TwitchBotOAuthService:
                     bot_token.updated_at = utcnow_naive()
                     logger.info(f"[UPDATE] Updated Twitch bot token for {bot_login}")
                 else:
-                    # Создаем новый
+                    # Create a new row.
                     bot_token = BotToken(
                         platform='twitch',
                         access_token=encrypt_token(access_token),
@@ -190,9 +182,7 @@ class TwitchBotOAuthService:
     
     @staticmethod
     async def get_bot_token(db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
-        """
-        Получить токен бота из базы данных.
-        """
+        """Load the bot token from the database."""
         async def _get(session_db: Session) -> Optional[Dict[str, Any]]:
             repo = BotTokenRepository(session_db)
             bot_token = repo.get_by_platform('twitch')
@@ -298,9 +288,7 @@ class TwitchBotOAuthService:
     
     @staticmethod
     async def refresh_bot_token(db: Optional[Session] = None) -> bool:
-        """
-        Обновить токен бота используя refresh_token.
-        """
+        """Refresh the bot token using the stored refresh token."""
         async def _refresh(session_db: Session) -> bool:
             try:
                 repo = BotTokenRepository(session_db)
@@ -366,9 +354,7 @@ class TwitchBotOAuthService:
     
     @staticmethod
     async def refresh_if_needed(db: Optional[Session] = None) -> bool:
-        """
-        Проверить и обновить токен если истекает в течение 7 дней.
-        """
+        """Refresh the bot token when it is close to expiry."""
         async def _check_and_refresh(session_db: Session) -> bool:
             repo = BotTokenRepository(session_db)
             bot_token = repo.get_by_platform('twitch')
@@ -402,6 +388,6 @@ class TwitchBotOAuthService:
             return False
 
 
-# Глобальный экземпляр
+# Shared module-level instance.
 twitch_bot_oauth_service = TwitchBotOAuthService()
 

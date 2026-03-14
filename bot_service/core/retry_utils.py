@@ -22,20 +22,20 @@ async def retry_async(
     **kwargs
 ) -> Optional[T]:
     """
-    Асинхронный retry с экспоненциальным backoff
-    
+    Run async retry logic with exponential backoff.
+
     Args:
-        func: Асинхронная функция для выполнения
-        max_attempts: Максимальное количество попыток
-        initial_delay: Начальная задержка в секундах
-        max_delay: Максимальная задержка в секундах
-        backoff_factor: Множитель для экспоненциального backoff
-        retry_on: Кортеж исключений для retry
-        on_failure: Колбэк при окончательной неудаче
-        **kwargs: Аргументы для функции
-        
+        func: Callable to execute
+        max_attempts: Maximum number of attempts
+        initial_delay: Initial delay in seconds
+        max_delay: Maximum delay in seconds
+        backoff_factor: Exponential backoff multiplier
+        retry_on: Exception tuple that should trigger retry
+        on_failure: Callback for final failure
+        **kwargs: Keyword arguments passed to ``func``
+
     Returns:
-        Результат функции или None при неудаче
+        Function result or ``None`` on failure
     """
     last_error = None
 
@@ -55,13 +55,13 @@ async def retry_async(
                     on_failure(e)
                 return None
 
-            # Экспоненциальный backoff
+            # Exponential backoff.
             delay = min(initial_delay * (backoff_factor ** (attempt - 1)), max_delay)
             logger.warning(f"[WARN] Attempt {attempt}/{max_attempts} failed: {e}. Retrying in {delay:.1f}s...")
             await asyncio.sleep(delay)
 
         except Exception as e:
-            # Неожиданное исключение - не ретраим
+            # Unexpected error, do not retry.
             logger.error(f"[ERROR] Unexpected error (not retrying): {e}")
             if on_failure:
                 on_failure(e)
@@ -84,20 +84,20 @@ def retry_sync(
     **kwargs
 ) -> Optional[T]:
     """
-    Синхронный retry с экспоненциальным backoff
-    
+    Run sync retry logic with exponential backoff.
+
     Args:
-        func: Синхронная функция для выполнения
-        max_attempts: Максимальное количество попыток
-        initial_delay: Начальная задержка в секундах
-        max_delay: Максимальная задержка в секундах
-        backoff_factor: Множитель для экспоненциального backoff
-        retry_on: Кортеж исключений для retry
-        on_failure: Колбэк при окончательной неудаче
-        **kwargs: Аргументы для функции
-        
+        func: Callable to execute
+        max_attempts: Maximum number of attempts
+        initial_delay: Initial delay in seconds
+        max_delay: Maximum delay in seconds
+        backoff_factor: Exponential backoff multiplier
+        retry_on: Exception tuple that should trigger retry
+        on_failure: Callback for final failure
+        **kwargs: Keyword arguments passed to ``func``
+
     Returns:
-        Результат функции или None при неудаче
+        Function result or ``None`` on failure
     """
     last_error = None
 
@@ -114,14 +114,14 @@ def retry_sync(
                     on_failure(e)
                 return None
 
-            # Экспоненциальный backoff
+            # Exponential backoff.
             delay = min(initial_delay * (backoff_factor ** (attempt - 1)), max_delay)
             logger.warning(f"[WARN] Attempt {attempt}/{max_attempts} failed: {e}. Retrying in {delay:.1f}s...")
             import time
             time.sleep(delay)
 
         except Exception as e:
-            # Неожиданное исключение - не ретраим
+            # Unexpected error, do not retry.
             logger.error(f"[ERROR] Unexpected error (not retrying): {e}")
             if on_failure:
                 on_failure(e)
@@ -135,12 +135,7 @@ def retry_sync(
 
 def async_retry_decorator(max_attempts: int = 3, initial_delay: float = 1.0, max_delay: float = 30.0):
     """
-    Декоратор для автоматического retry асинхронных функций
-    
-    Usage:
-        @async_retry_decorator(max_attempts=3, initial_delay=1.0)
-        async def my_function():
-            ...
+    Decorator for retrying async functions.
     """
     def decorator(func: Callable):
         @wraps(func)

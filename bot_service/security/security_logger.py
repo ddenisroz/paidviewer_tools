@@ -1,39 +1,31 @@
-"""
-Система логирования безопасности
-"""
-import logging
+﻿"""Security event logging helpers."""
+
 import json
+import logging
 import os
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from fastapi import Request
 from sqlalchemy.orm import Session
+
 from core.database import SecurityLog
 from core.datetime_utils import utcnow_naive
 
-# Настройка логгера безопасности
-security_logger = logging.getLogger('security')
+security_logger = logging.getLogger("security")
 security_logger.setLevel(logging.INFO)
 
-# Создаем обработчик для файла логов безопасности
-log_dir = os.path.join(os.getcwd(), 'logs', 'security')
+log_dir = os.path.join(os.getcwd(), "logs", "security")
 os.makedirs(log_dir, exist_ok=True)
 
-security_handler = logging.FileHandler(
-    os.path.join(log_dir, 'security.log'),
-    encoding='utf-8'
-)
+security_handler = logging.FileHandler(os.path.join(log_dir, "security.log"), encoding="utf-8")
 security_handler.setLevel(logging.INFO)
-
-# Форматтер для логов безопасности
-security_formatter = logging.Formatter(
-    '%(asctime)s - %(levelname)s - %(message)s'
-)
+security_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 security_handler.setFormatter(security_formatter)
-
 security_logger.addHandler(security_handler)
 
+
 class SecurityLogger:
-    """Класс для логирования событий безопасности"""
+    """Helper for logging security-related events."""
 
     @staticmethod
     def log_auth_attempt(
@@ -42,45 +34,41 @@ class SecurityLogger:
         platform: str,
         success: bool,
         reason: Optional[str] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
     ):
-        """Логирует попытку аутентификации"""
+        """Log an authentication attempt."""
+
         event_data = {
-            'event_type': 'auth_attempt',
-            'username': username,
-            'platform': platform,
-            'success': success,
-            'reason': reason,
-            'user_id': user_id,
-            'ip_address': request.client.host if request.client else None,
-            'user_agent': request.headers.get('user-agent'),
-            'timestamp': utcnow_naive().isoformat()
+            "event_type": "auth_attempt",
+            "username": username,
+            "platform": platform,
+            "success": success,
+            "reason": reason,
+            "user_id": user_id,
+            "ip_address": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": utcnow_naive().isoformat(),
         }
 
         level = logging.INFO if success else logging.WARNING
-        security_logger.log(level, f"Auth attempt: {json.dumps(event_data)}")
+        security_logger.log(level, "Auth attempt: %s", json.dumps(event_data))
 
     @staticmethod
-    def log_permission_denied(
-        request: Request,
-        user_id: int,
-        resource: str,
-        action: str,
-        reason: str
-    ):
-        """Логирует отказ в доступе"""
+    def log_permission_denied(request: Request, user_id: int, resource: str, action: str, reason: str):
+        """Log a permission denial event."""
+
         event_data = {
-            'event_type': 'permission_denied',
-            'user_id': user_id,
-            'resource': resource,
-            'action': action,
-            'reason': reason,
-            'ip_address': request.client.host if request.client else None,
-            'user_agent': request.headers.get('user-agent'),
-            'timestamp': utcnow_naive().isoformat()
+            "event_type": "permission_denied",
+            "user_id": user_id,
+            "resource": resource,
+            "action": action,
+            "reason": reason,
+            "ip_address": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": utcnow_naive().isoformat(),
         }
 
-        security_logger.warning(f"Permission denied: {json.dumps(event_data)}")
+        security_logger.warning("Permission denied: %s", json.dumps(event_data))
 
     @staticmethod
     def log_admin_action(
@@ -88,21 +76,22 @@ class SecurityLogger:
         admin_user_id: int,
         action: str,
         target_user_id: Optional[int] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
-        """Логирует действия администратора"""
+        """Log an administrative action."""
+
         event_data = {
-            'event_type': 'admin_action',
-            'admin_user_id': admin_user_id,
-            'action': action,
-            'target_user_id': target_user_id,
-            'details': details or {},
-            'ip_address': request.client.host if request.client else None,
-            'user_agent': request.headers.get('user-agent'),
-            'timestamp': utcnow_naive().isoformat()
+            "event_type": "admin_action",
+            "admin_user_id": admin_user_id,
+            "action": action,
+            "target_user_id": target_user_id,
+            "details": details or {},
+            "ip_address": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": utcnow_naive().isoformat(),
         }
 
-        security_logger.info(f"Admin action: {json.dumps(event_data)}")
+        security_logger.info("Admin action: %s", json.dumps(event_data))
 
     @staticmethod
     def log_data_access(
@@ -110,21 +99,22 @@ class SecurityLogger:
         user_id: int,
         resource_type: str,
         resource_id: Optional[int] = None,
-        action: str = 'read'
+        action: str = "read",
     ):
-        """Логирует доступ к данным"""
+        """Log a data access event."""
+
         event_data = {
-            'event_type': 'data_access',
-            'user_id': user_id,
-            'resource_type': resource_type,
-            'resource_id': resource_id,
-            'action': action,
-            'ip_address': request.client.host if request.client else None,
-            'user_agent': request.headers.get('user-agent'),
-            'timestamp': utcnow_naive().isoformat()
+            "event_type": "data_access",
+            "user_id": user_id,
+            "resource_type": resource_type,
+            "resource_id": resource_id,
+            "action": action,
+            "ip_address": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": utcnow_naive().isoformat(),
         }
 
-        security_logger.info(f"Data access: {json.dumps(event_data)}")
+        security_logger.info("Data access: %s", json.dumps(event_data))
 
     @staticmethod
     def log_suspicious_activity(
@@ -132,75 +122,71 @@ class SecurityLogger:
         user_id: Optional[int],
         activity_type: str,
         description: str,
-        severity: str = 'medium'
+        severity: str = "medium",
     ):
-        """Логирует подозрительную активность"""
+        """Log suspicious activity."""
+
         event_data = {
-            'event_type': 'suspicious_activity',
-            'user_id': user_id,
-            'activity_type': activity_type,
-            'description': description,
-            'severity': severity,
-            'ip_address': request.client.host if request.client else None,
-            'user_agent': request.headers.get('user-agent'),
-            'timestamp': utcnow_naive().isoformat()
+            "event_type": "suspicious_activity",
+            "user_id": user_id,
+            "activity_type": activity_type,
+            "description": description,
+            "severity": severity,
+            "ip_address": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": utcnow_naive().isoformat(),
         }
 
-        level = logging.ERROR if severity == 'high' else logging.WARNING
-        security_logger.log(level, f"Suspicious activity: {json.dumps(event_data)}")
+        level = logging.ERROR if severity == "high" else logging.WARNING
+        security_logger.log(level, "Suspicious activity: %s", json.dumps(event_data))
 
     @staticmethod
-    def log_csrf_violation(
-        request: Request,
-        user_id: Optional[int] = None
-    ):
-        """Логирует нарушение CSRF"""
+    def log_csrf_violation(request: Request, user_id: Optional[int] = None):
+        """Log a CSRF violation."""
+
         event_data = {
-            'event_type': 'csrf_violation',
-            'user_id': user_id,
-            'ip_address': request.client.host if request.client else None,
-            'user_agent': request.headers.get('user-agent'),
-            'timestamp': utcnow_naive().isoformat()
+            "event_type": "csrf_violation",
+            "user_id": user_id,
+            "ip_address": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": utcnow_naive().isoformat(),
         }
 
-        security_logger.warning(f"CSRF violation: {json.dumps(event_data)}")
+        security_logger.warning("CSRF violation: %s", json.dumps(event_data))
 
     @staticmethod
-    def log_rate_limit_exceeded(
-        request: Request,
-        user_id: Optional[int],
-        endpoint: str,
-        limit: int
-    ):
-        """Логирует превышение лимита запросов"""
+    def log_rate_limit_exceeded(request: Request, user_id: Optional[int], endpoint: str, limit: int):
+        """Log a rate-limit event."""
+
         event_data = {
-            'event_type': 'rate_limit_exceeded',
-            'user_id': user_id,
-            'endpoint': endpoint,
-            'limit': limit,
-            'ip_address': request.client.host if request.client else None,
-            'user_agent': request.headers.get('user-agent'),
-            'timestamp': utcnow_naive().isoformat()
+            "event_type": "rate_limit_exceeded",
+            "user_id": user_id,
+            "endpoint": endpoint,
+            "limit": limit,
+            "ip_address": request.client.host if request.client else None,
+            "user_agent": request.headers.get("user-agent"),
+            "timestamp": utcnow_naive().isoformat(),
         }
 
-        security_logger.warning(f"Rate limit exceeded: {json.dumps(event_data)}")
+        security_logger.warning("Rate limit exceeded: %s", json.dumps(event_data))
 
     @staticmethod
     def save_to_database(db: Session, event_data: Dict[str, Any]):
-        """Сохраняет событие безопасности в базу данных"""
+        """Persist a security event to the database."""
+
         try:
             security_log = SecurityLog(
-                event_type=event_data.get('event_type'),
-                user_id=event_data.get('user_id'),
-                ip_address=event_data.get('ip_address'),
-                user_agent=event_data.get('user_agent'),
+                event_type=event_data.get("event_type"),
+                user_id=event_data.get("user_id"),
+                ip_address=event_data.get("ip_address"),
+                user_agent=event_data.get("user_agent"),
                 details=event_data,
-                created_at=utcnow_naive()
+                created_at=utcnow_naive(),
             )
             db.add(security_log)
             db.commit()
-        except Exception as e:
-            security_logger.error(f"Failed to save security log to database: {e}")
+        except Exception as exc:
+            security_logger.error("Failed to save security log to database: %s", exc)
 
-# Глобальный экземпляр логгера безопасности
+
 security_logger_instance = SecurityLogger()

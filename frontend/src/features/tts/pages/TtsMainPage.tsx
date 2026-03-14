@@ -477,6 +477,7 @@ const TtsMainPageContent: React.FC = () => {
         },
     });
     const isEngineActionPending = toggleTtsMutation.isPending || switchEngineMutation.isPending;
+    const isGlobalTogglePending = toggleTtsMutation.isPending;
 
     const { data: ttsStatusResponse } = useTtsStatus(null, {
         enabled: !!isAuthenticated,
@@ -1574,7 +1575,7 @@ const TtsMainPageContent: React.FC = () => {
             <div className="mx-auto w-full max-w-6xl space-y-3">
                 <TtsMasterToggleCard
                     enabled={isAnyTtsEnabled}
-                    isPending={isEngineActionPending}
+                    isPending={isGlobalTogglePending}
                     onToggle={handleGlobalTtsToggle}
                 />
 
@@ -1742,77 +1743,71 @@ const TtsMainPageContent: React.FC = () => {
                                             </button>
                                         </div>
 
-                                        <div className="relative min-h-[196px] pt-1">
-                                            <div
-                                                className={`${listeningMode === 'website'
-                                                    ? 'translate-y-0 opacity-100'
-                                                    : 'pointer-events-none absolute inset-0 translate-y-1 opacity-0'
-                                                    } transition-all duration-200 ease-out`}
-                                                aria-hidden={listeningMode !== 'website'}
-                                            >
-                                                <div className="flex h-full min-h-[196px] flex-col gap-4 rounded-xl border border-border/50 bg-background/35 px-4 py-4">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
-                                                            <Play className="h-4 w-4" />
+                                        <div className="pt-1">
+                                            <div className="flex min-h-[236px] flex-col rounded-xl border border-border/50 bg-background/35 px-4 py-4">
+                                                {listeningMode === 'website' ? (
+                                                    <>
+                                                        <div className="flex items-start gap-3">
+                                                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
+                                                                <Play className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="text-sm font-semibold text-foreground">TTS Player</div>
+                                                                <div className="mt-1 text-xs text-muted-foreground">Отдельная вкладка для браузерного воспроизведения</div>
+                                                            </div>
                                                         </div>
-                                                        <div className="min-w-0">
-                                                            <div className="text-sm font-semibold text-foreground">TTS Player</div>
-                                                            <div className="mt-1 text-xs text-muted-foreground">Отдельная вкладка для браузерного воспроизведения</div>
-                                                        </div>
-                                                    </div>
 
-                                                    <div className="flex flex-1 items-center justify-center">
-                                                        <Button onClick={openPlayerTab} className="h-10 w-full max-w-[260px] px-5">
-                                                            <Play className="mr-2 h-4 w-4" />
-                                                            Открыть TTS Player
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                                        <div className="flex-1" />
 
-                                            <div
-                                                className={`${listeningMode === 'obs'
-                                                    ? 'translate-y-0 opacity-100'
-                                                    : 'pointer-events-none absolute inset-0 translate-y-1 opacity-0'
-                                                    } transition-all duration-200 ease-out`}
-                                                aria-hidden={listeningMode !== 'obs'}
-                                            >
-                                                <div className="flex h-full min-h-[196px] flex-col gap-4 rounded-xl border border-border/50 bg-background/35 px-4 py-4">
-                                                    <div className="flex items-start gap-3">
-                                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
-                                                            <Settings className="h-4 w-4" />
+                                                        <div className="flex items-center justify-center">
+                                                            <Button onClick={openPlayerTab} className="h-10 w-full max-w-[260px] px-5">
+                                                                <Play className="mr-2 h-4 w-4" />
+                                                                Открыть TTS Player
+                                                            </Button>
                                                         </div>
-                                                        <div className="min-w-0">
-                                                            <div className="text-sm font-semibold text-foreground">OBS endpoint</div>
-                                                            <div className="mt-1 text-xs text-muted-foreground">Ссылка для подключения OBS-плеера</div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div className="flex items-start gap-3">
+                                                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
+                                                                <Settings className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="text-sm font-semibold text-foreground">OBS endpoint</div>
+                                                                <div className="mt-1 text-xs text-muted-foreground">Ссылка для подключения OBS-плеера</div>
+                                                            </div>
                                                         </div>
-                                                    </div>
 
-                                                    <div
-                                                        className="group relative cursor-pointer rounded-lg border border-border/70 bg-background/70 px-3 py-2.5"
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(obsUrl);
-                                                            toast.success('Скопировано');
-                                                        }}
-                                                    >
-                                                        <div className="truncate pr-14 font-mono text-xs text-muted-foreground">
-                                                            {obsUrl || 'Генерация URL...'}
+                                                        <div className="mt-4">
+                                                            <div
+                                                                className="group relative cursor-pointer rounded-lg border border-border/70 bg-background/70 px-3 py-2.5"
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(obsUrl);
+                                                                    toast.success('Скопировано');
+                                                                }}
+                                                            >
+                                                                <div className="truncate pr-14 font-mono text-xs text-muted-foreground">
+                                                                    {obsUrl || 'Генерация URL...'}
+                                                                </div>
+                                                                <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                                                                    Copy
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                                                            Copy
-                                                        </div>
-                                                    </div>
 
-                                                    <div className="flex flex-1 items-center justify-center">
-                                                        <Button
-                                                            onClick={handleRegenerateObsUrl}
-                                                            className="h-10 w-full max-w-[260px] px-5"
-                                                            disabled={isRegeneratingUrl}
-                                                        >
-                                                            {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
-                                                        </Button>
-                                                    </div>
-                                                </div>
+                                                        <div className="flex-1" />
+
+                                                        <div className="flex items-center justify-center">
+                                                            <Button
+                                                                onClick={handleRegenerateObsUrl}
+                                                                className="h-10 w-full max-w-[260px] px-5"
+                                                                disabled={isRegeneratingUrl}
+                                                            >
+                                                                {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
+                                                            </Button>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

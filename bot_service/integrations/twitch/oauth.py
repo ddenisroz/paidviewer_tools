@@ -2,7 +2,7 @@
 """
 Twitch OAuth 2.0 Integration.
 
-Отвечает за:
+Responsible for:
 - App Access Token (server-to-server)
 - User Access Token (refresh, validate)
 """
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TwitchTokenResponse:
-    """Ответ Twitch OAuth."""
+    """Twitch OAuth response."""
     access_token: str
     refresh_token: Optional[str]
     expires_in: int
@@ -32,10 +32,10 @@ class TwitchTokenResponse:
 
 class TwitchOAuth:
     """
-    Управление OAuth токенами Twitch.
+    Manage Twitch OAuth tokens.
     
-    Поддерживает:
-    - App Access Token с автообновлением
+    Supports:
+    - App Access Token with automatic refresh
     - User Token refresh
     - Token validation
     """
@@ -52,15 +52,15 @@ class TwitchOAuth:
     
     @classmethod
     def from_settings(cls) -> "TwitchOAuth":
-        """Создаёт экземпляр из настроек приложения."""
+        """Create an instance from application settings."""
         if not settings.twitch_client_id or not settings.twitch_client_secret:
             raise ValueError("TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET must be set")
         return cls(settings.twitch_client_id, settings.twitch_client_secret)
     
     async def get_app_access_token(self, force_refresh: bool = False) -> str:
         """
-        Получает App Access Token для server-to-server запросов.
-        Кэширует токен и обновляет при необходимости.
+        Get an App Access Token for server-to-server requests.
+        Cache the token and refresh it when needed.
         """
         if not force_refresh and self._app_token and time.time() < self._app_token_expires_at:
             return self._app_token
@@ -79,7 +79,7 @@ class TwitchOAuth:
                 
                 result = await response.json()
                 self._app_token = result["access_token"]
-                # Обновляем за 60 секунд до истечения
+                # Refresh 60 seconds before expiration
                 self._app_token_expires_at = time.time() + result["expires_in"] - 60
                 
                 logger.info("[TWITCH] App access token refreshed successfully")
@@ -87,14 +87,14 @@ class TwitchOAuth:
     
     async def exchange_code(self, code: str, redirect_uri: str) -> TwitchTokenResponse:
         """
-        Обменивает authorization code на access token.
+        Exchange an authorization code for an access token.
         
         Args:
-            code: Authorization code из callback
-            redirect_uri: Redirect URI, использованный при авторизации
+            code: Authorization code from the callback
+            redirect_uri: Redirect URI used during authorization
             
         Returns:
-            TwitchTokenResponse с токенами
+            TwitchTokenResponse with tokens
         """
         async with aiohttp.ClientSession(timeout=self.TIMEOUT) as session:
             data = aiohttp.FormData()
@@ -112,7 +112,7 @@ class TwitchOAuth:
                 
                 result = await response.json()
                 
-                # Twitch может вернуть scopes как строку или список
+                # Twitch may return scopes either as a string or a list.
                 scope_data = result.get("scope", [])
                 if isinstance(scope_data, str):
                     scopes = [s.strip() for s in scope_data.split()] if scope_data else []
@@ -129,13 +129,13 @@ class TwitchOAuth:
     
     async def refresh_user_token(self, refresh_token: str) -> TwitchTokenResponse:
         """
-        Обновляет user access token.
+        Refresh a user access token.
         
         Args:
-            refresh_token: Refresh token пользователя
+            refresh_token: User refresh token
             
         Returns:
-            TwitchTokenResponse с новыми токенами
+            TwitchTokenResponse with refreshed tokens
         """
         async with aiohttp.ClientSession(timeout=self.TIMEOUT) as session:
             data = {
@@ -170,10 +170,10 @@ class TwitchOAuth:
     
     async def validate_token(self, access_token: str) -> Optional[Dict[str, Any]]:
         """
-        Проверяет валидность токена.
+        Validate a token.
         
         Returns:
-            Информация о токене или None если невалидный
+            Token information or None if the token is invalid
         """
         async with aiohttp.ClientSession(timeout=self.TIMEOUT) as session:
             headers = {"Authorization": f"OAuth {access_token}"}

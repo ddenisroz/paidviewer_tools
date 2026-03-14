@@ -1,7 +1,5 @@
 """
 User Cache Invalidation Helpers
-
-Хелперы для инвалидации кеша пользователей при изменениях.
 """
 import logging
 from sqlalchemy.orm import Session
@@ -12,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 def invalidate_user_cache(user_id: int, reason: str = "unknown"):
     """
-    Инвалидировать кеш пользователя.
-    
+    Invalidate the cache for a user.
+
     Args:
-        user_id: ID пользователя
-        reason: Причина инвалидации (для логирования)
+        user_id: User ID
+        reason: Invalidation reason for logging
     """
     user_cache.invalidate(user_id)
     logger.info(f"[DELETE] User cache invalidated for user {user_id}: {reason}")
@@ -24,11 +22,11 @@ def invalidate_user_cache(user_id: int, reason: str = "unknown"):
 
 def update_user_role(user_id: int, new_role: str, db: Session):
     """
-    Обновить роль пользователя и инвалидировать кеш.
-    
+    Update the user role and invalidate the cache.
+
     Args:
-        user_id: ID пользователя
-        new_role: Новая роль ('admin', 'user')
+        user_id: User ID
+        new_role: New role ('admin', 'user')
         db: Database session
     """
     from core.database import User
@@ -41,7 +39,7 @@ def update_user_role(user_id: int, new_role: str, db: Session):
     user.role = new_role
     db.commit()
     
-    # Инвалидируем кеш
+    # Invalidate cache after a role change.
     invalidate_user_cache(user_id, f"role changed: {old_role} -> {new_role}")
     
     logger.info(f"[OK] User {user_id} role updated: {old_role} -> {new_role}")
@@ -49,11 +47,11 @@ def update_user_role(user_id: int, new_role: str, db: Session):
 
 def block_user(user_id: int, reason: str, db: Session):
     """
-    Заблокировать пользователя и инвалидировать кеш.
-    
+    Block a user and invalidate the cache.
+
     Args:
-        user_id: ID пользователя
-        reason: Причина блокировки
+        user_id: User ID
+        reason: Blocking reason
         db: Database session
     """
     from core.database import User
@@ -69,7 +67,7 @@ def block_user(user_id: int, reason: str, db: Session):
     user.is_active = False
     db.commit()
     
-    # Инвалидируем кеш
+    # Invalidate cache after blocking the user.
     invalidate_user_cache(user_id, f"user blocked: {reason}")
     
     logger.warning(f"[WARN] User {user_id} blocked: {reason}")
@@ -77,10 +75,10 @@ def block_user(user_id: int, reason: str, db: Session):
 
 def unblock_user(user_id: int, db: Session):
     """
-    Разблокировать пользователя и инвалидировать кеш.
-    
+    Unblock a user and invalidate the cache.
+
     Args:
-        user_id: ID пользователя
+        user_id: User ID
         db: Database session
     """
     from core.database import User
@@ -95,7 +93,7 @@ def unblock_user(user_id: int, db: Session):
     user.is_active = True
     db.commit()
     
-    # Инвалидируем кеш
+    # Invalidate cache after unblocking the user.
     invalidate_user_cache(user_id, "user unblocked")
     
     logger.info(f"[OK] User {user_id} unblocked")
@@ -103,12 +101,12 @@ def unblock_user(user_id: int, db: Session):
 
 def update_user_username(user_id: int, platform: str, username: str, db: Session):
     """
-    Обновить username пользователя и инвалидировать кеш.
-    
+    Update a username and invalidate the cache.
+
     Args:
-        user_id: ID пользователя
-        platform: Платформа ('twitch', 'vk')
-        username: Новый username
+        user_id: User ID
+        platform: Platform ('twitch', 'vk')
+        username: New username
         db: Database session
     """
     from core.database import User
@@ -125,7 +123,7 @@ def update_user_username(user_id: int, platform: str, username: str, db: Session
     
     db.commit()
     
-    # Инвалидируем кеш
+    # Invalidate cache after updating the username.
     invalidate_user_cache(user_id, f"{platform} username updated: {username}")
     
     logger.info(f"[OK] User {user_id} {platform} username updated: {username}")

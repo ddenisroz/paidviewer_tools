@@ -1,11 +1,5 @@
 # bot_service/integrations/donationalerts/client.py
-"""
-DonationAlerts API Client.
-
-TODO: Миграция из существующих файлов:
-- api/donationalerts_api.py
-- auth/donationalerts_auth.py
-"""
+"""Base DonationAlerts API client for the new integration layer."""
 
 import logging
 from typing import Optional, Dict, Any
@@ -16,11 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class DonationAlertsClient(BaseIntegrationClient):
-    """
-    Клиент для DonationAlerts API.
-    
-    TODO: Реализовать методы на основе существующего кода.
-    """
+    """Base DonationAlerts API client."""
     
     BASE_URL = "https://www.donationalerts.com/api/v1"
     
@@ -28,10 +18,10 @@ class DonationAlertsClient(BaseIntegrationClient):
         super().__init__(self.BASE_URL)
     
     async def _get_headers(self, token: Optional[TokenInfo] = None) -> Dict[str, str]:
-        """Формирует заголовки для DonationAlerts API."""
+        """Build headers for the DonationAlerts API."""
         headers = {"Content-Type": "application/json"}
         if token:
             headers["Authorization"] = f"Bearer {token.access_token}"
         return headers
     
-    # TODO: Добавить методы по мере миграции
+    # Additional methods will be added as runtime logic moves into the integration layer.

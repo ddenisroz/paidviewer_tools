@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class DropsConfigCreate(BaseModel):
-    """Создание конфигурации Drops"""
+    """Payload for creating a Drops configuration."""
     channel_name: str = Field(..., min_length=1, max_length=100)
     platform: str = Field(..., pattern="^(twitch|vk)$")
     streak_enabled: bool = True
@@ -35,7 +35,7 @@ class DropsConfigCreate(BaseModel):
 
 
 class DropsConfigUpdate(BaseModel):
-    """Обновление конфигурации Drops"""
+    """Payload for updating a Drops configuration."""
     streak_enabled: Optional[bool] = None
     donation_enabled: Optional[bool] = None
     mythical_enabled: Optional[bool] = None
@@ -62,7 +62,7 @@ class DropsConfigUpdate(BaseModel):
 
 
 class DropsRewardCreate(BaseModel):
-    """Создание награды в Drops"""
+    """Payload for creating a Drops reward."""
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     quality_id: int = Field(..., ge=1)
@@ -75,7 +75,7 @@ class DropsRewardCreate(BaseModel):
 
 
 class DropsRewardUpdate(BaseModel):
-    """Обновление награды в Drops"""
+    """Payload for updating a Drops reward."""
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     quality_id: Optional[int] = Field(None, ge=1)
@@ -88,7 +88,7 @@ class DropsRewardUpdate(BaseModel):
 
 
 class DropsOpenRequest(BaseModel):
-    """Запрос на получение Drops"""
+    """Payload for opening a Drops reward."""
     drops_type: str = Field(..., pattern="^(streak|donation|mythical)$")
     viewer_id: str = Field(..., min_length=1, max_length=100)
     viewer_name: str = Field(..., min_length=1, max_length=100)

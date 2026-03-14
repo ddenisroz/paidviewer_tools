@@ -1,0 +1,941 @@
+2026-03-14T05:35:51.452 | INFO     | models.base | Database initialized
+2026-03-14T05:35:51.452 | INFO     | startup.lifespan | Database initialized
+2026-03-14T05:35:51.467 | INFO     | startup.lifespan | [STARTUP] Global bot commands already exist
+2026-03-14T05:35:51.470 | INFO     | core.connection_manager | [CONNECTION] ConnectionManager initialized
+2026-03-14T05:35:51.470 | INFO     | core.connection_manager | [FIX] Created global ConnectionManager instance
+2026-03-14T05:35:51.471 | INFO     | services.tts.memory_tts_queue | Memory TTS Queue started
+2026-03-14T05:35:51.471 | INFO     | services.memory_websocket_manager | Memory WebSocket Manager started
+2026-03-14T05:35:51.472 | INFO     | services.tts.tts_worker | TTS Worker started
+2026-03-14T05:35:51.472 | INFO     | services.tts.tts_worker | TTS Worker loop running...
+2026-03-14T05:35:51.472 | INFO     | startup.lifespan | All services started (TTS queue, WebSocket manager, TTS worker)
+2026-03-14T05:35:51.602 | INFO     | core.connection_manager_core | [SKIP] [TTS RECONNECT] Bot reconnected to yourchy, no active listeners for user 1; keeping pending TTS disconnect
+2026-03-14T05:35:51.603 | INFO     | core.connection_manager | Restored session 724c599f... for channel yourchy
+2026-03-14T05:35:51.604 | INFO     | core.connection_manager | Restored 1 active sessions from database
+2026-03-14T05:35:51.604 | INFO     | startup.lifespan | Restored 1 active channels
+2026-03-14T05:35:51.604 | INFO     | startup.lifespan | [OK] TTS will be enabled when users connect via WebSocket
+2026-03-14T05:35:52.146 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_initialized environment=development filename=vk_token_refresh_service.py func_name=__init__ lineno=38 service=bot_service version=0.03
+2026-03-14T05:35:52.147 | INFO     | core.background_tasks | [OK] [BACKGROUND] Started 6 background tasks:
+2026-03-14T05:35:52.147 | INFO     | core.background_tasks |    - cleanup_old_chat_messages (every 1 hour)
+2026-03-14T05:35:52.147 | INFO     | core.background_tasks |    - cleanup_expired_sessions (inactive-session retention, every 5 minutes)
+2026-03-14T05:35:52.148 | INFO     | core.background_tasks |    - refresh_bot_oauth_tokens (every 1 hour)
+2026-03-14T05:35:52.148 | INFO     | core.background_tasks |    - refresh_user_oauth_tokens (every 2 hours)
+2026-03-14T05:35:52.148 | INFO     | core.background_tasks |    - cleanup_task (every 1 minute)
+2026-03-14T05:35:52.148 | INFO     | core.background_tasks |    - cleanup_deleted_accounts (every 24 hours)
+2026-03-14T05:35:52.148 | INFO     | services.bot_token_validator | [BOT TOKEN] Starting token monitoring (interval: 3600s)
+2026-03-14T05:35:52.149 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_started environment=development filename=vk_token_refresh_service.py func_name=start lineno=53 service=bot_service version=0.03
+2026-03-14T05:35:52.151 | INFO     | core.background_tasks | [STARTUP] [TOKEN REFRESH] Initial token check on startup...
+2026-03-14T05:35:52.151 | INFO     | core.background_tasks | [REFRESH] [TOKEN REFRESH] Checking for expiring/expired user OAuth tokens...
+2026-03-14T05:35:52.167 | INFO     | startup.lifespan | All background tasks started (tasks, token monitoring, VK refresh)
+2026-03-14T05:35:52.172 | INFO     | core.connection_manager | [GAME] Found 1 Twitch channels to listen: ['yourchy']
+2026-03-14T05:35:52.176 | INFO     | core.connection_manager | Found 0 VK Live channels to listen (channel slugs): []
+2026-03-14T05:35:52.176 | INFO     | startup.bot_initializer | [STARTUP] Twitch channels: ['yourchy']
+2026-03-14T05:35:52.176 | INFO     | startup.bot_initializer | [STARTUP] VK channels: []
+2026-03-14T05:35:54.197 | WARNING  | services.bot_token_validator | [BOT TOKEN] Twitch token belongs to pa1dviewer, expected payedviewer
+2026-03-14T05:35:54.198 | INFO     | services.bot_token_validator | [OK] [BOT TOKEN] Twitch bot token is VALID
+2026-03-14T05:35:54.198 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:35:54.198 | INFO     | startup.bot_initializer | [TWITCH] Creating Twitch bot instance...
+2026-03-14T05:35:54.198 | INFO     | startup.bot_initializer | [TWITCH] Token validated: OK
+2026-03-14T05:35:54.199 | INFO     | startup.bot_initializer | [TWITCH] Bot user: pa1dviewer
+2026-03-14T05:35:54.199 | INFO     | startup.bot_initializer | [TWITCH] Channels to connect: ['yourchy']
+2026-03-14T05:35:54.200 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:35:54.200 | INFO     | bot_service | [BOT] CREATING TWITCH BOT
+2026-03-14T05:35:54.200 | INFO     | bot_service | [INFO] Token: [CENSORED]
+2026-03-14T05:35:54.200 | INFO     | bot_service | [CHANNELS] Initial channels: ['yourchy']
+2026-03-14T05:35:54.200 | INFO     | bot_service | [DEBUG] Token length: 36
+2026-03-14T05:35:54.200 | INFO     | bot_service | [DEBUG] Number of channels: 1
+2026-03-14T05:35:54.200 | INFO     | bot_service | [WRENCH] Initializing TwitchIO Bot...
+2026-03-14T05:35:54.200 | INFO     | bot_service | [DEBUG] Calling super().__init__ with token and 1 channels
+2026-03-14T05:35:54.200 | INFO     | bot_service | [OK] TwitchIO Bot initialized
+2026-03-14T05:35:54.200 | INFO     | bot_service | [DEBUG] Bot nick: None
+2026-03-14T05:35:54.201 | INFO     | bot_service | [DEBUG] Bot user_id: None
+2026-03-14T05:35:54.201 | INFO     | bot_service | [BOT] Universal command handler initialized
+2026-03-14T05:35:54.201 | INFO     | bot_service | [BOT] Twitch bot initialized with all modules
+2026-03-14T05:35:54.202 | INFO     | startup.bot_initializer | [TWITCH] Task created, waiting 5 seconds for connection...
+2026-03-14T05:35:56.076 | INFO     | twitchio.websocket | Successfully logged onto Twitch WS: pa1dviewer
+2026-03-14T05:35:56.103 | INFO     | bot_service | [JOIN] Joined channel: yourchy
+2026-03-14T05:35:56.112 | INFO     | core.connection_manager_core | [SKIP] [TTS RECONNECT] Bot reconnected to yourchy, no active listeners for user 1; keeping pending TTS disconnect
+2026-03-14T05:35:56.113 | INFO     | bot_service | [OK] [BOT] Joined channel yourchy (welcome message via OAuth only)
+2026-03-14T05:35:56.113 | INFO     | bot_service | ================================================================================
+2026-03-14T05:35:56.114 | INFO     | bot_service | [BOT] TWITCH BOT READY!
+2026-03-14T05:35:56.114 | INFO     | bot_service | ================================================================================
+2026-03-14T05:35:56.115 | INFO     | bot_service | [INFO] Bot logged in as: pa1dviewer
+2026-03-14T05:35:56.115 | INFO     | bot_service | [ID] Bot user id: 1317705797
+2026-03-14T05:35:56.115 | INFO     | bot_service | [CHANNELS] Connected to channels: [<Channel name: yourchy>]
+2026-03-14T05:35:56.115 | INFO     | bot_service | [BOT] BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!
+2026-03-14T05:35:56.115 | INFO     | bot_service | [BOT] BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS
+2026-03-14T05:35:56.115 | INFO     | bot_service | [OK] MONITORING CHAT: yourchy
+2026-03-14T05:35:56.115 | INFO     | bot_service | ================================================================================
+2026-03-14T05:35:56.115 | INFO     | bot_service | [BOT] All modules loaded and ready!
+2026-03-14T05:35:59.215 | INFO     | startup.bot_initializer | [OK] [TWITCH] Bot connected as: pa1dviewer
+2026-03-14T05:35:59.216 | INFO     | startup.bot_initializer | [OK] Twitch bot started
+2026-03-14T05:36:00.358 | INFO     | services.bot_token_validator | [OK] [BOT TOKEN] VK bot token is VALID
+2026-03-14T05:36:00.358 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:36:00.359 | INFO     | startup.bot_initializer | [VK] Creating VK bot instance...
+2026-03-14T05:36:00.359 | INFO     | startup.bot_initializer | [VK] Token validated: OK
+2026-03-14T05:36:00.359 | INFO     | startup.bot_initializer | [VK] Bot user: Денис Р#1209004
+2026-03-14T05:36:00.359 | INFO     | startup.bot_initializer | [VK] Channels to connect: []
+2026-03-14T05:36:00.359 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:36:00.360 | INFO     | bot_service | [VK BOT] VK Live bot initialized
+2026-03-14T05:36:00.360 | INFO     | bot_service | [START] VK LIVE BOT STARTED - Ready to listen to chat
+2026-03-14T05:36:00.360 | INFO     | bot_service | VK LIVE BOT: Started and ready to connect to channels
+2026-03-14T05:36:00.360 | INFO     | bot_service | [VK BOT] All modules loaded and ready!
+2026-03-14T05:36:00.361 | INFO     | startup.bot_initializer | [OK] VK bot started
+2026-03-14T05:36:00.362 | INFO     | startup.lifespan | === BOT SERVICE STARTED ===
+2026-03-14T05:36:00.362 | INFO     | uvicorn.error | Application startup complete.
+2026-03-14T05:36:00.368 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:36:00.370 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:36:00.600 | INFO     | uvicorn.error | 127.0.0.1:61251 - "WebSocket /ws/chat/1" [accepted]
+2026-03-14T05:36:00.611 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:36:00.614 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_dashboard_1773448560600229000 (role=dashboard, presence_only=False)
+2026-03-14T05:36:00.614 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_dashboard_1773448560600229000 (User: 1, role=dashboard, presence_only=False)
+2026-03-14T05:36:00.615 | INFO     | uvicorn.error | 127.0.0.1:61219 - "WebSocket /ws/chat/1" [accepted]
+2026-03-14T05:36:00.623 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:36:00.623 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_dashboard_1773448560615621200 (role=dashboard, presence_only=False)
+2026-03-14T05:36:00.624 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_dashboard_1773448560615621200 (User: 1, role=dashboard, presence_only=False)
+2026-03-14T05:36:00.626 | INFO     | uvicorn.error | connection open
+2026-03-14T05:36:00.626 | INFO     | uvicorn.error | connection open
+2026-03-14T05:36:00.668 | INFO     | services.user_identity_service | User operation: {'operation': 'get_user_settings', 'user_type': 'authenticated', 'identifier': '1'}
+2026-03-14T05:36:00.681 | INFO     | api.auth_api | === AUTH STATUS REQUEST START ===
+2026-03-14T05:36:00.839 | INFO     | api.auth_api | === AUTH STATUS REQUEST END ===
+2026-03-14T05:36:01.138 | WARNING  | api.websocket_endpoints | [WS] Error user 1: (<CloseCode.ABNORMAL_CLOSURE: 1006>, '')
+2026-03-14T05:36:01.145 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:36:01.146 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_dashboard_1773448560615621200
+2026-03-14T05:36:01.147 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:36:01.307 | INFO     | api.websocket_endpoints | [HISTORY] Sent 20 messages
+2026-03-14T05:36:01.314 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.946s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.315 | INFO     | core.middleware | GET /api/user-settings/ - Status: 200 - Time: 0.948s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.317 | INFO     | core.middleware | GET /api/auth/status - Status: 200 - Time: 0.949s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.322 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.954s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.334 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.965s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.538 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.113s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.557 | INFO     | core.middleware | GET /api/donationalerts/status - Status: 200 - Time: 0.128s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.579 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.154s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:01.599 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.157s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:02.060 | INFO     | bot_service | YouTube settings saved for user 1
+2026-03-14T05:36:02.064 | INFO     | core.middleware | POST /api/tts/youtube-settings - Status: 200 - Time: 0.140s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:03.807 | INFO     | core.middleware | GET /api/drops/qualities - Status: 200 - Time: 0.042s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:03.808 | INFO     | core.middleware | GET /api/drops/rewards/yourchy - Status: 200 - Time: 0.042s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:05.435 | INFO     | api.websocket_endpoints | [WS] Disconnected cleanly: 1
+2026-03-14T05:36:05.442 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:36:05.444 | INFO     | core.connection_manager_core | [TIMER] [TTS DISCONNECT] Scheduled TTS disable for user 1 (yourchy) in 60s
+2026-03-14T05:36:05.444 | INFO     | services.memory_websocket_manager | Scheduled TTS disconnect after last WebSocket removal for user 1 (yourchy)
+2026-03-14T05:36:05.445 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_dashboard_1773448560600229000
+2026-03-14T05:36:05.447 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:36:06.204 | INFO     | services.user_identity_service | User operation: {'operation': 'get_user_settings', 'user_type': 'authenticated', 'identifier': '1'}
+2026-03-14T05:36:06.240 | INFO     | api.auth_api | === AUTH STATUS REQUEST START ===
+2026-03-14T05:36:06.248 | INFO     | api.auth_api | === AUTH STATUS REQUEST END ===
+2026-03-14T05:36:06.305 | INFO     | core.middleware | GET /api/user-settings/ - Status: 200 - Time: 0.139s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:06.307 | INFO     | core.middleware | GET /api/auth/status - Status: 200 - Time: 0.140s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:06.312 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.145s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:06.361 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:36:06.381 | INFO     | uvicorn.error | 127.0.0.1:61285 - "WebSocket /ws/chat/1" [accepted]
+2026-03-14T05:36:06.399 | INFO     | core.connection_manager_core | [REFRESH] [TTS RECONNECT] Cancelled scheduled TTS disable for user 1
+2026-03-14T05:36:06.420 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:36:06.437 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_dashboard_1773448566403184000 (role=dashboard, presence_only=False)
+2026-03-14T05:36:06.452 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_dashboard_1773448566403184000 (User: 1, role=dashboard, presence_only=False)
+2026-03-14T05:36:06.454 | INFO     | uvicorn.error | connection open
+2026-03-14T05:36:06.456 | INFO     | core.connection_manager_core | [OK] [TTS RECONNECT] User 1 reconnected - keeping TTS enabled
+2026-03-14T05:36:06.564 | INFO     | api.websocket_endpoints | [HISTORY] Sent 20 messages
+2026-03-14T05:36:06.584 | INFO     | core.middleware | GET /api/donationalerts/status - Status: 200 - Time: 0.132s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:06.599 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.135s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:06.625 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.161s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:06.654 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.194s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:06.898 | INFO     | bot_service | YouTube settings saved for user 1
+2026-03-14T05:36:06.901 | INFO     | core.middleware | POST /api/tts/youtube-settings - Status: 200 - Time: 0.013s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:07.044 | INFO     | core.middleware | GET /api/drops/qualities - Status: 200 - Time: 0.014s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:36:07.046 | INFO     | core.middleware | GET /api/drops/rewards/yourchy - Status: 200 - Time: 0.016s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:37:06.691 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.010s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:38:06.710 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.023s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:38:06.711 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.023s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:38:06.737 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.017s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:39:06.768 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.009s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:40:06.753 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.020s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:40:06.755 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.019s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:40:06.803 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.020s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:40:49.526 | INFO     | core.middleware | GET /api/drops/history/yourchy - Status: 200 - Time: 0.021s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:41:06.872 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.013s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:06.791 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.024s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:06.791 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.025s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:06.899 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.008s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:10.321 | INFO     | core.middleware | GET /api/drops/config/yourchy - Status: 200 - Time: 0.035s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:10.323 | INFO     | core.middleware | GET /api/drops/streaks/yourchy - Status: 200 - Time: 0.035s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:10.961 | INFO     | core.middleware | GET /api/drops/history/yourchy - Status: 200 - Time: 0.013s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:11.678 | INFO     | core.middleware | GET /api/drops/streaks/yourchy - Status: 200 - Time: 0.013s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:12.890 | INFO     | core.middleware | GET /api/drops/streaks/yourchy - Status: 200 - Time: 0.013s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:14.069 | INFO     | core.middleware | GET /api/drops/streaks/yourchy - Status: 200 - Time: 0.013s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:15.077 | INFO     | utils.cache | Cache invalidated for pattern: drops_config:1:yourchy:, deleted 1 keys
+2026-03-14T05:42:15.079 | INFO     | core.middleware | PUT /api/drops/config/yourchy - Status: 200 - Time: 0.024s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:16.498 | INFO     | utils.cache | Cache invalidated for pattern: drops_config:1:yourchy:, deleted 0 keys
+2026-03-14T05:42:16.500 | INFO     | core.middleware | PUT /api/drops/config/yourchy - Status: 200 - Time: 0.021s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:17.201 | INFO     | core.middleware | GET /api/drops/streaks/yourchy - Status: 200 - Time: 0.014s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:18.563 | INFO     | core.middleware | GET /api/drops/streaks/yourchy - Status: 200 - Time: 0.010s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:19.584 | INFO     | utils.cache | Cache invalidated for pattern: drops_config:1:yourchy:, deleted 0 keys
+2026-03-14T05:42:19.586 | INFO     | core.middleware | PUT /api/drops/config/yourchy - Status: 200 - Time: 0.022s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:21.985 | INFO     | services.stream_info_service | [STREAM_INFO] Getting stream info for user_id=1, platform=twitch
+2026-03-14T05:42:21.988 | INFO     | platforms.registry | Registered Twitch platform
+2026-03-14T05:42:21.997 | INFO     | platforms.registry | Registered VK platform
+2026-03-14T05:42:21.998 | INFO     | platforms.registry | Platform registry initialized with 2 platforms
+2026-03-14T05:42:22.001 | INFO     | services.stream_info_service | [STREAM_INFO] Twitch username: yourchy
+2026-03-14T05:42:22.031 | INFO     | core.middleware | GET /api/stream/history - Status: 200 - Time: 0.056s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:23.448 | INFO     | integrations.twitch.oauth | [TWITCH] App access token refreshed successfully
+2026-03-14T05:42:23.895 | INFO     | services.stream_info_service | [STREAM_INFO] get_stream_status result: None
+2026-03-14T05:42:23.895 | INFO     | services.stream_info_service | [STREAM_INFO] is_live: False
+2026-03-14T05:42:23.896 | INFO     | services.stream_info_service | [STREAM_INFO] Stream offline, fetching channel_info for yourchy
+2026-03-14T05:42:24.349 | INFO     | services.stream_info_service | [STREAM_INFO] channel_info result: {'broadcaster_id': '75969278', 'broadcaster_login': 'yourchy', 'broadcaster_name': 'Yourchy', 'broadcaster_language': 'ru', 'game_id': '385322663', 'game_name': 'Dot', 'title': 'autotest title 1529', 'delay': 0, 'tags': [], 'content_classification_labels': [], 'is_branded_content': False}
+2026-03-14T05:42:24.350 | INFO     | services.stream_info_service | [STREAM_INFO] Using channel_info, title: autotest title 1529
+2026-03-14T05:42:24.571 | INFO     | services.stream_info_service | [STREAM_INFO] Final result: title=autotest title 1529, game=Dot, is_live=False
+2026-03-14T05:42:24.571 | WARNING  | middleware.logging_middleware | slow_request                   duration_ms=2596.99 environment=development filename=logging_middleware.py func_name=dispatch lineno=158 method=GET path=/api/twitch/stream-info service=bot_service threshold_ms=1000 version=0.03
+2026-03-14T05:42:24.572 | INFO     | core.middleware | GET /api/twitch/stream-info - Status: 200 - Time: 2.601s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:29.224 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.047s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:29.226 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.045s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:29.228 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.045s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:29.229 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.047s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:29.229 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.047s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:29.229 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.047s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:30.904 | INFO     | core.middleware | OPTIONS /api/tts/settings - Status: 200 - Time: 0.009s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:30.920 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:30.926 | INFO     | core.middleware | POST /api/tts/engine - Status: 200 - Time: 0.036s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:30.945 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:30.947 | INFO     | core.middleware | POST /api/tts/settings - Status: 200 - Time: 0.020s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.020 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.047s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.024 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.055s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.025 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.052s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.025 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.056s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.026 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.053s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.026 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.057s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.060 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.025s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.061 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.029s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.936 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:31.938 | INFO     | core.middleware | POST /api/tts/settings - Status: 200 - Time: 0.030s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.990 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.038s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.991 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.035s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.993 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.039s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.997 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.042s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:31.997 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.042s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:32.035 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.031s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:32.036 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.037s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:32.037 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.031s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:33.930 | WARNING  | middleware.logging_middleware | slow_request                   duration_ms=2016.82 environment=development filename=logging_middleware.py func_name=dispatch lineno=158 method=GET path=/api/tts/health service=bot_service threshold_ms=1000 version=0.03
+2026-03-14T05:42:33.931 | INFO     | core.middleware | GET /api/tts/health - Status: 200 - Time: 2.021s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:33.952 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:33.954 | INFO     | core.middleware | POST /api/tts/engine - Status: 200 - Time: 0.014s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.044 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:44.049 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:44.051 | INFO     | core.middleware | POST /api/tts/engine - Status: 200 - Time: 0.030s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.052 | INFO     | core.middleware | POST /api/tts/settings - Status: 200 - Time: 0.032s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.179 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.068s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.182 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.068s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.185 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.062s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.189 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.071s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.193 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.070s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.195 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.071s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.226 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.035s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:44.228 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.037s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.178 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:45.178 | INFO     | core.middleware | POST /api/tts/settings - Status: 200 - Time: 0.019s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.311 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.047s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.313 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.046s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.315 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.045s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.315 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.045s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.316 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.046s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.343 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.028s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.347 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.025s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:45.351 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.034s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:47.145 | WARNING  | middleware.logging_middleware | slow_request                   duration_ms=1981.66 environment=development filename=logging_middleware.py func_name=dispatch lineno=158 method=GET path=/api/tts/health service=bot_service threshold_ms=1000 version=0.03
+2026-03-14T05:42:47.147 | INFO     | core.middleware | GET /api/tts/health - Status: 200 - Time: 1.986s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:42:47.174 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:42:47.177 | INFO     | core.middleware | POST /api/tts/engine - Status: 200 - Time: 0.018s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:06.938 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.009s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:11.166 | INFO     | services.user_identity_service | User operation: {'operation': 'get_user_settings', 'user_type': 'authenticated', 'identifier': '1'}
+2026-03-14T05:43:11.172 | INFO     | api.auth_api | === AUTH STATUS REQUEST START ===
+2026-03-14T05:43:11.177 | INFO     | api.auth_api | === AUTH STATUS REQUEST END ===
+2026-03-14T05:43:11.186 | INFO     | core.middleware | GET /api/user-settings/ - Status: 200 - Time: 0.028s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:11.189 | INFO     | core.middleware | GET /api/auth/status - Status: 200 - Time: 0.027s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:11.189 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.028s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:11.221 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.012s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:11.532 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.008s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:16.513 | INFO     | core.middleware | GET /api/donationalerts/status - Status: 200 - Time: 0.028s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:16.522 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.034s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:16.537 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.040s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:17.017 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.058s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:17.020 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.061s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:17.020 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.062s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:17.023 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.056s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:17.026 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.060s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:17.039 | INFO     | bot_service | YouTube settings saved for user 1
+2026-03-14T05:43:17.042 | INFO     | core.middleware | POST /api/tts/youtube-settings - Status: 200 - Time: 0.028s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:18.931 | INFO     | core.middleware | POST /api/tts/generate-obs-url - Status: 200 - Time: 0.017s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:18.945 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:43:18.947 | INFO     | core.middleware | POST /api/tts/listening-mode - Status: 200 - Time: 0.033s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:19.382 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:43:19.384 | INFO     | core.middleware | POST /api/tts/listening-mode - Status: 200 - Time: 0.026s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:22.415 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:43:22.419 | INFO     | uvicorn.error | 127.0.0.1:50270 - "WebSocket /ws/chat/1?client_role=tts_player&presence_only=1" [accepted]
+2026-03-14T05:43:22.423 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:43:22.424 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_tts_player_1773449002420870200 (role=tts_player, presence_only=True)
+2026-03-14T05:43:22.424 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_tts_player_1773449002420870200 (User: 1, role=tts_player, presence_only=True)
+2026-03-14T05:43:22.425 | INFO     | uvicorn.error | connection open
+2026-03-14T05:43:22.440 | INFO     | services.user_identity_service | User operation: {'operation': 'get_user_settings', 'user_type': 'authenticated', 'identifier': '1'}
+2026-03-14T05:43:22.448 | INFO     | api.auth_api | === AUTH STATUS REQUEST START ===
+2026-03-14T05:43:22.452 | INFO     | api.auth_api | === AUTH STATUS REQUEST END ===
+2026-03-14T05:43:22.462 | INFO     | core.middleware | GET /api/user-settings/ - Status: 200 - Time: 0.036s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:22.463 | INFO     | core.middleware | GET /api/auth/status - Status: 200 - Time: 0.032s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:22.466 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.039s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:22.507 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.016s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:22.822 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.011s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:43:49.109 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: 123
+2026-03-14T05:43:49.123 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:43:49.124 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:43:49.124 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:43:49.125 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: 123
+2026-03-14T05:43:49.157 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:43:49.167 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: '123...'
+2026-03-14T05:43:49.182 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: 123... (engine=gtts, provider=f5, volume=44%)
+2026-03-14T05:43:49.183 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gtts
+2026-03-14T05:43:49.184 | INFO     | services.tts.basic_tts | [LANG] Basic TTS: language=ru, text='123....'
+2026-03-14T05:43:49.941 | INFO     | services.tts.basic_tts | [MIC] gTTS: language=ru, accent=com, slow=False
+2026-03-14T05:43:49.942 | INFO     | services.tts.basic_tts | [OK] gTTS audio generated: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449029184.mp3
+2026-03-14T05:43:51.405 | INFO     | services.tts.basic_tts | [VOLUME] Applied volume level: 44% (-1.2dB)
+2026-03-14T05:43:51.809 | INFO     | services.tts.basic_tts | [DB] Basic TTS saved to WAV: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449029184.wav
+2026-03-14T05:43:51.809 | INFO     | services.tts.tts_manager | [OK] Basic TTS synthesis succeeded
+2026-03-14T05:43:51.810 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=basic_gtts, voice=basic_gtts, channel=yourchy
+2026-03-14T05:43:51.812 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:43:51.848 | INFO     | core.middleware | GET /api/tts/audio/basic_tts_1773449029184.wav - Status: 206 - Time: 0.004s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:00.887 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: 321
+2026-03-14T05:44:00.887 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:44:00.888 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:44:00.888 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:44:00.888 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: 321
+2026-03-14T05:44:00.898 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:44:00.904 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: '321...'
+2026-03-14T05:44:00.923 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: 321... (engine=gtts, provider=f5, volume=44%)
+2026-03-14T05:44:00.923 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gtts
+2026-03-14T05:44:00.923 | INFO     | services.tts.basic_tts | [LANG] Basic TTS: language=ru, text='321....'
+2026-03-14T05:44:01.327 | INFO     | services.tts.basic_tts | [MIC] gTTS: language=ru, accent=com, slow=False
+2026-03-14T05:44:01.327 | INFO     | services.tts.basic_tts | [OK] gTTS audio generated: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449040923.mp3
+2026-03-14T05:44:01.521 | INFO     | services.tts.basic_tts | [VOLUME] Applied volume level: 44% (-1.2dB)
+2026-03-14T05:44:01.647 | INFO     | services.tts.basic_tts | [DB] Basic TTS saved to WAV: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449040923.wav
+2026-03-14T05:44:01.648 | INFO     | services.tts.tts_manager | [OK] Basic TTS synthesis succeeded
+2026-03-14T05:44:01.648 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=basic_gtts, voice=basic_gtts, channel=yourchy
+2026-03-14T05:44:01.650 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:44:01.654 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: 2131
+2026-03-14T05:44:01.655 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:44:01.655 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:44:01.655 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:44:01.656 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: 2131
+2026-03-14T05:44:01.666 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:44:01.671 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: '2131...'
+2026-03-14T05:44:01.680 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: 2131... (engine=gtts, provider=f5, volume=44%)
+2026-03-14T05:44:01.680 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gtts
+2026-03-14T05:44:01.680 | INFO     | services.tts.basic_tts | [LANG] Basic TTS: language=ru, text='2131....'
+2026-03-14T05:44:02.093 | INFO     | services.tts.basic_tts | [MIC] gTTS: language=ru, accent=com, slow=False
+2026-03-14T05:44:02.093 | INFO     | services.tts.basic_tts | [OK] gTTS audio generated: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449041680.mp3
+2026-03-14T05:44:02.300 | INFO     | services.tts.basic_tts | [VOLUME] Applied volume level: 44% (-1.2dB)
+2026-03-14T05:44:02.427 | INFO     | services.tts.basic_tts | [DB] Basic TTS saved to WAV: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449041680.wav
+2026-03-14T05:44:02.429 | INFO     | services.tts.tts_manager | [OK] Basic TTS synthesis succeeded
+2026-03-14T05:44:02.429 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=basic_gtts, voice=basic_gtts, channel=yourchy
+2026-03-14T05:44:02.431 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:44:02.436 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: 6464
+2026-03-14T05:44:02.437 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:44:02.437 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:44:02.437 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:44:02.437 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: 6464
+2026-03-14T05:44:02.444 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:44:02.450 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: '6464...'
+2026-03-14T05:44:02.462 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: 6464... (engine=gtts, provider=f5, volume=44%)
+2026-03-14T05:44:02.462 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gtts
+2026-03-14T05:44:02.462 | INFO     | services.tts.basic_tts | [LANG] Basic TTS: language=ru, text='6464....'
+2026-03-14T05:44:02.889 | INFO     | services.tts.basic_tts | [MIC] gTTS: language=ru, accent=com, slow=False
+2026-03-14T05:44:02.889 | INFO     | services.tts.basic_tts | [OK] gTTS audio generated: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449042463.mp3
+2026-03-14T05:44:03.064 | INFO     | services.tts.basic_tts | [VOLUME] Applied volume level: 44% (-1.2dB)
+2026-03-14T05:44:03.200 | INFO     | services.tts.basic_tts | [DB] Basic TTS saved to WAV: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449042463.wav
+2026-03-14T05:44:03.201 | INFO     | services.tts.tts_manager | [OK] Basic TTS synthesis succeeded
+2026-03-14T05:44:03.201 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=basic_gtts, voice=basic_gtts, channel=yourchy
+2026-03-14T05:44:03.204 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:44:03.208 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: 64
+2026-03-14T05:44:03.209 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:44:03.209 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:44:03.209 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:44:03.209 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: 64
+2026-03-14T05:44:03.216 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:44:03.221 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: '64...'
+2026-03-14T05:44:03.228 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: 64... (engine=gtts, provider=f5, volume=44%)
+2026-03-14T05:44:03.228 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gtts
+2026-03-14T05:44:03.228 | INFO     | services.tts.basic_tts | [LANG] Basic TTS: language=ru, text='64....'
+2026-03-14T05:44:03.651 | INFO     | services.tts.basic_tts | [MIC] gTTS: language=ru, accent=com, slow=False
+2026-03-14T05:44:03.652 | INFO     | services.tts.basic_tts | [OK] gTTS audio generated: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449043229.mp3
+2026-03-14T05:44:03.859 | INFO     | services.tts.basic_tts | [VOLUME] Applied volume level: 44% (-1.2dB)
+2026-03-14T05:44:03.997 | INFO     | services.tts.basic_tts | [DB] Basic TTS saved to WAV: H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\bot_service\temp\tts_audio\basic_tts_1773449043229.wav
+2026-03-14T05:44:03.999 | INFO     | services.tts.tts_manager | [OK] Basic TTS synthesis succeeded
+2026-03-14T05:44:03.999 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=basic_gtts, voice=basic_gtts, channel=yourchy
+2026-03-14T05:44:04.002 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:44:04.007 | INFO     | core.middleware | GET /api/tts/audio/basic_tts_1773449040923.wav - Status: 206 - Time: 1.571s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:06.321 | INFO     | core.middleware | GET /api/tts/audio/basic_tts_1773449041680.wav - Status: 206 - Time: 0.004s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:06.426 | INFO     | core.middleware | GET /api/tts/audio/basic_tts_1773449042463.wav - Status: 206 - Time: 0.003s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:15.272 | INFO     | core.middleware | GET /api/tts/audio/basic_tts_1773449043229.wav - Status: 206 - Time: 0.004s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:45.378 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.012s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.781 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:44:51.788 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:44:51.789 | INFO     | core.middleware | POST /api/tts/engine - Status: 200 - Time: 0.426s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.791 | INFO     | core.middleware | POST /api/tts/settings - Status: 200 - Time: 0.422s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.858 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.042s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.861 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.043s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.867 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.029s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.868 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.042s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.868 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.042s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.894 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.032s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.896 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.029s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:51.897 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.020s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:53.016 | WARNING  | middleware.logging_middleware | slow_request                   duration_ms=1645.17 environment=development filename=logging_middleware.py func_name=dispatch lineno=158 method=GET path=/api/tts/gcloud/voices service=bot_service threshold_ms=1000 version=0.03
+2026-03-14T05:44:53.017 | INFO     | core.middleware | GET /api/tts/gcloud/voices - Status: 200 - Time: 1.651s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:44:53.040 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:44:53.042 | INFO     | core.middleware | POST /api/tts/gcloud/voices - Status: 200 - Time: 0.015s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:45:07.480 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: проверка голосочка
+2026-03-14T05:45:07.480 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:45:07.480 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:45:07.480 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:45:07.481 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: проверка голосочка
+2026-03-14T05:45:07.485 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:45:07.490 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'проверка голосочка...'
+2026-03-14T05:45:07.501 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: проверка голосочка... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:45:07.501 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:45:07.502 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Charon resolved_voice=Charon model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:45:11.624 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:45:11.624 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Charon, channel=yourchy
+2026-03-14T05:45:11.627 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:45:11.660 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449111521.wav - Status: 206 - Time: 0.006s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:45:22.545 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.011s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:45:41.258 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:45:41.258 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:45:41.259 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:45:41.259 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:45:41.259 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:45:41.277 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:45:41.282 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:45:41.289 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:45:41.289 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:45:41.290 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Charon resolved_voice=Charon model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:45:46.146 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:45:46.147 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Charon, channel=yourchy
+2026-03-14T05:45:46.149 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:45:46.172 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449146017.wav - Status: 206 - Time: 0.007s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:45:51.980 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.011s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:02.520 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:46:02.520 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:46:02.520 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:46:02.520 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:46:02.520 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:46:02.531 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:46:02.536 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:46:02.544 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:46:02.545 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:46:02.545 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Charon resolved_voice=Charon model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:46:05.666 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:46:05.666 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:46:05.666 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:46:05.666 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:46:05.666 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:46:05.671 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:46:05.676 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:46:05.683 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:46:05.684 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:46:05.685 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Aoede resolved_voice=Aoede model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:46:06.407 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:46:06.408 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:46:06.408 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:46:06.408 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:46:06.408 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:46:06.422 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:46:06.428 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:46:06.437 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:46:06.437 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:46:06.437 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Aoede resolved_voice=Aoede model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:46:06.987 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:46:06.987 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Charon, channel=yourchy
+2026-03-14T05:46:06.990 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:46:07.062 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449166851.wav - Status: 206 - Time: 0.006s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:10.394 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:46:10.394 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Aoede, channel=yourchy
+2026-03-14T05:46:10.398 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:46:10.421 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449170265.wav - Status: 206 - Time: 0.004s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:11.070 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:46:11.072 | INFO     | services.tts.basic_tts | [DELETE] Removed 2 old basic TTS files
+2026-03-14T05:46:11.072 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Aoede, channel=yourchy
+2026-03-14T05:46:11.076 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:46:11.114 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449170933.wav - Status: 206 - Time: 0.005s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:22.021 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.015s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:35.692 | INFO     | api.websocket_endpoints | [WS] Disconnected cleanly: 1
+2026-03-14T05:46:35.695 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:46:35.695 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_tts_player_1773449002420870200
+2026-03-14T05:46:35.695 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:46:37.224 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:46:37.228 | INFO     | uvicorn.error | 127.0.0.1:50423 - "WebSocket /ws/chat/1?client_role=tts_player&presence_only=1" [accepted]
+2026-03-14T05:46:37.230 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:46:37.230 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_tts_player_1773449197228104000 (role=tts_player, presence_only=True)
+2026-03-14T05:46:37.230 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_tts_player_1773449197228104000 (User: 1, role=tts_player, presence_only=True)
+2026-03-14T05:46:37.231 | INFO     | uvicorn.error | connection open
+2026-03-14T05:46:37.865 | INFO     | api.websocket_endpoints | [WS] Disconnected cleanly: 1
+2026-03-14T05:46:37.868 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:46:37.868 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_tts_player_1773449197228104000
+2026-03-14T05:46:37.868 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:46:38.890 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:46:38.893 | INFO     | uvicorn.error | 127.0.0.1:50436 - "WebSocket /ws/chat/1?client_role=tts_player&presence_only=1" [accepted]
+2026-03-14T05:46:38.895 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:46:38.896 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_tts_player_1773449198893607000 (role=tts_player, presence_only=True)
+2026-03-14T05:46:38.896 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_tts_player_1773449198893607000 (User: 1, role=tts_player, presence_only=True)
+2026-03-14T05:46:38.897 | INFO     | uvicorn.error | connection open
+2026-03-14T05:46:38.907 | INFO     | services.user_identity_service | User operation: {'operation': 'get_user_settings', 'user_type': 'authenticated', 'identifier': '1'}
+2026-03-14T05:46:38.913 | INFO     | api.auth_api | === AUTH STATUS REQUEST START ===
+2026-03-14T05:46:38.916 | INFO     | api.auth_api | === AUTH STATUS REQUEST END ===
+2026-03-14T05:46:38.925 | INFO     | core.middleware | GET /api/user-settings/ - Status: 200 - Time: 0.027s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:38.928 | INFO     | core.middleware | GET /api/auth/status - Status: 200 - Time: 0.028s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:38.931 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.030s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:38.983 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.014s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:39.286 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.008s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:46:47.770 | WARNING  | uvicorn.error | StatReload detected changes in 'core\background_tasks.py'. Reloading...
+ 2026-03-14T05:46:47.784 | INFO     | uvicorn.error | Shutting down
+2026-03-14T05:46:47.785 | WARNING  | api.websocket_endpoints | [WS] Error user 1: (1012, None)
+2026-03-14T05:46:47.789 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:46:47.789 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_tts_player_1773449198893607000
+2026-03-14T05:46:47.789 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:46:47.790 | WARNING  | api.websocket_endpoints | [WS] Error user 1: (1012, None)
+2026-03-14T05:46:47.794 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:46:47.795 | INFO     | core.connection_manager_core | [TIMER] [TTS DISCONNECT] Scheduled TTS disable for user 1 (yourchy) in 60s
+2026-03-14T05:46:47.796 | INFO     | services.memory_websocket_manager | Scheduled TTS disconnect after last WebSocket removal for user 1 (yourchy)
+2026-03-14T05:46:47.796 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_dashboard_1773448566403184000
+2026-03-14T05:46:47.796 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:46:47.907 | INFO     | uvicorn.error | Waiting for application shutdown.
+2026-03-14T05:46:47.909 | INFO     | startup.lifespan | Bot service shutting down
+2026-03-14T05:46:47.909 | INFO     | startup.lifespan | [CLEANUP] Cleaning up 0 active VK bots...
+2026-03-14T05:46:47.911 | INFO     | startup.bot_registry | [OK] Twitch bot stopped
+2026-03-14T05:46:47.911 | INFO     | bot_service |  VK LIVE BOT STOPPED
+2026-03-14T05:46:47.911 | INFO     | bot_service | [VK BOT] VK Live bot shutdown complete
+2026-03-14T05:46:47.911 | INFO     | startup.bot_registry | [OK] VK Live bot stopped
+2026-03-14T05:46:47.912 | INFO     | services.bot_token_validator | [BOT TOKEN] Monitoring stopped
+2026-03-14T05:46:47.912 | INFO     | startup.lifespan | Bot token monitoring stopped
+2026-03-14T05:46:47.913 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_stopped environment=development filename=vk_token_refresh_service.py func_name=stop lineno=74 service=bot_service version=0.03
+2026-03-14T05:46:47.913 | INFO     | startup.lifespan | VK token refresh service stopped
+2026-03-14T05:46:47.913 | INFO     | core.background_tasks | Background tasks stopped
+2026-03-14T05:46:47.913 | INFO     | startup.lifespan | Background tasks stopped
+2026-03-14T05:46:47.913 | INFO     | services.tts.memory_tts_queue | Memory TTS Queue stopped
+2026-03-14T05:46:47.914 | INFO     | services.memory_websocket_manager | Memory WebSocket Manager stopped
+2026-03-14T05:46:47.914 | INFO     | services.tts.tts_worker | TTS Worker stopped
+2026-03-14T05:46:47.914 | INFO     | startup.lifespan | Connections cleaned up
+2026-03-14T05:46:47.914 | INFO     | startup.lifespan | === BOT SERVICE STOPPED ===
+2026-03-14T05:46:47.915 | INFO     | uvicorn.error | Application shutdown complete.
+2026-03-14T05:46:47.915 | INFO     | uvicorn.error | Finished server process [77632]
+2026-03-14T05:46:47.916 | INFO     | core.connection_manager_core | [OK] [TTS RECONNECT] User 1 reconnected - keeping TTS enabled
+2026-03-14T05:46:48.313 | ERROR    | asyncio | Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001F9FDA0B770>
+2026-03-14T05:46:54.583 | INFO     | core.structured_logging | Using plain FileHandler for 'H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\logs\bot_service.log' on Windows development runtime to avoid reload rotation conflicts.
+2026-03-14T05:46:54.584 | INFO     | core.structured_logging | structured_logging_initialized environment=development filename=structured_logging.py func_name=setup_structured_logging json_logs=False lineno=357 service=bot_service version=0.03
+2026-03-14T05:46:54.594 | INFO     | core.exception_handlers | [OK] Exception handlers registered
+2026-03-14T05:46:54.693 | INFO     | services.advanced_rate_limiter | [RATE-LIMITER] Advanced Rate Limiter initialized with limits library (storage=redis)
+2026-03-14T05:46:55.652 | INFO     | core.cookie_config | [DEV] Running in DEVELOPMENT mode: cookies.secure=False
+2026-03-14T05:46:56.208 | INFO     | startup.router_registry | Registered 44 routers
+2026-03-14T05:46:56.318 | INFO     | core.sentry_config | [SENTRY] DSN not configured, error tracking disabled
+2026-03-14T05:46:56.320 | INFO     | core.exception_handlers | [OK] Exception handlers registered
+2026-03-14T05:46:56.630 | INFO     | startup.router_registry | Registered 44 routers
+2026-03-14T05:46:56.631 | INFO     | uvicorn.error | Started server process [76920]
+2026-03-14T05:46:56.631 | INFO     | uvicorn.error | Waiting for application startup.
+2026-03-14T05:46:56.631 | INFO     | startup.lifespan | Bot service starting on port 8000
+2026-03-14T05:46:56.834 | INFO     | models.base | [DB] Database seeding complete (blocked bots + lootbox qualities)
+2026-03-14T05:46:56.835 | INFO     | models.base | Database initialized
+2026-03-14T05:46:56.835 | INFO     | startup.lifespan | Database initialized
+2026-03-14T05:46:56.851 | INFO     | startup.lifespan | [STARTUP] Global bot commands already exist
+2026-03-14T05:46:56.853 | INFO     | core.connection_manager | [CONNECTION] ConnectionManager initialized
+2026-03-14T05:46:56.853 | INFO     | core.connection_manager | [FIX] Created global ConnectionManager instance
+2026-03-14T05:46:56.853 | INFO     | services.tts.memory_tts_queue | Memory TTS Queue started
+2026-03-14T05:46:56.854 | INFO     | services.memory_websocket_manager | Memory WebSocket Manager started
+2026-03-14T05:46:56.854 | INFO     | services.tts.tts_worker | TTS Worker started
+2026-03-14T05:46:56.854 | INFO     | services.tts.tts_worker | TTS Worker loop running...
+2026-03-14T05:46:56.855 | INFO     | startup.lifespan | All services started (TTS queue, WebSocket manager, TTS worker)
+2026-03-14T05:46:56.968 | INFO     | core.connection_manager_core | [SKIP] [TTS RECONNECT] Bot reconnected to yourchy, no active listeners for user 1; keeping pending TTS disconnect
+2026-03-14T05:46:56.968 | INFO     | core.connection_manager | Restored session 724c599f... for channel yourchy
+2026-03-14T05:46:56.968 | INFO     | core.connection_manager | Restored 1 active sessions from database
+2026-03-14T05:46:56.968 | INFO     | startup.lifespan | Restored 1 active channels
+2026-03-14T05:46:56.969 | INFO     | startup.lifespan | [OK] TTS will be enabled when users connect via WebSocket
+2026-03-14T05:46:57.449 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_initialized environment=development filename=vk_token_refresh_service.py func_name=__init__ lineno=38 service=bot_service version=0.03
+2026-03-14T05:46:57.450 | INFO     | core.background_tasks | [BACKGROUND] Started 6 background tasks
+2026-03-14T05:46:57.450 | INFO     | core.background_tasks |   - cleanup_old_chat_messages (every 1 hour)
+2026-03-14T05:46:57.450 | INFO     | core.background_tasks |   - cleanup_expired_sessions (every 5 minutes)
+2026-03-14T05:46:57.450 | INFO     | core.background_tasks |   - refresh_bot_oauth_tokens (every 1 hour)
+2026-03-14T05:46:57.450 | INFO     | core.background_tasks |   - refresh_user_oauth_tokens (every 2 hours)
+2026-03-14T05:46:57.450 | INFO     | core.background_tasks |   - cleanup_task (every 1 minute)
+2026-03-14T05:46:57.450 | INFO     | core.background_tasks |   - cleanup_deleted_accounts (every 24 hours)
+2026-03-14T05:46:57.450 | INFO     | services.bot_token_validator | [BOT TOKEN] Starting token monitoring (interval: 3600s)
+2026-03-14T05:46:57.451 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_started environment=development filename=vk_token_refresh_service.py func_name=start lineno=53 service=bot_service version=0.03
+2026-03-14T05:46:57.452 | INFO     | core.background_tasks | [TOKEN REFRESH] Running initial token check on startup
+2026-03-14T05:46:57.452 | INFO     | core.background_tasks | [TOKEN REFRESH] Checking for expired or expiring user OAuth tokens
+2026-03-14T05:46:57.467 | INFO     | startup.lifespan | All background tasks started (tasks, token monitoring, VK refresh)
+2026-03-14T05:46:57.471 | INFO     | core.connection_manager | [GAME] Found 1 Twitch channels to listen: ['yourchy']
+2026-03-14T05:46:57.474 | INFO     | core.connection_manager | Found 0 VK Live channels to listen (channel slugs): []
+2026-03-14T05:46:57.474 | INFO     | startup.bot_initializer | [STARTUP] Twitch channels: ['yourchy']
+2026-03-14T05:46:57.474 | INFO     | startup.bot_initializer | [STARTUP] VK channels: []
+2026-03-14T05:46:58.820 | WARNING  | services.bot_token_validator | [BOT TOKEN] Twitch token belongs to pa1dviewer, expected payedviewer
+2026-03-14T05:46:58.821 | INFO     | services.bot_token_validator | [OK] [BOT TOKEN] Twitch bot token is VALID
+2026-03-14T05:46:58.821 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:46:58.821 | INFO     | startup.bot_initializer | [TWITCH] Creating Twitch bot instance...
+2026-03-14T05:46:58.821 | INFO     | startup.bot_initializer | [TWITCH] Token validated: OK
+2026-03-14T05:46:58.821 | INFO     | startup.bot_initializer | [TWITCH] Bot user: pa1dviewer
+2026-03-14T05:46:58.822 | INFO     | startup.bot_initializer | [TWITCH] Channels to connect: ['yourchy']
+2026-03-14T05:46:58.822 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:46:58.822 | INFO     | bot_service | [BOT] CREATING TWITCH BOT
+2026-03-14T05:46:58.822 | INFO     | bot_service | [INFO] Token: [CENSORED]
+2026-03-14T05:46:58.822 | INFO     | bot_service | [CHANNELS] Initial channels: ['yourchy']
+2026-03-14T05:46:58.822 | INFO     | bot_service | [DEBUG] Token length: 36
+2026-03-14T05:46:58.823 | INFO     | bot_service | [DEBUG] Number of channels: 1
+2026-03-14T05:46:58.823 | INFO     | bot_service | [WRENCH] Initializing TwitchIO Bot...
+2026-03-14T05:46:58.823 | INFO     | bot_service | [DEBUG] Calling super().__init__ with token and 1 channels
+2026-03-14T05:46:58.823 | INFO     | bot_service | [OK] TwitchIO Bot initialized
+2026-03-14T05:46:58.823 | INFO     | bot_service | [DEBUG] Bot nick: None
+2026-03-14T05:46:58.824 | INFO     | bot_service | [DEBUG] Bot user_id: None
+2026-03-14T05:46:58.824 | INFO     | bot_service | [BOT] Universal command handler initialized
+2026-03-14T05:46:58.824 | INFO     | bot_service | [BOT] Twitch bot initialized with all modules
+2026-03-14T05:46:58.824 | INFO     | startup.bot_initializer | [TWITCH] Task created, waiting 5 seconds for connection...
+2026-03-14T05:47:00.670 | INFO     | twitchio.websocket | Successfully logged onto Twitch WS: pa1dviewer
+2026-03-14T05:47:00.695 | INFO     | bot_service | [JOIN] Joined channel: yourchy
+2026-03-14T05:47:00.703 | INFO     | core.connection_manager_core | [SKIP] [TTS RECONNECT] Bot reconnected to yourchy, no active listeners for user 1; keeping pending TTS disconnect
+2026-03-14T05:47:00.704 | INFO     | bot_service | [OK] [BOT] Joined channel yourchy (welcome message via OAuth only)
+2026-03-14T05:47:00.704 | INFO     | bot_service | ================================================================================
+2026-03-14T05:47:00.704 | INFO     | bot_service | [BOT] TWITCH BOT READY!
+2026-03-14T05:47:00.705 | INFO     | bot_service | ================================================================================
+2026-03-14T05:47:00.705 | INFO     | bot_service | [INFO] Bot logged in as: pa1dviewer
+2026-03-14T05:47:00.705 | INFO     | bot_service | [ID] Bot user id: 1317705797
+2026-03-14T05:47:00.705 | INFO     | bot_service | [CHANNELS] Connected to channels: [<Channel name: yourchy>]
+2026-03-14T05:47:00.705 | INFO     | bot_service | [BOT] BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!
+2026-03-14T05:47:00.705 | INFO     | bot_service | [BOT] BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS
+2026-03-14T05:47:00.706 | INFO     | bot_service | [OK] MONITORING CHAT: yourchy
+2026-03-14T05:47:00.706 | INFO     | bot_service | ================================================================================
+2026-03-14T05:47:00.706 | INFO     | bot_service | [BOT] All modules loaded and ready!
+2026-03-14T05:47:03.831 | INFO     | startup.bot_initializer | [OK] [TWITCH] Bot connected as: pa1dviewer
+2026-03-14T05:47:03.831 | INFO     | startup.bot_initializer | [OK] Twitch bot started
+2026-03-14T05:47:04.990 | INFO     | services.bot_token_validator | [OK] [BOT TOKEN] VK bot token is VALID
+2026-03-14T05:47:04.990 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:47:04.990 | INFO     | startup.bot_initializer | [VK] Creating VK bot instance...
+2026-03-14T05:47:04.990 | INFO     | startup.bot_initializer | [VK] Token validated: OK
+2026-03-14T05:47:04.990 | INFO     | startup.bot_initializer | [VK] Bot user: Денис Р#1209004
+2026-03-14T05:47:04.990 | INFO     | startup.bot_initializer | [VK] Channels to connect: []
+2026-03-14T05:47:04.991 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:47:04.991 | INFO     | bot_service | [VK BOT] VK Live bot initialized
+2026-03-14T05:47:04.991 | INFO     | bot_service | [START] VK LIVE BOT STARTED - Ready to listen to chat
+2026-03-14T05:47:04.991 | INFO     | bot_service | VK LIVE BOT: Started and ready to connect to channels
+2026-03-14T05:47:04.991 | INFO     | bot_service | [VK BOT] All modules loaded and ready!
+2026-03-14T05:47:04.991 | INFO     | startup.bot_initializer | [OK] VK bot started
+2026-03-14T05:47:04.992 | INFO     | startup.lifespan | === BOT SERVICE STARTED ===
+2026-03-14T05:47:04.992 | INFO     | uvicorn.error | Application startup complete.
+2026-03-14T05:47:04.994 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:47:04.999 | INFO     | uvicorn.error | 127.0.0.1:50442 - "WebSocket /ws/chat/1" [accepted]
+2026-03-14T05:47:05.006 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:47:05.007 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_dashboard_1773449224999153600 (role=dashboard, presence_only=False)
+2026-03-14T05:47:05.007 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_dashboard_1773449224999153600 (User: 1, role=dashboard, presence_only=False)
+2026-03-14T05:47:05.007 | INFO     | uvicorn.error | connection open
+2026-03-14T05:47:05.019 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:47:05.023 | INFO     | uvicorn.error | 127.0.0.1:64927 - "WebSocket /ws/chat/1?client_role=tts_player&presence_only=1" [accepted]
+2026-03-14T05:47:05.026 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:47:05.027 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_tts_player_1773449225023241800 (role=tts_player, presence_only=True)
+2026-03-14T05:47:05.027 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_tts_player_1773449225023241800 (User: 1, role=tts_player, presence_only=True)
+2026-03-14T05:47:05.027 | INFO     | uvicorn.error | connection open
+2026-03-14T05:47:05.252 | INFO     | api.websocket_endpoints | [HISTORY] Sent 20 messages
+2026-03-14T05:47:07.013 | INFO     | core.middleware | GET /api/youtube/queue - Status: 200 - Time: 0.023s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:27.534 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:47:27.539 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:47:27.539 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:47:27.540 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:47:27.540 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:47:27.550 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:47:27.566 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:47:27.596 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:47:27.597 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:47:27.598 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Aoede resolved_voice=Aoede model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:47:32.943 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:47:32.944 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Aoede, channel=yourchy
+2026-03-14T05:47:32.946 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:47:33.162 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449252834.wav - Status: 200 - Time: 0.006s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:44.864 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:47:44.866 | INFO     | core.middleware | POST /api/tts/settings - Status: 200 - Time: 0.127s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:44.944 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.017s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:44.957 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.020s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:45.124 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.151s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:45.235 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.260s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:45.245 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.267s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:45.249 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.266s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:45.257 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.274s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:45.277 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.281s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:45.280 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.037s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:47:54.443 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: Проверка
+2026-03-14T05:47:54.444 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:47:54.444 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:47:54.444 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:47:54.444 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: Проверка
+2026-03-14T05:47:54.458 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:47:54.468 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'Проверка...'
+2026-03-14T05:47:54.487 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: Проверка... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:47:54.487 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:47:54.488 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Charon resolved_voice=Charon model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:47:58.061 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:47:58.061 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Charon, channel=yourchy
+2026-03-14T05:47:58.064 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:47:58.088 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449277958.wav - Status: 200 - Time: 0.006s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:07.188 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.019s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:10.634 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:10.634 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:48:10.635 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:48:10.635 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:48:10.635 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:10.648 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:48:10.662 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:48:10.677 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:48:10.678 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:48:10.678 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Fenrir resolved_voice=Fenrir model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:48:15.681 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:48:15.683 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Fenrir, channel=yourchy
+2026-03-14T05:48:15.689 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:48:15.817 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449295556.wav - Status: 200 - Time: 0.008s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:24.076 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:24.076 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:48:24.077 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:48:24.077 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:48:24.077 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:24.094 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:48:24.104 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:48:24.115 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:48:24.115 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:48:24.116 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Charon resolved_voice=Charon model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:48:24.619 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:24.619 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:48:24.619 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:48:24.619 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:48:24.619 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:24.624 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:48:24.635 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:48:24.655 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:48:24.656 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:48:24.656 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Fenrir resolved_voice=Fenrir model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:48:25.181 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:25.181 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:48:25.182 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:48:25.183 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:48:25.185 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:25.194 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:48:25.202 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:48:25.210 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:48:25.210 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:48:25.210 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Fenrir resolved_voice=Fenrir model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:48:30.070 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:48:30.074 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Fenrir, channel=yourchy
+2026-03-14T05:48:30.079 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:48:30.220 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:48:30.220 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Charon, channel=yourchy
+2026-03-14T05:48:30.225 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:48:30.237 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449309937.wav - Status: 200 - Time: 0.004s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:30.612 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:48:30.613 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Fenrir, channel=yourchy
+2026-03-14T05:48:30.617 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:48:35.305 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449310093.wav - Status: 200 - Time: 0.004s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:39.025 | INFO     | core.middleware | GET /api/chat/status - Status: 200 - Time: 0.017s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:40.703 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449310472.wav - Status: 200 - Time: 0.003s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:50.852 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:48:50.853 | INFO     | core.middleware | POST /api/tts/settings - Status: 200 - Time: 0.019s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.038 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.158s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.041 | INFO     | core.middleware | GET /api/tts/status - Status: 200 - Time: 0.159s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.044 | INFO     | core.middleware | GET /api/tts/platform-settings - Status: 200 - Time: 0.159s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.045 | INFO     | core.middleware | GET /api/tts/mode-settings - Status: 200 - Time: 0.151s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.046 | INFO     | core.middleware | GET /api/tts/audio-settings - Status: 200 - Time: 0.161s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.057 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.163s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.094 | INFO     | core.middleware | GET /api/tts/blocked-users - Status: 200 - Time: 0.049s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.095 | INFO     | core.middleware | GET /api/tts/filtered-words - Status: 200 - Time: 0.031s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:51.095 | INFO     | core.middleware | GET /api/tts/settings - Status: 200 - Time: 0.039s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:48:58.750 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:58.750 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:48:58.750 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:48:58.751 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:48:58.751 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:58.763 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:48:58.778 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:48:58.785 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:48:58.786 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:48:58.786 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Aoede resolved_voice=Aoede model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:48:59.376 | INFO     | bot_service | [CHAT] [TWITCH CHAT] yourchy: yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:59.377 | INFO     | bot_service | [LIST] [DEBUG] Message has tags: ['@badge-info', 'badges', 'client-nonce', 'color', 'display-name', 'emotes', 'first-msg', 'flags', 'id', 'mod', 'returning-chatter', 'room-id', 'subscriber', 'tmi-sent-ts', 'turbo', 'user-id', 'user-type']
+2026-03-14T05:48:59.377 | INFO     | bot_service | [BADGES RAW] yourchy: 'broadcaster/1,fright-fest-2025/1'
+2026-03-14T05:48:59.377 | INFO     | bot_service | [BADGES PARSED] yourchy: ['broadcaster/1', 'fright-fest-2025/1']
+2026-03-14T05:48:59.377 | INFO     | bot_service.notifications | [BROADCAST] Incoming message: twitch:yourchy | yourchy: озвучка сообщений, приятным голосочком!
+2026-03-14T05:48:59.386 | INFO     | bot_service.notifications | [SEND] TWITCH message sent to 2/2 connections
+2026-03-14T05:48:59.392 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing message for TTS: 'озвучка сообщений, приятным голосочком!...'
+2026-03-14T05:48:59.402 | INFO     | bot_service.tts | [MIC] [TWITCH TTS] Processing: yourchy: озвучка сообщений, приятным голосочком!... (engine=gcloud, provider=gcloud, volume=44%)
+2026-03-14T05:48:59.402 | INFO     | services.tts.tts_manager | [MIC] Engine resolved: gcloud
+2026-03-14T05:48:59.403 | INFO     | services.tts.google_cloud_tts | [GCLOUD] TTS request resolved: input_voice=ru-RU-Gemini-Charon resolved_voice=Charon model=gemini-2.5-flash-tts lang=ru-RU prompt=yes
+2026-03-14T05:49:03.557 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:49:03.557 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Aoede, channel=yourchy
+2026-03-14T05:49:03.560 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:49:03.636 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449343418.wav - Status: 200 - Time: 0.006s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:49:03.998 | INFO     | services.tts.tts_manager | [OK] Google Cloud TTS synthesis succeeded
+2026-03-14T05:49:03.999 | INFO     | bot_service.tts | [OK] TTS synthesis succeeded: type=google_cloud, voice=Charon, channel=yourchy
+2026-03-14T05:49:04.001 | INFO     | bot_service.notifications | [VOLUME] TTS audio sent to 1 connections (user=1, mode=website)
+2026-03-14T05:49:08.024 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449343871.wav - Status: 200 - Time: 0.004s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:49:15.166 | INFO     | core.middleware | GET /api/tts/audio/gcloud_tts_1773449343418.wav - Status: 200 - Time: 0.008s - User: Anonymous - IP: 127.0.0.1
+2026-03-14T05:50:31.726 | WARNING  | uvicorn.error | StatReload detected changes in 'core\session_manager.py'. Reloading...
+ 2026-03-14T05:50:31.750 | INFO     | uvicorn.error | Shutting down
+2026-03-14T05:50:31.751 | WARNING  | api.websocket_endpoints | [WS] Error user 1: (1012, None)
+2026-03-14T05:50:31.754 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:50:31.754 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_tts_player_1773449225023241800
+2026-03-14T05:50:31.755 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:50:31.755 | WARNING  | api.websocket_endpoints | [WS] Error user 1: (1012, None)
+2026-03-14T05:50:31.757 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:50:31.759 | INFO     | core.connection_manager_core | [TIMER] [TTS DISCONNECT] Scheduled TTS disable for user 1 (yourchy) in 60s
+2026-03-14T05:50:31.759 | INFO     | services.memory_websocket_manager | Scheduled TTS disconnect after last WebSocket removal for user 1 (yourchy)
+2026-03-14T05:50:31.760 | INFO     | services.memory_websocket_manager | WebSocket connection removed: 1_user_1_chat_dashboard_1773449224999153600
+2026-03-14T05:50:31.760 | INFO     | uvicorn.error | connection closed
+2026-03-14T05:50:31.874 | INFO     | uvicorn.error | Waiting for application shutdown.
+2026-03-14T05:50:31.875 | INFO     | startup.lifespan | Bot service shutting down
+2026-03-14T05:50:31.875 | INFO     | startup.lifespan | [CLEANUP] Cleaning up 0 active VK bots...
+2026-03-14T05:50:31.876 | INFO     | startup.bot_registry | [OK] Twitch bot stopped
+2026-03-14T05:50:31.877 | INFO     | bot_service |  VK LIVE BOT STOPPED
+2026-03-14T05:50:31.877 | INFO     | bot_service | [VK BOT] VK Live bot shutdown complete
+2026-03-14T05:50:31.877 | INFO     | startup.bot_registry | [OK] VK Live bot stopped
+2026-03-14T05:50:31.877 | INFO     | services.bot_token_validator | [BOT TOKEN] Monitoring stopped
+2026-03-14T05:50:31.877 | INFO     | startup.lifespan | Bot token monitoring stopped
+2026-03-14T05:50:31.878 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_stopped environment=development filename=vk_token_refresh_service.py func_name=stop lineno=74 service=bot_service version=0.03
+2026-03-14T05:50:31.878 | INFO     | startup.lifespan | VK token refresh service stopped
+2026-03-14T05:50:31.878 | INFO     | core.background_tasks | Background tasks stopped
+2026-03-14T05:50:31.878 | INFO     | startup.lifespan | Background tasks stopped
+2026-03-14T05:50:31.878 | INFO     | services.tts.memory_tts_queue | Memory TTS Queue stopped
+2026-03-14T05:50:31.878 | INFO     | services.memory_websocket_manager | Memory WebSocket Manager stopped
+2026-03-14T05:50:31.879 | INFO     | services.tts.tts_worker | TTS Worker stopped
+2026-03-14T05:50:31.879 | INFO     | startup.lifespan | Connections cleaned up
+2026-03-14T05:50:31.879 | INFO     | startup.lifespan | === BOT SERVICE STOPPED ===
+2026-03-14T05:50:31.879 | INFO     | uvicorn.error | Application shutdown complete.
+2026-03-14T05:50:31.879 | INFO     | uvicorn.error | Finished server process [76920]
+2026-03-14T05:50:31.880 | INFO     | core.connection_manager_core | [OK] [TTS RECONNECT] User 1 reconnected - keeping TTS enabled
+2026-03-14T05:50:37.539 | INFO     | core.structured_logging | Using plain FileHandler for 'H:\Programming\raw_code\AI\Python\TTS_TTV_0.02\logs\bot_service.log' on Windows development runtime to avoid reload rotation conflicts.
+2026-03-14T05:50:37.540 | INFO     | core.structured_logging | structured_logging_initialized environment=development filename=structured_logging.py func_name=setup_structured_logging json_logs=False lineno=357 service=bot_service version=0.03
+2026-03-14T05:50:37.549 | INFO     | core.exception_handlers | [OK] Exception handlers registered
+2026-03-14T05:50:37.638 | INFO     | services.advanced_rate_limiter | [RATE-LIMITER] Advanced Rate Limiter initialized with limits library (storage=redis)
+2026-03-14T05:50:38.349 | INFO     | core.cookie_config | [DEV] Running in DEVELOPMENT mode: cookies.secure=False
+2026-03-14T05:50:38.718 | INFO     | startup.router_registry | Registered 44 routers
+2026-03-14T05:50:38.825 | INFO     | core.sentry_config | [SENTRY] DSN not configured, error tracking disabled
+2026-03-14T05:50:38.826 | INFO     | core.exception_handlers | [OK] Exception handlers registered
+2026-03-14T05:50:39.067 | INFO     | startup.router_registry | Registered 44 routers
+2026-03-14T05:50:39.070 | INFO     | uvicorn.error | Started server process [78152]
+2026-03-14T05:50:39.070 | INFO     | uvicorn.error | Waiting for application startup.
+2026-03-14T05:50:39.071 | INFO     | startup.lifespan | Bot service starting on port 8000
+2026-03-14T05:50:39.262 | INFO     | models.base | [DB] Database seeding complete (blocked bots + lootbox qualities)
+2026-03-14T05:50:39.262 | INFO     | models.base | Database initialized
+2026-03-14T05:50:39.262 | INFO     | startup.lifespan | Database initialized
+2026-03-14T05:50:39.277 | INFO     | startup.lifespan | [STARTUP] Global bot commands already exist
+2026-03-14T05:50:39.278 | INFO     | core.connection_manager | [CONNECTION] ConnectionManager initialized
+2026-03-14T05:50:39.278 | INFO     | core.connection_manager | [FIX] Created global ConnectionManager instance
+2026-03-14T05:50:39.279 | INFO     | services.tts.memory_tts_queue | Memory TTS Queue started
+2026-03-14T05:50:39.279 | INFO     | services.memory_websocket_manager | Memory WebSocket Manager started
+2026-03-14T05:50:39.279 | INFO     | services.tts.tts_worker | TTS Worker started
+2026-03-14T05:50:39.280 | INFO     | services.tts.tts_worker | TTS Worker loop running...
+2026-03-14T05:50:39.280 | INFO     | startup.lifespan | All services started (TTS queue, WebSocket manager, TTS worker)
+2026-03-14T05:50:39.400 | INFO     | core.connection_manager_core | [SKIP] [TTS RECONNECT] Bot reconnected to yourchy, no active listeners for user 1; keeping pending TTS disconnect
+2026-03-14T05:50:39.401 | INFO     | core.connection_manager | Restored session 724c599f... for channel yourchy
+2026-03-14T05:50:39.401 | INFO     | core.connection_manager | Restored 1 active sessions from database
+2026-03-14T05:50:39.401 | INFO     | startup.lifespan | Restored 1 active channels
+2026-03-14T05:50:39.401 | INFO     | startup.lifespan | [OK] TTS will be enabled when users connect via WebSocket
+2026-03-14T05:50:39.874 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_initialized environment=development filename=vk_token_refresh_service.py func_name=__init__ lineno=38 service=bot_service version=0.03
+2026-03-14T05:50:39.875 | INFO     | core.background_tasks | [BACKGROUND] Started 6 background tasks
+2026-03-14T05:50:39.875 | INFO     | core.background_tasks |   - cleanup_old_chat_messages (every 1 hour)
+2026-03-14T05:50:39.875 | INFO     | core.background_tasks |   - cleanup_expired_sessions (every 5 minutes)
+2026-03-14T05:50:39.875 | INFO     | core.background_tasks |   - refresh_bot_oauth_tokens (every 1 hour)
+2026-03-14T05:50:39.875 | INFO     | core.background_tasks |   - refresh_user_oauth_tokens (every 2 hours)
+2026-03-14T05:50:39.876 | INFO     | core.background_tasks |   - cleanup_task (every 1 minute)
+2026-03-14T05:50:39.876 | INFO     | core.background_tasks |   - cleanup_deleted_accounts (every 24 hours)
+2026-03-14T05:50:39.876 | INFO     | services.bot_token_validator | [BOT TOKEN] Starting token monitoring (interval: 3600s)
+2026-03-14T05:50:39.876 | INFO     | services.vk_token_refresh_service | vk_token_refresh_service_started environment=development filename=vk_token_refresh_service.py func_name=start lineno=53 service=bot_service version=0.03
+2026-03-14T05:50:39.878 | INFO     | core.background_tasks | [TOKEN REFRESH] Running initial token check on startup
+2026-03-14T05:50:39.878 | INFO     | core.background_tasks | [TOKEN REFRESH] Checking for expired or expiring user OAuth tokens
+2026-03-14T05:50:39.892 | INFO     | startup.lifespan | All background tasks started (tasks, token monitoring, VK refresh)
+2026-03-14T05:50:39.897 | INFO     | core.connection_manager | [GAME] Found 1 Twitch channels to listen: ['yourchy']
+2026-03-14T05:50:39.901 | INFO     | core.connection_manager | Found 0 VK Live channels to listen (channel slugs): []
+2026-03-14T05:50:39.901 | INFO     | startup.bot_initializer | [STARTUP] Twitch channels: ['yourchy']
+2026-03-14T05:50:39.901 | INFO     | startup.bot_initializer | [STARTUP] VK channels: []
+2026-03-14T05:50:41.183 | WARNING  | services.bot_token_validator | [BOT TOKEN] Twitch token belongs to pa1dviewer, expected payedviewer
+2026-03-14T05:50:41.184 | INFO     | services.bot_token_validator | [OK] [BOT TOKEN] Twitch bot token is VALID
+2026-03-14T05:50:41.184 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:50:41.184 | INFO     | startup.bot_initializer | [TWITCH] Creating Twitch bot instance...
+2026-03-14T05:50:41.185 | INFO     | startup.bot_initializer | [TWITCH] Token validated: OK
+2026-03-14T05:50:41.185 | INFO     | startup.bot_initializer | [TWITCH] Bot user: pa1dviewer
+2026-03-14T05:50:41.185 | INFO     | startup.bot_initializer | [TWITCH] Channels to connect: ['yourchy']
+2026-03-14T05:50:41.185 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:50:41.185 | INFO     | bot_service | [BOT] CREATING TWITCH BOT
+2026-03-14T05:50:41.185 | INFO     | bot_service | [INFO] Token: [CENSORED]
+2026-03-14T05:50:41.185 | INFO     | bot_service | [CHANNELS] Initial channels: ['yourchy']
+2026-03-14T05:50:41.186 | INFO     | bot_service | [DEBUG] Token length: 36
+2026-03-14T05:50:41.186 | INFO     | bot_service | [DEBUG] Number of channels: 1
+2026-03-14T05:50:41.186 | INFO     | bot_service | [WRENCH] Initializing TwitchIO Bot...
+2026-03-14T05:50:41.186 | INFO     | bot_service | [DEBUG] Calling super().__init__ with token and 1 channels
+2026-03-14T05:50:41.187 | INFO     | bot_service | [OK] TwitchIO Bot initialized
+2026-03-14T05:50:41.187 | INFO     | bot_service | [DEBUG] Bot nick: None
+2026-03-14T05:50:41.187 | INFO     | bot_service | [DEBUG] Bot user_id: None
+2026-03-14T05:50:41.187 | INFO     | bot_service | [BOT] Universal command handler initialized
+2026-03-14T05:50:41.187 | INFO     | bot_service | [BOT] Twitch bot initialized with all modules
+2026-03-14T05:50:41.188 | INFO     | startup.bot_initializer | [TWITCH] Task created, waiting 5 seconds for connection...
+2026-03-14T05:50:43.056 | INFO     | twitchio.websocket | Successfully logged onto Twitch WS: pa1dviewer
+2026-03-14T05:50:43.081 | INFO     | bot_service | [JOIN] Joined channel: yourchy
+2026-03-14T05:50:43.087 | INFO     | core.connection_manager_core | [SKIP] [TTS RECONNECT] Bot reconnected to yourchy, no active listeners for user 1; keeping pending TTS disconnect
+2026-03-14T05:50:43.088 | INFO     | bot_service | [OK] [BOT] Joined channel yourchy (welcome message via OAuth only)
+2026-03-14T05:50:43.089 | INFO     | bot_service | ================================================================================
+2026-03-14T05:50:43.089 | INFO     | bot_service | [BOT] TWITCH BOT READY!
+2026-03-14T05:50:43.089 | INFO     | bot_service | ================================================================================
+2026-03-14T05:50:43.089 | INFO     | bot_service | [INFO] Bot logged in as: pa1dviewer
+2026-03-14T05:50:43.089 | INFO     | bot_service | [ID] Bot user id: 1317705797
+2026-03-14T05:50:43.090 | INFO     | bot_service | [CHANNELS] Connected to channels: [<Channel name: yourchy>]
+2026-03-14T05:50:43.090 | INFO     | bot_service | [BOT] BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!
+2026-03-14T05:50:43.090 | INFO     | bot_service | [BOT] BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS
+2026-03-14T05:50:43.090 | INFO     | bot_service | [OK] MONITORING CHAT: yourchy
+2026-03-14T05:50:43.090 | INFO     | bot_service | ================================================================================
+2026-03-14T05:50:43.090 | INFO     | bot_service | [BOT] All modules loaded and ready!
+2026-03-14T05:50:46.188 | INFO     | startup.bot_initializer | [OK] [TWITCH] Bot connected as: pa1dviewer
+2026-03-14T05:50:46.188 | INFO     | startup.bot_initializer | [OK] Twitch bot started
+2026-03-14T05:50:47.317 | INFO     | services.bot_token_validator | [OK] [BOT TOKEN] VK bot token is VALID
+2026-03-14T05:50:47.317 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:50:47.317 | INFO     | startup.bot_initializer | [VK] Creating VK bot instance...
+2026-03-14T05:50:47.318 | INFO     | startup.bot_initializer | [VK] Token validated: OK
+2026-03-14T05:50:47.318 | INFO     | startup.bot_initializer | [VK] Bot user: Денис Р#1209004
+2026-03-14T05:50:47.318 | INFO     | startup.bot_initializer | [VK] Channels to connect: []
+2026-03-14T05:50:47.318 | INFO     | startup.bot_initializer | ================================================================================
+2026-03-14T05:50:47.318 | INFO     | bot_service | [VK BOT] VK Live bot initialized
+2026-03-14T05:50:47.318 | INFO     | bot_service | [START] VK LIVE BOT STARTED - Ready to listen to chat
+2026-03-14T05:50:47.318 | INFO     | bot_service | VK LIVE BOT: Started and ready to connect to channels
+2026-03-14T05:50:47.318 | INFO     | bot_service | [VK BOT] All modules loaded and ready!
+2026-03-14T05:50:47.319 | INFO     | startup.bot_initializer | [OK] VK bot started
+2026-03-14T05:50:47.319 | INFO     | startup.lifespan | === BOT SERVICE STARTED ===
+2026-03-14T05:50:47.319 | INFO     | uvicorn.error | Application startup complete.
+2026-03-14T05:50:47.321 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:50:47.325 | INFO     | uvicorn.error | 127.0.0.1:63358 - "WebSocket /ws/chat/1" [accepted]
+2026-03-14T05:50:47.333 | INFO     | services.tts.memory_tts_queue | Disabled TTS generation for user 1. Dropped pending tasks: 0
+2026-03-14T05:50:47.333 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_dashboard_1773449447326313900 (role=dashboard, presence_only=False)
+2026-03-14T05:50:47.333 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_dashboard_1773449447326313900 (User: 1, role=dashboard, presence_only=False)
+2026-03-14T05:50:47.334 | INFO     | uvicorn.error | connection open
+2026-03-14T05:50:47.347 | INFO     | api.websocket_endpoints | [WS] Connection request for user 1
+2026-03-14T05:50:47.350 | INFO     | uvicorn.error | 127.0.0.1:63377 - "WebSocket /ws/chat/1?client_role=tts_player&presence_only=1" [accepted]
+2026-03-14T05:50:47.352 | INFO     | services.tts.memory_tts_queue | Enabled TTS generation for user 1
+2026-03-14T05:50:47.353 | INFO     | services.memory_websocket_manager | WebSocket connection added: 1_user_1_chat_tts_player_1773449447350990200 (role=tts_player, presence_only=True)
+2026-03-14T05:50:47.353 | INFO     | api.websocket_endpoints | [WS] Connected: 1_user_1_chat_tts_player_1773449447350990200 (User: 1, role=tts_player, presence_only=True)
+2026-03-14T05:50:47.353 | INFO     | uvicorn.error | connection open
+2026-03-14T05:50:47.535 | INFO     | api.websocket_endpoints | [HISTORY] Sent 20 messages
+
+Есть проблема что бот пишет в консоль что ожидает имя payedviewer а на самом деле оно другое, что можно сделать с этим? потому что имя payedviewer уже не используется. Также не понятно почему иногда google cloud tts выдат неправильный текст для озвучивания, то есть совсем не тот что я вижу в чате. Кроме того не понимаю почему в логах все еще есть шум от загрузки баджиков и прочего связанного с chatbox, chatbox давно убрали из проекта, оставили obs chat только и отдельный в окне, но они были не включены, поэтому странно что идут загрузки разных атрибутов чата, в том числе история. Также мне не понятно почему не загружается F5 tts озвучка на фронтенде, сейчас на бэкенде подняты сервисы F5 tts и gateway. Вот последние логи оттуда: INFO:     Started server process [48036]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8010 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56967 - "GET /health/live HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56967 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+2026-03-12 12:38:36,519 INFO app.engine.f5_engine: F5 model is ready
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8011 (Press CTRL+C to quit)
+INFO:     127.0.0.1:49495 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49495 - "GET /api/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52712 - "GET /api/voices/list HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:52712 - "GET /api/voices/list HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63273 - "GET /api/voices/list HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63273 - "GET /api/voices/list HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65010 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65010 - "GET /api/status HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64728 - "GET /api/voices/list HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64728 - "GET /api/voices/list HTTP/1.1" 404 Not Found
+Qwen tts пока не разворачивали. Прошу разберись со всеми тремя сервисами F5 Gateway и Qwen чтобы они работали. Их репозитории лежат на уровень выше, можешь изменять там код, лишь бы все связи были настроены, чтобы лучше диагностировать проблемы, можешь запустить chrome mcp devtools и протестировать функционал.

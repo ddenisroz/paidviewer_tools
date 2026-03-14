@@ -1,19 +1,19 @@
 # core/database.py
 """
-Фасад для обратной совместимости.
+Compatibility facade for database model imports.
 
-Все модели перенесены в bot_service/models/ для лучшей организации.
-Этот файл реэкспортирует все модели для существующего кода.
+All models live under ``bot_service/models/``. This module re-exports them for
+older imports that still use ``core.database``.
 
-ВАЖНО: Для нового кода рекомендуется импортировать напрямую из models:
+For new code, prefer importing directly from ``models``:
     from models import User, get_db
     from models.user import User, UserSettings
     from models.base import db_session
 """
 
-# Re-export всего из models для обратной совместимости
+# Re-export everything from ``models`` for backward compatibility.
 from models import (
-    # Base и инфраструктура
+    # Base and infrastructure
     Base,
     engine,
     SessionLocal,
@@ -22,7 +22,7 @@ from models import (
     init_db,
     DATABASE_URL,
     IS_POSTGRESQL,
-    # Пользователи
+    # Users
     User,
     UserSettings,
     UserSession,
@@ -37,18 +37,18 @@ from models import (
     UserVoiceSettings,
     # YouTube
     YouTubeQueue,
-    # Баллы
+    # Points
     ChannelPoints,
     ChannelReward,
     PointsTransaction,
     RewardQueue,
-    # Команды
+    # Commands
     BotCommand,
-    # Модерация
+    # Moderation
     BlockedBot,
     BlockedChannel,
     WhitelistedChannel,
-    # Аналитика
+    # Analytics
     PsychologyAnalysis,
     ChatMessage,
     UserProgression,
@@ -62,19 +62,19 @@ from models import (
     MemeAlertsGrantHistory,
     MythicalDropsSession,
     StreamSession,
-    # Геймификация
+    # Gamification
     Achievement,
     UserAchievement,
     DonationAlert,
-    # Поддержка
-    # Безопасность
+    # Support
+    # Security
     SecurityLog,
     SystemLog,
-    # Виджеты
+    # Widgets
     ChatBoxSettings,
 )
 
-# Также экспортируем утилиту datetime для совместимости
+# Re-export the datetime helper for compatibility.
 from core.datetime_utils import utcnow_naive
 
 __all__ = [

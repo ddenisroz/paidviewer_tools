@@ -1,8 +1,5 @@
 # bot_service/core/cookie_config.py
-"""
-Production-ready cookie configuration
-Автоматически настраивает security флаги на основе ENVIRONMENT
-"""
+"""Production-ready cookie configuration helpers."""
 import logging
 from typing import Optional
 from core.config import settings
@@ -18,18 +15,18 @@ def get_cookie_settings(
     max_age: Optional[int] = None
 ) -> dict:
     """
-    Получить настройки cookie с автоматической настройкой secure флага
+    Return cookie settings with an environment-aware secure flag.
     
     Args:
-        key: Ключ cookie
-        value: Значение cookie
-        httponly: HttpOnly флаг (защита от XSS)
-        samesite: SameSite политика (защита от CSRF)
-        path: Путь cookie
-        max_age: Время жизни в секундах
+        key: Cookie key
+        value: Cookie value
+        httponly: HttpOnly flag
+        samesite: SameSite policy
+        path: Cookie path
+        max_age: Lifetime in seconds
     
     Returns:
-        dict: Настройки для response.set_cookie()
+        Keyword arguments for ``response.set_cookie()``
     """
     is_production = settings.environment.lower() == "production"
 
@@ -37,7 +34,7 @@ def get_cookie_settings(
         "key": key,
         "value": value,
         "httponly": httponly,
-        "secure": is_production,  # True только в production
+        "secure": is_production,  # True only in production
         "samesite": samesite,
         "path": path
     }
@@ -45,7 +42,7 @@ def get_cookie_settings(
     if max_age is not None:
         cookie_settings["max_age"] = max_age
 
-    # Логируем для отладки (только в dev)
+    # Log extra details in development only.
     if not is_production:
         logger.debug(
             f"[COOKIE] Cookie '{key}' settings: "
@@ -58,29 +55,30 @@ def get_cookie_settings(
 
 
 def is_production() -> bool:
-    """Проверка что приложение запущено в production"""
+    """Return True when the application runs in production."""
     return settings.environment.lower() == "production"
 
 
 def is_development() -> bool:
-    """Проверка что приложение запущено в development"""
+    """Return True when the application does not run in production."""
     return not is_production()
 
 
-# Константы для session cookies
-# Бесконечная сессия (10 лет) - сессия живет до явного логаута или логина с другого устройства
-TEN_YEARS_IN_SECONDS = 10 * 365 * 24 * 60 * 60  # 315360000 секунд
+# Session cookie constants.
+# Sessions are intentionally long-lived and stay valid until explicit logout
+# or replacement by a new login from another device.
+TEN_YEARS_IN_SECONDS = 10 * 365 * 24 * 60 * 60  # 315360000 seconds
 SESSION_MAX_AGE_SECONDS = TEN_YEARS_IN_SECONDS
 
 def get_session_cookie_settings(session_id: str) -> dict:
     """
-    Получить настройки для session cookie с правильным secure флагом
+    Return settings for the session cookie.
     
     Args:
-        session_id: ID сессии
+        session_id: Session ID
         
     Returns:
-        dict: Настройки для response.set_cookie()
+        Keyword arguments for ``response.set_cookie()``
     """
     return get_cookie_settings(
         key="session_id",
@@ -92,7 +90,7 @@ def get_session_cookie_settings(session_id: str) -> dict:
     )
 
 
-# При импорте модуля показываем текущий режим
+# Log the active mode when the module is imported.
 if settings.is_production:
     logger.info("[SECURITY] Running in PRODUCTION mode: cookies.secure=True")
 else:

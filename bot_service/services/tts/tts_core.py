@@ -213,7 +213,7 @@ class CreateTtsRewardRequest(BaseModel):
 
 
 # ============================================================================
-# TTS API CLASS (для работы с TTS Manager)
+# TTS API class used by TTS Manager.
 # ============================================================================
 
 class TTSAPI:
@@ -238,7 +238,7 @@ class TTSAPI:
         word_filter: list = None,
         blocked_users: list = None
     ) -> dict:
-        """Отправить запрос на озвучку через TTS Manager"""
+        """Send a synthesis request through TTS Manager."""
         try:
             result = await self.tts_manager.synthesize_tts(
                 channel_name=channel_name,
@@ -259,14 +259,14 @@ class TTSAPI:
             if result.get("success"):
                 tts_type = result.get("tts_type", "unknown")
                 voice = result.get("voice", "unknown")
-                logger.info(f"[OK] TTS синтез успешен: type={tts_type}, voice={voice}, channel={channel_name}")
+                logger.info(f"[OK] TTS synthesis succeeded: type={tts_type}, voice={voice}, channel={channel_name}")
             else:
-                logger.error(f"[ERROR] TTS синтез не удался: {result.get('error')}")
+                logger.error(f"[ERROR] TTS synthesis failed: {result.get('error')}")
 
             return result
 
         except Exception:
-            logger.exception("[ERROR] Ошибка при отправке TTS запроса")
+            logger.exception("[ERROR] Failed to submit a TTS request")
             return {"success": False, "error": "Internal server error"}
 
 
@@ -275,7 +275,7 @@ class TTSAPI:
 # ============================================================================
 
 def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Проверяет whitelist для управления голосами (только для авторизованных пользователей)"""
+    """Validate voice-management access for authenticated users."""
     if not user or not user.get('id') or user.get('id') <= 0:
         raise HTTPException(
             status_code=401,
@@ -285,16 +285,16 @@ def check_user_whitelisted(user: dict = Depends(get_current_user), db: Session =
     from repositories.user_repository import UserRepository
     db_user = UserRepository(db).get_by_id(user['id'])
     if not db_user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
+        raise HTTPException(status_code=404, detail="User not found")
 
-    # Проверяем whitelist с кешированием
+    # Use the cached whitelist check.
     from utils.whitelist_cache import is_user_whitelisted_cached
     if is_user_whitelisted_cached(db_user, db):
         return user
 
     raise HTTPException(
         status_code=403,
-        detail="У вас нет доступа к управлению голосами. Обратитесь к администратору."
+        detail="You do not have access to voice management. Contact an administrator."
     )
 
 
@@ -304,7 +304,7 @@ async def check_local_tts_health(
     provider: str = "f5",
     fetch_status: bool = False,
 ) -> dict:
-    """Проверить здоровье локального TTS сервиса"""
+    """Check the health of a local TTS service."""
     try:
         endpoint = normalize_local_tts_endpoint_url(endpoint_url)
         normalized_provider = (provider or "f5").strip().lower()
@@ -315,10 +315,10 @@ async def check_local_tts_health(
         async with httpx.AsyncClient(timeout=5.0) as client:
             if normalized_provider == "qwen":
                 compatibility_note = (
-                    "Этот endpoint трактуется как self-hosted Qwen endpoint пользователя. "
-                    "Managed path в проекте остается gateway-managed через project-hosted worker. "
-                    "Текущий upstream Qwen еще не доведен до полного bot_service contract, "
-                    "поэтому для self-hosted path используется compatibility path через /api/prepare -> /api/stream/{id}."
+                    "This endpoint is treated as a user's self-hosted Qwen endpoint. "
+                    "The managed project path remains gateway-managed through a project-hosted worker. "
+                    "The current upstream Qwen runtime does not yet expose the full bot_service contract, "
+                    "so the self-hosted path uses a compatibility flow via /api/prepare -> /api/stream/{id}."
                 )
                 try:
                     prepare_probe = await client.get(f"{endpoint}/api/prepare", headers=headers)
@@ -376,7 +376,7 @@ async def check_local_tts_health(
     except ValueError as error:
         return {"healthy": False, "error": str(error)}
     except httpx.TimeoutException:
-        return {"healthy": False, "error": "Timeout: сервис не отвечает"}
+        return {"healthy": False, "error": "Timeout: service is not responding"}
     except Exception:
         return {"healthy": False, "error": "Internal server error"}
 

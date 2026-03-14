@@ -1,4 +1,4 @@
-# Деплой
+﻿# Деплой
 
 Последнее обновление: 2026-03-13
 
@@ -6,10 +6,10 @@
 
 ## Что важно помнить
 
-- `frontend` общается только с `bot_service`;
-- advanced synthesis для `f5` и `qwen` идёт через `tts-gateway`;
-- voice/admin API остаются за upstream-сервисами;
-- qwen voice CRUD выключен, пока не задан `QWEN_VOICE_SERVICE_URL`.
+- `frontend` общается только с `bot_service`
+- advanced synthesis для `f5` и `qwen` идёт через `tts-gateway`
+- voice/admin API остаются за upstream-сервисами
+- qwen voice CRUD выключен, пока не задан `QWEN_VOICE_SERVICE_URL`
 
 ## Активные compose entrypoints
 
@@ -35,9 +35,9 @@ QWEN_VOICE_SERVICE_URL=
 
 ## Внешние зависимости
 
-- `tts-gateway` требует Redis;
-- `f5-tts-service` требует PostgreSQL и model/vendor assets;
-- `nano-qwen3tts-vllm` практически требует Linux или WSL2.
+- `tts-gateway` требует Redis
+- `f5-tts-service` требует PostgreSQL и model/vendor assets
+- `nano-qwen3tts-vllm` практически требует Linux или WSL2
 
 ## Базовая проверка после деплоя
 
@@ -48,4 +48,7 @@ curl "http://localhost:8000/api/tts/health?provider=qwen"
 curl "http://localhost:8000/api/voices/providers/capabilities"
 ```
 
-Исторические заметки по деплою не должны жить в active docs. Их место в `docs/backlog/`.
+## Связанные документы
+
+- [LOCAL_TTS_INTEGRATION.md](LOCAL_TTS_INTEGRATION.md)
+- [LIVE_SMOKE_RUNBOOK.md](LIVE_SMOKE_RUNBOOK.md)

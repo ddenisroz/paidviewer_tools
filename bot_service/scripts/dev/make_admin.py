@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Сделать пользователя администратором.
+Make a user an administrator.
 
 Usage:
     python scripts/make_admin.py <user_id>
@@ -23,50 +23,50 @@ from core.database import SessionLocal, User  # noqa: E402
 
 
 def make_admin(user_id=None, username=None):
-    """Сделать пользователя администратором."""
+    """Make a user an administrator."""
     db = SessionLocal()
     try:
         if user_id:
             user = db.query(User).filter(User.id == user_id).first()
         elif username:
             user = db.query(User).filter(
-                (User.twitch_username == username.lower()) | 
+                (User.twitch_username == username.lower()) |
                 (User.vk_username == username.lower())
             ).first()
         else:
-            print("[ERROR] Укажите user_id или username")
+            print("[ERROR] Specify user_id or username")
             return False
-        
+
         if not user:
-            print("[ERROR] Пользователь не найден")
+            print("[ERROR] User not found")
             return False
-        
+
         if user.role == 'admin' or user.is_admin:
-            print(" Пользователь уже является админом:")
+            print("[OK] User is already an admin:")
             print(f"   ID: {user.id}")
-            print(f"   Twitch: {user.twitch_username or 'не настроен'}")
-            print(f"   VK: {user.vk_username or 'не настроен'}")
+            print(f"   Twitch: {user.twitch_username or 'not configured'}")
+            print(f"   VK: {user.vk_username or 'not configured'}")
             return True
-        
-        # Делаем админом
+
+        # Grant admin role.
         user.role = 'admin'
         user.is_admin = True
         db.commit()
-        
-        print(" Пользователь теперь администратор:")
+
+        print("[OK] User is now an administrator:")
         print(f"   ID: {user.id}")
-        print(f"   Twitch: {user.twitch_username or 'не настроен'}")
-        print(f"   VK: {user.vk_username or 'не настроен'}")
+        print(f"   Twitch: {user.twitch_username or 'not configured'}")
+        print(f"   VK: {user.vk_username or 'not configured'}")
         print(f"   Role: {user.role}")
         print(f"   Admin: {user.role == 'admin' or user.is_admin}")
-        print("\nТеперь вы можете:")
-        print("1. Перейти на http://localhost:8000/auth/twitch/bot/login")
-        print("2. Авторизовать бота через OAuth2")
+        print("\nNext:")
+        print("1. Open http://localhost:8000/auth/twitch/bot/login")
+        print("2. Authorize the bot via OAuth2")
         
         return True
         
     except Exception as e:
-        print(f"[ERROR] Ошибка: {e}")
+        print(f"[ERROR] Failed to update user role: {e}")
         db.rollback()
         return False
     finally:
@@ -74,28 +74,28 @@ def make_admin(user_id=None, username=None):
 
 
 def list_users():
-    """Показать всех пользователей."""
+    """Show all users."""
     db = SessionLocal()
     try:
         users = db.query(User).all()
-        
+
         if not users:
-            print("[ERROR] Пользователи не найдены")
-            print("\nСначала авторизуйтесь через:")
+            print("[ERROR] No users found")
+            print("\nAuthorize first via:")
             print("- http://localhost:8000/auth/twitch/login")
             print("- http://localhost:8000/auth/vk/login")
             return
-        
-        print(f"Найдено пользователей: {len(users)}\n")
-        
+
+        print(f"Users found: {len(users)}\n")
+
         for user in users:
             print(f"ID: {user.id}")
-            print(f"  Twitch: {user.twitch_username or 'не настроен'}")
-            print(f"  VK: {user.vk_username or 'не настроен'}")
-            print(f"  Admin: {' Да' if (user.role == 'admin' or user.is_admin) else '[ERROR] Нет'}")
+            print(f"  Twitch: {user.twitch_username or 'not configured'}")
+            print(f"  VK: {user.vk_username or 'not configured'}")
+            print(f"  Admin: {'yes' if (user.role == 'admin' or user.is_admin) else 'no'}")
             print()
-        
-        print("Чтобы сделать пользователя админом:")
+
+        print("To make a user an administrator:")
         print(f"  python scripts/make_admin.py {users[0].id}")
         print(f"  python scripts/make_admin.py --username {users[0].twitch_username or users[0].vk_username}")
         
@@ -111,12 +111,12 @@ if __name__ == "__main__":
             user_id = int(sys.argv[1])
             make_admin(user_id=user_id)
         except ValueError:
-            print("[ERROR] Неверный формат user_id")
+            print("[ERROR] Invalid user_id format")
             print("Usage: python scripts/make_admin.py <user_id>")
     elif len(sys.argv) == 3 and sys.argv[1] in ['--username', '-u']:
         make_admin(username=sys.argv[2])
     else:
         print("Usage:")
-        print("  python scripts/make_admin.py                    # Показать всех пользователей")
-        print("  python scripts/make_admin.py <user_id>          # Сделать админом по ID")
-        print("  python scripts/make_admin.py --username <name>  # Сделать админом по username")
+        print("  python scripts/make_admin.py                    # Show all users")
+        print("  python scripts/make_admin.py <user_id>          # Make user admin by ID")
+        print("  python scripts/make_admin.py --username <name>  # Make user admin by username")

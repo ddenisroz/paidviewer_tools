@@ -1,4 +1,4 @@
-﻿# bot_service/auth.py
+# bot_service/auth.py
 import logging
 from typing import Any, Dict, Optional
 
@@ -43,7 +43,7 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> D
     if not session_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+            detail="Authentication required.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -51,7 +51,7 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> D
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
+            detail="Authentication required.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -60,21 +60,21 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> D
         logger.warning("User %s not found in DB", user_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="User not found.",
         )
 
     if not user_data.get("is_active", True):
         logger.warning("User %s is not active", user_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Account is not active",
+            detail="Account is inactive.",
         )
 
     if user_data.get("is_blocked", False):
         logger.warning("User %s is blocked", user_id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Account blocked: {user_data.get('blocked_reason', 'No reason provided')}",
+            detail=f"Account is blocked: {user_data.get('blocked_reason', 'No reason provided')}",
         )
 
     logger.debug("User authenticated: ID %s, role=%s", user_id, user_data.get("role"))
@@ -105,7 +105,7 @@ async def get_current_user_optional(request: Request, db: Session = Depends(get_
 async def get_admin_user(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
     """Require the current user to have admin role."""
     if not (current_user.get("role") == "admin" or current_user.get("is_admin", False)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator privileges are required.")
     return current_user
 
 
@@ -121,4 +121,3 @@ def create_jwt_token(user_id: int, token_type: str = "obs") -> str:
 def verify_jwt_token(token: str, expected_type: Optional[str] = None) -> Dict[str, Any]:
     """Verify and decode a JWT token."""
     return security_manager.verify_jwt_token(token, expected_type)
-

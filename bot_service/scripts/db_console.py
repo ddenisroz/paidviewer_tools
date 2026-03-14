@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env python
-"""Интерактивная SQL-консоль для текущей БД проекта."""
+"""Interactive SQL console for the current project database."""
 
 from __future__ import annotations
 
@@ -21,11 +21,11 @@ from core.database import db_session  # noqa: E402
 
 def main() -> None:
     print('\n' + '=' * 64)
-    print('КОНСОЛЬ БАЗЫ ДАННЫХ')
+    print('DATABASE CONSOLE')
     print('=' * 64)
 
     with db_session() as db:
-        print('Подключение установлено.\n')
+        print('Connection established.\n')
         tables = db.execute(
             text(
                 """
@@ -37,12 +37,12 @@ def main() -> None:
             )
         ).fetchall()
 
-        print(f'Доступные таблицы: {len(tables)}')
+        print(f'Available tables: {len(tables)}')
         for table in tables:
             print(f"- {table[0]}")
 
-        print('\nВведите SQL-запрос или `exit` для выхода.')
-        print('Примеры:')
+        print('\nEnter an SQL query or `exit` to quit.')
+        print('Examples:')
         print('  SELECT * FROM users LIMIT 5;')
         print('  SELECT COUNT(*) FROM user_sessions;')
         print('  UPDATE users SET role = \'admin\' WHERE id = 1;')
@@ -52,7 +52,7 @@ def main() -> None:
             try:
                 query = input('SQL> ').strip()
                 if query.lower() in {'exit', 'quit', 'q'}:
-                    print('\nВыход из консоли.')
+                    print('\nExiting console.')
                     break
                 if not query:
                     continue
@@ -61,7 +61,7 @@ def main() -> None:
                 if query.lower().startswith('select'):
                     rows = result.fetchall()
                     if not rows:
-                        print('(нет результатов)\n')
+                        print('(no rows)\n')
                         continue
 
                     headers = result.keys()
@@ -69,12 +69,12 @@ def main() -> None:
                     print('-' * 80)
                     for row in rows:
                         print(' | '.join(str(value) for value in row))
-                    print(f'\nНайдено строк: {len(rows)}\n')
+                    print(f'\nRows returned: {len(rows)}\n')
                 else:
                     db.commit()
-                    print('Запрос выполнен успешно.\n')
+                    print('Query executed successfully.\n')
             except KeyboardInterrupt:
-                print('\n\nВыход из консоли.')
+                print('\n\nExiting console.')
                 break
             except Exception as exc:
                 print(f'[ERROR] {exc}\n')

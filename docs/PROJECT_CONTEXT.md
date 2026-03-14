@@ -1,68 +1,68 @@
-# Контекст проекта
+﻿# Контекст проекта
 
 Последнее обновление: 2026-03-13
 
 ## Что это за репозиторий
 
-Репозиторий содержит основной пользовательский продукт вокруг стримерских инструментов:
+Это основной продукт для стримеров:
 
-- `frontend` — dashboard и пользовательский интерфейс;
-- `bot_service` — центральный backend, orchestration и бизнес-логика;
-- внешние TTS-сервисы — `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm`.
+- `frontend` — пользовательский интерфейс и личный кабинет
+- `bot_service` — центральный backend: авторизация, настройки, бизнес-логика, оркестрация
+- внешние TTS-сервисы — `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm`
 
-`frontend` общается только с `bot_service`. Прямые runtime URL внешних TTS-сервисов во frontend не допускаются.
+`frontend` общается только с `bot_service`. Прямые обращения из frontend к внешним TTS-сервисам не допускаются.
 
-## Актуальная модель TTS
+## Как сейчас устроен TTS
 
-В проекте поддерживаются три режима:
+В проекте используются три режима:
 
-- `self-hosted endpoint` — пользователь сам поднимает TTS-сервис и подключает URL через настройки;
-- `project-hosted worker` — отдельный внешний воркер под инфраструктурой проекта;
-- `gateway-managed` — путь `bot_service -> tts-gateway -> project-hosted worker`.
+- `self-hosted endpoint` — пользователь сам поднимает TTS-сервис и подключает его URL
+- `project-hosted worker` — внешний воркер под инфраструктурой проекта
+- `gateway-managed` — путь `bot_service -> tts-gateway -> project-hosted worker`
 
-Старые флаги `use_local`, `f5_local`, `qwen_local` пока сохранены только как совместимые имена для self-hosted режима.
+Старые флаги `use_local`, `f5_local`, `qwen_local` пока сохранены только как совместимые имена.
 
 ## Провайдеры
 
 - `f5`
-  - managed synth: через `tts-gateway`;
-  - self-hosted: поддерживается;
-  - voice/admin CRUD: поддерживается через backend.
+  - управляемый путь: через `tts-gateway`
+  - собственный endpoint пользователя: поддерживается
+  - управление голосами: поддерживается через backend
 - `qwen`
-  - managed synth: через `tts-gateway`;
-  - self-hosted: работает через compatibility adapter;
-  - voice/admin CRUD: пока `501`, если не задан `QWEN_VOICE_SERVICE_URL`.
+  - управляемый путь: через `tts-gateway`
+  - собственный endpoint пользователя: работает через слой совместимости
+  - управление голосами: пока `501`, если не задан `QWEN_VOICE_SERVICE_URL`
 - `gcloud`
-  - встроенный backend fallback-путь.
+  - встроенный путь внутри `bot_service`
 
-## Auth и runtime-границы
+## Авторизация и ограничения runtime
 
-- protected API использует cookie `session_id`;
-- guest mode удалён из active runtime;
-- browser TTS работает только через отдельную вкладку `/tts-player`;
-- только одна активная вкладка `/tts-player` реально воспроизводит звук.
+- защищённый API использует cookie `session_id`
+- guest mode удалён из рабочего слоя
+- браузерная озвучка работает только через вкладку `/tts-player`
+- одновременно реально воспроизводит звук только одна активная вкладка `/tts-player`
 
 ## База данных
 
-- runtime и production работают на PostgreSQL;
-- SQLite допустим только в тестах;
-- orphan user-записи, legacy session-scoped хвосты и старые inactive sessions чистятся через `bot_service/scripts/database_hygiene.py`;
-- точечное удаление пользователей делается через `bot_service/scripts/delete_users.py`.
+- runtime и production работают на PostgreSQL
+- SQLite допустим только в тестах
+- очистка мусора и старых хвостов делается через `bot_service/scripts/database_hygiene.py`
+- безопасное удаление пользователей делается через `bot_service/scripts/delete_users.py`
 
 ## Что уже очищено
 
-- frontend больше не ходит напрямую к TTS runtime;
-- guest mode удалён из active runtime;
-- active user-only слой не должен создавать новые session-scoped записи в `user_settings`, `tts_user_settings`, `local_tts_endpoints`, `filtered_words`, `tts_blocked_users`;
-- YouTube queue переведён на user-only path в dashboard и runtime;
-- active `drops` runtime переведён на user-only wrappers в bot, webhook и history entrypoints;
-- `QueueHandlerMixin` — единственный активный путь для YouTube-команд `!sr`, `!skip`, `!clear`, `!queue`, `!wronglink`;
-- голосование за `!skip` вынесено в `services/youtube/skip_vote_store.py`;
-- пакет `bot_service/bots/command_handlers/*` больше не используется активным runtime.
+- frontend больше не ходит напрямую к TTS runtime
+- guest mode удалён из рабочего слоя
+- новые session-scoped записи не должны появляться в `user_settings`, `tts_user_settings`, `local_tts_endpoints`, `filtered_words`, `tts_blocked_users`
+- YouTube queue переведена на user-only путь
+- рабочий слой drops переведён на user-only wrappers
+- `QueueHandlerMixin` — единственный активный путь для YouTube-команд
+- голосование за `!skip` вынесено в `services/youtube/skip_vote_store.py`
+- пакет `bot_service/bots/command_handlers/*` больше не является частью рабочего слоя
 
 ## Что ещё открыто
 
-- добить remaining compat-хвосты в dual-mode доменах;
-- довести Qwen upstream до native parity;
-- полностью пройти live smoke по всем topology-путям;
-- продолжать сжимать active docs до короткого русского source of truth.
+- добить оставшиеся совместимые хвосты в смешанных доменах
+- довести Qwen upstream до полного контракта
+- пройти live smoke по основным TTS-путям
+- дальше сжимать основную документацию до короткого русского источника правды

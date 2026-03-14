@@ -1,4 +1,4 @@
-"""Обработчики аутентификации"""
+"""Authentication handlers."""
 from __future__ import annotations
 import logging
 from fastapi import HTTPException, Depends, Request
@@ -11,7 +11,7 @@ from services.user_identity_service import UserIdentityService
 logger = logging.getLogger(__name__)
 
 class AuthHandlers:
-    """Класс для обработки аутентификации"""
+    """Authentication handler container."""
 
     def __init__(self):
         pass
@@ -26,7 +26,7 @@ class AuthHandlers:
         return RedirectResponse(url=auth_url)
 
     async def api_twitch_login(self):
-        """API endpoint для Twitch login"""
+        """API endpoint for Twitch login."""
         from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f'{settings.backend_url}/auth/twitch/callback'
@@ -35,7 +35,7 @@ class AuthHandlers:
         return {'auth_url': auth_url}
 
     async def api_twitch_auth(self):
-        """API endpoint для Twitch auth"""
+        """API endpoint for Twitch auth."""
         from core.config import settings
         client_id = settings.twitch_client_id
         redirect_uri = f'{settings.backend_url}/auth/twitch/callback'

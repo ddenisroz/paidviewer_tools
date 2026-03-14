@@ -1,8 +1,5 @@
 """
-VK Token Refresh Service - автоматическое обновление токенов VK Live
-
-Документация: docs/vk/Авторизация.md
-Дата создания: 27 декабря 2025
+VK token refresh service for automatic VK Live token maintenance.
 """
 import asyncio
 import httpx
@@ -22,25 +19,17 @@ logger = structlog.get_logger(__name__)
 
 class VKTokenRefreshService:
     """
-    Сервис автоматического обновления VK токенов
-    
+    Service for automatic VK token refresh.
+
     Features:
-    - Фоновая задача проверки токенов каждый час
-    - Автообновление токенов за 24 часа до истечения
-    - Обработка ошибок с деактивацией невалидных токенов
-    - Ручное обновление токена по требованию
-    
-    Документация: docs/vk/Авторизация.md
-    
-    Example:
-        >>> service = VKTokenRefreshService()
-        >>> await service.start()  # Запустить фоновую задачу
-        >>> # ... приложение работает ...
-        >>> await service.stop()   # Остановить при shutdown
+    - background job that checks tokens every hour
+    - automatic refresh 24 hours before expiry
+    - invalid-token handling with deactivation
+    - manual token refresh on demand
     """
     
     def __init__(self):
-        """Инициализация сервиса"""
+        """Initialize the service."""
         self.refresh_task: Optional[asyncio.Task] = None
         self.running = False
         self.client = httpx.AsyncClient(
@@ -50,10 +39,10 @@ class VKTokenRefreshService:
         
     async def start(self):
         """
-        Запустить фоновую задачу обновления токенов
-        
-        Задача проверяет токены каждый час и обновляет те,
-        которые истекут в течение 24 часов.
+        Start the background refresh task.
+
+        The task checks tokens every hour and refreshes tokens that expire
+        within the next 24 hours.
         """
         if self.running:
             logger.warning("vk_token_refresh_service_already_running")
@@ -65,9 +54,9 @@ class VKTokenRefreshService:
         
     async def stop(self):
         """
-        Остановить фоновую задачу
-        
-        Вызывается при shutdown приложения.
+        Stop the background task.
+
+        Called during application shutdown.
         """
         if not self.running:
             return
@@ -86,14 +75,14 @@ class VKTokenRefreshService:
         
     async def _refresh_loop(self):
         """
-        Цикл проверки и обновления токенов
-        
-        Выполняется каждый час. При ошибке - повторная попытка через 5 минут.
+        Background loop for checking and refreshing tokens.
+
+        Runs every hour. On error it retries after five minutes.
         """
         while self.running:
             try:
                 await self._check_and_refresh_tokens()
-                # Проверять каждый час
+                # Check every hour.
                 await asyncio.sleep(3600)
                 
             except Exception as e:
@@ -102,25 +91,24 @@ class VKTokenRefreshService:
                     error=str(e),
                     error_type=type(e).__name__
                 )
-                # При ошибке - повторить через 5 минут
+                # Retry after five minutes on failure.
                 await asyncio.sleep(300)
                 
     async def _check_and_refresh_tokens(self):
         """
-        Проверить и обновить токены, которые скоро истекут
-        
-        Находит все VK токены, которые истекут в течение 24 часов,
-        и обновляет их используя refresh_token.
+        Check and refresh tokens that are close to expiry.
+
+        Finds VK tokens that expire within the next 24 hours and refreshes
+        them with the stored refresh token.
         """
         with next(get_db()) as db:
             repo = UserTokenRepository(db)
-            # Найти токены, которые истекут в течение 24 часов
+            # Find tokens that expire within the next 24 hours.
             expiring_soon = utcnow_naive() + timedelta(hours=24)
             
             tokens = repo.get_expiring_tokens('vk', expiring_soon)
-            # Дополнительно фильтруем, чтобы не обновлять те, что еще совсем свежие (хотя get_expiring_tokens берет <= threshold)
-            # В оригинале было: UserToken.expires_at > utcnow_naive()
-            # Добавим это фильтрование здесь, если репо возвращает и истекшие
+            # Skip tokens that are still clearly valid even if the repository
+            # returns them near the threshold or already expired.
             # Repos get_expiring_tokens returns <= threshold and is_active=True.
             # It might include expired ones. Original code updated valid-but-soon-expiring.
             # Expired ones might fail refresh if too old? VK refresh tokens live long.
@@ -149,7 +137,7 @@ class VKTokenRefreshService:
                         error_type=type(e).__name__
                     )
                     
-                    # Если refresh_token невалиден - деактивировать токен
+                    # Deactivate tokens with invalid refresh tokens.
                     if "invalid_grant" in str(e).lower():
                         token.is_active = False
                         db.commit() # Save state
@@ -161,17 +149,9 @@ class VKTokenRefreshService:
                         
     async def _refresh_token(self, token: UserToken, db: Session):
         """
-        Обновить конкретный токен
-        
-        Документация: docs/vk/Авторизация.md
-        POST https://api.live.vkvideo.ru/oauth/server/token
-        
-        Args:
-            token: Токен для обновления
-            db: Сессия базы данных
-            
-        Raises:
-            httpx.HTTPError: При ошибке HTTP запроса
+        Refresh a specific token.
+
+        Uses POST https://api.live.vkvideo.ru/oauth/server/token.
         """
         logger.info(
             "vk_token_refreshing",
@@ -179,7 +159,7 @@ class VKTokenRefreshService:
             expires_at=token.expires_at.isoformat() if token.expires_at else "None"
         )
         
-        # Подготовить данные для запроса
+        # Prepare the refresh request payload.
         data = {
             'grant_type': 'refresh_token',
             'refresh_token': decrypt_token(token.refresh_token),
@@ -187,7 +167,7 @@ class VKTokenRefreshService:
             'client_secret': settings.vk_client_secret
         }
         
-        # Отправить запрос на обновление токена
+        # Send the refresh request.
         response = await self.client.post(
             'https://api.live.vkvideo.ru/oauth/server/token',
             data=data,
@@ -197,7 +177,7 @@ class VKTokenRefreshService:
         response.raise_for_status()
         token_data = response.json()
         
-        # Обновить токен в базе данных
+        # Persist the refreshed token values.
         token.access_token = encrypt_token(token_data['access_token'])
         
         if 'refresh_token' in token_data:
@@ -217,9 +197,7 @@ class VKTokenRefreshService:
         )
         
     async def refresh_token_manually(self, user_id: int) -> bool:
-        """
-        Вручную обновить токен пользователя
-        """
+        """Refresh a user's token manually."""
         with next(get_db()) as db:
             repo = UserTokenRepository(db)
             token = repo.get_by_user_and_platform(user_id, 'vk')
@@ -244,9 +222,7 @@ class VKTokenRefreshService:
                 return False
                 
     async def get_token_status(self, user_id: int) -> Optional[dict]:
-        """
-        Получить статус токена пользователя
-        """
+        """Get the status of a user's token."""
         with next(get_db()) as db:
             repo = UserTokenRepository(db)
             token = repo.get_by_user_and_platform(user_id, 'vk')
@@ -268,6 +244,6 @@ class VKTokenRefreshService:
             }
 
 
-# Глобальный экземпляр сервиса
+# Shared module-level service instance.
 vk_token_refresh_service = VKTokenRefreshService()
 

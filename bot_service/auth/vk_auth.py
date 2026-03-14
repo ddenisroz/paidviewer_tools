@@ -1,5 +1,5 @@
 ﻿"""
-VK Live авторизация и гостевой вход
+VK Live authentication endpoints.
 """
 import httpx
 import logging
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# VK Live OAuth настройки из централизованной конфигурации
+# VK Live OAuth settings from centralized configuration
 VK_CLIENT_ID = settings.vk_client_id
 VK_CLIENT_SECRET = settings.vk_client_secret
 BACKEND_URL = settings.backend_url
@@ -34,7 +34,7 @@ ALGORITHM = settings.algorithm
 @router.get("/auth/vk")
 @limiter.limit("10/minute")
 async def vk_auth(request: Request):
-    """Инициация VK Live авторизации с полной авторизацией"""
+    """Start the full VK Live OAuth flow."""
     if not VK_CLIENT_ID:
         raise HTTPException(status_code=500, detail="VK_CLIENT_ID not configured")
 
@@ -43,9 +43,8 @@ async def vk_auth(request: Request):
     scopes = OAUTH_SCOPES["vk"]
     logger.info(f"VK OAuth requested with scopes: {scopes}")
 
-    # Генерируем state для защиты от CSRF
+    # Generate a CSRF protection state token.
     state = secrets.token_urlsafe(16)
-    # Сохраняем state в сессию для CSRF проверки
 
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
@@ -59,11 +58,11 @@ async def vk_auth(request: Request):
     logger.info("VK Live auth URL generated")
 
     response = RedirectResponse(url=auth_url)
-    # Сохраняем state в cookie для CSRF проверки в callback
+    # Persist the state in a cookie for callback validation.
     response.set_cookie(
         key="oauth_state_vk",
         value=state,
-        max_age=600,  # 10 минут
+        max_age=600,  # 10 minutes
         httponly=True,
         samesite="lax",
         secure=settings.is_production
@@ -73,7 +72,7 @@ async def vk_auth(request: Request):
 @router.get("/auth/vk/login")
 @limiter.limit("10/minute")
 async def login_vk(request: Request):
-    """API endpoint для VK login (для совместимости с фронтендом)"""
+    """Frontend-compatible entrypoint for VK login."""
     if not VK_CLIENT_ID:
         raise HTTPException(status_code=500, detail="VK_CLIENT_ID not configured")
 
@@ -84,9 +83,8 @@ async def login_vk(request: Request):
 
     redirect_uri = f"{BACKEND_URL}/auth/vk/callback"
 
-    # Генерируем state для защиты от CSRF
+    # Generate a CSRF protection state token.
     state = secrets.token_urlsafe(16)
-    # Сохраняем state в сессию для CSRF проверки
 
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
@@ -116,23 +114,23 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
 
     logger.info("[VK] OAuth callback received")
 
-    # --- ИСПРАВЛЕНО: Обработка отмены авторизации ---
+    # Handle explicit authorization cancellation from the provider.
     if error:
         logger.warning(f"VK OAuth cancelled by user or failed: {error} - {error_description}")
         return RedirectResponse(url=f"{FRONTEND_URL}/dashboard?auth_error=cancelled")
 
-    # Проверяем наличие кода авторизации
+    # Ensure that the provider returned an authorization code.
     if not code:
         logger.error("No authorization code received from VK")
         raise HTTPException(status_code=400, detail="No authorization code received from VK. Please try again.")
 
-    # CSRF: валидация state
+    # CSRF state validation.
     expected_state = request.cookies.get("oauth_state_vk")
     if not state or state != expected_state:
         logger.warning("VK OAuth CSRF state mismatch")
         raise HTTPException(status_code=400, detail="Invalid OAuth state (CSRF protection)")
 
-    # Используем настройки из централизованной конфигурации
+    # Use centralized OAuth settings.
     VK_REDIRECT_URI = f"{BACKEND_URL}/auth/vk/callback"
 
     if not all([VK_CLIENT_ID, VK_CLIENT_SECRET]):
@@ -143,9 +141,9 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     logger.info("VK authorization code received")
 
     try:
-        # --- 1. Обмен кода на токен ---
+        # Step 1: exchange the authorization code for tokens.
 
-        # Готовим Basic Auth заголовок для VK Live API
+        # Prepare the Basic Auth header for the VK Live API.
         credentials = f"{VK_CLIENT_ID}:{VK_CLIENT_SECRET}"
         base64_credentials = base64.b64encode(credentials.encode()).decode()
 
@@ -185,11 +183,11 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             expires_in = token_data.get("expires_in", 3600)
             expires_at = utcnow_naive() + timedelta(seconds=expires_in)
 
-            # Получаем scopes из ответа
+            # Read scopes from the token response.
             scope_string = token_data.get("scope", "")
             logger.info(f"[VK SCOPES] Raw scope string from API: '{scope_string}'")
 
-            # Если scope пустой, используем scopes из запроса
+            # Fall back to the requested scopes if the response does not include them.
             if not scope_string or scope_string == "":
                 logger.warning("[VK SCOPES] VK API returned empty scope! Using requested scopes as fallback")
                 from constants import OAUTH_SCOPES
@@ -199,16 +197,16 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 scopes = scope_string.split(",")
                 logger.info(f"[VK SCOPES] Parsed scopes: {scopes}")
 
-            # Логируем реальное время жизни токена
+            # Log the actual token lifetime for diagnostics.
             logger.info(f"[VK AUTH] Token expires_in: {expires_in} seconds ({expires_in / 3600:.1f} hours)")
 
-            # --- 2. Получение информации о пользователе ---
+            # Step 2: fetch the current user profile.
             logger.info("Attempting to get user info with token...")
 
             user_info = None
             ssl_verify = settings.is_production
             async with httpx.AsyncClient(trust_env=False, timeout=30.0, verify=ssl_verify) as client:
-                # Используем dev API (только он доступен)
+                # Use the dev API endpoint because it is the only one currently available.
                 endpoint = "https://apidev.live.vkvideo.ru/v1/current_user"
                 try:
                     logger.info(f"Fetching VK user info from dev API: {endpoint}")
@@ -292,13 +290,13 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
             platform_user_id = str(user_info.get("id"))
             avatar_url = user_info.get("avatar_url")
 
-            # --- 3. Используем общий OAuth handler ---
+            # Step 3: pass normalized data through the shared OAuth handler.
             from auth.oauth_handler import oauth_handler, OAuthUserData
             from constants import Platform
 
-            # Создаем объект с данными пользователя
-            # Извлекаем VK channel slug из channel URL для подключения бота
-            # VK Live API возвращает channel.url: "https://live.vkvideo.ru/yourchy"
+            # Build the normalized user payload.
+            # Extract the VK channel slug from the returned channel URL.
+            # VK Live API returns channel.url like "https://live.vkvideo.ru/yourchy".
             channel_url = user_info.get('channel_url')
             channel_name = None
             if channel_url:
@@ -335,7 +333,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 channel_name=channel_name  # Channel slug for bot routing
             )
 
-            # Используем общий OAuth handler с автоподключением бота
+            # Use the shared OAuth handler and auto-connect the bot when a channel slug is present.
             oauth_result = await oauth_handler.handle_oauth_callback(
                 request=request,
                 db=db,
@@ -345,7 +343,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
                 auto_connect_bot=bool(channel_name)
             )
 
-            # Создаем ответ с редиректом
+            # Build the final redirect response.
             return oauth_handler.create_oauth_response(oauth_result)
 
     except Exception as e:
@@ -354,7 +352,7 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
 
 @router.get("/auth/vk/status")
 async def vk_auth_status(user: dict = Depends(get_current_user_optional)):
-    """Проверить статус VK авторизации на основе общей сессии."""
+    """Check VK integration status based on the shared session."""
     if not user:
         return {"authenticated": False, "integrations": {}}
 
@@ -366,22 +364,22 @@ async def vk_auth_status(user: dict = Depends(get_current_user_optional)):
 
 @router.post("/auth/vk/logout")
 async def vk_logout(request: Request, response: Response):
-    """Выход из сессии (теперь это общий logout)."""
+    """Log out from the shared session."""
     session_id = request.cookies.get("session_id")
     if session_id:
-        # Получаем данные пользователя перед завершением сессии
+        # Read user data before terminating the session.
         user_data = session_manager.validate_session(session_id)
         if user_data:
             user_id = user_data.get('user_id') or user_data.get('id')
 
-            # Отключаем ботов от каналов пользователя
+            # Disconnect bots from the user's channels.
             try:
                 from startup.bot_registry import get_bot_registry
                 registry = get_bot_registry()
                 bot_instance = registry.twitch_bot
                 vk_live_bot_instance = registry.vk_bot
 
-                # Отключаем Twitch бота
+                # Disconnect the Twitch bot.
                 twitch_username = user_data.get('twitch_username')
                 if twitch_username and bot_instance:
                     try:
@@ -390,7 +388,7 @@ async def vk_logout(request: Request, response: Response):
                     except Exception as e:
                         logger.error(f"[ERROR] Error disconnecting Twitch bot: {e}")
 
-                # Отключаем VK Live бота
+                # Disconnect the VK Live bot.
                 vk_channel = user_data.get('vk_channel_name')
                 if vk_channel and vk_live_bot_instance:
                     try:
@@ -403,10 +401,10 @@ async def vk_logout(request: Request, response: Response):
             except Exception as e:
                 logger.error(f"[ERROR] Error disconnecting bots during logout: {e}")
 
-            # Примечание: НЕ удаляем токены интеграций при логауте.
-            # Токены платформ (Twitch, VK, DonationAlerts) должны persist
-            # между сессиями. Пользователь может перелогиниться и сохранить интеграции.
-            # Для полного удаления интеграций есть отдельные эндпоинты.
+            # Note: do not delete integration tokens on logout.
+            # Platform tokens (Twitch, VK, DonationAlerts) are expected to persist
+            # across sessions so the user can log in again without losing integrations.
+            # Dedicated endpoints are responsible for full integration removal.
         else:
             logger.warning(
                 "Could not get user data for session %s during VK logout",

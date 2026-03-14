@@ -1,106 +1,62 @@
-# models/__init__.py
-"""
-Модуль моделей базы данных.
+﻿"""Database model exports.
 
-Все модели разделены по доменам для лучшей организации кода.
-Этот файл реэкспортирует все модели для обратной совместимости.
+Models are split by domain for maintainability. This module re-exports the active
+model set for compatibility with existing imports.
 """
 
-# Base и инфраструктура
-from models.base import (
-    Base,
-    engine,
-    SessionLocal,
-    db_session,
-    init_db,
-    DATABASE_URL,
-    IS_POSTGRESQL,
-)
+# Base and infrastructure.
+from models.base import DATABASE_URL, IS_POSTGRESQL, Base, SessionLocal, db_session, engine, init_db
 
-# Import get_db from dependencies to avoid circular imports and keep single source of truth
+# Import get_db from dependencies to avoid circular imports and keep a single source of truth.
 from core.dependencies import get_db
 
-# Пользователи и сессии
-from models.user import (
-    User,
-    UserSettings,
-    UserSession,
-    UserToken,
-    AdminUser,
-)
+# Users and sessions.
+from models.user import AdminUser, User, UserSession, UserSettings, UserToken
 
-# Токены ботов
+# Bot tokens.
 from models.bot_token import BotToken
 
-# TTS настройки
-from models.tts import (
-    TTSUserSettings,
-    TTSBlockedUser,
-    FilteredWord,
-    LocalTTSEndpoint,
-    AudioSettings,
-    UserVoiceSettings,
-)
+# TTS settings.
+from models.tts import AudioSettings, FilteredWord, LocalTTSEndpoint, TTSBlockedUser, TTSUserSettings, UserVoiceSettings
 
-# YouTube очередь
+# YouTube queue.
 from models.youtube import YouTubeQueue
 
-# Система баллов
-from models.points import (
-    ChannelPoints,
-    ChannelReward,
-    PointsTransaction,
-    RewardQueue,
-)
+# Channel points.
+from models.points import ChannelPoints, ChannelReward, PointsTransaction, RewardQueue
 
-# Команды бота
+# Bot commands.
 from models.commands import BotCommand
 
-# Модерация
-from models.moderation import (
-    BlockedBot,
-    BlockedChannel,
-    WhitelistedChannel,
-)
+# Moderation.
+from models.moderation import BlockedBot, BlockedChannel, WhitelistedChannel
 
-# Аналитика и чат
-from models.analytics import (
-    PsychologyAnalysis,
-    ChatMessage,
-    UserProgression,
-)
+# Analytics and chat.
+from models.analytics import ChatMessage, PsychologyAnalysis, UserProgression
 
-# Система Drops (лутбоксы)
+# Drops system.
 from models.drops import (
-    DropsType,
-    DropsQuality,
     DropsConfig,
-    DropsReward,
-    UserStreak,
     DropsHistory,
+    DropsQuality,
+    DropsReward,
+    DropsType,
     MemeAlertsGrantHistory,
     MythicalDropsSession,
     StreamSession,
+    UserStreak,
 )
 
-# Геймификация
-from models.gamification import (
-    Achievement,
-    UserAchievement,
-    DonationAlert,
-)
+# Gamification.
+from models.gamification import Achievement, DonationAlert, UserAchievement
 
-# Безопасность и логи
-from models.security import (
-    SecurityLog,
-    SystemLog,
-)
+# Security and logs.
+from models.security import SecurityLog, SystemLog
 
-# Виджеты
+# Widgets.
 from models.widgets import ChatBoxSettings
 
 __all__ = [
-    # Base
     "Base",
     "engine",
     "SessionLocal",
@@ -109,39 +65,30 @@ __all__ = [
     "init_db",
     "DATABASE_URL",
     "IS_POSTGRESQL",
-    # User
     "User",
     "UserSettings",
     "UserSession",
     "UserToken",
     "AdminUser",
-    # Bot tokens
     "BotToken",
-    # TTS
     "TTSUserSettings",
     "TTSBlockedUser",
     "FilteredWord",
     "LocalTTSEndpoint",
     "AudioSettings",
     "UserVoiceSettings",
-    # YouTube
     "YouTubeQueue",
-    # Points
     "ChannelPoints",
     "ChannelReward",
     "PointsTransaction",
     "RewardQueue",
-    # Commands
     "BotCommand",
-    # Moderation
     "BlockedBot",
     "BlockedChannel",
     "WhitelistedChannel",
-    # Analytics
     "PsychologyAnalysis",
     "ChatMessage",
     "UserProgression",
-    # Drops
     "DropsType",
     "DropsQuality",
     "DropsConfig",
@@ -151,13 +98,10 @@ __all__ = [
     "MemeAlertsGrantHistory",
     "MythicalDropsSession",
     "StreamSession",
-    # Gamification
     "Achievement",
     "UserAchievement",
     "DonationAlert",
-    # Security
     "SecurityLog",
     "SystemLog",
-    # Widgets
     "ChatBoxSettings",
 ]

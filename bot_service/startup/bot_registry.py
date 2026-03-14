@@ -1,14 +1,8 @@
-# bot_service/startup/bot_registry.py
-"""
-Singleton registry для управления ботами.
-
-Заменяет глобальные переменные bot_instance, vk_live_bot_instance из main.py.
-Обеспечивает thread-safe доступ к ботам из любого модуля.
-"""
+﻿"""Singleton registry for managing bot instances."""
 
 import asyncio
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from bots.twitch_bot import Bot
@@ -18,94 +12,86 @@ logger = logging.getLogger(__name__)
 
 
 class BotRegistry:
-    """
-    Singleton registry для управления экземплярами ботов.
-    
-    Использование:
-        registry = get_bot_registry()
-        twitch_bot = registry.twitch_bot
-        vk_bot = registry.vk_bot
-    """
-    
+    """Singleton registry for Twitch and VK bot instances."""
+
     _instance: Optional["BotRegistry"] = None
     _lock = asyncio.Lock()
-    
+
     def __init__(self):
         self._twitch_bot: Optional["Bot"] = None
         self._twitch_task: Optional[asyncio.Task] = None
         self._vk_bot: Optional["VKLiveBot"] = None
         self._vk_task: Optional[asyncio.Task] = None
-    
+
     @classmethod
     def get_instance(cls) -> "BotRegistry":
-        """Получить singleton instance."""
+        """Return the singleton instance."""
+
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
-    
-    # === Twitch Bot ===
-    
+
     @property
     def twitch_bot(self) -> Optional["Bot"]:
-        """Получить Twitch бота."""
+        """Return the Twitch bot instance."""
+
         return self._twitch_bot
-    
+
     @twitch_bot.setter
     def twitch_bot(self, bot: Optional["Bot"]) -> None:
-        """Установить Twitch бота."""
+        """Store the Twitch bot instance."""
+
         self._twitch_bot = bot
-    
+
     @property
     def twitch_task(self) -> Optional[asyncio.Task]:
-        """Получить task Twitch бота."""
+        """Return the Twitch bot task."""
+
         return self._twitch_task
-    
+
     @twitch_task.setter
     def twitch_task(self, task: Optional[asyncio.Task]) -> None:
-        """Установить task Twitch бота."""
+        """Store the Twitch bot task."""
+
         self._twitch_task = task
-    
+
     def is_twitch_running(self) -> bool:
-        """Проверить, запущен ли Twitch бот."""
-        return (
-            self._twitch_bot is not None 
-            and self._twitch_task is not None 
-            and not self._twitch_task.done()
-        )
-    
-    # === VK Live Bot ===
-    
+        """Check whether the Twitch bot task is running."""
+
+        return self._twitch_bot is not None and self._twitch_task is not None and not self._twitch_task.done()
+
     @property
     def vk_bot(self) -> Optional["VKLiveBot"]:
-        """Получить VK Live бота."""
+        """Return the VK Live bot instance."""
+
         return self._vk_bot
-    
+
     @vk_bot.setter
     def vk_bot(self, bot: Optional["VKLiveBot"]) -> None:
-        """Установить VK Live бота."""
+        """Store the VK Live bot instance."""
+
         self._vk_bot = bot
-    
+
     @property
     def vk_task(self) -> Optional[asyncio.Task]:
-        """Получить task VK Live бота."""
+        """Return the VK Live bot task."""
+
         return self._vk_task
-    
+
     @vk_task.setter
     def vk_task(self, task: Optional[asyncio.Task]) -> None:
-        """Установить task VK Live бота."""
+        """Store the VK Live bot task."""
+
         self._vk_task = task
-    
+
     def is_vk_running(self) -> bool:
-        """Проверить, запущен ли VK Live бот."""
-        return (
-            self._vk_bot is not None 
-            and self._vk_bot.is_running
-        )
-    
-    # === Cleanup ===
-    
+        """Check whether the VK Live bot is running."""
+
+        return self._vk_bot is not None and self._vk_bot.is_running
+
     async def stop_twitch_bot(self) -> None:
-        """Остановить Twitch бота."""
+        """Stop the Twitch bot and clear its registry state."""
+
         if self._twitch_task:
             self._twitch_task.cancel()
             try:
@@ -115,14 +101,15 @@ class BotRegistry:
             self._twitch_task = None
         self._twitch_bot = None
         logger.info("[OK] Twitch bot stopped")
-    
+
     async def stop_vk_bot(self) -> None:
-        """Остановить VK Live бота."""
+        """Stop the VK Live bot and clear its registry state."""
+
         if self._vk_bot:
             try:
                 await self._vk_bot.stop_bot()
-            except Exception as e:
-                logger.error(f"[ERROR] Error stopping VK bot: {e}")
+            except Exception as exc:
+                logger.error("[ERROR] Error stopping VK bot: %s", exc)
         if self._vk_task:
             self._vk_task.cancel()
             try:
@@ -132,35 +119,28 @@ class BotRegistry:
             self._vk_task = None
         self._vk_bot = None
         logger.info("[OK] VK Live bot stopped")
-    
+
     async def stop_all(self) -> None:
-        """Остановить всех ботов."""
+        """Stop all registered bots."""
+
         await self.stop_twitch_bot()
         await self.stop_vk_bot()
 
 
 def get_bot_registry() -> BotRegistry:
-    """
-    Получить singleton instance BotRegistry.
-    
-    Использование:
-        from startup.bot_registry import get_bot_registry
-        
-        registry = get_bot_registry()
-        if registry.is_twitch_running():
-            bot = registry.twitch_bot
-    """
+    """Return the singleton bot registry instance."""
+
     return BotRegistry.get_instance()
 
 
-# === Backward Compatibility ===
-# Для обратной совместимости с существующим кодом, который импортирует из main.py
-
+# Backward compatibility for older imports.
 def get_bot_instance():
-    """Backward compatibility: получить Twitch бота."""
+    """Return the Twitch bot instance for compatibility wrappers."""
+
     return get_bot_registry().twitch_bot
 
 
 def get_vk_bot_instance():
-    """Backward compatibility: получить VK Live бота."""
+    """Return the VK Live bot instance for compatibility wrappers."""
+
     return get_bot_registry().vk_bot

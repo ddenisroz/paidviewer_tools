@@ -110,7 +110,7 @@ def get_stream_service(db: Session = Depends(get_db)) -> StreamInfoService:
 @router.get("/twitch/stream")
 async def get_twitch_stream_basic(user: dict = Depends(get_current_user)):
     """
-    Получить информацию о Twitch стриме (legacy basic info)
+    Get Twitch stream information (legacy basic info).
     """
     return JSONResponse(content={
         "is_live": False,
@@ -125,7 +125,7 @@ async def get_twitch_stream_info(
     user: dict = Depends(get_current_user),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Получить детальную информацию о Twitch стриме (cached for 30s)"""
+    """Get detailed Twitch stream information (cached for 30 seconds)."""
     try:
         user_id = user.get("id")
         session_id = user.get("session_id")
@@ -182,8 +182,8 @@ async def update_stream(
     user: dict = Depends(get_current_user),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Обновить информацию о стриме (title или category)"""
-    """Обновить информацию о стриме (title или category)"""
+    """Update stream information (title or category)."""
+    """Update stream information (title or category)."""
     logger.info("[STREAM UPDATE] Request received")
     
     try:
@@ -300,7 +300,7 @@ async def search_twitch_categories(
     user: dict = Depends(get_current_user_optional),
     service: StreamInfoService = Depends(get_stream_service)
 ):
-    """Поиск категорий Twitch"""
+    """Search Twitch categories."""
     user_id = user.get("id") if user else None
     categories = await service.search_categories("twitch", search, user_id)
     return JSONResponse(content={"categories": categories})

@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env python
-"""Показать структуру таблиц PostgreSQL и примеры данных."""
+"""Show PostgreSQL table structure and sample data."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from core.database import db_session  # noqa: E402
 
 def show_all_tables() -> None:
     print('\n' + '=' * 64)
-    print('СТРУКТУРА БАЗЫ ДАННЫХ')
+    print('DATABASE STRUCTURE')
     print('=' * 64 + '\n')
 
     with db_session() as db:
@@ -41,19 +41,19 @@ def show_all_tables() -> None:
             )
         ).fetchall()
 
-        print(f'Всего таблиц: {len(tables)}\n')
+        print(f'Total tables: {len(tables)}\n')
         for table_name, column_count in tables:
             try:
                 row_count = db.execute(text(f'SELECT COUNT(*) FROM {table_name}')).scalar()
             except Exception:
                 row_count = 'N/A'
             print(f'- {table_name}')
-            print(f'  Колонок: {column_count} | Записей: {row_count}')
+            print(f'  Columns: {column_count} | Rows: {row_count}')
 
 
 def show_table_details(table_name: str) -> None:
     print('\n' + '=' * 64)
-    print(f'ТАБЛИЦА: {table_name}')
+    print(f'TABLE: {table_name}')
     print('=' * 64 + '\n')
 
     with db_session() as db:
@@ -71,7 +71,7 @@ def show_table_details(table_name: str) -> None:
             {'table_name': table_name},
         ).scalar()
         if not exists:
-            print(f"[ERROR] Таблица '{table_name}' не найдена")
+            print(f"[ERROR] Table '{table_name}' was not found")
             return
 
         columns = db.execute(
@@ -91,8 +91,8 @@ def show_table_details(table_name: str) -> None:
             {'table_name': table_name},
         ).fetchall()
 
-        print('Колонки:\n')
-        print(f"{'Название':<30} {'Тип':<24} {'NULL':<8} По умолчанию")
+        print('Columns:\n')
+        print(f"{'Name':<30} {'Type':<24} {'NULL':<8} Default")
         print('-' * 100)
         for col_name, data_type, max_length, nullable, default in columns:
             type_name = data_type if not max_length else f'{data_type}({max_length})'
@@ -110,18 +110,18 @@ def show_table_details(table_name: str) -> None:
             {'table_name': table_name},
         ).fetchall()
         if indexes:
-            print('\nИндексы:\n')
+            print('\nIndexes:\n')
             for index_name, index_def in indexes:
                 print(f'- {index_name}')
                 print(f'  {index_def}')
 
         row_count = db.execute(text(f'SELECT COUNT(*) FROM {table_name}')).scalar()
-        print(f'\nВсего записей: {row_count}')
+        print(f'\nTotal rows: {row_count}')
 
         if row_count:
             rows = db.execute(text(f'SELECT * FROM {table_name} LIMIT 5')).fetchall()
             headers = db.execute(text(f'SELECT * FROM {table_name} LIMIT 1')).keys()
-            print('\nПервые 5 строк:\n')
+            print('\nFirst 5 rows:\n')
             print(' | '.join(str(header)[:18] for header in headers))
             print('-' * 100)
             for row in rows:
@@ -134,7 +134,7 @@ def main() -> None:
         return
 
     show_all_tables()
-    print('\nДля детального просмотра таблицы:')
+    print('\nFor a detailed table view:')
     print('  python scripts/show_db_structure.py users')
     print('  python scripts/show_db_structure.py bot_tokens')
 

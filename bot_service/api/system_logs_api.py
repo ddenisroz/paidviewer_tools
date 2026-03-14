@@ -1,5 +1,5 @@
 """
-API для системных логов и истории действий администраторов.
+API for system logs and administrator action history.
 Clean Architecture: uses SystemLogRepository for data access.
 """
 from fastapi import APIRouter, Depends, HTTPException
@@ -36,7 +36,7 @@ async def get_system_logs(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить логи действий администраторов с фильтрацией"""
+    """Get filtered administrator action logs."""
     try:
         if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -109,7 +109,7 @@ async def get_logs_statistics(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить статистику по логам (количество действий по типам)"""
+    """Get log statistics grouped by action type."""
     try:
         if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -165,7 +165,7 @@ async def get_available_actions(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список доступных типов действий"""
+    """Get the list of available action types."""
     try:
         if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -195,4 +195,3 @@ class SystemLogService:
     def log_action(db: Session, admin_id: int, action_type: str, **kwargs):
         repo = SystemLogRepository(db)
         return repo.log_action(admin_id=admin_id, action_type=action_type, **kwargs)
-

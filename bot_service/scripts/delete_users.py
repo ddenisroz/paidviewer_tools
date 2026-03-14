@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Безопасное удаление выбранных пользователей с dry-run preview."""
+"""Safely delete selected users with a dry-run preview."""
 
 from __future__ import annotations
 
@@ -28,13 +28,13 @@ from services.user_cleanup_service import user_cleanup_service  # noqa: E402
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Предпросмотр и безопасное окончательное удаление выбранных пользователей из PostgreSQL.",
+        description="Preview and safely perform permanent deletion of selected PostgreSQL users.",
     )
-    parser.add_argument("--list", action="store_true", help="Показать текущих пользователей и выйти.")
-    parser.add_argument("--user-id", type=int, action="append", default=[], help="ID пользователя для удаления.")
-    parser.add_argument("--twitch", action="append", default=[], help="Twitch username пользователя для удаления.")
-    parser.add_argument("--vk", action="append", default=[], help="VK username пользователя для удаления.")
-    parser.add_argument("--yes", action="store_true", help="Фактически удалить пользователей после preview.")
+    parser.add_argument("--list", action="store_true", help="Show current users and exit.")
+    parser.add_argument("--user-id", type=int, action="append", default=[], help="User ID to delete.")
+    parser.add_argument("--twitch", action="append", default=[], help="Twitch username to delete.")
+    parser.add_argument("--vk", action="append", default=[], help="VK username to delete.")
+    parser.add_argument("--yes", action="store_true", help="Perform deletion after the preview.")
     return parser.parse_args()
 
 
@@ -44,13 +44,13 @@ def list_users() -> int:
         repo = UserRepository(db)
         users = repo.get_all(skip=0, limit=10000)
         if not users:
-            print("Пользователи не найдены.")
+            print("No users found.")
             return 0
 
-        print("Текущие пользователи:")
+        print("Current users:")
         for user in users:
             print(
-                f"- id={user.id} роль={user.role} "
+                f"- id={user.id} role={user.role} "
                 f"twitch={user.twitch_username or '-'} "
                 f"vk={user.vk_username or '-'} "
                 f"vk_channel={user.vk_channel_name or '-'}"
@@ -69,13 +69,13 @@ def resolve_target_ids(args: argparse.Namespace) -> list[int]:
         for twitch_name in args.twitch:
             user = repo.get_by_twitch_username(twitch_name)
             if not user:
-                raise SystemExit(f"Twitch-пользователь не найден: {twitch_name}")
+                raise SystemExit(f"Twitch user not found: {twitch_name}")
             target_ids.add(user.id)
 
         for vk_name in args.vk:
             user = repo.get_by_vk_username(vk_name)
             if not user:
-                raise SystemExit(f"VK-пользователь не найден: {vk_name}")
+                raise SystemExit(f"VK user not found: {vk_name}")
             target_ids.add(user.id)
 
         return sorted(target_ids)
@@ -87,18 +87,18 @@ def print_preview(user_ids: list[int]) -> None:
     db = SessionLocal()
     try:
         if not user_ids:
-            print("Не выбраны целевые пользователи.")
+            print("No target users were selected.")
             return
 
         for user_id in user_ids:
             preview = user_cleanup_service.preview_user_deletion(user_id, db)
             print()
-            print(f"Пользователь {preview.user_id}: {preview.username} (роль={preview.role})")
+            print(f"User {preview.user_id}: {preview.username} (role={preview.role})")
             if preview.channel_names:
-                print(f"  имена каналов: {', '.join(preview.channel_names)}")
+                print(f"  channel names: {', '.join(preview.channel_names)}")
             if preview.platform_user_ids:
                 print(f"  platform ids: {', '.join(preview.platform_user_ids)}")
-            print(f"  всего строк к удалению: {preview.total_rows}")
+            print(f"  total rows to delete: {preview.total_rows}")
             for table_name, count in preview.counts.items():
                 if count:
                     print(f"    {table_name}: {count}")
@@ -122,7 +122,7 @@ async def run_delete(user_ids: list[int]) -> None:
 
 def main() -> int:
     if not os.getenv("DATABASE_URL"):
-        print("Не задана переменная DATABASE_URL.")
+        print("DATABASE_URL is not set.")
         return 1
 
     args = parse_args()
@@ -132,18 +132,18 @@ def main() -> int:
 
     target_ids = resolve_target_ids(args)
     if not target_ids:
-        print("Укажи хотя бы одну цель через --user-id, --twitch или --vk.")
+        print("Specify at least one target via --user-id, --twitch, or --vk.")
         return 1
 
     print_preview(target_ids)
 
     if not args.yes:
         print()
-        print("Это был только dry-run. Запусти снова с --yes для фактического удаления.")
+        print("This was only a dry-run. Run again with --yes to perform deletion.")
         return 0
 
     print()
-    print("Удаляю выбранных пользователей...")
+    print("Deleting selected users...")
     asyncio.run(run_delete(target_ids))
     return 0
 

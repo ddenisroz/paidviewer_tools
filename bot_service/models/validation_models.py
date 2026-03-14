@@ -1,4 +1,4 @@
-"""
+﻿"""
 Enhanced Pydantic Models with Comprehensive Validation
 Provides detailed validation for all API requests
 """
@@ -465,7 +465,7 @@ class UserSettingsUpdateRequest(BaseValidationModel):
     display_name: Optional[str] = Field(
         None,
         max_length=50,
-        regex=r'^[a-zA-Zа-яА-ЯёЁ0-9\s_-]*$',
+        regex=r"^[a-zA-Z\u0400-\u04FF0-9\s_-]*$",
         description="Display name"
     )
     notifications_enabled: Optional[bool] = None
@@ -486,16 +486,6 @@ class UserSettingsUpdateRequest(BaseValidationModel):
         if v:
             return sanitize_input(v, max_length=50)
         return v
-
-
-# ============================================================================
-# Guest mode removed - all users must authenticate via OAuth
-
-    @validator('channel_name')
-    def validate_channel(cls, v):
-        """Validate channel name"""
-        return validate_username(v)
-
 
 # ============================================================================
 # YOUTUBE MODELS
@@ -565,3 +555,4 @@ class FrontendErrorReport(BaseValidationModel):
             max_len = field.field_info.max_length
             return sanitize_input(v, max_length=max_len)
         return v
+

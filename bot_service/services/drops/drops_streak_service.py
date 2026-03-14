@@ -131,12 +131,12 @@ class DropsStreakMixin:
         )
 
     def get_user_streak(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None) -> Optional[UserStreak]:
-        """Получает стрик пользователя"""
+        """Get the viewer streak record."""
         repo = self._ensure_repo()
         return repo.get_user_streak(viewer_id, channel_name, platform, user_id, session_id)
 
     def update_user_streak(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, is_streaming: bool = True) -> UserStreak:
-        """Обновляет стрик пользователя"""
+        """Update the viewer streak record."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config:
             logger.warning(f"No config found for streak update: channel={channel_name}, viewer={viewer_name}")
@@ -242,7 +242,7 @@ class DropsStreakMixin:
         return streak
 
     def increment_viewer_message_count(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> UserStreak:
-        """Увеличивает счетчик сообщений зрителя за текущий стрим"""
+        """Increment the viewer message counter for the current stream."""
         repo = self._ensure_repo()
         # We should use locking if concurrent updates likely, but simple increment usually ok.
         # But get_user_streak might suffice.
@@ -270,7 +270,7 @@ class DropsStreakMixin:
         return streak
 
     def process_streak_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
-        """Обрабатывает стрик Drops"""
+        """Process streak drops."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config:
             return None
@@ -316,7 +316,7 @@ class DropsStreakMixin:
         }
 
     def process_donation_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, donation_amount: float = None) -> Optional[Dict[str, Any]]:
-        """Обрабатывает донатные Drops (общие, не зависят от платформы)"""
+        """Process donation drops shared across platforms."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config or not config.donation_enabled:
             return None
@@ -351,7 +351,7 @@ class DropsStreakMixin:
         }
 
     def _get_streak_quality(self, days: int, config: DropsConfig) -> Optional[str]:
-        """Определяет качество по дням стрика"""
+        """Resolve reward quality from streak length."""
         if days >= config.streak_days_legendary:
             return "Legendary"
         elif days >= config.streak_days_epic:
@@ -363,7 +363,7 @@ class DropsStreakMixin:
         return None
 
     def _get_donation_quality(self, amount: float, config: DropsConfig) -> Optional[str]:
-        """Определяет качество по сумме доната"""
+        """Resolve reward quality from donation amount."""
         if amount >= config.donation_amount_legendary:
             return "Legendary"
         elif amount >= config.donation_amount_epic:

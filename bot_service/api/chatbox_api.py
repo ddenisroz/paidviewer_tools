@@ -1,6 +1,6 @@
 # api/chatbox_api.py
 """
-API для настроек ChatBox виджета для OBS.
+API for ChatBox widget settings used by OBS.
 Clean Architecture: uses ChatBoxRepository for data access.
 """
 import logging
@@ -17,32 +17,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chatbox", tags=["chatbox"])
 
 
-# Pydantic модели для API
+# Pydantic models for the API.
 class ChatBoxSettingsCreate(BaseModel):
-    """Модель для создания/обновления настроек ChatBox"""
-    # Шрифт
+    """Model for creating or updating ChatBox settings."""
+    # Font settings
     font_family: str = Field(default='Inter, system-ui, sans-serif')
     font_size: int = Field(default=16, ge=8, le=32)
     font_weight: str = Field(default='normal')
     text_stroke_width: int = Field(default=0, ge=0, le=3)
     text_stroke_color: str = Field(default='#000000')
 
-    # Фон
+    # Background
     background_color: str = Field(default='#000000')
     background_opacity: float = Field(default=0.5, ge=0.0, le=1.0)
 
-    # Отображение
+    # Visibility options
     max_messages: int = Field(default=20, ge=1, le=50)
     show_platform_icons: bool = Field(default=True)
     show_roles: bool = Field(default=False)
     show_badges: bool = Field(default=True)
     show_avatars: bool = Field(default=False)
 
-    # Цвета текста
+    # Text colors
     text_color: str = Field(default='#FFFFFF')
     username_color: str = Field(default='#9147FF')
 
-    # Дополнительно
+    # Additional settings
     message_spacing: int = Field(default=8, ge=0, le=32)
     border_radius: int = Field(default=8, ge=0, le=32)
     animation_duration: int = Field(default=300, ge=0, le=2000)
@@ -56,12 +56,12 @@ class ChatBoxSettingsCreate(BaseModel):
     show_links: bool = Field(default=True)
     auto_load_images: bool = Field(default=True)
 
-    # Version для защиты от race conditions
+    # Version field used to guard against race conditions
     version: int = Field(default=1, ge=1)
 
 
 class ChatBoxSettingsResponse(ChatBoxSettingsCreate):
-    """Модель ответа с настройками ChatBox"""
+    """Response model with ChatBox settings."""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -116,7 +116,7 @@ async def get_chatbox_settings(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить текущие настройки ChatBox пользователя"""
+    """Get the current user's ChatBox settings."""
     user_id = current_user["id"]
     logger.info(f"[CHATBOX] Getting settings for user {user_id}")
 
@@ -137,7 +137,7 @@ async def save_chatbox_settings(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Сохранить настройки ChatBox и опционально перегенерировать токен"""
+    """Save ChatBox settings and optionally regenerate the token."""
     user_id = current_user["id"]
     logger.info(f"[CHATBOX] Saving settings for user {user_id}, regenerate_token={regenerate_token}")
 
@@ -204,7 +204,7 @@ async def get_settings_by_token(
     token: str,
     db: Session = Depends(get_db)
 ):
-    """Получить настройки ChatBox по токену (для OBS виджета, без авторизации)"""
+    """Get ChatBox settings by token for the OBS widget without authentication."""
     logger.info(f"[CHATBOX] Getting settings by token: {token[:8]}...")
 
     repo = ChatBoxRepository(db)

@@ -151,7 +151,7 @@ const BlacklistManager: React.FC = React.memo(() => {
     const getPlatformIcon = (platform: string): string => {
         if (platform === 'twitch') return '[TW]';
         if (platform === 'vk') return '[VK]';
-        return '[?]';
+        return '[--]';
     };
 
     // Получаем цвет для платформы

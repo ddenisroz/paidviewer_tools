@@ -1,7 +1,5 @@
 # bot_service/core/token_utils.py
-"""
-Утилиты для работы с токенами пользователей
-"""
+"""Utilities for working with user tokens."""
 from sqlalchemy.orm import Session
 from core.database import get_db, UserToken
 from core.http_timeouts import TOKEN_VALIDATION_TIMEOUT
@@ -13,19 +11,19 @@ logger = logging.getLogger(__name__)
 
 def get_user_token_from_db(user_id: int, platform: str, db: Session = None) -> Optional[Dict[str, Any]]:
     """
-    Получить токен пользователя из базы данных
+    Return a user token from the database.
     
     Args:
-        user_id: ID пользователя
-        platform: Платформа ('twitch', 'vk', 'donationalerts')
-        db: Database session (опционально, для предотвращения race conditions)
+        user_id: User ID
+        platform: Platform name ('twitch', 'vk', 'donationalerts')
+        db: Optional database session to avoid race conditions
         
     Returns:
-        dict: Информация о токене или None если не найден
+        Token data or None if the token does not exist
     """
     from core.token_encryption import decrypt_token
 
-    # Используем переданную сессию или создаем новую (legacy behavior)
+    # Use the passed session or create a new one for legacy callers.
     should_close_db = False
     if db is None:
         db = next(get_db())
@@ -39,7 +37,7 @@ def get_user_token_from_db(user_id: int, platform: str, db: Session = None) -> O
         ).first()
 
         if token and token.access_token:
-            # Расшифровываем токены перед возвратом
+            # Decrypt tokens before returning them.
             decrypted_access_token = decrypt_token(token.access_token) if token.access_token else None
             decrypted_refresh_token = decrypt_token(token.refresh_token) if token.refresh_token else None
 
@@ -58,19 +56,19 @@ def get_user_token_from_db(user_id: int, platform: str, db: Session = None) -> O
 
 async def validate_platform_token(token) -> bool:
     """
-    Валидация токена через API платформы с кешированием.
+    Validate a platform token through the upstream API with caching.
     
     Args:
-        token: UserToken объект
+        token: UserToken object
         
     Returns:
-        bool: True если токен валиден, False если нет
+        True if the token is valid, otherwise False
     """
     from core.token_validation_cache import token_validation_cache
 
     logger.debug(f"[DEBUG] VALIDATE_TOKEN START: platform={token.platform}, user_id={token.user_id}")
 
-    # Проверяем кеш
+    # Check cache first.
     cached_result = token_validation_cache.get(token.user_id, token.platform)
     if cached_result is not None:
         return cached_result
@@ -82,7 +80,7 @@ async def validate_platform_token(token) -> bool:
         from services.token_refresh_service import TokenRefreshService
         from core.database import SessionLocal # Need a session for refresh if needed
 
-        # Расшифровываем токен если он зашифрован
+        # Decrypt the token if it is stored encrypted.
         access_token = decrypt_token(token.access_token) if token.access_token else None
 
         if not access_token:
@@ -90,7 +88,7 @@ async def validate_platform_token(token) -> bool:
             token_validation_cache.set(token.user_id, token.platform, False)
             return False
 
-        # Проверяем истек ли токен по времени (если expires_at существует)
+        # Check expiry timestamp first when available.
         if token.expires_at and token.expires_at < utcnow_naive():
             logger.warning(f"Token for {token.platform} expired at {token.expires_at}, attempting auto-refresh...")
             
@@ -104,7 +102,7 @@ async def validate_platform_token(token) -> bool:
                 token_validation_cache.set(token.user_id, token.platform, False)
                 return False
 
-        # Валидация через API платформы
+        # Validate through the upstream platform API.
         is_valid = False
 
         if token.platform == 'twitch':
@@ -168,10 +166,10 @@ async def validate_platform_token(token) -> bool:
             # Unknown platform
             is_valid = False
 
-        # Кешируем и возвращаем
+        # Cache and return the result.
         if is_valid:
-             # Если рефреш произошел, то токен изменился в БД, но наш current 'access_token' variable устарел.
-             # Однако мы просто возвращаем True. Caller должен заново запросить токен из БД если ему нужен access_token.
+             # Refresh can change the stored token in the database.
+             # The caller should reload it if it needs the current access token.
              token_validation_cache.invalidate(token.user_id, token.platform)
         else:
              token_validation_cache.set(token.user_id, token.platform, False)

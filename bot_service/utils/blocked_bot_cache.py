@@ -1,29 +1,23 @@
-# utils/blocked_bot_cache.py
-"""Кешированные проверки заблокированных ботов для оптимизации"""
+﻿"""Cached blocked-bot lookups for runtime filtering."""
+
 import logging
 from typing import Set
+
 from sqlalchemy.orm import Session
+
 from core.database import BlockedBot
 from utils.cache import get_cached, invalidate_cache
 
 logger = logging.getLogger(__name__)
 
-# TTL для кеша заблокированных ботов (10 минут - боты редко меняются)
+# Blocked bots rarely change, so a longer TTL is acceptable.
 TTL_BLOCKED_BOTS = 600
 
 
 def get_blocked_bots_set_cached(db: Session) -> Set[str]:
-    """
-    Получить множество имен заблокированных ботов (с кешированием)
-    
-    Args:
-        db: Сессия БД
-    
-    Returns:
-        Set[str]: Множество имен заблокированных ботов в нижнем регистре
-    """
+    """Return the lowercased set of blocked bot names with caching."""
+
     def _load_blocked_bots(db_session: Session):
-        """Внутренняя функция для загрузки ботов из БД"""
         bots = db_session.query(BlockedBot.bot_name).all()
         return {bot.bot_name.lower() for bot in bots}
 
@@ -32,22 +26,14 @@ def get_blocked_bots_set_cached(db: Session) -> Set[str]:
 
 
 def is_bot_blocked_cached(bot_name: str, db: Session) -> bool:
-    """
-    Проверить, заблокирован ли бот (с кешированием)
-    
-    Args:
-        bot_name: Имя бота
-        db: Сессия БД
-    
-    Returns:
-        True если бот заблокирован, False иначе
-    """
+    """Check whether a bot name is blocked, using the shared cache."""
+
     blocked_bots = get_blocked_bots_set_cached(db)
     return bot_name.lower() in blocked_bots
 
 
 def invalidate_blocked_bots_cache():
-    """Инвалидировать кеш заблокированных ботов"""
+    """Invalidate the blocked bots cache."""
+
     invalidate_cache("blocked_bots:set")
     logger.debug("Blocked bots cache invalidated")
-

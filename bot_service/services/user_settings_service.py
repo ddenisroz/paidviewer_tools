@@ -94,7 +94,7 @@ class UserSettingsService:
 
         return {
             "success": True,
-            "message": "Настройки успешно сохранены",
+            "message": "Settings saved successfully.",
             "updated_fields": list(update_data.keys()),
             "settings": self._map_to_dict(settings)
         }
@@ -179,7 +179,7 @@ class UserSettingsService:
     def _map_to_dict(self, settings: UserSettings) -> Dict[str, Any]:
         """Map UserSettings model to dictionary."""
         return {
-            # Настройки чата
+            # Chat settings
             "chat_enabled": settings.chat_enabled,
             "chat_max_messages": settings.chat_max_messages,
             "chat_show_timestamps": settings.chat_show_timestamps,
@@ -188,7 +188,7 @@ class UserSettingsService:
             "chat_animation_duration": settings.chat_animation_duration,
             "chat_animation_type": settings.chat_animation_type,
 
-            # Настройки OBS чата
+            # OBS chat settings
             "obs_width": settings.obs_width,
             "obs_height": settings.obs_height,
             "obs_font_size": settings.obs_font_size,
@@ -205,13 +205,13 @@ class UserSettingsService:
             "obs_message_margin": settings.obs_message_margin,
             "obs_message_padding": settings.obs_message_padding,
 
-            # Цвета ролей для OBS
+            # OBS role colors
             "obs_moderator_color": settings.obs_moderator_color,
             "obs_vip_color": settings.obs_vip_color,
             "obs_subscriber_color": settings.obs_subscriber_color,
             "obs_normal_color": settings.obs_normal_color,
 
-            # Настройки объединения полей
+            # Field merge settings
             "combine_titles": settings.combine_titles,
             "combine_categories": settings.combine_categories,
         }

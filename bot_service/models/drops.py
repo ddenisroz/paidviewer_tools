@@ -1,26 +1,24 @@
-# models/drops.py
-"""
-Модели системы Drops (лутбоксы).
-"""
+﻿"""Drops and lootbox models."""
 
 from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
     Column,
+    DateTime,
+    Float,
+    ForeignKey,
     Integer,
     String,
-    Boolean,
-    DateTime,
-    ForeignKey,
     Text,
-    Float,
     UniqueConstraint,
-    CheckConstraint,
 )
+
 from core.datetime_utils import utcnow_naive
 from models.base import Base
 
 
 class DropsType(Base):
-    """Типы Drops"""
+    """Drop type definition."""
 
     __tablename__ = "drops_types"
     __table_args__ = {"extend_existing": True}
@@ -33,7 +31,7 @@ class DropsType(Base):
 
 
 class DropsQuality(Base):
-    """Качества Drops"""
+    """Drop quality definition."""
 
     __tablename__ = "drops_qualities"
     __table_args__ = {"extend_existing": True}
@@ -46,7 +44,7 @@ class DropsQuality(Base):
 
 
 class DropsConfig(Base):
-    """Конфигурация Drops для канала"""
+    """Drops configuration for a channel."""
 
     __tablename__ = "drops_configs"
     __table_args__ = (
@@ -63,7 +61,7 @@ class DropsConfig(Base):
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=True, default="global")
 
-    # Стрик настройки
+    # Streak settings.
     streak_days_common = Column(Integer, default=1)
     streak_days_rare = Column(Integer, default=3)
     streak_days_epic = Column(Integer, default=7)
@@ -72,16 +70,16 @@ class DropsConfig(Base):
     streak_reset_on_skip = Column(Boolean, default=True)
     streak_enabled_twitch = Column(Boolean, nullable=False, server_default="false")
     streak_enabled_vk = Column(Boolean, nullable=False, server_default="false")
-    streak_enabled = Column(Boolean, default=False)  # DEPRECATED
+    streak_enabled = Column(Boolean, default=False)  # Deprecated.
 
-    # Донат настройки
+    # Donation settings.
     donation_enabled = Column(Boolean, default=True)
     donation_amount_common = Column(Float, default=50.0)
     donation_amount_rare = Column(Float, default=100.0)
     donation_amount_epic = Column(Float, default=500.0)
     donation_amount_legendary = Column(Float, default=1000.0)
 
-    # Мифический лутбокс
+    # Mythical lootbox settings.
     mythical_enabled = Column(Boolean, default=True)
     mythical_min_interval_hours = Column(Integer, default=2)
     mythical_max_interval_hours = Column(Integer, default=8)
@@ -89,7 +87,7 @@ class DropsConfig(Base):
     mythical_donation_amount = Column(Float, default=2000.0)
     mythical_last_appeared = Column(DateTime, nullable=True)
 
-    # Настройки виджета (OBS анимация)
+    # Widget (OBS animation) settings.
     widget_spinning_duration_ms = Column(Integer, default=1500)
     widget_opening_duration_ms = Column(Integer, default=1000)
     widget_result_duration_ms = Column(Integer, default=5500)
@@ -101,7 +99,7 @@ class DropsConfig(Base):
 
 
 class DropsReward(Base):
-    """Награды в Drops"""
+    """Reward that can be granted by drops."""
 
     __tablename__ = "drops_rewards"
     __table_args__ = (
@@ -123,14 +121,14 @@ class DropsReward(Base):
     quality_id = Column(Integer, ForeignKey("drops_qualities.id"), nullable=False)
     weight = Column(Integer, default=100)
 
-    # Тип награды
+    # Reward payload.
     reward_type = Column(String, nullable=False)
     reward_value = Column(String, nullable=False)
 
-    # Изображение для карточки в гача крутке
+    # Card image for gacha roll UI.
     image_url = Column(String, nullable=True)
 
-    # Звук награды
+    # Reward sound.
     sound_file = Column(String, nullable=True)
     sound_volume = Column(Float, default=1.0)
 
@@ -141,14 +139,12 @@ class DropsReward(Base):
 
 
 class UserStreak(Base):
-    """Стрики пользователей"""
+    """Viewer streak tracking."""
 
     __tablename__ = "user_streaks"
     __table_args__ = (
         UniqueConstraint("user_id", "viewer_id", "platform", name="uq_user_streak"),
-        UniqueConstraint(
-            "session_id", "viewer_id", "platform", name="uq_session_streak"
-        ),
+        UniqueConstraint("session_id", "viewer_id", "platform", name="uq_session_streak"),
         CheckConstraint(
             "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
             name="check_user_or_session_user_streak",
@@ -169,10 +165,8 @@ class UserStreak(Base):
     last_activity = Column(DateTime, default=utcnow_naive)
     messages_this_stream = Column(Integer, default=0)
 
-    # Информация о последней трансляции
-    last_stream_session_id = Column(
-        Integer, ForeignKey("stream_sessions.id"), nullable=True, index=True
-    )
+    # Last stream attendance information.
+    last_stream_session_id = Column(Integer, ForeignKey("stream_sessions.id"), nullable=True, index=True)
     last_stream_attended_at = Column(DateTime, nullable=True, index=True)
 
     created_at = Column(DateTime, default=utcnow_naive)
@@ -180,7 +174,7 @@ class UserStreak(Base):
 
 
 class DropsHistory(Base):
-    """История получения Drops"""
+    """Drops reward history."""
 
     __tablename__ = "drops_history"
     __table_args__ = (
@@ -199,22 +193,22 @@ class DropsHistory(Base):
     viewer_id = Column(String, nullable=False, index=True)
     viewer_name = Column(String, nullable=False)
 
-    # Тип лутбокса
+    # Lootbox type.
     lootbox_type = Column(String, nullable=False)
     quality_id = Column(Integer, ForeignKey("drops_qualities.id"), nullable=False)
 
-    # Полученная награда
+    # Granted reward.
     reward_id = Column(Integer, ForeignKey("drops_rewards.id"), nullable=True)
     reward_name = Column(String, nullable=False)
     reward_type = Column(String, nullable=False)
     reward_value = Column(String, nullable=False)
 
-    # Дополнительная информация
+    # Additional context.
     donation_amount = Column(Float, nullable=True)
     streak_days = Column(Integer, nullable=True)
     messages_count = Column(Integer, nullable=True)
 
-    # Внешние данные
+    # External linkage data.
     donation_alert_id = Column(String, nullable=True)
     chat_message_id = Column(Integer, nullable=True)
 
@@ -222,7 +216,7 @@ class DropsHistory(Base):
 
 
 class MemeAlertsGrantHistory(Base):
-    """Локальная история успешных выдач MemeAlerts."""
+    """Local history of successful MemeAlerts grants."""
 
     __tablename__ = "memealerts_grant_history"
     __table_args__ = {"extend_existing": True}
@@ -240,7 +234,7 @@ class MemeAlertsGrantHistory(Base):
 
 
 class MythicalDropsSession(Base):
-    """Сессии мифических Drops"""
+    """Mythical drops session."""
 
     __tablename__ = "mythical_drops_sessions"
     __table_args__ = (
@@ -257,11 +251,11 @@ class MythicalDropsSession(Base):
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
 
-    # Параметры сессии
+    # Session parameters.
     donation_amount = Column(Float, nullable=False)
     window_duration_minutes = Column(Integer, nullable=False)
 
-    # Статус
+    # Runtime state.
     is_active = Column(Boolean, default=True)
 
     started_at = Column(DateTime, default=utcnow_naive)
@@ -274,7 +268,7 @@ class MythicalDropsSession(Base):
 
 
 class StreamSession(Base):
-    """Сессии трансляций для отслеживания начала и конца стримов"""
+    """Tracked stream session start/end boundaries."""
 
     __tablename__ = "stream_sessions"
     __table_args__ = (
@@ -291,14 +285,14 @@ class StreamSession(Base):
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
 
-    # Время начала и конца трансляции
+    # Stream timing.
     started_at = Column(DateTime, nullable=False, default=utcnow_naive, index=True)
     ended_at = Column(DateTime, nullable=True, index=True)
 
-    # Статус трансляции
+    # Stream state.
     is_active = Column(Boolean, default=True, index=True)
 
-    # Дополнительная информация
+    # Additional metadata.
     viewer_count_peak = Column(Integer, default=0)
     title = Column(String, nullable=True)
 

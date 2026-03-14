@@ -1,12 +1,12 @@
 """
-Централизованные обработчики исключений для FastAPI.
+Centralized exception handlers for FastAPI.
 
-Обрабатывает:
-- AppException и наследники (бизнес-ошибки)
-- HTTPException (FastAPI)
-- RequestValidationError (Pydantic)
-- SQLAlchemyError (БД)
-- Exception (все остальное)
+Handles:
+- AppException and derived business errors
+- HTTPException
+- RequestValidationError / ValidationError
+- SQLAlchemyError
+- any other unhandled exception
 """
 import logging
 from core.datetime_utils import utcnow_naive
@@ -26,13 +26,14 @@ logger = logging.getLogger(__name__)
 
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
-    Глобальный обработчик для всех необработанных исключений
-    Предотвращает падение приложения и логирует ошибки
+    Global handler for all unhandled exceptions.
+
+    Prevents application crashes and records the error details.
     """
-    # Получаем информацию о пользователе если доступна
+    # Extract user context when available.
     user_id = getattr(request.state, "user_id", None)
 
-    # Используем структурированное логирование
+    # Use structured logging.
     error_logger.log_error(
         exc,
         context={
@@ -53,11 +54,11 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         severity="CRITICAL",
     )
 
-    # В production не показываем детали ошибки
+    # Do not expose internal details to clients.
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "detail": "Внутренняя ошибка сервера",
+            "detail": "Internal server error",
             "timestamp": utcnow_naive().isoformat(),
         },
     )
@@ -65,12 +66,11 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """
-    Обработчик для HTTPException
-    Логирует и возвращает структурированный ответ
+    Handler for FastAPI HTTPException.
     """
     user_id = getattr(request.state, "user_id", None)
 
-    # Логируем только если это не ожидаемые ошибки (401, 403, 404)
+    # Log unexpected HTTP errors only.
     if exc.status_code not in [401, 403, 404]:
         logger.warning(
             f"HTTP {exc.status_code} in {request.method} {request.url.path}: {exc.detail}",
@@ -87,7 +87,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     # Other 5xx responses stay sanitized.
     response_detail = exc.detail
     if exc.status_code >= 500 and exc.status_code != 503:
-        response_detail = "Внутренняя ошибка сервера"
+        response_detail = "Internal server error"
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -102,22 +102,21 @@ async def validation_exception_handler(
     request: Request, exc: Union[RequestValidationError, ValidationError]
 ) -> JSONResponse:
     """
-    Обработчик для ошибок валидации Pydantic
-    Возвращает детальную информацию о полях с ошибками
+    Handler for Pydantic validation errors.
     """
     user_id = getattr(request.state, "user_id", None)
 
-    # Форматируем ошибки валидации
+    # Format validation errors.
     errors = []
     for error in exc.errors():
-        field_path = " -> ".join(str(loc) for loc in error["loc"][1:])  # Пропускаем 'body'
+        field_path = " -> ".join(str(loc) for loc in error["loc"][1:])  # Skip 'body'
         errors.append({
             "field": field_path,
             "message": error["msg"],
             "type": error["type"],
         })
 
-    # Используем структурированное логирование
+    # Use structured logging.
     error_logger.log_validation_error(
         errors=errors,
         endpoint=request.url.path,
@@ -127,7 +126,7 @@ async def validation_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
-            "detail": "Ошибка валидации данных",
+            "detail": "Validation error",
             "errors": errors,
             "timestamp": utcnow_naive().isoformat(),
         },
@@ -136,11 +135,11 @@ async def validation_exception_handler(
 
 async def database_exception_handler(request: Request, exc: SQLAlchemyError) -> JSONResponse:
     """
-    Обработчик для ошибок базы данных
+    Handler for database errors.
     """
     user_id = getattr(request.state, "user_id", None)
 
-    # Используем структурированное логирование
+    # Use structured logging.
     error_logger.log_database_error(
         exc,
         operation=f"{request.method} {request.url.path}",
@@ -150,7 +149,7 @@ async def database_exception_handler(request: Request, exc: SQLAlchemyError) -> 
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
-            "detail": "Ошибка базы данных",
+            "detail": "Database error",
             "timestamp": utcnow_naive().isoformat(),
         },
     )
@@ -158,12 +157,11 @@ async def database_exception_handler(request: Request, exc: SQLAlchemyError) -> 
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
     """
-    Обработчик для бизнес-исключений AppException.
-    Возвращает структурированный ответ с error_code и details.
+    Handler for AppException business errors.
     """
     user_id = getattr(request.state, "user_id", None)
 
-    # Логируем ошибки 5xx
+    # Log 5xx errors with structured context.
     if exc.status_code >= 500:
         error_logger.log_error(
             exc,
@@ -198,28 +196,22 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 
 def setup_exception_handlers(app):
     """
-    Регистрирует все обработчики исключений в FastAPI приложении
-    
-    Usage:
-        from core.exception_handlers import setup_exception_handlers
-        
-        app = FastAPI()
-        setup_exception_handlers(app)
+    Register exception handlers in the FastAPI application.
     """
-    # Глобальный обработчик для всех необработанных исключений
+    # Global handler for all unhandled exceptions.
     app.add_exception_handler(Exception, global_exception_handler)
 
-    # Обработчик для HTTPException
+    # Handler for HTTPException.
     app.add_exception_handler(HTTPException, http_exception_handler)
 
-    # Обработчик для ошибок валидации
+    # Handlers for validation errors.
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(ValidationError, validation_exception_handler)
 
-    # Обработчик для ошибок базы данных
+    # Handler for database errors.
     app.add_exception_handler(SQLAlchemyError, database_exception_handler)
 
-    # Обработчик для бизнес-исключений
+    # Handler for business exceptions.
     app.add_exception_handler(AppException, app_exception_handler)
 
     logger.info("[OK] Exception handlers registered")

@@ -1,7 +1,6 @@
 # bot_service/core/token_manager.py
 """
-УНИВЕРСАЛЬНЫЙ МЕНЕДЖЕР ТОКЕНОВ
-Единая точка входа для получения токенов пользователей
+Unified token manager for user platform tokens.
 """
 import logging
 from typing import Optional, Dict, Any
@@ -13,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 class TokenManager:
     """
-    Универсальный менеджер для работы с токенами пользователей.
-    
-    Проверяет только is_active флаг токена.
-    Безопасность через деактивацию токенов при новом логине.
+    Unified manager for working with user tokens.
+
+    Only checks the token ``is_active`` flag. Security relies on token
+    deactivation during new login flows.
     """
 
     @staticmethod
@@ -28,17 +27,17 @@ class TokenManager:
         db: Session = None
     ) -> Optional[str]:
         """
-        Получить access token пользователя для указанной платформы.
-        
+        Return the user access token for a platform.
+
         Args:
-            user_id: ID пользователя
-            platform: Платформа ('twitch', 'vk', 'donationalerts')
-            session_id: НЕ используется (для обратной совместимости)
-            require_session_check: НЕ используется (для обратной совместимости)
-            db: Database session (опционально, для предотвращения race conditions)
-        
+            user_id: User ID
+            platform: Platform ('twitch', 'vk', 'donationalerts')
+            session_id: Unused, kept for backward compatibility
+            require_session_check: Unused, kept for backward compatibility
+            db: Optional database session to avoid race conditions
+
         Returns:
-            str: Access token или None (если токен не найден или is_active=False)
+            Access token or ``None`` when missing
         """
         try:
             logger.debug(f"[PACKAGE] [TOKEN MANAGER] Getting token for user {user_id}, platform {platform}")
@@ -68,17 +67,7 @@ class TokenManager:
         db: Session = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Получить полные данные токена (не только access_token).
-        
-        Args:
-            user_id: ID пользователя
-            platform: Платформа
-            session_id: НЕ используется
-            require_session_check: НЕ используется
-            db: Database session (опционально, для предотвращения race conditions)
-        
-        Returns:
-            dict: Данные токена (platform_user_id, access_token, refresh_token, expires_at, etc.)
+        Return the full token payload, not only the access token.
         """
         try:
             logger.debug(f"[PACKAGE] [TOKEN MANAGER] Getting token DATA for user {user_id}, platform {platform}")

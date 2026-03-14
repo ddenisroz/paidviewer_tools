@@ -1,11 +1,6 @@
 # bot_service/services/integration_management_service.py
 """
-Сервис управления интеграциями пользователя.
-
-Отвечает за:
-- Получение списка активных интеграций
-- Отключение интеграций (disconnect)
-- Полное удаление интеграций (remove)
+Service for working with user integrations.
 """
 
 import logging
@@ -24,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class IntegrationInfo:
-    """Информация об интеграции."""
+    """Integration information."""
     platform: str
     connected: bool
     username: Optional[str]
@@ -34,11 +29,7 @@ class IntegrationInfo:
 
 class IntegrationManagementService:
     """
-    Сервис управления интеграциями.
-    
-    Использование:
-        service = IntegrationManagementService()
-        integrations = await service.get_user_integrations(user_id, db)
+    Service for working with user integrations.
     """
     
     async def get_user_integrations(
@@ -47,14 +38,7 @@ class IntegrationManagementService:
         db: Session
     ) -> Dict[str, IntegrationInfo]:
         """
-        Получает список активных интеграций пользователя с валидацией токенов.
-        
-        Args:
-            user_id: ID пользователя
-            db: Сессия БД
-            
-        Returns:
-            Словарь интеграций по платформам
+        Return active user integrations after token validation.
         """
         token_repo = UserTokenRepository(db)
         user_repo = UserRepository(db)
@@ -68,7 +52,7 @@ class IntegrationManagementService:
             if not token.access_token:
                 continue
                 
-            # Валидация токена через API платформы
+            # Validate the token through the platform API.
             is_valid = await validate_platform_token(token)
             
             if is_valid:
@@ -95,7 +79,7 @@ class IntegrationManagementService:
         user: Optional[User], 
         platform: str
     ) -> Optional[str]:
-        """Получает username для платформы из объекта пользователя."""
+        """Return platform username from a user object."""
         if not user:
             return None
             
@@ -115,15 +99,7 @@ class IntegrationManagementService:
         db: Session,
     ) -> bool:
         """
-        Отключает интеграцию (бота) и удаляет токен.
-        
-        Args:
-            user_id: ID пользователя
-            platform: Платформа (twitch, vk)
-            db: Сессия БД
-            
-        Returns:
-            True если успешно
+        Disconnect an integration and delete its token.
         """
         from core.connection_manager import get_connection_manager
         
@@ -136,13 +112,13 @@ class IntegrationManagementService:
         
         connection_manager = get_connection_manager()
         
-        # Отключаем бота от канала
+        # Disconnect the bot from the channel.
         if platform == "twitch":
             await self._disconnect_twitch_bot(db_user, connection_manager)
         elif platform == "vk":
             await self._disconnect_vk_bot(db_user, connection_manager)
         
-        # Удаляем токен
+        # Delete the token.
         success = token_repo.delete_by_user_and_platform(user_id, platform)
         
         if success:
@@ -152,7 +128,7 @@ class IntegrationManagementService:
         return True
     
     async def _disconnect_twitch_bot(self, user: User, connection_manager) -> None:
-        """Отключает Twitch бота от канала."""
+        """Disconnect the Twitch bot from the channel."""
         channel_name = user.twitch_username
         if not channel_name:
             return
@@ -170,7 +146,7 @@ class IntegrationManagementService:
             raise
     
     async def _disconnect_vk_bot(self, user: User, connection_manager) -> None:
-        """Отключает VK бота от канала."""
+        """Disconnect the VK bot from the channel."""
         channel_name = user.vk_channel_name or user.vk_username
         if not channel_name:
             return
@@ -194,15 +170,7 @@ class IntegrationManagementService:
         db: Session,
     ) -> bool:
         """
-        Полностью удаляет интеграцию.
-        
-        Args:
-            user_id: ID пользователя
-            platform: Платформа
-            db: Сессия БД
-            
-        Returns:
-            True если успешно
+        Fully remove an integration.
         """
         from core.session_manager import session_manager
         from core.connection_manager import get_connection_manager
@@ -215,16 +183,16 @@ class IntegrationManagementService:
         
         connection_manager = get_connection_manager()
         
-        # Отключаем бота
+        # Disconnect the bot.
         if platform == "twitch":
             await self._disconnect_twitch_bot(db_user, connection_manager)
         elif platform == "vk":
             await self._disconnect_vk_bot(db_user, connection_manager)
         
-        # Удаляем токены через session_manager
+        # Remove tokens through session_manager.
         success = session_manager.remove_platform_token(user_id, platform)
         if not success:
-            # Fallback to repo delete if session manager fails (though session manager should use repo internally ideally)
+            # Fallback to direct repository delete.
             UserTokenRepository(db).delete_by_user_and_platform(user_id, platform)
         
         logger.info(f"[INTEGRATION] {platform} fully removed for user {user_id}")

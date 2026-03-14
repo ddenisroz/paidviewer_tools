@@ -1,13 +1,5 @@
 # bot_service/services/memory_tts_queue.py
-"""
-Простая очередь TTS задач в памяти
-Заменяет Redis TTS Queue
-
-Task 5.4: Добавлен контроль генерации TTS на основе активных соединений
-- Проверка is_user_connected() перед добавлением задачи
-- Отключение TTS при отключении пользователя
-- Повторное включение при переподключении
-"""
+"""In-memory TTS task queue."""
 import asyncio
 import logging
 import time
@@ -26,7 +18,7 @@ class TaskStatus(Enum):
 
 @dataclass
 class TTSTask:
-    """Задача TTS синтеза"""
+    """TTS synthesis task."""
     task_id: str
     user_id: int
     text: str
@@ -43,11 +35,10 @@ class TTSTask:
 
 class MemoryTTSQueue:
     """
-    Простая очередь TTS задач в памяти
-    
-    Task 5.4: Добавлен контроль на основе активных соединений
-    - disabled_users: Set пользователей с отключенной генерацией TTS
-    - Проверка соединений перед добавлением задачи
+    In-memory TTS task queue.
+
+    The queue tracks users with disabled generation and verifies active sinks
+    before enqueuing new work.
     """
 
     def __init__(self, max_size: int = 1000):
@@ -59,7 +50,7 @@ class MemoryTTSQueue:
         self._cleanup_task: Optional[asyncio.Task] = None
         self._cleanup_interval_seconds = 600
         self.max_completed_tasks = 5000
-        # Task 5.4: Отслеживание пользователей с отключенной генерацией TTS
+        # Track users for whom TTS generation is currently disabled.
         self.disabled_users: Set[int] = set()
 
     def _mark_task_dropped(self, task: TTSTask, reason: str):
@@ -97,7 +88,7 @@ class MemoryTTSQueue:
                 logger.exception("Error in memory TTS queue cleanup loop")
 
     async def start(self):
-        """Запуск очереди"""
+        """Start the queue."""
         if self._running:
             return
 
@@ -106,7 +97,7 @@ class MemoryTTSQueue:
         logger.info("Memory TTS Queue started")
 
     async def stop(self):
-        """Остановка очереди"""
+        """Stop the queue."""
         self._running = False
         if self._cleanup_task:
             self._cleanup_task.cancel()
@@ -128,24 +119,24 @@ class MemoryTTSQueue:
         metadata: Dict[str, Any] = None
     ) -> str:
         """
-        Добавить задачу в очередь
-        
-        Task 5.4: Добавлена проверка активных соединений перед добавлением задачи
-        
+        Add a task to the queue.
+
+        Active sink validation is performed before the task is accepted.
+
         Args:
-            user_id: ID пользователя
-            text: Текст для синтеза
-            voice: Голос
-            channel: Канал
-            platform: Платформа
-            priority: Приоритет (1-4)
-            metadata: Дополнительные данные
-            
+            user_id: User ID.
+            text: Text for synthesis.
+            voice: Voice identifier.
+            channel: Channel name.
+            platform: Source platform.
+            priority: Task priority (1-4).
+            metadata: Optional metadata.
+
         Returns:
-            str: ID задачи
-            
+            Task ID.
+
         Raises:
-            RuntimeError: Если очередь не запущена, переполнена, или пользователь не подключен
+            RuntimeError: If the queue is not running, full, or the user has no active sink.
         """
         if not self._running:
             raise RuntimeError("Queue is not running")
@@ -153,12 +144,12 @@ class MemoryTTSQueue:
         if self.pending_queue.qsize() >= self.max_size:
             raise RuntimeError("Queue is full")
 
-        # Task 5.4: Проверка, не отключена ли генерация TTS для пользователя
+        # Skip users whose generation is currently disabled.
         if user_id in self.disabled_users:
             logger.info(f"Skipping TTS for user {user_id} - TTS generation disabled")
             raise RuntimeError(f"TTS generation disabled for user {user_id}")
 
-        # Task 5.4: Проверка активных соединений пользователя
+        # Require an active sink before enqueueing new work.
         if not self.is_user_connected(user_id):
             logger.info(f"Skipping TTS for user {user_id} - no active connections")
             raise RuntimeError(f"User {user_id} has no active connections")
@@ -180,14 +171,14 @@ class MemoryTTSQueue:
             created_at=time.time()
         )
 
-        # Добавляем метаданные если есть
+        # Attach metadata to the task if present.
         if metadata:
             for key, value in metadata.items():
                 setattr(task, f"meta_{key}", value)
 
         self.tasks[task_id] = task
 
-        # Добавляем в очередь по приоритету
+        # Queue the task.
         await self.pending_queue.put(task)
 
         logger.info(f"TTS task added: {task_id} for user {user_id}")
@@ -195,13 +186,13 @@ class MemoryTTSQueue:
 
     async def get_next_task(self, timeout: float = 1.0) -> Optional[TTSTask]:
         """
-        Получить следующую задачу из очереди
-        
+        Get the next task from the queue.
+
         Args:
-            timeout: Таймаут ожидания в секундах
-            
+            timeout: Wait timeout in seconds.
+
         Returns:
-            TTSTask или None если очередь пуста
+            ``TTSTask`` or ``None`` if the queue is empty.
         """
         if not self._running:
             return None
@@ -223,7 +214,7 @@ class MemoryTTSQueue:
                     logger.info(f"Dropped TTS task {task.task_id}: user {task.user_id} has no listeners")
                     continue
 
-                # Обновляем статус
+                # Update runtime status before handing the task to a worker.
                 task.status = TaskStatus.PROCESSING
                 task.started_at = time.time()
 
@@ -240,11 +231,11 @@ class MemoryTTSQueue:
 
     async def complete_task(self, task_id: str, result: Dict[str, Any]):
         """
-        Отметить задачу как выполненную
-        
+        Mark a task as completed.
+
         Args:
-            task_id: ID задачи
-            result: Результат выполнения
+            task_id: Task ID.
+            result: Task result payload.
         """
         if task_id not in self.tasks:
             logger.warning(f"Task not found: {task_id}")
@@ -255,7 +246,7 @@ class MemoryTTSQueue:
         task.completed_at = time.time()
         task.result = result
 
-        # Перемещаем в завершенные
+        # Move the task into terminal storage.
         self.completed_tasks[task_id] = task
         self.tasks.pop(task_id, None)
         self._trim_completed_tasks()
@@ -264,11 +255,11 @@ class MemoryTTSQueue:
 
     async def fail_task(self, task_id: str, error: str):
         """
-        Отметить задачу как неудачную
-        
+        Mark a task as failed.
+
         Args:
-            task_id: ID задачи
-            error: Ошибка
+            task_id: Task ID.
+            error: Error message.
         """
         if task_id not in self.tasks:
             logger.warning(f"Task not found: {task_id}")
@@ -279,7 +270,7 @@ class MemoryTTSQueue:
         task.completed_at = time.time()
         task.error = error
 
-        # Перемещаем в завершенные
+        # Move the task into terminal storage.
         self.completed_tasks[task_id] = task
         self.tasks.pop(task_id, None)
         self._trim_completed_tasks()
@@ -288,13 +279,13 @@ class MemoryTTSQueue:
 
     def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
         """
-        Получить статус задачи
-        
+        Get task status.
+
         Args:
-            task_id: ID задачи
-            
+            task_id: Task ID.
+
         Returns:
-            Dict с информацией о задаче или None
+            A task info dictionary or ``None``.
         """
         if task_id in self.tasks:
             task = self.tasks[task_id]
@@ -316,10 +307,10 @@ class MemoryTTSQueue:
 
     def get_queue_stats(self) -> Dict[str, Any]:
         """
-        Получить статистику очереди
-        
+        Get queue statistics.
+
         Returns:
-            Dict со статистикой
+            Queue statistics dictionary.
         """
         pending_count = self.pending_queue.qsize()
         processing_count = sum(1 for task in self.tasks.values()
@@ -341,15 +332,15 @@ class MemoryTTSQueue:
 
     async def cleanup_old_tasks(self, max_age_hours: int = 24):
         """
-        Очистить старые завершенные задачи
-        
+        Remove old completed tasks.
+
         Args:
-            max_age_hours: Максимальный возраст задач в часах
+            max_age_hours: Maximum completed-task age in hours.
         """
         current_time = time.time()
         max_age_seconds = max_age_hours * 3600
 
-        # Очищаем старые завершенные задачи
+        # Drop terminal tasks older than the configured threshold.
         old_tasks = []
         for task_id, task in list(self.completed_tasks.items()):
             if task.completed_at and (current_time - task.completed_at) > max_age_seconds:
@@ -365,18 +356,18 @@ class MemoryTTSQueue:
 
     def is_user_connected(self, user_id: int) -> bool:
         """
-        Task 5.4: Проверить, есть ли у пользователя активные соединения
-        
+        Check whether the user still has active connections.
+
         Args:
-            user_id: ID пользователя
-            
+            user_id: User ID.
+
         Returns:
-            bool: True если пользователь подключен
+            ``True`` if the user has an active connection.
         """
         try:
             from services.memory_websocket_manager import get_memory_websocket_manager
 
-            # Проверяем наличие активных соединений через WebSocket Manager
+            # Check active user connections through the in-memory WebSocket manager.
             conn_mgr = get_memory_websocket_manager()
             return user_id in conn_mgr.user_connections and \
                    len(conn_mgr.user_connections[user_id]) > 0
@@ -387,12 +378,12 @@ class MemoryTTSQueue:
 
     async def disable_for_user(self, user_id: int):
         """
-        Task 5.4: Отключить генерацию TTS для пользователя
-        
-        Вызывается когда пользователь полностью отключается (все соединения закрыты)
-        
+        Disable TTS generation for a user.
+
+        Called when the user fully disconnects and no sinks remain.
+
         Args:
-            user_id: ID пользователя
+            user_id: User ID.
         """
         self.disabled_users.add(user_id)
         removed_tasks = 0
@@ -417,17 +408,17 @@ class MemoryTTSQueue:
 
     async def enable_for_user(self, user_id: int):
         """
-        Task 5.4: Включить генерацию TTS для пользователя
-        
-        Вызывается когда пользователь переподключается
-        
+        Re-enable TTS generation for a user.
+
+        Called when the user reconnects.
+
         Args:
-            user_id: ID пользователя
+            user_id: User ID.
         """
         self.disabled_users.discard(user_id)
         logger.info(f"Enabled TTS generation for user {user_id}")
 
-# Глобальный экземпляр
+# Global singleton instance.
 _memory_tts_queue: Optional[MemoryTTSQueue] = None
 
 def get_memory_tts_queue() -> MemoryTTSQueue:
@@ -438,10 +429,6 @@ def get_memory_tts_queue() -> MemoryTTSQueue:
     if _memory_tts_queue is None:
         _memory_tts_queue = MemoryTTSQueue()
     return _memory_tts_queue
-
-
-
-
 
 
 

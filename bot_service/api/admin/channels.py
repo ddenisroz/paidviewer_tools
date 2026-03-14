@@ -36,7 +36,7 @@ async def get_blocked_channels(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список заблокированных каналов"""
+    """Get the list of blocked channels."""
     try:
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -58,7 +58,7 @@ async def get_blocked_channels(
         raise
     except Exception:
         logger.exception("Error getting blocked channels")
-        raise HTTPException(status_code=500, detail="Ошибка получения заблокированных каналов")
+        raise HTTPException(status_code=500, detail="Failed to fetch blocked channels.")
 
 
 @router.post("/blocked-channels")
@@ -68,18 +68,18 @@ async def block_channel(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Заблокировать канал"""
+    """Block a channel."""
     try:
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # Валидация
+        # Validate the request.
         if not channel_name or len(channel_name.strip()) < 2:
-            raise HTTPException(status_code=400, detail="Channel name должна быть минимум 2 символа")
+            raise HTTPException(status_code=400, detail="Channel name must contain at least 2 characters.")
         
         repo = BlockedChannelRepository(db)
         
-        # Проверяем, не заблокирован ли уже
+        # Check whether the channel is already blocked.
         if repo.is_blocked(channel_name):
             raise HTTPException(status_code=400, detail=f"Channel {channel_name} is already blocked")
         
@@ -100,7 +100,7 @@ async def block_channel(
         raise
     except Exception:
         logger.exception("Error blocking channel")
-        raise HTTPException(status_code=500, detail="Ошибка блокировки канала")
+        raise HTTPException(status_code=500, detail="Failed to block the channel.")
 
 
 @router.patch("/blocked-channels/{channel_id}")
@@ -110,7 +110,7 @@ async def update_blocked_channel(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить информацию о заблокированном канале"""
+    """Update blocked channel metadata."""
     try:
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -132,7 +132,7 @@ async def update_blocked_channel(
         raise
     except Exception:
         logger.exception("Error updating blocked channel")
-        raise HTTPException(status_code=500, detail="Ошибка обновления заблокированного канала")
+        raise HTTPException(status_code=500, detail="Failed to update the blocked channel.")
 
 
 @router.delete("/blocked-channels/{channel_id}")
@@ -141,7 +141,7 @@ async def unblock_channel(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Разблокировать канал (мягкое удаление)"""
+    """Unblock a channel (soft delete)."""
     try:
         if not (user.get('role') == 'admin' or user.get('is_admin', False)):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -162,5 +162,5 @@ async def unblock_channel(
         raise
     except Exception:
         logger.exception("Error unblocking channel")
-        raise HTTPException(status_code=500, detail="Ошибка разблокировки канала")
+        raise HTTPException(status_code=500, detail="Failed to unblock the channel.")
 

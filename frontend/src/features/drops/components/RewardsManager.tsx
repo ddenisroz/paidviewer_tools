@@ -99,6 +99,8 @@ const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const MAX_REWARD_WEIGHT = 2000;
 const BLUE_TEXT_BUTTON_CLASS = 'border-border/70 bg-transparent text-sky-300 hover:bg-transparent hover:text-sky-200';
 
+const QUALITY_CARD_SKELETON_COUNT = 4;
+
 const dedupeRewards = (items: Reward[]): Reward[] => {
   const bySignature = new Map<string, Reward>();
 
@@ -138,6 +140,20 @@ const emptyForm = (platform: string, qualityId: number | null): RewardForm => ({
   platform,
 });
 
+const getRewardQualityId = (reward: Reward): number | null => {
+  if (typeof reward.quality === 'object') return reward.quality?.id || null;
+  if (typeof reward.quality === 'number') return reward.quality;
+  const qualityName = typeof reward.quality === 'string' ? reward.quality.toLowerCase() : '';
+  return QUALITIES.find((item) => item.name.toLowerCase() === qualityName || item.label.toLowerCase() === qualityName)?.id || null;
+};
+
+const getWeightChanceLabel = (chance: number): string => {
+  if (!Number.isFinite(chance) || chance <= 0) return '0%';
+  if (chance >= 99.95) return '100%';
+  if (chance >= 10) return `${chance.toFixed(1)}%`;
+  return `${chance.toFixed(2)}%`;
+};
+
 const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channelName, onRewardsCountChange, integrations }) => {
   const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
   const [selectedRewardId, setSelectedRewardId] = useState<number | null>(null);
@@ -156,8 +172,8 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
   if (twitchAvailable) availablePlatforms.push({ value: 'twitch', label: 'Twitch' });
   if (vkAvailable) availablePlatforms.push({ value: 'vk', label: 'VK Live' });
 
-  const { data: qualitiesData = [] } = useDropsQualities();
-  const { data: allRewardsData = [] } = useDropsRewards(channelName);
+  const { data: qualitiesData = [], isLoading: isQualitiesLoading } = useDropsQualities();
+  const { data: allRewardsData = [], isLoading: isRewardsLoading } = useDropsRewards(channelName);
 
   const createRewardMutation = useCreateDropsReward(channelName);
   const updateRewardMutation = useUpdateDropsReward(channelName);
@@ -184,6 +200,37 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
     () => rewards.find((reward) => Number(reward.id) === selectedRewardId) || null,
     [rewards, selectedRewardId]
   );
+
+  const normalizedWeight = Math.max(1, Math.min(MAX_REWARD_WEIGHT, Number(form.weight) || 1));
+  const selectedQualityRewards = useMemo(() => {
+    if (!form.quality_id) return [];
+    return rewards.filter((reward) => getRewardQualityId(reward) === form.quality_id);
+  }, [form.quality_id, rewards]);
+
+  const weightPreview = useMemo(() => {
+    const currentQualityId = form.quality_id;
+    if (!currentQualityId) {
+      return {
+        totalWeight: normalizedWeight,
+        chancePercent: 100,
+        isOnlyReward: true,
+      };
+    }
+
+    const otherRewards = selectedQualityRewards.filter((reward) => {
+      if (editorMode !== 'edit' || !selectedReward) return true;
+      return Number(reward.id) !== Number(selectedReward.id);
+    });
+
+    const totalWeight = otherRewards.reduce((sum, reward) => sum + Math.max(1, Number(reward.weight) || 1), 0) + normalizedWeight;
+    const chancePercent = totalWeight > 0 ? (normalizedWeight / totalWeight) * 100 : 100;
+
+    return {
+      totalWeight,
+      chancePercent,
+      isOnlyReward: otherRewards.length === 0,
+    };
+  }, [editorMode, normalizedWeight, selectedQualityRewards, selectedReward]);
 
   useEffect(() => {
     if (onRewardsCountChange) onRewardsCountChange(rewards.length);
@@ -298,6 +345,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
   };
 
   const isSaving = createRewardMutation.isPending || updateRewardMutation.isPending;
+  const isRewardsLayoutLoading = isQualitiesLoading || isRewardsLoading;
 
   return (
     <div className="space-y-4">
@@ -316,12 +364,21 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                     <img src={qualityItem.image} alt={`${qualityItem.label} chest`} className="h-8 w-8 object-contain" />
                     <span style={{ color: qualityData?.color || qualityItem.color }}>{qualityItem.label}</span>
                     <Badge variant="outline" className="border-border/70 bg-transparent text-foreground/90">
-                      {qualityRewards.length}
+                      {isRewardsLayoutLoading ? '...' : qualityRewards.length}
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {qualityRewards.length === 0 ? (
+                  {isRewardsLayoutLoading ? (
+                    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                      {Array.from({ length: QUALITY_CARD_SKELETON_COUNT }).map((_, index) => (
+                        <div
+                          key={`${qualityItem.name}-skeleton-${index}`}
+                          className="h-[100px] animate-pulse rounded-xl border border-border/70 bg-card/60"
+                        />
+                      ))}
+                    </div>
+                  ) : qualityRewards.length === 0 ? (
                     <div className="rounded-lg border border-border/70 bg-transparent py-5 text-center text-sm text-muted-foreground">
                       Наград пока нет
                     </div>
@@ -336,7 +393,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                           >
                             <div className="mb-2 flex items-start justify-between gap-2">
                               <h4 className="line-clamp-2 text-sm font-semibold text-foreground">{reward.name}</h4>
-                              <Badge variant="outline" className="shrink-0 border-border/70 bg-transparent text-sky-300">{reward.weight}</Badge>
+                              <Badge variant="outline" className="shrink-0 border-border/70 bg-transparent text-sky-300">Вес {reward.weight}</Badge>
                             </div>
 
                             {reward.description && (
@@ -449,7 +506,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="reward_weight">Вес</Label>
+                <Label htmlFor="reward_weight">Вес выпадения</Label>
                 <Input
                   id="reward_weight"
                   type="number"
@@ -459,6 +516,11 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(({ user, channe
                   onChange={(e) => setForm((prev) => ({ ...prev, weight: Math.max(1, Math.min(MAX_REWARD_WEIGHT, parseInt(e.target.value, 10) || 1)) }))}
                   className="border-border/70 bg-transparent"
                 />
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  {weightPreview.isOnlyReward
+                    ? 'Если награда одна в этом сундуке, шанс выпадения будет 100%.'
+                    : `Примерный шанс выпадения в этом сундуке: ${getWeightChanceLabel(weightPreview.chancePercent)} при общем весе ${weightPreview.totalWeight}.`}
+                </p>
               </div>
             </div>
 

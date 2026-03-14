@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Text cleaned."""
+"""Initialize default records for blocked bots."""
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def init_blocked_bots():
-    """Text cleaned."""
+    """Ensure default blocked bot records exist if they are still missing."""
     db = SessionLocal()
     try:
         bots_to_block = ['payedviewer', 'streamelements', 'nightbot', 'streamlabs', 'moobot', 'twirapp', 'fossabot', 'streamlabs', 'wizebot', 'botrix', 'coebot', 'ankhbot', 'deepbot', 'xanbot', 'vivbot', 'ohbot', 'scorpstradamus', 'sery_bot', 'chatbot']
@@ -36,7 +36,7 @@ def init_blocked_bots():
         all_blocked = db.query(BlockedBot).order_by(BlockedBot.bot_name).all()
         print('\n[LIST] Current blocked bots list:')
         for bot in all_blocked:
-            marker = 'Text cleaned.' if bot.bot_name == 'payedviewer' else '[BOT]'
+            marker = '[BLOCKED]' if bot.bot_name == 'payedviewer' else '[BOT]'
             print(f'   {marker} {bot.bot_name}')
         print()
     except Exception as e:

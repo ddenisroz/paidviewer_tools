@@ -1,6 +1,6 @@
 # bot_service/api/stream_history_api.py
 """
-API для истории стримов.
+API for stream history.
 Clean Architecture: uses ChatMessageRepository for data access.
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
@@ -38,7 +38,7 @@ async def get_stream_history(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить историю стримов/сообщений"""
+    """Get stream and chat history."""
     try:
         user_id = user.get("id")
         if not user_id:
@@ -82,7 +82,7 @@ async def get_stream_stats(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить статистику стрима"""
+    """Get stream statistics."""
     try:
         user_id = user.get("id")
         if not user_id:
@@ -100,4 +100,3 @@ async def get_stream_stats(
     except Exception:
         logger.exception("Error getting stream stats")
         raise HTTPException(status_code=500, detail="Internal server error")
-

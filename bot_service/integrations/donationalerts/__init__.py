@@ -1,9 +1,5 @@
 # bot_service/integrations/donationalerts/__init__.py
-"""
-DonationAlerts Integration Layer.
-
-TODO: Вынести логику из api/donationalerts_api.py и auth/donationalerts_auth.py
-"""
+"""DonationAlerts integration layer."""
 
 from .client import DonationAlertsClient
 

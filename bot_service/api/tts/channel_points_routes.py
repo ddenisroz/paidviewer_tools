@@ -16,7 +16,7 @@ channel_points_router = APIRouter(prefix='/api/tts', tags=['tts-channel-points']
 
 @channel_points_router.get('/mode-settings')
 async def get_tts_mode_settings(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Get the TTS mode and reward settings."""
     try:
         repo = TTSSettingsRepository(db)
         settings = repo.get_or_create(user_id=user['id'])
@@ -33,14 +33,14 @@ async def get_tts_mode_settings(user: dict=Depends(get_current_user), db: Sessio
         raise
     except Exception:
         logger.exception('Error getting TTS mode settings')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @channel_points_router.post('/mode-settings')
 async def update_tts_mode_settings(request: UpdateTtsModeRequest, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Update the TTS operating mode."""
     try:
         if request.tts_mode not in ['all_messages', 'channel_points']:
-            raise HTTPException(status_code=400, detail='Invalid TTS mode')
+            raise HTTPException(status_code=400, detail='Invalid TTS mode.')
         repo = TTSSettingsRepository(db)
         settings = repo.get_or_create(user_id=user['id'])
         repo.update_settings(settings, {'tts_mode': request.tts_mode})
@@ -51,15 +51,15 @@ async def update_tts_mode_settings(request: UpdateTtsModeRequest, user: dict=Dep
     except Exception:
         logger.exception('Error updating TTS mode')
         db.rollback()
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @channel_points_router.post('/rewards/create')
 async def create_tts_reward(request: CreateTtsRewardRequest, starlette_request: Request, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Create a channel-points reward for TTS."""
     try:
         from platforms.registry import platform_registry
         if request.platform not in ['twitch', 'vk']:
-            raise HTTPException(status_code=400, detail='Invalid platform')
+            raise HTTPException(status_code=400, detail='Invalid platform.')
         token_repo = UserTokenRepository(db)
         active_tokens = token_repo.get_active_by_user(user['id'])
         tokens = {t.platform: t for t in active_tokens}
@@ -70,13 +70,13 @@ async def create_tts_reward(request: CreateTtsRewardRequest, starlette_request: 
             raise HTTPException(status_code=500, detail=f'Platform {request.platform} not initialized')
         reward_id = None
         if request.platform == 'twitch':
-            reward_data = {'title': request.title, 'cost': request.cost, 'is_user_input_required': True, 'prompt': 'Введите сообщение для озвучки TTS', 'global_cooldown_seconds': request.cooldown}
+            reward_data = {'title': request.title, 'cost': request.cost, 'is_user_input_required': True, 'prompt': 'Enter a message for TTS playback', 'global_cooldown_seconds': request.cooldown}
             reward_id = await platform.create_reward(user['id'], reward_data)
         elif request.platform == 'vk':
             reward_data = {'title': request.title, 'cost': request.cost}
             reward_id = await platform.create_reward(user['id'], reward_data)
         if not reward_id:
-            raise HTTPException(status_code=500, detail='Failed to create reward')
+            raise HTTPException(status_code=500, detail='Failed to create the reward.')
         repo = TTSSettingsRepository(db)
         settings = repo.get_or_create(user_id=user['id'])
         tts_reward_ids = settings.tts_reward_ids or {}
@@ -89,19 +89,19 @@ async def create_tts_reward(request: CreateTtsRewardRequest, starlette_request: 
     except Exception:
         logger.exception('Error creating TTS reward')
         db.rollback()
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @channel_points_router.delete('/rewards/{platform}')
 async def delete_tts_reward(platform: str, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Delete the channel-points reward used for TTS."""
     try:
         from platforms.registry import platform_registry
         if platform not in ['twitch', 'vk']:
-            raise HTTPException(status_code=400, detail='Invalid platform')
+            raise HTTPException(status_code=400, detail='Invalid platform.')
         repo = TTSSettingsRepository(db)
         settings = repo.get_by_user_id(user['id'])
         if not settings or not settings.tts_reward_ids:
-            raise HTTPException(status_code=404, detail='No rewards configured')
+            raise HTTPException(status_code=404, detail='Rewards are not configured yet.')
         tts_reward_ids = settings.tts_reward_ids or {}
         if platform not in tts_reward_ids:
             raise HTTPException(status_code=404, detail=f'No reward for {platform}')
@@ -118,4 +118,4 @@ async def delete_tts_reward(platform: str, user: dict=Depends(get_current_user),
     except Exception:
         logger.exception('Error deleting TTS reward')
         db.rollback()
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')

@@ -1,6 +1,6 @@
 # bot_service/services/admin/blocked_bots_service.py
 """
-Сервис управления заблокированными ботами.
+Service for managing blocked bot accounts.
 """
 
 import logging
@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class BlockedBotsService:
-    """Сервис для управления списком заблокированных ботов."""
+    """Service for managing the blocked-bots list."""
 
     async def get_blocked_bots(self, db: Session) -> List[BlockedBotPublic]:
-        """Получить список заблокированных ботов."""
+        """Get the list of blocked bots."""
         repo = BlockedBotRepository(db)
         bots = repo.get_all()
         return [BlockedBotPublic.model_validate(bot) for bot in bots]
@@ -28,7 +28,7 @@ class BlockedBotsService:
     async def add_blocked_bot(
         self, request: AddBlockedBotRequest, db: Session
     ) -> dict:
-        """Добавить бота в список заблокированных."""
+        """Add a bot to the blocked list."""
         repo = BlockedBotRepository(db)
         bot_name = request.bot_name.lower()
 
@@ -43,7 +43,7 @@ class BlockedBotsService:
         return {"message": f"Bot {bot_name} added to blocked list"}
 
     async def remove_blocked_bot(self, bot_name: str, db: Session) -> dict:
-        """Удалить бота из списка заблокированных."""
+        """Remove a bot from the blocked list."""
         repo = BlockedBotRepository(db)
         bot_name = bot_name.lower()
 

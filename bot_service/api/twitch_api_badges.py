@@ -1,5 +1,5 @@
 """
-API endpoints для получения Twitch badges
+API endpoints for retrieving Twitch badges.
 """
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
@@ -14,13 +14,13 @@ _CACHE_KEY = 'app_access_token'
 
 async def get_cached_app_token() -> str:
     """
-    Получить App Access Token с кешированием
+    Get an app access token with caching.
     
     Returns:
         access_token: Twitch App Access Token
         
     Raises:
-        HTTPException: Если не удалось получить токен
+        HTTPException: Raised when the token cannot be fetched.
     """
     if _CACHE_KEY in _app_token_cache:
         logger.debug('[OK] [CACHE HIT] Using cached App Access Token')
@@ -48,7 +48,7 @@ async def get_cached_app_token() -> str:
 @router.get('/badges/global')
 async def get_twitch_global_badges() -> JSONResponse:
     """
-    Получить маппинг глобальных Twitch badges (публичный endpoint)
+    Get the mapping of global Twitch badges (public endpoint).
     """
     try:
         client_id = settings.twitch_client_id
@@ -64,8 +64,8 @@ async def get_twitch_global_badges() -> JSONResponse:
 @router.get('/badges/channel/{identifier}')
 async def get_twitch_channel_badges(identifier: str) -> JSONResponse:
     """
-    Получить маппинг badges конкретного канала (публичный endpoint)
-    Принимает либо broadcaster_id (число), либо username (строка)
+    Get the mapping of badges for a specific channel (public endpoint).
+    Accepts either broadcaster_id (number) or username (string).
     """
     try:
         client_id = settings.twitch_client_id

@@ -1,8 +1,8 @@
 # bot_service/api/websocket_endpoints.py
 """
-WebSocket endpoints для чата и тестирования.
+WebSocket endpoints for chat and diagnostics.
 
-Вынесено из main.py для улучшения модульности.
+Moved out of main.py to improve modularity.
 """
 
 import json
@@ -26,11 +26,11 @@ router = APIRouter(tags=["websocket"])
 
 async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
     """
-    Загружает историю чата для пользователя.
+    Load chat history for a user.
     """
     def _db_query():
-        # Используем новый session context manager если он есть, или получаем session напрямую
-        # В данном проекте get_db() - это генератор
+        # Use the session context manager when available, otherwise read the session directly.
+        # In this project, get_db() is implemented as a generator.
         db = next(get_db())
         try:
             from repositories.user_repository import UserRepository
@@ -51,7 +51,7 @@ async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
                 return []
             
             chat_repo = ChatMessageRepository(db)
-            # Оптимизация: limit=20 для быстрой загрузки, клиент может запросить больше если надо
+            # Optimization: limit=20 for faster initial load; the client can request more if needed.
             messages = chat_repo.get_history_by_platforms(user_id, platforms, limit=20)
             messages.sort(key=lambda x: x.timestamp)
             return messages
@@ -65,8 +65,8 @@ async def _load_chat_history(user_id: int) -> List[Dict[str, Any]]:
 
 
 def _format_message(msg: ChatMessage) -> Dict[str, Any]:
-    """Форматирует сообщение для отправки клиенту."""
-    # Парсим badges
+    """Format a chat message for client delivery."""
+    # Parse badges
     badges_list = msg.badges
     if isinstance(badges_list, str):
         try:
@@ -74,7 +74,7 @@ def _format_message(msg: ChatMessage) -> Dict[str, Any]:
         except (json.JSONDecodeError, TypeError):
             badges_list = None
     
-    # Конвертируем timestamp
+    # Convert the timestamp
     timestamp_ms = None
     if msg.timestamp:
         timestamp_ms = int(msg.timestamp.timestamp() * 1000)
@@ -94,12 +94,12 @@ def _format_message(msg: ChatMessage) -> Dict[str, Any]:
 
 async def _send_chat_history(websocket: WebSocket, user_id: int) -> None:
     """
-    Отправляет историю чата через WebSocket.
+    Send chat history over WebSocket.
     
-    Выполняется асинхронно в background.
+    Runs asynchronously in the background.
     """
     try:
-        await asyncio.sleep(0.05)  # Даём клиенту время на инициализацию
+        await asyncio.sleep(0.05)  # Give the client time to initialize
         
         messages = await _load_chat_history(user_id)
         
@@ -144,7 +144,7 @@ async def _resolve_authenticated_user_id(websocket: WebSocket) -> Optional[int]:
 @router.websocket("/ws/chat/{user_id}")
 async def websocket_chat(websocket: WebSocket, user_id: str):
     """
-    WebSocket endpoint для чата.
+    WebSocket endpoint for chat.
     """
     logger.info(f"[WS] Connection request for user {user_id}")
 
@@ -258,7 +258,7 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
 
 
 async def _schedule_tts_disconnect(user_id: int) -> None:
-    """Планирует отключение TTS после отключения пользователя."""
+    """Schedule TTS shutdown after user disconnect."""
     conn_mgr = get_connection_manager()
     
     db = next(get_db())
@@ -277,7 +277,7 @@ async def _schedule_tts_disconnect(user_id: int) -> None:
 
 @router.websocket("/ws/test")
 async def websocket_test(websocket: WebSocket):
-    """Тестовый WebSocket endpoint."""
+    """Diagnostic WebSocket endpoint."""
     if settings.is_production:
         await websocket.close(code=4403)
         return

@@ -1,7 +1,7 @@
 # bot_service/api/dashboard_api.py
 """
-Dashboard API - Batch endpoint для инициализации дашборда.
-Объединяет несколько запросов в один для оптимизации производительности.
+Dashboard API batch endpoint for dashboard initialization.
+Combines multiple requests into a single payload to improve performance.
 Refactored to use DashboardService (Clean Architecture).
 """
 import logging
@@ -24,15 +24,15 @@ async def get_dashboard_init(
     db: Session = Depends(get_db)
 ) -> JSONResponse:
     """
-    Batch endpoint для инициализации дашборда.
+    Batch endpoint for dashboard initialization.
     
-    Возвращает все необходимые данные одним запросом:
-    - user: информация о пользователе
-    - integrations: статус интеграций (Twitch, VK, DonationAlerts)
-    - tts: настройки TTS
-    - chat_history: последние сообщения чата (50)
+    Returns all required data in a single request:
+    - user: current user data
+    - integrations: Twitch, VK, and DonationAlerts status
+    - tts: TTS settings
+    - chat_history: latest 50 chat messages
     
-    Это заменяет 4-6 отдельных запросов при загрузке главной страницы.
+    This replaces 4-6 separate requests during the initial dashboard load.
     """
     try:
         service = DashboardService(db)
@@ -45,4 +45,3 @@ async def get_dashboard_init(
     except Exception:
         logger.exception("[ERROR] [DASHBOARD] Error loading init data")
         raise HTTPException(status_code=500, detail="Internal server error")
-

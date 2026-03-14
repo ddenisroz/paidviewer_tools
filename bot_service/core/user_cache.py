@@ -1,8 +1,5 @@
 """
 User Cache with TTL and Invalidation
-
-Кеширует данные пользователей из БД для производительности,
-но с коротким TTL и возможностью инвалидации.
 """
 import logging
 from datetime import datetime, timedelta
@@ -16,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 class UserCache:
     """
-    Кеш данных пользователей с TTL и инвалидацией.
-    
-    Принципы:
-    - Single Source of Truth = БД
-    - Кеш = оптимизация производительности
-    - TTL = 5 минут (баланс между производительностью и актуальностью)
-    - Инвалидация = мгновенное применение изменений
+    User data cache with TTL and explicit invalidation.
+
+    Principles:
+    - Single source of truth = database
+    - Cache = performance optimization
+    - TTL = 5 minutes
+    - Invalidation = apply changes immediately
     """
 
     def __init__(self, ttl_minutes: int = 5):
@@ -33,16 +30,9 @@ class UserCache:
 
     def get(self, user_id: int, db: Session) -> Optional[Dict[str, Any]]:
         """
-        Получить данные пользователя (из кеша или БД).
-        
-        Args:
-            user_id: ID пользователя
-            db: Database session
-            
-        Returns:
-            Dict с данными пользователя или None если не найден
+        Return user data from cache or the database.
         """
-        # Проверяем кеш
+        # Check cache first.
         with self.lock:
             if user_id in self.cache:
                 data, expires_at = self.cache[user_id]
@@ -53,12 +43,12 @@ class UserCache:
                     logger.debug(f"Cache EXPIRED for user {user_id}")
                     del self.cache[user_id]
 
-        # Загружаем из БД
+        # Load from the database.
         logger.debug(f"Cache MISS for user {user_id}, loading from DB")
         return self._load_from_db(user_id, db)
 
     def _load_from_db(self, user_id: int, db: Session) -> Optional[Dict[str, Any]]:
-        """Загрузить данные пользователя из БД и закешировать"""
+        """Load user data from the database and cache it."""
         from core.database import User
 
         user = db.query(User).filter(User.id == user_id).first()
@@ -66,11 +56,11 @@ class UserCache:
             logger.warning(f"User {user_id} not found in DB")
             return None
 
-        # Формируем данные для кеша
+        # Build the cached payload.
         data = {
             'id': user.id,
             'role': user.role,
-            'is_admin': user.role == 'admin',  # Вычисляемое поле
+            'is_admin': user.role == 'admin',  # Derived field
             'is_active': user.is_active,
             'is_blocked': user.is_blocked,
             'blocked_reason': user.blocked_reason,
@@ -88,7 +78,7 @@ class UserCache:
             'vk_is_moderator': user.vk_is_moderator,
         }
 
-        # Сохраняем в кеш
+        # Store in cache.
         with self.lock:
             expires_at = utcnow_naive() + self.ttl
             self.cache[user_id] = (data, expires_at)
@@ -98,16 +88,10 @@ class UserCache:
 
     def invalidate(self, user_id: int):
         """
-        Инвалидировать кеш для пользователя.
-        
-        Вызывать при:
-        - Изменении роли
-        - Блокировке/разблокировке
-        - Изменении username
-        - Любых других изменениях данных пользователя
-        
-        Args:
-            user_id: ID пользователя
+        Invalidate cache for a user.
+
+        Call this after role changes, blocking/unblocking, username updates,
+        or any other user data mutation.
         """
         with self.lock:
             if user_id in self.cache:
@@ -117,14 +101,14 @@ class UserCache:
                 logger.debug(f"Cache invalidation skipped for user {user_id} (not in cache)")
 
     def invalidate_all(self):
-        """Инвалидировать весь кеш (для экстренных случаев)"""
+        """Invalidate the entire cache."""
         with self.lock:
             count = len(self.cache)
             self.cache.clear()
             logger.warning(f"[WARN] Invalidated ALL cache ({count} users)")
 
     def get_stats(self) -> Dict[str, Any]:
-        """Получить статистику кеша"""
+        """Return cache statistics."""
         with self.lock:
             return {
                 'cached_users': len(self.cache),
@@ -132,5 +116,5 @@ class UserCache:
             }
 
 
-# Глобальный экземпляр кеша
+# Global cache instance.
 user_cache = UserCache(ttl_minutes=5)

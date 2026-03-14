@@ -1,12 +1,6 @@
 # bot_service/services/account_deletion_service.py
 """
-Сервис удаления аккаунта.
-
-Отвечает за:
-- Soft delete аккаунта (GDPR compliance)
-- Hard delete аккаунта (admin only)
-- Отключение ботов при удалении
-- Анонимизация данных
+Account deletion service for soft and hard delete flows.
 """
 
 import logging
@@ -26,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DeletionResult:
-    """Результат удаления аккаунта."""
+    """Account deletion result."""
     success: bool
     deleted_counts: Dict[str, int]
     message: str
@@ -34,11 +28,7 @@ class DeletionResult:
 
 class AccountDeletionService:
     """
-    Сервис удаления аккаунтов.
-    
-    Использование:
-        service = AccountDeletionService()
-        result = await service.soft_delete_account(user_id, db)
+    Service responsible for account deletion workflows.
     """
     
     async def soft_delete_account(
@@ -47,17 +37,7 @@ class AccountDeletionService:
         db: Session,
     ) -> DeletionResult:
         """
-        Soft delete аккаунта с анонимизацией данных.
-        
-        Помечает пользователя как заблокированного и анонимизирует данные.
-        Используется для GDPR compliance.
-        
-        Args:
-            user_id: ID пользователя
-            db: Сессия БД
-            
-        Returns:
-            DeletionResult с информацией об удалении
+        Perform soft deletion with data anonymization.
         """
         from repositories.user_repository import UserRepository
         db_user = UserRepository(db).get_by_id(user_id)
@@ -66,25 +46,25 @@ class AccountDeletionService:
         
         logger.info(f"[ACCOUNT] Starting soft delete for user {user_id}")
         
-        # Отключаем боты
+        # Disconnect bots.
         await self._disconnect_all_bots(db_user)
         
-        # Удаляем связанные данные
+        # Delete related data.
         deleted_counts = self._delete_related_data(user_id, db_user, db)
         
-        # Soft delete: помечаем как удалённого
+        # Soft delete: mark as deleted.
         db_user.is_blocked = True
         db_user.blocked_reason = "account_deleted"
         db_user.blocked_at = utcnow_naive()
         
-        # Анонимизация для GDPR
+        # Anonymize for GDPR compliance.
         db_user.twitch_username = f"deleted_user_{user_id}"
         db_user.vk_username = f"deleted_user_{user_id}"
         db_user.vk_channel_name = None
         
         db.commit()
         
-        # Инвалидируем кеш
+        # Invalidate user cache.
         invalidate_user_cache(user_id, "account deleted")
         
         logger.info(f"[ACCOUNT] Soft deleted user {user_id}: {deleted_counts}")
@@ -102,17 +82,7 @@ class AccountDeletionService:
         db: Session,
     ) -> DeletionResult:
         """
-        Полное физическое удаление аккаунта (только для админов).
-        
-        ВНИМАНИЕ: Это действие НЕОБРАТИМО!
-        
-        Args:
-            user_id: ID удаляемого пользователя
-            admin_user_id: ID админа, выполняющего удаление
-            db: Сессия БД
-            
-        Returns:
-            DeletionResult с информацией об удалении
+        Permanently delete the account (admin only).
         """
         from repositories.user_repository import UserRepository
         target_user = UserRepository(db).get_by_id(user_id)
@@ -123,7 +93,7 @@ class AccountDeletionService:
         # was_blocked = target_user.is_blocked (unused)
         # blocked_reason = target_user.blocked_reason (unused)
         
-        # Физическое удаление
+        # Physical deletion.
         db.delete(target_user)
         db.commit()
         
@@ -139,7 +109,7 @@ class AccountDeletionService:
         )
     
     async def _disconnect_all_bots(self, user: User) -> None:
-        """Отключает все боты от каналов пользователя."""
+        """Disconnect all bots from the user's channels."""
         from core.connection_manager import get_connection_manager
         connection_manager = get_connection_manager()
         
@@ -166,7 +136,7 @@ class AccountDeletionService:
         user: User,
         db: Session
     ) -> Dict[str, int]:
-        """Удаляет все связанные данные пользователя."""
+        """Delete all related user data."""
         deleted = {}
         
         # Repositories

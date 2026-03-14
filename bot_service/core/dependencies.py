@@ -1,11 +1,11 @@
 # core/dependencies.py
 """
-Dependency Injection для FastAPI.
+Dependency injection helpers for FastAPI.
 
-Централизованное управление зависимостями:
-- Сервисы создаются один раз и переиспользуются
-- Легко заменять для тестирования
-- Явные зависимости вместо глобальных переменных
+Provides centralized dependency management:
+- services are created once and reused
+- dependencies are easy to replace in tests
+- explicit wiring replaces hidden globals
 """
 from functools import lru_cache
 from typing import Generator
@@ -18,7 +18,7 @@ from models.base import SessionLocal
 # === Database ===
 
 def get_db() -> Generator[Session, None, None]:
-    """Получить сессию БД для запроса."""
+    """Return a database session for a request."""
     db = SessionLocal()
     try:
         yield db
@@ -67,11 +67,11 @@ def get_logs_service():
 
 class ServiceContainer:
     """
-    Контейнер сервисов для тестирования.
-    Позволяет заменять сервисы моками.
+    Service container used by tests.
+    Allows swapping services with mocks.
     
     Usage:
-        # В тестах
+        # Example usage in tests.
         container = ServiceContainer()
         container.whitelist_service = MockWhitelistService()
         app.dependency_overrides[get_whitelist_service] = lambda: container.whitelist_service
@@ -135,12 +135,12 @@ class ServiceContainer:
         self._logs_service = value
 
 
-# Глобальный контейнер (для тестов)
+# Shared service container used in tests.
 _container: ServiceContainer | None = None
 
 
 def get_container() -> ServiceContainer:
-    """Получить контейнер сервисов."""
+    """Get the service container."""
     global _container
     if _container is None:
         _container = ServiceContainer()
@@ -148,10 +148,10 @@ def get_container() -> ServiceContainer:
 
 
 def reset_container():
-    """Сбросить контейнер (для тестов)."""
+    """Reset the service container for tests."""
     global _container
     _container = None
-    # Очищаем кэш lru_cache
+    # Clear lru_cache state as part of the reset.
     get_whitelist_service.cache_clear()
     get_blocked_bots_service.cache_clear()
     get_user_management_service.cache_clear()

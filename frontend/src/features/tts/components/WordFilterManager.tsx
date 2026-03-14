@@ -81,7 +81,7 @@ const WordFilterManager: React.FC = React.memo(() => {
         if (platform === 'twitch') return '[TW]';
         if (platform === 'vk') return '[VK]';
         if (platform === 'all') return '[WEB]';
-        return '[?]';
+        return '[--]';
     };
 
     // Добавление слова

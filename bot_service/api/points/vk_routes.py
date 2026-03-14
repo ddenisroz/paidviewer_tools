@@ -20,7 +20,7 @@ async def get_vk_rewards(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить награды VK канала"""
+    """Get VK channel rewards."""
     try:
         rewards = await get_platform_rewards_service().get_rewards(user['id'], 'vk', db)
 
@@ -44,7 +44,7 @@ async def create_vk_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать награду на VK Live"""
+    """Create a reward on VK Live."""
     try:
         result = await get_platform_rewards_service().create_reward(
             user['id'], 'vk', reward_data.dict(), db
@@ -69,7 +69,7 @@ async def update_vk_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить награду на VK Live"""
+    """Update a reward on VK Live."""
     try:
         result = await get_platform_rewards_service().update_reward(
             user['id'], 'vk', reward_id, reward_data.dict(), db
@@ -95,14 +95,14 @@ async def delete_vk_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить награду на VK Live"""
+    """Delete a reward on VK Live."""
     try:
         await get_platform_rewards_service().delete_reward(user['id'], 'vk', reward_id, db)
 
         return JSONResponse(content={
             "success": True,
             "platform": "vk",
-            "message": "Награда удалена"
+            "message": "Reward deleted."
         })
 
     except HTTPException:
@@ -118,7 +118,7 @@ async def toggle_vk_reward(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Включить/выключить награду на VK Live"""
+    """Enable or disable a VK Live reward."""
     try:
         success = await get_platform_rewards_service().toggle_reward(
             user['id'], 'vk', reward_id, request.is_enabled, db
@@ -129,10 +129,10 @@ async def toggle_vk_reward(
                 "success": True,
                 "platform": "vk",
                 "is_enabled": request.is_enabled,
-                "message": f"Награда {'включена' if request.is_enabled else 'выключена'}"
+                "message": f"Reward {'enabled' if request.is_enabled else 'disabled'}"
             })
         else:
-            raise HTTPException(status_code=400, detail="Ошибка переключения награды на VK Live API")
+            raise HTTPException(status_code=400, detail="VK Live API failed to toggle the reward.")
 
     except HTTPException:
         raise
@@ -145,7 +145,7 @@ async def get_vk_reward_demands(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список запросов наград VK Live"""
+    """Get VK Live reward requests."""
     try:
         demands = await get_platform_rewards_service().get_demands(user['id'], 'vk', db)
 
@@ -167,7 +167,7 @@ async def process_vk_reward_demands(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обработать запросы наград VK Live (принять/отклонить)"""
+    """Process VK Live reward requests (accept or reject)."""
     try:
         result = await get_platform_rewards_service().process_demands(
             user['id'], 'vk', request_data.demand_ids, request_data.action, db
@@ -179,10 +179,10 @@ async def process_vk_reward_demands(
                 "platform": "vk",
                 "action": request_data.action,
                 "processed_count": len(request_data.demand_ids),
-                "message": f"Запросы {'приняты' if request_data.action == 'accept' else 'отклонены'}"
+                "message": f"Requests {'accepted' if request_data.action == 'accept' else 'rejected'}"
             })
         else:
-            raise HTTPException(status_code=400, detail="Ошибка обработки запросов наград")
+            raise HTTPException(status_code=400, detail="Failed to process reward requests.")
 
     except HTTPException:
         raise

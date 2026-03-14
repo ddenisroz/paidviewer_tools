@@ -79,7 +79,7 @@ class BotControlService:
         vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
 
         if not twitch_token and not vk_token:
-            return {"success": False, "error": "Нет подключенных платформ. Подключите Twitch или VK Live"}
+            return {"success": False, "error": "No connected platforms. Connect Twitch or VK Live."}
 
         connection_manager = self._get_connection_manager()
         registry = self._get_registry()
@@ -98,12 +98,12 @@ class BotControlService:
         if connected_platforms:
              return {
                 "success": True,
-                "message": f"Бот подключен к: {', '.join(connected_platforms)}"
+                "message": f"Bot is connected to: {', '.join(connected_platforms)}"
             }
         else:
             return {
                 "success": True,
-                "message": "Боты запущены. Подключение может занять несколько секунд."
+                "message": "Bots are starting. Connection may take a few seconds."
             }
 
     def disconnect_chat(self, user_id: int, user_record: User) -> Dict[str, Any]:
@@ -138,12 +138,12 @@ class BotControlService:
         if disconnected:
              return {
                 "success": True,
-                "message": f"Бот отключен от: {', '.join(disconnected)}"
+                "message": f"Bot disconnected from: {', '.join(disconnected)}"
             }
         else:
              return {
                 "success": True,
-                "message": "Бот не был подключен"
+                "message": "Bot was not connected."
             }
             
     def get_chat_status(self, user_id: int, user_record: User) -> Dict[str, Any]:
@@ -186,7 +186,7 @@ class BotControlService:
         vk_token = token_manager.get_user_token_data(user_id, "vk", require_session_check=False)
 
         if not twitch_token and not vk_token:
-             return {"success": False, "error": "Нет подключенных платформ"}
+             return {"success": False, "error": "No connected platforms."}
 
         connection_manager = self._get_connection_manager()
         reconnected = []
@@ -204,7 +204,7 @@ class BotControlService:
         if reconnected:
              return {
                 "success": True,
-                "message": f"Переподключение инициировано для: {', '.join(reconnected)}"
+                "message": f"Reconnect initiated for: {', '.join(reconnected)}"
             }
         else:
-             return {"success": False, "error": "Не удалось инициировать переподключение"}
+             return {"success": False, "error": "Failed to initiate reconnect."}

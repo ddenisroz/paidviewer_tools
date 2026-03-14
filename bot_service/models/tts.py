@@ -1,86 +1,94 @@
-# models/tts.py
-"""
-Модели для TTS (Text-to-Speech) настроек.
-"""
+﻿"""TTS settings and related models."""
+
 from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Float,
-    Index, UniqueConstraint, CheckConstraint
+    JSON,
+    Boolean,
+    CheckConstraint,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
 )
+
 from core.datetime_utils import utcnow_naive
 from models.base import Base
 
 
 class TTSUserSettings(Base):
-    """Модель базовых настроек TTS для пользователей"""
-    __tablename__ = 'tts_user_settings'
+    """Base TTS settings for users."""
+
+    __tablename__ = "tts_user_settings"
     __table_args__ = (
         CheckConstraint(
-            '(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)',
-            name='check_user_or_session'
+            "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
+            name="check_user_or_session",
         ),
-        {'extend_existing': True}
+        {"extend_existing": True},
     )
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=True, unique=True)
     session_id = Column(String, nullable=True, unique=True)
 
-    # Основные настройки TTS
-    engine = Column(String, nullable=False, default='gtts')
-    voice = Column(String, nullable=False, default='female_1')
-    listening_mode = Column(String, nullable=False, default='website')
-    # Advanced provider selected in UI dropdown: f5 | gcloud | qwen
-    advanced_provider = Column(String, nullable=False, default='f5')
-    # Provider-specific execution mode: cloud | local
-    f5_mode = Column(String, nullable=False, default='cloud')
-    qwen_mode = Column(String, nullable=False, default='cloud')
+    # Core TTS settings.
+    engine = Column(String, nullable=False, default="gtts")
+    voice = Column(String, nullable=False, default="female_1")
+    listening_mode = Column(String, nullable=False, default="website")
+    advanced_provider = Column(String, nullable=False, default="f5")
+    f5_mode = Column(String, nullable=False, default="cloud")
+    qwen_mode = Column(String, nullable=False, default="cloud")
     gcloud_voices = Column(JSON, nullable=False, default=list)
-    gcloud_mood = Column(String, nullable=False, default='neutral')
-    qwen_voice = Column(String, nullable=False, default='default')
+    gcloud_mood = Column(String, nullable=False, default="neutral")
+    qwen_voice = Column(String, nullable=False, default="default")
     qwen_model = Column(String, nullable=True)
 
-    # Платформы для озвучки
-    enabled_platforms = Column(JSON, nullable=False, default=lambda: ['twitch', 'vk'])
+    # Enabled platforms for playback.
+    enabled_platforms = Column(JSON, nullable=False, default=lambda: ["twitch", "vk"])
 
-    # Режим работы TTS
-    tts_mode = Column(String, nullable=False, default='all_messages')
+    # TTS execution mode.
+    tts_mode = Column(String, nullable=False, default="all_messages")
     tts_reward_ids = Column(JSON, nullable=False, default=lambda: {})
 
-    # Фильтры эмодзи и смайлов
+    # Emoji and smiley filters.
     enable_7tv = Column(Boolean, nullable=False, default=False)
     enable_twitch = Column(Boolean, nullable=False, default=False)
     enable_lexicon_filter = Column(Boolean, nullable=False, default=True)
     enable_custom_lexicon = Column(Boolean, nullable=False, default=False)
 
-    # Дополнительные параметры
+    # Additional behavior settings.
     max_message_length = Column(Integer, nullable=False, default=500)
     skip_commands = Column(Boolean, nullable=False, default=True)
     use_local_tts = Column(Boolean, nullable=False, default=False)
 
-    # Фильтры сообщений
+    # Message filters.
     filter_replies = Column(Boolean, nullable=False, default=False)
     filter_mentions = Column(Boolean, nullable=False, default=False)
 
-    # YouTube настройки (playback_mode, volume_level)
-    youtube_settings = Column(JSON, nullable=False, default=lambda: {'playback_mode': 'browser', 'volume_level': 100})
+    # YouTube playback settings.
+    youtube_settings = Column(JSON, nullable=False, default=lambda: {"playback_mode": "browser", "volume_level": 100})
 
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
 
 
 class TTSBlockedUser(Base):
-    """Модель пользователей, заблокированных от TTS"""
+    """Users blocked from TTS playback."""
+
     __tablename__ = "tts_blocked_users"
     __table_args__ = (
         CheckConstraint(
-            '(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)',
-            name='check_user_or_session_tts_blocked_user'
+            "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
+            name="check_user_or_session_tts_blocked_user",
         ),
-        {'extend_existing': True}
+        {"extend_existing": True},
     )
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     session_id = Column(String, nullable=True, index=True)
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
@@ -91,61 +99,63 @@ class TTSBlockedUser(Base):
 
 
 class FilteredWord(Base):
-    """Модель заблокированных слов для TTS"""
-    __tablename__ = 'filtered_words'
+    """Blocked words for TTS filtering."""
+
+    __tablename__ = "filtered_words"
     __table_args__ = (
-        Index('idx_user_word', 'user_id', 'word'),
-        Index('idx_session_word', 'session_id', 'word'),
-        Index('idx_platform', 'platform'),
-        Index('idx_active', 'is_active'),
-        UniqueConstraint('user_id', 'word', 'platform', name='uq_user_word_platform'),
-        UniqueConstraint('session_id', 'word', 'platform', name='uq_session_word_platform'),
+        Index("idx_user_word", "user_id", "word"),
+        Index("idx_session_word", "session_id", "word"),
+        Index("idx_platform", "platform"),
+        Index("idx_active", "is_active"),
+        UniqueConstraint("user_id", "word", "platform", name="uq_user_word_platform"),
+        UniqueConstraint("session_id", "word", "platform", name="uq_session_word_platform"),
         CheckConstraint(
-            '(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)',
-            name='check_user_or_session_filtered_word'
+            "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
+            name="check_user_or_session_filtered_word",
         ),
-        {'extend_existing': True}
+        {"extend_existing": True},
     )
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     session_id = Column(String, nullable=True, index=True)
     word = Column(String, nullable=False, index=True)
-    platform = Column(String, nullable=False, default='all')
+    platform = Column(String, nullable=False, default="all")
     created_at = Column(DateTime, default=utcnow_naive, index=True)
     is_active = Column(Boolean, default=True)
 
 
 class LocalTTSEndpoint(Base):
-    """Модель конфигурации локального TTS F5 движка"""
-    __tablename__ = 'local_tts_endpoints'
+    """Local TTS endpoint configuration model."""
+
+    __tablename__ = "local_tts_endpoints"
     __table_args__ = (
-        UniqueConstraint('user_id', 'provider', name='uq_local_tts_endpoints_user_provider'),
-        UniqueConstraint('session_id', 'provider', name='uq_local_tts_endpoints_session_provider'),
+        UniqueConstraint("user_id", "provider", name="uq_local_tts_endpoints_user_provider"),
+        UniqueConstraint("session_id", "provider", name="uq_local_tts_endpoints_session_provider"),
         CheckConstraint(
-            '(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)',
-            name='check_user_or_session_local_tts'
+            "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
+            name="check_user_or_session_local_tts",
         ),
-        {'extend_existing': True}
+        {"extend_existing": True},
     )
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     session_id = Column(String, nullable=True, index=True)
 
-    # Конфигурация endpoint
-    provider = Column(String, nullable=False, default='f5', index=True)
+    # Endpoint configuration.
+    provider = Column(String, nullable=False, default="f5", index=True)
     endpoint_url = Column(String, nullable=False)
     api_key = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     use_local = Column(Boolean, default=False)
 
-    # Статус и мониторинг
+    # Health and monitoring.
     last_health_check = Column(DateTime, nullable=True)
     is_healthy = Column(Boolean, default=False)
     health_check_failures = Column(Integer, default=0)
 
-    # Метаданные
+    # Metadata.
     tts_version = Column(String, nullable=True)
     gpu_info = Column(JSON, nullable=True)
 
@@ -154,12 +164,13 @@ class LocalTTSEndpoint(Base):
 
 
 class AudioSettings(Base):
-    """Модель настроек звука для пользователей"""
-    __tablename__ = 'audio_settings'
-    __table_args__ = {'extend_existing': True}
-    
+    """Audio volume settings for users."""
+
+    __tablename__ = "audio_settings"
+    __table_args__ = {"extend_existing": True}
+
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
     website_volume = Column(Integer, nullable=False, default=50)
     obs_volume = Column(Integer, nullable=False, default=50)
     created_at = Column(DateTime, default=utcnow_naive)
@@ -167,24 +178,21 @@ class AudioSettings(Base):
 
 
 class UserVoiceSettings(Base):
-    """Personal settings for voices (both custom and global)
-    
-    For global voices: stores user's personal settings (speed, volume, CFG) that apply only to them.
-    For custom voices: this table is not used (settings are stored in TTS service).
-    """
-    __tablename__ = 'user_voice_settings'
+    """Personal settings for voices, both custom and global."""
+
+    __tablename__ = "user_voice_settings"
     __table_args__ = (
-        UniqueConstraint('user_id', 'voice_id', 'tts_provider', name='uq_user_voice_settings'),
-        {'extend_existing': True}
+        UniqueConstraint("user_id", "voice_id", "tts_provider", name="uq_user_voice_settings"),
+        {"extend_existing": True},
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     voice_id = Column(Integer, nullable=False, index=True)
     voice_name = Column(String, nullable=False)
-    tts_provider = Column(String, nullable=False, default='f5', index=True)
+    tts_provider = Column(String, nullable=False, default="f5", index=True)
 
-    # Personal settings for this voice
+    # Personal settings for this voice.
     cfg_strength = Column(Float, nullable=True)
     speed_preset = Column(Float, nullable=True)
     volume = Column(Float, nullable=True)

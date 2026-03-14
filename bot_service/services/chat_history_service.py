@@ -1,10 +1,6 @@
 # bot_service/services/chat_history_service.py
 """
-Сервис истории чата.
-
-Отвечает за:
-- Получение истории сообщений чата
-- Форматирование сообщений для API
+Chat history service for retrieving and formatting messages.
 """
 
 import json
@@ -24,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ChatMessageDTO:
-    """DTO для сообщения чата."""
+    """DTO for a chat message."""
     id: int
     author: str
     author_name: str
@@ -42,11 +38,7 @@ class ChatMessageDTO:
 
 class ChatHistoryService:
     """
-    Сервис для работы с историей чата.
-    
-    Использование:
-        service = ChatHistoryService()
-        messages = service.get_chat_history(user_id, channel, platform, limit, db)
+    Service for working with chat history.
     """
     
     def get_chat_history(
@@ -58,19 +50,9 @@ class ChatHistoryService:
         db: Session,
     ) -> List[ChatMessageDTO]:
         """
-        Получает историю сообщений чата.
-        
-        Args:
-            user_id: ID пользователя
-            channel: Название канала (опционально)
-            platform: Платформа (опционально)
-            limit: Максимальное количество сообщений
-            db: Сессия БД
-            
-        Returns:
-            Список сообщений в хронологическом порядке
+        Return chat message history.
         """
-        # Если канал не указан, используем канал пользователя
+        # If channel is not provided, use the user's default channel.
         if not channel:
             channel, platform = self._get_user_channel(user_id, db)
             if not channel:
@@ -93,7 +75,7 @@ class ChatHistoryService:
         
         logger.info(f"[CHAT] Found {len(messages)} messages in database")
         
-        # Конвертируем в DTO и реверсируем для хронологического порядка
+        # Convert to DTOs and reverse for chronological order.
         result = []
         for msg in reversed(messages):
             dto = self._message_to_dto(msg)
@@ -106,7 +88,7 @@ class ChatHistoryService:
         user_id: int, 
         db: Session
     ) -> tuple[Optional[str], Optional[str]]:
-        """Получает канал пользователя по умолчанию."""
+        """Return the user's default channel."""
         user_repo = UserRepository(db)
         db_user = user_repo.get(user_id)
         if not db_user:
@@ -120,8 +102,8 @@ class ChatHistoryService:
         return None, None
     
     def _message_to_dto(self, msg: ChatMessage) -> ChatMessageDTO:
-        """Конвертирует модель сообщения в DTO."""
-        # Парсим badges если это строка JSON
+        """Convert a message model to DTO."""
+        # Parse badges when they are stored as a JSON string.
         badges_list = getattr(msg, 'badges', None)
         if isinstance(badges_list, str):
             try:

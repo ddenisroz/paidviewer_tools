@@ -1,6 +1,6 @@
 # bot_service/api/active_channels_api.py
 """
-API для активных каналов.
+API for active channels.
 Clean Architecture: uses UserSettingsRepository for data access.
 """
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,7 +19,7 @@ async def get_active_channels(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список активных каналов"""
+    """Get the list of active channels."""
     try:
         repo = UserSettingsRepository(db)
         channels = repo.get_with_chat_enabled()
@@ -32,7 +32,7 @@ async def get_active_channels(
                 'created_at': channel.created_at.isoformat() if channel.created_at else None
             }
 
-            # Добавляем информацию о канале в зависимости от платформы
+            # Attach channel details based on the platform.
             if hasattr(channel, 'channel_name') and channel.channel_name:
                 channel_data.update({
                     'platform': 'twitch',
@@ -56,4 +56,3 @@ async def get_active_channels(
     except Exception:
         logger.exception("Error getting active channels")
         raise HTTPException(status_code=500, detail="Internal server error")
-

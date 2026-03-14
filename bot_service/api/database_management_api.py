@@ -1,5 +1,5 @@
 ﻿# bot_service/api/database_management_api.py
-"""Эндпоинты обслуживания и гигиены базы данных."""
+"""Database maintenance and hygiene endpoints."""
 
 import logging
 from typing import Literal
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api/database", tags=["database-management"])
 
 def _require_admin(current_user: dict) -> None:
     if not (current_user.get("role") == "admin" or current_user.get("is_admin")):
-        raise HTTPException(status_code=403, detail="Доступ запрещён")
+        raise HTTPException(status_code=403, detail="Access denied.")
 
 
 @router.get("/stats")
@@ -57,7 +57,7 @@ async def get_database_stats(
         raise
     except Exception:
         logger.exception("Error getting database stats")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/backups")
@@ -81,7 +81,7 @@ async def list_backups(
         raise
     except Exception:
         logger.exception("Error listing backups")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/cleanup")
@@ -100,7 +100,7 @@ async def cleanup_database(
         result: dict = {
             "success": True,
             "data": {},
-            "message": "Очистка завершена",
+            "message": "Cleanup completed.",
             "timestamp": utcnow_naive().isoformat(),
         }
 
@@ -117,13 +117,13 @@ async def cleanup_database(
         if cleanup_type == "backup":
             backup_result = cleanup_service.create_backup()
             result["data"]["backup"] = backup_result
-            result["message"] = "Резервная копия создана"
+            result["message"] = "Backup created."
             logger.info("Backup created: %s", backup_result)
 
         if cleanup_type == "restore":
             restore_result = cleanup_service.restore_from_backup()
             result["data"]["restore"] = restore_result
-            result["message"] = "База восстановлена из резервной копии"
+            result["message"] = "Database restored from backup."
             logger.info("Restored from backup: %s", restore_result)
 
         return result
@@ -132,7 +132,7 @@ async def cleanup_database(
         raise
     except Exception:
         logger.exception("Error cleaning up database")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/hygiene/preview")
@@ -159,7 +159,7 @@ async def preview_database_hygiene(
         raise
     except Exception:
         logger.exception("Error previewing database hygiene")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/hygiene/cleanup")
@@ -176,7 +176,7 @@ async def cleanup_database_hygiene(
         result: dict = {
             "success": True,
             "data": {},
-            "message": "Гигиена базы данных выполнена",
+            "message": "Database hygiene completed.",
             "timestamp": utcnow_naive().isoformat(),
         }
 
@@ -197,7 +197,7 @@ async def cleanup_database_hygiene(
         raise
     except Exception:
         logger.exception("Error cleaning database hygiene")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/backups/{filename}")
@@ -214,19 +214,19 @@ async def delete_backup(
         result = cleanup_service.delete_backup(filename)
 
         if not result.get("success"):
-            raise HTTPException(status_code=400, detail="Не удалось удалить резервную копию")
+            raise HTTPException(status_code=400, detail="Could not delete the backup.")
 
         return {
             "success": True,
             "data": result,
-            "message": f"Резервная копия {filename} удалена",
+            "message": f"Backup {filename} deleted.",
             "timestamp": utcnow_naive().isoformat(),
         }
     except HTTPException:
         raise
     except Exception:
         logger.exception("Error deleting backup")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/backups/{filename}/restore")
@@ -243,19 +243,19 @@ async def restore_backup(
         result = cleanup_service.restore_from_backup_file(filename)
 
         if not result.get("success"):
-            raise HTTPException(status_code=400, detail="Не удалось восстановить резервную копию")
+            raise HTTPException(status_code=400, detail="Could not restore the backup.")
 
         return {
             "success": True,
             "data": result,
-            "message": result.get("message", f"База восстановлена из {filename}"),
+            "message": result.get("message", f"Database restored from {filename}."),
             "timestamp": utcnow_naive().isoformat(),
         }
     except HTTPException:
         raise
     except Exception:
         logger.exception("Error restoring backup")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/optimize")
@@ -273,7 +273,7 @@ async def optimize_database(
         return {
             "success": True,
             "data": optimization_result,
-            "message": "Оптимизация базы данных завершена",
+            "message": "Database optimization completed.",
             "timestamp": utcnow_naive().isoformat(),
         }
 
@@ -281,7 +281,7 @@ async def optimize_database(
         raise
     except Exception:
         logger.exception("Error optimizing database")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/user-stats/{username}")
@@ -312,7 +312,7 @@ async def get_user_database_stats(
         raise
     except Exception:
         logger.exception("Error getting user database stats")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/cleanup-user/{username}")

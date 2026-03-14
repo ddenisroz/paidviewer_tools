@@ -82,7 +82,7 @@ class DropsService(DropsConfigMixin, DropsStreakMixin, DropsMythicalMixin):
         limit: int = 50,
         offset: int = 0,
     ) -> List[DropsHistory]:
-        """Получает историю Drops"""
+        """Get drops history."""
         return self.history_repo.get_history(
             channel_name, platform, user_id, session_id, limit, offset
         )
@@ -94,7 +94,7 @@ class DropsService(DropsConfigMixin, DropsStreakMixin, DropsMythicalMixin):
         channel_name: str = None,
         platform: str = "twitch",
     ) -> Dict[str, Any]:
-        """Получает статистику Drops"""
+        """Get drops statistics."""
         # Using count_drops helper might be inefficient if we do multiple queries,
         # but robust. Or we can add specific stats method to repo.
 

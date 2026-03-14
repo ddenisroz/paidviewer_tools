@@ -1,7 +1,4 @@
-"""
-Drops Webhooks, Triggers, and Widget API endpoints.
-Clean Architecture: uses repositories for data access.
-"""
+"""API for webhook events, widget tokens, and internal drops triggers."""
 import logging
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -16,7 +13,7 @@ router = APIRouter(prefix='/api/drops', tags=['drops'])
 
 
 def _extract_donationalerts_webhook_secret(request: Request) -> str:
-    """Extract webhook secret from supported locations."""
+    """Extract a webhook secret from supported request sources."""
     return (
         request.headers.get("X-DonationAlerts-Secret")
         or request.headers.get("X-Webhook-Secret")
@@ -27,111 +24,111 @@ def _extract_donationalerts_webhook_secret(request: Request) -> str:
 
 def _verify_donationalerts_webhook_secret(request: Request) -> None:
     """
-    Verify DonationAlerts webhook secret.
+    Validate the DonationAlerts webhook secret.
 
-    Production fails closed when secret is not configured.
-    Non-production keeps backward compatibility (warn-only).
+    In production, a missing secret is treated as a configuration error.
+    In non-production, compatibility mode is preserved without a hard failure.
     """
     configured_secret = (settings.donationalerts_webhook_secret or "").strip()
     if not configured_secret:
         if settings.is_production:
             logger.error("DonationAlerts webhook secret is not configured in production")
-            raise HTTPException(status_code=503, detail="Webhook is temporarily unavailable")
+            raise HTTPException(status_code=503, detail="Webhook is temporarily unavailable.")
         logger.warning("DonationAlerts webhook secret is not configured; accepting request in non-production mode")
         return
 
     provided_secret = _extract_donationalerts_webhook_secret(request).strip()
     if not provided_secret or not secrets.compare_digest(provided_secret, configured_secret):
         logger.warning("Rejected DonationAlerts webhook request: invalid or missing webhook secret")
-        raise HTTPException(status_code=403, detail="Invalid webhook signature")
+        raise HTTPException(status_code=403, detail="Invalid webhook signature.")
 
 @router.get('/triggers')
 async def get_drops_triggers(current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Get the current user's drops triggers."""
     try:
-        logger.info(f"[PACKAGE] [DROPS] Getting triggers for user {current_user.get('id')}")
+        logger.info(f"[DROPS] Getting triggers for user {current_user.get('id')}")
         return {'success': True, 'triggers': []}
     except HTTPException:
         raise
     except Exception:
-        logger.exception('[ERROR] [DROPS] Error getting triggers')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        logger.exception('[DROPS] Error getting triggers')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.post('/triggers')
 async def create_drops_trigger(request: dict, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Create a drops trigger."""
     try:
-        logger.info(f"[PACKAGE] [DROPS] Creating trigger for user {current_user.get('id')}")
-        return {'success': True, 'message': 'Operation completed.', 'trigger_id': 1}
+        logger.info(f"[DROPS] Creating trigger for user {current_user.get('id')}")
+        return {'success': True, 'message': 'Trigger created.', 'trigger_id': 1}
     except HTTPException:
         raise
     except Exception:
-        logger.exception('[ERROR] [DROPS] Error creating trigger')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        logger.exception('[DROPS] Error creating trigger')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.put('/triggers/{trigger_id}')
 async def update_drops_trigger(trigger_id: int, request: dict, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Update a drops trigger."""
     try:
-        logger.info(f'[PACKAGE] [DROPS] Updating trigger {trigger_id}')
-        return {'success': True, 'message': 'Operation completed.'}
+        logger.info(f'[DROPS] Updating trigger {trigger_id}')
+        return {'success': True, 'message': 'Trigger updated.'}
     except HTTPException:
         raise
     except Exception:
-        logger.exception('[ERROR] [DROPS] Error updating trigger')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        logger.exception('[DROPS] Error updating trigger')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.delete('/triggers/{trigger_id}')
 async def delete_drops_trigger(trigger_id: int, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Delete a drops trigger."""
     try:
-        logger.info(f'[PACKAGE] [DROPS] Deleting trigger {trigger_id}')
-        return {'success': True, 'message': 'Operation completed.'}
+        logger.info(f'[DROPS] Deleting trigger {trigger_id}')
+        return {'success': True, 'message': 'Trigger deleted.'}
     except HTTPException:
         raise
     except Exception:
-        logger.exception('[ERROR] [DROPS] Error deleting trigger')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        logger.exception('[DROPS] Error deleting trigger')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.post('/triggers/test/{trigger_id}')
 async def test_drops_trigger(trigger_id: int, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Run a test drops trigger."""
     try:
-        logger.info(f'[PACKAGE] [DROPS] Testing trigger {trigger_id}')
-        return {'success': True, 'message': 'Operation completed.'}
+        logger.info(f'[DROPS] Testing trigger {trigger_id}')
+        return {'success': True, 'message': 'Trigger test completed.'}
     except HTTPException:
         raise
     except Exception:
-        logger.exception('[ERROR] [DROPS] Error testing trigger')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        logger.exception('[DROPS] Error testing trigger')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.get('/user-from-token/{token}')
 async def get_user_from_token(token: str, db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Resolve a user and channel by drops widget token."""
     try:
         repo = DropsRewardRepository(db)
         config = repo.get_config_by_token(token)
         if not config or not config.user_id:
             logger.warning(f'Drops widget: Config not found for token: {token[:8]}...')
-            raise HTTPException(status_code=404, detail='Invalid widget token')
+            raise HTTPException(status_code=404, detail='Widget configuration not found.')
         return {'user_id': config.user_id, 'channel_name': config.channel_name, 'platform': config.platform or 'global', 'success': True}
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error getting user from token')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.post('/widget-url')
 async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Get or generate the drops widget URL for the current user."""
     try:
         user_repo = UserRepository(db)
         user = user_repo.get_by_id(current_user['id'])
         if not user:
-            raise HTTPException(status_code=400, detail='Operation failed.')
-        channel_name = user.twitch_username or user.vk_channel_name or user.username or 'unknown'
+            raise HTTPException(status_code=400, detail='Could not resolve the widget user.')
+        channel_name = user.twitch_username or user.vk_channel_name or getattr(user, 'username', None) or 'unknown'
         if channel_name == 'unknown':
-            raise HTTPException(status_code=400, detail='Operation failed.')
+            raise HTTPException(status_code=400, detail='Could not resolve the drops widget channel.')
         from services.drops.drops_service import DropsService
         drops_service = DropsService(db)
         config = drops_service.get_user_config(
@@ -178,11 +175,11 @@ async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends
     except Exception:
         logger.exception('Error generating widget URL')
         db.rollback()
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.post('/donationalerts/webhook')
 async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Handle DonationAlerts webhooks and grant drops when applicable."""
     try:
         _verify_donationalerts_webhook_secret(request)
 
@@ -194,16 +191,16 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
         donor_id = data.get('user_id', 'unknown')
         message = data.get('message', '')
         alert_id = data.get('id', '')
-        logger.info(f'[REWARD] [DONATION DROPS] Received donation: {donor_name} - {donation_amount}...')
+        logger.info(f'[DONATION DROPS] Received donation: {donor_name} - {donation_amount}')
         user_repo = UserRepository(db)
         user_token = user_repo.get_token_by_platform('donationalerts', data.get('user_id', ''))
         if not user_token:
             logger.warning(f"No user found for DonationAlerts ID: {data.get('user_id')}")
-            return {'success': True, 'processed': False, 'message': 'User not found'}
+            return {'success': True, 'processed': False, 'message': 'User for the DonationAlerts webhook was not found.'}
         user = user_repo.get_by_id(user_token.user_id)
         if not user:
-            logger.warning(f'User not found for user_id: {user_token.user_id}')
-            return {'success': True, 'processed': False, 'message': 'User record not found'}
+            logger.warning(f'DonationAlerts user not found for user_id: {user_token.user_id}')
+            return {'success': True, 'processed': False, 'message': 'User for the DonationAlerts token was not found.'}
         channel_name = user.twitch_username or user.vk_channel_name or 'default'
         result = None
         memealerts_result = None
@@ -212,9 +209,9 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             if not existing_donation:
                 donation_record = DonationAlert(user_id=user_token.user_id, channel_name=channel_name, amount=float(donation_amount), currency=data.get('currency', 'RUB'), message=message, alert_id=alert_id, is_processed=False)
                 db.add(donation_record)
-                logger.info(f'[OK] [DONATION RECORD] Saved donation {alert_id}')
+                logger.info(f'[DONATION RECORD] Saved donation {alert_id}')
             else:
-                logger.info(f'[INFO] [DONATION RECORD] Donation {alert_id} already recorded')
+                logger.info(f'[DONATION RECORD] Donation {alert_id} already recorded')
             drops_service = DropsService(db)
             result = drops_service.process_donation_drops_for_user(user_id=user_token.user_id, channel_name=channel_name, platform='donationalerts', viewer_id=donor_id, viewer_name=donor_name, donation_amount=donation_amount)
             memealerts_service = MemeAlertsService(db)
@@ -222,22 +219,22 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
             db.commit()
         except Exception:
             db.rollback()
-            logger.exception('[ERROR] Error processing donation {alert_id}')
+            logger.exception(f'Error processing donation {alert_id}')
         if memealerts_result and memealerts_result.get('handled'):
             if memealerts_result.get('success'):
                 logger.info('[MEMEALERTS] Donation auto-grant success: donor=%s, amount=%s', memealerts_result.get('nickname'), memealerts_result.get('amount'))
             else:
                 logger.warning('[MEMEALERTS] Donation auto-grant skipped/failed: %s', memealerts_result.get('error'))
         if result:
-            logger.info(f"[REWARD] [DONATION DROPS] {donor_name}...{result['reward']} ({result['quality']})")
+            logger.info(f"[DONATION DROPS] {donor_name}: {result['reward']} ({result['quality']})")
             from utils.websocket_helper import broadcast_drops_event
             await broadcast_drops_event(result)
-            response_payload = {'success': True, 'message': 'Drops processed successfully', 'data': result}
+            response_payload = {'success': True, 'message': 'Drops processed.', 'data': result}
             if memealerts_result and memealerts_result.get('handled'):
                 response_payload['memealerts'] = memealerts_result
             return response_payload
         else:
-            response_payload = {'success': True, 'processed': False, 'message': 'No drops available for this donation'}
+            response_payload = {'success': True, 'processed': False, 'message': 'No matching drops result was produced.'}
             if memealerts_result and memealerts_result.get('handled'):
                 response_payload['memealerts'] = memealerts_result
             return response_payload
@@ -245,4 +242,4 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
         raise
     except Exception:
         logger.exception('Error processing DonationAlerts webhook')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')

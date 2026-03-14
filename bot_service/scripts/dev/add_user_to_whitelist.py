@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Скрипт для добавления пользователя в whitelist
+Script for adding a user to the whitelist.
 """
 import sys
 import os
@@ -11,10 +11,10 @@ from core.database import User, WhitelistedChannel, get_db
 from utils.whitelist_cache import invalidate_whitelist_cache
 
 def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
-    """Добавляет пользователя в whitelist"""
+    """Add a user to the whitelist."""
     db = next(get_db())
     try:
-        # Получаем пользователя
+        # Load the user record.
         user = db.query(User).filter(User.id == user_id).first()
         
         if not user:
@@ -26,7 +26,7 @@ def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
             print(f"[ERROR] Invalid platform: {platform}. Must be 'twitch' or 'vk'")
             return False
         
-        # Определяем какое имя использовать
+        # Decide which username should be used.
         if platform == 'twitch':
             channel_name = user.twitch_username
         else:
@@ -38,7 +38,7 @@ def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
         
         channel_name = channel_name.lower()
         
-        # Проверяем, не добавлен ли уже
+        # Skip users that are already whitelisted.
         existing = db.query(WhitelistedChannel).filter(
             WhitelistedChannel.channel_name == channel_name,
             WhitelistedChannel.platform == platform
@@ -48,7 +48,7 @@ def add_user_to_whitelist(user_id: int, platform: str = 'twitch'):
             print(f"[WARN] Channel '{channel_name}' ({platform}) already in whitelist")
             return True
         
-        # Добавляем в whitelist
+        # Add the user to the whitelist.
         whitelist_entry = WhitelistedChannel(
             channel_name=channel_name,
             platform=platform
@@ -90,7 +90,7 @@ if __name__ == "__main__":
             print(f"[ERROR] Invalid platform: {platform}. Must be 'twitch' or 'vk'")
             sys.exit(1)
     
-    # Добавляем для обеих платформ если у пользователя есть оба username
+    # Add both platforms when the user has both usernames.
     user = next(get_db()).query(User).filter(User.id == user_id).first()
     if user:
         if user.twitch_username:

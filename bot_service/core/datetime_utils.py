@@ -1,71 +1,44 @@
-"""
-Утилиты для работы с датой и временем
-Заменяет deprecated datetime.utcnow() на современные аналоги
-"""
+"""Date and time utilities with timezone-safe UTC helpers."""
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 
 def utcnow() -> datetime:
     """
-    Возвращает текущее время в UTC с timezone aware
-    Заменяет deprecated datetime.utcnow()
-    
-    Returns:
-        datetime: Текущее время в UTC
+    Return the current UTC time as a timezone-aware value.
     """
     return datetime.now(timezone.utc)
 
 
 def utcnow_naive() -> datetime:
     """
-    Возвращает текущее время в UTC без timezone (naive)
-    Используйте только если необходима обратная совместимость
-    
-    Returns:
-        datetime: Текущее время в UTC (naive)
+    Return the current UTC time without timezone info.
+
+    Use this only for backward compatibility with legacy code.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def to_utc(dt: datetime) -> datetime:
     """
-    Конвертирует datetime в UTC timezone aware
-    
-    Args:
-        dt: datetime для конвертации
-        
-    Returns:
-        datetime: datetime в UTC
+    Convert ``dt`` to a timezone-aware UTC datetime.
     """
     if dt.tzinfo is None:
-        # Если naive, предполагаем что это UTC
+        # Assume naive values are already in UTC.
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
 
 
 def from_timestamp(timestamp: float) -> datetime:
     """
-    Создает timezone aware datetime из Unix timestamp
-    
-    Args:
-        timestamp: Unix timestamp
-        
-    Returns:
-        datetime: timezone aware datetime в UTC
+    Create a timezone-aware UTC datetime from a Unix timestamp.
     """
     return datetime.fromtimestamp(timestamp, tz=timezone.utc)
 
 
 def to_timestamp(dt: datetime) -> float:
     """
-    Конвертирует datetime в Unix timestamp
-    
-    Args:
-        dt: datetime для конвертации
-        
-    Returns:
-        float: Unix timestamp
+    Convert ``dt`` to a Unix timestamp.
     """
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
@@ -80,17 +53,7 @@ def add_time(
     seconds: int = 0
 ) -> datetime:
     """
-    Добавляет время к datetime или к текущему времени
-    
-    Args:
-        dt: datetime для модификации (если None, используется текущее время)
-        days: Количество дней для добавления
-        hours: Количество часов для добавления
-        minutes: Количество минут для добавления
-        seconds: Количество секунд для добавления
-        
-    Returns:
-        datetime: Модифицированный datetime
+    Add a time delta to ``dt`` or the current UTC time.
     """
     if dt is None:
         dt = utcnow()
@@ -101,13 +64,7 @@ def add_time(
 
 def is_expired(dt: datetime) -> bool:
     """
-    Проверяет, истек ли срок действия datetime
-    
-    Args:
-        dt: datetime для проверки
-        
-    Returns:
-        bool: True если истек, False иначе
+    Return ``True`` when ``dt`` is in the past.
     """
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
@@ -116,13 +73,7 @@ def is_expired(dt: datetime) -> bool:
 
 def format_iso(dt: datetime) -> str:
     """
-    Форматирует datetime в ISO 8601 формат
-    
-    Args:
-        dt: datetime для форматирования
-        
-    Returns:
-        str: ISO 8601 строка
+    Format ``dt`` as an ISO 8601 string.
     """
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
@@ -131,13 +82,7 @@ def format_iso(dt: datetime) -> str:
 
 def parse_iso(iso_string: str) -> datetime:
     """
-    Парсит ISO 8601 строку в datetime
-    
-    Args:
-        iso_string: ISO 8601 строка
-        
-    Returns:
-        datetime: Распарсенный datetime
+    Parse an ISO 8601 string into a datetime.
     """
     dt = datetime.fromisoformat(iso_string.replace('Z', '+00:00'))
     if dt.tzinfo is None:
@@ -147,14 +92,7 @@ def parse_iso(iso_string: str) -> datetime:
 
 def get_date_key(dt: Optional[datetime] = None, format: str = "daily") -> str:
     """
-    Возвращает ключ даты для группировки
-    
-    Args:
-        dt: datetime (если None, используется текущее время)
-        format: Формат ключа (daily, weekly, monthly, yearly)
-        
-    Returns:
-        str: Ключ даты
+    Return a date grouping key for the requested resolution.
     """
     if dt is None:
         dt = utcnow()
@@ -165,7 +103,7 @@ def get_date_key(dt: Optional[datetime] = None, format: str = "daily") -> str:
     if format == "daily":
         return dt.strftime("%Y-%m-%d")
     elif format == "weekly":
-        # ISO неделя (понедельник - первый день)
+        # ISO week (Monday is the first day).
         return dt.strftime("%Y-W%V")
     elif format == "monthly":
         return dt.strftime("%Y-%m")

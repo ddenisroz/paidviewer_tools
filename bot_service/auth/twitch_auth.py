@@ -1,6 +1,4 @@
-"""
-Twitch OAuth авторизация
-"""
+"""Twitch OAuth authorization flow."""
 import httpx
 import logging
 from datetime import timedelta
@@ -49,7 +47,7 @@ async def login_twitch(request: Request):
 @router.get('/auth/twitch/callback')
 @limiter.limit('20/minute')
 async def twitch_callback(request: Request, db: Session=Depends(get_db), code: str=None, state: str=None, error: str=None, error_description: str=None, current_user: Optional[Dict[str, Any]]=Depends(get_current_user_optional)):
-    """Обработка Twitch OAuth callback"""
+    """Handle the Twitch OAuth callback."""
     logger.info('Twitch callback received')
     if error:
         logger.warning(f'Twitch OAuth cancelled: {error} - {error_description}')
@@ -105,4 +103,3 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
     except Exception as e:
         logger.error(f'Twitch auth error: {e}', exc_info=True)
         raise HTTPException(status_code=500, detail='Internal server error during Twitch authentication')
-

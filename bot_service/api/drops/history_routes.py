@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/drops', tags=['drops'])
 
 class DropsOpenRequest(BaseModel):
-    """Рабочий маршрут API."""
+    """Payload for manually opening a drops reward."""
     drops_type: str = Field(..., pattern='^(streak|donation|mythical)$')
     viewer_id: str = Field(..., min_length=1, max_length=100)
     viewer_name: str = Field(..., min_length=1, max_length=100)
@@ -25,7 +25,7 @@ class DropsOpenRequest(BaseModel):
     messages_count: Optional[int] = Field(None, ge=0)
 
 def get_user_id(current_user: dict) -> int:
-    """Рабочий маршрут API."""
+    """Extract the current user ID from the auth payload."""
     if not current_user:
         return None
     user_id = current_user.get('id')
@@ -40,7 +40,7 @@ def get_drops_service(db: Session):
 
 @router.get('/qualities')
 async def get_drops_qualities(db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Get the list of available drops qualities."""
     try:
         service = get_drops_service(db)
         qualities = service.get_all_qualities()
@@ -49,11 +49,11 @@ async def get_drops_qualities(db: Session=Depends(get_db)):
         raise
     except Exception:
         logger.exception('Error getting drops qualities')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.get('/history/{channel_name}')
 async def get_drops_history(channel_name: str, platform: Optional[str]=None, viewer: Optional[str]=None, reward: Optional[str]=None, drops_type: Optional[str]=None, date_from: Optional[str]=None, date_to: Optional[str]=None, limit: int=50, offset: int=0, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Get drops history for the selected channel."""
     try:
         service = get_drops_service(db)
         history = service.get_drops_history(user_id=current_user['id'], channel_name=channel_name, platform=platform or 'twitch', limit=limit, offset=offset)
@@ -90,11 +90,11 @@ async def get_drops_history(channel_name: str, platform: Optional[str]=None, vie
         raise
     except Exception:
         logger.exception('Error getting drops history')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.post('/open')
 async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Opens a lootbox for a viewer"""
+    """Manually open a drops reward for the selected viewer."""
     try:
         from services.drops.drops_service import DropsService
         from services.drops.drops_calculation_service import DropsCalculationService
@@ -104,7 +104,7 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
         history_repo = DropsHistoryRepository(db)
         config = drops_service.get_config_by_user_id(current_user['id'])
         if not config:
-            raise HTTPException(status_code=404, detail='Operation failed.')
+            raise HTTPException(status_code=404, detail='Drops configuration not found.')
         quality_name = None
         if request.drops_type == 'streak':
             streak = drops_service.get_user_streak_for_user(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, viewer_id=request.viewer_id)
@@ -120,7 +120,7 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
                 quality_name = 'Common'
         elif request.drops_type == 'donation':
             if not request.donation_amount:
-                raise HTTPException(status_code=400, detail='Operation failed.')
+                raise HTTPException(status_code=400, detail='Not enough data to open streak drops.')
             if request.donation_amount >= config.donation_amount_legendary:
                 quality_name = 'Legendary'
             elif request.donation_amount >= config.donation_amount_epic:
@@ -134,14 +134,14 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
         elif request.drops_type == 'mythical':
             quality_name = 'Mythical'
             if not drops_service._can_activate_mythical(config):
-                raise HTTPException(status_code=400, detail='Operation failed.')
+                raise HTTPException(status_code=400, detail='Not enough data to open mythical drops.')
         else:
-            raise HTTPException(status_code=400, detail='Operation failed.')
+            raise HTTPException(status_code=400, detail='Unsupported drops type.')
         try:
             drop_result = calc_service.calculate_drop(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, quality_name=quality_name)
         except ValueError as e:
             logger.exception('[ERROR] [DROPS] Failed to calculate drop')
-            raise HTTPException(status_code=500, detail='Internal server error')
+            raise HTTPException(status_code=500, detail='Internal server error.')
         quality = drops_service.get_quality_by_name(quality_name)
         history_entry = history_repo.create_history_entry(user_id=current_user['id'], channel_name=config.channel_name, platform=config.platform, viewer_id=request.viewer_id, viewer_name=request.viewer_name, lootbox_type=request.drops_type, quality_id=quality.id if quality else None, reward_id=drop_result['reward_id'], reward_name=drop_result['reward_name'], reward_type=drop_result['reward_type'], reward_value=drop_result['reward_value'], donation_amount=request.donation_amount if request.drops_type == 'donation' else None, streak_days=request.streak_days if request.drops_type == 'streak' else None, messages_count=request.messages_count if request.drops_type == 'streak' else None)
         logger.info(f"[OK] [DROPS] Opened {request.drops_type} lootbox for {request.viewer_name}: {drop_result['reward_name']} ({quality_name})")
@@ -156,11 +156,11 @@ async def open_drops(request: DropsOpenRequest, current_user: dict=Depends(get_c
         raise
     except Exception:
         logger.exception('Error opening drops')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.get('/stats/{channel_name}')
 async def get_drops_stats(channel_name: str, platform: str='twitch', current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Get aggregated drops statistics for a channel."""
     try:
         service = get_drops_service(db)
         stats = service.get_full_channel_stats(user_id=current_user['id'], channel_name=channel_name, platform=platform)
@@ -169,16 +169,16 @@ async def get_drops_stats(channel_name: str, platform: str='twitch', current_use
         raise
     except Exception:
         logger.exception('Error getting drops stats')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.get('/streaks/{channel_name}')
 async def get_user_streaks(channel_name: str, platform: Optional[str]=None, limit: int=50, offset: int=0, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Get current streak entries for the user's channel."""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
         if not user_id:
-            raise HTTPException(status_code=401, detail='Authentication required')
+            raise HTTPException(status_code=401, detail='Authentication required.')
         config = service.get_user_config(user_id=user_id, channel_name=channel_name, platform=None)
         streak_enabled = False
         if config:
@@ -191,47 +191,47 @@ async def get_user_streaks(channel_name: str, platform: Optional[str]=None, limi
         raise
     except Exception:
         logger.exception('Error getting user streaks')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.post('/streak/reset/{channel_name}')
 async def reset_streak_statistics(channel_name: str, current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Reset streak statistics for the selected channel."""
     try:
         service = get_drops_service(db)
         user_id = get_user_id(current_user)
         if not user_id:
-            raise HTTPException(status_code=401, detail='Authentication required')
+            raise HTTPException(status_code=401, detail='Authentication required.')
         config = service.get_user_config(user_id=user_id, channel_name=channel_name, platform=None)
         if not config:
-            raise HTTPException(status_code=404, detail='Operation failed.')
+            raise HTTPException(status_code=404, detail='Drops configuration not found.')
         deleted_count = service.reset_channel_streaks(user_id=user_id, channel_name=channel_name)
         drops_logger.info(f'...{deleted_count}...{channel_name}')
-        return {'success': True, 'message': 'Operation completed.', 'data': {'channel_name': channel_name, 'platform': 'all', 'deleted_count': deleted_count}}
+        return {'success': True, 'message': 'Streak statistics reset.', 'data': {'channel_name': channel_name, 'platform': 'all', 'deleted_count': deleted_count}}
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error resetting streak statistics')
         db.rollback()
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.get('/mythical-session/{channel_name}')
 async def get_active_mythical_session(channel_name: str, widget_token: Optional[str]=None, current_user: Optional[dict]=Depends(get_current_user_optional), db: Session=Depends(get_db)):
-    """Рабочий маршрут API."""
+    """Get the active mythical session for a channel."""
     try:
         service = get_drops_service(db)
         if widget_token:
             config = service.get_config_by_widget_token(widget_token)
             if not config:
-                raise HTTPException(status_code=404, detail='Invalid widget token')
+                raise HTTPException(status_code=404, detail='Widget configuration not found.')
             user_id = config.user_id
         elif current_user:
             user_id = current_user.get('id')
         else:
-            raise HTTPException(status_code=401, detail='Authentication required')
+            raise HTTPException(status_code=401, detail='Authentication required.')
         session_data = service.get_active_user_mythical_session(user_id=user_id, channel_name=channel_name)
         return {'success': True, 'data': session_data}
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error getting active mythical session')
-        raise HTTPException(status_code=500, detail='Internal server error')
+        raise HTTPException(status_code=500, detail='Internal server error.')

@@ -12,8 +12,8 @@ logger = logging.getLogger('bot_service')
 
 class PointsService:
     """
-    Сервис для управления баллами канала и наградами.
-    Использует Repository pattern для доступа к данным.
+    Service for managing channel points and rewards.
+    Uses the repository pattern for data access.
     """
 
     def __init__(self):
@@ -30,7 +30,7 @@ class PointsService:
         channel_name: str,
         db: Session
     ) -> int:
-        """Получение баллов пользователя"""
+        """Get a viewer's current points balance."""
         repo = self._get_repository(db)
         points_record = repo.get_user_points(user_id, viewer_id, platform, channel_name)
         return points_record.points if points_record else 0
@@ -46,7 +46,7 @@ class PointsService:
         reason: str = "Manual add",
         db: Session = None
     ) -> int:
-        """Добавление баллов пользователю"""
+        """Add points to a viewer."""
         if amount <= 0:
             return 0
 
@@ -54,7 +54,7 @@ class PointsService:
             try:
                 repo = self._get_repository(session_db)
                 
-                # Получаем или создаем запись
+                # Get or create the points record.
                 points_record = repo.get_user_points(user_id, viewer_id, platform, channel_name)
                 
                 if not points_record:
@@ -68,11 +68,11 @@ class PointsService:
                     )
                     repo.add_points_record(points_record)
                 
-                # Обновляем баллы
+                # Update the balance.
                 points_record.points += amount
                 points_record.last_updated = utcnow_naive()
                 
-                # Записываем транзакцию
+                # Persist the transaction record.
                 transaction = PointsTransaction(
                     user_id=user_id,
                     viewer_id=viewer_id,
@@ -110,7 +110,7 @@ class PointsService:
         reason: str = "Manual deduct",
         db: Session = None
     ) -> int:
-        """Списание баллов у пользователя"""
+        """Deduct points from a viewer."""
         if amount <= 0:
             return 0
 
@@ -120,13 +120,13 @@ class PointsService:
                 points_record = repo.get_user_points(user_id, viewer_id, platform, channel_name)
                 
                 if not points_record or points_record.points < amount:
-                    return -1  # Недостаточно средств
+                    return -1  # Insufficient points.
                 
-                # Списываем баллы
+                # Apply the deduction.
                 points_record.points -= amount
                 points_record.last_updated = utcnow_naive()
                 
-                # Транзакция
+                # Persist the transaction record.
                 transaction = PointsTransaction(
                     user_id=user_id,
                     viewer_id=viewer_id,
@@ -161,7 +161,7 @@ class PointsService:
         limit: int = 10,
         db: Session = None
     ) -> List[Dict[str, Any]]:
-        """Получение топа пользователей по баллам"""
+        """Get the channel leaderboard by points."""
         def _get(session_db: Session):
             repo = self._get_repository(session_db)
             records = repo.get_leaderboard(user_id, channel_name, platform, limit)
@@ -192,12 +192,12 @@ class PointsService:
         is_dynamic_price: bool = False,
         **kwargs
     ) -> Optional[ChannelReward]:
-        """Создание новой награды"""
+        """Create a new channel reward."""
         with next(get_db()) as db:
             try:
                 repo = self._get_repository(db)
                 
-                # Проверка лимитов (опционально)
+                # Optional cap for the number of active rewards.
                 count = repo.count_active_rewards(user_id)
                 if count >= 50:
                     return None
@@ -228,7 +228,7 @@ class PointsService:
         platform: str = None,
         db: Session = None
     ) -> List[ChannelReward]:
-        """Получение наград канала"""
+        """Get channel rewards."""
         def _get(session_db: Session):
             repo = self._get_repository(session_db)
             return repo.get_active_rewards(user_id, platform)
@@ -249,29 +249,29 @@ class PointsService:
         channel_name: str,
         user_input: str = None
     ) -> Dict[str, Any]:
-        """Обмен награды за баллы"""
+        """Redeem a reward with points."""
         with next(get_db()) as db:
             try:
                 repo = self._get_repository(db)
                 
-                # 1. Получаем награду
+                # 1. Load the reward.
                 reward = repo.get_reward_by_user(reward_id, user_id)
                 if not reward or not reward.is_enabled:
                     return {"success": False, "error": "Reward not found or disabled"}
                 
-                # 2. Проверяем баллы
+                # 2. Validate the current balance.
                 points_record = repo.get_user_points(user_id, viewer_id, platform, channel_name)
                 current_points = points_record.points if points_record else 0
                 
                 if current_points < reward.cost:
                     return {"success": False, "error": "Insufficient points"}
                 
-                # 3. Списываем баллы
+                # 3. Deduct the cost.
                 if points_record:
                     points_record.points -= reward.cost
                     points_record.last_updated = utcnow_naive()
                 
-                # 4. Создаем заявку в очереди
+                # 4. Create the queue item.
                 queue_item = RewardQueue(
                     user_id=user_id,
                     reward_id=reward.id,
@@ -285,7 +285,7 @@ class PointsService:
                 )
                 repo.add_queue_item(queue_item)
                 
-                # 5. Пишем транзакцию
+                # 5. Record the points transaction.
                 transaction = PointsTransaction(
                     user_id=user_id,
                     viewer_id=viewer_id,
@@ -318,7 +318,7 @@ class PointsService:
         status: str = None,
         db: Session = None
     ) -> List[Dict[str, Any]]:
-        """Получение очереди наград"""
+        """Get the reward queue."""
         def _get(session_db: Session):
             repo = self._get_repository(session_db)
             queue = repo.get_queue_by_user(user_id, status)
@@ -349,7 +349,7 @@ class PointsService:
         action: str,
         moderator_note: str = None
     ) -> bool:
-        """Обработка награды модератором"""
+        """Process a reward queue item as a moderator."""
         with next(get_db()) as db:
             try:
                 repo = self._get_repository(db)
@@ -411,7 +411,7 @@ class PointsService:
         channel_name: str,
         db: Session = None
     ) -> Dict[str, int]:
-        """Получение статистики канала"""
+        """Get channel points statistics."""
         def _get(session_db: Session):
             repo = self._get_repository(session_db)
             return repo.get_channel_stats(user_id, channel_name)
@@ -429,7 +429,7 @@ class PointsService:
         update_data: Dict[str, Any],
         db: Session = None
     ) -> Optional[ChannelReward]:
-        """Обновление награды"""
+        """Update a reward."""
         def _update(session_db: Session):
             try:
                 repo = self._get_repository(session_db)
@@ -462,7 +462,7 @@ class PointsService:
         reward_id: int,
         db: Session = None
     ) -> bool:
-        """Удаление награды"""
+        """Delete a reward."""
         def _delete(session_db: Session):
             try:
                 repo = self._get_repository(session_db)
@@ -489,7 +489,7 @@ class PointsService:
         reward_id: int,
         db: Session = None
     ) -> Optional[bool]:
-        """Переключение статуса награды (enabled/disabled)"""
+        """Toggle reward enabled/disabled status."""
         def _toggle(session_db: Session):
             try:
                 repo = self._get_repository(session_db)

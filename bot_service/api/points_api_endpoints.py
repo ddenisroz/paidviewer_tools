@@ -5,13 +5,13 @@ from api.points.twitch_routes import points_twitch_router
 from api.points.vk_routes import points_vk_router
 from services.user_service import UserService
 
-# Создаем основной роутер
+# Create the main router.
 points_router = APIRouter(prefix="/api/points", tags=["points"])
 
-# Инициализируем сервисы (для совместимости импортов)
+# Initialize services for import compatibility.
 user_service = UserService()
 
-# Подключаем роутеры из модулей
+# Include routers from feature modules.
 points_router.include_router(points_core_router)
 points_router.include_router(points_twitch_router)
 points_router.include_router(points_vk_router)

@@ -1,6 +1,6 @@
 # bot_service/services/token_refresh_service.py
 """
-Сервис для автоматического обновления токенов платформ
+Service for automatic platform-token refresh.
 """
 import logging
 import httpx
@@ -19,17 +19,17 @@ from repositories.user_token_repository import UserTokenRepository
 
 logger = logging.getLogger('token_refresh')
 
-# Типы для refresh handlers
+# Type aliases for platform refresh handlers.
 RefreshHandler = Callable[[UserToken, Session], Awaitable[bool]]
 
 
 class TokenRefreshService:
-    """Сервис для обновления access tokens используя refresh tokens"""
+    """Service for refreshing access tokens via refresh tokens."""
     
     _refresh_handlers: dict[str, RefreshHandler] = {}
     
     def __init__(self):
-        # Регистрация хендлеров для платформ
+        # Register platform-specific refresh handlers.
         self._refresh_handlers = {
             'twitch': self._refresh_twitch,
             'vk': self._refresh_vk,
@@ -37,7 +37,7 @@ class TokenRefreshService:
         }
         
     def _get_refresh_handler(self, platform: str) -> Optional[RefreshHandler]:
-        """Получить handler для обновления токена платформы"""
+        """Get the refresh handler for a platform."""
         return self._refresh_handlers.get(platform)
 
     async def refresh_if_needed(self, user_id: int, platform: str, db: Optional[Session] = None) -> bool:
@@ -60,7 +60,7 @@ class TokenRefreshService:
         return False
 
     async def refresh_on_401(self, user_id: int, platform: str, db: Optional[Session] = None) -> bool:
-        """Обновить токен после получения 401 ошибки"""
+        """Refresh a token after receiving a 401 response."""
         logger.info(f"Got 401 for {platform} user {user_id}, attempting refresh...")
         
         if db:
@@ -77,7 +77,7 @@ class TokenRefreshService:
         return False
 
     async def _refresh_token(self, token: UserToken, db: Session) -> bool:
-        """Обновить токен используя refresh_token (dictionary dispatch)"""
+        """Refresh a token using the registered refresh-token handler."""
         handler = self._get_refresh_handler(token.platform)
         if not handler:
             logger.error(f"No refresh handler for platform {token.platform}")
@@ -90,7 +90,7 @@ class TokenRefreshService:
             return False
 
     async def _make_refresh_request(self, url: str, data: dict, headers: dict = None) -> Optional[dict]:
-        """Общий метод для выполнения refresh запроса с retry"""
+        """Shared helper for refresh requests with retry handling."""
         async def _do_refresh():
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, data=data, headers=headers)
@@ -104,7 +104,7 @@ class TokenRefreshService:
             return None
 
     def _update_token_from_response(self, token: UserToken, data: dict, db: Session) -> None:
-        """Обновить токен в БД из ответа OAuth"""
+        """Update a database token row from an OAuth refresh response."""
         repo = UserTokenRepository(db)
         
         refresh_token = data.get('refresh_token')
@@ -131,7 +131,7 @@ class TokenRefreshService:
         # Let's prefer explicit commit here as existing service logic did.
 
     async def _refresh_twitch(self, token: UserToken, db: Session) -> bool:
-        """Обновить Twitch токен"""
+        """Refresh a Twitch token."""
         refresh_token = decrypt_token(token.refresh_token)
         if not refresh_token:
             return False
@@ -153,7 +153,7 @@ class TokenRefreshService:
         return False
 
     async def _refresh_vk(self, token: UserToken, db: Session) -> bool:
-        """Обновить VK Live токен"""
+        """Refresh a VK Live token."""
         refresh_token = decrypt_token(token.refresh_token)
         if not refresh_token:
             return False
@@ -178,7 +178,7 @@ class TokenRefreshService:
         return False
         
     async def _refresh_donationalerts(self, token: UserToken, db: Session) -> bool:
-        """Обновить DonationAlerts токен"""
+        """Refresh a DonationAlerts token."""
         refresh_token = decrypt_token(token.refresh_token)
         if not refresh_token:
             return False
@@ -198,6 +198,6 @@ class TokenRefreshService:
             return True
         return False
 
-# Глобальный экземпляр сервиса
+# Shared module-level service instance.
 token_refresh_service = TokenRefreshService()
 

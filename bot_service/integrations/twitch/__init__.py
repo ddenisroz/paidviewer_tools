@@ -2,7 +2,7 @@
 """
 Twitch Integration Layer.
 
-Изолированный модуль для работы с Twitch API:
+Isolated module for Twitch API access:
 - OAuth 2.0 (app token, user token, refresh)
 - Helix API (users, streams, channels)
 - Channel Points (custom rewards)

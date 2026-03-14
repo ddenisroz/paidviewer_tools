@@ -84,10 +84,9 @@ input[type="radio"]:not(:disabled):hover {
 
 /* Global focus ring for all interactive elements */
 *:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-  border-radius: 4px;
-  transition: outline 0.15s ease-out;
+  outline: none;
+  box-shadow: none;
+  transition: none;
 }
 
 /* Enhanced focus for buttons */
@@ -101,7 +100,8 @@ button:focus-visible,
 /* Focus for inputs */
 input:focus-visible,
 textarea:focus-visible,
-select:focus-visible {
+select:focus-visible,
+[role="combobox"]:focus-visible {
   outline: none;
   border-color: inherit;
   box-shadow: none;
@@ -134,17 +134,16 @@ a:focus-visible {
 /* Focus for dropdown items */
 [role="menuitem"]:focus-visible,
 [role="option"]:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: -2px;
-  background-color: hsl(var(--accent));
-  transition: all 0.15s ease-out;
+  outline: none;
+  box-shadow: none;
+  transition: none;
 }
 
 /* Focus for tabs */
 [role="tab"]:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
-  transition: outline 0.15s ease-out;
+  outline: none;
+  box-shadow: none;
+  transition: none;
 }
 
 /* Skip focus outline for mouse users */

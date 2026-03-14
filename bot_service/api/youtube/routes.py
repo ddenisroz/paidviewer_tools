@@ -43,7 +43,7 @@ queue_service = QueueService()
 youtube_service = YouTubeService()
 
 async def notify_queue_update(user_id: int, db: Session=None):
-    """Маршрут API."""
+    """Send a YouTube queue update to the user's active clients."""
     try:
         connection_manager = get_connection_manager()
         queue_items = queue_service.get_user_queue(user_id=user_id, db=db)
@@ -57,16 +57,16 @@ async def notify_queue_update(user_id: int, db: Session=None):
 
 @youtube_router.post('/queue/add')
 async def add_video_to_queue(request: AddVideoRequest, user: dict=Depends(get_current_user_optional), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Add a video to the YouTube queue."""
     user_id = user.get('id')
     if not user_id or user_id <= 0:
-        raise HTTPException(status_code=401, detail='????????? ???????????')
+        raise HTTPException(status_code=401, detail='Authentication required.')
     log_request('/youtube/queue/add', 'POST', {'video_url': request.video_url}, user_id)
     start_time = time.time()
     from validators.youtube_validators import validate_youtube_url
     video_input = (request.video_url or '').strip()
     if len(video_input) < 2:
-        raise HTTPException(status_code=400, detail='??????? ???????? ????????? ??????')
+        raise HTTPException(status_code=400, detail='Provide a valid search query.')
     (is_valid, video_id, error) = validate_youtube_url(video_input)
     if not is_valid:
         pending_queue = queue_service.get_user_queue(user_id=user_id, db=db)
@@ -74,7 +74,7 @@ async def add_video_to_queue(request: AddVideoRequest, user: dict=Depends(get_cu
         search_results = await youtube_service.search_videos(video_input, max_results=5)
         if not search_results:
             logger.warning(f'[ERROR] [YOUTUBE] Search returned no results: {video_input}, user: {user_id}')
-            raise HTTPException(status_code=400, detail='????? ?? ??????? ?? ???????')
+            raise HTTPException(status_code=400, detail='No videos were found for the query.')
         selected_url = None
         for candidate in search_results:
             candidate_id = candidate.get('video_id')
@@ -86,43 +86,43 @@ async def add_video_to_queue(request: AddVideoRequest, user: dict=Depends(get_cu
             selected_url = candidate_url
             break
         if not selected_url:
-            raise HTTPException(status_code=400, detail='?? ??????? ????????? ????? ?? ???????. ???????? ??????.')
+            raise HTTPException(status_code=400, detail='Failed to pick a new video for the query. Refine the query and try again.')
         video_input = selected_url
         (is_valid, video_id, error) = validate_youtube_url(video_input)
         if not is_valid:
             logger.warning(f'[ERROR] [YOUTUBE] Invalid URL after search: {video_input}, user: {user_id}, error: {error}')
-            raise HTTPException(status_code=400, detail='Неверный YouTube URL')
+            raise HTTPException(status_code=400, detail='Invalid YouTube URL.')
     logger.debug(f'[OK] [YOUTUBE] Valid URL: {video_input}...{video_id}')
     from constants import MAX_YOUTUBE_QUEUE_SIZE
     current_queue = queue_service.get_user_queue(user_id=user_id, db=db)
     if len(current_queue) >= MAX_YOUTUBE_QUEUE_SIZE:
         logger.warning(f'[ERROR] [YOUTUBE] Queue full: user={user_id}, current={len(current_queue)}, max={MAX_YOUTUBE_QUEUE_SIZE}')
-        raise HTTPException(status_code=400, detail=f'??????? ???????????: ???????? {MAX_YOUTUBE_QUEUE_SIZE} ?????. ??????? ??????? ????? ?????.')
+        raise HTTPException(status_code=400, detail=f'Queue limit reached: at most {MAX_YOUTUBE_QUEUE_SIZE} videos are allowed. Remove old items before adding more.')
     try:
         result = await queue_service.add_video_to_user_queue(user_id=user_id, video_url=video_input, channel_name='web_interface', platform='web', requester_name=f'User_{user_id}', requester_id=str(user_id), is_paid=request.is_paid, points_cost=request.points_cost, db=db)
         if result['success']:
             await notify_queue_update(user_id=user_id, db=db)
-            response = {'success': True, 'message': '????? ????????? ? ???????', 'queue_item': result['queue_item']}
+            response = {'success': True, 'message': 'Video added to the queue.', 'queue_item': result['queue_item']}
             log_response('/youtube/queue/add', 200, response, time.time() - start_time)
             return response
         else:
             log_response('/youtube/queue/add', 400, {'error': result['error']}, time.time() - start_time)
-            raise HTTPException(status_code=400, detail='???????????? ??????')
+            raise HTTPException(status_code=400, detail='Invalid request.')
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error adding video to queue via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.get('/queue')
 async def get_queue(user: dict=Depends(get_current_user_optional), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Get the current YouTube queue for the authenticated user."""
     try:
         if not user:
-            raise HTTPException(status_code=401, detail='????????? ???????????')
+            raise HTTPException(status_code=401, detail='Authentication required.')
         user_id = user.get('id')
         if not user_id or user_id <= 0:
-            raise HTTPException(status_code=401, detail='????????? ???????????')
+            raise HTTPException(status_code=401, detail='Authentication required.')
         queue_items = queue_service.get_user_queue(user_id=user_id, db=db)
         current_video = queue_items[0] if queue_items and len(queue_items) > 0 else None
         logger.debug(f"[QUEUE] User {user_id}: {len(queue_items)} videos, current: {(current_video['title'] if current_video else 'None')}")
@@ -144,43 +144,43 @@ async def get_queue(user: dict=Depends(get_current_user_optional), db: Session=D
         raise
     except Exception:
         logger.exception('Error getting queue via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.get('/queue/next')
 async def get_next_video(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Get the next video from the queue."""
     try:
         next_video = queue_service.get_next_video(user['id'], db)
         if next_video:
             return {'success': True, 'video': next_video}
         else:
-            raise HTTPException(status_code=404, detail='? ??????? ??? ?????????? ?????')
+            raise HTTPException(status_code=404, detail='No next video is available in the queue.')
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error getting next video via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.post('/player/next')
 async def skip_to_next_video(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Switch playback to the next video."""
     try:
         queue_items = queue_service.get_user_queue(user['id'], db=db)
         if not queue_items or len(queue_items) == 0:
-            raise HTTPException(status_code=404, detail='??????? ?????')
+            raise HTTPException(status_code=404, detail='Queue is empty.')
         current_video_id = queue_items[0]['id']
         success = queue_service.mark_as_played(user['id'], current_video_id, db)
         if not success:
-            raise HTTPException(status_code=404, detail='?? ??????? ??????????? ?????')
+            raise HTTPException(status_code=404, detail='Failed to switch the current video.')
         updated_queue = queue_service.get_user_queue(user['id'], db=db)
         current_video = updated_queue[0] if updated_queue and len(updated_queue) > 0 else None
         await notify_queue_update(user['id'], db=db)
-        return {'success': True, 'message': '??????????? ?? ????????? ?????', 'current_video': current_video}
+        return {'success': True, 'message': 'Switched to the next video.', 'current_video': current_video}
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error skipping to next video via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.post('/queue/play/{queue_id}')
 async def play_queue_item(queue_id: int, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
@@ -188,7 +188,7 @@ async def play_queue_item(queue_id: int, user: dict=Depends(get_current_user), d
     try:
         success = queue_service.cut_to_item(user['id'], queue_id, db)
         if not success:
-            raise HTTPException(status_code=404, detail='????? ?? ??????? ? ???????')
+            raise HTTPException(status_code=404, detail='Video was not found in the queue.')
         updated_queue = queue_service.get_user_queue(user['id'], db=db)
         current_video = updated_queue[0] if updated_queue and len(updated_queue) > 0 else None
         await notify_queue_update(user['id'], db=db)
@@ -197,7 +197,7 @@ async def play_queue_item(queue_id: int, user: dict=Depends(get_current_user), d
         raise
     except Exception:
         logger.exception('Error moving queue item to top via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.post('/queue/ban/{queue_id}')
 async def ban_queue_item(queue_id: int, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
@@ -205,81 +205,81 @@ async def ban_queue_item(queue_id: int, user: dict=Depends(get_current_user), db
     try:
         result = queue_service.ban_video(user['id'], queue_id, db)
         if not result.get('success'):
-            raise HTTPException(status_code=404, detail='????? ?? ??????? ? ???????')
+            raise HTTPException(status_code=404, detail='Video was not found in the queue.')
         await notify_queue_update(user['id'], db=db)
-        return {'success': True, 'message': '????? ????????? ? ???', 'video_id': result.get('video_id'), 'banned_count': result.get('banned_count', 0)}
+        return {'success': True, 'message': 'Video added to the ban list.', 'video_id': result.get('video_id'), 'banned_count': result.get('banned_count', 0)}
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error banning video')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.delete('/queue/remove/{queue_id}')
 async def remove_from_queue(queue_id: int, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Remove a video from the queue."""
     try:
         success = queue_service.remove_from_queue(user['id'], queue_id, db)
         if success:
             await notify_queue_update(user['id'], db)
-            return {'success': True, 'message': '????? ??????? ?? ???????'}
+            return {'success': True, 'message': 'Video removed from the queue.'}
         else:
-            raise HTTPException(status_code=404, detail='?? ??????? ??????? ????? ?? ???????')
+            raise HTTPException(status_code=404, detail='Failed to remove the video from the queue.')
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error removing video from queue via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.delete('/queue/clear')
 @youtube_router.post('/clear')
 async def clear_queue(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Clear the YouTube queue."""
     try:
         cleared_count = queue_service.clear_queue(user['id'], db)
         await notify_queue_update(user['id'], db)
-        return {'success': True, 'message': f'??????? ???????, ??????? ?????: {cleared_count}'}
+        return {'success': True, 'message': f'Queue cleared. Removed videos: {cleared_count}'}
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error clearing queue via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.post('/queue/mark-played/{queue_id}')
 async def mark_as_played(queue_id: int, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Mark a video as played."""
     try:
         success = queue_service.mark_as_played(user['id'], queue_id, db)
         if success:
             await notify_queue_update(user['id'], db)
-            return {'success': True, 'message': '????? ???????? ??? ???????????'}
+            return {'success': True, 'message': 'Video marked as played.'}
         else:
-            raise HTTPException(status_code=404, detail='?? ??????? ???????? ????? ??? ???????????')
+            raise HTTPException(status_code=404, detail='Failed to mark the video as played.')
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error marking video as played via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.get('/video-info')
 async def get_video_info(video_url: str):
-    """Маршрут API."""
+    """Get video information from a YouTube URL."""
     try:
         if not youtube_service.is_valid_youtube_url(video_url):
-            raise HTTPException(status_code=400, detail='Неверный YouTube URL')
+            raise HTTPException(status_code=400, detail='Invalid YouTube URL.')
         video_info = await youtube_service.get_video_info(video_url)
         if video_info:
             return {'success': True, 'video_info': video_info}
         else:
-            raise HTTPException(status_code=404, detail='???????? ?? ?????????')
+            raise HTTPException(status_code=404, detail='Video was not found.')
     except HTTPException:
         raise
     except Exception:
         logger.exception('Error getting video info via API')
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.get('/search')
 async def search_youtube_videos(query: str=None, platform: str='youtube', user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Маршрут API."""
+    """Search YouTube videos for queue insertion."""
     log_request('/youtube/search', 'GET', {'query': query}, user.get('id'))
     start_time = time.time()
     try:
@@ -310,5 +310,5 @@ async def search_youtube_videos(query: str=None, platform: str='youtube', user: 
         raise
     except Exception:
         logger.exception('Error searching YouTube')
-        log_response('/youtube/search', 500, {'error': '?????????? ?????? ???????'}, time.time() - start_time)
-        raise HTTPException(status_code=500, detail='?????????? ?????? ???????')
+        log_response('/youtube/search', 500, {'error': 'Internal server error.'}, time.time() - start_time)
+        raise HTTPException(status_code=500, detail='Internal server error.')

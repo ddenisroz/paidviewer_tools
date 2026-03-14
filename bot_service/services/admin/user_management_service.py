@@ -1,6 +1,6 @@
 # bot_service/services/admin/user_management_service.py
 """
-Сервис управления пользователями.
+Service for user administration.
 """
 
 import logging
@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class UserManagementService:
-    """Сервис для управления пользователями."""
+    """Service for managing users."""
 
     async def get_users(self, db: Session) -> List[UserPublic]:
-        """Получить список всех пользователей."""
+        """Get the full user list."""
         repo = UserRepository(db)
         users = repo.get_all()
         return [UserPublic.model_validate(user) for user in users]
@@ -30,7 +30,7 @@ class UserManagementService:
     async def update_user(
         self, user_id: int, request: dict, db: Session
     ) -> dict:
-        """Обновить пользователя."""
+        """Update a user."""
         repo = UserRepository(db)
         user = repo.get(user_id)
         if not user:
@@ -38,7 +38,7 @@ class UserManagementService:
 
         changes = []
 
-        # Обновляем роль (is_admin deprecated, используем role)
+        # Update role-based admin state (`is_admin` is legacy compatibility only).
         if 'is_admin' in request:
             logger.warning("[WARN] is_admin field is deprecated, use role instead")
             if request['is_admin'] and user.role != 'admin':
@@ -69,7 +69,7 @@ class UserManagementService:
         return {"message": f"User {user_id} updated successfully"}
 
     async def delete_user(self, user_id: int, db: Session) -> dict:
-        """Удалить пользователя."""
+        """Delete a user."""
         repo = UserRepository(db)
         user = repo.get(user_id)
         if not user:
@@ -83,7 +83,7 @@ class UserManagementService:
     async def block_user(
         self, user_id: int, request: dict, db: Session
     ) -> dict:
-        """Заблокировать пользователя."""
+        """Block a user."""
         repo = UserRepository(db)
         user = repo.get(user_id)
         if not user:
@@ -103,7 +103,7 @@ class UserManagementService:
         return {"message": f"User {user_id} blocked successfully"}
 
     async def unblock_user(self, user_id: int, db: Session) -> dict:
-        """Разблокировать пользователя."""
+        """Unblock a user."""
         repo = UserRepository(db)
         user = repo.get(user_id)
         if not user:

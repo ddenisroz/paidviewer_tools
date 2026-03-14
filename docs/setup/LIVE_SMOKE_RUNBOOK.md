@@ -1,18 +1,19 @@
-# Live smoke runbook
+﻿# Live smoke runbook
 
-Last updated: 2026-03-13
+Последнее обновление: 2026-03-13
 
-Этот runbook нужен для первого end-to-end smoke без смешения проблем инфраструктуры, контракта и upstream gaps.
+Это документ для первого end-to-end smoke без смешения инфраструктурных проблем, контрактных проблем и upstream gaps.
 
 ## Термины
 
 - `self-hosted endpoint` — пользовательский TTS endpoint, сохранённый в `local_tts_endpoints`
-- `project-hosted worker` — выделенный TTS runtime под вашей инфраструктурой
+- `project-hosted worker` — выделенный TTS runtime под инфраструктурой проекта
 - `gateway-managed` — `bot_service -> tts-gateway -> project-hosted workers`
 
 ## Что входит в первый smoke
 
 Обязательно:
+
 1. `gateway-managed` synth для `f5`
 2. `gateway-managed` synth для `qwen`
 3. `self-hosted endpoint` для `f5`
@@ -21,23 +22,24 @@ Last updated: 2026-03-13
 
 ## Preflight
 
-Перед стартом прогоняй:
+Перед стартом прогони:
 
 ```powershell
 .\scripts\dev\tts-smoke-preflight.ps1 -Scenario all
 ```
 
-Должно быть закрыто до smoke:
+До smoke должно быть закрыто:
+
 - `bot_service/.env` существует и заполнен
 - `frontend/.env` существует и указывает на `bot_service`
-- backend знает URL/API keys для TTS upstreams
+- backend знает URL и API keys для TTS upstreams
 - `LOCAL_TTS_ALLOWED_HOSTS` и `LOCAL_TTS_ALLOWED_CIDRS` настроены
 
 ## Что preflight не гарантирует
 
 - что Redis реально доступен из `tts-gateway`
-- что F5 assets/weights реально присутствуют
-- что Qwen runtime реально поднят в Linux/WSL2
+- что F5 assets и weights реально присутствуют
+- что Qwen runtime реально поднят в Linux или WSL2
 - что пользователь уже авторизован и может включить self-hosted режим
 
 ## Порядок запуска
@@ -63,6 +65,7 @@ Last updated: 2026-03-13
 ### S1. Gateway-managed F5
 
 Ожидаемо:
+
 - `f5Mode = cloud`
 - `advancedProvider = f5`
 - `useLocalTTS = false`
@@ -71,6 +74,7 @@ Last updated: 2026-03-13
 ### S2. Gateway-managed Qwen
 
 Ожидаемо:
+
 - `qwenMode = cloud`
 - `advancedProvider = qwen`
 - `useLocalTTS = false`
@@ -79,6 +83,7 @@ Last updated: 2026-03-13
 ### S3. Self-hosted F5
 
 Ожидаемо:
+
 - local endpoint успешно проходит `test-connection`
 - конфиг сохраняется
 - synth идёт через пользовательский self-hosted endpoint
@@ -86,6 +91,7 @@ Last updated: 2026-03-13
 ### S4. Self-hosted Qwen
 
 Ожидаемо:
+
 - `test-connection` проходит с compatibility warning
 - synth идёт через `/api/prepare -> /api/stream/{id}` adapter
 - это не считается ошибкой текущей фазы
@@ -93,6 +99,7 @@ Last updated: 2026-03-13
 ### S5. Qwen voice CRUD guard
 
 Ожидаемо:
+
 - capabilities помечают Qwen CRUD как unavailable
 - backend возвращает `501`
 - UI не показывает сломанные действия как будто они должны работать
@@ -100,6 +107,7 @@ Last updated: 2026-03-13
 ## Критерий успеха
 
 Первый smoke считается успешным, если:
+
 1. `f5` и `qwen` synth работают через gateway-managed path
 2. `f5` self-hosted endpoint работает
 3. `qwen` self-hosted endpoint работает через compatibility path

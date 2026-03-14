@@ -38,7 +38,7 @@ async def check_username_availability(
     username: str = Query(..., min_length=3, max_length=25),
     db: Session = Depends(get_db)
 ):
-    """Проверить доступность никнейма"""
+    """Check whether a username is available."""
     try:
         username_normalized = username.strip().lower()
 
@@ -71,7 +71,7 @@ async def logout(
 
 @router.get("/status")
 async def auth_status(request: Request, db: Session = Depends(get_db)):
-    """Получить статус авторизации и интеграций."""
+    """Get the current authentication and integration status."""
     logger.info("=== AUTH STATUS REQUEST START ===")
     session_id = request.cookies.get("session_id")
     
@@ -128,11 +128,11 @@ async def auth_status(request: Request, db: Session = Depends(get_db)):
 
 async def _get_user_integrations(user_id: int, user, repo: UserRepository) -> dict:
     """
-    Получает интеграции пользователя БЕЗ валидации токенов.
+    Returns user integrations WITHOUT token validation.
     
-    ОПТИМИЗАЦИЯ: Валидация токенов убрана для быстрой загрузки страницы.
-    Токены валидируются только при реальном использовании (API calls).
-    Это снижает время auth/status с ~1200ms до <50ms.
+    OPTIMIZATION: Token validation is skipped to keep page load fast.
+    Tokens are validated only when they are actually used by API calls.
+    This keeps auth/status latency under ~50ms instead of ~1200ms.
     """
     integrations = {}
     

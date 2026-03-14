@@ -34,7 +34,7 @@ async def get_admin_users(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список пользователей для админки."""
+    """Get the user list for the admin panel."""
     try:
         require_admin(user)
         
@@ -57,10 +57,10 @@ async def block_user(
     db: Session = Depends(get_db)
 ):
     """
-    Комплексная блокировка пользователя:
-    1. Блокирует доступ через OAuth (User.is_blocked)
-    2. Блокирует все его каналы в гостевом режиме (BlockedChannel)
-    3. Отключает бота от всех каналов пользователя
+    Comprehensive user blocking:
+    1. Blocks OAuth access (User.is_blocked)
+    2. Blocks all user channels in compatibility mode (BlockedChannel)
+    3. Disconnects the bot from all user channels
     """
     try:
         require_admin(user)
@@ -123,7 +123,7 @@ async def unblock_user(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Комплексная разблокировка пользователя."""
+    """Perform a comprehensive user unblock."""
     try:
         require_admin(user)
         
@@ -152,7 +152,7 @@ async def get_sessions(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список активных сессий."""
+    """Get the list of active sessions."""
     try:
         require_admin(user)
         
@@ -173,7 +173,7 @@ async def add_to_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Добавить пользователя в whitelist."""
+    """Add a user to the whitelist."""
     try:
         require_admin(user)
         
@@ -214,7 +214,7 @@ async def get_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить список пользователей в whitelist."""
+    """Get the list of whitelisted users."""
     try:
         require_admin(user)
         
@@ -249,7 +249,7 @@ async def remove_from_whitelist(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Удалить пользователя из whitelist."""
+    """Remove a user from the whitelist."""
     try:
         require_admin(user)
         

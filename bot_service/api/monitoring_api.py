@@ -1,6 +1,6 @@
 # bot_service/api/monitoring_api.py
 """
-API endpoints для мониторинга системы
+API endpoints for system monitoring.
 """
 from fastapi import APIRouter, Depends, HTTPException
 from auth.auth import get_current_user
@@ -14,12 +14,12 @@ router = APIRouter(prefix="/api/monitoring", tags=["monitoring"])
 @router.get("/cache/stats")
 async def get_cache_stats(user: dict = Depends(get_current_user)):
     """
-    Получить статистику кеша валидации токенов.
+    Get token-validation cache statistics.
     
-    Требует авторизации. Доступно всем пользователям для просмотра статистики.
+    Requires authentication. Available to all authenticated users.
     
     Returns:
-        dict: Статистика кеша (количество записей, TTL)
+        dict: Cache statistics such as entry count and TTL.
     """
     from core.token_validation_cache import token_validation_cache
 
@@ -40,9 +40,9 @@ async def get_cache_stats(user: dict = Depends(get_current_user)):
 @router.post("/cache/clear")
 async def clear_cache(user: dict = Depends(get_current_user)):
     """
-    Очистить кеш валидации токенов (admin only).
+    Clear the token-validation cache (admin only).
     
-    Требует admin прав.
+    Requires administrator privileges.
     """
     if not (user.get("role") == "admin" or user.get("is_admin")):
         raise HTTPException(status_code=403, detail="Admin access required")
@@ -62,9 +62,9 @@ async def clear_cache(user: dict = Depends(get_current_user)):
 @router.post("/cache/cleanup")
 async def cleanup_expired_cache(user: dict = Depends(get_current_user)):
     """
-    Удалить истёкшие записи из кеша (admin only).
+    Remove expired cache entries (admin only).
     
-    Обычно выполняется автоматически, но можно вызвать вручную.
+    This is normally done automatically, but can also be triggered manually.
     """
     if not (user.get("role") == "admin" or user.get("is_admin")):
         raise HTTPException(status_code=403, detail="Admin access required")

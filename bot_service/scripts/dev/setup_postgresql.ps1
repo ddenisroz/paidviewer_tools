@@ -1,5 +1,5 @@
-﻿# Скрипт настройки PostgreSQL для TTS Bot
-# Запуск: .\scripts\setup_postgresql.ps1
+﻿# PostgreSQL setup script for TTS Bot
+# Run: .\scripts\setup_postgresql.ps1
 
 function Resolve-PsqlPath {
     if ($env:PSQL_PATH -and (Test-Path $env:PSQL_PATH)) {
@@ -36,95 +36,93 @@ function Resolve-PsqlPath {
 $PSQL_PATH = Resolve-PsqlPath
 
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  Настройка PostgreSQL для TTS Bot" -ForegroundColor Cyan
+Write-Host "  PostgreSQL Setup for TTS Bot" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# Проверяем наличие psql
+# Check psql availability
 if (-not (Test-Path $PSQL_PATH)) {
-    Write-Host "❌ PostgreSQL psql.exe не найден" -ForegroundColor Red
-    Write-Host "   Укажите PSQL_PATH или добавьте psql в PATH" -ForegroundColor Yellow
+    Write-Host "❌ PostgreSQL psql.exe was not found" -ForegroundColor Red
+    Write-Host "   Set PSQL_PATH or add psql to PATH" -ForegroundColor Yellow
     exit 1
 }
 
-Write-Host "✅ PostgreSQL найден" -ForegroundColor Green
+Write-Host "✅ PostgreSQL detected" -ForegroundColor Green
 Write-Host ""
 
-# Запрашиваем пароль postgres
-$postgresPassword = Read-Host "Введите пароль пользователя 'postgres' (который указывали при установке)" -AsSecureString
+# Ask for postgres password
+$postgresPassword = Read-Host "Enter the password for the 'postgres' user" -AsSecureString
 $postgresPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($postgresPassword))
 
-# Запрашиваем имя БД (можно оставить по умолчанию)
-$dbName = Read-Host "Имя базы данных [по умолчанию: tts_bot_db]"
+# Ask for database name
+$dbName = Read-Host "Database name [default: tts_bot_db]"
 if ([string]::IsNullOrWhiteSpace($dbName)) {
     $dbName = "tts_bot_db"
 }
 
-# Запрашиваем имя пользователя
-$dbUser = Read-Host "Имя пользователя БД [по умолчанию: tts_user]"
+# Ask for database user
+$dbUser = Read-Host "Database user name [default: tts_user]"
 if ([string]::IsNullOrWhiteSpace($dbUser)) {
     $dbUser = "tts_user"
 }
 
-# Запрашиваем пароль пользователя
+# Ask for database user password
 Write-Host ""
-$dbPassword = Read-Host "Пароль для пользователя '$dbUser'" -AsSecureString
+$dbPassword = Read-Host "Password for user '$dbUser'" -AsSecureString
 $dbPasswordPlain = [Runtime.InteropServices.Marshal]::PtrToStringAuto([Runtime.InteropServices.Marshal]::SecureStringToBSTR($dbPassword))
 
 Write-Host ""
-Write-Host "📋 Создание базы данных и пользователя..." -ForegroundColor Cyan
+Write-Host "📋 Creating database and user..." -ForegroundColor Cyan
 
-# SQL команды
+# SQL commands
 $sqlCommands = @"
--- Создаем базу данных
+-- Create database
 CREATE DATABASE $dbName;
 
--- Создаем пользователя
+-- Create user
 CREATE USER $dbUser WITH PASSWORD '$dbPasswordPlain';
 
--- Даем права на базу данных
+-- Grant database privileges
 GRANT ALL PRIVILEGES ON DATABASE $dbName TO $dbUser;
 
--- Подключаемся к новой БД и даем права на схему public
+-- Connect to the new database and grant schema privileges
 \c $dbName
 GRANT ALL ON SCHEMA public TO $dbUser;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $dbUser;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $dbUser;
 "@
 
-# Сохраняем во временный файл
+# Save to a temporary file
 $tempFile = [System.IO.Path]::GetTempFileName()
 $sqlCommands | Out-File -FilePath $tempFile -Encoding UTF8
 
 try {
-    # Устанавливаем переменную окружения с паролем
+    # Set password in environment
     $env:PGPASSWORD = $postgresPasswordPlain
-    
-    # Выполняем SQL команды
+
+    # Execute SQL commands
     $result = & $PSQL_PATH -U postgres -f $tempFile 2>&1
-    
+
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "✅ База данных и пользователь успешно созданы!" -ForegroundColor Green
+        Write-Host "✅ Database and user created successfully" -ForegroundColor Green
         Write-Host ""
-        Write-Host "📝 Добавьте в ваш .env файл:" -ForegroundColor Cyan
+        Write-Host "📝 Add this to your .env file:" -ForegroundColor Cyan
         Write-Host "DATABASE_URL=postgresql://$dbUser`:$dbPasswordPlain@localhost:5432/$dbName" -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "⚠️  ВАЖНО: Сохраните эту строку - она понадобится для подключения!" -ForegroundColor Yellow
+        Write-Host "⚠️  Save this line, you will need it for the application connection" -ForegroundColor Yellow
     } else {
-        Write-Host "❌ Ошибка создания базы данных:" -ForegroundColor Red
+        Write-Host "❌ Database creation failed:" -ForegroundColor Red
         Write-Host $result -ForegroundColor Red
     }
 } catch {
-    Write-Host "❌ Ошибка: $_" -ForegroundColor Red
+    Write-Host "❌ Error: $_" -ForegroundColor Red
 } finally {
-    # Удаляем временный файл
+    # Remove temporary file
     Remove-Item $tempFile -ErrorAction SilentlyContinue
-    # Очищаем пароль из окружения
+    # Clear password from environment
     Remove-Item Env:\PGPASSWORD -ErrorAction SilentlyContinue
 }
 
 Write-Host ""
-Write-Host "Нажмите Enter для выхода..."
+Write-Host "Press Enter to exit..."
 Read-Host
-
-

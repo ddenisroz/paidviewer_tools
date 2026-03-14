@@ -47,8 +47,8 @@ def calculate_relevance(category_name: str, query: str) -> float:
         return 0
     if cat_lower.startswith(query_lower):
         return 1
-    cat_words = [w for w in re.split('Text cleaned.', cat_lower) if len(w) > 0]
-    query_words = [w for w in re.split('Text cleaned.', query_lower) if len(w) > 0]
+    cat_words = [w for w in re.split(r'[\\s\\-:]+', cat_lower) if len(w) > 0]
+    query_words = [w for w in re.split(r'[\\s\\-:]+', query_lower) if len(w) > 0]
     all_words_match = True
     exact_word_matches = 0
     partial_word_matches = 0

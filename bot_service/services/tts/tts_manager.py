@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 _GEMINI_SPEAKER_PATTERN = re.compile(r"^[A-Z][A-Za-z0-9_]{1,63}$")
 _QWEN_LOCAL_DEFAULT_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
 _QWEN_LOCAL_DEFAULT_SPEAKER = "serena"
-_QWEN_LOCAL_DEFAULT_INSTRUCTION = "Нейтральный естественный голос."
+_QWEN_LOCAL_DEFAULT_INSTRUCTION = "Neutral natural voice."
 _QWEN_LOCAL_MODEL_ALIASES = {
     "0.6b-customvoice": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
     "1.7b-customvoice": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
@@ -90,8 +90,11 @@ class TTSManager:
     """Coordinates provider synthesis and fallback to basic TTS."""
 
     def __init__(self):
-        self.f5_tts_service_url = get_provider_service_url("f5")
-        self.qwen_tts_service_url = get_provider_service_url("qwen")
+        from core import config as config_module
+
+        current_settings = config_module.settings
+        self.f5_tts_service_url = current_settings.f5_tts_service_url
+        self.qwen_tts_service_url = current_settings.qwen_tts_service_url
         self.backend_url = settings.backend_url
 
         self.basic_tts = get_basic_tts()

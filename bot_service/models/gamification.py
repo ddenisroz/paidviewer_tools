@@ -1,18 +1,17 @@
-# models/gamification.py
-"""
-Модели геймификации: достижения, донаты.
-"""
+﻿"""Gamification models for achievements and donations."""
+
 from datetime import datetime
-from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float
-)
+
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+
 from models.base import Base
 
 
 class Achievement(Base):
-    """Достижения, которые можно получить"""
+    """Achievement definition."""
+
     __tablename__ = "achievements"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     channel_name = Column(String, nullable=False, index=True)
@@ -27,9 +26,10 @@ class Achievement(Base):
 
 
 class UserAchievement(Base):
-    """Полученные пользователями достижения"""
+    """Achievement earned by a user."""
+
     __tablename__ = "user_achievements"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
@@ -40,9 +40,10 @@ class UserAchievement(Base):
 
 
 class DonationAlert(Base):
-    """Донаты через DonationAlerts"""
+    """DonationAlerts donation record."""
+
     __tablename__ = "donation_alerts"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)

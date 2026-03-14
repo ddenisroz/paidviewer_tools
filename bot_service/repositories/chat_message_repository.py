@@ -1,6 +1,6 @@
 # bot_service/repositories/chat_message_repository.py
 """
-Репозиторий для работы с сообщениями чата.
+Repository for working with chat messages.
 """
 
 import logging
@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 class ChatMessageRepository(BaseRepository[ChatMessage]):
     """
-    Репозиторий для ChatMessage.
+    Repository for ChatMessage.
     
-    Использование:
+    Usage:
         repo = ChatMessageRepository(db)
         messages = repo.get_by_channel(user_id, "channel_name", limit=50)
     """
@@ -36,7 +36,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         limit: int = 50,
         include_deleted: bool = False,
     ) -> List[ChatMessage]:
-        """Получает сообщения канала."""
+        """Get channel messages."""
         query = self.db.query(ChatMessage).filter(
             ChatMessage.user_id == user_id,
             func.lower(ChatMessage.channel_name) == channel_name.lower(),
@@ -51,7 +51,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         return query.order_by(ChatMessage.timestamp.desc()).limit(limit).all()
     
     def get_recent(self, user_id: int, limit: int = 100) -> List[ChatMessage]:
-        """Получает последние сообщения пользователя."""
+        """Get the latest messages for a user."""
         return self.db.query(ChatMessage).filter(
             ChatMessage.user_id == user_id,
             ChatMessage.is_deleted.is_(False),
@@ -60,7 +60,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
     def get_history_by_platforms(
         self, user_id: int, platforms: List[str], limit: int = 50
     ) -> List[ChatMessage]:
-        """Получает историю сообщений для указанных платформ."""
+        """Get message history for the selected platforms."""
         return self.db.query(ChatMessage).filter(
             ChatMessage.user_id == user_id,
             ChatMessage.platform.in_(platforms)
@@ -139,7 +139,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         role: Optional[str] = None,
         badges: Optional[str] = None,
     ) -> ChatMessage:
-        """Создаёт новое сообщение."""
+        """Create a new message."""
         chat_msg = ChatMessage(
             user_id=user_id,
             channel_name=channel_name,
@@ -158,7 +158,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         return chat_msg
     
     def soft_delete(self, message_id: int) -> bool:
-        """Soft delete сообщения."""
+        """Soft-delete a message."""
         msg = self.db.query(ChatMessage).filter(ChatMessage.id == message_id).first()
         if msg:
             msg.is_deleted = True
@@ -167,13 +167,13 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
         return False
     
     def delete_by_user(self, user_id: int) -> int:
-        """Удаляет все сообщения пользователя."""
+        """Delete all messages for a user."""
         result = self.db.query(ChatMessage).filter(ChatMessage.user_id == user_id).delete()
         self.db.commit()
         return result
     
     def get_count_by_channel(self, user_id: int, channel_name: str) -> int:
-        """Получает количество сообщений в канале."""
+        """Get the number of messages in a channel."""
         return self.db.query(ChatMessage).filter(
             ChatMessage.user_id == user_id,
             func.lower(ChatMessage.channel_name) == channel_name.lower(),

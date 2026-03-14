@@ -1,7 +1,6 @@
 // src/shared/utils/botManagementHelpers.ts
 /**
- * Bot management helper functions
- * TODO: Implement actual logic
+ * Вспомогательные функции для отображения состояния ботов в UI.
  */
 
 export interface BotConfig {

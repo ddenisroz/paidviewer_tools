@@ -36,6 +36,7 @@ if str(BOT_SERVICE_ROOT) not in sys.path:
 from core.database import Base, get_db  # noqa: E402
 from main import app  # noqa: E402
 from models import User, UserToken, TTSUserSettings, YouTubeQueue, DropsConfig  # noqa: E402
+from services.advanced_rate_limiter import advanced_rate_limiter  # noqa: E402
 
 # Test database setup
 TEST_DATABASE_URL = "sqlite:///:memory:"
@@ -46,6 +47,14 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def reset_test_rate_limiter():
+    """Сбрасывает глобальный in-memory rate limiter между тестами."""
+    advanced_rate_limiter.reset_state()
+    yield
+    advanced_rate_limiter.reset_state()
 
 
 @pytest.fixture(scope="function")

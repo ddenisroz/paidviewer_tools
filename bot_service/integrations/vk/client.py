@@ -58,7 +58,7 @@ class VKClient(BaseIntegrationClient):
         data: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """
-        Выполнить запрос с временным base_url (для прод-эндпоинтов).
+        Execute a request with a temporary base_url for production endpoints.
         """
         url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
         headers = await self._get_headers(token)
@@ -142,7 +142,7 @@ class VKClient(BaseIntegrationClient):
         """
         # Based on vk_stream.py logic
         default_offline = {
-            "online": False, "title": "Стрим оффлайн", "category": "Общение",
+            "online": False, "title": "Stream offline", "category": "Just Chatting",
             "viewer_count": 0, "started_at": ""
         }
         
@@ -173,8 +173,8 @@ class VKClient(BaseIntegrationClient):
                 category = stream.get("category", {})
                 return {
                     "online": True,
-                    "title": stream.get("title", "Без названия"),
-                    "category": category.get("title", "Без категории") if category else "Без категории",
+                    "title": stream.get("title", "Untitled stream"),
+                    "category": category.get("title", "Uncategorized") if category else "Uncategorized",
                     "category_id": category.get("id") if category else None,
                     "viewer_count": stream.get("counters", {}).get("viewers", 0),
                     "started_at": stream.get("planned_at", ""),
@@ -184,8 +184,8 @@ class VKClient(BaseIntegrationClient):
                 }
             
             # Offline fallback
-            title = "Стрим оффлайн"
-            category_name = "Общение"
+            title = "Stream offline"
+            category_name = "Just Chatting"
             category_id = None
             if stream:
                  title = stream.get("title", title)

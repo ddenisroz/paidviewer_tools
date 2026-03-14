@@ -1,7 +1,5 @@
 # bot_service/services/admin/logs_service.py
-"""
-Сервис работы с логами.
-"""
+"""Service for reading and exporting logs."""
 
 import os
 import glob
@@ -15,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 class LogsService:
-    """Сервис для работы с системными логами."""
+    """Service for working with system logs."""
 
     def __init__(self):
         self._log_dirs = self._get_log_directories()
 
     def _get_log_directories(self) -> List[str]:
-        """Получить список директорий с логами."""
+        """Return the list of log directories."""
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         dirs = []
 
@@ -38,19 +36,19 @@ class LogsService:
         return dirs
 
     def _parse_log_line(self, line: str) -> Optional[Dict[str, Any]]:
-        """Парсит строку лога."""
+        """Parse a single log line."""
         line = line.strip()
         if not line:
             return None
 
-        # Формат: TIMESTAMP LEVEL MODULE: MESSAGE
+        # Format: TIMESTAMP LEVEL MODULE: MESSAGE
         parts = line.split(' ', 3)
         if len(parts) >= 4:
             timestamp_str = f"{parts[0]} {parts[1]}"
             log_level = parts[2]
             message_part = parts[3]
 
-            # Извлекаем модуль
+            # Extract module
             module = "system"
             message = message_part
             if ':' in message_part:
@@ -58,7 +56,7 @@ class LogsService:
                 module = module_part.strip()
                 message = msg.strip()
 
-            # Парсим timestamp
+            # Parse timestamp
             try:
                 timestamp = datetime.fromisoformat(
                     timestamp_str.replace('Z', '+00:00')
@@ -76,7 +74,7 @@ class LogsService:
                 "message": message
             }
 
-        # Fallback: не удалось распарсить
+        # Fallback when parsing fails
         return {
             "timestamp": utcnow_naive().isoformat(),
             "level": "INFO",
@@ -90,35 +88,35 @@ class LogsService:
         search: Optional[str] = None,
         limit: int = 100
     ) -> dict:
-        """Получить системные логи с фильтрацией."""
+        """Return system logs with optional filters."""
         logs: List[Dict[str, Any]] = []
 
         try:
-            # Собираем все .log файлы
+            # Collect all .log files
             log_files = []
             for log_dir in self._log_dirs:
                 log_files.extend(glob.glob(os.path.join(log_dir, '*.log')))
 
-            # Читаем логи
+            # Read logs
             for log_file in log_files:
                 lines = []
                 try:
-                    # Попытка 1: UTF-8 с поддержкой BOM
+                    # Attempt 1: UTF-8 with BOM support
                     with open(log_file, "r", encoding="utf-8-sig") as f:
                         lines = f.readlines()
                 except UnicodeDecodeError:
                     try:
-                        # Попытка 2: CP1251 (Windows Cyrillic) - наиболее вероятная для Windows
+                        # Attempt 2: CP1251 (common Windows Cyrillic encoding)
                         with open(log_file, "r", encoding="cp1251") as f:
                             lines = f.readlines()
                     except UnicodeDecodeError:
                         try:
-                            # Попытка 3: CP866 (DOS Cyrillic) - консольная кодировка
+                            # Attempt 3: CP866 (legacy DOS Cyrillic console encoding)
                             with open(log_file, "r", encoding="cp866") as f:
                                 lines = f.readlines()
                         except UnicodeDecodeError:
                             try:
-                                # Попытка 4: Latin-1 (читает всё, но могут быть кракозябры)
+                                # Attempt 4: Latin-1 (always decodes, but text may look garbled)
                                 with open(log_file, "r", encoding="latin1") as f:
                                     lines = f.readlines()
                             except Exception:
@@ -133,23 +131,23 @@ class LogsService:
                     if parsed:
                         logs.append(parsed)
 
-            # Сортируем по времени (новые сверху)
+            # Sort by time, newest first
             logs.sort(key=lambda x: x["timestamp"], reverse=True)
 
         except Exception:
             logger.exception("Error reading system logs")
             logs = []
 
-        # Фильтрация по уровню
+        # Filter by level
         if level:
             logs = [log for log in logs if log["level"] == level.upper()]
 
-        # Фильтрация по поиску
+        # Filter by search query
         if search:
             search_lower = search.lower()
             logs = [log for log in logs if search_lower in log["message"].lower()]
 
-        # Ограничение количества
+        # Limit item count
         logs = logs[:limit]
 
         return {
@@ -164,14 +162,12 @@ class LogsService:
 
     async def get_bots_logs(self) -> dict:
         """
-        Получить логи ботов из файлов.
-        
-        Note: В будущем можно реализовать чтение из отдельных файлов логов ботов.
-        Сейчас возвращаем пустой список, так как логи доступны через основной лог-файл.
+        Return bot logs from files.
+
+        Note: this can be extended later to read separate bot log files.
+        For now bot logs are available through the main log file.
         """
-        # Логи ботов доступны через основной лог-файл (logs/bot_service.log)
-        # Если нужны отдельные файлы логов для каждого бота, можно настроить
-        # отдельные handlers в logging_config.py
+        # Bot logs are currently available through the main log file.
         return {
             "logs": [],
             "message": "Bot logs are available in the main log file (logs/bot_service.log)"
@@ -182,13 +178,13 @@ class LogsService:
         level: Optional[str] = None,
         search: Optional[str] = None
     ) -> dict:
-        """Экспортировать системные логи в CSV."""
+        """Export system logs to CSV."""
         logs_data = await self.get_system_logs(level, search, limit=1000)
 
-        # Генерируем CSV
+        # Generate CSV
         csv_lines = ["timestamp,level,module,message"]
         for log in logs_data["logs"]:
-            # Экранируем кавычки в сообщении
+            # Escape quotes in the message
             message = log['message'].replace('"', '""')
             csv_lines.append(
                 f"{log['timestamp']},{log['level']},{log['module']},\"{message}\""

@@ -83,7 +83,7 @@ class QueueService:
         )
 
     async def add_video_to_queue(self, user_id: int=None, session_id: str=None, video_url: str=None, channel_name: str=None, platform: str=None, requester_name: str=None, requester_id: str=None, is_paid: bool=False, points_cost: int=None, db: Session=None) -> Dict[str, Any]:
-        """Добавление видео в очередь"""
+        """Add a video to the queue."""
         user_id, session_id, db = self._normalize_scope_args(user_id=user_id, session_id=session_id, db=db)
         if db is None:
             db = next(get_db())
@@ -93,16 +93,16 @@ class QueueService:
         try:
             queue_repo = YouTubeQueueRepository(db)
             if not user_id and (not session_id):
-                return {'success': False, 'error': 'Необходимо указать user_id или session_id'}
+                return {'success': False, 'error': 'user_id or session_id is required.'}
             video_input = (video_url or '').strip()
             if not video_input:
-                return {'success': False, 'error': 'Укажите ссылку или поисковый запрос.'}
+                return {'success': False, 'error': 'Provide a YouTube URL or a search query.'}
             if not self.youtube_service.is_valid_youtube_url(video_input):
                 if len(video_input) < 2:
-                    return {'success': False, 'error': 'Слишком короткий поисковый запрос.'}
+                    return {'success': False, 'error': 'Search query is too short.'}
                 search_results = await self.youtube_service.search_videos(video_input, max_results=5)
                 if not search_results:
-                    return {'success': False, 'error': 'Видео не найдено. Попробуйте другой запрос или ссылку.'}
+                    return {'success': False, 'error': 'Video was not found. Try a different query or URL.'}
                 selected_url = None
                 for candidate in search_results:
                     candidate_id = candidate.get('video_id')
@@ -116,19 +116,19 @@ class QueueService:
                     selected_url = candidate_url
                     break
                 if not selected_url:
-                    return {'success': False, 'error': 'Все найденные видео уже есть в очереди или забанены. Уточните запрос.'}
+                    return {'success': False, 'error': 'All matching videos are already queued or banned. Refine the query.'}
                 video_url = selected_url
             else:
                 video_url = video_input
             video_info = await self.youtube_service.get_video_info(video_url)
             if not video_info:
-                return {'success': False, 'error': 'Видео недоступно или удалено. Проверьте ссылку и попробуйте снова'}
+                return {'success': False, 'error': 'Video is unavailable or has been removed. Check the URL and try again.'}
             banned = queue_repo.get_banned_by_video_id(video_id=video_info['video_id'], user_id=user_id, session_id=session_id)
             if banned:
-                return {'success': False, 'error': '??? ????? ????????????? ??? ????? ??????.'}
+                return {'success': False, 'error': 'This video is banned for this queue.'}
             existing = queue_repo.get_pending_by_video_id(video_id=video_info['video_id'], user_id=user_id, session_id=session_id)
             if existing:
-                return {'success': False, 'error': 'Это видео уже есть в очереди! Выберите другое видео'}
+                return {'success': False, 'error': 'This video is already in the queue. Choose another one.'}
             max_position = queue_repo.count_pending(user_id=user_id, session_id=session_id)
             if is_paid and points_cost:
                 points_result = await self._deduct_points(user_id, requester_id, requester_name, platform, channel_name, points_cost, f"Song request: {video_info['title']}", db)
@@ -150,7 +150,7 @@ class QueueService:
         except Exception:
             db.rollback()
             logger.exception('Error adding video to queue')
-            return {'success': False, 'error': 'Ошибка добавления видео в очередь'}
+            return {'success': False, 'error': 'Failed to add the video to the queue.'}
         finally:
             if should_close:
                 db.close()
@@ -160,13 +160,13 @@ class QueueService:
         return await self.add_video_to_user_queue(user_id=user_id, video_url=url, channel_name=channel_name, platform=platform, requester_name=requested_by, requester_id=requester_id, is_paid=is_paid, points_cost=points_cost, db=db)
 
     async def _deduct_points(self, user_id: int, viewer_id: str, viewer_name: str, platform: str, channel_name: str, cost: int, reason: str, db: Session) -> Dict[str, Any]:
-        """Списание баллов за заказ с защитой от race condition"""
+        """Deduct points for a request with race-condition protection."""
         try:
             points_repo = PointsRepository(db)
             points_record = points_repo.get_user_points_for_update(user_id=user_id, viewer_id=viewer_id, platform=platform, channel_name=channel_name)
             if not points_record or points_record.points < cost:
                 db.rollback()
-                return {'success': False, 'error': f'Недостаточно баллов. Нужно: {cost}, есть: {(points_record.points if points_record else 0)}'}
+                return {'success': False, 'error': f'Not enough points. Required: {cost}, available: {(points_record.points if points_record else 0)}'}
             points_record.points -= cost
             points_record.total_spent += cost
             points_record.last_activity = utcnow_naive()
@@ -176,7 +176,7 @@ class QueueService:
         except Exception:
             db.rollback()
             logger.exception('Error deducting points')
-            return {'success': False, 'error': 'Ошибка списания баллов'}
+            return {'success': False, 'error': 'Failed to deduct points.'}
     def get_user_queue(self, user_id: int, db: Session=None) -> List[Dict[str, Any]]:
         """Active user-only queue path for dashboard and bot commands."""
         return self.get_queue(user_id=user_id, session_id=None, db=db)
@@ -204,7 +204,7 @@ class QueueService:
                 db.close()
 
     def remove_from_queue(self, user_id: int, queue_id: int, db: Session=None) -> bool:
-        """Удаление видео из очереди"""
+        """Remove a video from the queue."""
         if db is None:
             db = next(get_db())
             should_close = True
@@ -265,17 +265,17 @@ class QueueService:
 
     def remove_last_user_video(self, user_id: int, requester_id: str, requester_name: str, platform: str, db: Session=None) -> Dict[str, Any]:
         """
-        Удаление последнего видео, добавленного конкретным пользователем (команда !wronglink)
-        
+        Remove the last queued video added by a specific user (`!wronglink`).
+
         Args:
-            user_id: ID владельца канала
-            requester_id: ID пользователя, который добавил видео
-            requester_name: Имя пользователя
-            platform: Платформа (twitch/vk)
-            db: Database session
-        
+            user_id: Channel owner ID.
+            requester_id: ID of the user who added the video.
+            requester_name: Display name of the requester.
+            platform: Platform name, for example twitch or vk.
+            db: Database session.
+
         Returns:
-            Dict с результатом операции
+            Operation result payload.
         """
         if db is None:
             db = next(get_db())
@@ -286,7 +286,7 @@ class QueueService:
             queue_repo = YouTubeQueueRepository(db)
             last_video = queue_repo.get_last_pending_by_requester(user_id, requester_id, platform)
             if not last_video:
-                return {'success': False, 'error': f'@{requester_name}, у вас нет видео в очереди'}
+                return {'success': False, 'error': f'@{requester_name}, you have no videos in the queue'}
             video_title = last_video.title
             if last_video.is_paid and last_video.points_cost:
                 self._refund_points_sync(user_id, requester_id, requester_name, platform, last_video.channel_name, last_video.points_cost, f'Wronglink refund: {video_title}', db)
@@ -294,22 +294,22 @@ class QueueService:
             self._rebuild_positions(user_id, db)
             logger.info(f'[WRONGLINK] User {requester_name} removed their video: {video_title}')
             self._broadcast_queue_update_sync(user_id)
-            return {'success': True, 'message': f"@{requester_name}, видео '{video_title}' удалено из очереди", 'refunded': last_video.is_paid, 'points_refunded': last_video.points_cost if last_video.is_paid else 0}
+            return {'success': True, 'message': f"@{requester_name}, video '{video_title}' was removed from the queue", 'refunded': last_video.is_paid, 'points_refunded': last_video.points_cost if last_video.is_paid else 0}
         except Exception:
             if db:
                 db.rollback()
             logger.exception('[WRONGLINK] Error removing last user video')
-            return {'success': False, 'error': f'@{requester_name}, ошибка удаления видео'}
+            return {'success': False, 'error': f'@{requester_name}, failed to remove the video'}
         finally:
             if should_close:
                 db.close()
 
     async def _refund_points(self, user_id: int, viewer_id: str, viewer_name: str, platform: str, channel_name: str, amount: int, reason: str, db: Session):
-        """Возврат баллов (асинхронная версия)"""
+        """Refund points (async wrapper)."""
         self._refund_points_sync(user_id, viewer_id, viewer_name, platform, channel_name, amount, reason, db)
 
     def _refund_points_sync(self, user_id: int, viewer_id: str, viewer_name: str, platform: str, channel_name: str, amount: int, reason: str, db: Session):
-        """Возврат баллов (синхронная версия)"""
+        """Refund points (sync implementation)."""
         try:
             points_repo = PointsRepository(db)
             points_record = points_repo.get_user_points(user_id=user_id, viewer_id=viewer_id, platform=platform, channel_name=channel_name)
@@ -323,7 +323,7 @@ class QueueService:
             logger.exception('Error refunding points')
 
     def _rebuild_positions(self, user_id: int, db: Session):
-        """Перестройка позиций в очереди"""
+        """Rebuild queue positions."""
         try:
             queue_repo = YouTubeQueueRepository(db)
             queue_items = queue_repo.get_pending_ordered(user_id)
@@ -333,7 +333,7 @@ class QueueService:
             logger.exception('Error rebuilding positions')
 
     def clear_queue(self, user_id: int, db: Session=None) -> int:
-        """Очистка всей очереди"""
+        """Clear the entire queue."""
         if db is None:
             db = next(get_db())
             should_close = True
@@ -360,7 +360,7 @@ class QueueService:
                 db.close()
 
     def get_next_video(self, user_id: int, db: Session=None) -> Optional[Dict[str, Any]]:
-        """Получение следующего видео в очереди"""
+        """Get the next video in the queue."""
         if db is None:
             db = next(get_db())
             should_close = True
@@ -380,7 +380,7 @@ class QueueService:
                 db.close()
 
     def mark_as_played(self, user_id: int, queue_id: int, db: Session=None) -> bool:
-        """Отметить видео как проигранное"""
+        """Mark a video as played."""
         if db is None:
             db = next(get_db())
             should_close = True
@@ -473,7 +473,7 @@ class QueueService:
                 db.close()
 
     async def get_current_video(self, user_id: int, db: Session=None) -> Optional[Dict[str, Any]]:
-        """Получение текущего видео (первого в очереди)"""
+        """Get the current video (the first item in the queue)."""
         if db is None:
             db = next(get_db())
             should_close = True
@@ -489,7 +489,7 @@ class QueueService:
                 db.close()
 
     async def skip_current(self, user_id: int, db: Session=None) -> Dict[str, Any]:
-        """Пропустить текущее видео и перейти к следующему"""
+        """Skip the current video and move to the next one."""
         if db is None:
             db = next(get_db())
             should_close = True
@@ -498,17 +498,17 @@ class QueueService:
         try:
             queue_items = self.get_queue(user_id=user_id, db=db)
             if not queue_items or len(queue_items) == 0:
-                return {'success': False, 'error': 'Очередь пуста'}
+                return {'success': False, 'error': 'Queue is empty.'}
             current_video_id = queue_items[0]['id']
             success = self.mark_as_played(user_id, current_video_id, db)
             if not success:
-                return {'success': False, 'error': 'Не удалось пропустить видео'}
+                return {'success': False, 'error': 'Failed to skip the video.'}
             logger.info(f"Skipped video for user {user_id}: {queue_items[0].get('title', 'Unknown')}")
             await self._broadcast_queue_update(user_id)
-            return {'success': True, 'message': 'Видео пропущено'}
+            return {'success': True, 'message': 'Video skipped.'}
         except Exception:
             logger.exception('Error skipping current video')
-            return {'success': False, 'error': 'Ошибка пропуска видео'}
+            return {'success': False, 'error': 'Failed to skip the video.'}
         finally:
             if should_close:
                 db.close()

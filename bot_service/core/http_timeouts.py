@@ -1,40 +1,37 @@
 # bot_service/core/http_timeouts.py
-"""
-HTTP timeout константы для внешних API запросов.
-Централизованное управление таймаутами предотвращает magic numbers в коде.
-"""
+"""HTTP timeout constants for external API requests."""
 import aiohttp
 
 # OAuth endpoints
-OAUTH_REQUEST_TIMEOUT = 30.0  # секунд
-"""Timeout для OAuth запросов (token exchange, user info)"""
+OAUTH_REQUEST_TIMEOUT = 30.0  # seconds
+"""Timeout for OAuth requests (token exchange, user info)."""
 
 OAUTH_REQUEST_TIMEOUT_OBJ = aiohttp.ClientTimeout(total=30, connect=10)
-"""Timeout объект для aiohttp - OAuth запросы"""
+"""aiohttp timeout object for OAuth requests."""
 
 # Token validation
-TOKEN_VALIDATION_TIMEOUT = 10.0  # секунд
-"""Timeout для проверки валидности токенов через API платформ"""
+TOKEN_VALIDATION_TIMEOUT = 10.0  # seconds
+"""Timeout for token validation against platform APIs."""
 
 TOKEN_VALIDATION_TIMEOUT_OBJ = aiohttp.ClientTimeout(total=10, connect=5)
-"""Timeout объект для aiohttp - валидация токенов"""
+"""aiohttp timeout object for token validation."""
 
-# VK Live API (уже определен как aiohttp.ClientTimeout в vk_api.py)
-VK_API_TIMEOUT = 15.0  # секунд
-"""Timeout для VK Live API запросов (legacy)"""
+# VK Live API (also defined as aiohttp.ClientTimeout in vk_api.py)
+VK_API_TIMEOUT = 15.0  # seconds
+"""Timeout for VK Live API requests (legacy scalar form)."""
 
-# Twitch API - уменьшен таймаут чтобы избежать долгих зависаний при сетевых проблемах
+# Twitch API timeout is intentionally shorter to reduce long stalls on network errors.
 TWITCH_API_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=5)
-"""Timeout для Twitch API запросов - 10 секунд max (было 30)"""
+"""Timeout for Twitch API requests (10 seconds max, reduced from 30)."""
 
 # DonationAlerts API
-DONATIONALERTS_API_TIMEOUT = 15.0  # секунд
-"""Timeout для DonationAlerts API запросов"""
+DONATIONALERTS_API_TIMEOUT = 15.0  # seconds
+"""Timeout for DonationAlerts API requests."""
 
 DONATIONALERTS_API_TIMEOUT_OBJ = aiohttp.ClientTimeout(total=15, connect=10)
-"""Timeout объект для aiohttp - DonationAlerts API"""
+"""aiohttp timeout object for DonationAlerts API."""
 
 # General API
 DEFAULT_API_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
-"""Дефолтный timeout для API запросов"""
+"""Default timeout object for generic API requests."""
 

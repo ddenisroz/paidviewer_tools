@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Централизованный сервис для создания пользователей
-Предотвращает дубликаты и race conditions
+Centralized user-creation service.
+Prevents duplicates and race conditions.
 """
 import logging
 from sqlalchemy.orm import Session
@@ -11,13 +11,13 @@ from core.token_encryption import encrypt_token
 logger = logging.getLogger(__name__)
 
 class UserCreationService:
-    """Централизованный сервис для создания пользователей"""
+    """Centralized service for creating users."""
 
     @staticmethod
     async def find_or_create_user(db: Session, platform: str, platform_user_id: str, username: str=None, avatar_url: str=None, access_token: str=None, refresh_token: str=None, expires_at=None, scopes: list=None, current_user_id: int=None, is_admin: bool=False) -> User:
         """
-        Находит существующего пользователя или создает нового.
-        Предотвращает дубликаты и race conditions.
+        Find an existing user or create a new one.
+        Prevent duplicates and race conditions.
         """
         logger.info(f'[DEBUG] [USER_CREATION] Looking for user: {platform}:{platform_user_id}')
         if username:

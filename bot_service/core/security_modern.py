@@ -1,7 +1,8 @@
 # bot_service/core/security_modern.py
 """
-Современная система безопасности с использованием профессиональных библиотек
-Заменяет самописные костыли на проверенные решения
+Modern security helpers built on established third-party libraries.
+
+Replaces ad-hoc implementations with maintained solutions.
 """
 import logging
 import secrets
@@ -9,7 +10,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
-# Современные библиотеки безопасности
+# Security libraries
 from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 from slowapi import Limiter
@@ -24,14 +25,14 @@ from core.config import settings
 logger = logging.getLogger(__name__)
 
 
-# Настройка rate limiting
+# Rate limiting setup
 limiter = Limiter(key_func=get_remote_address)
 
-# Настройка JWT
+# JWT setup
 security = HTTPBearer()
 
 class ModernSecurityManager:
-    """Современный менеджер безопасности с профессиональными библиотеками"""
+    """Modern security manager built on established libraries."""
 
     def __init__(self):
         self.secret_key = settings.secret_key
@@ -43,7 +44,7 @@ class ModernSecurityManager:
 
     def create_access_token(self, data: dict, expires_delta: Optional[timedelta] = None) -> str:
         """
-        Создание JWT токена доступа
+        Create a JWT access token.
         """
         to_encode = data.copy()
         if expires_delta:
@@ -98,39 +99,39 @@ class ModernSecurityManager:
 
     def generate_session_id(self) -> str:
         """
-        Генерация безопасного ID сессии
+        Generate a secure session ID.
         """
         return secrets.token_urlsafe(32)
 
     def generate_csrf_token(self) -> str:
         """
-        Генерация CSRF токена
+        Generate a CSRF token.
         """
         return secrets.token_urlsafe(32)
 
     def verify_csrf_token(self, token: str, session_token: str) -> bool:
         """
-        Проверка CSRF токена
+        Verify a CSRF token.
         """
-        # Простая проверка - в реальном проекте можно использовать более сложную логику
+        # Simple comparison is enough for the current flow.
         return token == session_token
 
-# Глобальный экземпляр
+# Global instance
 modern_security_manager = ModernSecurityManager()
 
-# Декораторы для rate limiting
+# Rate limiting decorators
 def rate_limit(requests_per_minute: str):
-    """Декоратор для rate limiting"""
+    """Decorator for rate limiting."""
     return limiter.limit(requests_per_minute)
 
 def login_rate_limit():
-    """Декоратор для rate limiting логина"""
+    """Decorator for login rate limiting."""
     return limiter.limit(settings.rate_limit_login)
 
-# Функции для FastAPI
+# FastAPI helpers
 def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> int:
     """
-    Получение ID пользователя из JWT токена
+    Return the current user ID from a JWT token.
     """
     token = credentials.credentials
     payload = modern_security_manager.verify_token(token)
@@ -144,17 +145,17 @@ def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(secu
 
 def get_current_user_admin(credentials: HTTPAuthorizationCredentials = Depends(security)) -> bool:
     """
-    Проверка админских прав пользователя
+    Check whether the current user has admin rights.
     """
     token = credentials.credentials
     payload = modern_security_manager.verify_token(token)
     is_admin: bool = payload.get("is_admin", False)
     return is_admin
 
-# Обработчик ошибок rate limiting
+# Rate limit error handler
 def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     """
-    Обработчик ошибок rate limiting
+    Handle rate limit errors.
     """
     return JSONResponse(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -162,4 +163,3 @@ def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 logger.info("[AUTH] Modern Security Manager initialized with JWT")
-

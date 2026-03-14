@@ -111,7 +111,7 @@ class DropsMythicalMixin:
         )
 
     def process_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
-        """Обрабатывает мифические Drops"""
+        """Process mythical drops."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config or not config.mythical_enabled:
             return None
@@ -148,17 +148,17 @@ class DropsMythicalMixin:
         }
 
     def _can_activate_mythical(self, config: DropsConfig) -> bool:
-        """Проверяет, можно ли активировать мифический лутбокс"""
+        """Check whether the mythical lootbox can be activated."""
         if not config.mythical_last_appeared:
             return True
 
         now = utcnow_naive()
-        time_since_last = (now - config.mythical_last_appeared).total_seconds() / 3600  # в часах
+        time_since_last = (now - config.mythical_last_appeared).total_seconds() / 3600  # in hours
 
         return time_since_last >= config.mythical_min_interval_hours
 
     def check_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> bool:
-        """Проверяет, можно ли запустить мифический Drops"""
+        """Check whether mythical drops can be started."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.mythical_enabled:
             return False
@@ -197,7 +197,7 @@ class DropsMythicalMixin:
         return random.random() < 0.1
 
     def _check_stream_online(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> bool:
-        """Проверяет, онлайн ли стрим на указанной платформе"""
+        """Check whether the stream is online on the requested platform."""
         try:
             from core.database import User, UserToken # Needed for type checking or fallbacks?
             from core.connection_manager import get_connection_manager
@@ -230,7 +230,7 @@ class DropsMythicalMixin:
             return False
 
     def start_mythical_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch") -> Optional[MythicalDropsSession]:
-        """Запускает мифический Drops"""
+        """Start a mythical drops window."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform)
         if not config or not config.mythical_enabled:
             return None
@@ -282,7 +282,7 @@ class DropsMythicalMixin:
         return session
 
     def process_mythical_drops_with_session(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, amount: float = None) -> Optional[Dict[str, Any]]:
-        """Обрабатывает мифический Drops с активной сессией"""
+        """Process mythical drops for an active mythical session."""
         hist_repo, token_repo = self._ensure_mythical_repos()
         
         # Use simple get_active_mythical_session logic from repo

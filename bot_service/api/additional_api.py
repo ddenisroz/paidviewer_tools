@@ -2,12 +2,12 @@
 """
 Additional API endpoints.
 
-REFACTORED: Бизнес-логика вынесена в сервисы:
+REFACTORED: Business logic has been moved to services:
 - IntegrationManagementService
 - ChatHistoryService  
 - AccountDeletionService
 
-Этот файл содержит ТОЛЬКО роутинг и преобразование данных.
+This file contains ONLY routing and data transformation.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/api", tags=["additional"])
 
 @router.get("/auth/user/me")
 async def get_user_me(user: dict = Depends(get_current_user)):
-    """Получить информацию о текущем пользователе."""
+    """Get information about the current user."""
     return JSONResponse(content={
         "id": user.get("id"),
         "twitch_username": user.get("twitch_username"),
@@ -44,7 +44,7 @@ async def get_user_me(user: dict = Depends(get_current_user)):
 
 @router.get("/auth/session/status")
 async def get_session_status(user: dict = Depends(get_current_user)):
-    """Получить статус сессии."""
+    """Get the current session status."""
     return JSONResponse(content={
         "authenticated": True,
         "user_id": user.get("id"),
@@ -55,7 +55,7 @@ async def get_session_status(user: dict = Depends(get_current_user)):
 
 @router.post("/clear-verifications")
 async def clear_verifications(user: dict = Depends(get_current_user)):
-    """Очистить верификации."""
+    """Clear verification records."""
     logger.info(f"Clear verifications requested by user {user['id']}")
     return JSONResponse(content={"success": True, "message": "Verifications cleared"})
 
@@ -67,7 +67,7 @@ async def get_integrations(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Получить список интеграций пользователя с валидацией токенов."""
+    """Get the user's integrations with token validation."""
     try:
         user_id = user.get("id")
         if not user_id:
@@ -77,7 +77,7 @@ async def get_integrations(
             user_id, db
         )
         
-        # Конвертируем в формат API
+        # Convert the result to the API response format.
         result = {}
         for platform, info in integrations.items():
             result[platform] = {
@@ -103,7 +103,7 @@ async def disconnect_integration(
     db: Session = Depends(get_db),
 ):
     """
-    Отключить интеграцию (отключить бота и удалить токены).
+    Disable an integration by disconnecting the bot and removing tokens.
     """
     user_id = user.get("id")
     if not user_id:
@@ -133,8 +133,8 @@ async def remove_integration(
     db: Session = Depends(get_db),
 ):
     """
-    ПОЛНОСТЬЮ удалить интеграцию.
-    После этого потребуется полная переавторизация.
+    Fully remove an integration.
+    A complete re-authorization will be required afterwards.
     """
     user_id = user.get("id")
     if not user_id:
@@ -167,7 +167,7 @@ async def get_chat_history(
     current_user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
-    """Получить историю сообщений чата."""
+    """Get chat message history."""
     try:
         if not current_user:
             return JSONResponse(content={"success": True, "messages": []})
@@ -178,7 +178,7 @@ async def get_chat_history(
             user_id, channel, platform, limit, db
         )
         
-        # Конвертируем DTO в dict для JSON
+        # Convert DTOs into dictionaries for JSON serialization.
         messages_data = [msg.to_dict() for msg in messages]
         
         logger.info(f"[CHAT] Returning {len(messages_data)} messages")
@@ -209,7 +209,7 @@ async def permanently_delete_user(
 
     WARNING: this operation is irreversible.
     """
-    # Проверка прав администратора
+    # Validate administrator permissions.
     if not (current_user.get('role') == 'admin' or current_user.get('is_admin', False)):
         raise HTTPException(status_code=403, detail="Admin access required")
     
@@ -243,10 +243,10 @@ async def delete_user_account(
     db: Session = Depends(get_db),
 ):
     """
-    ПОЛНОЕ удаление аккаунта пользователя.
+    Permanently delete a user account.
     
-    Удаляет ВСЕ данные пользователя и анонимизирует его запись.
-    После удаления пользователь будет разлогинен.
+    Removes ALL user data and anonymizes the account record.
+    The user is logged out after deletion.
     """
     user_id = user.get("id")
     if not user_id:
@@ -255,7 +255,7 @@ async def delete_user_account(
     try:
         result = await account_deletion_service.soft_delete_account(user_id, db)
         
-        # Очищаем cookie сессии
+        # Clear the session cookie.
         response = JSONResponse(content={
             "success": result.success,
             "message": result.message,

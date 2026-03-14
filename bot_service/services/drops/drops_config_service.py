@@ -33,7 +33,7 @@ class DropsConfigMixin:
         channel_name: str = None,
         platform: str = None,
     ) -> Optional[DropsConfig]:
-        """Получает конфигурацию Drops для авторизованного пользователя."""
+        """Get the Drops configuration for an authenticated user."""
         target_platform = platform or "global"
         repo = self._get_config_repo()
 
@@ -53,7 +53,7 @@ class DropsConfigMixin:
         user_id: int,
         channel_name: str = None,
     ) -> Optional[DropsConfig]:
-        """Создаёт global-конфиг из существующих twitch/vk конфигов пользователя."""
+        """Build a global config from the user's existing Twitch/VK configs."""
         repo = self._get_config_repo()
         existing_configs = repo.get_existing_configs_for_user_compat(
             channel_name=channel_name,
@@ -116,7 +116,7 @@ class DropsConfigMixin:
         platform: str = None,
         config_data: Dict[str, Any] = None,
     ) -> DropsConfig:
-        """Создаёт или обновляет Drops-конфигурацию для авторизованного пользователя."""
+        """Create or update the Drops configuration for an authenticated user."""
         target_platform = platform or "global"
 
         config = self.get_user_config(
@@ -157,7 +157,7 @@ class DropsConfigMixin:
         platform: str = "twitch",
         quality_id: Optional[int] = None,
     ) -> List[DropsReward]:
-        """Получает активные награды для канала авторизованного пользователя."""
+        """Get active Drops rewards for the authenticated user's channel."""
         repo = self._get_reward_repo()
         return repo.get_active_by_user_and_channel(
             user_id=user_id,
@@ -172,7 +172,7 @@ class DropsConfigMixin:
         platform: str = "twitch",
         quality_id: int = None,
     ) -> Optional[DropsReward]:
-        """Получает случайную активную награду для авторизованного пользователя."""
+        """Get a random active reward for the authenticated user."""
         rewards = self.get_user_rewards(
             user_id=user_id,
             channel_name=channel_name,
@@ -209,9 +209,9 @@ class DropsConfigMixin:
         return rewards[-1]
 
     def get_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = None) -> Optional[DropsConfig]:
-        """Получает конфигурацию Drops для канала
+        """Get the Drops configuration for a channel
         
-        Если platform не указан, возвращает общий конфиг (platform="global").
+        When `platform` is not provided, returns the shared global config.
         """
         target_platform = platform or "global"
 
@@ -229,7 +229,7 @@ class DropsConfigMixin:
             session_id=session_id
         )
 
-        # Если конфига нет и платформа не указана, пытаемся создать общий на основе существующих
+        # When no platform is specified, try to synthesize a global config.
         if not config and not platform:
             return self._create_global_config_from_existing(user_id, session_id, channel_name)
 
@@ -298,7 +298,7 @@ class DropsConfigMixin:
         return None
 
     def create_or_update_config(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = None, config_data: Dict[str, Any] = None) -> DropsConfig:
-        """Создает или обновляет конфигурацию Drops"""
+        """Create or update a Drops configuration."""
         target_platform = platform or "global"
 
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=target_platform)
@@ -330,7 +330,7 @@ class DropsConfigMixin:
         return config
 
     def get_rewards(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", quality_id: Optional[int] = None) -> List[DropsReward]:
-        """Получает награды для канала (общие для всех платформ)"""
+        """Get channel rewards shared across all platforms."""
         from repositories.drops_reward_repository import DropsRewardRepository
         repo = DropsRewardRepository(self.db)
         
@@ -343,13 +343,13 @@ class DropsConfigMixin:
         )
 
     def get_quality_by_name(self, quality_name: str) -> Optional[DropsQuality]:
-        """Получает качество по имени"""
-        """Получает качество по имени"""
+        """Get a quality record by name."""
+        """Get a quality record by name."""
         from repositories.drops_reward_repository import DropsRewardRepository
         return DropsRewardRepository(self.db).get_quality_by_name(quality_name)
 
     def _get_random_reward(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", quality_id: int = None) -> Optional[DropsReward]:
-        """Получает случайную награду по качеству с корректным взвешенным случайным выбором"""
+        """Pick a weighted random reward for the requested quality."""
         rewards = self.get_rewards(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, quality_id=quality_id)
         if not rewards:
             logger.warning(f"No rewards found for quality_id={quality_id}, channel={channel_name}")
@@ -373,7 +373,7 @@ class DropsConfigMixin:
         return rewards[-1]
 
     def _record_drops_history(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, drops_type: str = None, quality_id: int = None, reward: DropsReward = None, **kwargs):
-        """Записывает в историю Drops"""
+        """Write a Drops event to history."""
         history_entry = DropsHistory(
             user_id=user_id,
             session_id=session_id,

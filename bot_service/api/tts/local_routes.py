@@ -48,10 +48,11 @@ def _provider_contract(provider: str) -> dict:
             "supports_native_status_endpoint": False,
             "supports_local_voice_management": False,
             "warning": (
-                "Этот экран настраивает self-hosted endpoint пользователя. "
-                "Managed path для Qwen в проекте сейчас gateway-managed: bot_service -> tts-gateway -> project-hosted worker. "
-                "Текущий upstream nano-qwen3tts-vllm еще не доведен до полного контракта bot_service, поэтому для self-hosted endpoint "
-                "bot_service использует compatibility adapter поверх /api/prepare -> /api/stream/{id}."
+                "This screen configures a user-owned self-hosted endpoint. "
+                "The managed Qwen path in this project remains gateway-managed: "
+                "bot_service -> tts-gateway -> project-hosted worker. "
+                "The current nano-qwen3tts-vllm upstream does not yet satisfy the full bot_service contract, "
+                "so bot_service uses a compatibility adapter over /api/prepare -> /api/stream/{id} for self-hosted endpoints."
             ),
         }
 
@@ -70,11 +71,11 @@ def _provider_contract(provider: str) -> dict:
 
 def _qwen_local_contract_detail() -> str:
     return (
-        "Этот endpoint трактуется как self-hosted Qwen endpoint пользователя. "
-        "Managed path в проекте остается gateway-managed через project-hosted worker. "
-        "Текущий upstream Qwen еще не доведен до полного bot_service contract, поэтому для self-hosted path "
-        "в этом репозитории используется compatibility adapter; для native parity upstream должен получить "
-        "health/auth/status/synthesis contract."
+        "This endpoint is treated as a user-owned self-hosted Qwen endpoint. "
+        "The project-managed path remains gateway-managed through a project-hosted worker. "
+        "The current Qwen upstream does not yet satisfy the full bot_service contract, so this repository uses "
+        "a compatibility adapter for the self-hosted path; native parity still requires upstream "
+        "health/auth/status/synthesis support."
     )
 
 
@@ -299,11 +300,16 @@ async def test_local_tts_connection(
             fetch_status=True,
         )
         if not health_result.get("healthy", False):
+            error_detail = str(health_result.get("error") or "").strip()
             if resolved_provider == "qwen":
                 raise HTTPException(status_code=502, detail=_qwen_local_contract_detail())
+            if error_detail.startswith("Timeout:"):
+                raise HTTPException(status_code=504, detail=error_detail)
+            if error_detail.startswith("endpoint_url"):
+                raise HTTPException(status_code=400, detail=error_detail)
             raise HTTPException(
                 status_code=502,
-                detail=health_result.get("error") or "Connection check failed",
+                detail=error_detail or "Connection check failed",
             )
 
         health_data = {

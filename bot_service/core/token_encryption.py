@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Модуль для шифрования и дешифрования токенов.
-Использует Fernet (симметричное шифрование).
+Helpers for token encryption and decryption.
+Uses Fernet for symmetric encryption.
 
-Зашифрованные токены помечаются префиксом ENC: для быстрой проверки
-без пробного дешифрования.
+Encrypted tokens are marked with the `ENC:` prefix for quick inspection
+without trying to decrypt them first.
 """
 import logging
 import sys
@@ -36,16 +36,16 @@ except Exception as e:
 
 def encrypt_token(token: str) -> str:
     """
-    Шифрует токен и помечает префиксом ENC:.
+    Encrypt a token and prefix it with `ENC:`.
 
     Args:
-        token: Токен для шифрования
+        token: Token value to encrypt
 
     Returns:
-        Зашифрованный токен с префиксом ENC:
+        Encrypted token with the `ENC:` prefix
 
     Raises:
-        TokenEncryptionError: При ошибке шифрования
+        TokenEncryptionError: Raised when encryption fails
     """
     if not token:
         return token
@@ -59,16 +59,16 @@ def encrypt_token(token: str) -> str:
 
 def decrypt_token(encrypted_token: str) -> Optional[str]:
     """
-    Дешифрует токен.
+    Decrypt a token.
 
     Args:
-        encrypted_token: Зашифрованный токен (с или без ENC: префикса)
+        encrypted_token: Encrypted token value, with or without the `ENC:` prefix
 
     Returns:
-        Расшифрованный токен
+        Decrypted token value
 
     Raises:
-        TokenEncryptionError: При ошибке дешифрования
+        TokenEncryptionError: Raised when decryption fails
     """
     if not encrypted_token:
         return encrypted_token
@@ -87,13 +87,13 @@ def decrypt_token(encrypted_token: str) -> Optional[str]:
 
 def is_token_encrypted(token: str) -> bool:
     """
-    Проверяет, зашифрован ли токен (по наличию ENC: префикса).
+    Check whether a token is encrypted by looking for the `ENC:` prefix.
 
     Args:
-        token: Токен для проверки
+        token: Token value to inspect
 
     Returns:
-        True если токен зашифрован, False иначе
+        True if the token is encrypted, otherwise False
     """
     if not token:
         return False

@@ -1,5 +1,5 @@
 ﻿// src/components/tts/TtsFilterManager.tsx
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Plus, UserX, X } from 'lucide-react';
@@ -45,9 +45,11 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
     const [newUsername, setNewUsername] = useState('');
     const [selectedUserPlatform, setSelectedUserPlatform] = useState<string>('twitch');
     const [pendingUnblockKey, setPendingUnblockKey] = useState<string | null>(null);
+    const blacklistFormRef = useRef<HTMLDivElement | null>(null);
 
     // Состояния для словаря фильтра
     const [newWord, setNewWord] = useState('');
+    const forbiddenWordsFormRef = useRef<HTMLDivElement | null>(null);
 
     // React Query hooks для черного списка
     const { data: blockedUsersData, isLoading: loadingUsers } = useBlockedUsers({
@@ -249,13 +251,20 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
 
                 <CardContent className="flex-1 space-y-3 p-3.5">
                     {/* Форма добавления */}
-                    <div className="flex gap-2">
+                    <div ref={blacklistFormRef} className="flex gap-2">
                         <div className="relative flex-1 group">
                             <Input
                                 placeholder="Имя пользователя"
                                 value={newUsername}
                                 onChange={(e) => setNewUsername(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && addToBlacklist()}
+                                onKeyDown={(e) => e.key === 'Enter' && addToBlacklist()}
+                                onBlur={(e) => {
+                                    const nextTarget = e.relatedTarget as Node | null;
+                                    if (nextTarget && blacklistFormRef.current?.contains(nextTarget)) {
+                                        return;
+                                    }
+                                    setNewUsername('');
+                                }}
                                 disabled={addingUser || availablePlatforms.length === 0}
                                 className="w-full bg-gray-900/50 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm pl-3"
                             />
@@ -365,12 +374,19 @@ const TtsFilterManager: React.FC<TtsFilterManagerProps> = React.memo(({ classNam
 
                 <CardContent className="flex-1 space-y-3 p-3.5">
                     {/* Форма добавления */}
-                    <div className="flex gap-2">
+                    <div ref={forbiddenWordsFormRef} className="flex gap-2">
                         <Input
                             placeholder="Слово или фраза"
                             value={newWord}
                             onChange={(e) => setNewWord(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && addWord()}
+                            onKeyDown={(e) => e.key === 'Enter' && addWord()}
+                            onBlur={(e) => {
+                                const nextTarget = e.relatedTarget as Node | null;
+                                if (nextTarget && forbiddenWordsFormRef.current?.contains(nextTarget)) {
+                                    return;
+                                }
+                                setNewWord('');
+                            }}
                             disabled={addingWord}
                             className="flex-1 bg-gray-900/50 border-gray-700/50 text-white placeholder-gray-500 h-9 text-sm"
                         />

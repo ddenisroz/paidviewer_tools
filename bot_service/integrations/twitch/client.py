@@ -2,8 +2,8 @@
 """
 Twitch Helix API Client.
 
-Чистый HTTP клиент для работы с Twitch Helix API.
-Все методы принимают токен явно — управление токенами вынесено в oauth.py.
+Pure HTTP client for working with the Twitch Helix API.
+All methods accept a token explicitly; token management lives in oauth.py.
 """
 
 import logging
@@ -19,16 +19,16 @@ logger = logging.getLogger(__name__)
 
 class TwitchClient(BaseIntegrationClient):
     """
-    Клиент для Twitch Helix API.
+    Client for the Twitch Helix API.
     
-    Примеры использования:
+    Usage examples:
         oauth = TwitchOAuth.from_settings()
         client = TwitchClient(oauth)
         
-        # Запрос с app token
+        # Request with an app token
         user_info = await client.get_user_by_login("streamer_name")
         
-        # Запрос с user token
+        # Request with a user token
         token = TokenInfo(access_token="<user_token>")
         await client.update_stream_title(broadcaster_id, "New Title", token)
     """
@@ -51,7 +51,7 @@ class TwitchClient(BaseIntegrationClient):
         try:
             return await super()._request(method, endpoint, token, params, json_data, data)
         except TokenExpiredError:
-            # Если запрос был без user token (значит использовался app token)
+            # If the request did not include a user token, an app token was used.
             if token is None:
                 logger.warning("[TWITCH] App token expired/invalid, forcing refresh...")
                 try:
@@ -64,11 +64,11 @@ class TwitchClient(BaseIntegrationClient):
             raise
 
     async def _get_headers(self, token: Optional[TokenInfo] = None) -> Dict[str, str]:
-        """Формирует заголовки с Client-ID и Authorization."""
+        """Build headers with Client-ID and Authorization."""
         if token:
             access_token = token.access_token
         else:
-            # Используем app token для публичных запросов
+            # Use an app token for public requests.
             access_token = await self.oauth.get_app_access_token()
         
         return {
@@ -80,7 +80,7 @@ class TwitchClient(BaseIntegrationClient):
     # ==================== Users ====================
     
     async def get_user_by_login(self, login: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о пользователе по login."""
+        """Get user information by login."""
         try:
             result = await self.get("users", params={"login": login})
             data = result.get("data", [])
@@ -90,7 +90,7 @@ class TwitchClient(BaseIntegrationClient):
             return None
     
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о пользователе по ID."""
+        """Get user information by ID."""
         try:
             result = await self.get("users", params={"id": user_id})
             data = result.get("data", [])
@@ -100,7 +100,7 @@ class TwitchClient(BaseIntegrationClient):
             return None
     
     async def get_user_from_token(self, token: TokenInfo) -> Optional[Dict[str, Any]]:
-        """Получает информацию о пользователе по его токену."""
+        """Get user information from the user's token."""
         try:
             result = await self.get("users", token=token)
             data = result.get("data", [])
@@ -112,7 +112,7 @@ class TwitchClient(BaseIntegrationClient):
     # ==================== Streams ====================
     
     async def get_stream_by_login(self, login: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о стриме по login."""
+        """Get stream information by login."""
         try:
             result = await self.get("streams", params={"user_login": login})
             data = result.get("data", [])
@@ -122,7 +122,7 @@ class TwitchClient(BaseIntegrationClient):
             return None
     
     async def get_stream_by_user_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о стриме по user ID."""
+        """Get stream information by user ID."""
         try:
             result = await self.get("streams", params={"user_id": user_id})
             data = result.get("data", [])
@@ -134,7 +134,7 @@ class TwitchClient(BaseIntegrationClient):
     # ==================== Channels ====================
     
     async def get_channel_info(self, broadcaster_id: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о канале."""
+        """Get channel information."""
         try:
             result = await self.get("channels", params={"broadcaster_id": broadcaster_id})
             data = result.get("data", [])
@@ -151,9 +151,9 @@ class TwitchClient(BaseIntegrationClient):
         game_id: Optional[str] = None,
     ) -> bool:
         """
-        Обновляет информацию о канале (title, game).
+        Update channel information such as title and game.
         
-        Требует scope: channel:manage:broadcast
+        Requires scope: channel:manage:broadcast
         """
         data = {}
         if title is not None:
@@ -181,7 +181,7 @@ class TwitchClient(BaseIntegrationClient):
     # ==================== Categories ====================
     
     async def search_categories(self, query: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Поиск категорий/игр."""
+        """Search categories and games."""
         if not query or not query.strip():
             return []
         
@@ -192,7 +192,7 @@ class TwitchClient(BaseIntegrationClient):
             )
             categories = result.get("data", [])
             
-            # Форматируем URL обложек
+            # Format cover-image URLs
             for cat in categories:
                 if 'box_art_url' in cat:
                     cat['box_art_url'] = cat['box_art_url'].replace('{width}x{height}', '285x380')
@@ -203,7 +203,7 @@ class TwitchClient(BaseIntegrationClient):
             return []
     
     async def get_category_by_id(self, game_id: str) -> Optional[Dict[str, Any]]:
-        """Получает информацию о категории по ID."""
+        """Get category information by ID."""
         try:
             result = await self.get("games", params={"id": game_id})
             data = result.get("data", [])
@@ -221,9 +221,9 @@ class TwitchClient(BaseIntegrationClient):
         only_manageable: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Получает список кастомных наград канала.
+        Get the list of custom channel rewards.
         
-        Требует scope: channel:read:redemptions или channel:manage:redemptions
+        Requires scope: channel:read:redemptions or channel:manage:redemptions
         """
         try:
             result = await self.get(
@@ -246,9 +246,9 @@ class TwitchClient(BaseIntegrationClient):
         reward_data: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
         """
-        Создаёт кастомную награду.
+        Create a custom reward.
         
-        Требует scope: channel:manage:redemptions
+        Requires scope: channel:manage:redemptions
         """
         try:
             result = await self.post(
@@ -272,7 +272,7 @@ class TwitchClient(BaseIntegrationClient):
         token: TokenInfo,
         reward_data: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
-        """Обновляет кастомную награду."""
+        """Update a custom reward."""
         try:
             result = await self.patch(
                 f"channel_points/custom_rewards?broadcaster_id={broadcaster_id}&id={reward_id}",
@@ -291,7 +291,7 @@ class TwitchClient(BaseIntegrationClient):
         reward_id: str,
         token: TokenInfo,
     ) -> bool:
-        """Удаляет кастомную награду."""
+        """Delete a custom reward."""
         try:
             await self.delete(
                 f"channel_points/custom_rewards?broadcaster_id={broadcaster_id}&id={reward_id}",
@@ -311,7 +311,7 @@ class TwitchClient(BaseIntegrationClient):
         user_id: str,
         token: TokenInfo,
     ) -> bool:
-        """Добавляет модератора на канал."""
+        """Add a moderator to a channel."""
         try:
             await self.post(
                 "moderation/moderators",
@@ -330,7 +330,7 @@ class TwitchClient(BaseIntegrationClient):
         user_id: str,
         token: TokenInfo,
     ) -> bool:
-        """Удаляет модератора с канала."""
+        """Remove a moderator from a channel."""
         try:
             await self.delete(
                 "moderation/moderators",
@@ -349,7 +349,7 @@ class TwitchClient(BaseIntegrationClient):
         user_id: str,
         token: TokenInfo,
     ) -> bool:
-        """Добавляет VIP на канал."""
+        """Add VIP status on a channel."""
         try:
             await self.post(
                 "channels/vips",
@@ -368,7 +368,7 @@ class TwitchClient(BaseIntegrationClient):
         user_id: str,
         token: TokenInfo,
     ) -> bool:
-        """Удаляет VIP с канала."""
+        """Remove VIP status from a channel."""
         try:
             await self.delete(
                 "channels/vips",
@@ -393,9 +393,9 @@ class TwitchClient(BaseIntegrationClient):
         limit: int = 20
     ) -> List[Dict[str, Any]]:
         """
-        Получает список активаций награды.
+        Get reward redemptions.
         
-        Требует scope: channel:read:redemptions или channel:manage:redemptions
+        Requires scope: channel:read:redemptions or channel:manage:redemptions
         """
         params = {
             "broadcaster_id": broadcaster_id,
@@ -426,9 +426,9 @@ class TwitchClient(BaseIntegrationClient):
         status: str
     ) -> bool:
         """
-        Обновляет статус активации (FULFILLED или CANCELED).
+        Update redemption status (FULFILLED or CANCELED).
         
-        Требует scope: channel:manage:redemptions
+        Requires scope: channel:manage:redemptions
         """
         try:
             result = await self.patch(
@@ -454,12 +454,12 @@ class TwitchClient(BaseIntegrationClient):
         reason: Optional[str] = None
     ) -> bool:
         """
-        Банит или тайм-аутит пользователя.
+        Ban or time out a user.
         
         Args:
-            duration: Если указано, это Timeout (секунды). Если None, это Ban.
+            duration: If provided, this is a timeout in seconds. If None, this is a ban.
             
-        Требует scope: moderator:manage:banned_users
+        Requires scope: moderator:manage:banned_users
         """
         params = {
             "broadcaster_id": broadcaster_id,
@@ -495,9 +495,9 @@ class TwitchClient(BaseIntegrationClient):
         token: TokenInfo
     ) -> bool:
         """
-        Разбанивает или снимает тайм-аут с пользователя.
+        Unban a user or remove a timeout.
         
-        Требует scope: moderator:manage:banned_users
+        Requires scope: moderator:manage:banned_users
         """
         params = {
             "broadcaster_id": broadcaster_id,

@@ -250,7 +250,7 @@ class MemeAlertsService:
             raise ValueError(f"{normalized_platform} integration is not connected")
 
         reward_title = (title or "").strip() or (
-            "MemeCoins reward" if normalized_platform == "twitch" else "Награда MemeCoins"
+            "MemeCoins reward"
         )
         reward_cost = self._safe_int(cost, 500, minimum=1)
         reward_coins = self._safe_int(coins_amount, 10, minimum=1)
@@ -267,13 +267,13 @@ class MemeAlertsService:
                 "title": reward_title,
                 "cost": reward_cost,
                 "is_user_input_required": True,
-                "prompt": "Введите ник саппортера, кому выдать мемкоины",
+                "prompt": "Enter the supporter nickname that should receive MemeCoins",
                 "global_cooldown_seconds": reward_cooldown,
             }
         else:
             reward_payload = {
                 "name": reward_title,
-                "description": "Введите ник саппортера, кому выдать мемкоины",
+                "description": "Enter the supporter nickname that should receive MemeCoins",
                 "price": reward_cost,
                 "is_message_required": True,
                 "repair_timeout": reward_cooldown,
@@ -360,7 +360,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "Укажите ник саппортера в сообщении награды",
+                "error": "Specify the supporter nickname in the reward message",
             }
 
         coins_amount = self._safe_int(platform_settings.get("coins_amount"), 0, minimum=0)
@@ -368,7 +368,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "Некорректная настройка количества мемкоинов",
+                "error": "Invalid MemeCoins amount configuration",
             }
 
         result = await self.grant_coins(

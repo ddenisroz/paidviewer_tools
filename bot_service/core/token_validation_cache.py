@@ -1,8 +1,5 @@
 # bot_service/core/token_validation_cache.py
-"""
-In-memory кеш для валидации токенов.
-Предотвращает избыточные HTTP запросы к API платформ.
-"""
+"""In-memory cache for token validation results."""
 import time
 import logging
 from typing import Dict, Tuple, Optional
@@ -12,13 +9,13 @@ logger = logging.getLogger(__name__)
 
 class TokenValidationCache:
     """
-    Простой thread-safe кеш для результатов валидации токенов.
-    
-    Использует (user_id, platform) как ключ.
-    Хранит (is_valid, timestamp) как значение.
+    Simple thread-safe cache for token validation results.
+
+    Uses ``(user_id, platform)`` as the key and stores
+    ``(is_valid, timestamp)`` as the value.
     """
 
-    # TTL для кеша в секундах (5 минут)
+    # Cache TTL in seconds (5 minutes).
     DEFAULT_TTL = 300
 
     def __init__(self, ttl: int = DEFAULT_TTL):
@@ -29,10 +26,10 @@ class TokenValidationCache:
 
     def get(self, user_id: int, platform: str) -> Optional[bool]:
         """
-        Получить закешированный результат валидации.
-        
+        Return a cached validation result.
+
         Returns:
-            bool: Результат валидации или None если нет в кеше/истек
+            The cached validation result or ``None`` if it is missing or expired.
         """
         key = (user_id, platform)
 
@@ -43,7 +40,7 @@ class TokenValidationCache:
             is_valid, cached_at = self._cache[key]
             age = time.time() - cached_at
 
-            # Проверяем TTL
+            # Check TTL.
             if age > self.ttl:
                 logger.debug(f" [CACHE] Expired for user {user_id}, platform {platform} (age: {age:.1f}s)")
                 del self._cache[key]
@@ -54,7 +51,7 @@ class TokenValidationCache:
 
     def set(self, user_id: int, platform: str, is_valid: bool):
         """
-        Сохранить результат валидации в кеш.
+        Store a validation result in the cache.
         """
         key = (user_id, platform)
 
@@ -64,28 +61,28 @@ class TokenValidationCache:
 
     def invalidate(self, user_id: int, platform: str = None):
         """
-        Инвалидировать кеш для пользователя.
-        
+        Invalidate cached results for a user.
+
         Args:
-            user_id: ID пользователя
-            platform: Конкретная платформа или None (все платформы)
+            user_id: User ID
+            platform: Specific platform or ``None`` for all platforms
         """
         with self._lock:
             if platform:
-                # Инвалидировать конкретную платформу
+                # Invalidate one platform entry.
                 key = (user_id, platform)
                 if key in self._cache:
                     del self._cache[key]
                     logger.debug(f"[DELETE] [CACHE INVALIDATE] user {user_id}, platform {platform}")
             else:
-                # Инвалидировать все платформы пользователя
+                # Invalidate all cached platforms for the user.
                 keys_to_delete = [k for k in self._cache.keys() if k[0] == user_id]
                 for key in keys_to_delete:
                     del self._cache[key]
                 logger.debug(f"[DELETE] [CACHE INVALIDATE] user {user_id}, all platforms ({len(keys_to_delete)} entries)")
 
     def clear(self):
-        """Очистить весь кеш."""
+        """Clear the entire cache."""
         with self._lock:
             count = len(self._cache)
             self._cache.clear()
@@ -93,8 +90,9 @@ class TokenValidationCache:
 
     def cleanup_expired(self):
         """
-        Удалить истекшие записи из кеша.
-        Рекомендуется вызывать периодически в background task.
+        Remove expired cache entries.
+
+        This method is safe to call periodically from a background task.
         """
         now = time.time()
 
@@ -111,7 +109,7 @@ class TokenValidationCache:
                 logger.info(f"[CLEANUP] [CACHE CLEANUP] Removed {len(expired_keys)} expired entries")
 
     def get_stats(self) -> Dict[str, int]:
-        """Получить статистику кеша."""
+        """Return cache statistics."""
         with self._lock:
             return {
                 "total_entries": len(self._cache),

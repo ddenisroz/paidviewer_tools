@@ -1,7 +1,6 @@
 // src/shared/utils/dashboardHelpers.ts
 /**
- * Dashboard helper functions
- * TODO: Implement actual logic
+ * Вспомогательные функции для карточек и индикаторов dashboard.
  */
 
 import { Activity, MessageCircle, Mic, Users } from 'lucide-react';

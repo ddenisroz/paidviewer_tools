@@ -1,6 +1,6 @@
 ﻿# bot_service/api/session_api.py
 """
-API для управления сессиями.
+API for session management.
 Refactored to use SessionService (Clean Architecture).
 """
 import logging
@@ -26,7 +26,7 @@ async def get_active_channels(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Получить список активных каналов"""
+    """Get the list of active channels."""
     try:
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -50,7 +50,7 @@ async def get_active_sessions(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Получить детальную информацию об активных сессиях"""
+    """Get detailed information about active sessions."""
     try:
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
@@ -75,9 +75,9 @@ async def disconnect_channel(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Принудительно отключить канал"""
+    """Force-disconnect a channel."""
     try:
-        # Проверяем права пользователя (только админы)
+        # Only administrators are allowed to perform this action.
         if not _is_admin(user):
             raise HTTPException(status_code=403, detail="Admin access required")
 
@@ -102,13 +102,13 @@ async def get_user_tokens(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Получить токены пользователя"""
+    """Get user tokens."""
     try:
-        # Если user_id не указан, используем текущего пользователя
+        # Use the current user when user_id is not provided.
         if user_id is None:
             user_id = user['id']
 
-        # Проверяем права доступа
+        # Validate access rights.
         if not _is_admin(user) and user['id'] != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
@@ -134,11 +134,11 @@ async def refresh_token(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Обновить токен пользователя (обновить timestamp)"""
+    """Refresh a user token timestamp."""
     try:
         service = SessionService(db)
         
-        # Проверка прав доступа
+        # Validate access rights.
         token_owner_id = service.get_token_owner(token_id)
         if not token_owner_id:
              raise HTTPException(status_code=404, detail="Token not found")
@@ -146,8 +146,8 @@ async def refresh_token(
         if not _is_admin(user) and user['id'] != token_owner_id:
             raise HTTPException(status_code=403, detail="Access denied")
 
-        # Выполняем обновление
-        # (передаем user_id для доп. проверки внутри сервиса, хотя мы уже проверили)
+        # Perform the update.
+        # user_id is still passed for the service-level safety check.
         service.refresh_token(token_id, token_owner_id)
 
         return {"success": True, "message": "Token refreshed successfully"}

@@ -1,5 +1,5 @@
 """
-Проверить статус tts_enabled для пользователя.
+Check the tts_enabled status for a user.
 """
 
 import sys
@@ -25,11 +25,11 @@ def check_tts():
             print(f"tts_listening_mode: {row[2]}")
             
             if row[1]:
-                print("\n⚠️ TTS ВКЛЮЧЕН по умолчанию!")
-                print("\nОтключить:")
+                print("\n[WARN] TTS is enabled by default.")
+                print("\nDisable it with:")
                 print("UPDATE users SET tts_enabled = false WHERE id = 1;")
             else:
-                print("\n TTS выключен (правильно)")
+                print("\n[OK] TTS is disabled.")
         else:
             print("User not found")
 

@@ -39,7 +39,7 @@ def get_or_create_obs_token(db: Session, user_id: int, regenerate: bool = False)
 @router.get("/tts/obs-url")
 @limiter.limit("60/minute")
 async def get_obs_url(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Получить существующий OBS URL"""
+    """Get the existing OBS URL."""
     try:
         user_repo = UserRepository(db)
         user_record = user_repo.get_by_id(user['id'])
@@ -55,7 +55,7 @@ async def get_obs_url(request: Request, user: dict = Depends(get_current_user), 
 @router.post("/tts/generate-obs-url")
 @limiter.limit("60/minute")
 async def generate_obs_url(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Генерировать URL для OBS WebSocket"""
+    """Generate an OBS WebSocket URL."""
     try:
         obs_token = get_or_create_obs_token(db, user['id'])
         return {"obs_token": obs_token}
@@ -70,7 +70,7 @@ async def generate_obs_url(request: Request, user: dict = Depends(get_current_us
 @router.post("/youtube/generate-obs-url")
 @limiter.limit("60/minute")
 async def generate_youtube_obs_url(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Генерировать URL для YouTube OBS WebSocket"""
+    """Generate a YouTube OBS WebSocket URL."""
     try:
         obs_token = get_or_create_obs_token(db, user['id'])
         frontend_url = settings.frontend_url
@@ -86,7 +86,7 @@ async def generate_youtube_obs_url(request: Request, user: dict = Depends(get_cu
 @router.post("/tts/regenerate-obs-url")
 @limiter.limit("60/minute")
 async def regenerate_obs_url(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Перегенерировать OBS URL"""
+    """Regenerate the OBS URL."""
     try:
         obs_token = get_or_create_obs_token(db, user['id'], regenerate=True)
         return {"obs_token": obs_token}
@@ -101,7 +101,7 @@ async def regenerate_obs_url(request: Request, user: dict = Depends(get_current_
 @router.post("/youtube/regenerate-obs-url")
 @limiter.limit("60/minute")
 async def regenerate_youtube_obs_url(request: Request, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Перегенерировать URL для YouTube OBS WebSocket"""
+    """Regenerate the YouTube OBS WebSocket URL."""
     try:
         obs_token = get_or_create_obs_token(db, user['id'], regenerate=True)
         frontend_url = settings.frontend_url

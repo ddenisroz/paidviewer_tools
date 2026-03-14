@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env python3
-"""Единая точка запуска безопасных backend-проверок."""
+"""Single entry point for safe backend checks."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ def _scripts_dir() -> Path:
 
 
 def list_checks() -> None:
-    print("Доступные проверки:")
+    print("Available checks:")
     for alias, script in sorted(CHECK_SCRIPTS.items()):
         print(f"  {alias:14} -> {script}")
 
@@ -35,13 +35,13 @@ def list_checks() -> None:
 def run_check(check_name: str, script_args: list[str]) -> int:
     script_name = CHECK_SCRIPTS.get(check_name)
     if not script_name:
-        print(f"[ERROR] Неизвестная проверка: {check_name}")
+        print(f"[ERROR] Unknown check: {check_name}")
         list_checks()
         return 2
 
     script_path = _scripts_dir() / script_name
     if not script_path.exists():
-        print(f"[ERROR] Скрипт не найден: {script_path}")
+        print(f"[ERROR] Script not found: {script_path}")
         return 2
 
     command = [sys.executable, str(script_path), *script_args]
@@ -51,10 +51,10 @@ def run_check(check_name: str, script_args: list[str]) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Единый launcher для безопасных backend-проверок")
-    parser.add_argument("check_name", nargs="?", help="Алиас проверки (см. --list)")
-    parser.add_argument("script_args", nargs=argparse.REMAINDER, help="Аргументы для целевого скрипта")
-    parser.add_argument("--list", action="store_true", help="Показать доступные проверки")
+    parser = argparse.ArgumentParser(description="Single launcher for safe backend checks")
+    parser.add_argument("check_name", nargs="?", help="Check alias (see --list)")
+    parser.add_argument("script_args", nargs=argparse.REMAINDER, help="Arguments for the target script")
+    parser.add_argument("--list", action="store_true", help="Show available checks")
     args = parser.parse_args()
 
     if args.list or not args.check_name:

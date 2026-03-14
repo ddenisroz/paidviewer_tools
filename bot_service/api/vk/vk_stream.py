@@ -134,7 +134,7 @@ class VKStream(VKAuth):
     async def get_stream_info(self, user_id: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """Get information about the current stream."""
         default_offline = {
-            "online": False, "title": "Стрим оффлайн", "category": "Общение",
+            "online": False, "title": "Stream offline", "category": "Just Chatting",
             "viewer_count": 0, "started_at": "", "stream_key": "",
             "description": "", "thumbnail": ""
         }
@@ -144,8 +144,8 @@ class VKStream(VKAuth):
                 logger.info(f"User {user_id} has not authorized VK Live via OAuth. Stream info unavailable.")
                 return {
                     **default_offline,
-                    "title": "VK Live бот работает (Stream info недоступен)",
-                    "description": "Авторизуйтесь через настройки для получения информации о стриме"
+                    "title": "VK Live bot is running (stream info unavailable)",
+                    "description": "Authorize through settings to retrieve stream information."
                 }
 
             # Get cached channel_url from DB
@@ -187,8 +187,8 @@ class VKStream(VKAuth):
                         category = stream.get("category", {})
                         return {
                             "online": True,
-                            "title": stream.get("title", "Без названия"),
-                            "category": category.get("title", "Без категории") if category else "Без категории",
+                            "title": stream.get("title", "Untitled stream"),
+                            "category": category.get("title", "Uncategorized") if category else "Uncategorized",
                             "category_id": category.get("id") if category else None,
                             "viewer_count": stream.get("counters", {}).get("viewers", 0),
                             "started_at": stream.get("planned_at", ""),
@@ -199,15 +199,15 @@ class VKStream(VKAuth):
                     else:
                         # Offline processing
                         category_id = None
-                        category_name = 'Общение'
-                        title = "Стрим оффлайн"
+                        category_name = 'Just Chatting'
+                        title = "Stream offline"
                         description = ""
                 
                         if stream and isinstance(stream, dict):
                             if stream.get("category"):
                                 category_id = stream["category"].get("id")
-                                category_name = stream["category"].get("title", 'Общение')
-                            title = stream.get("title", "Стрим оффлайн")
+                                category_name = stream["category"].get("title", 'Just Chatting')
+                            title = stream.get("title", "Stream offline")
                             description = stream.get("description", "")
                 
                         return {

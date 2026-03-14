@@ -1,5 +1,5 @@
 # bot_service/core/connection_manager.py
-"""Главный файл ConnectionManager - объединяет все модули"""
+"""Main ConnectionManager module that combines all submodules."""
 import logging
 from typing import List, TYPE_CHECKING
 from fastapi import WebSocket
@@ -12,11 +12,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Глобальный экземпляр ConnectionManager (синглтон)
+# Global ConnectionManager singleton.
 _connection_manager_instance = None
 
 def get_connection_manager():
-    """Возвращает глобальный экземпляр ConnectionManager (синглтон)"""
+    """Return the global ConnectionManager singleton."""
     global _connection_manager_instance
     if _connection_manager_instance is None:
         _connection_manager_instance = ConnectionManager()
@@ -24,14 +24,14 @@ def get_connection_manager():
     return _connection_manager_instance
 
 class ConnectionManager(ConnectionManagerCore):
-    """Главный класс управления соединениями"""
+    """Main connection manager class."""
 
     def __init__(self):
         super().__init__()
         logger.info("[CONNECTION] ConnectionManager initialized")
 
     async def connect(self, websocket: WebSocket, user_id: str):
-        """Подключить WebSocket"""
+        """Connect a user WebSocket."""
         try:
             await websocket.accept()
             self.active_connections[user_id] = websocket
@@ -40,7 +40,7 @@ class ConnectionManager(ConnectionManagerCore):
             logger.error(f"Error connecting WebSocket: {e}")
 
     async def disconnect(self, user_id: str):
-        """Отключить WebSocket"""
+        """Disconnect a user WebSocket."""
         try:
             if user_id in self.active_connections:
                 websocket = self.active_connections[user_id]
@@ -51,14 +51,13 @@ class ConnectionManager(ConnectionManagerCore):
             logger.error(f"Error disconnecting WebSocket: {e}")
 
     async def connect_obs(self, websocket: WebSocket, token: str):
-        """Подключить OBS WebSocket"""
+        """Connect an OBS WebSocket."""
         try:
             await websocket.accept()
             self.obs_connections[token] = websocket
             logger.info(f"OBS WebSocket connected: {token[:10]}...")
 
-            # [START] FIX: Отменяем отложенное отключение TTS при подключении OBS
-            # Получаем user_id из токена
+            # Cancel delayed TTS disconnect when OBS reconnects.
             from auth.auth import verify_jwt_token
 
             try:
@@ -79,7 +78,7 @@ class ConnectionManager(ConnectionManagerCore):
             logger.error(f"Error connecting OBS WebSocket: {e}")
 
     async def disconnect_obs(self, token: str):
-        """Отключить OBS WebSocket"""
+        """Disconnect an OBS WebSocket."""
         try:
             if token in self.obs_connections:
                 websocket = self.obs_connections[token]
@@ -87,8 +86,7 @@ class ConnectionManager(ConnectionManagerCore):
                 del self.obs_connections[token]
                 logger.info(f"OBS WebSocket disconnected: {token[:10]}...")
 
-                # [START] FIX: Планируем отключение TTS если нет других активных соединений
-                # Получаем user_id из токена
+                # Schedule TTS disconnect if no other active listeners remain.
                 from auth.auth import verify_jwt_token
                 from core.database import get_db, User
 
@@ -101,8 +99,7 @@ class ConnectionManager(ConnectionManagerCore):
                             user = db.query(User).filter(User.id == user_id).first()
                             if user:
                                 username = user.twitch_username or user.vk_username or f"user_{user_id}"
-                                # Планируем отключение TTS только если нет других активных соединений
-                                # Это будет проверено в _delayed_tts_disable
+                                # Actual listener checks are handled inside _delayed_tts_disable.
                                 self.schedule_tts_disconnect(user_id, username)
                                 try:
                                     from services.memory_websocket_manager import get_memory_websocket_manager
@@ -119,7 +116,7 @@ class ConnectionManager(ConnectionManagerCore):
             logger.error(f"Error disconnecting OBS WebSocket: {e}")
 
     async def connect_audio(self, websocket: WebSocket, channel: str):
-        """Подключить аудио WebSocket"""
+        """Connect an audio WebSocket."""
         try:
             await websocket.accept()
             self.audio_connections[channel] = websocket
@@ -128,7 +125,7 @@ class ConnectionManager(ConnectionManagerCore):
             logger.error(f"Error connecting audio WebSocket: {e}")
 
     async def disconnect_audio(self, channel: str):
-        """Отключить аудио WebSocket"""
+        """Disconnect an audio WebSocket."""
         try:
             if channel in self.audio_connections:
                 websocket = self.audio_connections[channel]
@@ -139,7 +136,7 @@ class ConnectionManager(ConnectionManagerCore):
             logger.error(f"Error disconnecting audio WebSocket: {e}")
 
     async def send_to_user(self, user_id: str, message: dict):
-        """Отправить сообщение пользователю"""
+        """Send a message to a user."""
         try:
             if user_id in self.active_connections:
                 websocket = self.active_connections[user_id]
@@ -154,7 +151,7 @@ class ConnectionManager(ConnectionManagerCore):
             return False
 
     async def send_to_channel(self, channel: str, message: dict):
-        """Отправить сообщение в канал"""
+        """Send a message to a channel."""
         try:
             if channel in self.audio_connections:
                 websocket = self.audio_connections[channel]
@@ -169,7 +166,7 @@ class ConnectionManager(ConnectionManagerCore):
             return False
 
     async def broadcast(self, message: dict):
-        """Отправить сообщение всем подключенным пользователям"""
+        """Broadcast a message to all connected users."""
         disconnected = []
         for user_id, websocket in self.active_connections.items():
             try:
@@ -180,7 +177,7 @@ class ConnectionManager(ConnectionManagerCore):
                 logger.error(f"Error broadcasting to user {user_id}: {e}")
                 disconnected.append(user_id)
 
-        # Удаляем отключенных пользователей
+        # Remove disconnected users.
         for user_id in disconnected:
             del self.active_connections[user_id]
             logger.debug(f"Removed disconnected user: {user_id}")
@@ -220,19 +217,19 @@ class ConnectionManager(ConnectionManagerCore):
         logger.debug(f"Broadcasted TTS status change to user {user_id}: {enabled}")
 
     def register_client_connection(self, user_id: str, connection_type: str):
-        """Зарегистрировать клиентское соединение"""
+        """Register a client connection."""
         logger.info(f"Client connection registered: {user_id} ({connection_type})")
 
     def unregister_client_connection(self, user_id: str, connection_type: str):
-        """Отменить регистрацию клиентского соединения"""
+        """Unregister a client connection."""
         logger.info(f"Client connection unregistered: {user_id} ({connection_type})")
 
     async def restore_active_sessions_from_db(self, db: 'Session'):
-        """Восстановить активные сессии из БД"""
+        """Restore active sessions from the database."""
         try:
             from core.database import UserSession
 
-            # Получаем все активные сессии
+            # Get all active sessions.
             active_sessions = db.query(UserSession).filter(
                 UserSession.is_active
             ).all()
@@ -243,7 +240,7 @@ class ConnectionManager(ConnectionManagerCore):
                 monitored_channel = device_info.get('monitored_channel')
 
                 if monitored_channel:
-                    # Добавляем сессию в connection manager
+                    # Add the session to the connection manager.
                     self.add_active_session(monitored_channel, session.session_id)
                     restored_count += 1
                     logger.info(
@@ -258,12 +255,12 @@ class ConnectionManager(ConnectionManagerCore):
             logger.error(f"Error restoring sessions from DB: {e}")
 
     async def get_twitch_channels_for_bot(self, db: 'Session') -> List[str]:
-        """Получить список Twitch каналов для бота (бот слушает ВСЕ каналы, tts_enabled проверяется отдельно)"""
+        """Return Twitch channels for the bot to join."""
         try:
-            # Получаем ВСЕ каналы с активным Twitch токеном
+            # Get all channels with active Twitch tokens.
             from core.database import User, UserToken
 
-            # Ищем пользователей с активным Twitch токеном
+            # Find users with active Twitch tokens.
             twitch_users = db.query(User).join(UserToken).filter(
                 UserToken.platform == 'twitch',
                 UserToken.is_active.is_(True),
@@ -282,12 +279,12 @@ class ConnectionManager(ConnectionManagerCore):
             return []
 
     async def get_vk_channels_for_bot(self, db: 'Session') -> List[str]:
-        """Получить список VK Live каналов для бота (бот слушает ВСЕ каналы, tts_enabled проверяется отдельно)"""
+        """Return VK Live channels for the bot to join."""
         try:
-            # Получаем ВСЕ каналы с активным VK токеном
+            # Get all channels with active VK tokens.
             from core.database import User, UserToken
             from sqlalchemy import or_
-            # Ищем пользователей с активным VK токеном
+            # Find users with active VK tokens.
             vk_users = db.query(User).join(UserToken).filter(
                 UserToken.platform == 'vk',
                 UserToken.is_active.is_(True),
@@ -296,7 +293,7 @@ class ConnectionManager(ConnectionManagerCore):
 
             vk_channels = []
             for user in vk_users:
-                # Используем vk_channel_name как основной идентификатор канала
+                # Use vk_channel_name as the primary channel identifier.
                 channel_name = user.vk_channel_name or user.vk_username
                 if user.vk_channel_name and user.vk_username and user.vk_channel_name.lower() != user.vk_username.lower():
                     logger.info(
@@ -319,28 +316,28 @@ class ConnectionManager(ConnectionManagerCore):
             return []
 
     async def cleanup_inactive_channels(self):
-        """Очистка неактивных каналов"""
+        """Clean up inactive channels."""
         try:
-            # Логика очистки неактивных каналов
+            # Placeholder cleanup logic for inactive channels.
             logger.debug("Cleaning up inactive channels")
         except Exception as e:
             logger.error(f"Error cleaning up inactive channels: {e}")
 
     async def cleanup_inactive_clients(self):
-        """Очистка неактивных клиентов"""
+        """Clean up inactive clients."""
         try:
-            # Логика очистки неактивных клиентов
+            # Placeholder cleanup logic for inactive clients.
             logger.debug("Cleaning up inactive clients")
         except Exception as e:
             logger.error(f"Error cleaning up inactive clients: {e}")
 
     def cleanup(self):
-        """Очистка ресурсов"""
+        """Clean up manager resources."""
         try:
-            # Закрываем все соединения
+            # Close all connections.
             for websocket in self.active_connections.values():
                 try:
-                    # websocket.close() - синхронный метод
+                    # websocket.close() is synchronous here.
                     pass
                 except Exception:
                     pass

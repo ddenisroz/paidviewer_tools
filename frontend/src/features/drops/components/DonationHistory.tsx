@@ -6,7 +6,6 @@ import { useDropsHistory } from '@/queries/drops/dropsQueries';
 import { Badge } from '@/shared/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 
-
 import type { DonationEntry } from '../../../types';
 
 interface DonationHistoryProps {
@@ -23,7 +22,7 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
     { platform, drops_type: 'donation', limit: 20 },
     {
       enabled: !!user && !!platform && !!channelName,
-      retry: false, // Silent fail - optional component
+      retry: false,
     }
   );
 
@@ -58,30 +57,30 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
   return (
     <Card className={SURFACE_CARD_CLASS}>
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <History className="w-5 h-5" />
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <History className="h-5 w-5" />
           Недавние донаты
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2 max-h-[min(300px,50vh)] overflow-y-auto">
+        <div className="max-h-[min(300px,50vh)] space-y-2 overflow-y-auto">
           {history.map((entry) => (
-            <div 
+            <div
               key={entry.id}
-              className="flex items-center justify-between p-2 border border-border/70 rounded bg-card/60 hover:bg-accent/60 transition-colors"
+              className="flex items-center justify-between rounded border border-border/70 bg-card/60 p-2 transition-colors hover:bg-accent/60"
             >
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <DollarSign className="w-4 h-4 text-green-400 flex-shrink-0" />
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <DollarSign className="h-4 w-4 flex-shrink-0 text-green-400" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{entry.viewer_name}</p>
-                  <p className={`text-xs truncate ${getQualityColor(entry.quality)}`}>
+                  <p className="truncate text-sm font-medium">{entry.viewer_name}</p>
+                  <p className={`truncate text-xs ${getQualityColor(entry.quality)}`}>
                     {entry.reward_name}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex flex-shrink-0 items-center gap-2">
                 <Badge variant="outline" className="text-xs">
-                  {entry.donation_amount}в‚Ѕ
+                  {entry.donation_amount} ₽
                 </Badge>
                 <span className="text-xs text-muted-foreground">
                   {formatDate(entry.created_at)}
@@ -96,6 +95,3 @@ const DonationHistory: React.FC<DonationHistoryProps> = ({ user, platform, chann
 };
 
 export default DonationHistory;
-
-
-
