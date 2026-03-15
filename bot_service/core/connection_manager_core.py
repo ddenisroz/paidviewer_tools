@@ -132,20 +132,33 @@ class ConnectionManagerCore:
         return len(self.active_sessions.get(channel_name, set()))
 
     def enable_tts_for_channel(self, channel_name: str, tts_type: str='basic'):
-        """Enable TTS for a channel."""
-        if tts_type == 'basic':
-            self.basic_tts_enabled_channels.add(channel_name)
-        elif tts_type == 'ai':
-            self.ai_tts_enabled_channels.add(channel_name)
-        self.tts_enabled_channels.add(channel_name)
-        logger.info(f'TTS enabled for channel {channel_name} (type: {tts_type})')
+        """Enable TTS for a channel and replace the previous type atomically."""
+        normalized_channel = str(channel_name or "").strip().lower()
+        if not normalized_channel:
+            return
+
+        self.basic_tts_enabled_channels.discard(normalized_channel)
+        self.ai_tts_enabled_channels.discard(normalized_channel)
+
+        normalized_type = str(tts_type or "basic").strip().lower()
+        if normalized_type == 'ai':
+            self.ai_tts_enabled_channels.add(normalized_channel)
+        else:
+            self.basic_tts_enabled_channels.add(normalized_channel)
+
+        self.tts_enabled_channels.add(normalized_channel)
+        logger.info(f'TTS enabled for channel {normalized_channel} (type: {normalized_type})')
 
     def disable_tts_for_channel(self, channel_name: str):
         """Disable TTS for a channel."""
-        self.basic_tts_enabled_channels.discard(channel_name)
-        self.ai_tts_enabled_channels.discard(channel_name)
-        self.tts_enabled_channels.discard(channel_name)
-        logger.info(f'TTS disabled for channel {channel_name}')
+        normalized_channel = str(channel_name or "").strip().lower()
+        if not normalized_channel:
+            return
+
+        self.basic_tts_enabled_channels.discard(normalized_channel)
+        self.ai_tts_enabled_channels.discard(normalized_channel)
+        self.tts_enabled_channels.discard(normalized_channel)
+        logger.info(f'TTS disabled for channel {normalized_channel}')
 
     def is_tts_enabled(self, channel_name: str) -> bool:
         """Check whether TTS is enabled for a channel."""

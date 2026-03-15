@@ -46,6 +46,7 @@ async def handle_tts_for_message(
     is_reply: bool = False,
     mentioned_users: list = None,
     reward_id: str = None,
+    message_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Process a chat message through the TTS handler service."""
 
@@ -60,6 +61,7 @@ async def handle_tts_for_message(
         is_reply,
         mentioned_users,
         reward_id,
+        message_id,
     )
 
 

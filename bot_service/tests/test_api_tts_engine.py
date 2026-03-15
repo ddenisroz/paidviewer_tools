@@ -1,5 +1,10 @@
 from unittest.mock import AsyncMock, patch
 
+import httpx
+import pytest
+
+from api.tts import settings_routes
+
 
 def _csrf_headers(authenticated_client):
     # Any GET /api/* sets csrf_token cookie via middleware.
@@ -83,3 +88,19 @@ def test_set_engine_invalid_value(authenticated_client):
         headers=headers,
     )
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_qwen_models_catalog_falls_back_to_product_catalog_when_upstream_unreachable(monkeypatch):
+    async def _raise_request_error(*_args, **_kwargs):
+        raise httpx.ConnectError("unreachable", request=httpx.Request("GET", "http://localhost:8012/api/models"))
+
+    monkeypatch.setattr(settings_routes.settings, "qwen_tts_service_url", "http://localhost:8012")
+    monkeypatch.setattr(settings_routes, "_fetch_qwen_models_payload", _raise_request_error)
+
+    result = await settings_routes.get_qwen_models_catalog(mode="cloud", user={"id": 1}, db=None)
+
+    assert result["success"] is True
+    assert result["available"] is True
+    assert [item["label"] for item in result["models"]] == ["1.7 Base", "1.7 VoiceDesign", "1.7 CustomVoice"]
+    assert result["detail"]["code"] == "qwen_models_upstream_unreachable"

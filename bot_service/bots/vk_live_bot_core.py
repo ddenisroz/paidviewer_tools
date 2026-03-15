@@ -219,6 +219,7 @@ class VKLiveBotCore:
         try:
             # Логируем все сообщения
             text = message.get("text", "")
+            source_message_id = str(message.get("id") or message.get("message_id") or "").strip() or None
             author = message.get("author", {})
             user = author.get("nick", author.get("name", "Unknown"))  # nick - правильное поле для VK Live
             user_id = str(author.get("id", ""))
@@ -251,6 +252,7 @@ class VKLiveBotCore:
                 content=text,
                 platform="vk",
                 channel=channel_id,
+                message_id=source_message_id,
                 role=role,
                 badges=badges,
                 emotes=emotes,
@@ -470,7 +472,8 @@ class VKLiveBotCore:
             tts_api=self.tts_api,
             connection_manager=self.connection_manager,
             skip_if_command=False,  # Команды уже отфильтрованы в _handle_message
-            reward_id=reward_id  # Передаем reward_id если есть
+            reward_id=reward_id,  # Передаем reward_id если есть
+            message_id=str(message.get("id") or message.get("message_id") or "").strip() or None,
         )
 
     def get_connected_channels(self) -> List[str]:

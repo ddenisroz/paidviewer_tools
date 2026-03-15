@@ -44,7 +44,7 @@ async def synthesize_text(
     try:
         data = await request.json()
         text = data.get("text")
-        voice = data.get("voice", "female_1") 
+        voice = data.get("voice", "default_voice")
         # Optional params
         channel = data.get("channel")
         platform = data.get("platform", "twitch")

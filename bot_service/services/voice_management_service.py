@@ -258,6 +258,7 @@ class VoiceManagementService:
         content: bytes,
         content_type: str,
         provider: str = "f5",
+        reference_text: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Upload a user voice.
@@ -306,6 +307,9 @@ class VoiceManagementService:
             # 3. External Service Upload
             files = {'file': (filename, content, content_type)}
             data = {'voice_name': name, 'user_id': str(user_id)}
+            if reference_text:
+                data['reference_text'] = reference_text
+                data['sample_text'] = reference_text
 
             async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.post(

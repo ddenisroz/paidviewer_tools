@@ -204,6 +204,48 @@ async def test_health_cache_scoped_by_endpoint(manager, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_gateway_health_status_ok_is_considered_healthy(manager, monkeypatch):
+    calls: list[str] = []
+
+    class _FakeResponse:
+        def __init__(self, status: int, payload: dict):
+            self.status = status
+            self._payload = payload
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def json(self):
+            return self._payload
+
+    class _FakeClientSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url: str, **kwargs):
+            calls.append(url)
+            _ = kwargs
+            return _FakeResponse(200, {"status": "ok", "redis": "ok", "scheduler": "running"})
+
+    monkeypatch.setattr(
+        "services.tts.tts_manager.aiohttp.ClientSession",
+        lambda timeout=None: _FakeClientSession(),
+    )
+    monkeypatch.setattr("services.tts.provider_utils.settings.tts_gateway_url", "http://gateway")
+
+    result = await manager.check_tts_service_health(provider="qwen", force_check=True)
+
+    assert result is True
+    assert "http://gateway/health/ready" in calls
+
+
+@pytest.mark.asyncio
 async def test_get_user_tts_endpoint_returns_saved_api_key(manager, monkeypatch):
     class _LocalConfig:
         endpoint_url = "http://endpoint-a"

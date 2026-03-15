@@ -12,6 +12,7 @@ from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from core.database import get_db
+from core.internal_service_auth import build_tts_auth_headers
 from auth.auth import get_current_user
 from services.tts.tts_manager import get_tts_manager
 from services.tts.provider_utils import normalize_local_tts_endpoint_url
@@ -56,7 +57,7 @@ class TtsSettingsRequest(BaseModel):
     advancedProvider: Optional[str] = Field(None)
     f5Mode: Optional[str] = Field(None)
     qwenMode: Optional[str] = Field(None)
-    voice: str = Field('female_1')
+    voice: str = Field('default_voice')
     listeningMode: str = Field('website')
     maxMessageLength: int = Field(500, ge=50, le=2000)
     skipCommands: bool = Field(True)
@@ -308,18 +309,45 @@ async def check_local_tts_health(
     try:
         endpoint = normalize_local_tts_endpoint_url(endpoint_url)
         normalized_provider = (provider or "f5").strip().lower()
-        headers = {}
-        if api_key:
-            headers['Authorization'] = f'Bearer {api_key}'
+        headers = build_tts_auth_headers(
+            provider=normalized_provider,
+            upstream="local",
+            local_api_key=api_key,
+            strict=False,
+        )
 
         async with httpx.AsyncClient(timeout=5.0) as client:
             if normalized_provider == "qwen":
                 compatibility_note = (
                     "This endpoint is treated as a user's self-hosted Qwen endpoint. "
                     "The managed project path remains gateway-managed through a project-hosted worker. "
-                    "The current upstream Qwen runtime does not yet expose the full bot_service contract, "
-                    "so the self-hosted path uses a compatibility flow via /api/prepare -> /api/stream/{id}."
+                    "The self-hosted path still uses a compatibility flow via /api/prepare -> /api/stream/{id}, "
+                    "but the worker now exposes health, model catalog and user voice CRUD endpoints."
                 )
+                for health_path in ("/health/ready", "/health/live", "/health"):
+                    try:
+                        health_probe = await client.get(f"{endpoint}{health_path}", headers=headers)
+                        if health_probe.status_code == 200:
+                            health_payload = health_probe.json()
+                            result = {
+                                "healthy": True,
+                                "status": health_payload.get("status", "healthy"),
+                                "compatibility_mode": "qwen_prepare_stream",
+                                "warning": compatibility_note,
+                                "version": health_payload.get("version"),
+                                "ready": health_payload.get("ready"),
+                                "phase": health_payload.get("phase"),
+                                "percent": health_payload.get("percent"),
+                                "message": health_payload.get("message"),
+                                "current_model": health_payload.get("current_model"),
+                                "target_model": health_payload.get("target_model"),
+                            }
+                            if fetch_status:
+                                result["status_data"] = None
+                            return result
+                    except httpx.RequestError:
+                        pass
+
                 try:
                     prepare_probe = await client.get(f"{endpoint}/api/prepare", headers=headers)
                     if prepare_probe.status_code in {405, 422}:
@@ -361,11 +389,17 @@ async def check_local_tts_health(
                     "healthy": True,
                     "status": data.get('status', 'healthy'),
                     "version": data.get('version'),
-                    "gpu_info": data.get('gpu_info')
+                    "gpu_info": data.get('gpu_info'),
+                    "ready": data.get("ready"),
+                    "phase": data.get("phase"),
+                    "percent": data.get("percent"),
+                    "message": data.get("message"),
+                    "current_model": data.get("current_model"),
+                    "target_model": data.get("target_model"),
                 }
                 if fetch_status:
                     try:
-                        status_response = await client.get(f"{endpoint}/api/status", headers=headers)
+                        status_response = await client.get(f"{endpoint}/api/tts/status", headers=headers)
                         result["status_data"] = status_response.json() if status_response.status_code == 200 else None
                     except Exception:
                         result["status_data"] = None

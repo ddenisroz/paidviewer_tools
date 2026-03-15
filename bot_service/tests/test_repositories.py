@@ -25,7 +25,7 @@ class TestTTSSettingsRepository:
         assert settings is not None
         assert settings.user_id == test_user.id
         assert settings.engine == 'gtts'  # Default
-        assert settings.voice == 'female_1'  # Default
+        assert settings.voice == 'default_voice'  # Default
     
     def test_get_or_create_existing_user(self, db: Session, test_user):
         """Should return existing settings."""

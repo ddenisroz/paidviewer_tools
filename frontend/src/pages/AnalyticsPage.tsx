@@ -19,7 +19,7 @@ const AnalyticsPage: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { integrations } = useIntegrations();
-  const { data: commandsData } = useCommands({
+  const { data: commandsData, isLoading: isCommandsLoading } = useCommands({
     enabled: !!isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
   });
   const createOverrideMutation = useCreateCommandOverride();
@@ -35,7 +35,7 @@ const AnalyticsPage: React.FC = () => {
     return alias || 'analyze';
   }, [analyzeCommand?.alias]);
 
-  const isEnabled = analyzeCommand?.enabled ?? false;
+  const isEnabled = !isCommandsLoading && (analyzeCommand?.enabled ?? false);
 
   const handleToggle = async (enabled: boolean): Promise<void> => {
     if (!analyzeCommand) return;
@@ -82,20 +82,29 @@ const AnalyticsPage: React.FC = () => {
             <CardHeader className="pb-1">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Terminal className="h-3 w-3 text-emerald-300" />
+                  <Terminal className="h-3 w-3 text-sky-300" />
                   <code className="text-sm font-bold font-mono bg-muted px-2 py-1 rounded text-foreground">
                     !{effectiveCommandName}
                   </code>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={isEnabled ? "default" : "secondary"}>
-                    {isEnabled ? 'Включена' : 'Отключена'}
-                  </Badge>
-                  <Switch
-                    checked={isEnabled}
-                    disabled={!hasAnalyzeCommand || !hasPlatforms || isSaving}
-                    onCheckedChange={handleToggle}
-                  />
+                  {isCommandsLoading ? (
+                    <>
+                      <div className="h-6 w-20 animate-pulse rounded-full bg-muted" />
+                      <div className="h-6 w-11 animate-pulse rounded-full bg-muted" />
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant={isEnabled ? "default" : "secondary"}>
+                        {isEnabled ? 'Включена' : 'Отключена'}
+                      </Badge>
+                      <Switch
+                        checked={isEnabled}
+                        disabled={!hasAnalyzeCommand || !hasPlatforms || isSaving}
+                        onCheckedChange={handleToggle}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -105,7 +114,7 @@ const AnalyticsPage: React.FC = () => {
               </p>
 
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <Badge variant="outline" className="text-xs px-1.5 py-0 bg-emerald-500/10 text-emerald-300 border-emerald-500/30">
+                <Badge variant="outline" className="text-xs px-1.5 py-0 bg-sky-500/10 text-sky-300 border-sky-500/30">
                   <MessageSquare className="h-3 w-3 mr-1" /> Аналитика
                 </Badge>
                 {!hasPlatforms && (

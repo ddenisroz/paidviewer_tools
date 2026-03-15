@@ -174,10 +174,13 @@ export const ttsService = {
    * Получить health статус TTS сервиса
    * @returns Promise с ответом API
    */
-  async getHealth(provider: 'f5' | 'qwen' | 'gcloud' = 'f5'): Promise<AxiosResponse<ApiResponse>> {
+  async getHealth(
+    provider: 'f5' | 'qwen' | 'gcloud' = 'f5',
+    mode?: 'cloud' | 'local',
+  ): Promise<AxiosResponse<ApiResponse>> {
     try {
       return await apiClient.get('/api/tts/health', {
-        params: { provider },
+        params: { provider, mode },
         timeout: 3000,
         skipRetry: true,
       } as AxiosRequestConfig & { skipRetry: boolean });
@@ -190,6 +193,7 @@ export const ttsService = {
             status: 'unhealthy',
             healthy: false,
             provider,
+            mode,
           }
         },
         status: 500,
@@ -202,6 +206,10 @@ export const ttsService = {
 
   async getProviderCapabilities(): Promise<AxiosResponse<ApiResponse<Record<string, unknown>>>> {
     return apiClient.get('/api/voices/providers/capabilities');
+  },
+
+  async getQwenModels(mode: 'cloud' | 'local' = 'cloud'): Promise<AxiosResponse<ApiResponse<Record<string, unknown>>>> {
+    return apiClient.get('/api/tts/qwen/models', { params: { mode } });
   },
 
   /**

@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         description="Strict API key for bot_service -> f5-tts-service requests",
     )
     qwen_tts_service_url: str = Field(
-        default="http://localhost:8000",
+        default="http://localhost:8012",
         description="Qwen TTS service URL",
     )
     qwen_tts_service_api_key: Optional[str] = Field(
@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     )
     qwen_voice_service_url: str = Field(
         default="",
-        description="Optional dedicated Qwen voice-management API URL (enables qwen voice CRUD when set)",
+        description="Optional dedicated Qwen voice-management API URL; when empty bot_service falls back to qwen_tts_service_url",
     )
     f5_tts_storage_root: Optional[str] = Field(
         default=None,

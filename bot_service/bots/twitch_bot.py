@@ -307,8 +307,10 @@ class Bot(TwitchBotCore):
         
         # Извлекаем reward_id из IRC tags если сообщение отправлено с наградой
         reward_id = None
+        source_message_id = None
         if hasattr(message, 'tags') and message.tags:
             reward_id = message.tags.get('custom-reward-id')
+            source_message_id = str(message.tags.get("id") or "").strip() or None
             if reward_id:
                 logger.info(f"[REWARD] [TWITCH MSG] Message from Channel Points reward: {reward_id}")
         
@@ -320,7 +322,8 @@ class Bot(TwitchBotCore):
             tts_api=self.tts_api,
             connection_manager=self.connection_manager,
             skip_if_command=True,
-            reward_id=reward_id
+            reward_id=reward_id,
+            message_id=source_message_id,
         )
 
     async def _handle_drops(self, message):
@@ -424,4 +427,3 @@ class Bot(TwitchBotCore):
             logger.info("[BOT] Twitch bot shutdown complete")
         except Exception as e:
             logger.error(f"[ERROR] Error during bot shutdown: {e}")
-

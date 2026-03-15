@@ -25,6 +25,33 @@ def test_normalize_provider(raw: str, expected: str):
 
 
 @pytest.mark.parametrize(
+    ("raw_model", "expected"),
+    [
+        (None, provider_utils.QWEN_BASE_MODEL),
+        ("", provider_utils.QWEN_BASE_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-0.6B-Base", provider_utils.QWEN_BASE_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", provider_utils.QWEN_BASE_MODEL),
+        ("base", provider_utils.QWEN_BASE_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", provider_utils.QWEN_VOICEDESIGN_MODEL),
+        ("customvoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
+        ("voicedesign", provider_utils.QWEN_VOICEDESIGN_MODEL),
+    ],
+)
+def test_normalize_qwen_model_selection(raw_model: str | None, expected: str):
+    assert provider_utils.normalize_qwen_model_selection(raw_model) == expected
+
+
+def test_get_qwen_model_catalog_returns_three_product_options():
+    catalog = provider_utils.get_qwen_model_catalog()
+    assert [item["label"] for item in catalog] == ["1.7 Base", "1.7 VoiceDesign", "1.7 CustomVoice"]
+    assert catalog[0]["supports_voice_cloning"] is True
+    assert catalog[1]["requires_prompt"] is True
+    assert catalog[2]["requires_prompt"] is True
+
+
+@pytest.mark.parametrize(
     ("engine", "advanced_provider", "expected"),
     [
         ("f5tts", None, "f5"),
@@ -136,6 +163,7 @@ def test_get_provider_upstream_params_includes_provider_only_for_gateway(monkeyp
 
 def test_voice_management_url_qwen_requires_qwen_voice_service(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
+    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "")
     with pytest.raises(provider_utils.ProviderRoutingError, match="qwen_voice_crud_not_available"):
         provider_utils.get_voice_management_upstream_url("qwen")
 
@@ -145,9 +173,16 @@ def test_voice_management_url_qwen_uses_qwen_voice_service(monkeypatch):
     assert provider_utils.get_voice_management_upstream_url("qwen") == "http://qwen-voices:8020"
 
 
+def test_voice_management_url_qwen_falls_back_to_qwen_tts_service(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
+    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8012/")
+    assert provider_utils.get_voice_management_upstream_url("qwen") == "http://qwen:8012"
+
+
 def test_provider_capabilities_qwen_defaults_to_no_voice_crud(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
     monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
+    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "")
     capabilities = provider_utils.get_provider_capabilities("qwen")
     assert capabilities["provider"] == "qwen"
     assert capabilities["synthesis_available"] is True
@@ -158,6 +193,15 @@ def test_provider_capabilities_qwen_defaults_to_no_voice_crud(monkeypatch):
 def test_provider_capabilities_qwen_enables_voice_crud_with_voice_url(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
     monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "http://qwen-voices:8020")
+    capabilities = provider_utils.get_provider_capabilities("qwen")
+    assert capabilities["voice_crud"] is True
+    assert capabilities["voice_admin"] is True
+
+
+def test_provider_capabilities_qwen_enables_voice_crud_with_qwen_tts_url(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
+    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
+    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8012")
     capabilities = provider_utils.get_provider_capabilities("qwen")
     assert capabilities["voice_crud"] is True
     assert capabilities["voice_admin"] is True

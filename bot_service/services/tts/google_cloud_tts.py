@@ -43,12 +43,9 @@ _VOICES_CACHE_TTL = 6 * 60 * 60
 _GEMINI_MODEL_NAME = "gemini-2.5-flash-tts"
 _GCLOUD_DEFAULT_MOOD = "neutral"
 _GCLOUD_MOOD_PROMPTS = {
-    "neutral": "You are having a casual conversation style with a friend.",
-    "sad": "Your communication style is very sad and depressive.",
-    "happy": (
-        "Your communication style is very unexpected, no one knows what to expect from you. "
-        "Bun mostly you are happy."
-    ),
+    "neutral": "Speak naturally, clearly, and conversationally.",
+    "sad": "Speak softly with a calm, subdued tone.",
+    "happy": "Speak warmly with a cheerful, upbeat tone.",
 }
 _GEMINI_ALIAS_PATTERN = re.compile(r"^([a-z]{2}-[A-Z]{2})-Gemini-([A-Za-z0-9_]+)$")
 _CHIRP_HD_PATTERN = re.compile(r"^([a-z]{2}-[A-Z]{2})-Chirp3-HD-([A-Za-z0-9_]+)$")
@@ -490,8 +487,9 @@ class GoogleCloudTTS:
         if model_name:
             voice_payload["modelName"] = model_name
 
+        resolved_mood = normalize_gcloud_mood(mood)
         explicit_prompt = (prompt or "").strip()
-        normalized_prompt = explicit_prompt or get_gcloud_prompt_for_mood(mood)
+        normalized_prompt = explicit_prompt or get_gcloud_prompt_for_mood(resolved_mood)
         input_payload: Dict[str, Any] = {"text": processed_text}
         if normalized_prompt and model_name:
             input_payload["prompt"] = normalized_prompt
@@ -500,11 +498,12 @@ class GoogleCloudTTS:
         fallback_used = False
 
         logger.info(
-            "[GCLOUD] TTS request resolved: input_voice=%s resolved_voice=%s model=%s lang=%s prompt=%s",
+            "[GCLOUD] TTS request resolved: input_voice=%s resolved_voice=%s model=%s lang=%s mood=%s prompt=%s",
             voice_name or "-",
             resolved_voice_name,
             model_name or "-",
             language_code,
+            resolved_mood,
             "yes" if normalized_prompt else "no",
         )
 

@@ -40,7 +40,7 @@ class TestTTSAPI:
         headers = _csrf_headers(authenticated_client)
         response = authenticated_client.post(
             "/api/tts/settings",
-            json={"voice": "female_1", "maxMessageLength": 400},
+            json={"voice": "default_voice", "maxMessageLength": 400},
             headers=headers,
         )
         assert response.status_code == 200
@@ -74,7 +74,7 @@ class TestTTSAPI:
         headers = _csrf_headers(authenticated_client)
         response = authenticated_client.post(
             "/api/tts/synthesize",
-            json={"voice": "female_1"},
+            json={"voice": "default_voice"},
             headers=headers,
         )
         assert response.status_code == 400

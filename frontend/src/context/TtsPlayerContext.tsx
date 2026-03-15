@@ -15,6 +15,10 @@ interface TtsQueueItem {
     volume: number;
     username?: string;
     platform?: string;
+    spokenText?: string;
+    originalText?: string;
+    traceId?: string;
+    sourceMessageId?: string;
     timestamp: Date;
 }
 
@@ -167,6 +171,10 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         volume?: number;
         username?: string;
         platform?: string;
+        spoken_text?: string;
+        original_text?: string;
+        trace_id?: string;
+        source_message_id?: string;
     }) => {
         if (!payload.audio_url) {
             return;
@@ -187,18 +195,31 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         const normalizedVolume = typeof payload.volume === 'number'
             ? Math.max(0, Math.min(100, Math.round(payload.volume)))
             : 50;
+        const spokenText = payload.spoken_text || payload.text || 'TTS Message';
 
         const newItem: TtsQueueItem = {
             id: `${Date.now()}-${Math.random()}`,
-            text: payload.text || 'TTS Message',
+            text: spokenText,
             audioUrl: resolveAudioUrl(payload.audio_url),
             volume: normalizedVolume,
             username: payload.username,
             platform: payload.platform,
+            spokenText,
+            originalText: payload.original_text,
+            traceId: payload.trace_id,
+            sourceMessageId: payload.source_message_id,
             timestamp: new Date()
         };
 
         setQueue((prev) => [...prev, newItem]);
+        logger.info('[TTS Player] Enqueued socket audio', {
+            trace_id: newItem.traceId,
+            source_message_id: newItem.sourceMessageId,
+            username: newItem.username,
+            platform: newItem.platform,
+            spoken_text: newItem.spokenText,
+            original_text: newItem.originalText,
+        });
     }, [resolveAudioUrl]);
 
     useEffect(() => {
@@ -434,12 +455,20 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                             volume?: number;
                             username?: string;
                             platform?: string;
+                            spoken_text?: string;
+                            original_text?: string;
+                            trace_id?: string;
+                            source_message_id?: string;
                         };
                         audio_url?: string;
                         text?: string;
                         volume?: number;
                         username?: string;
                         platform?: string;
+                        spoken_text?: string;
+                        original_text?: string;
+                        trace_id?: string;
+                        source_message_id?: string;
                     };
                     if (message.type === 'ping') {
                         ws.send(JSON.stringify({ type: 'ping' }));

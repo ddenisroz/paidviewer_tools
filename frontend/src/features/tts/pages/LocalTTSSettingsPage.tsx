@@ -11,7 +11,6 @@ import {
     HardDrive,
     Loader2,
     Mic,
-    Plus,
     RefreshCw,
     Server,
     Settings,
@@ -27,10 +26,9 @@ import { TABLE_CLASSES } from '@/constants/designSystem';
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import {
-    useCreateVoiceMutation,
     useDeleteVoiceMutation,
     useLocalVoicesQuery,
-    useUploadSampleMutation
+    useUploadVoiceMutation
 } from '@/queries/tts/localVoicesQueries';
 import {
     useLocalTtsConfig,
@@ -42,7 +40,7 @@ import PageWrapper from '@/shared/components/PageWrapper';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
@@ -76,10 +74,10 @@ const PROVIDER_META: Record<LocalTtsProvider, ProviderMeta> = {
     },
     qwen: {
         label: 'Qwen 3 TTS',
-        defaultEndpoint: 'http://localhost:8000',
+        defaultEndpoint: 'http://localhost:8012',
         folder: 'nano-qwen3tts-vllm',
         installCommand: 'python -m pip install -r requirements.txt',
-        runCommand: 'python api_server.py',
+        runCommand: 'python api_server.py --host 0.0.0.0 --port 8012',
         apiKeyHint: 'Поле API ключа пока резервное: текущий upstream Qwen не применяет strict auth contract, как F5.',
         docsUrl: 'https://github.com/calldatfate/nano-qwen3tts-vllm'
     }
@@ -113,12 +111,12 @@ const DEFAULT_PROVIDER_CONTRACT: Record<LocalTtsProvider, ProviderContract> = {
         upstream_parity_ready: false,
         requires_compatibility_adapter: true,
         managed_topology: 'gateway_managed',
-        project_hosted_direct_supported: false,
+        project_hosted_direct_supported: true,
         supports_native_strict_api_key: false,
-        supports_native_health_endpoint: false,
+        supports_native_health_endpoint: true,
         supports_native_status_endpoint: false,
-        supports_local_voice_management: false,
-        warning: 'Этот экран настраивает self-hosted endpoint пользователя. Managed path для Qwen в проекте сейчас gateway-managed: bot_service -> tts-gateway -> project-hosted worker. Для self-hosted endpoint bot_service использует compatibility adapter поверх /api/prepare -> /api/stream/{id}, пока upstream не закроет native parity.',
+        supports_local_voice_management: true,
+        warning: 'Этот экран настраивает self-hosted endpoint пользователя. Managed path для Qwen в проекте сейчас gateway-managed: bot_service -> tts-gateway -> project-hosted worker на localhost:8012. Для self-hosted endpoint synthesis по-прежнему идёт через compatibility adapter поверх /api/prepare -> /api/stream/{id}, но worker уже отдает health, model catalog и user voice CRUD.',
     },
 };
 
@@ -138,6 +136,12 @@ interface HealthData {
     status: string;
     version?: string;
     uptime?: number;
+    ready?: boolean;
+    phase?: string;
+    percent?: number;
+    message?: string;
+    current_model?: string | null;
+    target_model?: string | null;
     gpu_info?: {
         name: string;
         memory_total: number;
@@ -145,6 +149,20 @@ interface HealthData {
 }
 
 interface StatusData {
+    ready?: boolean;
+    phase?: string;
+    percent?: number;
+    message?: string;
+    current_model?: string | null;
+    target_model?: string | null;
+    progress?: {
+        ready?: boolean;
+        phase?: string;
+        percent?: number;
+        message?: string;
+        current_model?: string | null;
+        target_model?: string | null;
+    };
     stats?: {
         total_requests: number;
         successful_requests: number;
@@ -156,20 +174,25 @@ interface StatusData {
 interface Voice {
     id: number;
     name: string;
-    language: string;
-    description?: string;
+    language?: string | null;
+    description?: string | null;
     type?: 'base' | 'custom';
+    voice_type?: 'base' | 'custom';
     samples_count?: number;
+    file_path?: string | null;
+    is_active?: boolean;
 }
 
-interface NewVoice {
+interface UploadVoiceDraft {
     name: string;
-    language: 'ru' | 'en';
-    description: string;
+    sampleText: string;
+    file: File | null;
 }
 
 const TAB_TRIGGER_CLASS =
-    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-400 data-[state=active]:shadow-none';
+    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none';
+const PROVIDER_SWITCH_TAB_CLASS =
+    'appearance-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-[inset_0_-1px_0_0_rgba(14,165,233,1)]';
 
 const MANAGED_TOPOLOGY_LABELS: Record<NonNullable<ProviderContract['managed_topology']>, string> = {
     gateway_managed: 'gateway-managed',
@@ -198,30 +221,83 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [testResult, setTestResult] = useState<TestResult | null>(null);
     const [healthData, setHealthData] = useState<HealthData | null>(null);
     const [statusData, setStatusData] = useState<StatusData | null>(null);
-
-    const activeVoicesEndpoint = testResult?.success ? config.endpoint_url : undefined;
-
-    // TanStack Query for voices (replaces manual axios calls)
-    const { data: voicesData, isLoading: loadingVoices, refetch: refetchVoices } = useLocalVoicesQuery(provider, activeVoicesEndpoint);
-    const voices = (voicesData || []) as Voice[];
-
-    const createVoiceMutation = useCreateVoiceMutation(provider, activeVoicesEndpoint);
-    const uploadSampleMutation = useUploadSampleMutation(provider, activeVoicesEndpoint);
-    const deleteVoiceMutation = useDeleteVoiceMutation(provider, activeVoicesEndpoint);
-
-    const [isCreateVoiceDialogOpen, setIsCreateVoiceDialogOpen] = useState<boolean>(false);
-    const [newVoice, setNewVoice] = useState<NewVoice>({ name: '', language: 'ru', description: '' });
-    const uploadingFile = uploadSampleMutation.isPending;
-    const [currentTab, setCurrentTab] = useState<'connection' | 'voices'>('connection');
+    const [hasResolvedInitialConfig, setHasResolvedInitialConfig] = useState<boolean>(false);
     const { data: configData, isLoading: configLoading, error: configError } = useLocalTtsConfig(provider);
     const providerContract = configData?.provider_contract || DEFAULT_PROVIDER_CONTRACT[provider];
+
+    const canManageVoices = providerContract.supports_local_voice_management !== false;
+    const hasSavedConfig = configData?.configured === true;
+    const canOpenVoiceManagement = canManageVoices && testResult?.success === true && hasSavedConfig;
+    const shouldLoadVoices = canOpenVoiceManagement;
+    const initializationState = React.useMemo(() => {
+        const candidate = statusData?.progress || statusData || healthData;
+        if (!candidate) {
+            return null;
+        }
+
+        const rawPercent = candidate.percent;
+        const percent = typeof rawPercent === 'number'
+            ? Math.max(0, Math.min(100, rawPercent))
+            : null;
+        const phase = typeof candidate.phase === 'string' ? candidate.phase : null;
+        const message = typeof candidate.message === 'string' ? candidate.message : null;
+        const currentModel = typeof candidate.current_model === 'string' ? candidate.current_model : null;
+        const targetModel = typeof candidate.target_model === 'string' ? candidate.target_model : null;
+        const ready = candidate.ready === true || healthData?.status === 'healthy';
+
+        if (percent === null && !phase && !message && !currentModel && !targetModel) {
+            return null;
+        }
+
+        return {
+            percent,
+            phase,
+            message,
+            currentModel,
+            targetModel,
+            ready,
+        };
+    }, [healthData, statusData]);
+
+    const { data: voicesData, isLoading: loadingVoices, refetch: refetchVoices } = useLocalVoicesQuery(provider, shouldLoadVoices);
+    const voices = (voicesData || []) as Voice[];
+
+    const uploadVoiceMutation = useUploadVoiceMutation(provider);
+    const deleteVoiceMutation = useDeleteVoiceMutation(provider);
+
+    const [isUploadVoiceDialogOpen, setIsUploadVoiceDialogOpen] = useState<boolean>(false);
+    const [uploadVoiceDraft, setUploadVoiceDraft] = useState<UploadVoiceDraft>({
+        name: '',
+        sampleText: '',
+        file: null,
+    });
+    const uploadingFile = uploadVoiceMutation.isPending;
+    const [currentTab, setCurrentTab] = useState<'connection' | 'voices'>('connection');
 
     useEffect(() => {
         setTestResult(null);
         setHealthData(null);
         setStatusData(null);
         setCurrentTab('connection');
-    }, [provider]);
+        setConfig({
+            endpoint_url: providerMeta.defaultEndpoint,
+            api_key: '',
+            use_local: false,
+        });
+        setHasStoredApiKey(false);
+    }, [provider, providerMeta.defaultEndpoint]);
+
+    useEffect(() => {
+        if (!configLoading) {
+            setHasResolvedInitialConfig(true);
+        }
+    }, [configLoading]);
+
+    useEffect(() => {
+        if (currentTab === 'voices' && !canOpenVoiceManagement) {
+            setCurrentTab('connection');
+        }
+    }, [canOpenVoiceManagement, currentTab]);
 
     // React Query v5: onSuccess moved to useEffect
     useEffect(() => {
@@ -386,49 +462,30 @@ const LocalTTSSettingsPage: React.FC = () => {
         toast.success('Скопировано в буфер обмена');
     };
 
-    // Using TanStack Query mutation instead of direct axios
-    const createVoice = (): void => {
-        if (!newVoice.name.trim()) {
+    const uploadVoice = (): void => {
+        if (!uploadVoiceDraft.name.trim()) {
             toast.error('Введите название голоса');
             return;
         }
-
-        createVoiceMutation.mutate(
-            { name: newVoice.name, language: newVoice.language, description: newVoice.description },
-            {
-                onSuccess: () => {
-                    setIsCreateVoiceDialogOpen(false);
-                    setNewVoice({ name: '', language: 'ru', description: '' });
-                }
-            }
-        );
-    };
-
-    const [sampleDialogOpen, setSampleDialogOpen] = useState<boolean>(false);
-    const [currentSampleVoiceId, setCurrentSampleVoiceId] = useState<number | null>(null);
-    const [sampleText, setSampleText] = useState<string>('');
-    const [sampleFile, setSampleFile] = useState<File | null>(null);
-
-    const openSampleDialog = (voiceId: number): void => {
-        setCurrentSampleVoiceId(voiceId);
-        setSampleText('');
-        setSampleFile(null);
-        setSampleDialogOpen(true);
-    };
-
-    // Using TanStack Query mutation instead of direct axios
-    const handleSampleUpload = (): void => {
-        if (!sampleFile || !currentSampleVoiceId) {
-            toast.error('Выберите файл');
+        if (!uploadVoiceDraft.file) {
+            toast.error('Выберите аудиофайл');
             return;
         }
-        uploadSampleMutation.mutate(
-            { voiceId: currentSampleVoiceId, file: sampleFile, sampleText },
+
+        uploadVoiceMutation.mutate(
+            {
+                name: uploadVoiceDraft.name.trim(),
+                file: uploadVoiceDraft.file,
+                sampleText: uploadVoiceDraft.sampleText.trim() || undefined,
+            },
             {
                 onSuccess: () => {
-                    setSampleDialogOpen(false);
-                    setSampleText('');
-                    setSampleFile(null);
+                    setIsUploadVoiceDialogOpen(false);
+                    setUploadVoiceDraft({
+                        name: '',
+                        sampleText: '',
+                        file: null,
+                    });
                 }
             }
         );
@@ -504,7 +561,7 @@ const LocalTTSSettingsPage: React.FC = () => {
         );
     }
 
-    if (configLoading) {
+    if (configLoading && !hasResolvedInitialConfig) {
         return (
             <div className="container mx-auto p-6 flex items-center justify-center min-h-screen">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -513,203 +570,86 @@ const LocalTTSSettingsPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto max-w-5xl space-y-6">
-            <Card className="card-glass border-blue-500/20">
-                <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center justify-between gap-3 text-base">
-                        <span>Self-hosted TTS endpoint</span>
-                        <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="bg-blue-500/15 text-blue-200 border border-blue-500/30">
-                                {providerMeta.label}
-                            </Badge>
-                            {providerContract.requires_compatibility_adapter && (
-                                <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-200">
-                                    Compat
-                                </Badge>
-                            )}
-                        </div>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setProvider('f5')}
-                            className={`h-9 border ${provider === 'f5'
-                                ? 'border-blue-500 bg-blue-500/20 text-blue-200'
-                                : 'border-blue-900/60 bg-transparent text-blue-300 hover:bg-blue-500/10'
-                                }`}
-                        >
-                            F5 TTS
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setProvider('qwen')}
-                            className={`h-9 border ${provider === 'qwen'
-                                ? 'border-blue-500 bg-blue-500/20 text-blue-200'
-                                : 'border-blue-900/60 bg-transparent text-blue-300 hover:bg-blue-500/10'
-                                }`}
-                        >
-                            Qwen 3 TTS
-                        </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Этот экран управляет именно self-hosted endpoint пользователя. Флаги `use_local`, `f5_local` и `qwen_local`
-                        пока сохранены как legacy naming для self-hosted режима.
-                    </p>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                        <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-100">
-                            <div className="mb-2 flex items-center gap-2 text-blue-200">
-                                <HardDrive className="h-4 w-4" />
-                                <span className="font-medium">Self-hosted endpoint</span>
-                            </div>
-                            <p>Пользователь сам поднимает TTS-сервис и указывает его URL в этой форме.</p>
-                        </div>
-                        <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-100">
-                            <div className="mb-2 flex items-center gap-2 text-blue-200">
-                                <Server className="h-4 w-4" />
-                                <span className="font-medium">Project-hosted worker</span>
-                            </div>
-                            <p>Отдельный воркер проекта, хостится вашей инфраструктурой и подключается как managed upstream.</p>
-                        </div>
-                        <div className="rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-100">
-                            <div className="mb-2 flex items-center gap-2 text-blue-200">
-                                <Zap className="h-4 w-4" />
-                                <span className="font-medium">Gateway-managed</span>
-                            </div>
-                            <p>`bot_service` ходит в `tts-gateway`, а gateway уже маршрутизирует трафик в project-hosted workers.</p>
-                        </div>
-                    </div>
-                    {providerContract.warning && (
-                        <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                            {providerContract.warning}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-
-            <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="w-full">
+        <PageWrapper title="Локальный TTS">
+            <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="space-y-6">
                 <TabsList className="h-auto w-full justify-start rounded-none bg-transparent p-0 border-b border-border">
                     <TabsTrigger value="connection" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`}>
                         <Server className="w-4 h-4" />
                         Подключение
                     </TabsTrigger>
-                    <TabsTrigger value="voices" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`} disabled={!testResult?.success}>
+                    <TabsTrigger value="voices" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`} disabled={!canOpenVoiceManagement}>
                         <Mic className="w-4 h-4" />
                         Управление голосами
                     </TabsTrigger>
                 </TabsList>
 
-                {!testResult?.success && (
-                    <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                        Управление голосами станет доступно после успешного теста подключения выбранного провайдера.
-                    </div>
-                )}
-
-                <TabsContent value="connection" className="space-y-4 mt-4">
-                    <Card className="card-glass border-blue-500/20">
-                        <CardHeader>
-                            <CardTitle className="text-blue-400 flex items-center gap-2">
-                                <ExternalLink className="w-5 h-5" />
-                                Как запустить self-hosted {providerMeta.label}?
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="space-y-3 text-sm">
-                                <div className="flex items-start gap-3">
-                                    <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">1</span>
-                                    <div>
-                                        <p className="font-medium">Перейдите в папку сервиса:</p>
-                                        <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            cd {providerMeta.folder}
-                                        </code>
-                                    </div>
+                <TabsContent value="connection" className="space-y-4">
+                    <div className="space-y-4 rounded-2xl border border-border/70 bg-card/75 p-6 shadow-none backdrop-blur-sm">
+                        <div className="space-y-4">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Server className="w-5 h-5" />
+                                    <h3 className="text-lg font-semibold text-foreground">Подключение</h3>
                                 </div>
 
-                                <div className="flex items-start gap-3">
-                                    <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">2</span>
-                                    <div>
-                                        <p className="font-medium">Установите зависимости:</p>
-                                        <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            {providerMeta.installCommand}
-                                        </code>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-3">
-                                    <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">3</span>
-                                    <div>
-                                        <p className="font-medium">Запустите API сервер:</p>
-                                        <code className="block bg-gray-800 p-2 rounded mt-1">
-                                            {providerMeta.runCommand}
-                                        </code>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-3">
-                                    <span className="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">4</span>
-                                    <div>
-                                        <p className="font-medium">Проверьте URL и API ключ в форме ниже</p>
-                                        <p className="text-muted-foreground text-xs mt-1">
-                                            {providerMeta.apiKeyHint}
-                                        </p>
-                                        {providerContract.managed_topology === 'gateway_managed' && (
-                                            <p className="text-amber-200 text-xs mt-1">
-                                                Managed production path для {providerMeta.label} сейчас:
-                                                <code className="mx-1 rounded bg-gray-900 px-1.5 py-0.5 text-[11px]">
-                                                    bot_service -&gt; tts-gateway -&gt; project-hosted worker
-                                                </code>
-                                                а этот экран нужен именно для self-hosted endpoint.
-                                            </p>
-                                        )}
-                                        {providerContract.project_hosted_direct_supported && (
-                                            <p className="text-blue-200 text-xs mt-1">
-                                                Для {providerMeta.label} также допускается direct project-hosted worker fallback, если gateway временно недоступен.
-                                            </p>
-                                        )}
-                                    </div>
+                                <div className="flex flex-wrap items-center gap-4 text-sm">
+                                    <a
+                                        href={PROVIDER_META.f5.docsUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-2 text-sky-300 hover:text-sky-200"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                        Репозиторий F5
+                                    </a>
+                                    <a
+                                        href={PROVIDER_META.qwen.docsUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-2 text-sky-300 hover:text-sky-200"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5" />
+                                        Репозиторий Qwen
+                                    </a>
                                 </div>
                             </div>
 
-                            {providerMeta.docsUrl && (
-                                <a
-                                    href={providerMeta.docsUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-2 text-xs text-blue-300 hover:text-blue-200"
+                            <div className="flex items-center gap-6 pb-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setProvider('f5')}
+                                    className={PROVIDER_SWITCH_TAB_CLASS}
+                                    data-state={provider === 'f5' ? 'active' : 'inactive'}
                                 >
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                    Открыть репозиторий {providerMeta.label}
-                                </a>
-                            )}
+                                    F5 TTS
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setProvider('qwen')}
+                                    className={PROVIDER_SWITCH_TAB_CLASS}
+                                    data-state={provider === 'qwen' ? 'active' : 'inactive'}
+                                >
+                                    Qwen 3 TTS
+                                </button>
+                            </div>
+                        </div>
 
-                            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 flex items-start gap-2">
-                                <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-                                <div className="text-sm text-yellow-200">
-                                    <p className="font-medium">Рекомендации:</p>
-                                    <ul className="list-disc list-inside mt-1 space-y-1 text-xs text-yellow-200/80">
-                                        <li>Используйте отдельный порт для каждого self-hosted провайдера</li>
-                                        <li>Перед включением self-hosted режима выполняйте тест подключения</li>
-                                        <li>Если используется Docker, проверьте доступность порта из bot_service</li>
-                                        {providerContract.requires_compatibility_adapter && (
-                                            <li>Для Qwen self-hosted path сейчас используется backend compatibility adapter, пока upstream не закроет native contract parity</li>
-                                        )}
-                                    </ul>
+                        <div className="space-y-4">
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div className="rounded-xl border border-border/70 bg-background/55 p-4">
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">Папка</p>
+                                    <code className="block rounded-lg bg-[#13192b] px-3 py-2 text-sm text-slate-100">
+                                        cd {providerMeta.folder}
+                                    </code>
+                                </div>
+                                <div className="rounded-xl border border-border/70 bg-background/55 p-4">
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">Запуск</p>
+                                    <code className="block rounded-lg bg-[#13192b] px-3 py-2 text-sm text-slate-100">
+                                        {providerMeta.runCommand}
+                                    </code>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
 
-                    <Card className="card-glass">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Server className="w-5 h-5" />
-                                Настройки self-hosted endpoint {providerMeta.label}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="endpoint_url">URL сервера</Label>
                                 <Input
@@ -718,15 +658,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     onChange={(e) => setConfig({ ...config, endpoint_url: e.target.value })}
                                     placeholder={providerMeta.defaultEndpoint}
                                 />
-                                <p className="text-xs text-muted-foreground">
-                                    По умолчанию: {providerMeta.defaultEndpoint}
-                                </p>
-                                {provider === 'qwen' && (
-                                    <p className="text-xs text-blue-200/80">
-                                        Managed Qwen path в проекте идет через `tts-gateway` к project-hosted worker. Этот URL нужен для self-hosted endpoint
-                                        пользователя и проверки доступности движка.
-                                    </p>
-                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -750,17 +681,9 @@ const LocalTTSSettingsPage: React.FC = () => {
                                         </Button>
                                     )}
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                    {providerMeta.apiKeyHint}
-                                </p>
-                                {!providerContract.supports_native_strict_api_key && (
-                                    <p className="text-xs text-amber-300">
-                                        Этот upstream пока не подтверждает native strict API-key проверку на health/synthesis-роутах так же, как `f5`.
-                                    </p>
-                                )}
                                 {hasStoredApiKey && !config.api_key.trim() && (
                                     <p className="text-xs text-amber-300">
-                                        Ключ сохранён на сервере. Оставьте поле пустым, чтобы не менять его.
+                                        Ключ уже сохранён. Поле можно оставить пустым.
                                     </p>
                                 )}
                             </div>
@@ -803,16 +726,16 @@ const LocalTTSSettingsPage: React.FC = () => {
 
                             {testResult && (
                                 <div className={`rounded-lg border p-4 ${testResult.success
-                                    ? 'bg-green-500/10 border-green-500/30'
+                                    ? 'border-blue-500/30 bg-blue-500/10'
                                     : 'bg-red-500/10 border-red-500/30'
                                     }`}>
                                     <div className="flex items-center gap-3">
                                         {testResult.success ? (
-                                            <CheckCircle className="w-5 h-5 text-green-400" />
+                                            <CheckCircle className="w-5 h-5 text-blue-300" />
                                         ) : (
                                             <XCircle className="w-5 h-5 text-red-400" />
                                         )}
-                                        <span className={testResult.success ? 'text-green-300' : 'text-red-300'}>
+                                        <span className={testResult.success ? 'text-blue-100' : 'text-red-300'}>
                                             {testResult.message}
                                         </span>
                                     </div>
@@ -825,23 +748,61 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     )}
                                 </div>
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
                     {healthData && (
                         <Card className="card-glass">
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <Zap className="w-5 h-5" />
+                                    <Server className="w-5 h-5 text-blue-300" />
                                     Статус сервера
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <CardContent className="space-y-4">
+                                {initializationState && (
+                                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                                        <div className="mb-2 flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-medium text-foreground">
+                                                    {initializationState.ready ? 'Готовность' : 'Инициализация'}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {initializationState.message || initializationState.phase || 'Подготовка модели'}
+                                                </p>
+                                            </div>
+                                            <span className="text-sm font-semibold text-blue-300">
+                                                {initializationState.percent ?? (initializationState.ready ? 100 : 0)}%
+                                            </span>
+                                        </div>
+                                        <div className="h-2 overflow-hidden rounded-full bg-background/80">
+                                            <div
+                                                className="h-full rounded-full bg-blue-500 transition-[width] duration-300"
+                                                style={{ width: `${initializationState.percent ?? (initializationState.ready ? 100 : 0)}%` }}
+                                            />
+                                        </div>
+                                        {(initializationState.currentModel || initializationState.targetModel) && (
+                                            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-blue-100/90">
+                                                {initializationState.currentModel && (
+                                                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1">
+                                                        Текущая: {initializationState.currentModel}
+                                                    </span>
+                                                )}
+                                                {initializationState.targetModel && (
+                                                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-1">
+                                                        Целевая: {initializationState.targetModel}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                     <div className="space-y-2">
                                         <p className="text-sm text-muted-foreground">Статус</p>
                                         <p className="text-lg font-semibold flex items-center gap-2">
-                                            <CheckCircle className="w-5 h-5 text-green-400" />
+                                            <CheckCircle className="w-5 h-5 text-blue-300" />
                                             {healthData.status === 'healthy' ? 'Доступен' : 'Ошибка'}
                                         </p>
                                     </div>
@@ -881,12 +842,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {providerContract.supports_native_status_endpoint === false && (
-                                    <div className="mt-4 rounded-lg border border-blue-500/20 bg-blue-500/10 p-3 text-xs text-blue-100">
-                                        У текущего upstream для {providerMeta.label} нет native summary `/api/status`, поэтому расширенная статистика здесь может отсутствовать даже при рабочем синтезе.
-                                    </div>
-                                )}
-
                                 {statusData?.stats && providerContract.supports_native_status_endpoint !== false && (
                                     <div className="mt-4 pt-4 border-t border-gray-700">
                                         <h4 className="text-sm font-medium mb-3">Статистика</h4>
@@ -897,7 +852,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                             </div>
                                             <div>
                                                 <p className="text-xs text-muted-foreground">Успешно</p>
-                                                <p className="text-lg font-semibold text-green-400">
+                                                <p className="text-lg font-semibold text-blue-300">
                                                     {statusData.stats.successful_requests}
                                                 </p>
                                             </div>
@@ -932,10 +887,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                     {testResult?.success && (
                         <Card className="card-glass">
                             <CardHeader>
-                                <CardTitle>Использование self-hosted endpoint</CardTitle>
+                                <CardTitle>Self-hosted режим</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <div className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                                <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/60 p-4">
                                     <div>
                                         <p className="font-medium">Использовать self-hosted {providerMeta.label}</p>
                                         <p className="text-sm text-muted-foreground">
@@ -944,17 +899,12 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                 : `Запросы идут через ${MANAGED_TOPOLOGY_LABELS[providerContract.managed_topology || 'gateway_managed']} или через fallback`
                                             }
                                         </p>
-                                        {providerContract.requires_compatibility_adapter && (
-                                            <p className="mt-2 text-xs text-amber-300">
-                                                Для Qwen self-hosted mode здесь используется compatibility adapter. После native parity в upstream этот слой можно будет убрать.
-                                            </p>
-                                        )}
                                     </div>
                                     <Button
                                         onClick={toggleService}
                                         variant={config.use_local ? 'default' : 'outline'}
                                         className={config.use_local
-                                            ? 'bg-green-600 hover:bg-green-700 text-white'
+                                            ? 'bg-blue-700 hover:bg-blue-800 text-white'
                                             : 'border-blue-700 text-blue-300 hover:bg-blue-500/10'}
                                     >
                                         {config.use_local ? 'Включено' : 'Отключено'}
@@ -965,7 +915,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                     )}
                 </TabsContent>
 
-                <TabsContent value="voices" className="space-y-4 mt-4">
+                <TabsContent value="voices" className="space-y-4">
                     <Card className="card-glass">
                         <CardHeader>
                             <div className="flex items-center justify-between">
@@ -974,137 +924,130 @@ const LocalTTSSettingsPage: React.FC = () => {
                                         <Mic className="w-5 h-5" />
                                         Управление голосами ({providerMeta.label})
                                     </CardTitle>
-                                    <p className="text-sm text-muted-foreground mt-1">
-                                        Голоса и сэмплы сохраняются отдельно для выбранного провайдера
-                                    </p>
                                 </div>
-                                <Dialog open={isCreateVoiceDialogOpen} onOpenChange={setIsCreateVoiceDialogOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button className="flex items-center gap-2 border border-blue-700 bg-blue-700 text-white hover:bg-blue-800">
-                                            <Plus className="w-4 h-4" />
-                                            Создать голос
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Создание нового голоса</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4">
-                                            <div>
-                                                <Label>Название голоса *</Label>
-                                                <Input
-                                                    value={newVoice.name}
-                                                    onChange={(e) => setNewVoice({ ...newVoice, name: e.target.value })}
-                                                    placeholder="Пример: Мой голос"
-                                                />
+                                {canManageVoices ? (
+                                    <Dialog open={isUploadVoiceDialogOpen} onOpenChange={setIsUploadVoiceDialogOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button variant="ghost" className="flex items-center gap-2 border border-blue-500/30 bg-transparent text-blue-300 hover:bg-blue-500/10 hover:text-sky-300">
+                                                <Upload className="w-4 h-4" />
+                                                Загрузить голос
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Загрузка пользовательского голоса</DialogTitle>
+                                            </DialogHeader>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <Label>Название голоса *</Label>
+                                                    <Input
+                                                        value={uploadVoiceDraft.name}
+                                                        onChange={(e) => setUploadVoiceDraft((prev) => ({ ...prev, name: e.target.value }))}
+                                                        placeholder="Пример: Мой голос"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>Текст референса (опционально)</Label>
+                                                    <Textarea
+                                                        value={uploadVoiceDraft.sampleText}
+                                                        onChange={(e) => setUploadVoiceDraft((prev) => ({ ...prev, sampleText: e.target.value }))}
+                                                        placeholder="Текст, который произносится в референсном аудио"
+                                                        className="h-24"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>Аудиофайл *</Label>
+                                                    <Input
+                                                        type="file"
+                                                        accept=".wav,.mp3,.ogg,.m4a,.flac"
+                                                        onChange={(e) => setUploadVoiceDraft((prev) => ({ ...prev, file: e.target.files?.[0] || null }))}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <Label>Язык</Label>
-                                                <select
-                                                    className="w-full p-2 bg-gray-800 border border-gray-700 rounded"
-                                                    value={newVoice.language}
-                                                    onChange={(e) => setNewVoice({ ...newVoice, language: e.target.value as 'ru' | 'en' })}
+                                            <DialogFooter>
+                                                <Button variant="outline" onClick={() => setIsUploadVoiceDialogOpen(false)} className="border-blue-700 text-blue-300 hover:bg-blue-500/10">
+                                                    Отмена
+                                                </Button>
+                                                <Button
+                                                    onClick={uploadVoice}
+                                                    disabled={uploadingFile || !uploadVoiceDraft.name.trim() || !uploadVoiceDraft.file}
+                                                    className="border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
                                                 >
-                                                    <option value="ru">Русский</option>
-                                                    <option value="en">English</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <Label>Описание (опционально)</Label>
-                                                <Input
-                                                    value={newVoice.description}
-                                                    onChange={(e) => setNewVoice({ ...newVoice, description: e.target.value })}
-                                                    placeholder="Описание голоса"
-                                                />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="outline" onClick={() => setIsCreateVoiceDialogOpen(false)} className="border-blue-700 text-blue-300 hover:bg-blue-500/10">
-                                                Отмена
-                                            </Button>
-                                            <Button onClick={createVoice} className="border border-blue-700 bg-blue-700 text-white hover:bg-blue-800">
-                                                Создать
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
+                                                    {uploadingFile && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                    Загрузить
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                ) : (
+                                    <Badge variant="secondary">CRUD недоступен</Badge>
+                                )}
                             </div>
                         </CardHeader>
                         <CardContent>
-                            {provider === 'qwen' ? (
-                                <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 text-sm text-blue-100">
-                                    <p className="font-medium">Локальный voice CRUD для Qwen здесь отключен.</p>
-                                    <p className="mt-2 text-blue-100/80">
-                                        Управление голосами выполняется через `bot_service` админку и capability-aware API.
-                                        Для текущей фазы Qwen voice CRUD вернет 501, пока не настроен `QWEN_VOICE_SERVICE_URL`.
-                                    </p>
-                                </div>
-                            ) : loadingVoices ? (
+                            {loadingVoices ? (
                                 <div className="flex items-center justify-center py-8">
                                     <Loader2 className="w-6 h-6 animate-spin" />
                                 </div>
                             ) : voices.length === 0 ? (
                                 <div className="text-center py-8 text-muted-foreground">
                                     <Mic className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                                    <p>Нет созданных голосов</p>
-                                    <p className="text-sm mt-2">Создайте первый голос, чтобы начать</p>
+                                    <p>Нет загруженных голосов</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {voices.map((voice) => {
-                                        const voiceType = voice.type === 'base' ? 'base' : 'custom';
+                                        const voiceType = voice.type === 'base' || voice.voice_type === 'base' ? 'base' : 'custom';
                                         return (
-                                            <Card key={voice.id} className="overflow-hidden">
-                                            <CardHeader className="pb-3">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex-1">
-                                                        <CardTitle className="text-base flex items-center gap-2">
-                                                            {voice.name}
-                                                            <Badge variant={voiceType === 'base' ? 'default' : 'secondary'}>
-                                                                {voiceType === 'base' ? 'Базовый' : 'Свой'}
-                                                            </Badge>
-                                                        </CardTitle>
-                                                        <p className="text-xs text-muted-foreground mt-1">
-                                                            {voice.language === 'ru' ? 'RU Русский' : 'EN English'}
-                                                        </p>
-                                                    </div>
-                                                    {voiceType === 'custom' && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => deleteVoice(voice.id)}
-                                                            className={TABLE_CLASSES.actionButton}
-                                                        >
-                                                            <Trash2 className="w-4 h-4 text-red-400" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {voiceType === 'custom' && (
-                                                    <>
-                                                        <div className="flex items-center justify-between mb-3">
-                                                            <span className="text-sm text-muted-foreground">
-                                                                Сэмплов: {voice.samples_count || 0}
-                                                            </span>
+                                            <Card key={voice.id} className="overflow-hidden border-blue-500/20 bg-[#171d31] shadow-none">
+                                                <CardHeader className="pb-3">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                            <CardTitle className="text-base flex items-center gap-2">
+                                                                {voice.name}
+                                                                <Badge variant={voiceType === 'base' ? 'default' : 'secondary'}>
+                                                                    {voiceType === 'base' ? 'Базовый' : 'Свой'}
+                                                                </Badge>
+                                                            </CardTitle>
+                                                            <p className="text-xs text-muted-foreground mt-1">
+                                                                {voice.language === 'ru'
+                                                                    ? 'RU Русский'
+                                                                    : voice.language === 'en'
+                                                                        ? 'EN English'
+                                                                        : voice.file_path
+                                                                            ? 'Референсный файл подключен'
+                                                                            : 'Нет активного файла'}
+                                                            </p>
                                                         </div>
-                                                        <Button
-                                                            onClick={() => openSampleDialog(voice.id)}
-                                                            variant="outline"
-                                                            className="w-full border-blue-700 text-blue-300 hover:bg-blue-500/10"
-                                                            disabled={uploadingFile}
-                                                        >
-                                                            <Upload className="w-4 h-4 mr-2" />
-                                                            Загрузить сэмпл
-                                                        </Button>
-                                                    </>
-                                                )}
-                                                {voiceType === 'base' && (
-                                                    <p className="text-xs text-muted-foreground italic">
-                                                        Базовые голоса нельзя изменять
-                                                    </p>
-                                                )}
-                                            </CardContent>
+                                                        {voiceType === 'custom' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => deleteVoice(voice.id)}
+                                                                className={TABLE_CLASSES.actionButton}
+                                                            >
+                                                                <Trash2 className="w-4 h-4 text-red-400" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </CardHeader>
+                                                <CardContent className="space-y-3">
+                                                    <div className="flex items-center justify-between text-sm">
+                                                        <span className="text-muted-foreground">Статус</span>
+                                                        <span className={voice.is_active === false || !voice.file_path ? 'text-red-400' : 'text-blue-300'}>
+                                                            {voice.is_active === false || !voice.file_path ? 'Недоступен' : 'Готов'}
+                                                        </span>
+                                                    </div>
+                                                    {voiceType === 'custom' ? (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Пользовательский голос сохранён и доступен для выбранного провайдера.
+                                                        </p>
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground italic">
+                                                            Базовые голоса только для чтения.
+                                                        </p>
+                                                    )}
+                                                </CardContent>
                                             </Card>
                                         );
                                     })}
@@ -1114,46 +1057,8 @@ const LocalTTSSettingsPage: React.FC = () => {
                     </Card>
                 </TabsContent>
 
-                <Dialog open={sampleDialogOpen} onOpenChange={setSampleDialogOpen}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Загрузка сэмпла</DialogTitle>
-                            <DialogDescription>
-                                Загрузите аудиофайл (wav/mp3) с голосом. Желательно от 10 секунд до 2 минут.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                            <div>
-                                <Label>Текст сэмпла (для улучшения качества)</Label>
-                                <Textarea
-                                    value={sampleText}
-                                    onChange={(e) => setSampleText(e.target.value)}
-                                    placeholder="Текст, который произносится в аудио..."
-                                    className="h-24"
-                                />
-                            </div>
-                            <div>
-                                <Label>Файл</Label>
-                                <Input
-                                    type="file"
-                                    onChange={(e) => setSampleFile(e.target.files?.[0] || null)}
-                                    accept=".wav,.mp3,.ogg"
-                                />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setSampleDialogOpen(false)} className="border-blue-700 text-blue-300 hover:bg-blue-500/10">
-                                Отмена
-                            </Button>
-                            <Button onClick={handleSampleUpload} disabled={uploadingFile || !sampleFile} className="border border-blue-700 bg-blue-700 text-white hover:bg-blue-800">
-                                {uploadingFile && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Загрузить
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
             </Tabs>
-        </div>
+        </PageWrapper>
     );
 };
 

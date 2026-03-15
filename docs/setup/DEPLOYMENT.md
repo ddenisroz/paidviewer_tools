@@ -9,7 +9,7 @@
 - `frontend` общается только с `bot_service`
 - advanced synthesis для `f5` и `qwen` идёт через `tts-gateway`
 - voice/admin API остаются за upstream-сервисами
-- qwen voice CRUD выключен, пока не задан `QWEN_VOICE_SERVICE_URL`
+- qwen voice/admin API по умолчанию используют `QWEN_TTS_SERVICE_URL`; `QWEN_VOICE_SERVICE_URL` нужен только если voice CRUD вынесен в отдельный upstream
 
 ## Активные compose entrypoints
 
@@ -28,10 +28,13 @@ TTS_GATEWAY_URL=http://localhost:8010
 TTS_GATEWAY_API_KEY=...
 F5_TTS_SERVICE_URL=http://localhost:8011
 F5_TTS_SERVICE_API_KEY=...
-QWEN_TTS_SERVICE_URL=http://localhost:8000
+QWEN_TTS_SERVICE_URL=http://localhost:8012
 QWEN_TTS_SERVICE_API_KEY=...
 QWEN_VOICE_SERVICE_URL=
+TTS_INTERNAL_API_KEY=
 ```
+
+`F5_TTS_SERVICE_API_KEY` и `QWEN_TTS_SERVICE_API_KEY` могут быть пустыми, если ты используешь один общий inter-service key через `TTS_INTERNAL_API_KEY` или уже заданный `TTS_GATEWAY_API_KEY`.
 
 ## Внешние зависимости
 

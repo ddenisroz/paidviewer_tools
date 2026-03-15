@@ -92,9 +92,17 @@ class NotificationService:
                     "tts_type": audio_data.get("tts_type", "unknown"),
                     "duration": audio_data.get("duration", 0),
                     "text": audio_data.get("text", ""),
+                    "spoken_text": audio_data.get("spoken_text") or audio_data.get("text", ""),
+                    "original_text": audio_data.get("original_text", ""),
                     "username": audio_data.get("username", ""),
                     "channel": channel_name,
                     "platform": platform,
+                    "trace_id": audio_data.get("trace_id"),
+                    "source_message_id": audio_data.get("source_message_id"),
+                    "requested_provider": audio_data.get("requested_provider"),
+                    "actual_provider": audio_data.get("actual_provider"),
+                    "fallback_used": bool(audio_data.get("fallback_used", False)),
+                    "fallback_reason": audio_data.get("fallback_reason"),
                     "timestamp": datetime.now().isoformat()
                 }
             }

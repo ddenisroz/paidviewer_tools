@@ -47,6 +47,20 @@ export const useTtsSettings = (options?: Omit<UseQueryOptions<ApiResponse<TtsSet
   });
 };
 
+export const useQwenModels = (
+  mode: 'cloud' | 'local' = 'cloud',
+  options?: Omit<UseQueryOptions<ApiResponse<Record<string, unknown>>, AxiosError>, 'queryKey' | 'queryFn'>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.tts.qwenModels(mode),
+    queryFn: () => unwrapResponse(ttsService.getQwenModels(mode)),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 1,
+    ...options,
+  });
+};
+
 /**
  * Сохранить настройки TTS
  */

@@ -18,6 +18,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import aiohttp
 
@@ -38,30 +39,37 @@ from services.tts.google_cloud_tts import (
 )
 from services.tts.provider_utils import (
     ProviderRoutingError,
+    QWEN_BASE_MODEL,
+    QWEN_CUSTOMVOICE_MODEL,
+    QWEN_DEFAULT_MODEL,
+    QWEN_PROMPT_MODEL,
+    QWEN_VOICEDESIGN_MODEL,
     get_provider_service_url,
+    get_qwen_model_family,
     get_synthesis_upstream_params,
     get_synthesis_upstream_url,
     infer_provider_from_engine,
     normalize_local_tts_endpoint_url,
     normalize_provider,
     normalize_provider_mode,
+    normalize_qwen_model_selection,
     should_route_provider_via_gateway,
 )
 
 logger = logging.getLogger(__name__)
 _GEMINI_SPEAKER_PATTERN = re.compile(r"^[A-Z][A-Za-z0-9_]{1,63}$")
-_QWEN_LOCAL_DEFAULT_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
+_QWEN_LOCAL_DEFAULT_MODEL = QWEN_DEFAULT_MODEL
 _QWEN_LOCAL_DEFAULT_SPEAKER = "serena"
 _QWEN_LOCAL_DEFAULT_INSTRUCTION = "Neutral natural voice."
 _QWEN_LOCAL_MODEL_ALIASES = {
-    "0.6b-customvoice": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-    "1.7b-customvoice": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
-    "1.7b-voicedesign": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
-    "0.6b-base": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
-    "1.7b-base": "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
-    "customvoice": "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-    "voicedesign": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
-    "base": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+    "0.6b-customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "1.7b-customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "1.7b-voicedesign": QWEN_VOICEDESIGN_MODEL,
+    "0.6b-base": QWEN_BASE_MODEL,
+    "1.7b-base": QWEN_BASE_MODEL,
+    "customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "voicedesign": QWEN_VOICEDESIGN_MODEL,
+    "base": QWEN_BASE_MODEL,
 }
 
 
@@ -159,8 +167,9 @@ class TTSManager:
         if not candidate or candidate.lower() == "default":
             return _QWEN_LOCAL_DEFAULT_MODEL
 
-        if candidate.startswith("Qwen/"):
-            return candidate
+        normalized_selection = normalize_qwen_model_selection(candidate)
+        if normalized_selection in {QWEN_BASE_MODEL, QWEN_VOICEDESIGN_MODEL, QWEN_CUSTOMVOICE_MODEL}:
+            return normalized_selection
 
         normalized = candidate.lower().replace("_", "").replace(" ", "").replace("/", "")
         for alias, resolved in _QWEN_LOCAL_MODEL_ALIASES.items():
@@ -188,9 +197,10 @@ class TTSManager:
         request_settings = dict(tts_settings or {})
 
         model = self._normalize_qwen_local_model(request_settings.get("qwen_model"))
-        speaker = self._normalize_qwen_local_speaker(
-            request_settings.get("qwen_voice") or request_settings.get("voice")
-        )
+        qwen_voice_value = str(
+            request_settings.get("qwen_voice") or request_settings.get("voice") or ""
+        ).strip()
+        speaker = self._normalize_qwen_local_speaker(qwen_voice_value)
         language = "Russian" if self.basic_tts.detect_language(text) == "ru" else "English"
 
         raw_temperature = request_settings.get("qwen_temperature", request_settings.get("temperature", 0.9))
@@ -201,15 +211,9 @@ class TTSManager:
         if temperature <= 0:
             temperature = 0.9
 
-        if "Base" in model:
-            logger.warning(
-                "[WARN] Qwen local Base model requires ref_audio; falling back to CustomVoice compatibility model"
-            )
-            model = _QWEN_LOCAL_DEFAULT_MODEL
-
         instruction = ""
-        if "VoiceDesign" in model:
-            raw_instruction = str(request_settings.get("qwen_instruction") or "").strip()
+        if get_qwen_model_family(model) != "base":
+            raw_instruction = str(request_settings.get("qwen_instruction") or qwen_voice_value).strip()
             instruction = raw_instruction or _QWEN_LOCAL_DEFAULT_INSTRUCTION
             speaker = ""
 
@@ -472,11 +476,21 @@ class TTSManager:
                     self._provider_last_health_check[cache_key] = current_time
                     return False
 
+                status_value = str(health_payload.get("status") or "").strip().lower()
+                tts_engine_value = str(health_payload.get("tts_engine") or "").strip().lower()
+                redis_state = str(health_payload.get("redis") or "").strip().lower()
+                scheduler_state = str(health_payload.get("scheduler") or "").strip().lower()
+                ready_flag = health_payload.get("ready")
+
                 is_healthy = bool(
                     health_payload.get("tts_engine_loaded", False)
-                    or health_payload.get("status") == "healthy"
-                    or health_payload.get("tts_engine") == "ready"
+                    or status_value in {"healthy", "ok", "ready"}
+                    or tts_engine_value == "ready"
+                    or ready_flag is True
                 )
+
+                if use_gateway and status_value == "ok":
+                    is_healthy = redis_state != "down" and scheduler_state != "stopped"
 
                 previous_state = self._provider_health.get(cache_key)
                 if previous_state is not None and previous_state != is_healthy:
@@ -508,6 +522,126 @@ class TTSManager:
         self._provider_last_health_check[cache_key] = current_time
         return False
 
+    @staticmethod
+    def _enrich_result(
+        result: Dict[str, Any],
+        *,
+        requested_provider: str,
+        actual_provider: str,
+        fallback_used: bool,
+        fallback_reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = dict(result or {})
+        payload["requested_provider"] = requested_provider
+        payload["actual_provider"] = actual_provider
+        payload["fallback_used"] = bool(fallback_used)
+        if fallback_reason:
+            payload["fallback_reason"] = fallback_reason
+        elif "fallback_reason" in payload:
+            payload.pop("fallback_reason", None)
+        return payload
+
+    async def _persist_audio_bytes(
+        self,
+        *,
+        audio_bytes: bytes,
+        provider: str,
+        source_url: Optional[str],
+        content_type: Optional[str],
+    ) -> Dict[str, str]:
+        suffix = Path(urlparse(str(source_url or "")).path).suffix.lower()
+        if suffix not in {".wav", ".mp3", ".ogg", ".flac", ".m4a", ".aac", ".aiff", ".au", ".wma"}:
+            normalized_content_type = str(content_type or "").lower()
+            if "mpeg" in normalized_content_type or "mp3" in normalized_content_type:
+                suffix = ".mp3"
+            elif "ogg" in normalized_content_type:
+                suffix = ".ogg"
+            else:
+                suffix = ".wav"
+
+        output_dir = TEMP_DIR / "tts_audio"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{provider}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}{suffix}"
+        output_path = output_dir / filename
+        await asyncio.to_thread(output_path.write_bytes, audio_bytes)
+        return {
+            "audio_url": f"{self.backend_url}/api/tts/audio/{filename}",
+            "audio_path": str(output_path.resolve()),
+        }
+
+    async def _materialize_provider_audio(
+        self,
+        *,
+        session: aiohttp.ClientSession,
+        provider: str,
+        audio_url: Optional[str],
+        endpoint: str,
+        headers: Dict[str, str],
+    ) -> Dict[str, Optional[str]]:
+        raw_audio_url = str(audio_url or "").strip()
+        if not raw_audio_url:
+            return {"audio_url": None, "audio_path": None}
+
+        if raw_audio_url.startswith(self.backend_url):
+            return {"audio_url": raw_audio_url, "audio_path": None}
+
+        if raw_audio_url.startswith(("http://", "https://")):
+            resolved_audio_url = raw_audio_url
+        elif raw_audio_url.startswith("/"):
+            resolved_audio_url = f"{endpoint}{raw_audio_url}"
+        else:
+            resolved_audio_url = f"{endpoint}/api/tts/audio/{raw_audio_url}"
+
+        if resolved_audio_url.startswith(self.backend_url):
+            return {"audio_url": resolved_audio_url, "audio_path": None}
+
+        async with session.get(resolved_audio_url, headers=headers) as audio_response:
+            if audio_response.status != 200:
+                body = await audio_response.text()
+                raise RuntimeError(
+                    f"Provider audio fetch failed provider={provider} status={audio_response.status} body={body[:200]}"
+                )
+            audio_bytes = await audio_response.read()
+            if not audio_bytes:
+                raise RuntimeError(f"Provider audio fetch returned empty payload provider={provider}")
+            localized = await self._persist_audio_bytes(
+                audio_bytes=audio_bytes,
+                provider=provider,
+                source_url=resolved_audio_url,
+                content_type=audio_response.headers.get("content-type"),
+            )
+            return localized
+
+    async def _build_provider_success_result(
+        self,
+        *,
+        session: aiohttp.ClientSession,
+        provider: str,
+        endpoint: str,
+        headers: Dict[str, str],
+        tts_type: str,
+        result_payload: Dict[str, Any],
+        volume_level: float,
+    ) -> Dict[str, Any]:
+        selected_voice = result_payload.get("selected_voice") or result_payload.get("voice")
+        localized_audio = await self._materialize_provider_audio(
+            session=session,
+            provider=provider,
+            audio_url=result_payload.get("audio_url"),
+            endpoint=endpoint,
+            headers=headers,
+        )
+        return {
+            "success": True,
+            "voice": selected_voice,
+            "volume": volume_level,
+            "tts_type": tts_type,
+            "audio_url": localized_audio.get("audio_url"),
+            "audio_path": localized_audio.get("audio_path"),
+            "duration": result_payload.get("duration"),
+            "spoken_text": result_payload.get("spoken_text"),
+        }
+
     async def synthesize_tts(
         self,
         channel_name: str,
@@ -524,12 +658,21 @@ class TTSManager:
         db_session=None,
         engine: Optional[str] = None,
     ) -> Dict:
-        """Synthesize speech with advanced provider first and mandatory basic fallback."""
-        _ = use_basic_tts  # kept for backwards compatibility, fallback is always enabled
+        """Synthesize speech with provider-first routing and explicit fallback metadata."""
 
         settings_dict = tts_settings or {}
         resolved_engine = (engine or ("f5tts" if use_ai_tts else "gtts")).strip().lower()
         logger.info("[MIC] Engine resolved: %s", resolved_engine)
+        requested_provider = "gtts"
+        fallback_reason: Optional[str] = None
+
+        if resolved_engine in {"f5tts", "qwen"}:
+            requested_provider = infer_provider_from_engine(
+                resolved_engine,
+                advanced_provider=settings_dict.get("advanced_provider"),
+            )
+        elif resolved_engine == "gcloud":
+            requested_provider = "gcloud"
 
         # Priority A: Google Cloud TTS
         if resolved_engine == "gcloud":
@@ -542,17 +685,21 @@ class TTSManager:
                 if result.get("success"):
                     logger.info("[OK] Google Cloud TTS synthesis succeeded")
                     self.cleanup_old_files_if_needed()
-                    return result
+                    return self._enrich_result(
+                        result,
+                        requested_provider="gcloud",
+                        actual_provider="gcloud",
+                        fallback_used=False,
+                    )
+                fallback_reason = f"gcloud_error:{result.get('error') or 'unknown'}"
                 logger.warning("[WARN] Google Cloud TTS failed: %s", result.get("error"))
             except Exception:
+                fallback_reason = "gcloud_exception"
                 logger.exception("[ERROR] Google Cloud TTS execution failed")
 
         # Priority B: Advanced providers (F5/Qwen) with retries
         elif resolved_engine in {"f5tts", "qwen"} and use_ai_tts:
-            provider = infer_provider_from_engine(
-                resolved_engine,
-                advanced_provider=settings_dict.get("advanced_provider"),
-            )
+            provider = requested_provider
             provider_mode_key = "qwen_mode" if provider == "qwen" else "f5_mode"
             preferred_mode = normalize_provider_mode(settings_dict.get(provider_mode_key))
             use_local_flag = bool(settings_dict.get("use_local_tts", False))
@@ -579,12 +726,14 @@ class TTSManager:
                         provider,
                         user_id,
                     )
+                    fallback_reason = f"{provider}_local_endpoint_not_configured"
 
             if resolved_mode != "local" and provider == "qwen" and (not should_route_provider_via_gateway(provider)):
                 logger.warning(
                     "[WARN] Qwen synthesis requires configured gateway; fallback to basic TTS"
                 )
                 resolved_mode = "cloud_gateway_unavailable"
+                fallback_reason = "qwen_gateway_not_configured"
 
             if resolved_mode != "local" or has_explicit_local_endpoint:
                 max_retries = TTS_MAX_RETRIES
@@ -601,7 +750,9 @@ class TTSManager:
                         provider,
                         endpoint,
                     )
+                    fallback_reason = f"{provider}_unhealthy"
                 else:
+                    last_advanced_error: Optional[str] = None
                     for attempt in range(1, max_retries + 1):
                         try:
                             result = await self._synthesize_via_tts_service(
@@ -626,8 +777,14 @@ class TTSManager:
                                     max_retries,
                                 )
                                 self.cleanup_old_files_if_needed()
-                                return result
+                                return self._enrich_result(
+                                    result,
+                                    requested_provider=provider,
+                                    actual_provider=provider,
+                                    fallback_used=False,
+                                )
 
+                            last_advanced_error = str(result.get("error") or "provider_failed")
                             logger.warning(
                                 "[WARN] Advanced synthesis failed provider=%s attempt=%s/%s error=%s",
                                 provider,
@@ -636,6 +793,7 @@ class TTSManager:
                                 result.get("error"),
                             )
                         except asyncio.TimeoutError:
+                            last_advanced_error = "timeout"
                             logger.warning(
                                 "[WARN] Advanced synthesis timeout provider=%s attempt=%s/%s",
                                 provider,
@@ -643,6 +801,7 @@ class TTSManager:
                                 max_retries,
                             )
                         except aiohttp.ClientError as error:
+                            last_advanced_error = f"connection:{error}"
                             logger.warning(
                                 "[WARN] Advanced synthesis connection error provider=%s attempt=%s/%s error=%s",
                                 provider,
@@ -651,6 +810,7 @@ class TTSManager:
                                 error,
                             )
                         except Exception:
+                            last_advanced_error = "exception"
                             logger.exception(
                                 "[ERROR] Advanced synthesis exception provider=%s attempt=%s/%s",
                                 provider,
@@ -666,19 +826,49 @@ class TTSManager:
                         "[WARN] Advanced provider exhausted retries provider=%s; fallback to basic TTS",
                         provider,
                     )
+                    fallback_reason = f"{provider}_failed:{last_advanced_error or 'unknown'}"
+        elif resolved_engine in {"f5tts", "qwen"}:
+            fallback_reason = f"{requested_provider}_disabled"
 
-        # Priority C: Basic fallback (always available)
+        # Priority C: Basic TTS or explicit fallback.
+        if resolved_engine != "gtts" and not use_basic_tts:
+            return self._enrich_result(
+                {"success": False, "error": fallback_reason or "Advanced provider failed with fallback disabled"},
+                requested_provider=requested_provider,
+                actual_provider=requested_provider,
+                fallback_used=False,
+                fallback_reason=fallback_reason,
+            )
+
         try:
             result = await self._synthesize_via_basic_tts(text, volume_level)
             if result.get("success"):
                 logger.info("[OK] Basic TTS synthesis succeeded")
                 self.cleanup_old_files_if_needed()
-                return result
+                return self._enrich_result(
+                    result,
+                    requested_provider=requested_provider,
+                    actual_provider="gtts",
+                    fallback_used=requested_provider != "gtts",
+                    fallback_reason=fallback_reason,
+                )
             logger.error("[ERROR] Basic TTS synthesis failed: %s", result.get("error"))
-            return {"success": False, "error": "Basic TTS synthesis failed"}
+            return self._enrich_result(
+                {"success": False, "error": "Basic TTS synthesis failed"},
+                requested_provider=requested_provider,
+                actual_provider="gtts",
+                fallback_used=requested_provider != "gtts",
+                fallback_reason=fallback_reason,
+            )
         except Exception as error:
             logger.exception("[ERROR] Basic TTS execution failed")
-            return {"success": False, "error": f"Basic TTS error: {error}"}
+            return self._enrich_result(
+                {"success": False, "error": f"Basic TTS error: {error}"},
+                requested_provider=requested_provider,
+                actual_provider="gtts",
+                fallback_used=requested_provider != "gtts",
+                fallback_reason=fallback_reason,
+            )
 
     async def _synthesize_via_tts_service(
         self,
@@ -757,18 +947,27 @@ class TTSManager:
 
             request_settings = dict(tts_settings or {})
             request_settings.setdefault("advanced_provider", normalized_provider)
+            trace_id = str(request_settings.get("trace_id") or "").strip()
+            source_message_id = str(request_settings.get("source_message_id") or "").strip()
             f5_voice = str(request_settings.get("voice") or "").strip()
-            qwen_voice = str(request_settings.get("qwen_voice") or "").strip() or f5_voice
+            qwen_model = normalize_qwen_model_selection(request_settings.get("qwen_model"))
+            qwen_family = get_qwen_model_family(qwen_model)
+            request_settings["qwen_model"] = qwen_model
+            raw_qwen_voice = str(request_settings.get("qwen_voice") or "").strip()
+            if normalized_provider == "qwen" and qwen_family != "base":
+                request_settings["qwen_instruction"] = str(
+                    request_settings.get("qwen_instruction") or raw_qwen_voice
+                ).strip() or _QWEN_LOCAL_DEFAULT_INSTRUCTION
+            qwen_voice = raw_qwen_voice or f5_voice
             voice_map = {}
             if f5_voice:
                 voice_map["f5"] = f5_voice
-            if qwen_voice:
+            if qwen_voice and not (normalized_provider == "qwen" and qwen_family != "base"):
                 voice_map["qwen"] = qwen_voice
-            selected_request_voice = (
-                voice_map.get(normalized_provider)
-                or f5_voice
-                or ("default" if normalized_provider == "qwen" else "female_1")
-            )
+            if normalized_provider == "qwen":
+                selected_request_voice = voice_map.get("qwen") or "default"
+            else:
+                selected_request_voice = voice_map.get("f5") or f5_voice or "default_voice"
 
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 url = f"{endpoint}/api/tts/synthesize-channel"
@@ -784,7 +983,17 @@ class TTSManager:
                     "provider": normalized_provider,
                     "voice": selected_request_voice,
                     "voice_map": voice_map,
+                    "request_id": source_message_id or trace_id or uuid.uuid4().hex,
+                    "event_id": source_message_id or None,
                 }
+                logger.info(
+                    "[TRACE] Provider request provider=%s trace_id=%s source_message_id=%s voice=%s endpoint=%s",
+                    normalized_provider,
+                    trace_id or "-",
+                    source_message_id or "-",
+                    selected_request_voice,
+                    endpoint,
+                )
 
                 async with session.post(
                     url,
@@ -795,8 +1004,10 @@ class TTSManager:
                     if response.status != 200:
                         error_text = await response.text()
                         logger.error(
-                            "[ERROR] Provider returned error provider=%s status=%s body=%s",
+                            "[ERROR] Provider returned error provider=%s trace_id=%s source_message_id=%s status=%s body=%s",
                             normalized_provider,
+                            trace_id or "-",
+                            source_message_id or "-",
                             response.status,
                             error_text,
                         )
@@ -806,18 +1017,16 @@ class TTSManager:
                         }
 
                     result = await response.json()
-                    selected_voice = result.get("selected_voice") or result.get("voice")
-                    raw_audio_url = result.get("audio_url")
-
-                    if raw_audio_url:
-                        if raw_audio_url.startswith(("http://", "https://")):
-                            audio_url = raw_audio_url
-                        elif raw_audio_url.startswith("/"):
-                            audio_url = f"{endpoint}{raw_audio_url}"
-                        else:
-                            audio_url = f"{endpoint}/api/tts/audio/{raw_audio_url}"
-                    else:
-                        audio_url = None
+                    provider_result = await self._build_provider_success_result(
+                        session=session,
+                        provider=normalized_provider,
+                        endpoint=endpoint,
+                        headers=headers,
+                        tts_type=tts_type,
+                        result_payload=result,
+                        volume_level=volume_level,
+                    )
+                    selected_voice = provider_result.get("voice")
 
                     # Preserve existing behavior: if voice has a per-channel priority volume,
                     # trigger one more provider request with that volume.
@@ -833,22 +1042,18 @@ class TTSManager:
                                 timeout=timeout,
                             ) as priority_response:
                                 if priority_response.status == 200:
-                                    await priority_response.json()
-                                    return {
-                                        "success": True,
-                                        "voice": selected_voice,
-                                        "volume": priority_volume,
-                                        "tts_type": tts_type,
-                                        "audio_url": audio_url,
-                                    }
+                                    priority_payload = await priority_response.json()
+                                    return await self._build_provider_success_result(
+                                        session=session,
+                                        provider=normalized_provider,
+                                        endpoint=endpoint,
+                                        headers=headers,
+                                        tts_type=tts_type,
+                                        result_payload=priority_payload,
+                                        volume_level=priority_volume,
+                                    )
 
-                    return {
-                        "success": True,
-                        "voice": selected_voice,
-                        "volume": volume_level,
-                        "tts_type": tts_type,
-                        "audio_url": audio_url,
-                    }
+                    return provider_result
 
         except asyncio.TimeoutError:
             logger.warning("[WARN] Provider request timeout provider=%s", normalized_provider)

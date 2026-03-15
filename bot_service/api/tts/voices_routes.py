@@ -1,23 +1,32 @@
 import logging
+import mimetypes
+import uuid
+from pathlib import Path
+from urllib.parse import urlparse
+
 import httpx
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Form, File, UploadFile, Body
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from core.database import get_db
+from core.config import settings
 from auth.auth import get_current_user
 from core.permissions import require_permission, Permission
 from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
+from core.project_paths import TEMP_DIR
 from services.tts.tts_core import check_user_whitelisted
 from services.voice_management_service import VoiceManagementService
 from repositories.user_repository import UserRepository
 from repositories.local_tts_repository import LocalTTSRepository
+from repositories.tts_settings_repository import TTSSettingsRepository
 from services.tts.provider_utils import (
     ProviderRoutingError,
     get_all_provider_capabilities,
     get_voice_management_upstream_params,
     get_voice_management_upstream_url,
     normalize_provider,
+    normalize_qwen_model_selection,
     qwen_voice_crud_not_available_detail,
 )
 logger = logging.getLogger('bot_service')
@@ -88,6 +97,78 @@ def _provider_base_url(provider: str) -> str:
 def _provider_upstream_params(provider: str, extra_params: Optional[dict] = None) -> dict:
     resolved_provider = _normalize_voice_provider(provider)
     return get_voice_management_upstream_params(resolved_provider, extra_params=extra_params)
+
+
+def _guess_audio_suffix(*, audio_url: str, content_type: Optional[str]) -> str:
+    guessed_suffix = mimetypes.guess_extension(str(content_type or "").split(";")[0].strip()) or ""
+    if guessed_suffix:
+        return guessed_suffix
+
+    parsed_path = Path(urlparse(audio_url).path)
+    if parsed_path.suffix:
+        return parsed_path.suffix.lower()
+
+    return ".wav"
+
+
+def _resolve_provider_audio_url(*, upstream_base_url: str, audio_url: str) -> str:
+    raw_audio_url = str(audio_url or "").strip()
+    if not raw_audio_url:
+        return ""
+    if raw_audio_url.startswith(("http://", "https://")):
+        return raw_audio_url
+    base = upstream_base_url.rstrip("/")
+    if raw_audio_url.startswith("/"):
+        return f"{base}{raw_audio_url}"
+    return f"{base}/api/tts/audio/{raw_audio_url}"
+
+
+async def _materialize_preview_audio(
+    *,
+    provider: str,
+    payload: dict,
+    upstream_base_url: str,
+) -> dict:
+    raw_audio_url = str(payload.get("audio_url") or "").strip()
+    if not raw_audio_url:
+        return payload
+
+    backend_base_url = str(settings.backend_url or "").strip().rstrip("/")
+    if backend_base_url and raw_audio_url.startswith(backend_base_url):
+        return payload
+
+    resolved_audio_url = _resolve_provider_audio_url(
+        upstream_base_url=upstream_base_url,
+        audio_url=raw_audio_url,
+    )
+    if not resolved_audio_url:
+        return payload
+
+    async with httpx.AsyncClient(timeout=30.0, **build_tts_httpx_client_kwargs()) as client:
+        audio_response = await client.get(
+            resolved_audio_url,
+            headers=_tts_auth_headers(provider),
+        )
+    if audio_response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail="Provider preview audio is unavailable.",
+        )
+
+    suffix = _guess_audio_suffix(
+        audio_url=resolved_audio_url,
+        content_type=audio_response.headers.get("content-type"),
+    )
+    output_dir = TEMP_DIR / "tts_audio"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"preview_{provider}_{uuid.uuid4().hex}{suffix}"
+    output_path = output_dir / filename
+    output_path.write_bytes(audio_response.content)
+
+    localized_payload = dict(payload)
+    localized_payload["audio_url"] = f"{backend_base_url}/api/tts/audio/{filename}" if backend_base_url else f"/api/tts/audio/{filename}"
+    localized_payload["audio_path"] = str(output_path.resolve())
+    return localized_payload
 
 @voices_router.get('/whitelist-status')
 async def check_whitelist_status(user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
@@ -165,13 +246,32 @@ async def get_user_voices(user_id: int, request: Request, user: dict=Depends(get
         raise HTTPException(status_code=500, detail='Internal server error.')
 
 @user_voices_router.post('/upload')
-async def upload_user_voice(request: Request, user_id: int, file: UploadFile=File(...), name: str=Form(...), user: dict=Depends(check_user_whitelisted), service: VoiceManagementService=Depends(get_voice_service), provider: str='f5'):
+async def upload_user_voice(
+    request: Request,
+    user_id: int,
+    file: UploadFile = File(...),
+    name: str = Form(...),
+    reference_text: Optional[str] = Form(default=None),
+    sample_text: Optional[str] = Form(default=None),
+    user: dict = Depends(check_user_whitelisted),
+    service: VoiceManagementService = Depends(get_voice_service),
+    provider: str = 'f5',
+):
     """Upload a custom voice for the selected owner."""
     try:
         if user['id'] != user_id and (not _is_admin(user)):
             raise HTTPException(status_code=403, detail='Operation is not permitted.')
         file_content = await file.read()
-        return await service.upload_user_voice(user_id=user_id, name=name, filename=file.filename, content=file_content, content_type=file.content_type, provider=_normalize_voice_provider(provider))
+        resolved_reference_text = (reference_text or sample_text or '').strip() or None
+        return await service.upload_user_voice(
+            user_id=user_id,
+            name=name,
+            filename=file.filename,
+            content=file_content,
+            content_type=file.content_type,
+            provider=_normalize_voice_provider(provider),
+            reference_text=resolved_reference_text,
+        )
     except HTTPException:
         raise
     except Exception:
@@ -313,21 +413,43 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
             upstream_data['cfg_strength'] = str(payload['cfg_strength'])
         if payload.get('speed_preset') is not None:
             upstream_data['speed_preset'] = str(payload['speed_preset'])
-        async with httpx.AsyncClient(timeout=30.0, **build_tts_httpx_client_kwargs()) as client:
+        if resolved_provider == 'qwen':
+            settings_repo = TTSSettingsRepository(service.db)
+            user_settings = settings_repo.get_or_create(owner_id or actor_id)
+            upstream_data['model'] = normalize_qwen_model_selection(getattr(user_settings, 'qwen_model', None))
+        preview_timeout = 120.0 if resolved_provider == 'qwen' else 30.0
+        upstream_base_url = _provider_base_url(resolved_provider)
+        async with httpx.AsyncClient(timeout=preview_timeout, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
-                f'{_provider_base_url(resolved_provider)}/api/admin/voices/test',
+                f'{upstream_base_url}/api/admin/voices/test',
                 data=upstream_data,
                 headers=_tts_auth_headers(resolved_provider),
                 params=_provider_upstream_params(resolved_provider),
             )
         if response.status_code == 200:
-            return response.json()
+            preview_payload = response.json()
+            if isinstance(preview_payload, dict) and preview_payload.get('success') and preview_payload.get('audio_url'):
+                return await _materialize_preview_audio(
+                    provider=resolved_provider,
+                    payload=preview_payload,
+                    upstream_base_url=upstream_base_url,
+                )
+            return preview_payload
         detail = 'Failed to synthesize the test voice.'
         try:
             detail = response.json().get('detail', detail)
         except Exception:
             pass
         raise HTTPException(status_code=response.status_code, detail=detail)
+    except httpx.TimeoutException as error:
+        if resolved_provider == 'qwen':
+            logger.warning('Qwen voice preview timed out while waiting for worker warmup: %s', error)
+            raise HTTPException(
+                status_code=504,
+                detail='Qwen worker is still loading the selected model. Try the preview again in a few seconds.',
+            ) from error
+        logger.warning('Voice preview timed out provider=%s error=%s', resolved_provider, error)
+        raise HTTPException(status_code=504, detail='Voice preview timed out. Try again.') from error
     except HTTPException:
         raise
     except Exception:

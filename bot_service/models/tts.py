@@ -36,7 +36,7 @@ class TTSUserSettings(Base):
 
     # Core TTS settings.
     engine = Column(String, nullable=False, default="gtts")
-    voice = Column(String, nullable=False, default="female_1")
+    voice = Column(String, nullable=False, default="default_voice")
     listening_mode = Column(String, nullable=False, default="website")
     advanced_provider = Column(String, nullable=False, default="f5")
     f5_mode = Column(String, nullable=False, default="cloud")

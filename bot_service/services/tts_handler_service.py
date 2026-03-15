@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 from typing import Dict, Any, Optional
 
 from sqlalchemy.orm import Session
@@ -19,7 +20,11 @@ from services.user_service import UserService
 from services.platform_rewards_service import PlatformRewardsService
 from services.notification_service import notification_service
 from services.memory_websocket_manager import get_memory_websocket_manager
-from services.tts.provider_utils import infer_provider_from_engine, normalize_provider_mode
+from services.tts.provider_utils import (
+    infer_provider_from_engine,
+    normalize_provider_mode,
+    normalize_qwen_model_selection,
+)
 
 # API (for specific legacy checks if needed)
 from api.moderation_api import is_user_blocked_from_tts
@@ -29,7 +34,7 @@ from constants import TTS_DEFAULT_VOLUME
 # Analysis logging for LLM feature verification
 from core.analysis_logging import (
     log_tts_request, log_error as log_analysis_error,
-    set_correlation_id, clear_correlation_id
+    get_correlation_id, set_correlation_id, clear_correlation_id
 )
 
 logger = logging.getLogger('bot_service.tts')
@@ -48,6 +53,10 @@ class TTSHandlerService:
     def __init__(self):
         self.user_service = UserService()
         self.rewards_service = PlatformRewardsService()
+        self._message_id_dedupe_ttl_sec = 60.0
+        self._fallback_dedupe_ttl_sec = 2.0
+        self._recent_message_ids: dict[tuple[str, str], float] = {}
+        self._recent_fallback_keys: dict[tuple[str, str, str, str], float] = {}
 
     async def process_message_for_tts(
         self,
@@ -60,7 +69,8 @@ class TTSHandlerService:
         skip_if_command: bool = True,
         is_reply: bool = False,
         mentioned_users: list = None,
-        reward_id: str = None
+        reward_id: str = None,
+        message_id: str = None,
     ) -> Dict[str, Any]:
         """
         Process a message for TTS generation.
@@ -76,8 +86,24 @@ class TTSHandlerService:
 
             # 2. Database Context
             db = SessionLocal()
-            set_correlation_id()
+            trace_id = set_correlation_id()
+            source_message_id = self._normalize_message_id(message_id)
             try:
+                if self._is_duplicate_tts_event(
+                    platform=platform,
+                    channel_identifier=channel_identifier,
+                    username=username,
+                    text=text,
+                    message_id=source_message_id,
+                ):
+                    logger.info(
+                        "[SKIP] [%s TTS] Duplicate event suppressed trace_id=%s source_message_id=%s",
+                        platform.upper(),
+                        trace_id,
+                        source_message_id or "-",
+                    )
+                    return {"success": False, "error": "Duplicate message suppressed"}
+
                 # 3. Load User and Settings
                 user_data = self._load_user_and_settings(db, channel_identifier, platform)
                 if not user_data:
@@ -117,7 +143,10 @@ class TTSHandlerService:
                     engine_config,
                     platform,
                     db,
-                    reward_id
+                    reward_id,
+                    original_text=text,
+                    source_message_id=source_message_id,
+                    trace_id=trace_id,
                 )
 
             finally:
@@ -128,6 +157,52 @@ class TTSHandlerService:
             logger.exception("[ERROR] [{platform.upper()} TTS] Error processing TTS")
             log_analysis_error(feature='tts_handler', error=e, context=f"process_message_{platform}")
             return {"success": False, "error": "Internal server error"}
+
+    @staticmethod
+    def _normalize_message_id(message_id: Optional[str]) -> Optional[str]:
+        normalized = str(message_id or "").strip()
+        return normalized or None
+
+    def _prune_recent_dedupe_state(self, current_ts: float) -> None:
+        self._recent_message_ids = {
+            key: value
+            for key, value in self._recent_message_ids.items()
+            if current_ts - value < self._message_id_dedupe_ttl_sec
+        }
+        self._recent_fallback_keys = {
+            key: value
+            for key, value in self._recent_fallback_keys.items()
+            if current_ts - value < self._fallback_dedupe_ttl_sec
+        }
+
+    def _is_duplicate_tts_event(
+        self,
+        *,
+        platform: str,
+        channel_identifier: str,
+        username: str,
+        text: str,
+        message_id: Optional[str],
+    ) -> bool:
+        current_ts = time.monotonic()
+        self._prune_recent_dedupe_state(current_ts)
+
+        normalized_platform = str(platform or "").strip().lower()
+        if message_id:
+            message_key = (normalized_platform, message_id)
+            previous_ts = self._recent_message_ids.get(message_key)
+            self._recent_message_ids[message_key] = current_ts
+            return previous_ts is not None and (current_ts - previous_ts) < self._message_id_dedupe_ttl_sec
+
+        fallback_key = (
+            normalized_platform,
+            str(channel_identifier or "").strip().lower(),
+            str(username or "").strip().lower(),
+            str(text or "").strip().lower(),
+        )
+        previous_ts = self._recent_fallback_keys.get(fallback_key)
+        self._recent_fallback_keys[fallback_key] = current_ts
+        return previous_ts is not None and (current_ts - previous_ts) < self._fallback_dedupe_ttl_sec
 
     def _check_initial_conditions(self, text, username, channel_identifier, platform, connection_manager, skip_if_command):
         # Skip commands
@@ -264,11 +339,6 @@ class TTSHandlerService:
         tts_settings = user_data["tts_settings"]
         audio_settings = user_data["audio_settings"]
         audio_settings_dict = user_data["audio_settings_dict"]
-        
-        # AI TTS requested?
-        use_ai_tts_requested = False
-        if connection_manager:
-            use_ai_tts_requested = connection_manager.is_tts_enabled(channel_identifier)
 
         engine = tts_settings.engine or 'gtts'
         advanced_provider = infer_provider_from_engine(
@@ -277,10 +347,6 @@ class TTSHandlerService:
         )
         use_ai_tts = (engine in {'f5tts', 'qwen'})
         use_basic_tts = True
-
-        if use_ai_tts and not use_ai_tts_requested:
-            logger.info(f"[MIC] [{platform.upper()} TTS] AI TTS disabled via connection_manager for channel")
-            use_ai_tts = False
         
         # Check Local Endpoint
         local_tts_repo = LocalTTSRepository(db)
@@ -339,9 +405,25 @@ class TTSHandlerService:
             "voice_settings": voice_settings_dict
         }
 
-    async def _execute_tts_request(self, tts_api, connection_manager, channel_identifier, text, username, user_data, engine_config, platform, db, reward_id=None):
+    async def _execute_tts_request(
+        self,
+        tts_api,
+        connection_manager,
+        channel_identifier,
+        text,
+        username,
+        user_data,
+        engine_config,
+        platform,
+        db,
+        reward_id=None,
+        original_text: str = "",
+        source_message_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
+    ):
         user_id = user_data["user_id"]
         tts_settings = user_data["tts_settings"]
+        resolved_trace_id = trace_id or get_correlation_id()
         
         tts_settings_dict = {
             "enable7TV": tts_settings.enable_7tv,
@@ -356,7 +438,11 @@ class TTSHandlerService:
             "gcloud_voices": getattr(tts_settings, "gcloud_voices", []) or [],
             "gcloud_mood": getattr(tts_settings, "gcloud_mood", "neutral") or "neutral",
             "qwen_voice": getattr(tts_settings, "qwen_voice", "default") or "default",
-            "qwen_model": getattr(tts_settings, "qwen_model", None),
+            "qwen_model": normalize_qwen_model_selection(getattr(tts_settings, "qwen_model", None)),
+            "trace_id": resolved_trace_id,
+            "source_message_id": source_message_id,
+            "source_platform": platform,
+            "source_channel": channel_identifier,
         }
         
         if engine_config["voice_settings"]:
@@ -366,6 +452,14 @@ class TTSHandlerService:
             f"[MIC] [{platform.upper()} TTS] Processing: {username}: {text[:50]}... "
             f"(engine={tts_settings.engine}, provider={engine_config.get('advanced_provider')}, "
             f"volume={engine_config['volume']}%)"
+        )
+        logger.info(
+            "[TRACE] [%s TTS] trace_id=%s source_message_id=%s original_text=%r filtered_text=%r",
+            platform.upper(),
+            resolved_trace_id,
+            source_message_id or "-",
+            original_text[:200],
+            text[:200],
         )
 
         result = await tts_api.send_tts_request(
@@ -381,6 +475,10 @@ class TTSHandlerService:
             connection_manager=connection_manager,
             tts_settings=tts_settings_dict
         )
+        result["trace_id"] = resolved_trace_id
+        result["source_message_id"] = source_message_id
+        result["spoken_text"] = text
+        result["original_text"] = original_text
 
         if result.get("success"):
             # Log successful TTS request for analysis
@@ -406,10 +504,29 @@ class TTSHandlerService:
                     "tts_type": result.get("tts_type", "unknown"),
                     "duration": result.get("duration", 0),
                     "text": text,
-                    "username": username
+                    "spoken_text": result.get("spoken_text") or text,
+                    "original_text": original_text,
+                    "username": username,
+                    "trace_id": resolved_trace_id,
+                    "source_message_id": source_message_id,
+                    "requested_provider": result.get("requested_provider"),
+                    "actual_provider": result.get("actual_provider"),
+                    "fallback_used": bool(result.get("fallback_used")),
+                    "fallback_reason": result.get("fallback_reason"),
                 },
                 channel_name=channel_identifier,
                 platform=platform
+            )
+            logger.info(
+                "[TRACE] [%s TTS] trace_id=%s source_message_id=%s requested_provider=%s actual_provider=%s fallback=%s voice=%s audio_url=%s",
+                platform.upper(),
+                resolved_trace_id,
+                source_message_id or "-",
+                result.get("requested_provider") or engine_config.get("advanced_provider") or engine_config.get("engine"),
+                result.get("actual_provider") or result.get("tts_type", "unknown"),
+                bool(result.get("fallback_used")),
+                result.get("voice", "unknown"),
+                result.get("audio_url"),
             )
         else:
             # Log failed TTS request
@@ -420,7 +537,13 @@ class TTSHandlerService:
                 user_id=user_id,
                 error=result.get("error")
             )
-            logger.error(f"[ERROR] [{platform.upper()} TTS] Synthesis FAILED: {result.get('error')}")
+            logger.error(
+                "[ERROR] [%s TTS] Synthesis FAILED trace_id=%s source_message_id=%s error=%s",
+                platform.upper(),
+                resolved_trace_id,
+                source_message_id or "-",
+                result.get("error"),
+            )
 
         return result
 

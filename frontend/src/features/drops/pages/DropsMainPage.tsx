@@ -29,7 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 
 type TabType = 'streak' | 'donation' | 'points' | 'rewards' | 'history' | 'widget';
 const TAB_TRIGGER_CLASS =
-  'rounded-none -mb-px whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-foreground data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-emerald-400 data-[state=active]:shadow-none gap-2';
+  'rounded-none -mb-px whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none gap-2';
 const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 const TAB_LIST_CONTAINER_CLASS = 'mb-4 border-b border-border';
 

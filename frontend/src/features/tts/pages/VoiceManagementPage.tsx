@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 /* eslint-disable no-alert */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, Edit, Globe, Lock, RefreshCw, Settings, TestTube2, Trash2, Upload, User } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Edit, Globe, Lock, RefreshCw, Settings, TestTube2, Trash2, Upload, User, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL } from '@/constants';
@@ -27,7 +27,6 @@ import PageWrapper from '@/shared/components/PageWrapper';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -72,6 +71,11 @@ interface TestVoiceResponse {
 
 type VoiceProvider = 'f5' | 'qwen';
 
+const PROVIDER_TAB_CLASS =
+    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300';
+const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
+const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
+
 const extractApiErrorMessage = (error: unknown): string | null => {
     if (!error) return null;
     const typedError = error as {
@@ -113,6 +117,7 @@ const VoiceManagementPageContent: React.FC = () => {
     const [newVoiceName, setNewVoiceName] = useState<string>('');
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [voiceName, setVoiceName] = useState<string>('');
+    const [uploadReferenceText, setUploadReferenceText] = useState<string>('');
     const [testText, setTestText] = useState<string>("Привет, я бы хотел с тобой постримить, если честно, для меня бы это было честью. Постримить с таким великим стримером было бы реально круто.");
     const [isUploading, setIsUploading] = useState<boolean>(false);
     const [isTranscribing, setIsTranscribing] = useState<boolean>(false);
@@ -225,6 +230,7 @@ const VoiceManagementPageContent: React.FC = () => {
             setUploadDialogOpen(false);
             setUploadFile(null);
             setVoiceName('');
+            setUploadReferenceText('');
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
@@ -435,6 +441,10 @@ const VoiceManagementPageContent: React.FC = () => {
         formData.append('file', uploadFile);
         formData.append('voice_name', voiceName.trim());
         formData.append('user_id', uploadUserId.toString());
+        if (uploadReferenceText.trim()) {
+            formData.append('reference_text', uploadReferenceText.trim());
+            formData.append('sample_text', uploadReferenceText.trim());
+        }
 
         uploadVoiceMutation.mutate({ userId: uploadUserId, formData });
     };
@@ -683,6 +693,90 @@ const VoiceManagementPageContent: React.FC = () => {
         updateEnabledVoicesMutation.mutate({ userId, voiceIds: newEnabledIds });
     };
 
+    const renderVoiceCard = (voice: TtsVoice, scope: 'user' | 'global') => {
+        const isEnabled = enabledVoiceIds.includes(voice.id);
+        const isGlobalVoice = scope === 'global';
+
+        return (
+            <Card
+                key={`${scope}-${voice.id}`}
+                className={`${VOICE_CARD_CLASS} flex min-h-[148px] flex-col ${isEnabled ? 'border-emerald-400/45 bg-emerald-500/[0.08]' : ''}`}
+            >
+                <CardHeader className="space-y-2 p-3.5 pb-2">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <CardTitle className="truncate text-sm font-semibold text-foreground">
+                                {voice.name}
+                            </CardTitle>
+                        </div>
+
+                        {!isGlobalVoice && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(voice.id, voice.voice_type)}
+                                className="h-8 w-8 shrink-0 p-0 text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                                title="Удалить голос"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex">
+                        <Badge
+                            variant="outline"
+                            className={`justify-center px-3 py-1 ${isEnabled
+                                ? 'border-emerald-400/45 bg-emerald-500/10 text-emerald-300'
+                                : 'border-emerald-500/15 bg-background/40 text-muted-foreground'}`}
+                        >
+                            {isEnabled ? 'Активен' : 'Выкл'}
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="mt-auto px-3.5 pb-3.5 pt-0">
+                    <div className="grid grid-cols-2 gap-1.5">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleVoiceEnabled(voice.id)}
+                            title={isEnabled ? 'Убрать из пула' : 'Добавить в пул'}
+                            aria-label={isEnabled ? 'Убрать из пула' : 'Добавить в пул'}
+                            className={isEnabled
+                                ? 'h-8 justify-center border-blue-500/35 bg-blue-500/12 text-blue-200 hover:border-blue-400/45 hover:bg-blue-500/16 hover:text-blue-100'
+                                : 'h-8 justify-center border-blue-500/35 bg-blue-500/12 text-blue-200 hover:border-blue-400/45 hover:bg-blue-500/16 hover:text-blue-100'}
+                        >
+                            {isEnabled ? (
+                                <>
+                                    <XCircle className="h-3.5 w-3.5" />
+                                    Из пула
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                    В пул
+                                </>
+                            )}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(voice)}
+                            title="Настроить"
+                            aria-label="Настроить"
+                            className="h-8 justify-center border-blue-500/35 bg-blue-500/12 text-blue-200 hover:border-blue-400/45 hover:bg-blue-500/16 hover:text-blue-100"
+                        >
+                            <Settings className="h-3.5 w-3.5" />
+                            Настроить
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
+
     if (!isAuthenticated) {
         return (
             <PageWrapper title="Управление голосами">
@@ -772,30 +866,30 @@ const VoiceManagementPageContent: React.FC = () => {
                     : ""
             }
         >
-            <Card className="card-glass border-blue-500/25">
-                <CardContent className="pt-5">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-300/90">Провайдер голосов</p>
-                            <p className="text-xs text-slate-400 mt-1">
-                                Голоса, сэмплы и персональные настройки редактируются отдельно для F5 и Qwen.
-                            </p>
-                        </div>
-                        <div className="w-full sm:w-[240px]">
-                            <Label htmlFor="voice-provider-select" className="text-xs text-slate-300">Активный провайдер</Label>
-                            <select
-                                id="voice-provider-select"
-                                value={voiceProvider}
-                                onChange={(event) => setVoiceProvider(event.target.value as VoiceProvider)}
-                                className="mt-1 h-10 w-full rounded-md border border-blue-500/35 bg-transparent px-3 text-sm text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500/35"
-                            >
-                                <option value="f5" className="bg-slate-900 text-slate-100">F5 TTS</option>
-                                <option value="qwen" className="bg-slate-900 text-slate-100">Qwen 3 TTS</option>
-                            </select>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="mb-4 border-b border-border">
+                <div className="flex items-center gap-6">
+                    <button
+                        type="button"
+                        onClick={() => setVoiceProvider('f5')}
+                        className={`${PROVIDER_TAB_CLASS} ${voiceProvider === 'f5'
+                            ? 'border-sky-500 text-sky-400'
+                            : 'border-transparent text-muted-foreground hover:text-sky-300'
+                            }`}
+                    >
+                        F5 TTS
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setVoiceProvider('qwen')}
+                        className={`${PROVIDER_TAB_CLASS} ${voiceProvider === 'qwen'
+                            ? 'border-sky-500 text-sky-400'
+                            : 'border-transparent text-muted-foreground hover:text-sky-300'
+                            }`}
+                    >
+                        Qwen 3 TTS
+                    </button>
+                </div>
+            </div>
 
             <input
                 ref={(el) => {
@@ -899,6 +993,7 @@ const VoiceManagementPageContent: React.FC = () => {
                             if (!open) {
                                 setUploadFile(null);
                                 setVoiceName('');
+                                setUploadReferenceText('');
                                 if (fileInputRef.current) {
                                     fileInputRef.current.value = '';
                                 }
@@ -943,8 +1038,8 @@ const VoiceManagementPageContent: React.FC = () => {
                                             </Button>
                                         </div>
                                         {uploadFile && (
-                                            <p className="text-xs text-green-400 mt-1">
-                                                ? Файл выбран: {uploadFile.name}
+                                            <p className="mt-1 text-xs text-sky-400">
+                                                Файл выбран: {uploadFile.name}
                                             </p>
                                         )}
                                     </div>
@@ -960,6 +1055,19 @@ const VoiceManagementPageContent: React.FC = () => {
                                         />
                                         <p className="text-xs text-slate-400 mt-1">
                                             Имя будет использоваться для выбора голоса в TTS
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="voice-reference-text">Reference text</Label>
+                                        <Textarea
+                                            id="voice-reference-text"
+                                            value={uploadReferenceText}
+                                            onChange={(e) => setUploadReferenceText(e.target.value)}
+                                            placeholder="Опционально. Если оставить пустым, backend попробует транскрибировать sample автоматически."
+                                            className="mt-1 min-h-[96px]"
+                                        />
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            Для Qwen Base это reference_text для voice cloning. Для F5 поле тоже сохраняется вместе с sample.
                                         </p>
                                     </div>
                                     <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3">
@@ -979,7 +1087,8 @@ const VoiceManagementPageContent: React.FC = () => {
                                     <Button
                                         onClick={handleUpload}
                                         disabled={isUploading || !uploadFile || !voiceName.trim()}
-                                        className="w-36 bg-green-600 hover:bg-green-700"
+                                        variant="ghost"
+                                        className="w-36 border border-blue-500/30 bg-transparent text-blue-300 hover:bg-blue-500/10 hover:text-sky-300"
                                     >
                                         {isUploading ? 'Загрузка...' : 'Загрузить'}
                                     </Button>
@@ -994,10 +1103,10 @@ const VoiceManagementPageContent: React.FC = () => {
                         <div>
                             <div className="flex items-center justify-between mb-4">
                                 <div className="flex items-center gap-2">
-                                    <User className="h-5 w-5 text-green-400" />
+                                    <User className="h-5 w-5 text-sky-400" />
                                     <h3 className="text-lg font-semibold text-white">Мои голоса</h3>
                                     {userVoices.length > 0 && (
-                                        <Badge variant="outline" className="text-green-400 border-green-400">
+                                        <Badge variant="outline" className="border-sky-500/40 text-sky-400">
                                             {userVoices.length}
                                         </Badge>
                                     )}
@@ -1007,17 +1116,18 @@ const VoiceManagementPageContent: React.FC = () => {
                                     if (!open) {
                                         setUploadFile(null);
                                         setVoiceName('');
+                                        setUploadReferenceText('');
                                         if (fileInputRef.current) {
                                             fileInputRef.current.value = '';
                                         }
                                     }
-                                }}>
-                                    <DialogTrigger asChild>
-                                        <Button className="bg-purple-600 hover:bg-purple-700">
-                                            <Upload className="h-4 w-4 mr-2" />
-                                            Загрузить свой голос
-                                        </Button>
-                                    </DialogTrigger>
+                                    }}>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" className="border-blue-700/40 bg-transparent text-muted-foreground hover:bg-transparent hover:text-blue-400">
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                Загрузить свой голос
+                                            </Button>
+                                        </DialogTrigger>
                                     <DialogContent
                                         key="upload-dialog"
                                         className="max-w-md"
@@ -1050,11 +1160,7 @@ const VoiceManagementPageContent: React.FC = () => {
                                                         {uploadFile ? uploadFile.name : 'Выбрать файл'}
                                                     </Button>
                                                 </div>
-                                                {uploadFile && (
-                                                    <p className="text-xs text-green-400 mt-1">
-                                                        ? Файл выбран: {uploadFile.name}
-                                                    </p>
-                                                )}
+                                                {uploadFile && <p className="mt-1 text-xs text-sky-400">Файл выбран: {uploadFile.name}</p>}
                                             </div>
                                             <div>
                                                 <Label htmlFor="voice-name">Имя голоса</Label>
@@ -1068,6 +1174,19 @@ const VoiceManagementPageContent: React.FC = () => {
                                                 />
                                                 <p className="text-xs text-slate-400 mt-1">
                                                     Имя будет использоваться для выбора голоса в TTS
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <Label htmlFor="voice-reference-text-secondary">Reference text</Label>
+                                                <Textarea
+                                                    id="voice-reference-text-secondary"
+                                                    value={uploadReferenceText}
+                                                    onChange={(e) => setUploadReferenceText(e.target.value)}
+                                                    placeholder="Опционально. Если оставить пустым, backend попробует транскрибировать sample автоматически."
+                                                    className="mt-1 min-h-[96px]"
+                                                />
+                                                <p className="text-xs text-slate-400 mt-1">
+                                                    Для Qwen Base это reference_text для voice cloning. Для F5 поле тоже сохраняется вместе с sample.
                                                 </p>
                                             </div>
                                             <div className="bg-blue-900/20 border border-blue-500/50 rounded-lg p-3">
@@ -1087,7 +1206,8 @@ const VoiceManagementPageContent: React.FC = () => {
                                             <Button
                                                 onClick={handleUpload}
                                                 disabled={isUploading || !uploadFile || !voiceName.trim()}
-                                                className="w-36 bg-green-600 hover:bg-green-700"
+                                                variant="ghost"
+                                                className="w-36 border border-blue-500/30 bg-transparent text-blue-300 hover:bg-blue-500/10 hover:text-sky-300"
                                             >
                                                 {isUploading ? 'Загрузка...' : 'Загрузить'}
                                             </Button>
@@ -1096,55 +1216,14 @@ const VoiceManagementPageContent: React.FC = () => {
                                 </Dialog>
                             </div>
                             {userVoices.length === 0 ? (
-                                <div className="text-center py-8 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
-                                    <User className="h-10 w-10 mx-auto mb-3 text-slate-600" />
-                                    <p className="text-slate-400 mb-2">У вас пока нет личных голосов</p>
-                                    <p className="text-sm text-slate-500">Загрузите свой первый голос, чтобы начать</p>
+                                <div className="rounded-2xl border border-border/70 border-dashed bg-card/55 py-8 text-center">
+                                    <User className="mx-auto mb-3 h-10 w-10 text-slate-500" />
+                                    <p className="mb-2 text-slate-300">У вас пока нет личных голосов</p>
+                                    <p className="text-sm text-slate-500">Загрузите первый sample, чтобы начать</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
-                                    {userVoices.map((voice) => {
-                                        const isEnabled = enabledVoiceIds.includes(voice.id);
-                                        return (
-                                            <Card key={voice.id} className={`bg-slate-800 border-slate-700 flex flex-col transition-opacity ${!isEnabled ? 'opacity-50' : ''}`}>
-                                                <CardHeader className="pb-2 pt-3 px-3">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5 flex-1 min-w-0">
-                                                            <Checkbox
-                                                                checked={isEnabled}
-                                                                onCheckedChange={() => handleToggleVoiceEnabled(voice.id)}
-                                                                className="flex-shrink-0"
-                                                            />
-                                                            <User className="h-3.5 w-3.5 text-green-400 flex-shrink-0" />
-                                                            <span className="truncate">{voice.name}</span>
-                                                        </CardTitle>
-                                                    </div>
-                                                </CardHeader>
-                                                <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
-                                                    <div className="flex gap-1.5">
-                                                        <Button
-                                                            className="flex-1 h-7 text-xs px-2"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleEdit(voice)}
-                                                        >
-                                                            <Settings className="h-3 w-3 mr-1" />
-                                                            Настроить
-                                                        </Button>
-                                                        <Button
-                                                            className="h-7 w-7 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDelete(voice.id, voice.voice_type)}
-                                                            title="Удалить голос"
-                                                        >
-                                                            <Trash2 className="h-3 w-3" />
-                                                        </Button>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        );
-                                    })}
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                                    {userVoices.map((voice) => renderVoiceCard(voice, 'user'))}
                                 </div>
                             )}
                         </div>
@@ -1159,48 +1238,19 @@ const VoiceManagementPageContent: React.FC = () => {
                             <div className="flex items-center gap-2 mb-4">
                                 <Globe className="h-5 w-5 text-blue-400" />
                                 <h3 className="text-lg font-semibold text-white">Глобальные голоса</h3>
-                                <Badge variant="outline" className="text-blue-400 border-blue-400">
+                                <Badge variant="outline" className="border-sky-500/40 text-sky-400">
                                     {globalVoices.length}
                                 </Badge>
                             </div>
                             {globalVoices.length === 0 ? (
-                                <div className="text-center py-12 bg-slate-800/50 rounded-lg border border-slate-700 border-dashed">
+                                <div className="rounded-2xl border border-border/70 border-dashed bg-card/55 py-12 text-center">
                                     <Globe className="h-16 w-16 mx-auto mb-4 text-slate-600" />
                                     <p className="text-slate-400 text-lg mb-2">Глобальных голосов пока нет</p>
                                     <p className="text-sm text-slate-500">Глобальные голоса доступны всем пользователям</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2">
-                                    {globalVoices.map((voice) => {
-                                        const isEnabled = enabledVoiceIds.includes(voice.id);
-                                        return (
-                                            <Card key={voice.id} className={`bg-slate-800 border-slate-700 flex flex-col transition-opacity ${!isEnabled ? 'opacity-50' : ''}`}>
-                                                <CardHeader className="pb-2 pt-3 px-3">
-                                                    <div className="flex items-center justify-between gap-2">
-                                                        <CardTitle className="text-xs font-medium text-white flex items-center gap-1.5 flex-1 min-w-0">
-                                                            <Checkbox
-                                                                checked={isEnabled}
-                                                                onCheckedChange={() => handleToggleVoiceEnabled(voice.id)}
-                                                                className="flex-shrink-0"
-                                                            />
-                                                            <span className="truncate">{voice.name}</span>
-                                                        </CardTitle>
-                                                    </div>
-                                                </CardHeader>
-                                                <CardContent className="flex-grow flex flex-col justify-end pt-0 px-3 pb-3">
-                                                    <Button
-                                                        className="w-full h-7 text-xs px-2"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleEdit(voice)}
-                                                    >
-                                                        <Settings className="h-3 w-3 mr-1" />
-                                                        Настроить
-                                                    </Button>
-                                                </CardContent>
-                                            </Card>
-                                        );
-                                    })}
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                                    {globalVoices.map((voice) => renderVoiceCard(voice, 'global'))}
                                 </div>
                             )}
                         </div>
@@ -1259,7 +1309,7 @@ const VoiceManagementPageContent: React.FC = () => {
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="voice-volume">Индивидуальная громкость</Label>
-                                    <span className="text-sm text-purple-400 font-medium">
+                                    <span className="text-sm font-medium text-blue-300">
                                         {voiceVolumes[currentVoice.name] || 50}%
                                     </span>
                                 </div>
@@ -1297,56 +1347,63 @@ const VoiceManagementPageContent: React.FC = () => {
 
                             <div className="space-y-4">
                                 <h4 className="text-sm font-medium text-white">Настройки генерации</h4>
+                            {voiceProvider === 'f5' ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="cfg-strength">Стабильность синтеза: {currentVoice.cfg_strength}</Label>
+                                        <Slider
+                                            id="cfg-strength"
+                                            min={0.1}
+                                            max={10.0}
+                                            step={0.1}
+                                            value={[currentVoice.cfg_strength || 3.0]}
+                                            onValueChange={(value) => setCurrentVoice(prev => prev ? ({ ...prev, cfg_strength: value[0] }) : null)}
+                                            className="mt-2"
+                                        />
+                                    </div>
 
-                                <div>
-                                    <Label htmlFor="cfg-strength">Стабильность синтеза: {currentVoice.cfg_strength}</Label>
-                                    <Slider
-                                        id="cfg-strength"
-                                        min={0.1}
-                                        max={10.0}
-                                        step={0.1}
-                                        value={[currentVoice.cfg_strength || 3.0]}
-                                        onValueChange={(value) => setCurrentVoice(prev => prev ? ({ ...prev, cfg_strength: value[0] }) : null)}
-                                        className="mt-2"
-                                    />
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="speed-preset">Скорость речи: {
-                                        currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
-                                            currentVoice.speed_preset === 'slow' ? 'Медленный' :
-                                                currentVoice.speed_preset === 'normal' ? 'Нормальный' :
-                                                    currentVoice.speed_preset === 'fast' ? 'Быстрый' : 'Очень быстрый'
-                                    }</Label>
-                                    <Slider
-                                        id="speed-preset"
-                                        min={0}
-                                        max={4}
-                                        step={1}
-                                        value={[
-                                            currentVoice.speed_preset === 'very_slow' ? 0 :
-                                                currentVoice.speed_preset === 'slow' ? 1 :
-                                                    currentVoice.speed_preset === 'normal' ? 2 :
-                                                        currentVoice.speed_preset === 'fast' ? 3 : 4
-                                        ]}
-                                        onValueChange={(value) => {
-                                            const preset = value[0] === 0 ? 'very_slow' :
-                                                value[0] === 1 ? 'slow' :
-                                                    value[0] === 2 ? 'normal' :
-                                                        value[0] === 3 ? 'fast' : 'very_fast';
-                                            logger.log('Speed preset changed to:', preset);
-                                            setCurrentVoice(prev => prev ? ({ ...prev, speed_preset: preset }) : null);
-                                        }}
-                                        className="mt-2"
-                                    />
-                                    <div className="flex justify-between text-xs text-muted-foreground mt-1 px-1">
-                                        <span className="text-center w-1/5">Очень медл.</span>
-                                        <span className="text-center w-1/5">Медленный</span>
-                                        <span className="text-center w-1/5">Нормальный</span>
-                                        <span className="text-center w-1/5">Быстрый</span>
-                                        <span className="text-center w-1/5">Очень быстрый</span>
+                                    <div>
+                                        <Label htmlFor="speed-preset">Скорость речи: {
+                                            currentVoice.speed_preset === 'very_slow' ? 'Очень медленный' :
+                                                currentVoice.speed_preset === 'slow' ? 'Медленный' :
+                                                    currentVoice.speed_preset === 'normal' ? 'Нормальный' :
+                                                        currentVoice.speed_preset === 'fast' ? 'Быстрый' : 'Очень быстрый'
+                                        }</Label>
+                                        <Slider
+                                            id="speed-preset"
+                                            min={0}
+                                            max={4}
+                                            step={1}
+                                            value={[
+                                                currentVoice.speed_preset === 'very_slow' ? 0 :
+                                                    currentVoice.speed_preset === 'slow' ? 1 :
+                                                        currentVoice.speed_preset === 'normal' ? 2 :
+                                                            currentVoice.speed_preset === 'fast' ? 3 : 4
+                                            ]}
+                                            onValueChange={(value) => {
+                                                const preset = value[0] === 0 ? 'very_slow' :
+                                                    value[0] === 1 ? 'slow' :
+                                                        value[0] === 2 ? 'normal' :
+                                                            value[0] === 3 ? 'fast' : 'very_fast';
+                                                logger.log('Speed preset changed to:', preset);
+                                                setCurrentVoice(prev => prev ? ({ ...prev, speed_preset: preset }) : null);
+                                            }}
+                                            className="mt-2"
+                                        />
+                                        <div className="mt-1 grid grid-cols-5 gap-1 px-1 text-[11px] text-muted-foreground">
+                                            <span className="text-center whitespace-nowrap leading-none">Очень медл.</span>
+                                            <span className="text-center whitespace-nowrap leading-none">Медленный</span>
+                                            <span className="text-center whitespace-nowrap leading-none">Нормальный</span>
+                                            <span className="text-center whitespace-nowrap leading-none">Быстрый</span>
+                                            <span className="text-center whitespace-nowrap leading-none">Очень быстр.</span>
+                                        </div>
                                     </div>
                                 </div>
+                            ) : (
+                                <div className="rounded-xl border border-border/70 bg-background/50 px-4 py-3 text-sm text-muted-foreground">
+                                    Для Qwen здесь используются только reference text, sample и индивидуальная громкость. Генерационный промпт модели задаётся на основной вкладке TTS.
+                                </div>
+                            )}
                             </div>
                         </div>
                     )}

@@ -35,7 +35,7 @@ interface TtsContextValue {
     initializeTts: () => Promise<void>;
     setNotificationHandler: (callback: ((message: string, type?: string) => void) | null) => void;
     checkTtsStatus: () => Promise<void>;
-    checkTtsHealth: () => Promise<{ isHealthy: boolean; isChecking: boolean }>;
+    checkTtsHealth: (provider?: 'f5' | 'qwen' | 'gcloud', mode?: 'cloud' | 'local') => Promise<{ isHealthy: boolean; isChecking: boolean }>;
     isCheckingHealth: boolean;
 }
 
@@ -91,6 +91,12 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             )
                 ? 'f5'
                 : null;
+    const healthMode: 'cloud' | 'local' | undefined =
+        selectedEngineType === 'qwen_local' || selectedEngineType === 'f5_local' || selectedEngineType === 'local'
+            ? 'local'
+            : selectedEngineType === 'qwen_cloud' || selectedEngineType === 'f5_cloud' || selectedEngineType === 'cloud'
+                ? 'cloud'
+                : undefined;
     const shouldCheckProviderHealth = !!user && healthProvider !== null;
 
     const { data: statusData, refetch: refetchStatus } = useTtsStatus(channelName, {
@@ -161,19 +167,25 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         }
     }, [statusData]);
 
-    const runProviderHealthCheck = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
+    const runProviderHealthCheck = useCallback(async (
+        providerOverride?: 'f5' | 'qwen' | 'gcloud',
+        modeOverride?: 'cloud' | 'local',
+    ): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
         if (isCheckingHealth) {
             return { isHealthy: engineStatus.loaded, isChecking: true };
         }
 
-        if (!shouldCheckProviderHealth || !healthProvider) {
+        const providerToCheck = providerOverride || healthProvider;
+        const modeToCheck = modeOverride || healthMode;
+
+        if (!providerToCheck || (!providerOverride && !shouldCheckProviderHealth)) {
             setEngineStatus({ loaded: true, error: null });
             return { isHealthy: true, isChecking: false };
         }
 
         setIsCheckingHealth(true);
         try {
-            const response = await ttsService.getHealth(healthProvider);
+            const response = await ttsService.getHealth(providerToCheck, modeToCheck);
             const payload = (response.data?.data || response.data) as {
                 healthy?: boolean;
                 tts_engine_loaded?: boolean;
@@ -187,7 +199,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             if (isHealthy) {
                 setEngineStatus({ loaded: true, error: null });
             } else {
-                const providerLabel = healthProvider.toUpperCase();
+                const providerLabel = providerToCheck.toUpperCase();
                 setEngineStatus({ loaded: false, error: `${providerLabel} TTS service is unavailable` });
             }
 
@@ -196,7 +208,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
             logger.error('TTS Health check failed:', error);
             setEngineStatus({
                 loaded: false,
-                error: healthProvider === 'qwen'
+                error: providerToCheck === 'qwen'
                     ? 'Unable to connect to Qwen TTS service'
                     : 'Unable to connect to F5 TTS service',
             });
@@ -204,7 +216,7 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         } finally {
             setIsCheckingHealth(false);
         }
-    }, [isCheckingHealth, engineStatus.loaded, shouldCheckProviderHealth, healthProvider]);
+    }, [isCheckingHealth, engineStatus.loaded, shouldCheckProviderHealth, healthProvider, healthMode]);
 
     const { data: voicesData } = useGlobalVoices({
         enabled: !!user && engineStatus.loaded && isVoiceManagementPage,
@@ -265,8 +277,11 @@ export const TtsProvider: React.FC<TtsProviderProps> = ({ children }) => {
         }
     }, [user, refetchStatus]);
 
-    const checkTtsHealth = useCallback(async (): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
-        return runProviderHealthCheck();
+    const checkTtsHealth = useCallback(async (
+        provider?: 'f5' | 'qwen' | 'gcloud',
+        mode?: 'cloud' | 'local',
+    ): Promise<{ isHealthy: boolean; isChecking: boolean }> => {
+        return runProviderHealthCheck(provider, mode);
     }, [runProviderHealthCheck]);
 
     useEffect(() => {

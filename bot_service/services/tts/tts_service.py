@@ -26,7 +26,9 @@ from services.voice_management_service import VoiceManagementService
 import random
 from services.tts.provider_utils import (
     infer_provider_from_engine,
+    normalize_provider,
     normalize_provider_mode,
+    normalize_qwen_model_selection,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,6 +65,27 @@ class TTSService:
         self.chat_repo = ChatMessageRepository(db)
         self.user_repo = UserRepository(db)
         self.token_repo = UserTokenRepository(db)
+
+    @staticmethod
+    def _resolve_connection_manager_tts_type(engine: Optional[str]) -> str:
+        normalized_engine = str(engine or "").strip().lower()
+        return "ai" if normalized_engine in {"f5tts", "qwen", "gcloud"} else "basic"
+
+    def _sync_connection_manager_tts_channels(self, *, user_id: int, engine: Optional[str]) -> None:
+        user = self.user_repo.get_by_id(user_id)
+        if not user or not getattr(user, "tts_enabled", False):
+            return
+
+        connection_manager = get_connection_manager()
+        tts_type = self._resolve_connection_manager_tts_type(engine)
+
+        if user.twitch_username:
+            connection_manager.enable_tts_for_channel(user.twitch_username.lower(), tts_type=tts_type)
+
+        tokens = self.token_repo.get_all_by_user(user_id)
+        for token in tokens:
+            if token.platform == 'vk' and token.platform_user_id:
+                connection_manager.enable_tts_for_channel(str(token.platform_user_id).lower(), tts_type=tts_type)
 
     @staticmethod
     def normalize_blocked_username(username: str) -> str:
@@ -162,7 +185,7 @@ class TTSService:
         self,
         text: str,
         user: Dict[str, Any],
-        voice: str = "female_1",
+        voice: str = "default_voice",
         channel: str = None,
         platform: str = "twitch",
         priority: int = 1
@@ -285,6 +308,7 @@ class TTSService:
             payload = dict(kwargs)
             payload.pop("user_id", None)
             payload.pop("client_version", None)
+            payload = self._normalize_settings_payload(settings, payload)
 
             # Update
             updated_settings = self.settings_repo.update_settings(settings, payload)
@@ -296,6 +320,10 @@ class TTSService:
                     self.user_repo.update(user, {"tts_listening_mode": listening_mode})
 
             if user_id:
+                self._sync_connection_manager_tts_channels(
+                    user_id=user_id,
+                    engine=getattr(updated_settings, "engine", payload.get("engine")),
+                )
                 from services.memory_websocket_manager import get_memory_websocket_manager
                 await get_memory_websocket_manager().sync_user_tts_generation(user_id)
             
@@ -305,6 +333,76 @@ class TTSService:
         except Exception as e:
             logger.exception("Error saving TTS settings")
             return {"success": False, "error": "Internal server error"}
+
+    @staticmethod
+    def _normalize_settings_payload(settings, payload: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = dict(payload)
+
+        current_engine = getattr(settings, "engine", "gtts")
+        current_provider = infer_provider_from_engine(
+            current_engine,
+            advanced_provider=getattr(settings, "advanced_provider", None),
+        )
+        current_f5_mode = normalize_provider_mode(getattr(settings, "f5_mode", "cloud"))
+        current_qwen_mode = normalize_provider_mode(getattr(settings, "qwen_mode", "cloud"))
+
+        if "qwen_model" in normalized:
+            normalized["qwen_model"] = normalize_qwen_model_selection(normalized.get("qwen_model"))
+
+        engine = str(normalized.get("engine") or current_engine or "gtts").strip().lower()
+        provider = normalize_provider(normalized.get("advanced_provider") or current_provider)
+
+        if "advanced_provider" in normalized and "engine" not in normalized:
+            if provider == "gcloud":
+                engine = "gcloud"
+            elif provider == "qwen":
+                engine = "qwen"
+            else:
+                engine = "f5tts"
+
+        if engine == "gcloud":
+            provider = "gcloud"
+        elif engine == "qwen":
+            provider = "qwen"
+        elif engine == "f5tts":
+            provider = "f5"
+
+        normalized["engine"] = engine
+        normalized["advanced_provider"] = provider
+
+        if "f5_mode" in normalized:
+            normalized["f5_mode"] = normalize_provider_mode(normalized.get("f5_mode"))
+        else:
+            normalized["f5_mode"] = current_f5_mode
+
+        if "qwen_mode" in normalized:
+            normalized["qwen_mode"] = normalize_provider_mode(normalized.get("qwen_mode"))
+        else:
+            normalized["qwen_mode"] = current_qwen_mode
+
+        explicit_use_local = normalized.get("use_local_tts")
+        if explicit_use_local is not None:
+            use_local_tts = bool(explicit_use_local)
+        elif provider == "qwen":
+            use_local_tts = normalize_provider_mode(normalized.get("qwen_mode")) == "local"
+        elif provider == "f5":
+            use_local_tts = normalize_provider_mode(normalized.get("f5_mode")) == "local"
+        else:
+            use_local_tts = False
+
+        if provider == "qwen":
+            normalized["qwen_mode"] = "local" if use_local_tts else normalize_provider_mode(normalized.get("qwen_mode"))
+            normalized["use_local_tts"] = normalized["qwen_mode"] == "local"
+        elif provider == "f5":
+            normalized["f5_mode"] = "local" if use_local_tts else normalize_provider_mode(normalized.get("f5_mode"))
+            normalized["use_local_tts"] = normalized["f5_mode"] == "local"
+        else:
+            normalized["use_local_tts"] = False
+
+        if engine in {"gtts", "gcloud"}:
+            normalized["use_local_tts"] = False
+
+        return normalized
 
     # === Filter Management ===
 
@@ -447,17 +545,12 @@ class TTSService:
 
             # Use repository for update
             self.user_repo.update(user, {'tts_enabled': True})
-            
-            # Connection Manager Update
-            connection_manager = get_connection_manager()
-            if user.twitch_username:
-                connection_manager.enable_tts_for_channel(user.twitch_username.lower())
-            
-            # VK Support
-            tokens = self.token_repo.get_all_by_user(user_id)
-            for t in tokens:
-                if t.platform == 'vk' and t.platform_user_id:
-                     connection_manager.enable_tts_for_channel(t.platform_user_id)
+
+            settings = self.settings_repo.get_or_create(user_id=user_id)
+            self._sync_connection_manager_tts_channels(
+                user_id=user_id,
+                engine=getattr(settings, "engine", None),
+            )
 
             from services.memory_websocket_manager import get_memory_websocket_manager
             await get_memory_websocket_manager().sync_user_tts_generation(user_id)

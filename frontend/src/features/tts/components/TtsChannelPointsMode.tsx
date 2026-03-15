@@ -187,27 +187,27 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
           <button
             onClick={() => onModeChange('all_messages')}
             disabled={isSaving}
-            className={`p-3 rounded-lg border transition-all text-left ${ttsMode === 'all_messages'
-              ? 'border-green-500 bg-green-500/25 text-white'
-              : 'border-gray-700 hover:border-green-500/50 text-gray-400'
+            className={`rounded-lg border p-3 text-left transition-colors ${ttsMode === 'all_messages'
+              ? 'border-sky-500/50 bg-sky-500/10 text-sky-50'
+              : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
               }`}
           >
             <div className="font-semibold text-sm mb-0.5">Все сообщения</div>
-            <div className="text-xs text-gray-400">Стандартный режим</div>
+            <div className={`text-xs ${ttsMode === 'all_messages' ? 'text-sky-200/80' : 'text-muted-foreground'}`}>Стандартный режим</div>
           </button>
 
           <button
             onClick={() => onModeChange('channel_points')}
             disabled={isSaving || !isTwitchConnected}
-            className={`p-3 rounded-lg border transition-all text-left ${!isTwitchConnected
-              ? 'opacity-40 cursor-not-allowed border-gray-700 text-gray-500'
+            className={`rounded-lg border p-3 text-left transition-colors ${!isTwitchConnected
+              ? 'cursor-not-allowed border-border/60 bg-background/20 text-muted-foreground/70 opacity-40'
               : ttsMode === 'channel_points'
-                ? 'border-green-500 bg-green-500/25 text-white'
-                : 'border-gray-700 hover:border-green-500/50 text-gray-400'
+                ? 'border-sky-500/50 bg-sky-500/10 text-sky-50'
+                : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
               }`}
           >
             <div className="font-semibold text-sm mb-0.5">За баллы канала</div>
-            <div className="text-xs text-gray-400">
+            <div className={`text-xs ${ttsMode === 'channel_points' && isTwitchConnected ? 'text-sky-200/80' : 'text-muted-foreground'}`}>
               {!isTwitchConnected ? 'Требуется Twitch' : 'Только с наградой'}
             </div>
           </button>
@@ -236,7 +236,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
                       {isLoadingRewards ? (
                         <Loader2 className="w-3 h-3 animate-spin text-gray-500" />
                       ) : ttsRewardIds[platform] ? (
-                        <span className="text-[10px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded border border-green-500/20 font-medium whitespace-nowrap">
+                        <span className="text-[10px] bg-sky-500/10 text-sky-300 px-1.5 py-0.5 rounded border border-sky-500/20 font-medium whitespace-nowrap">
                           ВКЛ
                         </span>
                       ) : (
@@ -271,7 +271,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={() => openCreateDialog(platform)}
-                        className="h-7 text-xs border-green-600/50 text-green-400 hover:bg-green-600/10 hover:text-green-300"
+                        className="h-7 text-xs border-sky-600/50 text-sky-300 hover:bg-sky-600/10 hover:text-sky-200"
                       >
                         Создать
                       </Button>

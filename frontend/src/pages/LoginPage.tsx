@@ -47,7 +47,7 @@ const LoginPage: React.FC = () => {
     const [subtitleText, setSubtitleText] = useState<string>('');
     const [subtitleVisible, setSubtitleVisible] = useState<boolean>(false);
     const [currentFeatureIndex, setCurrentFeatureIndex] = useState<number>(0);
-    const fullTitle = 'Payedviewer tools';
+    const fullTitle = 'Paidviewer_tools';
 
     useEffect(() => {
         if (!isCheckingAuth && isAuthenticated) {
@@ -121,7 +121,7 @@ const LoginPage: React.FC = () => {
 
         return (
             <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative">
-                <Card className="login-card w-full max-w-sm shadow-2xl h-[min(280px,70vh)] flex items-center justify-center animate-fade-in">
+                <Card className="login-card w-full max-w-[28rem] shadow-2xl h-[min(280px,70vh)] flex items-center justify-center animate-fade-in">
                     <CardContent className="flex flex-col items-center gap-3">
                         <div className="relative w-8 h-8">
                             <div className="absolute inset-0 rounded-full border-2 border-green-400/30"></div>
@@ -137,9 +137,9 @@ const LoginPage: React.FC = () => {
     return (
         <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative">
 
-            <Card className="login-card w-full max-w-sm shadow-2xl">
+            <Card className="login-card w-full max-w-[28rem] shadow-2xl">
                 <CardHeader className="text-center pt-10 pb-4">
-                    <h1 className="select-none text-3xl font-bold mb-3 text-green-400 h-10 font-mono tracking-wider">
+                    <h1 className="brand-wordmark select-none mb-3 h-10 whitespace-nowrap text-[1.7rem] leading-none text-green-400 sm:text-[2.1rem]">
                         {title}
                         <span className="blinking-cursor">{!isTyping ? '_' : ''}</span>
                     </h1>

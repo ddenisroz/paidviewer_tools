@@ -201,6 +201,7 @@ textarea:-webkit-autofill:focus {
     /* Font families with consistent fallbacks to prevent layout shift */
     --font-family-base: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
     --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+    --font-family-brand: 'Orbitron', 'Rajdhani', 'Exo 2', 'JetBrains Mono', monospace;
 
     /* Font rendering optimization */
     --font-smoothing: antialiased;
@@ -557,6 +558,15 @@ body {
 
 .animate-orbit {
   animation: orbit 4s linear infinite;
+}
+
+.brand-wordmark {
+  font-family: var(--font-family-brand) !important;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-feature-settings: normal;
+  text-rendering: geometricPrecision;
 }
 
 /* Стили для страницы логина, как на скриншоте */

@@ -80,18 +80,32 @@ const ChatWindow: React.FC = () => {
     const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
 
     useEffect(() => {
-        if (!badgesLoaded) {
-            twitchBadgesService.loadGlobalBadges()
-                .then(() => setBadgesLoaded(true))
-                .catch(err => logger.error('Failed to load badges:', err));
+        if (!settings.show_badges) {
+            setBadgesLoaded(false);
+            return;
         }
 
-        if (settings.show_7tv_emotes && user?.twitch_username) {
+        if (badgesLoaded) {
+            return;
+        }
+
+        twitchBadgesService.loadGlobalBadges()
+            .then(() => setBadgesLoaded(true))
+            .catch(err => logger.error('Failed to load badges:', err));
+    }, [badgesLoaded, settings.show_badges]);
+
+    useEffect(() => {
+        if (!settings.show_7tv_emotes) {
+            setEmotes({ channelEmotes: new Map(), globalEmotes: new Map() });
+            return;
+        }
+
+        if (user?.twitch_username) {
             getAllEmotesForChannel(user.twitch_username, twitchUserId)
                 .then(data => setEmotes(data))
                 .catch(err => logger.error('Failed to load 7TV emotes:', err));
         }
-    }, [badgesLoaded, settings.show_7tv_emotes, user?.twitch_username, twitchUserId]);
+    }, [settings.show_7tv_emotes, user?.twitch_username, twitchUserId]);
 
     const previousMessageCount = useRef<number>(0);
 

@@ -26,8 +26,9 @@ async def test_get_local_tts_config_exposes_qwen_provider_contract(monkeypatch):
     assert result["provider_contract"]["upstream_parity_ready"] is False
     assert result["provider_contract"]["requires_compatibility_adapter"] is True
     assert result["provider_contract"]["managed_topology"] == "gateway_managed"
-    assert result["provider_contract"]["project_hosted_direct_supported"] is False
+    assert result["provider_contract"]["project_hosted_direct_supported"] is True
     assert result["provider_contract"]["supports_native_strict_api_key"] is False
+    assert result["provider_contract"]["supports_native_health_endpoint"] is True
 
 
 @pytest.mark.asyncio
@@ -40,7 +41,7 @@ async def test_qwen_test_connection_returns_contract_error_when_health_endpoint_
     request = type(
         "Req",
         (),
-        {"endpoint_url": "http://localhost:8000", "api_key": None, "provider": "qwen"},
+        {"endpoint_url": "http://localhost:8012", "api_key": None, "provider": "qwen"},
     )()
 
     with pytest.raises(HTTPException) as exc_info:
@@ -48,7 +49,7 @@ async def test_qwen_test_connection_returns_contract_error_when_health_endpoint_
 
     assert exc_info.value.status_code == 502
     assert "compatibility adapter" in exc_info.value.detail
-    assert "native parity" in exc_info.value.detail
+    assert "voice CRUD" in exc_info.value.detail
 
 
 @pytest.mark.asyncio
@@ -67,7 +68,7 @@ async def test_qwen_test_connection_returns_warning_metadata_on_success(monkeypa
     request = type(
         "Req",
         (),
-        {"endpoint_url": "http://localhost:8000", "api_key": None, "provider": "qwen"},
+        {"endpoint_url": "http://localhost:8012", "api_key": None, "provider": "qwen"},
     )()
 
     result = await tts_local_routes.test_local_tts_connection(request=request, user={"id": 1}, db=None)

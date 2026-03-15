@@ -5,10 +5,8 @@
  */
 import { useCallback, useState } from 'react';
 
-import { useTtsPlayer } from '@/context/TtsPlayerContext';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
-import { resolveAudioUrl } from '@/shared/utils/urlUtils';
 
 import type { PlatformFilter } from './useChatMessages';
 import type { BotStatusType } from '@/features/admin/hooks/useBotConnection';
@@ -32,15 +30,23 @@ interface TtsAudioMessage extends WebSocketMessage {
         volume?: number;
         tts_type?: string;
         text?: string;
+        spoken_text?: string;
+        original_text?: string;
         username?: string;
         platform?: string;
+        trace_id?: string;
+        source_message_id?: string;
     };
     audio_url?: string;
     volume?: number;
     tts_type?: string;
     text?: string;
+    spoken_text?: string;
+    original_text?: string;
     username?: string;
     platform?: string;
+    trace_id?: string;
+    source_message_id?: string;
 }
 
 interface BotStatusMessage extends WebSocketMessage {
@@ -79,7 +85,6 @@ export function useChatWebSocket({
     onError
 }: UseChatWebSocketOptions): UseChatWebSocketReturn {
     const { addToast } = useToast();
-    const { addToQueue } = useTtsPlayer();
     const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessage | null>(null);
 
     const getPlatformFilter = useCallback((): PlatformFilter => ({
@@ -89,57 +94,16 @@ export function useChatWebSocket({
 
     const handleTtsAudio = useCallback((data: TtsAudioMessage) => {
         const audioData = data.data || data;
-        const isTtsEnabled = (() => {
-            if (typeof window === 'undefined') return true;
-            const stored = window.localStorage.getItem('tts_enabled');
-            if (stored === null) return true;
-            return stored === 'true';
-        })();
-
-        if (!isTtsEnabled) {
-            logger.debug('[TTS] Ignoring audio event because global TTS is disabled');
-            return;
-        }
-
-        const platform = typeof audioData.platform === 'string' ? audioData.platform.toLowerCase() : null;
-        if (platform && typeof window !== 'undefined') {
-            const storedPlatforms = window.localStorage.getItem('tts_enabled_platforms');
-            if (storedPlatforms) {
-                try {
-                    const enabledPlatforms = JSON.parse(storedPlatforms) as string[];
-                    if (Array.isArray(enabledPlatforms) && enabledPlatforms.length > 0 && !enabledPlatforms.includes(platform)) {
-                        logger.debug(`[TTS] Ignoring audio event for disabled platform: ${platform}`);
-                        return;
-                    }
-                } catch (error) {
-                    logger.warn('[TTS] Failed to parse enabled platforms from storage:', error);
-                }
-            }
-        }
-
-        if (!audioData.audio_url) {
-            logger.warn('TTS audio event received but no audio_url provided');
-            return;
-        }
-
-        try {
-            const audioUrl = resolveAudioUrl(audioData.audio_url);
-            logger.debug(`[LINK] Resolved audio URL: ${audioUrl}`);
-
-            // Add to TTS player queue
-            addToQueue({
-                text: audioData.text || 'TTS Message',
-                audioUrl: audioUrl,
-                volume: audioData.volume || 50,
-                username: audioData.username,
-                platform: audioData.platform
-            });
-
-            logger.info(`[OK] [TTS] Added to queue: ${audioData.text?.substring(0, 50) || 'TTS Message'}...`);
-        } catch (err) {
-            logger.error('Error adding TTS to queue:', err);
-        }
-    }, [addToQueue]);
+        logger.debug('[TTS] Shared chat websocket received audio event', {
+            platform: audioData.platform,
+            username: audioData.username,
+            trace_id: audioData.trace_id,
+            source_message_id: audioData.source_message_id,
+            spoken_text: audioData.spoken_text || audioData.text,
+            original_text: audioData.original_text,
+            has_audio_url: Boolean(audioData.audio_url),
+        });
+    }, []);
 
     const handleWebSocketMessage = useCallback((data: WebSocketMessage): void => {
         setLastJsonMessage(data);

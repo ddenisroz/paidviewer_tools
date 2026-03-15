@@ -16,7 +16,9 @@ from typing import Any, Dict, Optional
 import httpx
 
 from core.config import settings
+from core.database import db_session
 from core.datetime_utils import utcnow_naive
+from repositories.bot_token_repository import BotTokenRepository
 from services.twitch_bot_oauth_service import twitch_bot_oauth_service
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,30 @@ class BotTokenValidator:
         self.twitch_token_valid: bool = False
         self.vk_token_valid: bool = False
         self._monitoring_task: Optional[asyncio.Task] = None
+
+    def _sync_twitch_bot_login(self, expected_login: Optional[str], actual_login: Optional[str]) -> None:
+        normalized_actual = str(actual_login or "").strip().lower()
+        normalized_expected = str(expected_login or "").strip().lower()
+        if not normalized_actual or normalized_actual == normalized_expected:
+            return
+
+        try:
+            with db_session() as db:
+                repo = BotTokenRepository(db)
+                bot_token = repo.get_by_platform("twitch")
+                if not bot_token:
+                    return
+
+                bot_token.bot_login = normalized_actual
+                bot_token.updated_at = utcnow_naive()
+                repo.save(bot_token)
+                logger.info(
+                    "[BOT TOKEN] Synced stored Twitch bot login from %s to %s",
+                    normalized_expected or "<empty>",
+                    normalized_actual,
+                )
+        except Exception:
+            logger.exception("[BOT TOKEN] Failed to sync Twitch bot login to validated identity")
 
     async def validate_twitch_bot_token(self) -> Dict[str, Any]:
         """Validate Twitch bot token from DB."""
@@ -68,12 +94,14 @@ class BotTokenValidator:
                 self.last_twitch_check = utcnow_naive()
 
                 db_login = bot_token.get("bot_login") if bot_token else None
-                if db_login and data.get("login") != db_login:
-                    logger.warning(
-                        "[BOT TOKEN] Twitch token belongs to %s, expected %s",
-                        data.get("login"),
+                validated_login = data.get("login")
+                if db_login and validated_login != db_login:
+                    logger.info(
+                        "[BOT TOKEN] Twitch token belongs to %s, stored login was %s; updating DB",
+                        validated_login,
                         db_login,
                     )
+                    self._sync_twitch_bot_login(db_login, validated_login)
 
                 logger.info("[OK] [BOT TOKEN] Twitch bot token is VALID")
                 return {

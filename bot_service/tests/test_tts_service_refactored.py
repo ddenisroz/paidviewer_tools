@@ -85,11 +85,14 @@ async def test_update_settings_version_conflict(tts_service):
 async def test_enable_tts_success(tts_service):
     tts_service.user_repo = MagicMock()
     tts_service.token_repo = MagicMock()
+    tts_service.settings_repo = MagicMock()
 
     mock_user = MagicMock()
     mock_user.twitch_username = "test_channel"
+    mock_user.tts_enabled = True
     tts_service.user_repo.get_by_id.return_value = mock_user
     tts_service.token_repo.get_all_by_user.return_value = []
+    tts_service.settings_repo.get_or_create.return_value = MagicMock(engine="gtts")
 
     with patch("services.tts.tts_service.get_connection_manager") as mock_cm_getter:
         mock_cm = MagicMock()
@@ -99,7 +102,72 @@ async def test_enable_tts_success(tts_service):
 
     assert result is True
     tts_service.user_repo.update.assert_called_with(mock_user, {"tts_enabled": True})
-    mock_cm.enable_tts_for_channel.assert_called_with("test_channel")
+    mock_cm.enable_tts_for_channel.assert_called_with("test_channel", tts_type="basic")
+
+
+@pytest.mark.asyncio
+async def test_enable_tts_uses_ai_channel_type_for_qwen(tts_service):
+    tts_service.user_repo = MagicMock()
+    tts_service.token_repo = MagicMock()
+    tts_service.settings_repo = MagicMock()
+
+    mock_user = MagicMock()
+    mock_user.twitch_username = "test_channel"
+    mock_user.tts_enabled = True
+    tts_service.user_repo.get_by_id.return_value = mock_user
+    tts_service.token_repo.get_all_by_user.return_value = []
+    tts_service.settings_repo.get_or_create.return_value = MagicMock(engine="qwen")
+
+    with patch("services.tts.tts_service.get_connection_manager") as mock_cm_getter:
+        mock_cm = MagicMock()
+        mock_cm_getter.return_value = mock_cm
+
+        result = await tts_service.enable_tts(user_id=1)
+
+    assert result is True
+    mock_cm.enable_tts_for_channel.assert_called_with("test_channel", tts_type="ai")
+
+
+@pytest.mark.asyncio
+async def test_save_tts_settings_syncs_connection_manager_channel_type_when_enabled(tts_service):
+    tts_service.settings_repo = MagicMock()
+    tts_service.user_repo = MagicMock()
+    tts_service.token_repo = MagicMock()
+
+    current_settings = MagicMock()
+    current_settings.version = 1
+    current_settings.engine = "gtts"
+    current_settings.advanced_provider = "f5"
+    current_settings.f5_mode = "cloud"
+    current_settings.qwen_mode = "cloud"
+    tts_service.settings_repo.get_or_create.return_value = current_settings
+
+    updated_settings = MagicMock(engine="qwen", version=2)
+    tts_service.settings_repo.update_settings.return_value = updated_settings
+
+    enabled_user = MagicMock()
+    enabled_user.twitch_username = "test_channel"
+    enabled_user.tts_enabled = True
+    tts_service.user_repo.get_by_id.return_value = enabled_user
+    tts_service.token_repo.get_all_by_user.return_value = []
+
+    with patch("services.tts.tts_service.get_connection_manager") as mock_cm_getter:
+        mock_cm = MagicMock()
+        mock_cm_getter.return_value = mock_cm
+        with patch("services.memory_websocket_manager.get_memory_websocket_manager") as mock_get_ws_manager:
+            mock_ws_manager = AsyncMock()
+            mock_get_ws_manager.return_value = mock_ws_manager
+
+            result = await tts_service.save_tts_settings(
+                user_id=1,
+                engine="qwen",
+                advanced_provider="qwen",
+                qwen_mode="cloud",
+            )
+
+    assert result["success"] is True
+    mock_cm.enable_tts_for_channel.assert_called_with("test_channel", tts_type="ai")
+    mock_ws_manager.sync_user_tts_generation.assert_awaited_once_with(1)
 
 
 @pytest.mark.asyncio

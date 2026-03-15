@@ -4,14 +4,15 @@ Provider-aware Local TTS API endpoints.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
 from core.database import get_db
+from core.internal_service_auth import build_tts_auth_headers
 from repositories.local_tts_repository import LocalTTSRepository
 from services.tts.provider_utils import normalize_local_tts_endpoint_url
 from services.tts.tts_core import LocalTTSConfigRequest, check_local_tts_health
@@ -42,17 +43,18 @@ def _provider_contract(provider: str) -> dict:
             "upstream_parity_ready": False,
             "requires_compatibility_adapter": True,
             "managed_topology": "gateway_managed",
-            "project_hosted_direct_supported": False,
+            "project_hosted_direct_supported": True,
             "supports_native_strict_api_key": False,
-            "supports_native_health_endpoint": False,
+            "supports_native_health_endpoint": True,
             "supports_native_status_endpoint": False,
-            "supports_local_voice_management": False,
+            "supports_local_voice_management": True,
             "warning": (
                 "This screen configures a user-owned self-hosted endpoint. "
                 "The managed Qwen path in this project remains gateway-managed: "
-                "bot_service -> tts-gateway -> project-hosted worker. "
-                "The current nano-qwen3tts-vllm upstream does not yet satisfy the full bot_service contract, "
-                "so bot_service uses a compatibility adapter over /api/prepare -> /api/stream/{id} for self-hosted endpoints."
+                "bot_service -> tts-gateway -> project-hosted worker on localhost:8012. "
+                "Self-hosted Qwen endpoints now expose model catalog and user voice CRUD, "
+                "but synthesis still uses a compatibility adapter over /api/prepare -> /api/stream/{id}. "
+                "Health endpoints are available; native status remains limited."
             ),
         }
 
@@ -73,10 +75,58 @@ def _qwen_local_contract_detail() -> str:
     return (
         "This endpoint is treated as a user-owned self-hosted Qwen endpoint. "
         "The project-managed path remains gateway-managed through a project-hosted worker. "
-        "The current Qwen upstream does not yet satisfy the full bot_service contract, so this repository uses "
-        "a compatibility adapter for the self-hosted path; native parity still requires upstream "
-        "health/auth/status/synthesis support."
+        "This repository still uses a compatibility adapter for synthesis, but the worker now exposes "
+        "/health/live, /health/ready, /api/models and user voice CRUD endpoints. Native status/auth parity remains partial."
     )
+
+
+def _require_authenticated_user_id(user: Optional[dict]) -> int:
+    user_id = user.get("id") if user else None
+    if not user_id or user_id <= 0:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return int(user_id)
+
+
+def _build_local_headers(provider: str, api_key: Optional[str]) -> dict[str, str]:
+    return build_tts_auth_headers(
+        provider=provider,
+        upstream="local",
+        local_api_key=api_key,
+        strict=False,
+    )
+
+
+def _get_local_config_or_404(
+    *,
+    repo: LocalTTSRepository,
+    user_id: int,
+    provider: str,
+):
+    config = repo.get_by_user_id(user_id, provider=provider)
+    if not config:
+        raise HTTPException(status_code=404, detail="Local TTS is not configured")
+    return config
+
+
+async def _fetch_f5_local_voices(
+    *,
+    endpoint: str,
+    headers: dict[str, str],
+    user_id: int,
+) -> list[dict[str, Any]]:
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(
+            f"{endpoint}/api/tts/voices",
+            headers=headers,
+            params={"user_id": user_id},
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch voices")
+
+        data = response.json()
+        if isinstance(data, list):
+            return data
+        return list(data.get("voices") or [])
 
 
 # ============================================================================
@@ -349,6 +399,142 @@ async def test_local_tts_connection(
         raise HTTPException(status_code=500, detail="Connection check failed")
 
 
+@local_tts_router.get("/voices")
+async def list_local_tts_voices(
+    provider: str = "f5",
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resolved_provider = _normalize_local_provider(provider)
+    user_id = _require_authenticated_user_id(user)
+    provider_contract = _provider_contract(resolved_provider)
+
+    if not provider_contract["supports_local_voice_management"]:
+        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
+
+    repo = LocalTTSRepository(db)
+    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
+    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
+    headers = _build_local_headers(resolved_provider, config.api_key)
+
+    try:
+        voices = await _fetch_f5_local_voices(endpoint=endpoint, headers=headers, user_id=user_id)
+        return {
+            "success": True,
+            "provider": resolved_provider,
+            "voices": voices,
+        }
+    except HTTPException:
+        raise
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Failed to reach local TTS endpoint")
+    except Exception:
+        logger.exception("Error listing local voices")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@local_tts_router.post("/voices/upload")
+async def upload_local_tts_voice(
+    provider: str = Form("f5"),
+    voice_name: str = Form(...),
+    sample_text: Optional[str] = Form(default=None),
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resolved_provider = _normalize_local_provider(provider)
+    user_id = _require_authenticated_user_id(user)
+    provider_contract = _provider_contract(resolved_provider)
+
+    if not provider_contract["supports_local_voice_management"]:
+        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
+
+    repo = LocalTTSRepository(db)
+    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
+    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
+    headers = _build_local_headers(resolved_provider, config.api_key)
+
+    files = {"file": (file.filename or "voice.wav", await file.read(), file.content_type or "application/octet-stream")}
+    data = {
+        "voice_name": voice_name,
+        "user_id": str(user_id),
+    }
+    if sample_text and sample_text.strip():
+        data["sample_text"] = sample_text.strip()
+        data["reference_text"] = sample_text.strip()
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{endpoint}/api/tts/user/voices/upload",
+                headers=headers,
+                data=data,
+                files=files,
+            )
+        if response.status_code != 200:
+            detail = response.text or "Failed to upload voice"
+            raise HTTPException(status_code=response.status_code, detail=detail)
+
+        payload = response.json()
+        return {
+            "success": True,
+            "provider": resolved_provider,
+            "voice": payload.get("voice"),
+            "message": payload.get("message") or "Voice uploaded",
+        }
+    except HTTPException:
+        raise
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Failed to reach local TTS endpoint")
+    except Exception:
+        logger.exception("Error uploading local voice")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@local_tts_router.delete("/voices/{voice_id}")
+async def delete_local_tts_voice(
+    voice_id: int,
+    provider: str = Query("f5"),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resolved_provider = _normalize_local_provider(provider)
+    user_id = _require_authenticated_user_id(user)
+    provider_contract = _provider_contract(resolved_provider)
+
+    if not provider_contract["supports_local_voice_management"]:
+        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
+
+    repo = LocalTTSRepository(db)
+    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
+    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
+    headers = _build_local_headers(resolved_provider, config.api_key)
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.delete(
+                f"{endpoint}/api/tts/user/voices/{voice_id}",
+                headers=headers,
+                params={"user_id": user_id},
+            )
+        if response.status_code != 200:
+            detail = response.text or "Failed to delete voice"
+            raise HTTPException(status_code=response.status_code, detail=detail)
+
+        return {
+            "success": True,
+            "provider": resolved_provider,
+            "message": "Voice deleted",
+        }
+    except HTTPException:
+        raise
+    except httpx.RequestError:
+        raise HTTPException(status_code=502, detail="Failed to reach local TTS endpoint")
+    except Exception:
+        logger.exception("Error deleting local voice")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 @local_tts_router.post("/sync-global-voices")
 async def sync_global_voices_to_local(
     user: dict = Depends(get_current_user),
@@ -358,29 +544,23 @@ async def sync_global_voices_to_local(
     """Fetch voice list from configured local provider endpoint."""
     try:
         resolved_provider = _normalize_local_provider(provider)
-
-        user_id = user.get("id") if user else None
-        if not user_id or user_id <= 0:
-            raise HTTPException(status_code=401, detail="Authentication required")
+        user_id = _require_authenticated_user_id(user)
 
         repo = LocalTTSRepository(db)
-        config = repo.get_by_user_id(user_id, provider=resolved_provider)
-        if not config:
-            raise HTTPException(status_code=404, detail="Local TTS is not configured")
+        config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
+        provider_contract = _provider_contract(resolved_provider)
+        if not provider_contract["supports_local_voice_management"]:
+            raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
 
-        headers = {}
-        if config.api_key:
-            headers["Authorization"] = f"Bearer {config.api_key}"
+        headers = _build_local_headers(resolved_provider, config.api_key)
         endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{endpoint}/api/voices/list", headers=headers)
-                if response.status_code != 200:
-                    raise HTTPException(status_code=response.status_code, detail="Failed to fetch voices")
-
-                data = response.json()
-                local_voices = data.get("voices", [])
+            local_voices = await _fetch_f5_local_voices(
+                endpoint=endpoint,
+                headers=headers,
+                user_id=user_id,
+            )
         except httpx.RequestError:
             raise HTTPException(status_code=500, detail="Internal server error")
 

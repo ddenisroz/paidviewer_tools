@@ -47,18 +47,24 @@ def _resolve_gateway_api_key(*, strict: bool) -> str:
 
 def _resolve_provider_api_key(provider: str, *, strict: bool) -> str:
     normalized_provider = _normalize_provider(provider)
+    shared_api_key = (
+        _normalize_api_key(settings.tts_internal_api_key)
+        or _normalize_api_key(settings.tts_gateway_api_key)
+    )
     if normalized_provider == "qwen":
-        api_key = _normalize_api_key(settings.qwen_tts_service_api_key)
+        api_key = _normalize_api_key(settings.qwen_tts_service_api_key) or shared_api_key
         if not api_key and strict:
             raise TTSAuthConfigError(
-                "QWEN_TTS_SERVICE_API_KEY is required for qwen upstream requests."
+                "QWEN_TTS_SERVICE_API_KEY is required for qwen upstream requests. "
+                "Fallbacks: TTS_INTERNAL_API_KEY, TTS_GATEWAY_API_KEY."
             )
         return api_key
 
-    api_key = _normalize_api_key(settings.f5_tts_service_api_key)
+    api_key = _normalize_api_key(settings.f5_tts_service_api_key) or shared_api_key
     if not api_key and strict:
         raise TTSAuthConfigError(
-            "F5_TTS_SERVICE_API_KEY is required for f5 upstream requests."
+            "F5_TTS_SERVICE_API_KEY is required for f5 upstream requests. "
+            "Fallbacks: TTS_INTERNAL_API_KEY, TTS_GATEWAY_API_KEY."
         )
     return api_key
 

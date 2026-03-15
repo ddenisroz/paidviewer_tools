@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from repositories.base_repository import BaseRepository
 from models.tts import TTSUserSettings
+from services.tts.provider_utils import normalize_qwen_model_selection
 
 
 class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
@@ -67,7 +68,7 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
             "gcloud_voices": settings.gcloud_voices or [],
             "gcloud_mood": settings.gcloud_mood or "neutral",
             "qwen_voice": getattr(settings, "qwen_voice", "default") or "default",
-            "qwen_model": getattr(settings, "qwen_model", None),
+            "qwen_model": normalize_qwen_model_selection(getattr(settings, "qwen_model", None)),
             "max_message_length": settings.max_message_length,
             "skip_commands": settings.skip_commands,
             "use_local_tts": settings.use_local_tts,

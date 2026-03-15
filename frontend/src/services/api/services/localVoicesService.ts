@@ -1,100 +1,84 @@
-/**
- * Local TTS Voices Service - API calls to external local TTS providers (F5/Qwen).
- *
- * These endpoints are on the user's local TTS server, not our backend.
- */
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
 
+import apiClient from '@/services/api/client';
 import { logger } from '@/shared/utils/prodLogger';
+
+export type LocalTtsProvider = 'f5' | 'qwen';
 
 export interface LocalVoice {
     id: number;
     name: string;
-    language: string;
-    description?: string;
+    language?: string | null;
+    description?: string | null;
+    type?: 'base' | 'custom' | 'global' | 'user';
+    voice_type?: 'base' | 'custom' | 'global' | 'user';
     samples_count?: number;
+    file_path?: string | null;
+    is_active?: boolean;
     created_at?: string;
 }
 
-export interface LocalVoicesResponse {
+interface LocalVoicesResponse {
     success: boolean;
     voices: LocalVoice[];
 }
 
-export interface CreateVoiceData {
+export interface UploadVoiceData {
     name: string;
-    language: string;
-    description: string;
+    file: File;
+    sampleText?: string;
 }
 
-export interface UploadSampleResponse {
+interface UploadVoiceResponse {
     success: boolean;
     message?: string;
-    transcription?: string;
+    voice?: LocalVoice | null;
 }
 
-/**
- * Service for interacting with local TTS server voices API
- */
+const normalizeVoiceType = (voice: LocalVoice): 'base' | 'custom' => {
+    const candidate = String(voice.type || voice.voice_type || '').trim().toLowerCase();
+    return candidate === 'global' || candidate === 'base' ? 'base' : 'custom';
+};
+
+const normalizeVoice = (voice: LocalVoice): LocalVoice => {
+    const normalizedType = normalizeVoiceType(voice);
+    return {
+        ...voice,
+        type: normalizedType,
+        voice_type: normalizedType,
+    };
+};
+
 export const localVoicesService = {
-    /**
-     * Get list of voices from local TTS server
-     */
-    async listVoices(endpointUrl: string): Promise<LocalVoice[]> {
+    async listVoices(provider: LocalTtsProvider): Promise<LocalVoice[]> {
         try {
-            const response = await axios.get<LocalVoicesResponse>(
-                `${endpointUrl}/api/voices/list`
-            );
-            return response.data.voices || [];
+            const response = await apiClient.get<LocalVoicesResponse>('/api/local-tts/voices', {
+                params: { provider },
+            });
+            return (response.data.voices || []).map(normalizeVoice);
         } catch (error) {
             logger.error('Error loading local voices:', error);
             throw error;
         }
     },
 
-    /**
-     * Create a new voice on local TTS server
-     */
-    async createVoice(endpointUrl: string, data: CreateVoiceData): Promise<LocalVoice> {
+    async uploadVoice(provider: LocalTtsProvider, data: UploadVoiceData): Promise<LocalVoice | null> {
         const formData = new FormData();
-        formData.append('name', data.name);
-        formData.append('language', data.language);
-        formData.append('description', data.description);
-
-        const response = await axios.post<{ success: boolean; voice: LocalVoice }>(
-            `${endpointUrl}/api/voices/create`,
-            formData
-        );
-        return response.data.voice;
-    },
-
-    /**
-     * Upload a sample for a voice
-     */
-    async uploadSample(
-        endpointUrl: string,
-        voiceId: number,
-        file: File,
-        sampleText?: string
-    ): Promise<UploadSampleResponse> {
-        const formData = new FormData();
-        formData.append('file', file);
-        if (sampleText) {
-            formData.append('sample_text', sampleText);
+        formData.append('provider', provider);
+        formData.append('voice_name', data.name);
+        formData.append('file', data.file);
+        if (data.sampleText) {
+            formData.append('sample_text', data.sampleText);
         }
 
-        const response = await axios.post<UploadSampleResponse>(
-            `${endpointUrl}/api/voices/${voiceId}/upload`,
-            formData
-        );
-        return response.data;
+        const response = await apiClient.post<UploadVoiceResponse>('/api/local-tts/voices/upload', formData);
+        return response.data.voice ? normalizeVoice(response.data.voice) : null;
     },
 
-    /**
-     * Delete a voice from local TTS server
-     */
-    async deleteVoice(endpointUrl: string, voiceId: number): Promise<void> {
-        await axios.delete(`${endpointUrl}/api/voices/${voiceId}`);
+    async deleteVoice(provider: LocalTtsProvider, voiceId: number): Promise<void> {
+        await apiClient.delete(`/api/local-tts/voices/${voiceId}`, {
+            params: { provider },
+        });
     },
 };
 

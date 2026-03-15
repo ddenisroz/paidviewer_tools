@@ -62,7 +62,7 @@ const CONTROL_TRIGGER_CLASS = 'h-9 border-border/70 bg-background/80 shadow-none
 const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const TAB_BUTTON_BASE =
     'inline-flex items-center px-4 py-2 text-sm font-medium transition-colors border-b-2 border-transparent -mb-px';
-const TAB_ACTIVE_CLASS = 'border-emerald-500 text-emerald-400 shadow-[inset_0_-2px_0_0_rgba(16,185,129,1)]';
+const TAB_ACTIVE_CLASS = 'border-sky-500 text-sky-400 shadow-[inset_0_-2px_0_0_rgba(14,165,233,1)]';
 
 const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRefresh }) => {
     const [deleting, setDeleting] = useState<boolean>(false);
@@ -1034,14 +1034,14 @@ const PointsManagementPage: React.FC = () => {
 
     return (
         <div className="container mx-auto p-4 sm:p-6">
-            <div className="flex flex-col gap-4 mb-6">
-                <div className="flex items-center justify-between border-b border-border">
+            <div className="flex flex-col gap-3 mb-6">
+                <div className="flex flex-col gap-3 border-b border-border pb-1 sm:flex-row sm:items-end sm:justify-between">
                     <div className="flex">
                         <button
                             onClick={() => setActiveTab('rewards')}
                             className={`${TAB_BUTTON_BASE} ${activeTab === 'rewards'
                                 ? TAB_ACTIVE_CLASS
-                                : 'border-transparent text-muted-foreground hover:text-emerald-300'
+                                : 'border-transparent text-muted-foreground hover:text-sky-300'
                                 }`}
                         >
                             Награды
@@ -1050,7 +1050,7 @@ const PointsManagementPage: React.FC = () => {
                             onClick={() => setActiveTab('queue')}
                             className={`${TAB_BUTTON_BASE} ${activeTab === 'queue'
                                 ? TAB_ACTIVE_CLASS
-                                : 'border-transparent text-muted-foreground hover:text-emerald-300'
+                                : 'border-transparent text-muted-foreground hover:text-sky-300'
                                 }`}
                         >
                             Очередь запросов
@@ -1058,17 +1058,17 @@ const PointsManagementPage: React.FC = () => {
                     </div>
 
                     {(twitchEnabled || vkEnabled) && (
-                        <div className="flex items-center gap-1 rounded-md border border-border/70 bg-card/60 p-1">
+                        <div className="inline-flex items-center gap-1 rounded-lg border border-border/70 bg-background/35 p-1">
                             {twitchEnabled && (
                                 <Button
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setSelectedPlatform('twitch')}
                                     className={cn(
-                                        'h-8 gap-1.5 px-2.5 text-xs sm:text-sm',
+                                        'h-8 rounded-md border border-transparent gap-1.5 px-3 text-xs sm:text-sm',
                                         selectedPlatform === 'twitch'
                                             ? 'text-white shadow-sm hover:text-white'
-                                            : 'text-muted-foreground hover:bg-background/60 hover:text-[#9146FF]'
+                                            : 'text-muted-foreground hover:border-border hover:bg-background/60 hover:text-[#9146FF]'
                                     )}
                                     style={selectedPlatform === 'twitch'
                                         ? { backgroundColor: PLATFORM_COLORS.TWITCH }
@@ -1084,10 +1084,10 @@ const PointsManagementPage: React.FC = () => {
                                     size="sm"
                                     onClick={() => setSelectedPlatform('vk')}
                                     className={cn(
-                                        'h-8 gap-1.5 px-2.5 text-xs sm:text-sm',
+                                        'h-8 rounded-md border border-transparent gap-1.5 px-3 text-xs sm:text-sm',
                                         selectedPlatform === 'vk'
                                             ? 'text-white shadow-sm hover:text-white'
-                                            : 'text-muted-foreground hover:text-foreground hover:bg-background/60'
+                                            : 'text-muted-foreground hover:border-border hover:text-foreground hover:bg-background/60'
                                     )}
                                     style={selectedPlatform === 'vk'
                                         ? { backgroundColor: PLATFORM_COLORS.VK_LIVE }

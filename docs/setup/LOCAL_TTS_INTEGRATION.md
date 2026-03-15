@@ -41,7 +41,7 @@ TTS_GATEWAY_API_KEY=<gateway-key>
 F5_TTS_SERVICE_URL=http://localhost:8011
 F5_TTS_SERVICE_API_KEY=<f5-key>
 
-QWEN_TTS_SERVICE_URL=http://localhost:8000
+QWEN_TTS_SERVICE_URL=http://localhost:8012
 QWEN_TTS_SERVICE_API_KEY=<qwen-key-or-empty>
 QWEN_VOICE_SERVICE_URL=
 
@@ -59,7 +59,7 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 
 - `tts-gateway` — `8010`
 - `f5-tts-service` — `8011`
-- `nano-qwen3tts-vllm` — `8000`
+- `nano-qwen3tts-vllm` — `8012`
 
 ## Ограничения по upstream
 
@@ -109,5 +109,5 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 2. `GET /api/tts/health?provider=qwen` возвращает healthy или контролируемый gateway-required статус
 3. Synth через backend и gateway работает для `f5` и `qwen`
 4. F5 voice CRUD работает через backend routes
-5. Qwen voice CRUD даёт ожидаемый `501`
-6. Self-hosted Qwen connection checks используют compatibility probe
+5. Qwen voice CRUD и model catalog работают через backend routes
+6. Self-hosted Qwen connection checks используют compatibility probe только для synth path

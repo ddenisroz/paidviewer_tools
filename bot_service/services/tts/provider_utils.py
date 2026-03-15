@@ -21,6 +21,61 @@ ProviderMode = Literal["cloud", "local"]
 _DEFAULT_PROVIDER: TTSProvider = "f5"
 _DEFAULT_MODE: ProviderMode = "cloud"
 
+QWEN_BASE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+QWEN_VOICEDESIGN_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+QWEN_CUSTOMVOICE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+QWEN_PROMPT_MODEL = QWEN_CUSTOMVOICE_MODEL
+QWEN_DEFAULT_MODEL = QWEN_BASE_MODEL
+
+_QWEN_MODEL_ALIASES = {
+    "qwen/qwen3-tts-12hz-0.6b-base": QWEN_BASE_MODEL,
+    "qwen/qwen3-tts-12hz-1.7b-base": QWEN_BASE_MODEL,
+    "qwen/qwen3-tts-12hz-0.6b-customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "qwen/qwen3-tts-12hz-1.7b-customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "qwen/qwen3-tts-12hz-1.7b-voicedesign": QWEN_VOICEDESIGN_MODEL,
+    "1.7 base": QWEN_BASE_MODEL,
+    "1.7base": QWEN_BASE_MODEL,
+    "base": QWEN_BASE_MODEL,
+    "1.7 customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "1.7customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "1.7 voicedesign": QWEN_VOICEDESIGN_MODEL,
+    "1.7voicedesign": QWEN_VOICEDESIGN_MODEL,
+    "voice_design": QWEN_VOICEDESIGN_MODEL,
+    "voicedesign": QWEN_VOICEDESIGN_MODEL,
+    "prompt": QWEN_VOICEDESIGN_MODEL,
+}
+
+QWEN_MODEL_CATALOG = [
+    {
+        "id": QWEN_BASE_MODEL,
+        "label": "1.7 Base",
+        "family": "base",
+        "supports_voice_cloning": True,
+        "requires_ref_audio": True,
+        "requires_prompt": False,
+        "description": "Позволяет клонировать голос через загруженные sample-ы и reference_text.",
+    },
+    {
+        "id": QWEN_VOICEDESIGN_MODEL,
+        "label": "1.7 VoiceDesign",
+        "family": "voice_design",
+        "supports_voice_cloning": False,
+        "requires_ref_audio": False,
+        "requires_prompt": True,
+        "description": "Позволяет описать голос через prompt.",
+    },
+    {
+        "id": QWEN_CUSTOMVOICE_MODEL,
+        "label": "1.7 CustomVoice",
+        "family": "custom_voice",
+        "supports_voice_cloning": False,
+        "requires_ref_audio": False,
+        "requires_prompt": True,
+        "description": "Генерация голоса по текстовому prompt.",
+    },
+]
+
 _DEFAULT_LOCAL_TTS_ALLOWED_HOSTS = (
     "localhost",
     "127.0.0.1",
@@ -42,7 +97,7 @@ def qwen_voice_crud_not_available_detail() -> Dict[str, str]:
     return {
         "code": "qwen_voice_crud_not_available",
         "message": "Qwen voice CRUD is not available in this deployment.",
-        "hint": "Configure QWEN_VOICE_SERVICE_URL to enable qwen voice/admin endpoints.",
+        "hint": "Configure QWEN_TTS_SERVICE_URL or QWEN_VOICE_SERVICE_URL to enable qwen voice/admin endpoints.",
     }
 
 
@@ -55,6 +110,35 @@ def normalize_provider(provider: Optional[str]) -> TTSProvider:
     if normalized in {"qwen", "qwen3", "qwen-3", "qwen3tts"}:
         return "qwen"
     return _DEFAULT_PROVIDER
+
+
+def normalize_qwen_model_selection(raw_model: Optional[str]) -> str:
+    candidate = str(raw_model or "").strip()
+    if not candidate:
+        return QWEN_DEFAULT_MODEL
+
+    normalized = candidate.lower().strip()
+    compact = normalized.replace("_", "").replace(" ", "")
+
+    for alias, resolved in _QWEN_MODEL_ALIASES.items():
+        alias_compact = alias.lower().replace("_", "").replace(" ", "")
+        if normalized == alias or compact == alias_compact:
+            return resolved
+
+    return candidate if candidate in {QWEN_BASE_MODEL, QWEN_VOICEDESIGN_MODEL, QWEN_CUSTOMVOICE_MODEL} else QWEN_DEFAULT_MODEL
+
+
+def get_qwen_model_family(raw_model: Optional[str]) -> str:
+    model = normalize_qwen_model_selection(raw_model)
+    if model == QWEN_VOICEDESIGN_MODEL:
+        return "voice_design"
+    if model == QWEN_CUSTOMVOICE_MODEL:
+        return "custom_voice"
+    return "base"
+
+
+def get_qwen_model_catalog() -> list[Dict[str, Any]]:
+    return [dict(item) for item in QWEN_MODEL_CATALOG]
 
 
 def normalize_provider_mode(mode: Optional[str]) -> ProviderMode:
@@ -130,7 +214,10 @@ def get_provider_service_url(provider: Optional[str]) -> str:
 
 
 def get_qwen_voice_service_url() -> str:
-    return (settings.qwen_voice_service_url or "").strip().rstrip("/")
+    voice_url = (settings.qwen_voice_service_url or "").strip().rstrip("/")
+    if voice_url:
+        return voice_url
+    return (settings.qwen_tts_service_url or "").strip().rstrip("/")
 
 
 def is_qwen_voice_service_enabled() -> bool:

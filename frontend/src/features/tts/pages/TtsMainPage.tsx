@@ -18,6 +18,7 @@ import {
     useSaveTtsSettings,
     useSetTtsEngine,
     useSetTtsListeningMode,
+    useQwenModels,
     useToggleTts,
     useTtsAudioSettings,
     useTtsModeSettings,
@@ -31,7 +32,10 @@ import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Label } from '@/shared/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Switch } from '@/shared/components/ui/switch';
+import { Textarea } from '@/shared/components/ui/textarea';
 import { logger } from '@/shared/utils/prodLogger';
 import { getQueryCache } from '@/shared/utils/queryPersist';
 import { getTtsWebSocketUrl } from '@/shared/utils/urlUtils';
@@ -108,17 +112,114 @@ type BooleanTtsSettingKey = 'enable7TV' | 'enableTwitch' | 'filterReplies' | 'fi
 
 type GcloudMood = 'neutral' | 'sad' | 'happy';
 
+interface QwenModelOption {
+    value: string;
+    label: string;
+    family?: string;
+    supportsVoiceCloning?: boolean;
+    requiresRefAudio?: boolean;
+    requiresPrompt?: boolean;
+}
+
+interface QwenModelCatalogItem {
+    id?: string;
+    label?: string;
+    family?: string;
+    supports_voice_cloning?: boolean;
+    requires_ref_audio?: boolean;
+    requires_prompt?: boolean;
+}
+
+interface QwenModelsCatalogResponse {
+    success?: boolean;
+    provider?: string;
+    mode?: 'cloud' | 'local';
+    source?: 'managed' | 'local';
+    configured?: boolean;
+    available?: boolean;
+    endpoint_url?: string | null;
+    current_model?: string | null;
+    models?: QwenModelCatalogItem[];
+    detail?: {
+        code?: string;
+        message?: string;
+    };
+}
+
 const GCLOUD_MOOD_OPTIONS: Array<{ value: GcloudMood; label: string }> = [
     { value: 'neutral', label: 'Нейтральная' },
     { value: 'sad', label: 'Грустная' },
     { value: 'happy', label: 'Веселая' },
 ];
 
+const QWEN_MODEL_DEFAULT = 'Qwen/Qwen3-TTS-12Hz-1.7B-Base';
+
+const QWEN_MODEL_FALLBACK_OPTIONS: QwenModelOption[] = [
+    {
+        value: 'Qwen/Qwen3-TTS-12Hz-1.7B-Base',
+        label: '1.7 Base',
+        family: 'base',
+        supportsVoiceCloning: true,
+        requiresRefAudio: true,
+        requiresPrompt: false,
+    },
+    {
+        value: 'Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign',
+        label: '1.7 VoiceDesign',
+        family: 'voice_design',
+        supportsVoiceCloning: false,
+        requiresRefAudio: false,
+        requiresPrompt: true,
+    },
+    {
+        value: 'Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice',
+        label: '1.7 CustomVoice',
+        family: 'custom_voice',
+        supportsVoiceCloning: false,
+        requiresRefAudio: false,
+        requiresPrompt: false,
+    },
+];
+
+const QWEN_CUSTOMVOICE_SPEAKERS = [
+    { value: 'serena', label: 'Serena' },
+    { value: 'dylan', label: 'Dylan' },
+    { value: 'anna', label: 'Anna' },
+    { value: 'jason', label: 'Jason' },
+];
+
+const normalizeQwenModelOption = (model: QwenModelCatalogItem): QwenModelOption | null => {
+    const value = (model.id || '').trim();
+    if (!value) return null;
+
+    const family = (model.family || '').trim();
+    const supportsVoiceCloning = Boolean(model.supports_voice_cloning);
+    const requiresRefAudio = Boolean(model.requires_ref_audio);
+    const requiresPrompt = Boolean(model.requires_prompt);
+    return {
+        value,
+        label: (model.label || value).trim(),
+        family,
+        supportsVoiceCloning,
+        requiresRefAudio,
+        requiresPrompt,
+    };
+};
+
+const getQwenModelOption = (options: QwenModelOption[], value?: string): QwenModelOption | undefined => {
+    const normalized = (value || '').trim();
+    if (!normalized) return undefined;
+    return options.find((option) => option.value === normalized);
+};
+
 const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
 const SECTION_PANEL_CLASS = 'rounded-xl border border-border/70 bg-card/60 p-4';
 const SECTION_EYEBROW_CLASS = 'mb-2 text-xs font-semibold text-muted-foreground';
-const SEGMENT_BUTTON_CLASS = 'rounded-lg border-0 px-3 py-2 text-xs font-semibold transition-colors duration-200 shadow-none';
-const PROJECT_BLUE_SOLID_CLASS = 'bg-blue-700 text-white hover:bg-blue-800';
+const SEGMENT_BUTTON_CLASS = 'rounded-lg border border-transparent px-3 py-2 text-xs font-semibold transition-colors duration-200 shadow-none';
+const SELECTOR_BUTTON_BASE_CLASS = 'rounded-lg border p-3 text-left transition-colors';
+const SELECTOR_BUTTON_ACTIVE_CLASS = 'border-sky-500/50 bg-sky-500/10 text-sky-50';
+const SELECTOR_BUTTON_IDLE_CLASS = 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground';
+const PROJECT_BLUE_SOLID_CLASS = 'border border-sky-400/80 bg-sky-500/12 text-sky-50 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.22)] hover:bg-sky-500/18';
 const PROJECT_BLUE_SUBTLE_CLASS = 'bg-blue-700/10 text-blue-400';
 const PROJECT_BLUE_TEXT_HOVER_CLASS = 'bg-background/60 text-muted-foreground hover:bg-background/60 hover:text-blue-400';
 
@@ -143,9 +244,9 @@ const ProviderOptionButton = React.memo(function ProviderOptionButton({
             type="button"
             onClick={() => onSelect(provider)}
             disabled={disabled}
-            className={`rounded-lg px-3 py-3 text-left transition-colors ${active
-                ? PROJECT_BLUE_SOLID_CLASS
-                : PROJECT_BLUE_TEXT_HOVER_CLASS
+            className={`${SELECTOR_BUTTON_BASE_CLASS} ${active
+                ? SELECTOR_BUTTON_ACTIVE_CLASS
+                : SELECTOR_BUTTON_IDLE_CLASS
                 } ${disabled ? 'cursor-not-allowed opacity-70' : ''}`}
         >
             <div className="text-sm font-semibold">{title}</div>
@@ -191,7 +292,6 @@ const SourcePlatformToggleRow = React.memo(function SourcePlatformToggleRow({
                 checked={Boolean(isConnected && isEnabled)}
                 onCheckedChange={() => onToggle(platform)}
                 disabled={!isConnected}
-                className="data-[state=checked]:bg-emerald-600"
             />
         </div>
     );
@@ -218,7 +318,6 @@ const TtsFilterSwitchRow = React.memo(function TtsFilterSwitchRow({
             <Switch
                 checked={checked}
                 onCheckedChange={(nextChecked) => onToggle(settingKey, invert ? !Boolean(nextChecked) : Boolean(nextChecked))}
-                className="data-[state=checked]:bg-emerald-600"
             />
         </div>
     );
@@ -242,7 +341,7 @@ const TtsMasterToggleCard = React.memo(function TtsMasterToggleCard({
         >
             <CardContent className="flex items-center justify-between gap-4 p-3.5">
                 <div className="flex items-center gap-3">
-                    <div className={`h-3 w-3 rounded-full transition-all duration-300 ${enabled ? 'bg-emerald-500 shadow-lg shadow-emerald-500/40' : 'bg-muted-foreground/50'}`} />
+                    <div className={`h-3 w-3 rounded-full transition-all duration-300 ${enabled ? 'bg-green-500 shadow-lg shadow-green-500/40' : 'bg-muted-foreground/50'}`} />
                     <div>
                         <div className="text-sm font-semibold text-foreground">Озвучка сообщений</div>
                     </div>
@@ -250,7 +349,7 @@ const TtsMasterToggleCard = React.memo(function TtsMasterToggleCard({
                 <Switch
                     checked={enabled}
                     onCheckedChange={onToggle}
-                    className="pointer-events-none data-[state=checked]:bg-emerald-600"
+                    className="pointer-events-none"
                     disabled={isPending}
                 />
             </CardContent>
@@ -387,6 +486,8 @@ const TtsMainPageContent: React.FC = () => {
     const [advancedProvider, setAdvancedProvider] = useState<AdvancedProvider>('f5');
     const [f5Mode, setF5Mode] = useState<'cloud' | 'local'>('cloud');
     const [qwenMode, setQwenMode] = useState<'cloud' | 'local'>('cloud');
+    const [qwenModel, setQwenModel] = useState<string>(QWEN_MODEL_DEFAULT);
+    const [qwenVoiceValue, setQwenVoiceValue] = useState<string>('');
     const [listeningMode, setListeningMode] = useState<'website' | 'obs'>('website');
     const [obsUrl, setObsUrl] = useState<string>('');
     const [localVolume, setLocalVolume] = useState<number>(50);
@@ -503,6 +604,15 @@ const TtsMainPageContent: React.FC = () => {
         typeof (ttsStatusData as TtsStatusData | undefined)?.has_local_setup_qwen === 'boolean'
             ? Boolean((ttsStatusData as TtsStatusData).has_local_setup_qwen)
             : hasLocalSetup;
+
+    const { data: qwenModelsResponse, isLoading: isLoadingQwenModels } = useQwenModels(qwenMode, {
+        enabled: !!isAuthenticated && advancedProvider === 'qwen',
+        refetchOnMount: false,
+        refetchOnWindowFocus: false,
+        retry: false,
+        initialData: () => getQueryCache(queryKeys.tts.qwenModels(qwenMode)) || undefined,
+    });
+    const qwenModelsData = qwenModelsResponse as QwenModelsCatalogResponse | undefined;
 
     // Only show loading if we don't have health data yet
     const isF5TTSDataLoading = isChecking;
@@ -667,6 +777,14 @@ const TtsMainPageContent: React.FC = () => {
             if (nextQwenMode === 'cloud' || nextQwenMode === 'local') {
                 setQwenMode(prev => (prev !== nextQwenMode ? nextQwenMode : prev));
             }
+
+            const nextQwenModel = (settingsData.qwenModel || settingsData.qwen_model || '').trim();
+            if (nextQwenModel) {
+                setQwenModel(prev => (prev !== nextQwenModel ? nextQwenModel : prev));
+            }
+
+            const nextQwenVoiceValue = (settingsData.qwenVoice || settingsData.qwen_voice || '').trim();
+            setQwenVoiceValue(prev => (prev !== nextQwenVoiceValue ? nextQwenVoiceValue : prev));
 
             const gcloudSelection = Array.isArray(settingsData.gcloudVoices)
                 ? settingsData.gcloudVoices
@@ -876,7 +994,7 @@ const TtsMainPageContent: React.FC = () => {
     }, [canUseQwenCloud, canUseQwenLocal]);
 
     const ensureF5CloudIsHealthy = useCallback(async (): Promise<boolean> => {
-        const health = await checkTtsHealth();
+        const health = await checkTtsHealth('f5', 'cloud');
         if (!health.isHealthy) {
             toast.error('F5 Cloud сейчас недоступен');
             return false;
@@ -884,21 +1002,12 @@ const TtsMainPageContent: React.FC = () => {
         return true;
     }, [checkTtsHealth]);
 
-    const switchToFallbackEngine = useCallback(async (reason?: string): Promise<boolean> => {
-        try {
-            await switchEngineMutation.mutateAsync('gtts');
-            setTtsEngine('gtts');
-            queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
-            if (reason) {
-                toast.warning(reason);
-            }
-            return true;
-        } catch (error: unknown) {
-            logger.error('Error switching to fallback Google TTS:', error);
-            toast.error('Не удалось переключиться на fallback озвучку');
-            return false;
+    const notifyUnavailableProvider = useCallback((reason?: string): boolean => {
+        if (reason) {
+            toast.warning(reason);
         }
-    }, [queryClient, switchEngineMutation]);
+        return false;
+    }, []);
 
     const applySelectedProviderEngine = useCallback(async (
         provider: AdvancedProvider,
@@ -919,7 +1028,7 @@ const TtsMainPageContent: React.FC = () => {
             if (provider === 'f5') {
                 let mode = resolveAvailableF5Mode(f5Mode);
                 if (!mode) {
-                    return switchToFallbackEngine('F5 недоступен. Используется fallback Google TTS');
+                    return notifyUnavailableProvider('F5 сейчас недоступен');
                 }
 
                 if (mode === 'cloud') {
@@ -930,7 +1039,7 @@ const TtsMainPageContent: React.FC = () => {
                             setF5Mode('local');
                             toast.warning('F5 Cloud недоступен, переключено на локальный F5');
                         } else {
-                            return switchToFallbackEngine('F5 Cloud недоступен. Используется fallback Google TTS');
+                            return notifyUnavailableProvider('F5 Cloud сейчас недоступен');
                         }
                     }
                 }
@@ -947,7 +1056,7 @@ const TtsMainPageContent: React.FC = () => {
 
             const mode = resolveAvailableQwenMode(qwenMode);
             if (!mode) {
-                return switchToFallbackEngine('Qwen недоступен. Используется fallback Google TTS');
+                return notifyUnavailableProvider('Qwen сейчас недоступен');
             }
             const engineType = `qwen_${mode}` as 'qwen_cloud' | 'qwen_local';
             await switchEngineMutation.mutateAsync(engineType);
@@ -971,7 +1080,7 @@ const TtsMainPageContent: React.FC = () => {
         resolveAvailableF5Mode,
         resolveAvailableQwenMode,
         switchEngineMutation,
-        switchToFallbackEngine,
+        notifyUnavailableProvider,
     ]);
 
     useEffect(() => {
@@ -1052,9 +1161,8 @@ const TtsMainPageContent: React.FC = () => {
         }
 
         setF5Mode(mode);
-        saveTtsSettingsMutation.mutate({ f5Mode: mode });
-
         if (!ttsEnabled || advancedProvider !== 'f5') {
+            saveTtsSettingsMutation.mutate({ f5Mode: mode });
             return;
         }
         await applySelectedProviderEngine('f5');
@@ -1085,9 +1193,8 @@ const TtsMainPageContent: React.FC = () => {
         }
 
         setQwenMode(mode);
-        saveTtsSettingsMutation.mutate({ qwenMode: mode });
-
         if (!ttsEnabled || advancedProvider !== 'qwen') {
+            saveTtsSettingsMutation.mutate({ qwenMode: mode });
             return;
         }
         await applySelectedProviderEngine('qwen');
@@ -1102,12 +1209,60 @@ const TtsMainPageContent: React.FC = () => {
         ttsEnabled,
     ]);
 
+    const handleQwenModelChange = useCallback((model: string): void => {
+        const nextModel = (model || '').trim();
+        if (!nextModel || nextModel === qwenModel || saveTtsSettingsMutation.isPending) {
+            return;
+        }
+
+        const previousModel = qwenModel;
+        setQwenModel(nextModel);
+
+        saveTtsSettingsMutation.mutate(
+            { qwenModel: nextModel },
+            {
+                onSuccess: () => {
+                    queryClient.invalidateQueries({ queryKey: queryKeys.tts.settings() });
+                },
+                onError: () => {
+                    setQwenModel(previousModel);
+                    toast.error('Не удалось сохранить модель Qwen');
+                },
+            },
+        );
+    }, [qwenModel, queryClient, saveTtsSettingsMutation]);
+
+    const handleQwenVoiceValueBlur = useCallback((): void => {
+        const trimmedValue = qwenVoiceValue.trim();
+        saveTtsSettingsMutation.mutate(
+            { qwenVoice: trimmedValue },
+            {
+                onError: () => {
+                    toast.error('Не удалось сохранить параметры Qwen');
+                },
+            },
+        );
+    }, [qwenVoiceValue, saveTtsSettingsMutation]);
+
+    const handleQwenVoicePresetChange = useCallback((value: string): void => {
+        const nextValue = value.trim();
+        setQwenVoiceValue(nextValue);
+        saveTtsSettingsMutation.mutate(
+            { qwenVoice: nextValue },
+            {
+                onError: () => {
+                    toast.error('Не удалось сохранить параметры Qwen');
+                },
+            },
+        );
+    }, [saveTtsSettingsMutation]);
+
     const handleAdvancedProviderChange = useCallback(async (provider: AdvancedProvider): Promise<void> => {
         if (provider === advancedProvider) return;
         setAdvancedProvider(provider);
-        saveTtsSettingsMutation.mutate({ advancedProvider: provider });
 
         if (!ttsEnabled || isEngineActionPending) {
+            saveTtsSettingsMutation.mutate({ advancedProvider: provider });
             return;
         }
         await applySelectedProviderEngine(provider);
@@ -1354,6 +1509,36 @@ const TtsMainPageContent: React.FC = () => {
         isLoadingGcloudVoices,
     ]);
 
+    const qwenModelOptions = useMemo(() => {
+        const merged = new Map<string, QwenModelOption>();
+        QWEN_MODEL_FALLBACK_OPTIONS.forEach((option) => {
+            merged.set(option.value, option);
+        });
+
+        if (qwenModelsData) {
+            const catalog = Array.isArray(qwenModelsData.models) ? qwenModelsData.models : [];
+            const normalizedCatalog = catalog
+                .map(normalizeQwenModelOption)
+                .filter((option): option is QwenModelOption => Boolean(option));
+            normalizedCatalog.forEach((option) => {
+                merged.set(option.value, option);
+            });
+        }
+
+        return Array.from(merged.values());
+    }, [qwenModelsData]);
+
+    const selectedQwenModelOption = useMemo(
+        () =>
+            getQwenModelOption(qwenModelOptions, qwenModel) ||
+            getQwenModelOption(qwenModelOptions, QWEN_MODEL_DEFAULT),
+        [qwenModel, qwenModelOptions],
+    );
+    const isQwenBaseModel = Boolean(
+        selectedQwenModelOption?.supportsVoiceCloning || selectedQwenModelOption?.requiresRefAudio,
+    );
+    const isQwenPromptModel = Boolean(selectedQwenModelOption?.requiresPrompt);
+
     const providerOptionButtons = useMemo(() => (
         providerOptions.map((option) => (
             <ProviderOptionButton
@@ -1582,7 +1767,7 @@ const TtsMainPageContent: React.FC = () => {
                 {isAnyTtsEnabled && (
                     <>
                         <div className="grid grid-cols-1 items-stretch gap-3 lg:grid-cols-2">
-                            <Card className={`${SURFACE_CARD_CLASS} flex flex-col`}>
+                            <Card className={`${SURFACE_CARD_CLASS} min-w-0 flex flex-col`}>
                                 <CardHeader className="border-b border-border/50 pb-3.5">
                                     <CardTitle className="text-base font-bold text-foreground">Озвучка</CardTitle>
                                 </CardHeader>
@@ -1610,54 +1795,55 @@ const TtsMainPageContent: React.FC = () => {
                                         {advancedProvider === 'f5' && (
                                             <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
                                                 <div>
-                                                    <div className="text-sm font-semibold text-foreground">Режим F5</div>
+                                                    <div className="text-sm font-semibold text-foreground">Режим подключения</div>
                                                     {!canUseF5TTS && (
                                                         <p className="mt-1 text-xs text-muted-foreground">{getF5UnavailableReason()}</p>
                                                     )}
                                                 </div>
-                                                <div className="inline-flex rounded-lg bg-background/70 p-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => void handleF5ModeChange('cloud')}
-                                                            disabled={!canUseF5Cloud || isEngineActionPending}
-                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${f5Mode === 'cloud'
-                                                                ? PROJECT_BLUE_SOLID_CLASS
-                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
-                                                                } ${!canUseF5Cloud ? 'cursor-not-allowed opacity-45' : ''}`}
-                                                        >
-                                                            Облако
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => void handleF5ModeChange('local')}
-                                                            disabled={!canUseF5Local || isEngineActionPending}
-                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${f5Mode === 'local'
-                                                                ? PROJECT_BLUE_SOLID_CLASS
-                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
-                                                                } ${!canUseF5Local ? 'cursor-not-allowed opacity-45' : ''}`}
-                                                        >
-                                                            Self-hosted
-                                                        </button>
+                                                <div className="grid w-full grid-cols-2 gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void handleF5ModeChange('cloud')}
+                                                        disabled={!canUseF5Cloud || isEngineActionPending}
+                                                        className={`${SELECTOR_BUTTON_BASE_CLASS} ${f5Mode === 'cloud'
+                                                            ? SELECTOR_BUTTON_ACTIVE_CLASS
+                                                            : SELECTOR_BUTTON_IDLE_CLASS
+                                                            } ${!canUseF5Cloud ? 'cursor-not-allowed opacity-45' : ''}`}
+                                                    >
+                                                        Облако
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void handleF5ModeChange('local')}
+                                                        disabled={!canUseF5Local || isEngineActionPending}
+                                                        className={`${SELECTOR_BUTTON_BASE_CLASS} ${f5Mode === 'local'
+                                                            ? SELECTOR_BUTTON_ACTIVE_CLASS
+                                                            : SELECTOR_BUTTON_IDLE_CLASS
+                                                            } ${!canUseF5Local ? 'cursor-not-allowed opacity-45' : ''}`}
+                                                    >
+                                                        Self-hosted
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
 
                                         {advancedProvider === 'qwen' && (
-                                            <div className="flex flex-col gap-3 pt-1 md:flex-row md:items-center md:justify-between">
-                                                <div>
-                                                    <div className="text-sm font-semibold text-foreground">Режим Qwen</div>
-                                                    {!canUseQwenTTS && (
-                                                        <p className="mt-1 text-xs text-muted-foreground">{getQwenUnavailableReason()}</p>
-                                                    )}
-                                                </div>
-                                                <div className="inline-flex rounded-lg bg-background/70 p-1">
+                                            <div className="space-y-3 pt-1">
+                                                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                                    <div>
+                                                        <div className="text-sm font-semibold text-foreground">Режим подключения</div>
+                                                        {!canUseQwenTTS && (
+                                                            <p className="mt-1 text-xs text-muted-foreground">{getQwenUnavailableReason()}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid w-full grid-cols-2 gap-2">
                                                         <button
                                                             type="button"
                                                             onClick={() => void handleQwenModeChange('cloud')}
                                                             disabled={!canUseQwenCloud || isEngineActionPending}
-                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${qwenMode === 'cloud'
-                                                                ? PROJECT_BLUE_SOLID_CLASS
-                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
+                                                            className={`${SELECTOR_BUTTON_BASE_CLASS} ${qwenMode === 'cloud'
+                                                                ? SELECTOR_BUTTON_ACTIVE_CLASS
+                                                                : SELECTOR_BUTTON_IDLE_CLASS
                                                                 } ${!canUseQwenCloud ? 'cursor-not-allowed opacity-45' : ''}`}
                                                         >
                                                             Облако
@@ -1666,13 +1852,86 @@ const TtsMainPageContent: React.FC = () => {
                                                             type="button"
                                                             onClick={() => void handleQwenModeChange('local')}
                                                             disabled={!canUseQwenLocal || isEngineActionPending}
-                                                            className={`${SEGMENT_BUTTON_CLASS} min-w-[120px] ${qwenMode === 'local'
-                                                                ? PROJECT_BLUE_SOLID_CLASS
-                                                                : PROJECT_BLUE_TEXT_HOVER_CLASS
+                                                            className={`${SELECTOR_BUTTON_BASE_CLASS} ${qwenMode === 'local'
+                                                                ? SELECTOR_BUTTON_ACTIVE_CLASS
+                                                                : SELECTOR_BUTTON_IDLE_CLASS
                                                                 } ${!canUseQwenLocal ? 'cursor-not-allowed opacity-45' : ''}`}
                                                         >
                                                             Self-hosted
                                                         </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    <Select value={qwenModel} onValueChange={handleQwenModelChange}>
+                                                        <SelectTrigger className="h-10 bg-background/70">
+                                                            <SelectValue placeholder="Выбери модель Qwen" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {qwenModelOptions.map((option) => (
+                                                                <SelectItem key={option.value} value={option.value}>
+                                                                    {option.label}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+
+                                                    {qwenModelsData?.available === false && !isLoadingQwenModels && qwenModelOptions.length === 0 && (
+                                                        <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-100/90">
+                                                            {qwenModelsData.detail?.message || 'Каталог моделей Qwen сейчас недоступен.'}
+                                                        </div>
+                                                    )}
+
+                                                    <div className="min-h-[152px] pt-1">
+                                                        {isQwenBaseModel ? (
+                                                            <div className="flex h-[152px] items-center justify-center rounded-xl border border-border/60 bg-background/35 px-4 py-4 text-center">
+                                                                <div className="flex items-center justify-center">
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        onClick={() => navigate('/dashboard/tts/voices')}
+                                                                        className="h-auto px-0 text-base text-sky-300 hover:bg-transparent hover:text-sky-200"
+                                                                    >
+                                                                        Перейти к управлению голосами
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        ) : selectedQwenModelOption?.family === 'custom_voice' ? (
+                                                            <div className="h-[152px] overflow-hidden rounded-xl border border-border/60 bg-background/35 p-3">
+                                                                <div className="grid h-full grid-cols-2 gap-2 overflow-y-auto pr-1">
+                                                                    {QWEN_CUSTOMVOICE_SPEAKERS.map((speaker) => {
+                                                                        const isSelected = (qwenVoiceValue || QWEN_CUSTOMVOICE_SPEAKERS[0].value) === speaker.value;
+                                                                        return (
+                                                                            <button
+                                                                                key={speaker.value}
+                                                                                type="button"
+                                                                                onClick={() => handleQwenVoicePresetChange(speaker.value)}
+                                                                                className={`flex min-h-[48px] items-center justify-center rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${isSelected
+                                                                                    ? 'border-sky-500/50 bg-sky-500/12 text-sky-300'
+                                                                                    : 'border-border/70 bg-background/70 text-muted-foreground hover:border-sky-500/35 hover:text-sky-200'
+                                                                                    }`}
+                                                                            >
+                                                                                {speaker.label}
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        ) : isQwenPromptModel ? (
+                                                            <div className="h-[152px]">
+                                                                <Textarea
+                                                                    id="qwen-prompt"
+                                                                    value={qwenVoiceValue}
+                                                                    onChange={(event) => setQwenVoiceValue(event.target.value)}
+                                                                    onBlur={handleQwenVoiceValueBlur}
+                                                                    placeholder="Опиши желаемый характер голоса для генерации"
+                                                                    className="h-full min-h-0 resize-none bg-background/60"
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="h-[152px]" />
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -1720,13 +1979,13 @@ const TtsMainPageContent: React.FC = () => {
                                     <div className={`${SECTION_PANEL_CLASS} space-y-3.5`}>
                                         <div className={SECTION_EYEBROW_CLASS}>Вывод звука</div>
 
-                                        <div className="inline-flex w-full flex-wrap gap-2 rounded-lg bg-background/70 p-1">
+                                        <div className="grid w-full grid-cols-2 gap-2">
                                             <button
                                                 type="button"
                                                 onClick={() => handleListeningModeChange('website')}
-                                                className={`${SEGMENT_BUTTON_CLASS} flex-1 ${listeningMode === 'website'
-                                                    ? PROJECT_BLUE_SOLID_CLASS
-                                                    : PROJECT_BLUE_TEXT_HOVER_CLASS
+                                                className={`${SELECTOR_BUTTON_BASE_CLASS} text-center ${listeningMode === 'website'
+                                                    ? SELECTOR_BUTTON_ACTIVE_CLASS
+                                                    : SELECTOR_BUTTON_IDLE_CLASS
                                                     }`}
                                             >
                                                 Браузер
@@ -1734,21 +1993,21 @@ const TtsMainPageContent: React.FC = () => {
                                             <button
                                                 type="button"
                                                 onClick={() => handleListeningModeChange('obs')}
-                                                className={`${SEGMENT_BUTTON_CLASS} flex-1 ${listeningMode === 'obs'
-                                                    ? PROJECT_BLUE_SOLID_CLASS
-                                                    : PROJECT_BLUE_TEXT_HOVER_CLASS
+                                                className={`${SELECTOR_BUTTON_BASE_CLASS} text-center ${listeningMode === 'obs'
+                                                    ? SELECTOR_BUTTON_ACTIVE_CLASS
+                                                    : SELECTOR_BUTTON_IDLE_CLASS
                                                     }`}
                                             >
                                                 OBS
                                             </button>
                                         </div>
 
-                                        <div className="pt-1">
-                                            <div className="flex min-h-[236px] flex-col rounded-xl border border-border/50 bg-background/35 px-4 py-4">
+                                        <div className="min-w-0 pt-1">
+                                            <div className="grid min-h-[168px] min-w-0 grid-rows-[auto_40px_40px] gap-3 overflow-hidden rounded-xl border border-border/50 bg-background/35 px-4 py-3">
                                                 {listeningMode === 'website' ? (
                                                     <>
                                                         <div className="flex items-start gap-3">
-                                                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
+                                                            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
                                                                 <Play className="h-4 w-4" />
                                                             </div>
                                                             <div className="min-w-0">
@@ -1757,10 +2016,9 @@ const TtsMainPageContent: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex-1" />
-
-                                                        <div className="flex items-center justify-center">
-                                                            <Button onClick={openPlayerTab} className="h-10 w-full max-w-[260px] px-5">
+                                                        <div aria-hidden="true" className="h-10" />
+                                                        <div className="flex items-center">
+                                                            <Button onClick={openPlayerTab} className="h-10 w-full px-4">
                                                                 <Play className="mr-2 h-4 w-4" />
                                                                 Открыть TTS Player
                                                             </Button>
@@ -1769,7 +2027,7 @@ const TtsMainPageContent: React.FC = () => {
                                                 ) : (
                                                     <>
                                                         <div className="flex items-start gap-3">
-                                                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
+                                                            <div className={`flex h-9 w-9 items-center justify-center rounded-xl ${PROJECT_BLUE_SUBTLE_CLASS}`}>
                                                                 <Settings className="h-4 w-4" />
                                                             </div>
                                                             <div className="min-w-0">
@@ -1778,15 +2036,15 @@ const TtsMainPageContent: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="mt-4">
+                                                        <div className="min-w-0">
                                                             <div
-                                                                className="group relative cursor-pointer rounded-lg border border-border/70 bg-background/70 px-3 py-2.5"
+                                                                className="group relative flex h-10 min-w-0 cursor-pointer items-center overflow-hidden rounded-lg border border-border/70 bg-background/70 px-3"
                                                                 onClick={() => {
                                                                     navigator.clipboard.writeText(obsUrl);
                                                                     toast.success('Скопировано');
                                                                 }}
                                                             >
-                                                                <div className="truncate pr-14 font-mono text-xs text-muted-foreground">
+                                                                <div className="min-w-0 flex-1 truncate pr-14 font-mono text-xs text-muted-foreground">
                                                                     {obsUrl || 'Генерация URL...'}
                                                                 </div>
                                                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
@@ -1795,12 +2053,10 @@ const TtsMainPageContent: React.FC = () => {
                                                             </div>
                                                         </div>
 
-                                                        <div className="flex-1" />
-
-                                                        <div className="flex items-center justify-center">
+                                                        <div className="flex items-center">
                                                             <Button
                                                                 onClick={handleRegenerateObsUrl}
-                                                                className="h-10 w-full max-w-[260px] px-5"
+                                                                className="h-10 w-full px-4"
                                                                 disabled={isRegeneratingUrl}
                                                             >
                                                                 {isRegeneratingUrl ? 'Обновление...' : 'Сбросить токен'}
@@ -1814,7 +2070,7 @@ const TtsMainPageContent: React.FC = () => {
                                 </CardContent>
                             </Card>
 
-                            <div className="flex h-full flex-col gap-3">
+                            <div className="flex min-w-0 h-full flex-col gap-3">
                                 <Card className={SURFACE_CARD_CLASS}>
                                     <CardHeader className="border-b border-border/50 pb-3.5">
                                         <CardTitle className="text-base font-bold text-foreground">Источники озвучки</CardTitle>

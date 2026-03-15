@@ -110,13 +110,13 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                             <>
                                                 {msg.badges.map((badge, idx) => {
                                                     if (!badge || typeof badge !== 'string' || !badge.includes('/')) {
-                                                        logger.warn('Invalid badge format:', badge);
+                                                        logger.debug('Invalid badge format:', badge);
                                                         return null;
                                                     }
 
                                                     const [badgeId, version] = badge.split('/');
                                                     if (!badgeId || !version) {
-                                                        logger.warn('Badge missing id or version:', badge);
+                                                        logger.debug('Badge missing id or version:', badge);
                                                         return null;
                                                     }
 

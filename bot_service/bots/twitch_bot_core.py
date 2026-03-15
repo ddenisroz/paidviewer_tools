@@ -77,6 +77,7 @@ class TwitchBotCore(commands.Bot):
             role = None
             badges_list = []
             emotes_list = []
+            source_message_id = None
 
             # Проверяем роль (broadcaster > moderator > vip > subscriber)
             if message.author.is_broadcaster:
@@ -90,22 +91,18 @@ class TwitchBotCore(commands.Bot):
 
             # Парсим badges из tags (если доступны)
             if hasattr(message, 'tags') and message.tags:
-                logger.info(f"[LIST] [DEBUG] Message has tags: {list(message.tags.keys())}")
+                source_message_id = str(message.tags.get("id") or "").strip() or None
                 if 'badges' in message.tags:
                     # Формат: "broadcaster/1,subscriber/12"
                     badges_str = message.tags.get('badges', '')
-                    logger.info(f"[BADGES RAW] {message.author.name}: '{badges_str}'")
+                    logger.debug("[BADGES RAW] %s: %r", message.author.name, badges_str)
                     if badges_str:
                         badges_list = badges_str.split(',')
-                        logger.info(f"[BADGES PARSED] {message.author.name}: {badges_list}")
-                else:
-                    logger.warning(f"[WARN] [BADGES] 'badges' not in tags for {message.author.name}")
+                        logger.debug("[BADGES PARSED] %s: %s", message.author.name, badges_list)
 
                 emotes_tag = message.tags.get('emotes')
                 if emotes_tag:
                     emotes_list = self._parse_twitch_emotes(emotes_tag, message.content)
-            else:
-                logger.warning(f"[WARN] [BADGES] No tags attribute or empty tags for {message.author.name}")
 
             logger.debug(f"[ROLE] {message.author.name}: role={role}, badges={badges_list}")
 
@@ -116,6 +113,7 @@ class TwitchBotCore(commands.Bot):
                 content=message.content,
                 platform='twitch',
                 channel=message.channel.name,
+                message_id=source_message_id,
                 role=role,
                 badges=badges_list if badges_list else None,
                 emotes=emotes_list if emotes_list else None,
