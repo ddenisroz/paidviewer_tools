@@ -41,7 +41,7 @@ export const adminService = {
   },
 
   async blockChannel(data: { channel_name: string; reason?: string }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/admin/blocked-channels', data);
+    return apiClient.post('/api/admin/blocked-channels', data, { params: data });
   },
 
   async unblockChannel(channelId: number): Promise<AxiosResponse<ApiResponse>> {
@@ -93,7 +93,9 @@ export const adminService = {
   },
 
   async blockUser(userId: number, data: { reason?: string }): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post(`/api/admin/users/${userId}/block`, data);
+    return apiClient.post(`/api/admin/users/${userId}/block`, data, {
+      params: data.reason ? { reason: data.reason } : undefined,
+    });
   },
 
   async unblockUser(userId: number): Promise<AxiosResponse<ApiResponse>> {

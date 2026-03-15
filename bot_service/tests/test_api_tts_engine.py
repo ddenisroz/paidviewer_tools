@@ -91,7 +91,7 @@ def test_set_engine_invalid_value(authenticated_client):
 
 
 @pytest.mark.asyncio
-async def test_qwen_models_catalog_falls_back_to_product_catalog_when_upstream_unreachable(monkeypatch):
+async def test_qwen_models_catalog_reports_unavailable_when_upstream_unreachable(monkeypatch):
     async def _raise_request_error(*_args, **_kwargs):
         raise httpx.ConnectError("unreachable", request=httpx.Request("GET", "http://localhost:8012/api/models"))
 
@@ -101,6 +101,65 @@ async def test_qwen_models_catalog_falls_back_to_product_catalog_when_upstream_u
     result = await settings_routes.get_qwen_models_catalog(mode="cloud", user={"id": 1}, db=None)
 
     assert result["success"] is True
-    assert result["available"] is True
-    assert [item["label"] for item in result["models"]] == ["1.7 Base", "1.7 VoiceDesign", "1.7 CustomVoice"]
+    assert result["available"] is False
+    assert result["models"] == []
     assert result["detail"]["code"] == "qwen_models_upstream_unreachable"
+    assert result["detail"]["message"] == "Qwen worker недоступен или ещё прогревается. Список моделей runtime временно недоступен."
+
+
+@pytest.mark.asyncio
+async def test_qwen_models_catalog_returns_exact_runtime_models_without_product_fallback(monkeypatch):
+    async def _return_payload(*_args, **_kwargs):
+        return {
+            "success": True,
+            "current_model": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+            "models": [
+                {
+                    "id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+                    "label": "0.6B Base",
+                    "family": "base",
+                    "supports_voice_cloning": True,
+                    "requires_ref_audio": True,
+                    "requires_prompt": False,
+                }
+            ],
+        }
+
+    monkeypatch.setattr(settings_routes.settings, "qwen_tts_service_url", "http://localhost:8012")
+    monkeypatch.setattr(settings_routes, "_fetch_qwen_models_payload", _return_payload)
+
+    result = await settings_routes.get_qwen_models_catalog(mode="cloud", user={"id": 1}, db=None)
+
+    assert result["success"] is True
+    assert result["available"] is True
+    assert result["current_model"] == "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    assert result["models"] == [
+        {
+            "id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+            "label": "0.6B Base",
+            "family": "base",
+            "supports_voice_cloning": True,
+            "requires_ref_audio": True,
+            "requires_prompt": False,
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_qwen_models_catalog_reports_local_mode_not_configured(monkeypatch):
+    class _Repo:
+        def __init__(self, _db):
+            pass
+
+        def get_by_user_id(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(settings_routes, "LocalTTSRepository", _Repo)
+
+    result = await settings_routes.get_qwen_models_catalog(mode="local", user={"id": 1}, db=object())
+
+    assert result["success"] is True
+    assert result["configured"] is False
+    assert result["available"] is False
+    assert result["detail"]["code"] == "qwen_local_not_configured"
+    assert result["detail"]["message"] == "Self-hosted Qwen endpoint не настроен для этого пользователя."

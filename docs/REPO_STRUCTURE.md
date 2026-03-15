@@ -44,11 +44,14 @@
 - `pytest-cache-files-*`
 - `tmp/`, `.pytest_tmp/`, `bot_service/tmp/`
 - `frontend/dist/`, `frontend/.vite/`, `frontend/.vitest/`
-- `logs/`, `*.log`
+- `logs/`, `*.log`, `tmp_runtime_logs/`
+- root-level runtime dumps вроде `Qwen_logs.txt`, `bot_log.txt`, `F5_log.txt`
 - `.playwright*/`, `playwright-report/`, `*.har`
 - `artifacts/`, `*.tmp`, `*.fixed`
 
 Если файл создаётся runtime, тестом, сборкой, браузерной проверкой или локальной отладкой, это не продуктовый артефакт и ему не место в git.
+
+Все рабочие `.py`, `.ts`, `.tsx`, `.md` файлы должны оставаться в нормальном UTF-8 без битой кодировки и mojibake.
 
 ## Очистка перед отгрузкой
 

@@ -96,13 +96,13 @@
 - synth идёт через `/api/prepare -> /api/stream/{id}` adapter
 - это не считается ошибкой текущей фазы
 
-### S5. Qwen voice CRUD guard
+### S5. Qwen voice/admin CRUD
 
 Ожидаемо:
 
-- capabilities помечают Qwen CRUD как unavailable
-- backend возвращает `501`
-- UI не показывает сломанные действия как будто они должны работать
+- capabilities помечают Qwen admin как available
+- backend routes для global/admin voices отвечают успешно
+- UI не показывает admin-действия, если `voice_admin=false`
 
 ## Критерий успеха
 
@@ -111,5 +111,5 @@
 1. `f5` и `qwen` synth работают через gateway-managed path
 2. `f5` self-hosted endpoint работает
 3. `qwen` self-hosted endpoint работает через compatibility path
-4. `qwen` voice CRUD даёт ожидаемый `501`
+4. `qwen` voice/admin CRUD работает через backend/upstream contract
 5. frontend везде остаётся backend-only

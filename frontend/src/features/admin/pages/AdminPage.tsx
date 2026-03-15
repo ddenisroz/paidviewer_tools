@@ -1,9 +1,10 @@
 ﻿import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 
-import { BarChart3, Bot, FileText, Mic, Monitor, Shield, Users } from 'lucide-react';
+import { BarChart3, Bot, FileText, Mic, Monitor, Shield, Slash, Users } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
+import { AdminPageHeader, ADMIN_PAGE_CLASS } from '@/features/admin/components/admin-ui';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import Skeleton from '@/shared/components/ui/skeleton';
@@ -11,11 +12,12 @@ import Skeleton from '@/shared/components/ui/skeleton';
 const AdminDashboard = lazy(() => import('./AdminDashboard'));
 const VoiceManagement = lazy(() => import('../components/VoiceManagement'));
 const UserManagementPage = lazy(() => import('./UserManagementPage'));
-const BotManagementPage = lazy(() => import('./BotManagementPage'));
-const SystemLogsPage = lazy(() => import('./SystemLogsPage'));
-const MonitoringPage = lazy(() => import('./MonitoringPage'));
+const BotManagementPage = lazy(() => import('./AdminBotManagementPage'));
+const BlockedChannelsPage = lazy(() => import('./AdminChannelsPage'));
+const SystemLogsPage = lazy(() => import('./AdminSystemLogsPage'));
+const MonitoringPage = lazy(() => import('./AdminMonitoringPage'));
 
-type TabId = 'dashboard' | 'bots' | 'voices' | 'users' | 'logs' | 'monitoring';
+type TabId = 'dashboard' | 'bots' | 'voices' | 'users' | 'channels' | 'logs' | 'monitoring';
 
 interface Tab {
   id: TabId;
@@ -24,12 +26,13 @@ interface Tab {
 }
 
 const VISIBLE_TABS: Tab[] = [
-  { id: 'dashboard', label: 'Overview', icon: BarChart3 },
-  { id: 'bots', label: 'Bot Connect', icon: Bot },
-  { id: 'voices', label: 'Voices', icon: Mic },
-  { id: 'users', label: 'Users', icon: Users },
-  { id: 'logs', label: 'Logs', icon: FileText },
-  { id: 'monitoring', label: 'Monitoring', icon: Monitor },
+  { id: 'dashboard', label: 'Обзор', icon: BarChart3 },
+  { id: 'bots', label: 'Боты', icon: Bot },
+  { id: 'voices', label: 'Голоса', icon: Mic },
+  { id: 'users', label: 'Пользователи', icon: Users },
+  { id: 'channels', label: 'Каналы', icon: Slash },
+  { id: 'logs', label: 'Логи', icon: FileText },
+  { id: 'monitoring', label: 'Мониторинг', icon: Monitor },
 ];
 
 const isTabId = (value: string | null): value is TabId =>
@@ -37,6 +40,7 @@ const isTabId = (value: string | null): value is TabId =>
   value === 'bots' ||
   value === 'voices' ||
   value === 'users' ||
+  value === 'channels' ||
   value === 'logs' ||
   value === 'monitoring';
 
@@ -44,6 +48,7 @@ const tabFromPath = (pathname: string): TabId => {
   if (pathname.endsWith('/bots')) return 'bots';
   if (pathname.endsWith('/voices')) return 'voices';
   if (pathname.endsWith('/users')) return 'users';
+  if (pathname.endsWith('/channels')) return 'channels';
   if (pathname.endsWith('/monitoring')) return 'monitoring';
   if (pathname.endsWith('/logs')) return 'logs';
   return 'dashboard';
@@ -69,6 +74,8 @@ const TabContent: React.FC<{ activeTab: TabId }> = ({ activeTab }) => {
       return <VoiceManagement />;
     case 'users':
       return <UserManagementPage />;
+    case 'channels':
+      return <BlockedChannelsPage />;
     case 'logs':
       return <SystemLogsPage />;
     case 'monitoring':
@@ -104,12 +111,12 @@ const AdminPage: React.FC = () => {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen p-4 flex items-center justify-center">
+      <div className="min-h-screen p-4 font-sans flex items-center justify-center">
         <Card className="max-w-sm w-full">
           <CardContent className="p-5 text-center space-y-3">
             <Shield className="h-10 w-10 mx-auto text-muted-foreground" />
-            <h1 className="text-xl font-semibold">Access denied</h1>
-            <p className="text-sm text-muted-foreground">Administrator role is required.</p>
+            <h1 className="text-xl font-semibold">Доступ ограничен</h1>
+            <p className="text-sm text-muted-foreground">Для этого раздела нужна роль администратора.</p>
           </CardContent>
         </Card>
       </div>
@@ -117,37 +124,44 @@ const AdminPage: React.FC = () => {
   }
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="mx-auto mb-4 w-full max-w-5xl border-b border-border">
-        <div className="flex justify-start overflow-x-auto overflow-y-hidden hide-scrollbar">
-          {VISIBLE_TABS.map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabChange(tab.id)}
-                className={cn(
-                  'inline-flex items-center gap-2 whitespace-nowrap px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
-                  isActive
-                    ? 'border-emerald-500 text-emerald-400'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className={cn('p-4', ADMIN_PAGE_CLASS)}>
+      <div className="mx-auto w-full max-w-6xl space-y-4">
+        <AdminPageHeader
+          title="Админ-панель"
+          description="Управление системой, голосами и bot runtime в одном месте."
+        />
 
-      <Suspense fallback={<TabSkeleton />}>
-        <div className="mx-auto w-full max-w-5xl">
-          <TabContent activeTab={activeTab} />
+        <div className="rounded-2xl border border-border/70 bg-card/60 p-1.5">
+          <div className="flex justify-start gap-1 overflow-x-auto overflow-y-hidden hide-scrollbar">
+            {VISIBLE_TABS.map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleTabChange(tab.id)}
+                  className={cn(
+                    'inline-flex items-center gap-2 rounded-xl whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </Suspense>
+
+        <Suspense fallback={<TabSkeleton />}>
+          <div className="mx-auto w-full max-w-6xl">
+            <TabContent activeTab={activeTab} />
+          </div>
+        </Suspense>
+      </div>
     </div>
   );
 };

@@ -146,6 +146,12 @@ interface QwenModelsCatalogResponse {
     };
 }
 
+interface ApplySelectedProviderOptions {
+    showSuccessToast?: boolean;
+    f5ModeOverride?: 'cloud' | 'local';
+    qwenModeOverride?: 'cloud' | 'local';
+}
+
 const GCLOUD_MOOD_OPTIONS: Array<{ value: GcloudMood; label: string }> = [
     { value: 'neutral', label: 'Нейтральная' },
     { value: 'sad', label: 'Грустная' },
@@ -153,33 +159,6 @@ const GCLOUD_MOOD_OPTIONS: Array<{ value: GcloudMood; label: string }> = [
 ];
 
 const QWEN_MODEL_DEFAULT = 'Qwen/Qwen3-TTS-12Hz-1.7B-Base';
-
-const QWEN_MODEL_FALLBACK_OPTIONS: QwenModelOption[] = [
-    {
-        value: 'Qwen/Qwen3-TTS-12Hz-1.7B-Base',
-        label: '1.7 Base',
-        family: 'base',
-        supportsVoiceCloning: true,
-        requiresRefAudio: true,
-        requiresPrompt: false,
-    },
-    {
-        value: 'Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign',
-        label: '1.7 VoiceDesign',
-        family: 'voice_design',
-        supportsVoiceCloning: false,
-        requiresRefAudio: false,
-        requiresPrompt: true,
-    },
-    {
-        value: 'Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice',
-        label: '1.7 CustomVoice',
-        family: 'custom_voice',
-        supportsVoiceCloning: false,
-        requiresRefAudio: false,
-        requiresPrompt: false,
-    },
-];
 
 const QWEN_CUSTOMVOICE_SPEAKERS = [
     { value: 'serena', label: 'Serena' },
@@ -521,11 +500,11 @@ const TtsMainPageContent: React.FC = () => {
     const gcloudSelectionInitializedRef = useRef<boolean>(false);
     const gcloudVoicesRequestStartedRef = useRef<boolean>(false);
     const lastGcloudPreviewAtRef = useRef<number>(0);
+    const autoAlignedQwenModelRef = useRef<string | null>(null);
 
     const queryClient = useQueryClient();
     const isTwitchConnected = integrations.twitch?.enabled;
     const isVkConnected = integrations.vk?.enabled;
-    const hasLocalSetupFromStorage = localStorage.getItem('tts_has_local_setup') === 'true';
     const isAnyTtsEnabled = ttsEnabled;
     const toggleTtsMutation = useToggleTts({
         onSuccess: () => {
@@ -592,18 +571,14 @@ const TtsMainPageContent: React.FC = () => {
         initialData: () => getQueryCache(queryKeys.tts.status(null)) || undefined
     });
     const ttsStatusData = ttsStatusResponse?.data;
-    const hasLocalSetup =
-        typeof (ttsStatusData as { has_local_setup?: boolean } | undefined)?.has_local_setup === 'boolean'
-            ? Boolean((ttsStatusData as { has_local_setup?: boolean }).has_local_setup)
-            : hasLocalSetupFromStorage;
     const hasLocalSetupF5 =
         typeof (ttsStatusData as TtsStatusData | undefined)?.has_local_setup_f5 === 'boolean'
             ? Boolean((ttsStatusData as TtsStatusData).has_local_setup_f5)
-            : hasLocalSetup;
+            : false;
     const hasLocalSetupQwen =
         typeof (ttsStatusData as TtsStatusData | undefined)?.has_local_setup_qwen === 'boolean'
             ? Boolean((ttsStatusData as TtsStatusData).has_local_setup_qwen)
-            : hasLocalSetup;
+            : false;
 
     const { data: qwenModelsResponse, isLoading: isLoadingQwenModels } = useQwenModels(qwenMode, {
         enabled: !!isAuthenticated && advancedProvider === 'qwen',
@@ -1002,6 +977,16 @@ const TtsMainPageContent: React.FC = () => {
         return true;
     }, [checkTtsHealth]);
 
+    const ensureQwenModeIsHealthy = useCallback(async (mode: 'cloud' | 'local'): Promise<boolean> => {
+        const health = await checkTtsHealth('qwen', mode);
+        if (!health.isHealthy) {
+            queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
+            toast.error(mode === 'local' ? 'Локальный Qwen сервер сейчас недоступен' : 'Qwen Cloud сейчас недоступен');
+            return false;
+        }
+        return true;
+    }, [checkTtsHealth, queryClient]);
+
     const notifyUnavailableProvider = useCallback((reason?: string): boolean => {
         if (reason) {
             toast.warning(reason);
@@ -1011,7 +996,7 @@ const TtsMainPageContent: React.FC = () => {
 
     const applySelectedProviderEngine = useCallback(async (
         provider: AdvancedProvider,
-        options?: { showSuccessToast?: boolean }
+        options?: ApplySelectedProviderOptions,
     ): Promise<boolean> => {
         const showSuccessToast = options?.showSuccessToast ?? true;
         try {
@@ -1026,9 +1011,10 @@ const TtsMainPageContent: React.FC = () => {
             }
 
             if (provider === 'f5') {
-                let mode = resolveAvailableF5Mode(f5Mode);
+                const preferredMode = options?.f5ModeOverride ?? f5Mode;
+                let mode = resolveAvailableF5Mode(preferredMode);
                 if (!mode) {
-                    return notifyUnavailableProvider('F5 сейчас недоступен');
+                    return notifyUnavailableProvider(getF5UnavailableReason() || 'F5 сейчас недоступен');
                 }
 
                 if (mode === 'cloud') {
@@ -1054,16 +1040,33 @@ const TtsMainPageContent: React.FC = () => {
                 return true;
             }
 
-            const mode = resolveAvailableQwenMode(qwenMode);
+            const preferredMode = options?.qwenModeOverride ?? qwenMode;
+            let mode = resolveAvailableQwenMode(preferredMode);
             if (!mode) {
-                return notifyUnavailableProvider('Qwen сейчас недоступен');
+                return notifyUnavailableProvider(getQwenUnavailableReason() || 'Qwen сейчас недоступен');
+            }
+            if (mode === 'local') {
+                const localHealthy = await ensureQwenModeIsHealthy('local');
+                if (!localHealthy) {
+                    if (options?.qwenModeOverride || !canUseQwenCloud) {
+                        return false;
+                    }
+                    mode = 'cloud';
+                    setQwenMode('cloud');
+                    toast.warning('Локальный Qwen недоступен, переключено на Qwen Cloud');
+                }
+            } else if (options?.qwenModeOverride === 'cloud') {
+                const cloudHealthy = await ensureQwenModeIsHealthy('cloud');
+                if (!cloudHealthy) {
+                    return false;
+                }
             }
             const engineType = `qwen_${mode}` as 'qwen_cloud' | 'qwen_local';
             await switchEngineMutation.mutateAsync(engineType);
             setTtsEngine(engineType);
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
             if (showSuccessToast) {
-                toast.success(mode === 'local' ? 'Провайдер Qwen (локально) активирован' : 'Провайдер Qwen (облако) активирован');
+                toast.success(mode === 'local' ? 'Режим Qwen Self-hosted активирован' : 'Режим Qwen Cloud активирован');
             }
             return true;
         } catch (error: unknown) {
@@ -1074,9 +1077,13 @@ const TtsMainPageContent: React.FC = () => {
     }, [
         canUseF5Local,
         ensureF5CloudIsHealthy,
+        ensureQwenModeIsHealthy,
         f5Mode,
+        getF5UnavailableReason,
+        getQwenUnavailableReason,
         queryClient,
         qwenMode,
+        canUseQwenCloud,
         resolveAvailableF5Mode,
         resolveAvailableQwenMode,
         switchEngineMutation,
@@ -1084,24 +1091,24 @@ const TtsMainPageContent: React.FC = () => {
     ]);
 
     useEffect(() => {
-        if (!ttsEnabled || advancedProvider !== 'f5') {
+        if (advancedProvider !== 'f5') {
             return;
         }
         const resolvedMode = resolveAvailableF5Mode(f5Mode);
         if (resolvedMode && resolvedMode !== f5Mode) {
             setF5Mode(resolvedMode);
         }
-    }, [ttsEnabled, advancedProvider, f5Mode, resolveAvailableF5Mode]);
+    }, [advancedProvider, f5Mode, resolveAvailableF5Mode]);
 
     useEffect(() => {
-        if (!ttsEnabled || advancedProvider !== 'qwen') {
+        if (advancedProvider !== 'qwen') {
             return;
         }
         const resolvedMode = resolveAvailableQwenMode(qwenMode);
         if (resolvedMode && resolvedMode !== qwenMode) {
             setQwenMode(resolvedMode);
         }
-    }, [ttsEnabled, advancedProvider, qwenMode, resolveAvailableQwenMode]);
+    }, [advancedProvider, qwenMode, resolveAvailableQwenMode]);
 
     const handleGlobalTtsToggleRef = useRef<() => void>(() => { });
 
@@ -1160,12 +1167,16 @@ const TtsMainPageContent: React.FC = () => {
             }
         }
 
+        const previousMode = f5Mode;
         setF5Mode(mode);
         if (!ttsEnabled || advancedProvider !== 'f5') {
             saveTtsSettingsMutation.mutate({ f5Mode: mode });
             return;
         }
-        await applySelectedProviderEngine('f5');
+        const applied = await applySelectedProviderEngine('f5', { f5ModeOverride: mode });
+        if (!applied) {
+            setF5Mode(previousMode);
+        }
     }, [
         advancedProvider,
         applySelectedProviderEngine,
@@ -1191,18 +1202,37 @@ const TtsMainPageContent: React.FC = () => {
             toast.error('Доступ к Qwen Cloud отсутствует');
             return;
         }
+        if (
+            mode === 'local'
+            && !(await ensureQwenModeIsHealthy('local'))
+        ) {
+            return;
+        }
+        if (
+            mode === 'cloud'
+            && ttsEnabled
+            && advancedProvider === 'qwen'
+            && !(await ensureQwenModeIsHealthy('cloud'))
+        ) {
+            return;
+        }
 
+        const previousMode = qwenMode;
         setQwenMode(mode);
         if (!ttsEnabled || advancedProvider !== 'qwen') {
             saveTtsSettingsMutation.mutate({ qwenMode: mode });
             return;
         }
-        await applySelectedProviderEngine('qwen');
+        const applied = await applySelectedProviderEngine('qwen', { qwenModeOverride: mode });
+        if (!applied) {
+            setQwenMode(previousMode);
+        }
     }, [
         advancedProvider,
         applySelectedProviderEngine,
         canUseQwenCloud,
         canUseQwenLocal,
+        ensureQwenModeIsHealthy,
         isEngineActionPending,
         qwenMode,
         saveTtsSettingsMutation,
@@ -1259,13 +1289,16 @@ const TtsMainPageContent: React.FC = () => {
 
     const handleAdvancedProviderChange = useCallback(async (provider: AdvancedProvider): Promise<void> => {
         if (provider === advancedProvider) return;
-        setAdvancedProvider(provider);
 
         if (!ttsEnabled || isEngineActionPending) {
+            setAdvancedProvider(provider);
             saveTtsSettingsMutation.mutate({ advancedProvider: provider });
             return;
         }
-        await applySelectedProviderEngine(provider);
+        const changed = await applySelectedProviderEngine(provider);
+        if (changed) {
+            setAdvancedProvider(provider);
+        }
     }, [
         advancedProvider,
         applySelectedProviderEngine,
@@ -1510,23 +1543,51 @@ const TtsMainPageContent: React.FC = () => {
     ]);
 
     const qwenModelOptions = useMemo(() => {
-        const merged = new Map<string, QwenModelOption>();
-        QWEN_MODEL_FALLBACK_OPTIONS.forEach((option) => {
-            merged.set(option.value, option);
-        });
+        const catalog = Array.isArray(qwenModelsData?.models) ? qwenModelsData.models : [];
+        return catalog
+            .map(normalizeQwenModelOption)
+            .filter((option): option is QwenModelOption => Boolean(option));
+    }, [qwenModelsData]);
 
-        if (qwenModelsData) {
-            const catalog = Array.isArray(qwenModelsData.models) ? qwenModelsData.models : [];
-            const normalizedCatalog = catalog
-                .map(normalizeQwenModelOption)
-                .filter((option): option is QwenModelOption => Boolean(option));
-            normalizedCatalog.forEach((option) => {
-                merged.set(option.value, option);
-            });
+    useEffect(() => {
+        if (qwenModelOptions.length === 0) {
+            autoAlignedQwenModelRef.current = null;
+            return;
         }
 
-        return Array.from(merged.values());
-    }, [qwenModelsData]);
+        const hasSelectedModel = qwenModelOptions.some((option) => option.value === qwenModel);
+        if (hasSelectedModel) {
+            autoAlignedQwenModelRef.current = null;
+            return;
+        }
+
+        const runtimeCurrentModel = typeof qwenModelsData?.current_model === 'string'
+            ? qwenModelsData.current_model.trim()
+            : '';
+        const fallbackModel = qwenModelOptions.find((option) => option.value === runtimeCurrentModel)?.value
+            || qwenModelOptions[0]?.value
+            || QWEN_MODEL_DEFAULT;
+
+        if (fallbackModel && fallbackModel !== qwenModel) {
+            setQwenModel(fallbackModel);
+            if (
+                advancedProvider === 'qwen'
+                && !saveTtsSettingsMutation.isPending
+                && autoAlignedQwenModelRef.current !== `${qwenMode}:${fallbackModel}`
+            ) {
+                autoAlignedQwenModelRef.current = `${qwenMode}:${fallbackModel}`;
+                saveTtsSettingsMutation.mutate(
+                    { qwenModel: fallbackModel },
+                    {
+                        onError: () => {
+                            autoAlignedQwenModelRef.current = null;
+                            toast.error('Не удалось синхронизировать модель Qwen с доступным runtime');
+                        },
+                    },
+                );
+            }
+        }
+    }, [advancedProvider, qwenMode, qwenModel, qwenModelOptions, qwenModelsData?.current_model, saveTtsSettingsMutation]);
 
     const selectedQwenModelOption = useMemo(
         () =>
@@ -1863,8 +1924,14 @@ const TtsMainPageContent: React.FC = () => {
                                                 </div>
 
                                                 <div className="space-y-3">
-                                                    <Select value={qwenModel} onValueChange={handleQwenModelChange}>
-                                                        <SelectTrigger className="h-10 bg-background/70">
+                                                    <Select
+                                                        value={qwenModelOptions.some((option) => option.value === qwenModel) ? qwenModel : undefined}
+                                                        onValueChange={handleQwenModelChange}
+                                                    >
+                                                        <SelectTrigger
+                                                            className="h-10 bg-background/70"
+                                                            disabled={isLoadingQwenModels || qwenModelOptions.length === 0}
+                                                        >
                                                             <SelectValue placeholder="Выбери модель Qwen" />
                                                         </SelectTrigger>
                                                         <SelectContent>

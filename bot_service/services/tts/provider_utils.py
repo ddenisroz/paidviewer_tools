@@ -21,23 +21,35 @@ ProviderMode = Literal["cloud", "local"]
 _DEFAULT_PROVIDER: TTSProvider = "f5"
 _DEFAULT_MODE: ProviderMode = "cloud"
 
-QWEN_BASE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+QWEN_BASE_06_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+QWEN_BASE_17_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+QWEN_CUSTOMVOICE_06_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
+QWEN_CUSTOMVOICE_17_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+QWEN_BASE_MODEL = QWEN_BASE_17_MODEL
 QWEN_VOICEDESIGN_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
-QWEN_CUSTOMVOICE_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
-QWEN_PROMPT_MODEL = QWEN_CUSTOMVOICE_MODEL
+QWEN_CUSTOMVOICE_MODEL = QWEN_CUSTOMVOICE_17_MODEL
+QWEN_PROMPT_MODEL = QWEN_VOICEDESIGN_MODEL
 QWEN_DEFAULT_MODEL = QWEN_BASE_MODEL
 
 _QWEN_MODEL_ALIASES = {
-    "qwen/qwen3-tts-12hz-0.6b-base": QWEN_BASE_MODEL,
-    "qwen/qwen3-tts-12hz-1.7b-base": QWEN_BASE_MODEL,
-    "qwen/qwen3-tts-12hz-0.6b-customvoice": QWEN_CUSTOMVOICE_MODEL,
-    "qwen/qwen3-tts-12hz-1.7b-customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "qwen/qwen3-tts-12hz-0.6b-base": QWEN_BASE_06_MODEL,
+    "qwen/qwen3-tts-12hz-1.7b-base": QWEN_BASE_17_MODEL,
+    "qwen/qwen3-tts-12hz-0.6b-customvoice": QWEN_CUSTOMVOICE_06_MODEL,
+    "qwen/qwen3-tts-12hz-1.7b-customvoice": QWEN_CUSTOMVOICE_17_MODEL,
     "qwen/qwen3-tts-12hz-1.7b-voicedesign": QWEN_VOICEDESIGN_MODEL,
+    "0.6 base": QWEN_BASE_06_MODEL,
+    "0.6base": QWEN_BASE_06_MODEL,
+    "06 base": QWEN_BASE_06_MODEL,
+    "06base": QWEN_BASE_06_MODEL,
     "1.7 base": QWEN_BASE_MODEL,
     "1.7base": QWEN_BASE_MODEL,
     "base": QWEN_BASE_MODEL,
-    "1.7 customvoice": QWEN_CUSTOMVOICE_MODEL,
-    "1.7customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "0.6 customvoice": QWEN_CUSTOMVOICE_06_MODEL,
+    "0.6customvoice": QWEN_CUSTOMVOICE_06_MODEL,
+    "06 customvoice": QWEN_CUSTOMVOICE_06_MODEL,
+    "06customvoice": QWEN_CUSTOMVOICE_06_MODEL,
+    "1.7 customvoice": QWEN_CUSTOMVOICE_17_MODEL,
+    "1.7customvoice": QWEN_CUSTOMVOICE_17_MODEL,
     "customvoice": QWEN_CUSTOMVOICE_MODEL,
     "1.7 voicedesign": QWEN_VOICEDESIGN_MODEL,
     "1.7voicedesign": QWEN_VOICEDESIGN_MODEL,
@@ -48,6 +60,15 @@ _QWEN_MODEL_ALIASES = {
 
 QWEN_MODEL_CATALOG = [
     {
+        "id": QWEN_BASE_06_MODEL,
+        "label": "0.6 Base",
+        "family": "base",
+        "supports_voice_cloning": True,
+        "requires_ref_audio": True,
+        "requires_prompt": False,
+        "description": "Fast Base runtime for voice cloning from a stored sample and reference_text.",
+    },
+    {
         "id": QWEN_BASE_MODEL,
         "label": "1.7 Base",
         "family": "base",
@@ -55,6 +76,15 @@ QWEN_MODEL_CATALOG = [
         "requires_ref_audio": True,
         "requires_prompt": False,
         "description": "Позволяет клонировать голос через загруженные sample-ы и reference_text.",
+    },
+    {
+        "id": QWEN_CUSTOMVOICE_06_MODEL,
+        "label": "0.6 CustomVoice",
+        "family": "custom_voice",
+        "supports_voice_cloning": False,
+        "requires_ref_audio": False,
+        "requires_prompt": False,
+        "description": "Lightweight runtime with built-in speaker presets.",
     },
     {
         "id": QWEN_VOICEDESIGN_MODEL,
@@ -71,7 +101,7 @@ QWEN_MODEL_CATALOG = [
         "family": "custom_voice",
         "supports_voice_cloning": False,
         "requires_ref_audio": False,
-        "requires_prompt": True,
+        "requires_prompt": False,
         "description": "Генерация голоса по текстовому prompt.",
     },
 ]
@@ -125,14 +155,22 @@ def normalize_qwen_model_selection(raw_model: Optional[str]) -> str:
         if normalized == alias or compact == alias_compact:
             return resolved
 
-    return candidate if candidate in {QWEN_BASE_MODEL, QWEN_VOICEDESIGN_MODEL, QWEN_CUSTOMVOICE_MODEL} else QWEN_DEFAULT_MODEL
+    known_models = {
+        QWEN_BASE_06_MODEL,
+        QWEN_BASE_17_MODEL,
+        QWEN_CUSTOMVOICE_06_MODEL,
+        QWEN_CUSTOMVOICE_17_MODEL,
+        QWEN_VOICEDESIGN_MODEL,
+    }
+    return candidate if candidate in known_models else QWEN_DEFAULT_MODEL
 
 
 def get_qwen_model_family(raw_model: Optional[str]) -> str:
     model = normalize_qwen_model_selection(raw_model)
-    if model == QWEN_VOICEDESIGN_MODEL:
+    normalized = model.lower()
+    if "voicedesign" in normalized:
         return "voice_design"
-    if model == QWEN_CUSTOMVOICE_MODEL:
+    if "customvoice" in normalized:
         return "custom_voice"
     return "base"
 

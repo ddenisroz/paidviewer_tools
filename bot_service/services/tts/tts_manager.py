@@ -242,6 +242,9 @@ class TTSManager:
         headers: Dict[str, str],
     ) -> bool:
         probe_specs = (
+            ("/health/ready", {200}),
+            ("/health/live", {200}),
+            ("/api/models", {200}),
             ("/api/prepare", {405, 422}),
             ("/api/status/__healthcheck__", {200, 404}),
             ("/", {200}),
@@ -256,6 +259,54 @@ class TTSManager:
                 continue
 
         return False
+
+    async def _fetch_qwen_local_status(
+        self,
+        *,
+        endpoint: str,
+        headers: Dict[str, str],
+        stream_id: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        if not stream_id:
+            return None
+
+        timeout = aiohttp.ClientTimeout(total=5, connect=2, sock_read=5)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(f"{endpoint}/api/status/{stream_id}", headers=headers) as response:
+                    payload: Dict[str, Any]
+                    try:
+                        payload = await response.json()
+                    except Exception:
+                        payload = {"detail": await response.text()}
+                    payload["http_status"] = response.status
+                    return payload
+        except Exception as error:
+            return {"error": str(error)}
+
+    async def _cancel_qwen_local_stream(
+        self,
+        *,
+        endpoint: str,
+        headers: Dict[str, str],
+        stream_id: Optional[str],
+    ) -> Optional[int]:
+        if not stream_id:
+            return None
+
+        timeout = aiohttp.ClientTimeout(total=5, connect=2, sock_read=5)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.post(f"{endpoint}/api/cancel/{stream_id}", headers=headers) as response:
+                    return response.status
+        except Exception as error:
+            logger.warning(
+                "[WARN] Failed to cancel qwen local stream endpoint=%s stream_id=%s error=%s",
+                endpoint,
+                stream_id,
+                error,
+            )
+            return None
 
     async def _synthesize_via_qwen_local_compat(
         self,
@@ -290,6 +341,7 @@ class TTSManager:
         )
 
         timeout = aiohttp.ClientTimeout(total=90, connect=10, sock_read=90)
+        stream_id: Optional[str] = None
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(f"{endpoint}/api/prepare", data=form, headers=headers) as response:
@@ -340,7 +392,23 @@ class TTSManager:
                 "audio_path": str(output_path.resolve()),
             }
         except asyncio.TimeoutError:
-            logger.warning("[WARN] Qwen local compatibility synthesis timeout endpoint=%s", endpoint)
+            status_payload = await self._fetch_qwen_local_status(
+                endpoint=endpoint,
+                headers=headers,
+                stream_id=stream_id,
+            )
+            cancel_status = await self._cancel_qwen_local_stream(
+                endpoint=endpoint,
+                headers=headers,
+                stream_id=stream_id,
+            )
+            logger.warning(
+                "[WARN] Qwen local compatibility synthesis timeout endpoint=%s stream_id=%s status_payload=%s cancel_status=%s",
+                endpoint,
+                stream_id or "-",
+                status_payload,
+                cancel_status,
+            )
             return {"success": False, "error": "Request timeout"}
         except aiohttp.ClientError as error:
             logger.warning("[WARN] Qwen local compatibility synthesis connection error: %s", error)
@@ -348,6 +416,44 @@ class TTSManager:
         except Exception:
             logger.exception("[ERROR] Qwen local compatibility synthesis failed")
             return {"success": False, "error": "Internal server error"}
+
+    def _resolve_provider_audio_fetch_headers(
+        self,
+        *,
+        provider: str,
+        endpoint: str,
+        resolved_audio_url: str,
+        headers: Dict[str, str],
+    ) -> Dict[str, str]:
+        resolved_netloc = urlparse(resolved_audio_url).netloc.strip().lower()
+        endpoint_netloc = urlparse(endpoint).netloc.strip().lower()
+        if not resolved_netloc or resolved_netloc == endpoint_netloc:
+            return headers
+
+        provider_service_url = get_provider_service_url(provider).rstrip("/")
+        provider_service_netloc = urlparse(provider_service_url).netloc.strip().lower()
+        if resolved_netloc == provider_service_netloc:
+            provider_headers = build_tts_auth_headers(
+                provider=provider,
+                upstream="voice",
+                strict=False,
+            )
+            if provider_headers:
+                return provider_headers
+
+        gateway_url = str(getattr(settings, "tts_gateway_url", "") or "").strip().rstrip("/")
+        gateway_netloc = urlparse(gateway_url).netloc.strip().lower()
+        if resolved_netloc == gateway_netloc:
+            gateway_headers = build_tts_auth_headers(
+                provider=provider,
+                upstream="synthesis",
+                use_gateway=True,
+                strict=False,
+            )
+            if gateway_headers:
+                return gateway_headers
+
+        return headers
 
     async def check_tts_service_health(
         self,
@@ -595,7 +701,14 @@ class TTSManager:
         if resolved_audio_url.startswith(self.backend_url):
             return {"audio_url": resolved_audio_url, "audio_path": None}
 
-        async with session.get(resolved_audio_url, headers=headers) as audio_response:
+        fetch_headers = self._resolve_provider_audio_fetch_headers(
+            provider=provider,
+            endpoint=endpoint,
+            resolved_audio_url=resolved_audio_url,
+            headers=headers,
+        )
+
+        async with session.get(resolved_audio_url, headers=fetch_headers) as audio_response:
             if audio_response.status != 200:
                 body = await audio_response.text()
                 raise RuntimeError(

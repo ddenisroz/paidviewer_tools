@@ -1,6 +1,6 @@
 ﻿# Локальная интеграция TTS
 
-Последнее обновление: 2026-03-13
+Последнее обновление: 2026-03-15
 
 Документ фиксирует активный контракт внешнего TTS-стека вокруг `bot_service`.
 
@@ -29,8 +29,9 @@ Voice/admin CRUD живёт на стороне upstream-провайдера.
    - `Authorization: Bearer <key>`
    - `X-API-Key: <key>`
 3. Managed `qwen` synthesis требует настроенный `TTS_GATEWAY_URL`
-4. Если `QWEN_VOICE_SERVICE_URL` пуст, qwen voice/admin CRUD возвращает явный `501`
-5. `local_tts_endpoints` в runtime означают именно пользовательские self-hosted endpoints
+4. Gateway-managed `f5` и proxy-режим `qwen` должны отдавать gateway-hosted `audio_url`, а не прямой provider URL
+5. Qwen voice/admin CRUD использует `QWEN_VOICE_SERVICE_URL`, а если он пуст, fallback идет на `QWEN_TTS_SERVICE_URL`
+6. `local_tts_endpoints` в runtime означают именно пользовательские self-hosted endpoints
 
 ## Нужные backend env
 
@@ -78,6 +79,10 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 - практически требует Linux или WSL2 runtime
 - в текущем upstream нет native parity по auth, health и status
 - self-hosted path в этом репозитории работает через слой совместимости
+- рекомендуемый режим для прод/runtime: один контейнер = одна объявленная модель или семейство
+- для single-model запуска используй `QWEN3_TTS_MODEL_PATH=<exact-model-id-or-path>`
+- для ограниченного multi-model runtime используй `QWEN_TTS_ALLOWED_MODELS=base` или список exact ids через запятую
+- `QWEN_VOICE_STORAGE_DIR` должен быть вынесен в persistent volume и шариться между runtime-перезапусками
 
 ## Стабильные backend entrypoints
 
@@ -93,7 +98,7 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 ## Поведение voice/admin
 
 - `provider=f5` — нормальный CRUD
-- `provider=qwen` — `501`, пока не задан `QWEN_VOICE_SERVICE_URL`
+- `provider=qwen` — user/global/admin CRUD работает через Qwen upstream; отдельный `QWEN_VOICE_SERVICE_URL` нужен только если voice API вынесен отдельно
 
 ## Базовый UI flow для self-hosted
 
@@ -109,5 +114,6 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 2. `GET /api/tts/health?provider=qwen` возвращает healthy или контролируемый gateway-required статус
 3. Synth через backend и gateway работает для `f5` и `qwen`
 4. F5 voice CRUD работает через backend routes
-5. Qwen voice CRUD и model catalog работают через backend routes
+5. Qwen voice/admin CRUD и model catalog работают через backend routes
 6. Self-hosted Qwen connection checks используют compatibility probe только для synth path
+7. `/api/tts/qwen/models` показывает только реально доступные модели текущего runtime, а не полный product catalog

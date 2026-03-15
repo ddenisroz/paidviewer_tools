@@ -1,18 +1,7 @@
-/**
- * Централизованные query keys для React Query
- * Используются для инвалидации и синхронизации кэша
+﻿/**
+ * Централизованные query keys для React Query.
+ * Используются для типизированной инвалидации и синхронизации кэша.
  */
-
-/**
- * Query Keys Factory Pattern
- * Позволяет создавать типизированные ключи для queries
- */
-
-/**
- * Централизованные query keys для React Query
- * Factory pattern для создания ключей
- */
-
 export const queryKeys = {
   // Auth
   auth: {
@@ -131,4 +120,3 @@ export const queryKeys = {
     ttsStatus: () => ['admin', 'tts-status'] as const,
   },
 };
-

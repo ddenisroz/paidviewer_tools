@@ -224,12 +224,14 @@ const BotManagementPage: React.FC = () => {
   useEffect(() => { refreshAll(); }, [refreshAll]);
 
   /* ─── derived state ─── */
+  const formatChannelCount = (count: number) => `${count} ${count === 1 ? 'channel' : 'channels'}`;
+
   const runtimeSummary = useMemo(() => {
     const twitchOk = runtimeBots.twitch.connected && (runtimeBots.twitch.is_ready !== false);
     const vkOk = runtimeBots.vk.connected && runtimeBots.vk.is_running;
     const count = [twitchOk, vkOk].filter(Boolean).length;
-    if (count === 0) return 'No active bots';
-    return `${count}/2 bot(s) connected`;
+    if (count === 0) return 'No active bot runtimes';
+    return `${count}/2 runtimes online`;
   }, [runtimeBots]);
 
   const getBadge = (platform: Platform) => {
@@ -274,7 +276,7 @@ const BotManagementPage: React.FC = () => {
                 return (
                   <Badge key={p} variant={online ? 'default' : 'secondary'} className="gap-1.5">
                     <PlatformIcon platform={p} className="h-3 w-3" />
-                    {PLATFORM_META[p].label}: {online ? `${rt.channels} ch` : 'off'}
+                    {PLATFORM_META[p].label}: {online ? formatChannelCount(rt.channels || 0) : 'offline'}
                   </Badge>
                 );
               })}

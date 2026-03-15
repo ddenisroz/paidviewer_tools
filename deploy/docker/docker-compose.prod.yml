@@ -74,6 +74,13 @@ services:
     environment:
       - PORT=8000
       - API_KEY=${QWEN_TTS_SERVICE_API_KEY}
+      - HF_HOME=/root/.cache/huggingface
+      - QWEN_VOICE_STORAGE_DIR=/app/runtime/qwen_voices
+      - QWEN3_TTS_MODEL_PATH=${QWEN3_TTS_MODEL_PATH:-}
+      - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
+    volumes:
+      - qwen_hf_cache:/root/.cache/huggingface
+      - qwen_voice_storage:/app/runtime/qwen_voices
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -339,6 +346,10 @@ volumes:
   tts_backups:
     driver: local
   tts_cache:
+    driver: local
+  qwen_hf_cache:
+    driver: local
+  qwen_voice_storage:
     driver: local
   bot_cache:
     driver: local

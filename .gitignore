@@ -238,6 +238,10 @@ artifacts/
 # Logs
 logs
 *.log
+tmp_runtime_logs/
+Qwen_logs.txt
+bot_log.txt
+F5_log.txt
 
 # Runtime data
 pids

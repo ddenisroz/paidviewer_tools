@@ -1,9 +1,9 @@
-/**
- * Типы для TTS (Text-to-Speech)
+﻿/**
+ * Типы для TTS (Text-to-Speech).
  */
 
 /**
- * Статус TTS
+ * Статус TTS.
  */
 export interface TtsStatus {
   enabled: boolean;
@@ -22,7 +22,7 @@ export interface TtsStatus {
 }
 
 /**
- * Настройки TTS
+ * Настройки TTS.
  */
 export interface TtsSettings {
   enabled: boolean;
@@ -60,7 +60,7 @@ export interface TtsSettings {
 }
 
 /**
- * Настройки платформы для TTS
+ * Настройки платформы для TTS.
  */
 export interface TtsPlatformSettings {
   enabled: boolean;
@@ -70,7 +70,7 @@ export interface TtsPlatformSettings {
 }
 
 /**
- * Голос TTS
+ * Голос TTS.
  */
 export interface TtsVoice {
   id: number;
@@ -92,7 +92,7 @@ export interface TtsVoice {
 }
 
 /**
- * Фильтрованное слово
+ * Отфильтрованное слово.
  */
 export interface FilteredWord {
   id: number;
@@ -102,7 +102,7 @@ export interface FilteredWord {
 }
 
 /**
- * Заблокированный пользователь
+ * Заблокированный пользователь.
  */
 export interface BlockedUser {
   id: number;
@@ -114,7 +114,7 @@ export interface BlockedUser {
 }
 
 /**
- * Локальная конфигурация TTS
+ * Локальная конфигурация TTS.
  */
 export interface LocalTtsConfig {
   enabled: boolean;
@@ -148,12 +148,12 @@ export interface LocalTtsConfig {
 }
 
 /**
- * Режим TTS (все сообщения или за баллы канала)
+ * Режим TTS: все сообщения или только за баллы канала.
  */
 export type TtsTriggerMode = 'all_messages' | 'channel_points';
 
 /**
- * Настройки режима TTS
+ * Настройки режима TTS.
  */
 export interface TtsModeSettings {
   tts_mode?: TtsTriggerMode;
@@ -161,7 +161,7 @@ export interface TtsModeSettings {
 }
 
 /**
- * ID наград TTS по платформам
+ * ID TTS-наград по платформам.
  */
 export interface TtsRewardIds {
   twitch?: string;
@@ -170,7 +170,7 @@ export interface TtsRewardIds {
 }
 
 /**
- * Ответ с настройками режима TTS
+ * Ответ с настройками режима TTS.
  */
 export interface TtsModeSettingsResponse {
   success: boolean;
@@ -178,7 +178,7 @@ export interface TtsModeSettingsResponse {
 }
 
 /**
- * Данные для создания TTS награды
+ * Данные для создания TTS-награды.
  */
 export interface CreateTtsRewardData {
   platform: string;
@@ -188,7 +188,7 @@ export interface CreateTtsRewardData {
 }
 
 /**
- * Ответ при создании TTS награды
+ * Ответ при создании TTS-награды.
  */
 export interface CreateTtsRewardResponse {
   success: boolean;
@@ -199,16 +199,15 @@ export interface CreateTtsRewardResponse {
 }
 
 /**
- * Ответ при удалении TTS награды
+ * Ответ при удалении TTS-награды.
  */
 export interface DeleteTtsRewardResponse {
   success: boolean;
   message?: string;
 }
 
-
 /**
- * Статус whitelist пользователя
+ * Статус whitelist пользователя.
  */
 export interface WhitelistStatus {
   is_whitelisted: boolean;

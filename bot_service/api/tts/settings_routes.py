@@ -24,14 +24,12 @@ from services.tts.provider_utils import (
     QWEN_BASE_MODEL,
     QWEN_PROMPT_MODEL,
     get_synthesis_upstream_url,
-    get_qwen_model_catalog,
     get_voice_management_upstream_params,
     get_voice_management_upstream_url,
     infer_provider_from_engine,
     normalize_local_tts_endpoint_url,
     normalize_provider,
     normalize_provider_mode,
-    normalize_qwen_model_selection,
     qwen_voice_crud_not_available_detail,
     should_route_provider_via_gateway,
 )
@@ -339,7 +337,7 @@ async def get_qwen_models_catalog(
                 "models": [],
                 "detail": {
                     "code": "qwen_local_not_configured",
-                    "message": "Local Qwen endpoint is not configured for this user.",
+                    "message": "Self-hosted Qwen endpoint не настроен для этого пользователя.",
                 },
             }
 
@@ -359,7 +357,7 @@ async def get_qwen_models_catalog(
                 "models": [],
                 "detail": {
                     "code": "qwen_cloud_not_configured",
-                    "message": "Managed Qwen worker endpoint is not configured.",
+                    "message": "Облачный Qwen worker не настроен.",
                 },
             }
         headers = _qwen_models_headers()
@@ -367,43 +365,38 @@ async def get_qwen_models_catalog(
     try:
         payload = await _fetch_qwen_models_payload(endpoint_url=endpoint_url, headers=headers)
     except httpx.RequestError:
-        fallback_catalog = [dict(item, available=True) for item in get_qwen_model_catalog()]
         return {
             "success": True,
             "provider": "qwen",
             "mode": normalized_mode,
             "source": "local" if normalized_mode == "local" else "managed",
             "configured": True,
-            "available": True,
+            "available": False,
             "endpoint_url": endpoint_url,
-            "models": fallback_catalog,
+            "models": [],
             "detail": {
                 "code": "qwen_models_upstream_unreachable",
-                "message": "Qwen worker is still warming up. Backend returned the product model catalog fallback.",
+                "message": "Qwen worker недоступен или ещё прогревается. Список моделей runtime временно недоступен.",
             },
         }
 
-    models = payload.get("models") if isinstance(payload.get("models"), list) else []
-    available_ids = {
-        str(model.get("id") or "").strip()
-        for model in models
-        if isinstance(model, dict)
-    }
-    filtered_catalog = [
-        dict(item, available=item["id"] in available_ids)
-        for item in get_qwen_model_catalog()
+    models = [
+        dict(model)
+        for model in (payload.get("models") if isinstance(payload.get("models"), list) else [])
+        if isinstance(model, dict) and str(model.get("id") or "").strip()
     ]
-    current_model = normalize_qwen_model_selection(payload.get("current_model"))
+    current_model_raw = str(payload.get("current_model") or "").strip()
+    current_model = current_model_raw or None
     return {
         "success": True,
         "provider": "qwen",
         "mode": normalized_mode,
         "source": "local" if normalized_mode == "local" else "managed",
         "configured": True,
-        "available": any(item["available"] for item in filtered_catalog),
+        "available": len(models) > 0,
         "endpoint_url": endpoint_url,
         "current_model": current_model,
-        "models": filtered_catalog,
+        "models": models,
         "product_defaults": {
             "base_model": QWEN_BASE_MODEL,
             "prompt_model": QWEN_PROMPT_MODEL,

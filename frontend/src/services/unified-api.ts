@@ -105,8 +105,8 @@ export const renameUserVoice = async (
 };
 
 export const getUsers = async (): Promise<AxiosResponse<ApiResponse>> => {
-  const { apiClient } = await import('./api/client');
-  return apiClient.get('/api/admin/users/list');
+  const { adminService } = await import('./api/services/adminService');
+  return adminService.getUsers({ page: 1, limit: 1000 });
 };
 
 export const updateUserVoiceSettings = async (

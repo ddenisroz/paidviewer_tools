@@ -10,19 +10,20 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import { ADMIN_CARD_CLASS } from '@/features/admin/components/admin-ui';
 import { cn } from '@/lib/utils';
 import api from '@/services/api/client';
 import { StatsGrid } from '@/shared/components';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import {
-  calculateStoragePercent,
-  createStatsCards,
-  type DashboardStats,
-  getStorageColorClass
-} from '@/shared/utils/dashboardHelpers';
+  calculateAdminStoragePercent,
+  createAdminStatsCards,
+  type AdminDashboardStats,
+  getAdminStorageColorClass,
+} from '@/features/admin/utils/adminDashboardCards';
 
 // Re-export type for local use
-type Stats = DashboardStats;
+type Stats = AdminDashboardStats;
 
 
 
@@ -42,14 +43,14 @@ const AdminDashboard: React.FC = () => {
   });
 
   // Подготовка данных для StatsGrid
-  const statsCards = createStatsCards(stats, navigate);
-  const storagePercent = calculateStoragePercent(stats);
+  const statsCards = createAdminStatsCards(stats, navigate);
+  const storagePercent = calculateAdminStoragePercent(stats);
 
   return (
     <div className="space-y-4">
       <StatsGrid stats={statsCards} columns={4} loading={isLoading} />
 
-      <Card>
+      <Card className={ADMIN_CARD_CLASS}>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <Database className="h-4 w-4" />
@@ -66,7 +67,7 @@ const AdminDashboard: React.FC = () => {
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className={cn('h-full transition-all duration-500', getStorageColorClass(storagePercent))}
+                className={cn('h-full transition-all duration-500', getAdminStorageColorClass(storagePercent))}
                 style={{ width: `${storagePercent}%` }}
               />
             </div>

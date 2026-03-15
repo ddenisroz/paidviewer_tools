@@ -23,10 +23,12 @@ from repositories.tts_settings_repository import TTSSettingsRepository
 from services.tts.provider_utils import (
     ProviderRoutingError,
     get_all_provider_capabilities,
+    get_qwen_model_family,
     get_voice_management_upstream_params,
     get_voice_management_upstream_url,
     normalize_provider,
     normalize_qwen_model_selection,
+    QWEN_BASE_MODEL,
     qwen_voice_crud_not_available_detail,
 )
 logger = logging.getLogger('bot_service')
@@ -416,8 +418,12 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
         if resolved_provider == 'qwen':
             settings_repo = TTSSettingsRepository(service.db)
             user_settings = settings_repo.get_or_create(owner_id or actor_id)
-            upstream_data['model'] = normalize_qwen_model_selection(getattr(user_settings, 'qwen_model', None))
-        preview_timeout = 120.0 if resolved_provider == 'qwen' else 30.0
+            requested_model = normalize_qwen_model_selection(getattr(user_settings, 'qwen_model', None))
+            # Stored qwen voices are reference-audio clones, so preview must always use a Base model.
+            if get_qwen_model_family(requested_model) != 'base':
+                requested_model = QWEN_BASE_MODEL
+            upstream_data['model'] = requested_model
+        preview_timeout = 240.0 if resolved_provider == 'qwen' else 30.0
         upstream_base_url = _provider_base_url(resolved_provider)
         async with httpx.AsyncClient(timeout=preview_timeout, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(

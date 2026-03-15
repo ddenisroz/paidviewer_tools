@@ -17,6 +17,7 @@ import {
     Trash2, Twitch, UserCheck, UserX, Wifi
 } from 'lucide-react';
 
+import { AdminPageHeader } from '@/features/admin/components/admin-ui';
 import { adminService } from '@/services/api/services/adminService';
 import { DataTable, type DataTableBulkAction, type DataTableColumn, type DataTableFilter } from '@/shared/components';
 import { Badge } from '@/shared/components/ui/badge';
@@ -341,7 +342,7 @@ const UserManagementPage: React.FC = () => {
                 return (
                     <div className="flex flex-col items-center justify-center gap-1">
                         <Badge variant="outline" className="text-xs border-emerald-500/40 bg-emerald-500/10 text-emerald-200">
-                            [KEY] #{user.id}
+                            ID #{user.id}
                         </Badge>
                         <span className="text-xs text-muted-foreground">{displayName}</span>
                         {hasActiveSession && <Wifi className="w-3 h-3 text-sky-300" />}
@@ -674,7 +675,7 @@ const UserManagementPage: React.FC = () => {
 
     if (error) {
         return (
-            <div className="container mx-auto p-6">
+            <div className="space-y-6">
                 <Card className={`${SURFACE_CARD_CLASS} p-6`}>
                     <div className="text-center text-destructive">
                         <p>Ошибка загрузки пользователей</p>
@@ -689,23 +690,20 @@ const UserManagementPage: React.FC = () => {
     }
 
     return (
-        <div className="container mx-auto max-w-[1200px] p-4 space-y-4">
-            {/* Header */}
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
-                    <h1 className="text-2xl font-semibold text-foreground">
-                        Управление пользователями
-                    </h1>
-                    <p className="text-muted-foreground text-sm mt-1">
-                        Всего пользователей: <span className="text-foreground font-medium">{usersResponse.pagination.total || 0}</span>
+        <div className="space-y-6">
+            <AdminPageHeader
+                title="Пользователи"
+                description="Управление ролями, блокировками и whitelist по всем подключённым аккаунтам."
+                meta={
+                    <div className="text-sm text-muted-foreground">
+                        Всего пользователей: <span className="font-medium text-foreground">{usersResponse.pagination.total || 0}</span>
                         {usersResponse.pagination.total_users !== undefined && (
-                            <span className="ml-2 text-sm text-muted-foreground">
-                                (Аккаунты: {usersResponse.pagination.total_users})
-                            </span>
+                            <span className="ml-2">Аккаунтов: {usersResponse.pagination.total_users}</span>
                         )}
-                    </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
+                    </div>
+                }
+                actions={
+                    <div className="flex flex-wrap gap-2">
                     <Button
                         variant="outline"
                         onClick={() => refetch()}
@@ -773,8 +771,9 @@ const UserManagementPage: React.FC = () => {
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
-                </div>
-            </div>
+                    </div>
+                }
+            />
 
             {/* DataTable */}
             <DataTable

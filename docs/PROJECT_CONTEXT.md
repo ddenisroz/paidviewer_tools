@@ -1,6 +1,6 @@
 ﻿# Контекст проекта
 
-Последнее обновление: 2026-03-13
+Последнее обновление: 2026-03-15
 
 ## Что это за репозиторий
 
@@ -27,11 +27,15 @@
 - `f5`
   - управляемый путь: через `tts-gateway`
   - собственный endpoint пользователя: поддерживается
+  - gateway возвращает gateway-hosted `audio_url`, а не прямой provider `audio_url`
   - управление голосами: поддерживается через backend
 - `qwen`
   - управляемый путь: через `tts-gateway`
   - собственный endpoint пользователя: работает через слой совместимости
-  - управление голосами: пока `501`, если не задан `QWEN_VOICE_SERVICE_URL`
+  - управление голосами: поддерживается через backend/admin routes upstream-а
+  - admin/global voices доступны при настроенном `QWEN_TTS_SERVICE_URL` или `QWEN_VOICE_SERVICE_URL`
+  - модельный каталог должен отражать только реально поднятые runtime-модели из upstream `/api/models`, без product fallback в UI
+  - `QWEN_VOICE_STORAGE_DIR` должен жить в общем persistent volume, чтобы sample-ы переживали смену `base` / `voice_design` / `custom_voice` runtime
 - `gcloud`
   - встроенный путь внутри `bot_service`
 
@@ -52,6 +56,8 @@
 ## Что уже очищено
 
 - frontend больше не ходит напрямую к TTS runtime
+- админка использует единый shell c вкладками `Обзор`, `Боты`, `Голоса`, `Пользователи`, `Каналы`, `Логи`, `Мониторинг`
+- прямые admin routes `/dashboard/dolbaebadmintts/channels` и `/dashboard/dolbaebadmintts/logs` должны оставаться рабочими вместе с query-tab навигацией
 - guest mode удалён из рабочего слоя
 - новые session-scoped записи не должны появляться в `user_settings`, `tts_user_settings`, `local_tts_endpoints`, `filtered_words`, `tts_blocked_users`
 - YouTube queue переведена на user-only путь
@@ -60,9 +66,14 @@
 - голосование за `!skip` вынесено в `services/youtube/skip_vote_store.py`
 - пакет `bot_service/bots/command_handlers/*` больше не является частью рабочего слоя
 
+## Гигиена репозитория
+
+- рабочие текстовые файлы должны храниться в UTF-8 без битых строк и mojibake
+- runtime/debug артефакты (`tmp_runtime_logs/`, root-level `Qwen_logs.txt`, `bot_log.txt`, `F5_log.txt`) не считаются частью продукта и не должны попадать в git
+- `__pycache__/`, `pytest-cache-files-*`, `.ruff_cache/`, временные audio/log файлы должны очищаться перед фиксацией прогресса
+
 ## Что ещё открыто
 
 - добить оставшиеся совместимые хвосты в смешанных доменах
-- довести Qwen upstream до полного контракта
 - пройти live smoke по основным TTS-путям
 - дальше сжимать основную документацию до короткого русского источника правды

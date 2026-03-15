@@ -22,6 +22,7 @@ class _FakeVoiceService:
 @pytest.mark.asyncio
 async def test_qwen_voice_preview_uses_extended_timeout_and_returns_504(monkeypatch):
     captured_timeouts: list[float] = []
+    captured_models: list[str] = []
 
     class _FakeAsyncClient:
         def __init__(self, timeout=None, **kwargs):
@@ -35,7 +36,7 @@ async def test_qwen_voice_preview_uses_extended_timeout_and_returns_504(monkeypa
             return False
 
         async def post(self, *args, **kwargs):
-            _ = (args, kwargs)
+            captured_models.append(str(kwargs.get("data", {}).get("model")))
             raise httpx.ReadTimeout("worker is loading")
 
     class _FakeSettingsRepo:
@@ -63,7 +64,8 @@ async def test_qwen_voice_preview_uses_extended_timeout_and_returns_504(monkeypa
 
     assert exc_info.value.status_code == 504
     assert "still loading" in str(exc_info.value.detail).lower()
-    assert captured_timeouts == [120.0]
+    assert captured_timeouts == [240.0]
+    assert captured_models == ["Qwen/Qwen3-TTS-12Hz-1.7B-Base"]
 
 
 @pytest.mark.asyncio

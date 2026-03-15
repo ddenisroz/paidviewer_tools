@@ -53,9 +53,10 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 ## Repository Hygiene
 
 - Keep temporary/local tooling artifacts out of commits (`.playwright-cli/`, `.playwright/`, `playwright-report/`, `*.har`).
-- Remove stale cache/build outputs before release-oriented PRs (`__pycache__/`, `.ruff_cache/`, frontend build dirs, temp audio files).
+- Remove stale cache/build outputs before release-oriented PRs (`__pycache__/`, `.ruff_cache/`, frontend build dirs, temp audio files, `tmp_runtime_logs/`, root debug logs like `Qwen_logs.txt`).
 - Favor small, reviewable cleanup commits over large mixed refactors.
 - Place one-off backend fix/migration scripts into `bot_service/scripts/archive/legacy/`; keep only operational scripts at `bot_service/scripts/` root.
+- Keep text files in UTF-8 and fix mojibake instead of carrying broken strings/comments forward.
 
 ## Agent-Specific Instructions
 
@@ -100,6 +101,8 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - Browser TTS now plays only via dedicated `/tts-player` tab (`client_role=tts_player`); without this tab, website-mode TTS generation stays disabled.
 - Only one `/tts-player` tab is active for playback at a time; passive tabs stay connected but do not enqueue/play audio until they take control.
 - TTS synthesis is now sink-aware: website mode requires an active `/tts-player` connection, OBS mode requires an active OBS socket; queued tasks are dropped when sinks disappear.
+- Gateway-managed `f5` and proxied `qwen` synthesis must return gateway/backend-served audio URLs; frontend/runtime should not depend on direct provider `/api/tts/audio/*` URLs.
+- Qwen voice management now includes admin/global routes in the upstream contract; admin UI gating should use provider capability `voice_admin`.
 - TTS/YouTube autoplay must not resume automatically after full page reload; explicit user action is required to start playback again.
 - Audio priority controls were removed; TTS no longer pauses/resumes YouTube automatically.
 - YouTube queue bans set queue items to `status='banned'` and prevent re-adding the same video via `/api/youtube/queue/ban/{queue_id}`.
@@ -133,3 +136,4 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - MemeAlerts points-reward auto grants use `tts_user_settings.youtube_settings.memealerts_settings.points_reward`; Twitch match is by `reward_id`, VK match is by reward title from ChatBot message.
 - MemeAlerts donation auto-conversion uses `tts_user_settings.youtube_settings.memealerts_settings.donation_auto` and requires connected DonationAlerts token before enabling.
 - Admin UI consistency: prefer semantic tokens (`text-foreground`, `text-muted-foreground`, `bg-card`, `border-border`) over hardcoded gray/white classes; keep heading hierarchy, spacing, and button heights (`h-8`/`h-9`) consistent between admin pages.
+- Admin panel routes must stay aligned between tabs and direct URLs: `/dashboard/dolbaebadmintts`, `/dashboard/dolbaebadmintts/bots`, `/dashboard/dolbaebadmintts/voices`, `/dashboard/dolbaebadmintts/users`, `/dashboard/dolbaebadmintts/channels`, `/dashboard/dolbaebadmintts/logs`, `/dashboard/dolbaebadmintts/monitoring`.

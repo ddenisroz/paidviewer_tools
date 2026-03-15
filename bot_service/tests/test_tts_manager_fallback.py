@@ -238,11 +238,69 @@ async def test_gateway_health_status_ok_is_considered_healthy(manager, monkeypat
         lambda timeout=None: _FakeClientSession(),
     )
     monkeypatch.setattr("services.tts.provider_utils.settings.tts_gateway_url", "http://gateway")
+    monkeypatch.setattr("core.internal_service_auth.settings.tts_gateway_url", "http://gateway")
+    monkeypatch.setattr("core.internal_service_auth.settings.tts_gateway_api_key", "gateway-key")
 
     result = await manager.check_tts_service_health(provider="qwen", force_check=True)
 
     assert result is True
     assert "http://gateway/health/ready" in calls
+
+
+@pytest.mark.asyncio
+async def test_materialize_provider_audio_uses_provider_auth_for_direct_provider_url(manager, monkeypatch):
+    requested_headers = {}
+
+    class _FakeResponse:
+        def __init__(self, status: int, payload: bytes):
+            self.status = status
+            self._payload = payload
+            self.headers = {"content-type": "audio/wav"}
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def read(self):
+            return self._payload
+
+        async def text(self):
+            return self._payload.decode("utf-8", errors="ignore")
+
+    class _FakeSession:
+        def get(self, url: str, **kwargs):
+            requested_headers["url"] = url
+            requested_headers["headers"] = kwargs.get("headers") or {}
+            return _FakeResponse(200, b"wav-bytes")
+
+    monkeypatch.setattr("services.tts.tts_manager.get_provider_service_url", lambda provider: "http://provider-upstream")
+    monkeypatch.setattr("core.internal_service_auth.settings.tts_gateway_url", "http://gateway")
+    monkeypatch.setattr("core.internal_service_auth.settings.tts_gateway_api_key", "gateway-key")
+    monkeypatch.setattr("core.internal_service_auth.settings.f5_tts_service_api_key", "provider-key")
+    monkeypatch.setattr("core.internal_service_auth.settings.tts_internal_api_key", "")
+
+    manager._persist_audio_bytes = AsyncMock(
+        return_value={
+            "audio_url": "http://backend/api/tts/audio/local.wav",
+            "audio_path": "C:/tmp/local.wav",
+        }
+    )
+
+    result = await manager._materialize_provider_audio(
+        session=_FakeSession(),
+        provider="f5",
+        audio_url="http://provider-upstream/api/tts/audio/test.wav",
+        endpoint="http://gateway",
+        headers={"Authorization": "Bearer gateway-key", "X-API-Key": "gateway-key"},
+    )
+
+    assert result["audio_url"] == "http://backend/api/tts/audio/local.wav"
+    assert requested_headers["url"] == "http://provider-upstream/api/tts/audio/test.wav"
+    assert requested_headers["headers"]["Authorization"] == "Bearer provider-key"
+    assert requested_headers["headers"]["X-API-Key"] == "provider-key"
+    manager._persist_audio_bytes.assert_awaited_once()
 
 
 @pytest.mark.asyncio

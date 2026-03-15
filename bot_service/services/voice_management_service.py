@@ -134,16 +134,31 @@ class VoiceManagementService:
 
     async def get_voice_info(self, voice_id: int, provider: str = "f5") -> Optional[Dict[str, Any]]:
         """Get information about a specific voice."""
+        normalized_provider = self._ensure_voice_management_provider(provider)
+        request_timeout = 30.0 if normalized_provider == "qwen" else 10.0
         try:
-            async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
+            async with httpx.AsyncClient(timeout=request_timeout, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.get(
-                    f"{self._provider_tts_api_base(provider)}/voices/{voice_id}",
-                    headers=self._tts_auth_headers(provider),
-                    params=self._provider_request_params(provider),
+                    f"{self._provider_tts_api_base(normalized_provider)}/voices/{voice_id}",
+                    headers=self._tts_auth_headers(normalized_provider),
+                    params=self._provider_request_params(normalized_provider),
                 )
                 if response.status_code == 200:
                     return response.json()
                 return None
+        except httpx.TimeoutException as error:
+            logger.warning(
+                "Voice info request timed out provider=%s voice_id=%s timeout=%ss",
+                normalized_provider,
+                voice_id,
+                request_timeout,
+            )
+            if normalized_provider == "qwen":
+                raise HTTPException(
+                    status_code=504,
+                    detail="Qwen voice service is busy warming up. Try the preview again in a few seconds.",
+                ) from error
+            raise HTTPException(status_code=504, detail="Voice service timed out") from error
         except HTTPException:
             raise
         except Exception:
@@ -461,19 +476,21 @@ class VoiceManagementService:
         provider: str = "f5",
     ) -> Dict[str, Any]:
         """Upload a global voice in selected provider service."""
+        normalized_provider = self._ensure_voice_management_provider(provider)
+        request_timeout = 240.0 if normalized_provider == "qwen" else 60.0
         files = {"file": (filename, content, content_type)}
         data: Dict[str, str] = {}
         if name:
             data["name"] = name
 
         try:
-            async with httpx.AsyncClient(timeout=60.0, **build_tts_httpx_client_kwargs()) as client:
+            async with httpx.AsyncClient(timeout=request_timeout, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.post(
-                    f"{self._provider_admin_api_base(provider)}/voices/upload",
+                    f"{self._provider_admin_api_base(normalized_provider)}/voices/upload",
                     files=files,
                     data=data,
-                    headers=self._tts_auth_headers(provider),
-                    params=self._provider_request_params(provider),
+                    headers=self._tts_auth_headers(normalized_provider),
+                    params=self._provider_request_params(normalized_provider),
                 )
 
             if response.status_code == 200:
@@ -486,6 +503,18 @@ class VoiceManagementService:
                 (response.text or "")[:500],
             )
             raise HTTPException(status_code=response.status_code, detail="Failed to upload voice")
+        except httpx.TimeoutException as error:
+            logger.warning(
+                "Admin upload voice timed out provider=%s timeout=%ss",
+                normalized_provider,
+                request_timeout,
+            )
+            if normalized_provider == "qwen":
+                raise HTTPException(
+                    status_code=504,
+                    detail="Qwen is still processing the uploaded sample. Refresh the voice list in a minute and try again.",
+                ) from error
+            raise HTTPException(status_code=504, detail="Voice upload timed out") from error
         except HTTPException:
             raise
         except Exception:

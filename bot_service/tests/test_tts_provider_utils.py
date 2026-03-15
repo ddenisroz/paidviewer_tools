@@ -29,12 +29,14 @@ def test_normalize_provider(raw: str, expected: str):
     [
         (None, provider_utils.QWEN_BASE_MODEL),
         ("", provider_utils.QWEN_BASE_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-0.6B-Base", provider_utils.QWEN_BASE_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", provider_utils.QWEN_BASE_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-0.6B-Base", provider_utils.QWEN_BASE_06_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", provider_utils.QWEN_BASE_17_MODEL),
         ("base", provider_utils.QWEN_BASE_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_06_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_17_MODEL),
         ("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", provider_utils.QWEN_VOICEDESIGN_MODEL),
+        ("0.6 base", provider_utils.QWEN_BASE_06_MODEL),
+        ("0.6 customvoice", provider_utils.QWEN_CUSTOMVOICE_06_MODEL),
         ("customvoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
         ("voicedesign", provider_utils.QWEN_VOICEDESIGN_MODEL),
     ],
@@ -43,12 +45,18 @@ def test_normalize_qwen_model_selection(raw_model: str | None, expected: str):
     assert provider_utils.normalize_qwen_model_selection(raw_model) == expected
 
 
-def test_get_qwen_model_catalog_returns_three_product_options():
+def test_get_qwen_model_catalog_returns_all_exact_qwen_product_options():
     catalog = provider_utils.get_qwen_model_catalog()
-    assert [item["label"] for item in catalog] == ["1.7 Base", "1.7 VoiceDesign", "1.7 CustomVoice"]
+    assert [item["label"] for item in catalog] == [
+        "0.6 Base",
+        "1.7 Base",
+        "0.6 CustomVoice",
+        "1.7 VoiceDesign",
+        "1.7 CustomVoice",
+    ]
     assert catalog[0]["supports_voice_cloning"] is True
-    assert catalog[1]["requires_prompt"] is True
-    assert catalog[2]["requires_prompt"] is True
+    assert catalog[3]["requires_prompt"] is True
+    assert catalog[4]["requires_prompt"] is False
 
 
 @pytest.mark.parametrize(
