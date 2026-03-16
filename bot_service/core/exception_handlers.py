@@ -214,4 +214,4 @@ def setup_exception_handlers(app):
     # Handler for business exceptions.
     app.add_exception_handler(AppException, app_exception_handler)
 
-    logger.info("[OK] Exception handlers registered")
+    logger.debug("Exception handlers registered")

@@ -131,7 +131,7 @@ def register_all_routers(app: FastAPI) -> None:
                     f"Unexpected error while loading router from {config.module_path}"
                 )
     
-    logger.info(f"Registered {registered_count} routers")
+    logger.debug("Registered %s routers", registered_count)
 
 
 def get_router_count() -> int:

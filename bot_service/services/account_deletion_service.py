@@ -111,7 +111,10 @@ class AccountDeletionService:
     async def _disconnect_all_bots(self, user: User) -> None:
         """Disconnect all bots from the user's channels."""
         from core.connection_manager import get_connection_manager
+        from startup.bot_registry import get_bot_registry
+
         connection_manager = get_connection_manager()
+        registry = get_bot_registry()
         
         # Twitch
         if user.twitch_username:
@@ -122,9 +125,8 @@ class AccountDeletionService:
         channel_name = user.vk_channel_name or user.vk_username
         if channel_name:
             try:
-                import main
-                if main.vk_live_bot_instance:
-                    await main.vk_live_bot_instance.disconnect_from_channel(channel_name)
+                if registry.vk_bot:
+                    await registry.vk_bot.disconnect_from_channel(channel_name)
                 connection_manager.disable_tts_for_channel(channel_name.lower())
                 logger.info(f"[ACCOUNT] Disconnected VK bot from {channel_name}")
             except Exception:

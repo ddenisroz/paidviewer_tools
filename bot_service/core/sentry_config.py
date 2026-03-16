@@ -9,6 +9,7 @@ Provides centralized Sentry setup with:
 - Custom tags and context
 - Before-send filtering
 """
+import functools
 import logging
 from typing import Optional, Dict, Any
 
@@ -68,7 +69,7 @@ def init_sentry():
     sentry_dsn = getattr(settings, 'sentry_dsn', None)
     
     if not sentry_dsn:
-        logger.info("[SENTRY] DSN not configured, error tracking disabled")
+        logger.debug("Sentry DSN not configured, error tracking disabled")
         return
     
     try:
@@ -211,8 +212,6 @@ def capture_message(message: str, level: str = "info", **extra):
 
 
 # Convenience decorators
-
-import functools
 
 def with_sentry_context(**context):
     """
