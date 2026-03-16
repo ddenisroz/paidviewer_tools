@@ -23,6 +23,7 @@ from services.tts.provider_utils import (
     ProviderRoutingError,
     QWEN_BASE_MODEL,
     QWEN_PROMPT_MODEL,
+    filter_qwen_cloud_models,
     get_synthesis_upstream_url,
     get_voice_management_upstream_params,
     get_voice_management_upstream_url,
@@ -385,6 +386,19 @@ async def get_qwen_models_catalog(
         for model in (payload.get("models") if isinstance(payload.get("models"), list) else [])
         if isinstance(model, dict) and str(model.get("id") or "").strip()
     ]
+    filtering_payload = {
+        "enabled": False,
+        "tokens": [],
+        "families": [],
+        "exact_ids": [],
+        "filtered_count": 0,
+        "source": None,
+    }
+    if normalized_mode == "cloud":
+        filtered_payload = filter_qwen_cloud_models(models)
+        models = filtered_payload["models"]
+        filtering_payload = filtered_payload["filtering"]
+
     current_model_raw = str(payload.get("current_model") or "").strip()
     current_model = current_model_raw or None
     return {
@@ -397,6 +411,7 @@ async def get_qwen_models_catalog(
         "endpoint_url": endpoint_url,
         "current_model": current_model,
         "models": models,
+        "filtering": filtering_payload,
         "product_defaults": {
             "base_model": QWEN_BASE_MODEL,
             "prompt_model": QWEN_PROMPT_MODEL,

@@ -128,6 +128,13 @@ class LocalTTSRepository(BaseRepository[LocalTTSEndpoint]):
         self.db.commit()
         self.db.refresh(endpoint)
         return endpoint
+
+    def set_use_local(self, endpoint: LocalTTSEndpoint, use_local: bool) -> LocalTTSEndpoint:
+        """Mirror compatibility use_local flag without treating it as routing source of truth."""
+        endpoint.use_local = use_local
+        self.db.commit()
+        self.db.refresh(endpoint)
+        return endpoint
     
     def disable_local(self, endpoint: LocalTTSEndpoint) -> LocalTTSEndpoint:
         """Disable local TTS (set use_local to False)."""

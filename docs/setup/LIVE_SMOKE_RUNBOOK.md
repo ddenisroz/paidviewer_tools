@@ -103,6 +103,7 @@
 - capabilities помечают Qwen admin как available
 - backend routes для global/admin voices отвечают успешно
 - UI не показывает admin-действия, если `voice_admin=false`
+- preview/test либо отрабатывает успешно, либо за разумное время возвращает понятный warmup/model-loading ответ; не должно быть многоминутного `pending`
 
 ## Критерий успеха
 

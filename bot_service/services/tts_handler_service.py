@@ -345,13 +345,17 @@ class TTSHandlerService:
             engine,
             advanced_provider=getattr(tts_settings, "advanced_provider", None),
         )
+        f5_mode = normalize_provider_mode(getattr(tts_settings, "f5_mode", "cloud"))
+        qwen_mode = normalize_provider_mode(getattr(tts_settings, "qwen_mode", "cloud"))
         use_ai_tts = (engine in {'f5tts', 'qwen'})
         use_basic_tts = True
-        
+
+        preferred_mode = qwen_mode if advanced_provider == "qwen" else f5_mode
+
         # Check Local Endpoint
         local_tts_repo = LocalTTSRepository(db)
-        local_tts = local_tts_repo.get_by_user_id(user_id, provider=advanced_provider)
-        has_local_endpoint = use_ai_tts and local_tts and local_tts.use_local
+        local_tts = local_tts_repo.get_healthy(user_id=user_id, provider=advanced_provider)
+        has_local_endpoint = bool(use_ai_tts and preferred_mode == "local" and local_tts)
 
         # Whitelist Check
         if use_ai_tts and not has_local_endpoint:
@@ -397,8 +401,8 @@ class TTSHandlerService:
         return {
             "engine": engine,
             "advanced_provider": advanced_provider,
-            "f5_mode": normalize_provider_mode(getattr(tts_settings, "f5_mode", "cloud")),
-            "qwen_mode": normalize_provider_mode(getattr(tts_settings, "qwen_mode", "cloud")),
+            "f5_mode": f5_mode,
+            "qwen_mode": qwen_mode,
             "use_ai_tts": use_ai_tts,
             "use_basic_tts": use_basic_tts,
             "volume": final_volume,

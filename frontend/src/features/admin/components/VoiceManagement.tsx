@@ -59,6 +59,39 @@ interface AudioResponse {
     audio_url?: string;
 }
 
+const extractApiErrorMessage = (error: unknown): string | null => {
+    if (!error) return null;
+
+    const typedError = error as {
+        message?: string;
+        response?: {
+            data?: {
+                detail?: string | { message?: string };
+                message?: string;
+                error?: string;
+            };
+        };
+    };
+
+    const detail = typedError.response?.data?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+        return detail;
+    }
+    if (detail && typeof detail === 'object' && typeof detail.message === 'string' && detail.message.trim()) {
+        return detail.message;
+    }
+    if (typedError.response?.data?.message?.trim()) {
+        return typedError.response.data.message;
+    }
+    if (typedError.response?.data?.error?.trim()) {
+        return typedError.response.data.error;
+    }
+    if (typedError.message?.trim()) {
+        return typedError.message;
+    }
+    return null;
+};
+
 interface TranscribeResponse {
     data: {
         reference_text: string;
@@ -71,8 +104,8 @@ const VOICE_GRID_CLASS = 'flex flex-wrap gap-4';
 const EMPTY_STATE_CLASS = 'rounded-2xl border border-border/60 border-dashed bg-muted/20 py-10 text-center';
 const MODAL_OVERLAY_CLASS = 'fixed inset-0 z-[9999] bg-black/65 backdrop-blur-[1px]';
 const MODAL_PANEL_CLASS = 'pointer-events-auto flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-border/70 bg-background/95 shadow-2xl shadow-black/35';
-const DIALOG_FOOTER_CLASS = 'flex flex-col gap-3 border-t border-border/70 bg-background/70 p-4 sm:flex-row sm:items-center sm:justify-end';
-const DIALOG_ACTION_CLASS = 'h-10 w-full justify-center px-4 text-sm whitespace-normal sm:flex-1';
+const DIALOG_FOOTER_CLASS = 'flex flex-col gap-3 border-t border-border/70 bg-background/70 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end';
+const DIALOG_ACTION_CLASS = 'h-10 w-full justify-center px-4 text-sm whitespace-nowrap sm:min-w-[148px] sm:flex-1';
 
 const VoiceManagement: React.FC = () => {
     const { addToast } = useToast();
@@ -608,8 +641,11 @@ const VoiceManagement: React.FC = () => {
         } catch (error: unknown) {
             logger.error('Test voice error:', error);
             setIsTestingVoice(false);
-            const err = error as { message?: string };
-            addToast({ type: 'error', title: 'Ошибка', message: err.message || 'Не удалось протестировать голос.' });
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: extractApiErrorMessage(error) || 'Не удалось протестировать голос.',
+            });
         }
     };
 

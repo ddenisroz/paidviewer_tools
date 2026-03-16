@@ -102,7 +102,10 @@ Contribute with small, focused changes. If behavior changes, update the docs in 
 - Only one `/tts-player` tab is active for playback at a time; passive tabs stay connected but do not enqueue/play audio until they take control.
 - TTS synthesis is now sink-aware: website mode requires an active `/tts-player` connection, OBS mode requires an active OBS socket; queued tasks are dropped when sinks disappear.
 - Gateway-managed `f5` and proxied `qwen` synthesis must return gateway/backend-served audio URLs; frontend/runtime should not depend on direct provider `/api/tts/audio/*` URLs.
+- Cloud/self-hosted routing source of truth is `advanced_provider` plus provider-specific `f5_mode` / `qwen_mode`; legacy `use_local_tts` and `local_tts_endpoints.use_local` are compatibility mirrors only.
+- Managed Qwen model catalog may be backend-filtered by `QWEN_CLOUD_ALLOWED_MODELS`; self-hosted Qwen model catalogs must continue to reflect the connected user endpoint as-is.
 - Qwen voice management now includes admin/global routes in the upstream contract; admin UI gating should use provider capability `voice_admin`.
+- Qwen voice preview/test should fail fast with a readable warmup/model-loading message; admin/user preview flows must not sit in multi-minute pending state.
 - TTS/YouTube autoplay must not resume automatically after full page reload; explicit user action is required to start playback again.
 - Audio priority controls were removed; TTS no longer pauses/resumes YouTube automatically.
 - YouTube queue bans set queue items to `status='banned'` and prevent re-adding the same video via `/api/youtube/queue/ban/{queue_id}`.

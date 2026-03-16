@@ -33,8 +33,7 @@ import {
 import {
     useLocalTtsConfig,
     useSaveLocalTtsConfig,
-    useTestLocalTtsConnection,
-    useToggleLocalTts
+    useTestLocalTtsConnection
 } from '@/queries/tts/ttsQueries';
 import PageWrapper from '@/shared/components/PageWrapper';
 import { Badge } from '@/shared/components/ui/badge';
@@ -426,35 +425,6 @@ const LocalTTSSettingsPage: React.FC = () => {
             api_key: config.api_key.trim() || undefined,
             use_local: config.use_local
         });
-    };
-
-    const toggleServiceMutation = useToggleLocalTts({
-        onSuccess: (response) => {
-            const payload = response as {
-                success?: boolean;
-                message?: string;
-                use_local?: boolean;
-                data?: { success?: boolean; message?: string; use_local?: boolean };
-            };
-            const nested = payload.data || {};
-            const success = payload.success ?? nested.success ?? false;
-            const useLocal = payload.use_local ?? nested.use_local ?? false;
-            const message = payload.message || nested.message;
-            if (success) {
-                setConfig(prev => ({ ...prev, use_local: useLocal }));
-                toast.success(message || (useLocal ? 'Локальный режим включен' : 'Локальный режим отключен'));
-                return;
-            }
-            toast.error(message || 'Ошибка переключения локального режима');
-        },
-        onError: (error) => {
-            logger.error('Error toggling service:', error);
-            toast.error('Ошибка переключения локального режима');
-        },
-    });
-
-    const toggleService = (): void => {
-        toggleServiceMutation.mutate(provider);
     };
 
     const copyToClipboard = (text: string): void => {
@@ -887,29 +857,26 @@ const LocalTTSSettingsPage: React.FC = () => {
                     {testResult?.success && (
                         <Card className="card-glass">
                             <CardHeader>
-                                <CardTitle>Self-hosted режим</CardTitle>
+                                <CardTitle>Режим подключения</CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                <div className="flex items-center justify-between rounded-xl border border-border/70 bg-background/60 p-4">
+                            <CardContent className="space-y-4">
+                                <div className="rounded-xl border border-border/70 bg-background/60 p-4">
                                     <div>
-                                        <p className="font-medium">Использовать self-hosted {providerMeta.label}</p>
+                                        <p className="font-medium">Endpoint сохранен для self-hosted {providerMeta.label}</p>
                                         <p className="text-sm text-muted-foreground">
-                                            {config.use_local
-                                                ? 'Запросы выбранного провайдера идут через self-hosted endpoint пользователя'
-                                                : `Запросы идут через ${MANAGED_TOPOLOGY_LABELS[providerContract.managed_topology || 'gateway_managed']} или через fallback`
-                                            }
+                                            Этот экран управляет только адресом сервиса, API ключом и проверкой здоровья.
+                                            Переключение между {MANAGED_TOPOLOGY_LABELS[providerContract.managed_topology || 'gateway_managed']} и self-hosted
+                                            теперь делается только на основной странице TTS.
                                         </p>
                                     </div>
-                                    <Button
-                                        onClick={toggleService}
-                                        variant={config.use_local ? 'default' : 'outline'}
-                                        className={config.use_local
-                                            ? 'bg-blue-700 hover:bg-blue-800 text-white'
-                                            : 'border-blue-700 text-blue-300 hover:bg-blue-500/10'}
-                                    >
-                                        {config.use_local ? 'Включено' : 'Отключено'}
-                                    </Button>
                                 </div>
+                                <Button
+                                    onClick={() => navigate('/dashboard/tts')}
+                                    variant="outline"
+                                    className="w-full border-blue-700 text-blue-300 hover:bg-blue-500/10"
+                                >
+                                    Открыть основные настройки TTS
+                                </Button>
                             </CardContent>
                         </Card>
                     )}

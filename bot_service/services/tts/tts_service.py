@@ -5,9 +5,7 @@ import time
 
 from sqlalchemy.orm import Session
 
-from core.database import User
 from core.connection_manager import get_connection_manager
-from core.datetime_utils import utcnow_naive
 from integrations.base import IntegrationError
 
 from repositories.tts_settings_repository import TTSSettingsRepository
@@ -29,6 +27,7 @@ from services.tts.provider_utils import (
     normalize_provider,
     normalize_provider_mode,
     normalize_qwen_model_selection,
+    resolve_provider_mode_for_settings,
 )
 
 logger = logging.getLogger(__name__)
@@ -267,7 +266,7 @@ class TTSService:
                 "message": "TTS task queued"
             }
 
-        except Exception as e:
+        except Exception:
             logger.exception("Error in synthesize")
             return {"success": False, "error": "Internal server error"}
 
@@ -282,7 +281,7 @@ class TTSService:
             settings = self.audio_repo.get_or_create(user_id)
             self.audio_repo.update(settings, {"website_volume": website_volume})
             return True
-        except Exception as e:
+        except Exception:
             logger.exception("Error saving audio settings")
             return False
 
@@ -330,13 +329,15 @@ class TTSService:
             # Version is auto-incremented inside update_settings
             return {"success": True, "version": getattr(updated_settings, 'version', 1)}
         
-        except Exception as e:
+        except Exception:
             logger.exception("Error saving TTS settings")
             return {"success": False, "error": "Internal server error"}
 
     @staticmethod
     def _normalize_settings_payload(settings, payload: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(payload)
+        has_explicit_f5_mode = "f5_mode" in normalized
+        has_explicit_qwen_mode = "qwen_mode" in normalized
 
         current_engine = getattr(settings, "engine", "gtts")
         current_provider = infer_provider_from_engine(
@@ -383,19 +384,15 @@ class TTSService:
         explicit_use_local = normalized.get("use_local_tts")
         if explicit_use_local is not None:
             use_local_tts = bool(explicit_use_local)
-        elif provider == "qwen":
-            use_local_tts = normalize_provider_mode(normalized.get("qwen_mode")) == "local"
-        elif provider == "f5":
-            use_local_tts = normalize_provider_mode(normalized.get("f5_mode")) == "local"
-        else:
-            use_local_tts = False
+            if provider == "qwen" and not has_explicit_qwen_mode:
+                normalized["qwen_mode"] = "local" if use_local_tts else "cloud"
+            elif provider == "f5" and not has_explicit_f5_mode:
+                normalized["f5_mode"] = "local" if use_local_tts else "cloud"
 
         if provider == "qwen":
-            normalized["qwen_mode"] = "local" if use_local_tts else normalize_provider_mode(normalized.get("qwen_mode"))
-            normalized["use_local_tts"] = normalized["qwen_mode"] == "local"
+            normalized["use_local_tts"] = normalize_provider_mode(normalized.get("qwen_mode")) == "local"
         elif provider == "f5":
-            normalized["f5_mode"] = "local" if use_local_tts else normalize_provider_mode(normalized.get("f5_mode"))
-            normalized["use_local_tts"] = normalized["f5_mode"] == "local"
+            normalized["use_local_tts"] = normalize_provider_mode(normalized.get("f5_mode")) == "local"
         else:
             normalized["use_local_tts"] = False
 
@@ -466,15 +463,19 @@ class TTSService:
             engine,
             advanced_provider=getattr(settings, "advanced_provider", None),
         )
-        use_local_tts = bool(getattr(settings, "use_local_tts", False))
         f5_mode = normalize_provider_mode(getattr(settings, "f5_mode", "cloud"))
         qwen_mode = normalize_provider_mode(getattr(settings, "qwen_mode", "cloud"))
+        _, resolved_mode = resolve_provider_mode_for_settings(
+            engine=engine,
+            use_local_tts=bool(getattr(settings, "use_local_tts", False)),
+            advanced_provider=getattr(settings, "advanced_provider", None),
+            f5_mode=f5_mode,
+            qwen_mode=qwen_mode,
+        )
 
         if engine == 'f5tts':
-            resolved_mode = 'local' if use_local_tts else f5_mode
             engine_type = f'f5_{resolved_mode}'
         elif engine == 'qwen':
-            resolved_mode = 'local' if use_local_tts else qwen_mode
             engine_type = f'qwen_{resolved_mode}'
         elif engine == 'gcloud':
             engine_type = 'gcloud'
@@ -495,13 +496,13 @@ class TTSService:
             local_qwen = local_repo.get_active(user_id=user_id, provider="qwen")
             has_local_setup_qwen = bool(local_qwen and local_qwen.is_healthy)
             has_local_setup = has_local_setup_qwen if provider == "qwen" else has_local_setup_f5
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to resolve local TTS status for user %s", user_id)
 
         try:
             from utils.whitelist_cache import is_user_whitelisted_cached
             is_whitelisted = bool(is_user_whitelisted_cached(user, self.db))
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to resolve whitelist status for user %s", user_id)
 
         return {
@@ -527,7 +528,7 @@ class TTSService:
             # Repository handles commit
             self.settings_repo.update_settings(settings, {"enabled_platforms": enabled_platforms})
             return True
-        except Exception as e:
+        except Exception:
             logger.exception("Error setting platform settings")
             return False
 
@@ -556,7 +557,7 @@ class TTSService:
             await get_memory_websocket_manager().sync_user_tts_generation(user_id)
             
             return True
-        except Exception as e:
+        except Exception:
             logger.exception("Error enabling TTS")
             return False
 
@@ -586,7 +587,7 @@ class TTSService:
             await get_memory_websocket_manager().sync_user_tts_generation(user_id)
 
             return True
-        except Exception as e:
+        except Exception:
              logger.exception("Error disabling TTS")
              return False
 
@@ -633,7 +634,7 @@ class TTSService:
             self.settings_repo.update_settings(settings, {"voice": resolved_voice})
             return True
             
-        except Exception as e:
+        except Exception:
             logger.exception("Error setting voice")
             return False
 
@@ -673,7 +674,7 @@ class TTSService:
             
             return voice_name
             
-        except Exception as e:
+        except Exception:
             logger.exception("Error setting random voice")
             return None
 
@@ -681,7 +682,7 @@ class TTSService:
         """Set TTS website volume."""
         try:
             return await self.save_audio_settings(website_volume=volume, user_id=user_id)
-        except Exception as e:
+        except Exception:
             logger.exception("Error setting volume")
             return False
 

@@ -1,6 +1,6 @@
 ﻿# Локальная интеграция TTS
 
-Последнее обновление: 2026-03-15
+Последнее обновление: 2026-03-16
 
 Документ фиксирует активный контракт внешнего TTS-стека вокруг `bot_service`.
 
@@ -20,7 +20,7 @@ Voice/admin CRUD живёт на стороне upstream-провайдера.
 - `project-hosted worker` — отдельный runtime-воркер проекта, это не пользовательский self-hosted режим
 - `gateway-managed` — управляемый путь через `tts-gateway`
 
-Флаги `use_local`, `f5_local`, `qwen_local` пока сохранены только как старые имена для self-hosted path.
+Флаги `use_local`, `f5_local`, `qwen_local` сохранены только как совместимые имена; источник истины для выбора cloud/self-hosted — `advanced_provider` + `f5_mode` / `qwen_mode`.
 
 ## Runtime-контракт
 
@@ -45,6 +45,8 @@ F5_TTS_SERVICE_API_KEY=<f5-key>
 QWEN_TTS_SERVICE_URL=http://localhost:8012
 QWEN_TTS_SERVICE_API_KEY=<qwen-key-or-empty>
 QWEN_VOICE_SERVICE_URL=
+QWEN_ALLOWED_MODELS=
+QWEN_CLOUD_ALLOWED_MODELS=
 
 LOCAL_TTS_ALLOWED_HOSTS=localhost,127.0.0.1,::1,host.docker.internal,f5_tts,tts_service,qwen_tts,qwen_service
 LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
@@ -81,7 +83,9 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 - self-hosted path в этом репозитории работает через слой совместимости
 - рекомендуемый режим для прод/runtime: один контейнер = одна объявленная модель или семейство
 - для single-model запуска используй `QWEN3_TTS_MODEL_PATH=<exact-model-id-or-path>`
-- для ограниченного multi-model runtime используй `QWEN_TTS_ALLOWED_MODELS=base` или список exact ids через запятую
+- рекомендуемый единый ключ для обоих репозиториев: `QWEN_ALLOWED_MODELS=base` или CSV exact ids
+- для ограниченного multi-model runtime используй `QWEN_TTS_ALLOWED_MODELS=base` или список exact ids через запятую, если нужен runtime-only override
+- для backend-managed cloud catalog/filtering используй `QWEN_CLOUD_ALLOWED_MODELS`, если нужен backend-only override
 - `QWEN_VOICE_STORAGE_DIR` должен быть вынесен в persistent volume и шариться между runtime-перезапусками
 
 ## Стабильные backend entrypoints
@@ -106,7 +110,7 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 2. Выбери provider `f5` или `qwen`
 3. Сохрани endpoint URL
 4. При необходимости сохрани endpoint API key
-5. Включи self-hosted режим в TTS settings
+5. Переключи нужный provider в `Self-hosted` на основной странице TTS settings
 
 ## Smoke-checklist
 
@@ -116,4 +120,5 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 4. F5 voice CRUD работает через backend routes
 5. Qwen voice/admin CRUD и model catalog работают через backend routes
 6. Self-hosted Qwen connection checks используют compatibility probe только для synth path
-7. `/api/tts/qwen/models` показывает только реально доступные модели текущего runtime, а не полный product catalog
+7. `/api/tts/qwen/models?mode=cloud` показывает runtime-модели managed worker с backend-фильтрацией; рекомендуемый общий env — `QWEN_ALLOWED_MODELS`, backend-only override — `QWEN_CLOUD_ALLOWED_MODELS`
+8. `/api/tts/qwen/models?mode=local` показывает runtime-модели пользовательского endpoint-а без backend-фильтрации

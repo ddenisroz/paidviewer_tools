@@ -10,6 +10,7 @@ Supported advanced providers:
 from __future__ import annotations
 
 import ipaddress
+import os
 from typing import Any, Dict, Literal, Optional
 from urllib.parse import urlparse
 
@@ -32,6 +33,7 @@ QWEN_PROMPT_MODEL = QWEN_VOICEDESIGN_MODEL
 QWEN_DEFAULT_MODEL = QWEN_BASE_MODEL
 
 _QWEN_MODEL_ALIASES = {
+    "default": QWEN_DEFAULT_MODEL,
     "qwen/qwen3-tts-12hz-0.6b-base": QWEN_BASE_06_MODEL,
     "qwen/qwen3-tts-12hz-1.7b-base": QWEN_BASE_17_MODEL,
     "qwen/qwen3-tts-12hz-0.6b-customvoice": QWEN_CUSTOMVOICE_06_MODEL,
@@ -56,6 +58,15 @@ _QWEN_MODEL_ALIASES = {
     "voice_design": QWEN_VOICEDESIGN_MODEL,
     "voicedesign": QWEN_VOICEDESIGN_MODEL,
     "prompt": QWEN_VOICEDESIGN_MODEL,
+}
+
+_QWEN_FAMILY_ALIASES = {
+    "base": "base",
+    "customvoice": "custom_voice",
+    "custom_voice": "custom_voice",
+    "voice_design": "voice_design",
+    "voicedesign": "voice_design",
+    "prompt": "voice_design",
 }
 
 QWEN_MODEL_CATALOG = [
@@ -154,15 +165,7 @@ def normalize_qwen_model_selection(raw_model: Optional[str]) -> str:
         alias_compact = alias.lower().replace("_", "").replace(" ", "")
         if normalized == alias or compact == alias_compact:
             return resolved
-
-    known_models = {
-        QWEN_BASE_06_MODEL,
-        QWEN_BASE_17_MODEL,
-        QWEN_CUSTOMVOICE_06_MODEL,
-        QWEN_CUSTOMVOICE_17_MODEL,
-        QWEN_VOICEDESIGN_MODEL,
-    }
-    return candidate if candidate in known_models else QWEN_DEFAULT_MODEL
+    return candidate
 
 
 def get_qwen_model_family(raw_model: Optional[str]) -> str:
@@ -177,6 +180,116 @@ def get_qwen_model_family(raw_model: Optional[str]) -> str:
 
 def get_qwen_model_catalog() -> list[Dict[str, Any]]:
     return [dict(item) for item in QWEN_MODEL_CATALOG]
+
+
+def normalize_qwen_model_family_alias(raw_family: Optional[str]) -> Optional[str]:
+    candidate = str(raw_family or "").strip().lower()
+    if not candidate:
+        return None
+    compact = candidate.replace(" ", "").replace("-", "_")
+    return _QWEN_FAMILY_ALIASES.get(compact)
+
+
+def get_qwen_cloud_allowed_models() -> Dict[str, Any]:
+    raw = ""
+    source: str | None = None
+    for env_name in ("QWEN_CLOUD_ALLOWED_MODELS", "QWEN_ALLOWED_MODELS", "QWEN_TTS_ALLOWED_MODELS"):
+        candidate = str(os.getenv(env_name, "") or "").strip()
+        if candidate:
+            raw = candidate
+            source = env_name
+            break
+
+    if not raw:
+        candidate = str(getattr(settings, "qwen_cloud_allowed_models", "") or "").strip()
+        if candidate:
+            raw = candidate
+            source = "settings"
+
+    if not raw:
+        return {
+            "enabled": False,
+            "tokens": [],
+            "families": [],
+            "exact_ids": [],
+            "source": None,
+        }
+
+    tokens = [item.strip() for item in raw.split(",") if item.strip()]
+    families: set[str] = set()
+    exact_ids: set[str] = set()
+
+    for token in tokens:
+        family = normalize_qwen_model_family_alias(token)
+        if family:
+            families.add(family)
+            continue
+        exact_ids.add(normalize_qwen_model_selection(token))
+
+    return {
+        "enabled": bool(families or exact_ids),
+        "tokens": tokens,
+        "families": sorted(families),
+        "exact_ids": sorted(exact_ids),
+        "source": source,
+    }
+
+
+def is_qwen_cloud_model_allowed(
+    model: Dict[str, Any],
+    *,
+    allowed_families: set[str],
+    allowed_exact_ids: set[str],
+) -> bool:
+    if not allowed_families and not allowed_exact_ids:
+        return True
+
+    model_id = str(model.get("id") or "").strip()
+    if model_id and model_id in allowed_exact_ids:
+        return True
+
+    explicit_family = normalize_qwen_model_family_alias(model.get("family"))
+    family = explicit_family or get_qwen_model_family(model_id)
+    return family in allowed_families
+
+
+def filter_qwen_cloud_models(models: list[Dict[str, Any]]) -> Dict[str, Any]:
+    allow_config = get_qwen_cloud_allowed_models()
+    if not allow_config["enabled"]:
+        return {
+            "models": [dict(model) for model in models],
+            "filtering": {
+                "enabled": False,
+                "tokens": [],
+                "families": [],
+                "exact_ids": [],
+                "filtered_count": 0,
+                "source": allow_config["source"],
+            },
+        }
+
+    allowed_families = set(allow_config["families"])
+    allowed_exact_ids = set(allow_config["exact_ids"])
+    filtered_models = [
+        dict(model)
+        for model in models
+        if is_qwen_cloud_model_allowed(
+            model,
+            allowed_families=allowed_families,
+            allowed_exact_ids=allowed_exact_ids,
+        )
+    ]
+    return {
+        "models": filtered_models,
+        "filtering": {
+            "enabled": True,
+            "tokens": allow_config["tokens"],
+            "families": allow_config["families"],
+            "exact_ids": allow_config["exact_ids"],
+            "filtered_count": max(0, len(models) - len(filtered_models)),
+            "source": allow_config["source"],
+        },
+    }
 
 
 def normalize_provider_mode(mode: Optional[str]) -> ProviderMode:
@@ -222,14 +335,13 @@ def resolve_provider_mode_for_settings(
     if provider == "gcloud":
         return provider, "cloud"
 
-    if provider == "qwen":
-        preferred = normalize_provider_mode(qwen_mode)
-    else:
-        preferred = normalize_provider_mode(f5_mode)
+    preferred_mode_raw = qwen_mode if provider == "qwen" else f5_mode
+    if preferred_mode_raw is not None:
+        return provider, normalize_provider_mode(preferred_mode_raw)
 
     if use_local_tts:
         return provider, "local"
-    return provider, preferred
+    return provider, _DEFAULT_MODE
 
 
 def get_tts_gateway_url() -> str:

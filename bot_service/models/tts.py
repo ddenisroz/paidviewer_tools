@@ -194,7 +194,7 @@ class UserVoiceSettings(Base):
 
     # Personal settings for this voice.
     cfg_strength = Column(Float, nullable=True)
-    speed_preset = Column(Float, nullable=True)
+    speed_preset = Column(String, nullable=True)
     volume = Column(Float, nullable=True)
 
     created_at = Column(DateTime, default=utcnow_naive)

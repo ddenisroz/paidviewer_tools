@@ -42,7 +42,6 @@ from services.tts.provider_utils import (
     QWEN_BASE_MODEL,
     QWEN_CUSTOMVOICE_MODEL,
     QWEN_DEFAULT_MODEL,
-    QWEN_PROMPT_MODEL,
     QWEN_VOICEDESIGN_MODEL,
     get_provider_service_url,
     get_qwen_model_family,
@@ -815,8 +814,11 @@ class TTSManager:
             provider = requested_provider
             provider_mode_key = "qwen_mode" if provider == "qwen" else "f5_mode"
             preferred_mode = normalize_provider_mode(settings_dict.get(provider_mode_key))
-            use_local_flag = bool(settings_dict.get("use_local_tts", False))
-            resolved_mode = "local" if use_local_flag else preferred_mode
+            has_explicit_provider_mode = provider_mode_key in settings_dict and settings_dict.get(provider_mode_key) is not None
+            if has_explicit_provider_mode:
+                resolved_mode = preferred_mode
+            else:
+                resolved_mode = "local" if bool(settings_dict.get("use_local_tts", False)) else preferred_mode
 
             endpoint = get_provider_service_url(provider)
             endpoint_api_key: Optional[str] = None

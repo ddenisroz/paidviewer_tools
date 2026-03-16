@@ -43,6 +43,9 @@ services:
       - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-https://qwen-tts.yourdomain.com}
       - QWEN_TTS_SERVICE_API_KEY=${QWEN_TTS_SERVICE_API_KEY}
       - QWEN_VOICE_SERVICE_URL=${QWEN_VOICE_SERVICE_URL:-}
+      - QWEN_ALLOWED_MODELS=${QWEN_ALLOWED_MODELS:-}
+      - QWEN_CLOUD_ALLOWED_MODELS=${QWEN_CLOUD_ALLOWED_MODELS:-}
+      - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
     volumes:
       - ../../bot_service/data:/app/data
       - ../../bot_service/logs:/app/logs

@@ -29,6 +29,7 @@ def test_normalize_provider(raw: str, expected: str):
     [
         (None, provider_utils.QWEN_BASE_MODEL),
         ("", provider_utils.QWEN_BASE_MODEL),
+        ("default", provider_utils.QWEN_BASE_MODEL),
         ("Qwen/Qwen3-TTS-12Hz-0.6B-Base", provider_utils.QWEN_BASE_06_MODEL),
         ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", provider_utils.QWEN_BASE_17_MODEL),
         ("base", provider_utils.QWEN_BASE_MODEL),
@@ -39,6 +40,7 @@ def test_normalize_provider(raw: str, expected: str):
         ("0.6 customvoice", provider_utils.QWEN_CUSTOMVOICE_06_MODEL),
         ("customvoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
         ("voicedesign", provider_utils.QWEN_VOICEDESIGN_MODEL),
+        ("Qwen/Qwen3-TTS-12Hz-9.9B-Base", "Qwen/Qwen3-TTS-12Hz-9.9B-Base"),
     ],
 )
 def test_normalize_qwen_model_selection(raw_model: str | None, expected: str):
@@ -88,7 +90,7 @@ def test_normalize_provider_mode(mode: str | None, expected: str):
     assert provider_utils.normalize_provider_mode(mode) == expected
 
 
-def test_resolve_provider_mode_for_settings_forces_local_when_use_local_true():
+def test_resolve_provider_mode_for_settings_prefers_explicit_provider_mode_over_legacy_flag():
     provider, mode = provider_utils.resolve_provider_mode_for_settings(
         engine="f5tts",
         use_local_tts=True,
@@ -97,7 +99,7 @@ def test_resolve_provider_mode_for_settings_forces_local_when_use_local_true():
         qwen_mode="cloud",
     )
     assert provider == "f5"
-    assert mode == "local"
+    assert mode == "cloud"
 
 
 def test_resolve_provider_mode_for_settings_uses_qwen_mode():
@@ -112,6 +114,18 @@ def test_resolve_provider_mode_for_settings_uses_qwen_mode():
     assert mode == "cloud"
 
 
+def test_resolve_provider_mode_for_settings_uses_legacy_use_local_only_when_provider_mode_missing():
+    provider, mode = provider_utils.resolve_provider_mode_for_settings(
+        engine="qwen",
+        use_local_tts=True,
+        advanced_provider="qwen",
+        f5_mode="cloud",
+        qwen_mode=None,
+    )
+    assert provider == "qwen"
+    assert mode == "local"
+
+
 def test_resolve_provider_mode_for_settings_gcloud_is_always_cloud():
     provider, mode = provider_utils.resolve_provider_mode_for_settings(
         engine="gcloud",
@@ -122,6 +136,64 @@ def test_resolve_provider_mode_for_settings_gcloud_is_always_cloud():
     )
     assert provider == "gcloud"
     assert mode == "cloud"
+
+
+def test_get_qwen_cloud_allowed_models_parses_family_aliases_and_exact_ids(monkeypatch):
+    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
+    monkeypatch.setattr(
+        provider_utils.settings,
+        "qwen_cloud_allowed_models",
+        "base, voice_design, Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    )
+
+    result = provider_utils.get_qwen_cloud_allowed_models()
+
+    assert result["enabled"] is True
+    assert result["families"] == ["base", "voice_design"]
+    assert result["exact_ids"] == ["Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"]
+    assert result["source"] == "settings"
+
+
+def test_get_qwen_cloud_allowed_models_prefers_shared_alias_env(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "qwen_cloud_allowed_models", "")
+    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
+    monkeypatch.setenv("QWEN_ALLOWED_MODELS", "base")
+
+    result = provider_utils.get_qwen_cloud_allowed_models()
+
+    assert result["enabled"] is True
+    assert result["families"] == ["base"]
+    assert result["source"] == "QWEN_ALLOWED_MODELS"
+
+
+def test_filter_qwen_cloud_models_filters_runtime_catalog(monkeypatch):
+    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
+    monkeypatch.setattr(
+        provider_utils.settings,
+        "qwen_cloud_allowed_models",
+        "base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    )
+
+    result = provider_utils.filter_qwen_cloud_models(
+        [
+            {"id": provider_utils.QWEN_BASE_06_MODEL, "family": "base"},
+            {"id": provider_utils.QWEN_CUSTOMVOICE_06_MODEL, "family": "custom_voice"},
+            {"id": provider_utils.QWEN_VOICEDESIGN_MODEL, "family": "voice_design"},
+        ]
+    )
+
+    assert [item["id"] for item in result["models"]] == [
+        provider_utils.QWEN_BASE_06_MODEL,
+        provider_utils.QWEN_CUSTOMVOICE_06_MODEL,
+    ]
+    assert result["filtering"]["enabled"] is True
+    assert result["filtering"]["filtered_count"] == 1
+    assert result["filtering"]["source"] == "settings"
 
 
 def test_get_provider_service_url_prefers_qwen_url(monkeypatch):

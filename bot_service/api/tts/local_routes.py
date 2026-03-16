@@ -14,8 +14,10 @@ from auth.auth import get_current_user
 from core.database import get_db
 from core.internal_service_auth import build_tts_auth_headers
 from repositories.local_tts_repository import LocalTTSRepository
-from services.tts.provider_utils import normalize_local_tts_endpoint_url
+from repositories.tts_settings_repository import TTSSettingsRepository
+from services.tts.provider_utils import normalize_local_tts_endpoint_url, normalize_provider_mode
 from services.tts.tts_core import LocalTTSConfigRequest, check_local_tts_health
+from services.tts.tts_service import TTSService
 
 logger = logging.getLogger("bot_service.tts.local")
 
@@ -108,6 +110,20 @@ def _get_local_config_or_404(
     return config
 
 
+def _is_provider_local_mode(db: Session, user_id: int, provider: str) -> bool:
+    settings = TTSSettingsRepository(db).get_or_create(user_id=user_id)
+    if provider == "qwen":
+        return normalize_provider_mode(getattr(settings, "qwen_mode", "cloud")) == "local"
+    return normalize_provider_mode(getattr(settings, "f5_mode", "cloud")) == "local"
+
+
+def _provider_mode_payload(provider: str, use_local: bool) -> dict[str, str]:
+    target_mode = "local" if use_local else "cloud"
+    if provider == "qwen":
+        return {"qwen_mode": target_mode}
+    return {"f5_mode": target_mode}
+
+
 async def _fetch_f5_local_voices(
     *,
     endpoint: str,
@@ -169,8 +185,9 @@ async def get_local_tts_config(
                 "has_api_key": False,
                 "use_local": False,
                 "message": "Local TTS is not configured",
-            }
+        }
 
+        compatibility_use_local = _is_provider_local_mode(db, int(user_id), resolved_provider)
         api_key_redacted = _redact_api_key(config.api_key)
         return {
             "success": True,
@@ -183,7 +200,7 @@ async def get_local_tts_config(
             "api_key": None,
             "api_key_redacted": api_key_redacted,
             "has_api_key": bool(config.api_key),
-            "use_local": config.use_local,
+            "use_local": compatibility_use_local,
             "is_active": config.is_active,
             "config": {
                 "id": config.id,
@@ -193,7 +210,7 @@ async def get_local_tts_config(
                 "api_key_redacted": api_key_redacted,
                 "has_api_key": bool(config.api_key),
                 "is_active": config.is_active,
-                "use_local": config.use_local,
+                "use_local": compatibility_use_local,
                 "is_healthy": config.is_healthy,
                 "provider_contract": provider_contract,
             },
@@ -222,10 +239,11 @@ async def save_local_tts_config(
         resolved_provider = _normalize_local_provider(request.provider)
         provider_contract = _provider_contract(resolved_provider)
         repo = LocalTTSRepository(db)
+        compatibility_use_local = _is_provider_local_mode(db, int(user_id), resolved_provider)
         config = repo.create_or_update(
             endpoint_url=request.endpoint_url,
             api_key=request.api_key,
-            use_local=request.use_local,
+            use_local=compatibility_use_local,
             user_id=user_id,
             provider=resolved_provider,
         )
@@ -249,7 +267,7 @@ async def save_local_tts_config(
                 "api_key": None,
                 "api_key_redacted": _redact_api_key(config.api_key),
                 "has_api_key": bool(config.api_key),
-                "use_local": config.use_local,
+                "use_local": compatibility_use_local,
                 "provider_contract": provider_contract,
             },
         }
@@ -271,37 +289,27 @@ async def toggle_local_tts(
     db: Session = Depends(get_db),
     provider: str = "f5",
 ):
-    """Toggle use_local flag for selected local provider."""
+    """Toggle provider-specific self-hosted mode and mirror compatibility use_local flag."""
     try:
         resolved_provider = _normalize_local_provider(provider)
         provider_contract = _provider_contract(resolved_provider)
         repo = LocalTTSRepository(db)
 
-        db_user = repo.get_user_by_id(user["id"])
-        if not db_user:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        login_platform = user.get("login_platform")
-        if not repo.is_user_whitelisted(db_user, login_platform):
-            raise HTTPException(
-                status_code=403,
-                detail="Local TTS is available only for whitelisted users.",
-            )
-
         config = repo.get_by_user_id(user["id"], provider=resolved_provider)
         if not config:
             raise HTTPException(status_code=404, detail="Local TTS config not found.")
 
-        config = repo.toggle_use_local(config)
+        current_use_local = _is_provider_local_mode(db, int(user["id"]), resolved_provider)
+        next_use_local = not current_use_local
 
-        if config.use_local:
+        if next_use_local:
             health_status = await check_local_tts_health(
                 config.endpoint_url,
                 config.api_key,
                 provider=resolved_provider,
             )
             if not health_status.get("healthy", False):
-                repo.disable_local(config)
+                repo.set_use_local(config, False)
                 raise HTTPException(
                     status_code=503,
                     detail=(
@@ -311,11 +319,21 @@ async def toggle_local_tts(
                     ),
                 )
 
+        service = TTSService(db)
+        save_result = await service.save_tts_settings(
+            user_id=int(user["id"]),
+            **_provider_mode_payload(resolved_provider, next_use_local),
+        )
+        if not save_result.get("success"):
+            raise HTTPException(status_code=500, detail="Failed to update provider mode")
+
+        repo.set_use_local(config, next_use_local)
+
         return {
             "success": True,
             "provider": resolved_provider,
-            "message": f"Local TTS {'enabled' if config.use_local else 'disabled'}",
-            "use_local": config.use_local,
+            "message": f"Self-hosted mode {'enabled' if next_use_local else 'disabled'} for {resolved_provider.upper()}",
+            "use_local": next_use_local,
             "provider_contract": provider_contract,
         }
     except HTTPException:

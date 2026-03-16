@@ -8,7 +8,11 @@ from sqlalchemy.orm import Session
 
 from repositories.base_repository import BaseRepository
 from models.tts import TTSUserSettings
-from services.tts.provider_utils import normalize_qwen_model_selection
+from services.tts.provider_utils import (
+    infer_provider_from_engine,
+    normalize_provider_mode,
+    normalize_qwen_model_selection,
+)
 
 
 class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
@@ -54,6 +58,17 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
     
     def get_settings_dict(self, settings: TTSUserSettings) -> Dict[str, Any]:
         """Convert settings to dictionary for API response."""
+        provider = infer_provider_from_engine(
+            settings.engine,
+            advanced_provider=getattr(settings, "advanced_provider", None),
+        )
+        if provider == "qwen":
+            use_local_tts = normalize_provider_mode(getattr(settings, "qwen_mode", "cloud")) == "local"
+        elif provider == "f5":
+            use_local_tts = normalize_provider_mode(getattr(settings, "f5_mode", "cloud")) == "local"
+        else:
+            use_local_tts = False
+
         return {
             "enable_7tv": settings.enable_7tv,
             "enable_twitch": settings.enable_twitch,
@@ -71,7 +86,7 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
             "qwen_model": normalize_qwen_model_selection(getattr(settings, "qwen_model", None)),
             "max_message_length": settings.max_message_length,
             "skip_commands": settings.skip_commands,
-            "use_local_tts": settings.use_local_tts,
+            "use_local_tts": use_local_tts,
             "filter_replies": settings.filter_replies,
             "filter_mentions": settings.filter_mentions,
             "tts_mode": settings.tts_mode,

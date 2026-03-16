@@ -1,6 +1,6 @@
 ﻿# Деплой
 
-Последнее обновление: 2026-03-13
+Последнее обновление: 2026-03-16
 
 Документ фиксирует актуальный deployment-контракт репозитория.
 
@@ -21,9 +21,10 @@
 | `deploy/docker/docker-compose.tts-advanced.yml` | overlay для выделенного `f5-tts-service` host |
 | `deploy/docker/docker-compose.tts-simple.yml` | overlay для локального single-node `f5-tts-service` |
 
-## Обязательные backend env
+## Core backend env
 
 ```env
+DATABASE_URL=postgresql://user:password@localhost:5432/bot_service_db
 TTS_GATEWAY_URL=http://localhost:8010
 TTS_GATEWAY_API_KEY=...
 F5_TTS_SERVICE_URL=http://localhost:8011
@@ -31,10 +32,15 @@ F5_TTS_SERVICE_API_KEY=...
 QWEN_TTS_SERVICE_URL=http://localhost:8012
 QWEN_TTS_SERVICE_API_KEY=...
 QWEN_VOICE_SERVICE_URL=
-TTS_INTERNAL_API_KEY=
+QWEN_ALLOWED_MODELS=
 ```
 
 `F5_TTS_SERVICE_API_KEY` и `QWEN_TTS_SERVICE_API_KEY` могут быть пустыми, если ты используешь один общий inter-service key через `TTS_INTERNAL_API_KEY` или уже заданный `TTS_GATEWAY_API_KEY`.
+
+`bot_service/.env.example` теперь intentionally minimal: редкие overrides вроде `QWEN_CLOUD_ALLOWED_MODELS`, mTLS, internal JWT, rate-limit tweaks и прочие tuning-переменные не удалены из кода, они просто убраны из основного шаблона.
+
+Рекомендуемый паттерн: задай общий `QWEN_ALLOWED_MODELS`, а специализированные env используй только как override.
+Для managed Qwen держи `QWEN_CLOUD_ALLOWED_MODELS` или общий `QWEN_ALLOWED_MODELS` синхронно с runtime allowlist (`QWEN_TTS_ALLOWED_MODELS` / `QWEN3_TTS_MODEL_PATH` в upstream контейнере), иначе backend catalog и реально поднятые модели разъедутся.
 
 ## Внешние зависимости
 

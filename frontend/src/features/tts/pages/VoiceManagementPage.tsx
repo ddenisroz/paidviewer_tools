@@ -72,9 +72,12 @@ interface TestVoiceResponse {
 type VoiceProvider = 'f5' | 'qwen';
 
 const PROVIDER_TAB_CLASS =
-    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300';
+    'appearance-none rounded-none border-0 bg-transparent px-4 pb-3 pt-2 text-sm font-medium shadow-none transition-colors';
+const PROVIDER_TAB_ACTIVE_CLASS = 'text-sky-400 shadow-[inset_0_-2px_0_0_rgba(56,189,248,1)]';
+const PROVIDER_TAB_INACTIVE_CLASS = 'text-muted-foreground hover:text-sky-300';
 const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
 const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
+const SECTION_DIVIDER_CLASS = 'border-t border-border/70';
 
 const extractApiErrorMessage = (error: unknown): string | null => {
     if (!error) return null;
@@ -872,8 +875,8 @@ const VoiceManagementPageContent: React.FC = () => {
                         type="button"
                         onClick={() => setVoiceProvider('f5')}
                         className={`${PROVIDER_TAB_CLASS} ${voiceProvider === 'f5'
-                            ? 'border-sky-500 text-sky-400'
-                            : 'border-transparent text-muted-foreground hover:text-sky-300'
+                            ? PROVIDER_TAB_ACTIVE_CLASS
+                            : PROVIDER_TAB_INACTIVE_CLASS
                             }`}
                     >
                         F5 TTS
@@ -882,8 +885,8 @@ const VoiceManagementPageContent: React.FC = () => {
                         type="button"
                         onClick={() => setVoiceProvider('qwen')}
                         className={`${PROVIDER_TAB_CLASS} ${voiceProvider === 'qwen'
-                            ? 'border-sky-500 text-sky-400'
-                            : 'border-transparent text-muted-foreground hover:text-sky-300'
+                            ? PROVIDER_TAB_ACTIVE_CLASS
+                            : PROVIDER_TAB_INACTIVE_CLASS
                             }`}
                     >
                         Qwen 3 TTS
@@ -1229,8 +1232,8 @@ const VoiceManagementPageContent: React.FC = () => {
                         </div>
                     )}
 
-                    {userVoices.length > 0 && whitelistStatus?.can_manage_voices && globalVoices.length > 0 && (
-                        <hr className="border-slate-700" />
+                    {whitelistStatus?.can_manage_voices && (
+                        <div className={SECTION_DIVIDER_CLASS} />
                     )}
 
                     {whitelistStatus?.can_manage_voices && (
@@ -1408,15 +1411,15 @@ const VoiceManagementPageContent: React.FC = () => {
                         </div>
                     )}
                     <DialogFooter className="flex-wrap gap-2">
-                        <Button onClick={handleTestVoice} variant="outline" disabled={isTestingVoice} className="flex-1 min-w-[clamp(92px,18vw,120px)]">
+                        <Button onClick={handleTestVoice} variant="outline" disabled={isTestingVoice} className="flex-1 min-w-[clamp(92px,18vw,120px)] whitespace-nowrap">
                             <TestTube2 className="h-4 w-4 mr-2" />{isTestingVoice ? 'Генерирую...' : 'Тест'}
                         </Button>
                         {currentVoice?.voice_type === 'user' && (
-                            <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[clamp(120px,22vw,160px)] text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
+                            <Button onClick={handleRenameVoice} variant="outline" className="flex-1 min-w-[clamp(120px,22vw,160px)] whitespace-nowrap text-orange-600 border-orange-600 hover:bg-orange-600 hover:text-white">
                                 <Edit className="h-4 w-4 mr-2" />Переименовать
                             </Button>
                         )}
-                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[clamp(110px,20vw,140px)] bg-blue-700 hover:bg-blue-800">
+                        <Button onClick={handleSaveSettings} className="flex-1 min-w-[clamp(110px,20vw,140px)] whitespace-nowrap bg-blue-700 hover:bg-blue-800">
                             <Settings className="h-4 w-4 mr-2" />Сохранить
                         </Button>
                     </DialogFooter>

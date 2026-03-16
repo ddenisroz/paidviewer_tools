@@ -73,6 +73,16 @@ class Settings(BaseSettings):
         default="",
         description="Optional dedicated Qwen voice-management API URL; when empty bot_service falls back to qwen_tts_service_url",
     )
+    qwen_cloud_allowed_models: str = Field(
+        default=os.getenv(
+            "QWEN_CLOUD_ALLOWED_MODELS",
+            os.getenv("QWEN_ALLOWED_MODELS", os.getenv("QWEN_TTS_ALLOWED_MODELS", "")),
+        ),
+        description=(
+            "Optional backend allowlist for managed Qwen runtime models "
+            "(comma-separated family aliases and/or exact model ids)"
+        ),
+    )
     f5_tts_storage_root: Optional[str] = Field(
         default=None,
         description="Optional path to local F5 storage root when running maintenance in split deployment",

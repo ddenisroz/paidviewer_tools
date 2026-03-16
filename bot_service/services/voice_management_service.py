@@ -6,7 +6,6 @@ from fastapi import HTTPException
 
 from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
 from repositories.user_voice_settings_repository import UserVoiceSettingsRepository
-from core.database import UserVoiceSettings
 from services.tts.provider_utils import (
     ProviderRoutingError,
     get_voice_management_upstream_params,
@@ -189,56 +188,23 @@ class VoiceManagementService:
         is_global = voice_info.get('type') == 'global' or voice_info.get('is_global') is True
         
         if is_global:
-            # Handle global voice settings (stored locally for each user)
-            current_settings = self.repository.get_by_user_and_voice_id(
-                user_id,
-                voice_id,
+            # Global voice overrides are stored locally per user in bot_service DB.
+            persisted_settings = self.repository.update_or_create_by_voice_id(
+                user_id=user_id,
+                voice_id=voice_id,
+                settings_data={**settings_data, "voice_name": voice_info.get("name")},
                 tts_provider=normalized_provider,
             )
-            
-            if current_settings:
-                # Update existing settings
-                if 'cfg_strength' in settings_data:
-                    current_settings.cfg_strength = settings_data['cfg_strength']
-                if 'speed_preset' in settings_data:
-                    current_settings.speed_preset = settings_data['speed_preset']
-                if 'volume' in settings_data:
-                    current_settings.volume = settings_data['volume']
-                
-                self.db.commit()
-                self.db.refresh(current_settings)
-                
-                return {
-                    "id": current_settings.id,
-                    "voice_id": current_settings.voice_id,
-                    "voice_name": current_settings.voice_name,
-                    "tts_provider": current_settings.tts_provider,
-                    "cfg_strength": current_settings.cfg_strength,
-                    "speed_preset": current_settings.speed_preset,
-                    "volume": current_settings.volume
-                }
-            else:
-                # Create new settings
-                new_settings = UserVoiceSettings(
-                    user_id=user_id,
-                    voice_id=voice_id,
-                    voice_name=voice_info.get('name'),
-                    tts_provider=normalized_provider,
-                    cfg_strength=settings_data.get('cfg_strength'),
-                    speed_preset=settings_data.get('speed_preset'),
-                    volume=settings_data.get('volume')
-                )
-                self.repository.add(new_settings)
-                
-                return {
-                    "id": new_settings.id,
-                    "voice_id": new_settings.voice_id,
-                    "voice_name": new_settings.voice_name,
-                    "tts_provider": new_settings.tts_provider,
-                    "cfg_strength": new_settings.cfg_strength,
-                    "speed_preset": new_settings.speed_preset,
-                    "volume": new_settings.volume
-                }
+
+            return {
+                "id": persisted_settings.id,
+                "voice_id": persisted_settings.voice_id,
+                "voice_name": persisted_settings.voice_name,
+                "tts_provider": persisted_settings.tts_provider,
+                "cfg_strength": persisted_settings.cfg_strength,
+                "speed_preset": persisted_settings.speed_preset,
+                "volume": persisted_settings.volume,
+            }
         else:
             # Handle custom voice settings (stored in external service)
             # Verify ownership if possible, but the external service checks user_id usually

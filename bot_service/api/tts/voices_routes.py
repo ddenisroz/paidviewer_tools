@@ -35,6 +35,8 @@ logger = logging.getLogger('bot_service')
 voices_router = APIRouter(prefix='/api/voices', tags=['voices'])
 user_voices_router = APIRouter(prefix='/api/user/voices', tags=['user_voices'])
 
+QWEN_VOICE_PREVIEW_TIMEOUT_SECONDS = 30.0
+
 class VoiceSchema(BaseModel):
     id: int
     name: str
@@ -423,7 +425,7 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
             if get_qwen_model_family(requested_model) != 'base':
                 requested_model = QWEN_BASE_MODEL
             upstream_data['model'] = requested_model
-        preview_timeout = 240.0 if resolved_provider == 'qwen' else 30.0
+        preview_timeout = QWEN_VOICE_PREVIEW_TIMEOUT_SECONDS if resolved_provider == 'qwen' else 30.0
         upstream_base_url = _provider_base_url(resolved_provider)
         async with httpx.AsyncClient(timeout=preview_timeout, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
@@ -449,7 +451,11 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
         raise HTTPException(status_code=response.status_code, detail=detail)
     except httpx.TimeoutException as error:
         if resolved_provider == 'qwen':
-            logger.warning('Qwen voice preview timed out while waiting for worker warmup: %s', error)
+            logger.warning(
+                'Qwen voice preview timed out while waiting for worker warmup timeout=%ss error=%s',
+                preview_timeout,
+                error,
+            )
             raise HTTPException(
                 status_code=504,
                 detail='Qwen worker is still loading the selected model. Try the preview again in a few seconds.',

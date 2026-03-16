@@ -1595,6 +1595,10 @@ const TtsMainPageContent: React.FC = () => {
             getQwenModelOption(qwenModelOptions, QWEN_MODEL_DEFAULT),
         [qwenModel, qwenModelOptions],
     );
+    const qwenSelectValue = useMemo(
+        () => (qwenModelOptions.some((option) => option.value === qwenModel) ? qwenModel : ''),
+        [qwenModel, qwenModelOptions],
+    );
     const isQwenBaseModel = Boolean(
         selectedQwenModelOption?.supportsVoiceCloning || selectedQwenModelOption?.requiresRefAudio,
     );
@@ -1925,7 +1929,7 @@ const TtsMainPageContent: React.FC = () => {
 
                                                 <div className="space-y-3">
                                                     <Select
-                                                        value={qwenModelOptions.some((option) => option.value === qwenModel) ? qwenModel : undefined}
+                                                        value={qwenSelectValue}
                                                         onValueChange={handleQwenModelChange}
                                                     >
                                                         <SelectTrigger

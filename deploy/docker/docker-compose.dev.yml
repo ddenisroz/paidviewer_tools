@@ -52,6 +52,9 @@ services:
       - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-http://qwen_tts:8000}
       - QWEN_TTS_SERVICE_API_KEY=${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
       - QWEN_VOICE_SERVICE_URL=${QWEN_VOICE_SERVICE_URL:-}
+      - QWEN_ALLOWED_MODELS=${QWEN_ALLOWED_MODELS:-}
+      - QWEN_CLOUD_ALLOWED_MODELS=${QWEN_CLOUD_ALLOWED_MODELS:-}
+      - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
       - REDIS_URL=redis://redis:6379/0
       - TWITCH_CLIENT_ID=your_twitch_client_id
       - TWITCH_CLIENT_SECRET=your_twitch_client_secret
@@ -145,6 +148,7 @@ services:
       - API_KEY=${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
       - HF_HOME=/root/.cache/huggingface
       - QWEN_VOICE_STORAGE_DIR=/app/runtime/qwen_voices
+      - QWEN_ALLOWED_MODELS=${QWEN_ALLOWED_MODELS:-}
       - QWEN3_TTS_MODEL_PATH=${QWEN3_TTS_MODEL_PATH:-}
       - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
     volumes:

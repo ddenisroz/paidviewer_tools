@@ -109,6 +109,11 @@ async def test_qwen_models_catalog_reports_unavailable_when_upstream_unreachable
 
 @pytest.mark.asyncio
 async def test_qwen_models_catalog_returns_exact_runtime_models_without_product_fallback(monkeypatch):
+    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
+    monkeypatch.setattr(settings_routes.settings, "qwen_cloud_allowed_models", "")
+
     async def _return_payload(*_args, **_kwargs):
         return {
             "success": True,
@@ -133,6 +138,8 @@ async def test_qwen_models_catalog_returns_exact_runtime_models_without_product_
     assert result["success"] is True
     assert result["available"] is True
     assert result["current_model"] == "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+    assert result["filtering"]["enabled"] is False
+    assert result["filtering"]["source"] is None
     assert result["models"] == [
         {
             "id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
@@ -143,6 +150,46 @@ async def test_qwen_models_catalog_returns_exact_runtime_models_without_product_
             "requires_prompt": False,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_qwen_models_catalog_filters_managed_cloud_catalog_by_backend_allowlist(monkeypatch):
+    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
+
+    async def _return_payload(*_args, **_kwargs):
+        return {
+            "success": True,
+            "current_model": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+            "models": [
+                {
+                    "id": "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+                    "label": "0.6B Base",
+                    "family": "base",
+                },
+                {
+                    "id": "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign",
+                    "label": "1.7B VoiceDesign",
+                    "family": "voice_design",
+                },
+            ],
+        }
+
+    monkeypatch.setattr(settings_routes.settings, "qwen_tts_service_url", "http://localhost:8012")
+    monkeypatch.setattr(settings_routes.settings, "qwen_cloud_allowed_models", "base")
+    monkeypatch.setattr(settings_routes, "_fetch_qwen_models_payload", _return_payload)
+
+    result = await settings_routes.get_qwen_models_catalog(mode="cloud", user={"id": 1}, db=None)
+
+    assert result["success"] is True
+    assert result["available"] is True
+    assert [model["id"] for model in result["models"]] == ["Qwen/Qwen3-TTS-12Hz-0.6B-Base"]
+    assert result["current_model"] == "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
+    assert result["filtering"]["enabled"] is True
+    assert result["filtering"]["families"] == ["base"]
+    assert result["filtering"]["filtered_count"] == 1
+    assert result["filtering"]["source"] == "settings"
 
 
 @pytest.mark.asyncio
