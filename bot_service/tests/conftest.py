@@ -16,6 +16,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
+from pathlib import Path
+
+TEST_TMP_ROOT = Path(__file__).parent / ".pytest_tmp"
+TEST_TMP_ROOT.mkdir(parents=True, exist_ok=True)
 
 # Set testing environment
 os.environ["TESTING"] = "true"
@@ -24,10 +28,15 @@ os.environ["TWITCH_CLIENT_ID"] = "test_client_id"
 os.environ["TWITCH_CLIENT_SECRET"] = "test_client_secret"
 os.environ["VK_TOKEN"] = "test_vk_token"
 os.environ["OPENAI_API_KEY"] = "test_openai_key"
+os.environ["DEBUG"] = "true"
+os.environ["TOKEN_ENCRYPTION_KEY"] = "2bD0gYfJwRo_-esxNUFDXL9uBeb5GsyhQOdE31jj4n4="
+os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ["TEMP"] = str(TEST_TMP_ROOT)
+os.environ["TMP"] = str(TEST_TMP_ROOT)
+os.environ["ENV_FILE"] = str(Path(__file__).with_name(".env.test"))
 
 # Add bot_service to path
 import sys
-from pathlib import Path
 
 BOT_SERVICE_ROOT = Path(__file__).parent.parent
 if str(BOT_SERVICE_ROOT) not in sys.path:

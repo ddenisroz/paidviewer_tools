@@ -333,6 +333,7 @@ pytest_*.txt
 *_log.txt
 regression_log.txt
 *.har
+.chrome-mcp-profile/
 
 # Old backups (keep only recent)
 */backups/*/*.db
@@ -393,6 +394,7 @@ tts_service/logs/*.log
 .env.*
 !.env.example
 !env.example
+!bot_service/tests/.env.test
 bot_service/.env
 bot_service/.env.*
 !bot_service/env.example
