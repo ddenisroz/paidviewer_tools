@@ -230,6 +230,7 @@ dist
 
 # Temporary folders
 tmp/
+tmp_pycache/
 temp/
 artifacts/
 *.tmp

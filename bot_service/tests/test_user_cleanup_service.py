@@ -16,7 +16,9 @@ from models import (
     UserToken,
     WhitelistedChannel,
 )
+from core.datetime_utils import utcnow_naive
 from models.points import PointsTransaction, RewardQueue
+from models.worker import TTSJob, TTSJobAttempt, Worker, WorkerPairingToken
 from services.user_cleanup_service import UserDeletionResult, user_cleanup_service
 
 
@@ -73,6 +75,49 @@ def _seed_related_rows(db, user: User, admin_user: User) -> None:
     db.commit()
     db.refresh(reward)
 
+    worker = Worker(
+        owner_user_id=user.id,
+        worker_key="worker-delete-me",
+        label="Delete Me Worker",
+        auth_token_hash="worker-hash-delete-me",
+        supports_f5=True,
+        status="offline",
+        is_active=True,
+    )
+    pairing_token = WorkerPairingToken(
+        owner_user_id=user.id,
+        token_hash="pairing-hash-delete-me",
+        provider_hint="f5",
+        expires_at=utcnow_naive(),
+    )
+    db.add_all([worker, pairing_token])
+    db.commit()
+    db.refresh(worker)
+
+    tts_job = TTSJob(
+        id="job-delete-me",
+        owner_user_id=user.id,
+        created_by_user_id=user.id,
+        target_worker_id=worker.id,
+        assigned_worker_id=worker.id,
+        provider="f5",
+        text="hello world",
+        payload={},
+    )
+    db.add(tts_job)
+    db.commit()
+
+    db.add(
+        TTSJobAttempt(
+            job_id=tts_job.id,
+            worker_id=worker.id,
+            provider="f5",
+            status="completed",
+            attempt_number=1,
+        )
+    )
+    db.commit()
+
     db.add_all(
         [
             PointsTransaction(
@@ -118,6 +163,10 @@ def test_preview_user_deletion_counts_related_rows(db, admin_user):
     assert preview.counts["whitelisted_channels"] == 1
     assert preview.counts["blocked_channels"] == 1
     assert preview.counts["achievements"] == 1
+    assert preview.counts["worker_pairing_tokens"] == 1
+    assert preview.counts["workers"] == 1
+    assert preview.counts["tts_jobs"] == 1
+    assert preview.counts["tts_job_attempts"] == 1
     assert preview.counts["admin_users"] == 1
     assert preview.counts["users"] == 1
     assert preview.total_rows >= 13
@@ -155,6 +204,10 @@ def test_permanently_delete_user_removes_rows_and_keeps_unrelated(db, admin_user
     assert db.query(ChannelReward).filter(ChannelReward.user_id == target_user.id).count() == 0
     assert db.query(PointsTransaction).filter(PointsTransaction.user_id == target_user.id).count() == 0
     assert db.query(RewardQueue).filter(RewardQueue.user_id == target_user.id).count() == 0
+    assert db.query(WorkerPairingToken).filter(WorkerPairingToken.owner_user_id == target_user.id).count() == 0
+    assert db.query(Worker).filter(Worker.owner_user_id == target_user.id).count() == 0
+    assert db.query(TTSJob).filter(TTSJob.owner_user_id == target_user.id).count() == 0
+    assert db.query(TTSJobAttempt).join(TTSJob, TTSJobAttempt.job_id == TTSJob.id).filter(TTSJob.owner_user_id == target_user.id).count() == 0
 
 
 def test_admin_permanent_delete_endpoint_returns_deleted_counts(admin_client, db, admin_user, monkeypatch):

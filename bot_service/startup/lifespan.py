@@ -60,14 +60,16 @@ async def _startup_services() -> None:
     """Start core runtime services in parallel."""
 
     from services.tts.tts_worker import tts_worker
+    from services.worker_control.reconciler import worker_control_reconciler
 
     try:
         await asyncio.gather(
             get_memory_tts_queue().start(),
             get_memory_websocket_manager().start(),
             tts_worker.start(),
+            worker_control_reconciler.start(),
         )
-        logger.info("All services started (TTS queue, WebSocket manager, TTS worker)")
+        logger.info("All services started (TTS queue, WebSocket manager, TTS worker, worker reconciler)")
     except Exception as exc:
         logger.error("Failed to start services: %s", exc)
         raise
@@ -142,6 +144,13 @@ async def _shutdown_services() -> None:
         await tts_worker.stop()
     except Exception as exc:
         logger.error("Error stopping TTS Worker: %s", exc)
+
+    try:
+        from services.worker_control.reconciler import worker_control_reconciler
+
+        await worker_control_reconciler.stop()
+    except Exception as exc:
+        logger.error("Error stopping worker control reconciler: %s", exc)
 
 
 async def _shutdown_background_tasks() -> None:

@@ -1,4 +1,4 @@
-# TTS_TTV
+# Paidviewer Tools
 
 Платформа для стримеров с `bot_service`, dashboard, TTS, YouTube queue, drops и интеграциями.
 

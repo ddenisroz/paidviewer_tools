@@ -523,6 +523,129 @@ class TTSManager:
             materialize_provider_audio_fn=self._materialize_provider_audio,
         )
 
+    @staticmethod
+    def _build_worker_job_payload(
+        *,
+        channel_name: str,
+        text: str,
+        author: str,
+        user_id: Optional[int],
+        volume_level: float,
+        tts_settings: Optional[dict[str, Any]],
+        word_filter: Optional[list],
+        blocked_users: Optional[list],
+        provider: str,
+        voice: Optional[str],
+    ) -> dict[str, Any]:
+        request_settings = dict(tts_settings or {})
+        if provider:
+            request_settings.setdefault("advanced_provider", provider)
+        return {
+            "channel_name": channel_name,
+            "text": text,
+            "author": author,
+            "user_id": user_id,
+            "volume_level": volume_level,
+            "tts_settings": request_settings,
+            "word_filter": list(word_filter or []),
+            "blocked_users": list(blocked_users or []),
+            "provider": provider,
+            "voice": voice,
+            "voice_map": {
+                "f5": request_settings.get("voice"),
+                "qwen": request_settings.get("qwen_voice") or request_settings.get("voice"),
+            },
+        }
+
+    async def _synthesize_via_worker_control(
+        self,
+        *,
+        provider: str,
+        managed_only: bool,
+        channel_name: str,
+        text: str,
+        author: str,
+        user_id: Optional[int],
+        volume_level: float,
+        tts_settings: Optional[dict[str, Any]],
+        word_filter: Optional[list],
+        blocked_users: Optional[list],
+        db_session,
+    ) -> Optional[Dict[str, Any]]:
+        if not db_session:
+            return None
+
+        from services.worker_control.service import WorkerControlPlaneService
+
+        request_settings = dict(tts_settings or {})
+        voice = str(
+            request_settings.get("qwen_voice" if provider == "qwen" else "voice")
+            or request_settings.get("voice")
+            or ""
+        ).strip() or None
+
+        worker_service = WorkerControlPlaneService(db_session)
+        final_job = await worker_service.synthesize_via_worker(
+            provider=provider,
+            text=text,
+            voice=voice,
+            payload=self._build_worker_job_payload(
+                channel_name=channel_name,
+                text=text,
+                author=author,
+                user_id=user_id,
+                volume_level=volume_level,
+                tts_settings=request_settings,
+                word_filter=word_filter,
+                blocked_users=blocked_users,
+                provider=provider,
+                voice=voice,
+            ),
+            owner_user_id=user_id,
+            created_by_user_id=user_id,
+            managed_only=managed_only,
+            timeout_seconds=settings.worker_result_timeout_seconds,
+        )
+        if final_job is None:
+            return None
+
+        if final_job.get("status") != "completed":
+            error_message = (
+                final_job.get("error_message")
+                or f"worker job ended with status={final_job.get('status')}"
+            )
+            return {
+                "success": False,
+                "error": error_message,
+                "worker_path_used": True,
+                "worker_mode": final_job.get("worker_mode"),
+                "worker_key": final_job.get("worker_key"),
+                "job_id": final_job.get("id"),
+            }
+
+        result_payload = dict(final_job.get("result_payload") or {})
+        selected_voice = (
+            result_payload.get("selected_voice")
+            or result_payload.get("voice")
+            or voice
+            or ("default" if provider == "qwen" else "default_voice")
+        )
+        return {
+            "success": True,
+            "voice": selected_voice,
+            "selected_voice": selected_voice,
+            "volume": volume_level,
+            "tts_type": result_payload.get("tts_type") or ("ai_qwen" if provider == "qwen" else "ai_f5"),
+            "audio_url": final_job.get("result_audio_url"),
+            "audio_path": result_payload.get("audio_path"),
+            "duration": result_payload.get("duration"),
+            "provider": provider,
+            "worker_mode": final_job.get("worker_mode"),
+            "worker_key": final_job.get("worker_key"),
+            "job_id": final_job.get("id"),
+            "worker_path_used": True,
+        }
+
     async def synthesize_tts(
         self,
         channel_name: str,
@@ -580,6 +703,105 @@ class TTSManager:
                 provider=provider,
                 settings_dict=settings_dict,
             )
+
+            if (
+                resolved_mode == "local"
+                and user_id
+                and db_session
+                and settings.worker_control_self_host_enabled
+            ):
+                try:
+                    worker_result = await self._synthesize_via_worker_control(
+                        provider=provider,
+                        managed_only=False,
+                        channel_name=channel_name,
+                        text=text,
+                        author=author,
+                        user_id=user_id,
+                        volume_level=volume_level,
+                        tts_settings=settings_dict,
+                        word_filter=word_filter,
+                        blocked_users=blocked_users,
+                        db_session=db_session,
+                    )
+                    if worker_result:
+                        if worker_result.get("success"):
+                            logger.info(
+                                "[OK] Self-host worker synthesis succeeded provider=%s worker_key=%s",
+                                provider,
+                                worker_result.get("worker_key"),
+                            )
+                            self.cleanup_old_files_if_needed()
+                            return self._enrich_result(
+                                worker_result,
+                                requested_provider=provider,
+                                actual_provider=provider,
+                                fallback_used=False,
+                            )
+                        fallback_reason = f"{provider}_worker_failed:{worker_result.get('error') or 'unknown'}"
+                        logger.warning(
+                            "[WARN] Self-host worker synthesis failed provider=%s worker_key=%s error=%s; "
+                            "falling back to legacy endpoint/basic path",
+                            provider,
+                            worker_result.get("worker_key"),
+                            worker_result.get("error"),
+                        )
+                except Exception:
+                    fallback_reason = f"{provider}_worker_control_exception"
+                    logger.exception(
+                        "[WARN] Self-host worker control path raised unexpectedly provider=%s; "
+                        "falling back to legacy endpoint/basic path",
+                        provider,
+                    )
+
+            if (
+                resolved_mode != "local"
+                and db_session
+                and settings.worker_control_managed_enabled
+            ):
+                try:
+                    worker_result = await self._synthesize_via_worker_control(
+                        provider=provider,
+                        managed_only=True,
+                        channel_name=channel_name,
+                        text=text,
+                        author=author,
+                        user_id=user_id,
+                        volume_level=volume_level,
+                        tts_settings=settings_dict,
+                        word_filter=word_filter,
+                        blocked_users=blocked_users,
+                        db_session=db_session,
+                    )
+                    if worker_result:
+                        if worker_result.get("success"):
+                            logger.info(
+                                "[OK] Managed worker synthesis succeeded provider=%s worker_key=%s",
+                                provider,
+                                worker_result.get("worker_key"),
+                            )
+                            self.cleanup_old_files_if_needed()
+                            return self._enrich_result(
+                                worker_result,
+                                requested_provider=provider,
+                                actual_provider=provider,
+                                fallback_used=False,
+                            )
+                        fallback_reason = f"{provider}_managed_worker_failed:{worker_result.get('error') or 'unknown'}"
+                        logger.warning(
+                            "[WARN] Managed worker synthesis failed provider=%s worker_key=%s error=%s; "
+                            "falling back to gateway/direct/basic path",
+                            provider,
+                            worker_result.get("worker_key"),
+                            worker_result.get("error"),
+                        )
+                except Exception:
+                    fallback_reason = f"{provider}_managed_worker_control_exception"
+                    logger.exception(
+                        "[WARN] Managed worker control path raised unexpectedly provider=%s; "
+                        "falling back to gateway/direct/basic path",
+                        provider,
+                    )
 
             endpoint = get_provider_service_url(provider)
             endpoint_api_key: Optional[str] = None

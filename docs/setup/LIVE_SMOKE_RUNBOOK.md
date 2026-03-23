@@ -89,7 +89,7 @@
 - local endpoint успешно проходит `test-connection`
 - конфиг сохраняется
 - synth идёт через пользовательский self-hosted endpoint
-- upload smoke использует [female_1.wav](/H:/Programming/raw_code/AI/Python/TTS_TTV_0.02/female_1.wav)
+- upload smoke использует [female_1.wav](/H:/Programming/raw_code/AI/Python/paidviewer_tools/female_1.wav)
 
 ### S4. Self-hosted Qwen
 
@@ -98,7 +98,7 @@
 - `test-connection` проходит с compatibility warning
 - synth идёт через `/api/prepare -> /api/stream/{id}` adapter
 - это не считается ошибкой текущей фазы
-- upload smoke использует [female_1.wav](/H:/Programming/raw_code/AI/Python/TTS_TTV_0.02/female_1.wav) и валидный `API_KEY` worker-а
+- upload smoke использует [female_1.wav](/H:/Programming/raw_code/AI/Python/paidviewer_tools/female_1.wav) и валидный `API_KEY` worker-а
 
 ### S5. Qwen voice/admin CRUD
 

@@ -1,6 +1,6 @@
 ﻿import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 
-import { BarChart3, Bot, FileText, Mic, Monitor, Shield, Slash, Users } from 'lucide-react';
+import { BarChart3, Bot, FileText, Mic, Monitor, Server, Shield, Slash, Users } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
@@ -16,8 +16,9 @@ const BotManagementPage = lazy(() => import('./AdminBotManagementPage'));
 const BlockedChannelsPage = lazy(() => import('./AdminChannelsPage'));
 const SystemLogsPage = lazy(() => import('./AdminSystemLogsPage'));
 const MonitoringPage = lazy(() => import('./AdminMonitoringPage'));
+const AdminWorkersPage = lazy(() => import('./AdminWorkersPage'));
 
-type TabId = 'dashboard' | 'bots' | 'voices' | 'users' | 'channels' | 'logs' | 'monitoring';
+type TabId = 'dashboard' | 'bots' | 'voices' | 'users' | 'workers' | 'channels' | 'logs' | 'monitoring';
 
 interface Tab {
   id: TabId;
@@ -30,6 +31,7 @@ const VISIBLE_TABS: Tab[] = [
   { id: 'bots', label: 'Боты', icon: Bot },
   { id: 'voices', label: 'Голоса', icon: Mic },
   { id: 'users', label: 'Пользователи', icon: Users },
+  { id: 'workers', label: 'Воркеры', icon: Server },
   { id: 'channels', label: 'Каналы', icon: Slash },
   { id: 'logs', label: 'Логи', icon: FileText },
   { id: 'monitoring', label: 'Мониторинг', icon: Monitor },
@@ -40,6 +42,7 @@ const isTabId = (value: string | null): value is TabId =>
   value === 'bots' ||
   value === 'voices' ||
   value === 'users' ||
+  value === 'workers' ||
   value === 'channels' ||
   value === 'logs' ||
   value === 'monitoring';
@@ -48,6 +51,7 @@ const tabFromPath = (pathname: string): TabId => {
   if (pathname.endsWith('/bots')) return 'bots';
   if (pathname.endsWith('/voices')) return 'voices';
   if (pathname.endsWith('/users')) return 'users';
+  if (pathname.endsWith('/workers')) return 'workers';
   if (pathname.endsWith('/channels')) return 'channels';
   if (pathname.endsWith('/monitoring')) return 'monitoring';
   if (pathname.endsWith('/logs')) return 'logs';
@@ -74,6 +78,8 @@ const TabContent: React.FC<{ activeTab: TabId }> = ({ activeTab }) => {
       return <VoiceManagement />;
     case 'users':
       return <UserManagementPage />;
+    case 'workers':
+      return <AdminWorkersPage />;
     case 'channels':
       return <BlockedChannelsPage />;
     case 'logs':

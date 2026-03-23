@@ -5,6 +5,7 @@ import time
 
 from sqlalchemy.orm import Session
 
+from core.config import settings
 from core.connection_manager import get_connection_manager
 from integrations.base import IntegrationError
 
@@ -233,9 +234,28 @@ class TTSService:
             # We fetch them here to snapshot state at time of request
             tts_settings = self.settings_repo.get_or_create(user_id=user_id)
             audio_settings = self.audio_repo.get_or_create(user_id=user_id)
+            filtered_words = [
+                str(item.word).strip().lower()
+                for item in self.filter_repo.get_by_user_id(user_id)
+                if getattr(item, "word", None)
+            ]
+            blocked_usernames = [
+                str(item.username).strip().lower()
+                for item in self.blocked_user_repo.get_by_user_id(user_id)
+                if getattr(item, "username", None)
+            ]
             
             # Map settings to dicts because Queue stores simple types
             settings_dict = self.settings_repo.get_settings_dict(tts_settings)
+            resolved_provider = infer_provider_from_engine(
+                settings_dict.get("engine"),
+                advanced_provider=settings_dict.get("advanced_provider"),
+            )
+            requested_voice = str(voice or "").strip()
+            if requested_voice:
+                settings_dict["voice"] = requested_voice
+                if resolved_provider == "qwen":
+                    settings_dict["qwen_voice"] = requested_voice
             
             # Add to Queue
             # Add to Queue
@@ -251,6 +271,8 @@ class TTSService:
                     "volume": audio_settings.website_volume,
                     "author": user.get('username', 'Unknown'),
                     "settings": settings_dict,
+                    "word_filter": filtered_words,
+                    "blocked_users": blocked_usernames,
                     "use_ai": True # Default to trying AI
                 }
             )
@@ -457,18 +479,18 @@ class TTSService:
             return {"enabled": False, "listening_mode": "website", "error": "User not found"}
         enabled = getattr(user, 'tts_enabled', False)
 
-        settings = self.settings_repo.get_or_create(user_id=user_id)
-        engine = getattr(settings, 'engine', 'gtts')
+        tts_settings_row = self.settings_repo.get_or_create(user_id=user_id)
+        engine = getattr(tts_settings_row, 'engine', 'gtts')
         provider = infer_provider_from_engine(
             engine,
-            advanced_provider=getattr(settings, "advanced_provider", None),
+            advanced_provider=getattr(tts_settings_row, "advanced_provider", None),
         )
-        f5_mode = normalize_provider_mode(getattr(settings, "f5_mode", "cloud"))
-        qwen_mode = normalize_provider_mode(getattr(settings, "qwen_mode", "cloud"))
+        f5_mode = normalize_provider_mode(getattr(tts_settings_row, "f5_mode", "cloud"))
+        qwen_mode = normalize_provider_mode(getattr(tts_settings_row, "qwen_mode", "cloud"))
         _, resolved_mode = resolve_provider_mode_for_settings(
             engine=engine,
-            use_local_tts=bool(getattr(settings, "use_local_tts", False)),
-            advanced_provider=getattr(settings, "advanced_provider", None),
+            use_local_tts=bool(getattr(tts_settings_row, "use_local_tts", False)),
+            advanced_provider=getattr(tts_settings_row, "advanced_provider", None),
             f5_mode=f5_mode,
             qwen_mode=qwen_mode,
         )
@@ -482,19 +504,45 @@ class TTSService:
         else:
             engine_type = 'gtts'
 
-        listening_mode = getattr(settings, 'listening_mode', None) or getattr(user, 'tts_listening_mode', 'website')
+        listening_mode = getattr(tts_settings_row, 'listening_mode', None) or getattr(user, 'tts_listening_mode', 'website')
 
         has_local_setup = False
         has_local_setup_f5 = False
         has_local_setup_qwen = False
+        has_worker_setup = False
+        has_worker_setup_f5 = False
+        has_worker_setup_qwen = False
         is_whitelisted = False
 
         try:
             local_repo = LocalTTSRepository(self.db)
             local_f5 = local_repo.get_active(user_id=user_id, provider="f5")
-            has_local_setup_f5 = bool(local_f5 and local_f5.is_healthy)
+            has_local_endpoint_f5 = bool(local_f5 and local_f5.is_healthy)
             local_qwen = local_repo.get_active(user_id=user_id, provider="qwen")
-            has_local_setup_qwen = bool(local_qwen and local_qwen.is_healthy)
+            has_local_endpoint_qwen = bool(local_qwen and local_qwen.is_healthy)
+
+            from services.worker_control.service import WorkerControlPlaneService
+
+            worker_service = WorkerControlPlaneService(self.db)
+            has_worker_setup_f5 = bool(
+                settings.worker_control_self_host_enabled
+                and worker_service.get_preferred_worker(
+                    provider="f5",
+                    owner_user_id=user_id,
+                    managed_only=False,
+                )
+            )
+            has_worker_setup_qwen = bool(
+                settings.worker_control_self_host_enabled
+                and worker_service.get_preferred_worker(
+                    provider="qwen",
+                    owner_user_id=user_id,
+                    managed_only=False,
+                )
+            )
+            has_local_setup_f5 = has_local_endpoint_f5 or has_worker_setup_f5
+            has_local_setup_qwen = has_local_endpoint_qwen or has_worker_setup_qwen
+            has_worker_setup = has_worker_setup_qwen if provider == "qwen" else has_worker_setup_f5
             has_local_setup = has_local_setup_qwen if provider == "qwen" else has_local_setup_f5
         except Exception:
             logger.exception("Failed to resolve local TTS status for user %s", user_id)
@@ -516,6 +564,9 @@ class TTSService:
             "has_local_setup": has_local_setup,
             "has_local_setup_f5": has_local_setup_f5,
             "has_local_setup_qwen": has_local_setup_qwen,
+            "has_worker_setup": has_worker_setup,
+            "has_worker_setup_f5": has_worker_setup_f5,
+            "has_worker_setup_qwen": has_worker_setup_qwen,
             "is_whitelisted": is_whitelisted,
         }
 

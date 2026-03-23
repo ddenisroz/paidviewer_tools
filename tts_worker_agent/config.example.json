@@ -1,0 +1,22 @@
+{
+  "server_base_url": "http://127.0.0.1:8000",
+  "pairing_code": "PASTE-FIRST-PAIRING-CODE-HERE",
+  "worker_token": "",
+  "worker_key": "",
+  "label": "My TTS Worker",
+  "poll_interval_sec": 2,
+  "max_jobs_per_poll": 1,
+  "wait_for_jobs": true,
+  "providers": {
+    "f5": {
+      "enabled": true,
+      "endpoint_url": "http://127.0.0.1:8011",
+      "api_key": ""
+    },
+    "qwen": {
+      "enabled": true,
+      "endpoint_url": "http://127.0.0.1:8012",
+      "api_key": ""
+    }
+  }
+}

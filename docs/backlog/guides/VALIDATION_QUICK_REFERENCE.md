@@ -1,6 +1,6 @@
 # Validation Quick Reference
 
-Quick reference for using the validation system in the TTS_TTV_0.02 application.
+Quick reference for using the validation system in the paidviewer_tools application.
 
 ## Frontend
 

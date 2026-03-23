@@ -35,6 +35,10 @@ from models import (
     LocalTTSEndpoint,
     AudioSettings,
     UserVoiceSettings,
+    Worker,
+    WorkerPairingToken,
+    TTSJob,
+    TTSJobAttempt,
     # YouTube
     YouTubeQueue,
     # Points
@@ -100,6 +104,10 @@ __all__ = [
     "LocalTTSEndpoint",
     "AudioSettings",
     "UserVoiceSettings",
+    "Worker",
+    "WorkerPairingToken",
+    "TTSJob",
+    "TTSJobAttempt",
     # YouTube
     "YouTubeQueue",
     # Points

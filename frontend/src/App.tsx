@@ -218,6 +218,13 @@ const App: React.FC = () => {
                                     </Suspense>
                                 </RouteErrorBoundary>
                             } />
+                            <Route path="dashboard/dolbaebadmintts/workers" element={
+                                <RouteErrorBoundary routeName="Admin Workers">
+                                    <Suspense fallback={<MinimalFallback />}>
+                                        <AdminPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            } />
                             <Route path="dashboard/dolbaebadmintts/bots" element={
                                 <RouteErrorBoundary routeName="Admin Bots">
                                     <Suspense fallback={<MinimalFallback />}>

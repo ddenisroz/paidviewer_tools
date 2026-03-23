@@ -1,4 +1,4 @@
-# Текущий статус проекта TTS_TTV_0.02
+# Текущий статус проекта paidviewer_tools
 
 **Последнее обновление:** 27 декабря 2025  
 **Версия:** 0.03  
@@ -575,7 +575,7 @@
 ```bash
 # 1. Клонировать
 git clone <repo>
-cd TTS_TTV_0.02
+cd paidviewer_tools
 
 # 2. Frontend
 npm install

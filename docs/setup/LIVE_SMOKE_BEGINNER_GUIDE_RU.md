@@ -31,7 +31,7 @@ Qwen runtime можно оставить на второй этап.
 
 ```text
 H:\Programming\raw_code\AI\Python\
-├─ TTS_TTV_0.02\
+├─ paidviewer_tools\
 ├─ tts-gateway\
 ├─ f5-tts-service\
 └─ nano-qwen3tts-vllm\

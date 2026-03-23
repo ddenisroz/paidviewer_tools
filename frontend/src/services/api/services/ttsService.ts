@@ -413,6 +413,14 @@ export const ttsService = {
     return apiClient.post('/api/local-tts/toggle', null, { params: { provider } });
   },
 
+  async getWorkerAgents(): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/tts/workers');
+  },
+
+  async createWorkerPairingToken(payload: { label_hint?: string; provider_hint?: 'f5' | 'qwen' }): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post('/api/tts/workers/pairing-tokens', payload);
+  },
+
   /**
    * Получить статус whitelist
    * @returns Promise с ответом API

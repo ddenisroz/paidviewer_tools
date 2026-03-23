@@ -101,7 +101,7 @@ async def test_f5_voice_preview_localizes_provider_audio_to_bot_service(monkeypa
                 headers={"content-type": "audio/wav"},
             )
 
-    temp_root = Path("H:/Programming/raw_code/AI/Python/TTS_TTV_0.02/.pytest_tmp/voice_preview_localized")
+    temp_root = Path("H:/Programming/raw_code/AI/Python/paidviewer_tools/.pytest_tmp/voice_preview_localized")
     shutil.rmtree(temp_root, ignore_errors=True)
     temp_root.mkdir(parents=True, exist_ok=True)
 

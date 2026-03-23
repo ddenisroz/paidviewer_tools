@@ -150,6 +150,46 @@ class Settings(BaseSettings):
         default="127.0.0.0/8,::1/128",
         description="Allowed CIDRs for local TTS endpoint IPs when raw IP host is used (comma-separated)",
     )
+    worker_pairing_token_ttl_minutes: int = Field(
+        default=15,
+        description="One-time worker pairing token TTL in minutes",
+    )
+    worker_poll_timeout_seconds: int = Field(
+        default=20,
+        description="Maximum long-poll duration for worker-agent poll endpoint",
+    )
+    worker_job_lease_seconds: int = Field(
+        default=120,
+        description="Lease duration for claimed worker jobs before they are requeued",
+    )
+    worker_job_max_attempts: int = Field(
+        default=3,
+        description="Maximum number of worker job attempts before marking the job as failed",
+    )
+    worker_stale_after_seconds: int = Field(
+        default=90,
+        description="How long a worker can stay silent before being reported as offline",
+    )
+    worker_control_self_host_enabled: bool = Field(
+        default=True,
+        description="Allow bot_service to route self-hosted local TTS requests through worker-agent jobs",
+    )
+    worker_control_managed_enabled: bool = Field(
+        default=True,
+        description="Allow bot_service to route managed F5/Qwen requests through worker-agent jobs",
+    )
+    worker_result_timeout_seconds: int = Field(
+        default=90,
+        description="How long bot_service waits for a worker job to complete during synchronous synthesis",
+    )
+    worker_result_poll_interval_seconds: int = Field(
+        default=1,
+        description="Polling interval used while bot_service waits for a synchronous worker job result",
+    )
+    worker_reconcile_interval_seconds: int = Field(
+        default=15,
+        description="How often bot_service reconciles stale workers and expired worker job leases",
+    )
 
     # === DATABASE ===
     database_url: str = Field(
@@ -396,6 +436,23 @@ class Settings(BaseSettings):
         """Validate internal JWT TTL to avoid near-eternal tokens."""
         if v < 30 or v > 3600:
             raise ValueError("INTERNAL_SERVICE_JWT_TTL_SECONDS must be between 30 and 3600")
+        return v
+
+    @field_validator(
+        "worker_pairing_token_ttl_minutes",
+        "worker_poll_timeout_seconds",
+        "worker_job_lease_seconds",
+        "worker_job_max_attempts",
+        "worker_stale_after_seconds",
+        "worker_result_timeout_seconds",
+        "worker_result_poll_interval_seconds",
+        "worker_reconcile_interval_seconds",
+    )
+    @classmethod
+    def validate_worker_control_positive(cls, v: int) -> int:
+        """Worker control plane timing settings must stay positive."""
+        if v < 1:
+            raise ValueError("Worker control-plane settings must be positive integers")
         return v
 
     @field_validator('max_requests_per_minute')

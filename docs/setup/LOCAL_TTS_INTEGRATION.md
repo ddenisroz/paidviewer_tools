@@ -118,7 +118,7 @@ LOCAL_TTS_ALLOWED_CIDRS=127.0.0.0/8,::1/128
 
 ## Рекомендуемый test asset
 
-- для upload smoke используй [female_1.wav](/H:/Programming/raw_code/AI/Python/TTS_TTV_0.02/female_1.wav)
+- для upload smoke используй [female_1.wav](/H:/Programming/raw_code/AI/Python/paidviewer_tools/female_1.wav)
 
 ## Smoke-checklist
 

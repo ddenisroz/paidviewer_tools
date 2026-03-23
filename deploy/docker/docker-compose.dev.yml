@@ -142,7 +142,7 @@ services:
     image: ${QWEN_TTS_IMAGE:-nano-qwen3tts-vllm:latest}
     container_name: tts_qwen_service_dev
     ports:
-      - "8000:8000"
+      - "8012:8000"
     environment:
       - PORT=8000
       - API_KEY=${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}

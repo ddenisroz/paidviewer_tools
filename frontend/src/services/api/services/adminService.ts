@@ -118,6 +118,10 @@ export const adminService = {
     return apiClient.get('/api/admin/tts/status');
   },
 
+  async getTtsWorkers(): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/tts/admin/workers');
+  },
+
   async restartBotService(): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/admin/bot-service/restart');
   },

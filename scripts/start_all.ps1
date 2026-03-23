@@ -1,5 +1,5 @@
 ﻿# scripts/start_all.ps1
-Write-Host "=== Starting TTS TTV Project ===" -ForegroundColor Cyan
+Write-Host "=== Starting paidviewer_tools ===" -ForegroundColor Cyan
 
 # 1. Start Backend Server
 Write-Host "Launching Backend..." -ForegroundColor Yellow

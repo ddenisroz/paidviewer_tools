@@ -8,6 +8,8 @@ import logging
 import traceback
 from typing import Optional
 
+from repositories.blocked_user_repository import BlockedUserRepository
+from repositories.filtered_word_repository import FilteredWordRepository
 from services.tts.memory_tts_queue import get_memory_tts_queue, TTSTask, TaskStatus
 from services.tts.tts_manager import get_tts_manager
 from core.database import SessionLocal
@@ -70,54 +72,30 @@ class TTSWorker:
         """Execute a single TTS task."""
         try:
             logger.info(f"Processing TTS task {task.task_id} for user {task.user_id}")
-            
-            # Create a DB session for this operation if needed (though TTSManager currently handles it or takes it)
-            # Ideally TTSManager methods should accept a session or manage their own scope for transactional integrity.
-            # Looking at TTSManager code, it mostly calls external APIs or BasicTTS (local).
-            # Unblocking User / updating stats might require DB.
-            
-            # Using SessionLocal context manager for safety
+
             db = SessionLocal()
             try:
-                # Execute Synthesis
-                # Note: tts_manager.synthesize_tts signature:
-                # channel_name, text, author, user_id=None, volume_level=..., use_ai_tts=..., use_basic_tts=..., 
-                # connection_manager=..., tts_settings=..., word_filter=..., blocked_users=..., db_session=...
-                
-                # We need to extract args from task
-                # Assuming task.result or task.meta might store some pre-fetched config, 
-                # but usually we should re-fetch or pass them.
-                # However, MemoryTTSQueue stores minimal info.
-                
-                # Let's see what we stored in memory_tts_queue.TTSTask
-                # user_id, text, voice, channel, platform, priority
-                
-                # We need to reconstruct the call. 
-                # Ideally, the Service should have resolved all settings BEFORE queuing, 
-                # OR the Worker resolves them now. 
-                # "Deferred resolution" is better for consistency if queue time is short.
-                # But if we want exact state at request time, "Resolved" is better.
-                # Given current architecture, let's assume we pass what we have.
-                
-                # NOTE: The task object in memory_tts_queue.py only has basic fields.
-                # We might need to fetch settings here if they weren't passed.
-                # But wait, looking at `api/tts/synthesis_routes.py`, it calculates limits but 
-                # `memory_tts_queue.add_tts_task` puts it in queue.
-                
-                # The `synthesize_tts` method in `TTSManager` does a lot of work (validation, etc maybe?).
-                # Actually `TTSManager` mostly does the actual synthesis call.
-                
-                # We will call tts_manager.synthesize_tts
-                # We interpret "voice" from task as a preference, but Manager might override based on settings?
-                # Actually TTSManager takes `use_ai_tts` flag.
-                
-                # For now, let's map what we have.
-                # We might need to improve TTSTask definition later to include more metadata (volume, etc)
-                # stored in `meta_` fields.
-                
-                volume = getattr(task, 'meta_volume', 50.0) # Default 50
+                volume = getattr(task, 'meta_volume', 50.0)
                 author = getattr(task, 'meta_author', 'System')
-                use_ai = getattr(task, 'meta_use_ai', True) # Default try AI
+                use_ai = getattr(task, 'meta_use_ai', True)
+                tts_settings = getattr(task, 'meta_settings', None)
+                engine = None
+                if isinstance(tts_settings, dict):
+                    engine = str(tts_settings.get("engine") or "").strip() or None
+                word_filter = getattr(task, 'meta_word_filter', None)
+                blocked_users = getattr(task, 'meta_blocked_users', None)
+                if word_filter is None:
+                    word_filter = [
+                        str(item.word).strip().lower()
+                        for item in FilteredWordRepository(db).get_by_user_id(task.user_id)
+                        if getattr(item, "word", None)
+                    ]
+                if blocked_users is None:
+                    blocked_users = [
+                        str(item.username).strip().lower()
+                        for item in BlockedUserRepository(db).get_by_user_id(task.user_id)
+                        if getattr(item, "username", None)
+                    ]
                 
                 result = await self.tts_manager.synthesize_tts(
                     channel_name=task.channel,
@@ -126,16 +104,13 @@ class TTSWorker:
                     user_id=task.user_id,
                     volume_level=volume,
                     use_ai_tts=use_ai,
-                    use_basic_tts=True, # Always allow fallback
+                    use_basic_tts=True,
                     connection_manager=self.connection_manager,
-                    db_session=db
-                    # tts_settings, word_filter etc - extracted inside if not passed? 
-                    # TTSManager doesn't seem to fetch them automatically if not passed.
-                    # We should probably refactor TTSManager to fetch if missing, or fetch here.
-                    # For this iteration, let's rely on TTSManager defaults or internal fetching if implemented.
-                    # Re-reading TTSManager: it passes them to _synthesize_via_tts_service which sends them to Service.
-                    # So we SHOULD fetch them here or let the remote Service fetch them?
-                    # Remote service probably needs them passed.
+                    db_session=db,
+                    tts_settings=tts_settings,
+                    word_filter=word_filter,
+                    blocked_users=blocked_users,
+                    engine=engine,
                 )
                 
                 if result.get("success"):
@@ -147,7 +122,7 @@ class TTSWorker:
                 db.close()
                 
         except Exception as e:
-            logger.exception("Failed to process task {task.task_id}")
+            logger.exception("Failed to process task %s", task.task_id)
             logger.error(traceback.format_exc())
             await get_memory_tts_queue().fail_task(task.task_id, str(e))
 

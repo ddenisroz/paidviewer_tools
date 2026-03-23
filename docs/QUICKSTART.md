@@ -16,7 +16,7 @@
 
 ```powershell
 git clone <repo>
-cd TTS_TTV_0.02
+cd paidviewer_tools
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```

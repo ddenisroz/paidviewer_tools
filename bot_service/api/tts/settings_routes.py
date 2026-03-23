@@ -456,10 +456,65 @@ async def get_tts_upstream_health(
     local_api_key = None
     use_gateway = should_route_provider_via_gateway(normalized_provider)
 
+    if normalized_mode != "local" and normalized_provider in {"f5", "qwen"}:
+        try:
+            from services.worker_control.service import WorkerControlPlaneService
+
+            managed_worker = None
+            if settings.worker_control_managed_enabled:
+                managed_worker = WorkerControlPlaneService(db).get_preferred_worker(
+                    provider=normalized_provider,
+                    managed_only=True,
+                )
+            if managed_worker:
+                return {
+                    "success": True,
+                    "provider": normalized_provider,
+                    "mode": normalized_mode,
+                    "healthy": True,
+                    "status": "healthy",
+                    "upstream": {
+                        "url": None,
+                        "via": "worker-agent",
+                        "worker_key": managed_worker.worker_key,
+                        "worker_label": managed_worker.label,
+                        "managed": True,
+                    },
+                }
+        except Exception:
+            logger.exception("Failed to resolve managed worker-agent health provider=%s", normalized_provider)
+
     if normalized_mode == "local":
         repo = LocalTTSRepository(db)
         local_config = repo.get_by_user_id(int(user["id"]), provider=normalized_provider)
+        worker = None
+        try:
+            from services.worker_control.service import WorkerControlPlaneService
+
+            if settings.worker_control_self_host_enabled:
+                worker = WorkerControlPlaneService(db).get_preferred_worker(
+                    provider=normalized_provider,
+                    owner_user_id=int(user["id"]),
+                    managed_only=False,
+                )
+        except Exception:
+            logger.exception("Failed to resolve worker-agent local health provider=%s", normalized_provider)
+
         if not local_config or not str(local_config.endpoint_url or "").strip():
+            if worker:
+                return {
+                    "success": True,
+                    "provider": normalized_provider,
+                    "mode": "local",
+                    "healthy": True,
+                    "status": "healthy",
+                    "upstream": {
+                        "url": None,
+                        "via": "worker-agent",
+                        "worker_key": worker.worker_key,
+                        "worker_label": worker.label,
+                    },
+                }
             return {
                 "success": True,
                 "provider": normalized_provider,
@@ -471,7 +526,34 @@ async def get_tts_upstream_health(
                     "message": f"Local {normalized_provider.upper()} endpoint is not configured.",
                 },
             }
-        local_endpoint_url = normalize_local_tts_endpoint_url(local_config.endpoint_url)
+        try:
+            local_endpoint_url = normalize_local_tts_endpoint_url(local_config.endpoint_url)
+        except ValueError as error:
+            if worker:
+                return {
+                    "success": True,
+                    "provider": normalized_provider,
+                    "mode": "local",
+                    "healthy": True,
+                    "status": "healthy",
+                    "upstream": {
+                        "url": None,
+                        "via": "worker-agent",
+                        "worker_key": worker.worker_key,
+                        "worker_label": worker.label,
+                    },
+                }
+            return {
+                "success": True,
+                "provider": normalized_provider,
+                "mode": "local",
+                "healthy": False,
+                "status": "unavailable",
+                "detail": {
+                    "code": "local_tts_invalid_endpoint",
+                    "message": str(error),
+                },
+            }
         local_api_key = str(local_config.api_key or "").strip() or None
         use_gateway = False
 
@@ -510,6 +592,33 @@ async def get_tts_upstream_health(
         endpoint_override=local_endpoint_url,
         endpoint_api_key=local_api_key,
     )
+    if normalized_mode == "local" and not is_healthy:
+        try:
+            from services.worker_control.service import WorkerControlPlaneService
+
+            worker = None
+            if settings.worker_control_self_host_enabled:
+                worker = WorkerControlPlaneService(db).get_preferred_worker(
+                    provider=normalized_provider,
+                    owner_user_id=int(user["id"]),
+                    managed_only=False,
+                )
+            if worker:
+                return {
+                    "success": True,
+                    "provider": normalized_provider,
+                    "mode": "local",
+                    "healthy": True,
+                    "status": "healthy",
+                    "upstream": {
+                        "url": None,
+                        "via": "worker-agent",
+                        "worker_key": worker.worker_key,
+                        "worker_label": worker.label,
+                    },
+                }
+        except Exception:
+            logger.exception("Failed to resolve local worker-agent fallback provider=%s", normalized_provider)
     return {
         "success": True,
         "provider": normalized_provider,

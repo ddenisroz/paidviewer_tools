@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react';
 
 /* eslint-disable no-alert */
+import { useQuery } from '@tanstack/react-query';
 import {
     AlertCircle,
     AlertTriangle,
@@ -35,6 +36,8 @@ import {
     useSaveLocalTtsConfig,
     useTestLocalTtsConnection
 } from '@/queries/tts/ttsQueries';
+import { queryKeys } from '@/queries/queryKeys';
+import { ttsService } from '@/services/api/services/ttsService';
 import PageWrapper from '@/shared/components/PageWrapper';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -169,6 +172,26 @@ interface StatusData {
         failed_requests: number;
         average_processing_time: number;
     };
+}
+
+interface WorkerInfo {
+    worker_key: string;
+    label: string;
+    status: string;
+    is_active: boolean;
+    is_managed: boolean;
+    supports_f5: boolean;
+    supports_qwen: boolean;
+    providers?: string[];
+}
+
+interface WorkersResponse {
+    workers?: WorkerInfo[];
+}
+
+interface PairingTokenPayload {
+    pairing_code?: string;
+    expires_at?: string | null;
 }
 
 interface Voice {
@@ -331,6 +354,11 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     const [isUploadVoiceDialogOpen, setIsUploadVoiceDialogOpen] = useState<boolean>(false);
     const [isVoiceSettingsDialogOpen, setIsVoiceSettingsDialogOpen] = useState<boolean>(false);
+    const [isPairingDialogOpen, setIsPairingDialogOpen] = useState<boolean>(false);
+    const [pairingCode, setPairingCode] = useState<string>('');
+    const [pairingCodeExpiresAt, setPairingCodeExpiresAt] = useState<string | null>(null);
+    const [pairingLoading, setPairingLoading] = useState<boolean>(false);
+    const [pairingError, setPairingError] = useState<string | null>(null);
     const [uploadVoiceDraft, setUploadVoiceDraft] = useState<UploadVoiceDraft>({
         name: '',
         sampleText: '',
@@ -344,6 +372,29 @@ const LocalTTSSettingsPage: React.FC = () => {
     });
     const uploadingFile = uploadVoiceMutation.isPending;
     const [currentTab, setCurrentTab] = useState<'connection' | 'voices'>('connection');
+    const { data: workerAgentsData, refetch: refetchWorkerAgents } = useQuery<WorkersResponse>({
+        queryKey: queryKeys.tts.workers(provider),
+        queryFn: async () => {
+            const response = await ttsService.getWorkerAgents();
+            return response.data as WorkersResponse;
+        },
+        staleTime: 5_000,
+        refetchInterval: 15_000,
+        refetchOnWindowFocus: false,
+        enabled: isAuthenticated,
+    });
+    const providerWorkers = React.useMemo(() => {
+        const workers = workerAgentsData?.workers || [];
+        return workers.filter((worker) => (
+            provider === 'qwen' ? worker.supports_qwen : worker.supports_f5
+        ));
+    }, [provider, workerAgentsData]);
+    const hasReadyWorker = providerWorkers.some((worker) => (
+        worker.is_active && (worker.status === 'online' || worker.status === 'busy')
+    ));
+    const providerLampClass = hasReadyWorker
+        ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]'
+        : 'bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.18)]';
 
     useEffect(() => {
         setTestResult(null);
@@ -352,6 +403,10 @@ const LocalTTSSettingsPage: React.FC = () => {
         setCurrentTab('connection');
         setIsUploadVoiceDialogOpen(false);
         setIsVoiceSettingsDialogOpen(false);
+        setIsPairingDialogOpen(false);
+        setPairingCode('');
+        setPairingCodeExpiresAt(null);
+        setPairingError(null);
         setCurrentVoice(null);
         setVoiceSettingsDraft({
             referenceText: '',
@@ -510,6 +565,32 @@ const LocalTTSSettingsPage: React.FC = () => {
     const copyToClipboard = (text: string): void => {
         navigator.clipboard.writeText(text);
         toast.success('Скопировано в буфер обмена');
+    };
+
+    const requestPairingCode = async (): Promise<void> => {
+        setPairingLoading(true);
+        setPairingError(null);
+        setPairingCode('');
+        setPairingCodeExpiresAt(null);
+        try {
+            const response = await ttsService.createWorkerPairingToken({ provider_hint: provider });
+            const payload = response.data as PairingTokenPayload;
+            const nextPairingCode = String(payload.pairing_code || '').trim();
+            if (!nextPairingCode) {
+                throw new Error('Сервер не вернул pairing code');
+            }
+            setPairingCode(nextPairingCode);
+            setPairingCodeExpiresAt(payload.expires_at || null);
+            setIsPairingDialogOpen(true);
+            void refetchWorkerAgents();
+        } catch (error) {
+            logger.error('Error creating worker pairing token:', error);
+            const message = error instanceof Error ? error.message : 'Не удалось создать код подключения';
+            setPairingError(message);
+            setIsPairingDialogOpen(true);
+        } finally {
+            setPairingLoading(false);
+        }
     };
 
     const resetUploadVoiceDraft = (): void => {
@@ -758,7 +839,18 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <h3 className="text-lg font-semibold text-foreground">Подключение</h3>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-4 text-sm">
+                                <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={requestPairingCode}
+                                        disabled={pairingLoading}
+                                        className="border-blue-700 text-blue-300 hover:bg-blue-500/10"
+                                    >
+                                        <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${providerLampClass}`} />
+                                        Подключить устройство
+                                        {pairingLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
+                                    </Button>
                                     <a
                                         href={PROVIDER_META.f5.docsUrl}
                                         target="_blank"
@@ -924,6 +1016,64 @@ const LocalTTSSettingsPage: React.FC = () => {
                             )}
                         </div>
                     </div>
+
+                    <Dialog open={isPairingDialogOpen} onOpenChange={setIsPairingDialogOpen}>
+                        <DialogContent className="max-w-sm">
+                            <DialogHeader>
+                                <DialogTitle>Подключить устройство</DialogTitle>
+                            </DialogHeader>
+
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <Badge variant="outline" className="border-blue-700/60 bg-blue-500/10 text-blue-300">
+                                        {providerMeta.label}
+                                    </Badge>
+                                    {pairingCodeExpiresAt ? (
+                                        <span className="text-xs text-muted-foreground">
+                                            До {new Date(pairingCodeExpiresAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    ) : null}
+                                </div>
+
+                                {pairingLoading ? (
+                                    <div className="flex items-center justify-center rounded-xl border border-border/70 bg-background/55 p-6">
+                                        <Loader2 className="h-5 w-5 animate-spin text-blue-300" />
+                                    </div>
+                                ) : pairingError ? (
+                                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                                        {pairingError}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-xl border border-border/70 bg-background/55 p-4">
+                                        <code className="block text-center text-xl font-semibold tracking-[0.24em] text-foreground">
+                                            {pairingCode || '-'}
+                                        </code>
+                                    </div>
+                                )}
+                            </div>
+
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={requestPairingCode}
+                                    className="border-blue-700 text-blue-300 hover:bg-blue-500/10"
+                                    disabled={pairingLoading}
+                                >
+                                    Обновить код
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={() => copyToClipboard(pairingCode)}
+                                    disabled={!pairingCode || pairingLoading}
+                                    className="border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
+                                >
+                                    <Copy className="mr-2 h-4 w-4" />
+                                    Копировать
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
 
                     {healthData && (
                         <Card className="card-glass">

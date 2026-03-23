@@ -29,6 +29,7 @@ export const queryKeys = {
     filteredWords: () => ['tts', 'filtered-words'] as const,
     blockedUsers: () => ['tts', 'blocked-users'] as const,
     localTtsConfig: (provider: 'f5' | 'qwen' = 'f5') => ['tts', 'local-tts-config', provider] as const,
+    workers: (provider?: 'f5' | 'qwen') => ['tts', 'workers', provider] as const,
     qwenModels: (mode: 'cloud' | 'local' = 'cloud') => ['tts', 'qwen-models', mode] as const,
     whitelistStatus: () => ['tts', 'voices-whitelist-status'] as const,
   },
@@ -118,5 +119,6 @@ export const queryKeys = {
     users: (params?: Record<string, unknown>) => ['admin', 'users', params] as const,
     sessions: () => ['admin', 'sessions'] as const,
     ttsStatus: () => ['admin', 'tts-status'] as const,
+    workers: () => ['admin', 'workers'] as const,
   },
 };

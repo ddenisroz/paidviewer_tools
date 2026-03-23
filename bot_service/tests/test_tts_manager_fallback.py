@@ -512,7 +512,7 @@ async def test_qwen_local_compat_synthesis_saves_audio(manager, monkeypatch):
         "services.tts.provider_utils.settings.local_tts_allowed_cidrs",
         "",
     )
-    temp_root = Path("H:/Programming/raw_code/AI/Python/TTS_TTV_0.02/.pytest_tmp/qwen_local_compat")
+    temp_root = Path("H:/Programming/raw_code/AI/Python/paidviewer_tools/.pytest_tmp/qwen_local_compat")
     shutil.rmtree(temp_root, ignore_errors=True)
     temp_root.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr("services.tts.tts_manager.TEMP_DIR", temp_root)

@@ -169,12 +169,28 @@ class UserCleanupService:
             UserVoiceSettings,
         )
         from models.user import AdminUser, UserSession, UserSettings, UserToken
+        from models.worker import TTSJob, TTSJobAttempt, Worker, WorkerPairingToken
         from models.widgets import ChatBoxSettings
         from models.youtube import YouTubeQueue
 
         user_id = user.id
         channel_names = self._collect_channel_names(user)
         platform_user_ids = self._collect_platform_user_ids(user_id, db)
+        worker_ids = list(
+            db.execute(select(Worker.id).where(Worker.owner_user_id == user_id)).scalars()
+        )
+        job_conditions = [
+            TTSJob.owner_user_id == user_id,
+            TTSJob.created_by_user_id == user_id,
+        ]
+        if worker_ids:
+            job_conditions.extend(
+                [
+                    TTSJob.target_worker_id.in_(worker_ids),
+                    TTSJob.assigned_worker_id.in_(worker_ids),
+                ]
+            )
+        job_ids = list(db.execute(select(TTSJob.id).where(or_(*job_conditions))).scalars())
 
         delete_plan: List[DeletePlanStep] = [
             ("security_logs", SecurityLog, SecurityLog.user_id == user_id),
@@ -210,6 +226,7 @@ class UserCleanupService:
             ("user_voice_settings", UserVoiceSettings, UserVoiceSettings.user_id == user_id),
             ("audio_settings", AudioSettings, AudioSettings.user_id == user_id),
             ("local_tts_endpoints", LocalTTSEndpoint, LocalTTSEndpoint.user_id == user_id),
+            ("worker_pairing_tokens", WorkerPairingToken, WorkerPairingToken.owner_user_id == user_id),
             ("filtered_words", FilteredWord, FilteredWord.user_id == user_id),
             ("tts_blocked_users", TTSBlockedUser, TTSBlockedUser.user_id == user_id),
             ("tts_user_settings", TTSUserSettings, TTSUserSettings.user_id == user_id),
@@ -219,6 +236,21 @@ class UserCleanupService:
             ("user_tokens", UserToken, UserToken.user_id == user_id),
             ("user_settings", UserSettings, UserSettings.user_id == user_id),
         ]
+
+        if job_ids or worker_ids:
+            attempt_conditions = []
+            if job_ids:
+                attempt_conditions.append(TTSJobAttempt.job_id.in_(job_ids))
+            if worker_ids:
+                attempt_conditions.append(TTSJobAttempt.worker_id.in_(worker_ids))
+            if attempt_conditions:
+                delete_plan.extend(
+                    [
+                        ("tts_job_attempts", TTSJobAttempt, or_(*attempt_conditions)),
+                        ("tts_jobs", TTSJob, or_(*job_conditions)),
+                    ]
+                )
+            delete_plan.append(("workers", Worker, Worker.owner_user_id == user_id))
 
         if channel_names:
             delete_plan.extend(

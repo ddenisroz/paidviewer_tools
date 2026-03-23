@@ -18,6 +18,7 @@ from models.bot_token import BotToken
 
 # TTS settings.
 from models.tts import AudioSettings, FilteredWord, LocalTTSEndpoint, TTSBlockedUser, TTSUserSettings, UserVoiceSettings
+from models.worker import TTSJob, TTSJobAttempt, Worker, WorkerPairingToken
 
 # YouTube queue.
 from models.youtube import YouTubeQueue
@@ -77,6 +78,10 @@ __all__ = [
     "LocalTTSEndpoint",
     "AudioSettings",
     "UserVoiceSettings",
+    "Worker",
+    "WorkerPairingToken",
+    "TTSJob",
+    "TTSJobAttempt",
     "YouTubeQueue",
     "ChannelPoints",
     "ChannelReward",
