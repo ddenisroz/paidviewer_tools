@@ -253,6 +253,8 @@ class TestVoiceRoutesAuthenticated:
         providers = payload.get("providers") or {}
         assert "f5" in providers
         assert "qwen" in providers
+        assert providers["f5"]["official_self_host_path"] == "tts_worker_agent"
+        assert providers["qwen"]["supports_streaming"] is True
 
 
 class TestVoiceInputValidation:

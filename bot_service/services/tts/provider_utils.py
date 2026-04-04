@@ -18,9 +18,11 @@ from core.config import settings
 
 TTSProvider = Literal["f5", "gcloud", "qwen"]
 ProviderMode = Literal["cloud", "local"]
+ProviderPublicMode = Literal["cloud", "self_host"]
 
 _DEFAULT_PROVIDER: TTSProvider = "f5"
 _DEFAULT_MODE: ProviderMode = "cloud"
+_DEFAULT_PUBLIC_MODE: ProviderPublicMode = "cloud"
 
 QWEN_BASE_06_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 QWEN_BASE_17_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
@@ -294,9 +296,134 @@ def filter_qwen_cloud_models(models: list[Dict[str, Any]]) -> Dict[str, Any]:
 
 def normalize_provider_mode(mode: Optional[str]) -> ProviderMode:
     normalized = (mode or "").strip().lower()
-    if normalized == "local":
+    if normalized in {"local", "self_host", "self-host"}:
         return "local"
     return _DEFAULT_MODE
+
+
+def to_public_provider_mode(mode: Optional[str]) -> ProviderPublicMode:
+    return "self_host" if normalize_provider_mode(mode) == "local" else _DEFAULT_PUBLIC_MODE
+
+
+def get_official_mode_path(provider: Optional[str], public_mode: Optional[str]) -> Optional[str]:
+    normalized_provider = normalize_provider(provider)
+    normalized_public_mode = to_public_provider_mode(public_mode)
+
+    if normalized_provider == "gcloud":
+        return "internal" if normalized_public_mode == "cloud" else None
+
+    if normalized_public_mode == "cloud":
+        return "tts-gateway"
+    return "tts_worker_agent"
+
+
+def resolve_cloud_slot_policy(
+    provider: Optional[str],
+    *,
+    is_whitelisted: bool = False,
+) -> Dict[str, Any]:
+    normalized_provider = normalize_provider(provider)
+    policy = str(getattr(settings, "tts_cloud_slot_mode", "open") or "open").strip().lower()
+    if policy not in {"open", "whitelist"}:
+        policy = "open"
+
+    if normalized_provider == "gcloud":
+        return {
+            "provider": normalized_provider,
+            "policy": "internal",
+            "slot_allowed": True,
+            "degraded_reason": None,
+            "error_code": None,
+        }
+
+    if policy == "whitelist" and not is_whitelisted:
+        return {
+            "provider": normalized_provider,
+            "policy": policy,
+            "slot_allowed": False,
+            "degraded_reason": "Cloud capacity is limited right now. A self-host slot is recommended for this channel.",
+            "error_code": "cloud_slot_required",
+        }
+
+    return {
+        "provider": normalized_provider,
+        "policy": policy,
+        "slot_allowed": True,
+        "degraded_reason": None,
+        "error_code": None,
+    }
+
+
+def build_tts_mode_contract(
+    provider: Optional[str],
+    mode: Optional[str],
+    *,
+    available: bool,
+    is_whitelisted: bool = False,
+    degraded_reason: Optional[str] = None,
+    error_code: Optional[str] = None,
+    recommended_path: Optional[str] = None,
+    capabilities: Optional[Dict[str, Any]] = None,
+    upstream: Optional[Dict[str, Any]] = None,
+    status: Optional[str] = None,
+) -> Dict[str, Any]:
+    normalized_provider = normalize_provider(provider)
+    normalized_mode = normalize_provider_mode(mode)
+    public_mode = to_public_provider_mode(normalized_mode)
+    resolved_capabilities = dict(capabilities or get_provider_capabilities(normalized_provider))
+    slot_policy = resolve_cloud_slot_policy(
+        normalized_provider,
+        is_whitelisted=is_whitelisted,
+    ) if public_mode == "cloud" else {
+        "provider": normalized_provider,
+        "policy": "n/a",
+        "slot_allowed": True,
+        "degraded_reason": None,
+        "error_code": None,
+    }
+
+    slot_allowed = bool(slot_policy["slot_allowed"])
+    final_error_code = error_code or slot_policy["error_code"]
+    final_degraded_reason = degraded_reason or slot_policy["degraded_reason"]
+    final_available = bool(available) and slot_allowed
+
+    official_path = get_official_mode_path(normalized_provider, public_mode)
+    final_recommended_path = recommended_path or (
+        get_official_mode_path(normalized_provider, "self_host")
+        if public_mode == "cloud" and not slot_allowed
+        else official_path
+    )
+
+    resolved_status = status
+    if not resolved_status:
+        if final_available:
+            resolved_status = "healthy"
+        elif final_error_code or final_degraded_reason:
+            resolved_status = "degraded"
+        else:
+            resolved_status = "unavailable"
+
+    payload = {
+        "provider": normalized_provider,
+        "mode": normalized_mode,
+        "official_mode": public_mode,
+        "available": final_available,
+        "healthy": final_available,
+        "status": resolved_status,
+        "degraded_reason": final_degraded_reason,
+        "slot_allowed": slot_allowed,
+        "recommended_path": final_recommended_path,
+        "official_path": official_path,
+        "error_code": final_error_code,
+        "capabilities": resolved_capabilities,
+    }
+    if upstream is not None:
+        payload["upstream"] = upstream
+    payload["slot_policy"] = {
+        "policy": slot_policy["policy"],
+        "slot_allowed": slot_allowed,
+    }
+    return payload
 
 
 def normalize_engine(engine: Optional[str], provider: Optional[str] = None) -> str:
@@ -451,6 +578,20 @@ def get_provider_capabilities(provider: Optional[str]) -> Dict[str, Any]:
             "voice_crud": False,
             "voice_admin": False,
             "voice_reason": "gcloud_managed_voices_only",
+            "supports_streaming": False,
+            "supports_voice_clone": False,
+            "supports_voice_design": False,
+            "supports_models": False,
+            "supports_global_voices": False,
+            "supports_user_voices": False,
+            "official_modes": ["cloud"],
+            "official_cloud_path": "internal",
+            "official_self_host_path": None,
+            "legacy_raw_endpoint_supported": False,
+            "mode_contract": {
+                "cloud": {"supported": True, "path": "internal", "legacy_alias": "cloud"},
+                "self_host": {"supported": False, "path": None, "legacy_alias": "local"},
+            },
         }
 
     if normalized_provider == "qwen":
@@ -463,6 +604,20 @@ def get_provider_capabilities(provider: Optional[str]) -> Dict[str, Any]:
             "voice_crud": qwen_voice_enabled,
             "voice_admin": qwen_voice_enabled,
             "voice_upstream_configured": qwen_voice_enabled,
+            "supports_streaming": True,
+            "supports_voice_clone": True,
+            "supports_voice_design": True,
+            "supports_models": True,
+            "supports_global_voices": qwen_voice_enabled,
+            "supports_user_voices": qwen_voice_enabled,
+            "official_modes": ["cloud", "self_host"],
+            "official_cloud_path": "tts-gateway",
+            "official_self_host_path": "tts_worker_agent",
+            "legacy_raw_endpoint_supported": True,
+            "mode_contract": {
+                "cloud": {"supported": True, "path": "tts-gateway", "legacy_alias": "cloud"},
+                "self_host": {"supported": True, "path": "tts_worker_agent", "legacy_alias": "local"},
+            },
         }
         if not qwen_voice_enabled:
             payload["voice_detail"] = qwen_voice_crud_not_available_detail()
@@ -483,6 +638,20 @@ def get_provider_capabilities(provider: Optional[str]) -> Dict[str, Any]:
         "voice_crud": True,
         "voice_admin": True,
         "voice_upstream_configured": True,
+        "supports_streaming": False,
+        "supports_voice_clone": True,
+        "supports_voice_design": False,
+        "supports_models": False,
+        "supports_global_voices": True,
+        "supports_user_voices": True,
+        "official_modes": ["cloud", "self_host"],
+        "official_cloud_path": "tts-gateway",
+        "official_self_host_path": "tts_worker_agent",
+        "legacy_raw_endpoint_supported": True,
+        "mode_contract": {
+            "cloud": {"supported": True, "path": "tts-gateway", "legacy_alias": "cloud"},
+            "self_host": {"supported": True, "path": "tts_worker_agent", "legacy_alias": "local"},
+        },
     }
 
 

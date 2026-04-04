@@ -3,7 +3,22 @@ Base interface for streaming platforms
 """
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any, List
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass
+class PlatformCapabilities:
+    """Normalized feature availability for a streaming platform."""
+
+    roles: bool = True
+    badges: bool = False
+    reply_context: bool = False
+    mention_context: bool = False
+    moderation_actions: bool = False
+    rewards: bool = False
+    bot_status: bool = False
+    supported_roles: list[str] = field(default_factory=list)
+    moderation_actions_available: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -17,6 +32,7 @@ class PlatformConfig:
     supports_points: bool
     supports_categories: bool
     color: str  # Brand color for UI
+    capabilities: PlatformCapabilities = field(default_factory=PlatformCapabilities)
 
 
 class StreamingPlatform(ABC):

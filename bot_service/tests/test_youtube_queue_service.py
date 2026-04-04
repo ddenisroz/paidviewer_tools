@@ -68,3 +68,102 @@ def test_get_queue_supports_legacy_positional_db_argument(db, test_user):
 
     assert len(queue) == 1
     assert queue[0]["video_id"] == "legacycompat1"
+
+
+def test_reorder_queue_items_rebuilds_positions_around_current_video(db, test_user):
+    current_item = _queue_item(
+        user_id=test_user.id,
+        video_id="currentvideo1",
+        title="Current Video",
+        position=1,
+    )
+    second_item = _queue_item(
+        user_id=test_user.id,
+        video_id="nextvideo2",
+        title="Next Video",
+        position=2,
+    )
+    third_item = _queue_item(
+        user_id=test_user.id,
+        video_id="latervideo3",
+        title="Later Video",
+        position=3,
+    )
+    db.add_all([current_item, second_item, third_item])
+    db.commit()
+    db.refresh(current_item)
+    db.refresh(second_item)
+    db.refresh(third_item)
+
+    success = QueueService().reorder_queue_items(
+        test_user.id,
+        third_item.id,
+        second_item.id,
+        db=db,
+    )
+
+    assert success is True
+
+    reordered_items = (
+        db.query(YouTubeQueue)
+        .filter(YouTubeQueue.user_id == test_user.id, YouTubeQueue.status == "pending")
+        .order_by(YouTubeQueue.position.asc())
+        .all()
+    )
+
+    assert [item.video_id for item in reordered_items] == [
+        "currentvideo1",
+        "latervideo3",
+        "nextvideo2",
+    ]
+    assert [item.position for item in reordered_items] == [1, 2, 3]
+
+
+def test_reorder_queue_api_updates_pending_order(authenticated_client, db, test_user):
+    current_item = _queue_item(
+        user_id=test_user.id,
+        video_id="api_current_1",
+        title="API Current",
+        position=1,
+    )
+    second_item = _queue_item(
+        user_id=test_user.id,
+        video_id="api_second_2",
+        title="API Second",
+        position=2,
+    )
+    third_item = _queue_item(
+        user_id=test_user.id,
+        video_id="api_third_3",
+        title="API Third",
+        position=3,
+    )
+    db.add_all([current_item, second_item, third_item])
+    db.commit()
+    db.refresh(second_item)
+    db.refresh(third_item)
+
+    response = authenticated_client.post(
+        "/api/youtube/queue/reorder",
+        json={
+            "active_queue_id": third_item.id,
+            "over_queue_id": second_item.id,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+
+    reordered_items = (
+        db.query(YouTubeQueue)
+        .filter(YouTubeQueue.user_id == test_user.id, YouTubeQueue.status == "pending")
+        .order_by(YouTubeQueue.position.asc())
+        .all()
+    )
+
+    assert [item.video_id for item in reordered_items] == [
+        "api_current_1",
+        "api_third_3",
+        "api_second_2",
+    ]

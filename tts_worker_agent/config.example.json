@@ -3,6 +3,8 @@
   "pairing_code": "PASTE-FIRST-PAIRING-CODE-HERE",
   "worker_token": "",
   "worker_key": "",
+  "required_agent_version": "1.0.0",
+  "recommended_agent_version": "1.0.0",
   "label": "My TTS Worker",
   "poll_interval_sec": 2,
   "max_jobs_per_poll": 1,

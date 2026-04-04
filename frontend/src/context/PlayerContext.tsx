@@ -54,6 +54,8 @@ interface PlayerState {
 }
 
 type PlayerSource = 'global' | 'page';
+type PauseReason = 'user' | 'system' | null;
+type PlaybackSyncCommand = 'intent' | 'play' | 'pause';
 
 type PlayerAction =
     | { type: 'SET_LOADING'; payload: boolean }
@@ -103,6 +105,8 @@ const initialState: PlayerState = {
 };
 
 const MINI_PLAYER_MINIMIZED_STORAGE_KEY = 'yt_player_minimized';
+const YOUTUBE_VOLUME_STORAGE_KEY = 'yt_volume';
+const YOUTUBE_PLAYBACK_SYNC_STORAGE_KEY = 'yt_playback_sync';
 
 const initializePlayerState = (baseState: PlayerState): PlayerState => {
     if (typeof window === 'undefined') {
@@ -231,6 +235,7 @@ interface PlayerContextValue extends PlayerState {
     maximizePlayer: () => void;
     updateTime: () => void;
     setIsTheaterMode: (value: boolean) => void;
+    markPlaybackStarted: () => void;
     // Legacy portal support (deprecated)
     playerContainerRef: HTMLDivElement | null;
     setPlayerContainer: (container: HTMLDivElement | null) => void;
@@ -250,7 +255,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const lastSavedVolumeRef = useRef<number | null>(null);
     const lastNonZeroVolumeRef = useRef<number>(100);
     const playerSourceRef = useRef<PlayerSource | null>(null);
-    const pauseReasonRef = useRef<'user' | null>(null);
+    const pauseReasonRef = useRef<PauseReason>(null);
     const [playerContainerRef, setPlayerContainer] = React.useState<HTMLDivElement | null>(null);
     const { isAuthenticated } = useAuth();
     const { lastJsonMessage, isConnected: isChatConnected } = useChat();
@@ -266,11 +271,33 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         ? (isChatConnected ? 30000 : 15000)
         : (state.isVisible ? 60000 : 120000);
 
+    const broadcastPlaybackSync = useCallback((command: PlaybackSyncCommand): void => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        try {
+            window.localStorage.setItem(
+                YOUTUBE_PLAYBACK_SYNC_STORAGE_KEY,
+                JSON.stringify({ command, timestamp: Date.now() }),
+            );
+        } catch (error) {
+            logger.debug('[YouTube] Failed to broadcast playback sync', error);
+        }
+    }, []);
+
+    const markPlaybackStarted = useCallback((): void => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        window.ytUserStarted = true;
+        broadcastPlaybackSync('intent');
+    }, [broadcastPlaybackSync]);
+
     useEffect(() => {
         if (typeof window === 'undefined') {
             return;
         }
-        const storedVolume = window.localStorage.getItem('yt_volume');
+        const storedVolume = window.localStorage.getItem(YOUTUBE_VOLUME_STORAGE_KEY);
         if (storedVolume === null) {
             return;
         }
@@ -380,6 +407,82 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         await refetchQueue();
     }, [isAuthenticated, refetchQueue]);
 
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        const handleStorage = (event: StorageEvent): void => {
+            if (event.key === MINI_PLAYER_MINIMIZED_STORAGE_KEY && event.newValue !== null) {
+                const shouldMinimize = event.newValue === '1';
+                if (shouldMinimize !== state.isMinimized) {
+                    dispatch({ type: shouldMinimize ? 'MINIMIZE_PLAYER' : 'MAXIMIZE_PLAYER' });
+                }
+                return;
+            }
+
+            if (event.key === YOUTUBE_VOLUME_STORAGE_KEY && event.newValue !== null) {
+                const parsedVolume = Number(event.newValue);
+                if (!Number.isNaN(parsedVolume)) {
+                    dispatch({ type: 'SET_VOLUME', payload: parsedVolume });
+                }
+                return;
+            }
+
+            if (event.key !== YOUTUBE_PLAYBACK_SYNC_STORAGE_KEY || !event.newValue) {
+                return;
+            }
+
+            try {
+                const payload = JSON.parse(event.newValue) as { command?: PlaybackSyncCommand };
+                if (!payload.command) {
+                    return;
+                }
+
+                if (payload.command === 'intent') {
+                    window.ytUserStarted = true;
+                    if (!state.userPaused) {
+                        void refetchQueue();
+                    }
+                    return;
+                }
+
+                if (payload.command === 'play') {
+                    window.ytUserStarted = true;
+                    pauseReasonRef.current = null;
+                    dispatch({ type: 'SET_USER_PAUSED', payload: false });
+                    if (state.playerRef) {
+                        try {
+                            state.playerRef.playVideo();
+                        } catch (error) {
+                            logger.debug('[YouTube] Remote play sync skipped', error);
+                        }
+                    }
+                    void refetchQueue();
+                    return;
+                }
+
+                pauseReasonRef.current = 'user';
+                dispatch({ type: 'SET_PLAYING', payload: false });
+                dispatch({ type: 'SET_USER_PAUSED', payload: true });
+                if (state.playerRef) {
+                    try {
+                        state.playerRef.pauseVideo();
+                    } catch (error) {
+                        logger.debug('[YouTube] Remote pause sync skipped', error);
+                    }
+                }
+            } catch (error) {
+                logger.debug('[YouTube] Failed to parse playback sync payload', error);
+            }
+        };
+
+        window.addEventListener('storage', handleStorage);
+        return () => {
+            window.removeEventListener('storage', handleStorage);
+        };
+    }, [refetchQueue, state.isMinimized, state.playerRef, state.userPaused]);
+
     const skipVideoMutation = useSkipYoutubeVideo({
         onSuccess: (response) => {
             // Response is typed from youtubeService
@@ -423,7 +526,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const togglePlayPause = (): void => {
         const nextIsPlaying = !state.isPlaying;
         if (nextIsPlaying) {
-            window.ytUserStarted = true;
+            markPlaybackStarted();
+            broadcastPlaybackSync('play');
+        } else {
+            broadcastPlaybackSync('pause');
         }
         dispatch({ type: 'SET_USER_PAUSED', payload: !nextIsPlaying });
         try {
@@ -518,7 +624,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
         volumeSaveTimeoutRef.current = window.setTimeout(async () => {
             try {
-                window.localStorage.setItem('yt_volume', String(state.volume));
+                window.localStorage.setItem(YOUTUBE_VOLUME_STORAGE_KEY, String(state.volume));
                 if (isAuthenticated) {
                     await youtubeService.saveSettings({ volume_level: state.volume });
                 }
@@ -542,6 +648,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         // Это позволяет hidden плееру продолжать существовать для бесшовного воспроизведения
         if (currentRef && currentRef !== ref) {
             try {
+                pauseReasonRef.current = 'system';
                 currentRef.pauseVideo();
                 currentRef.mute();
                 // НЕ вызываем destroy - плеер должен остаться для бесшовного переключения
@@ -561,6 +668,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         // НЕ уничтожаем плеер - просто ставим на паузу и мьютим
         if (state.playerRef) {
             try {
+                pauseReasonRef.current = 'system';
                 state.playerRef.pauseVideo();
                 state.playerRef.mute();
                 // НЕ вызываем destroy - плеер может понадобиться для бесшовного воспроизведения
@@ -624,9 +732,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             window.ytUserStarted = true;
             logger.debug('▶ [YOUTUBE] Playing, mini-player visible');
         } else if (playerState === 2) {
+            const wasUserPause = pauseReasonRef.current === 'user';
             pauseReasonRef.current = null;
             dispatch({ type: 'SET_PLAYING', payload: false });
-            dispatch({ type: 'SET_USER_PAUSED', payload: true });
+            dispatch({ type: 'SET_USER_PAUSED', payload: wasUserPause });
             logger.debug('⏸ [YOUTUBE] Paused');
         } else if (playerState === 0) {
             logger.debug('[SKIP] [YOUTUBE] Video ended, switching to next');
@@ -659,17 +768,21 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
     const closePlayer = (): void => {
         if (state.playerRef) {
+            pauseReasonRef.current = 'user';
             state.playerRef.pauseVideo();
         }
         window.ytUserStarted = false;
+        broadcastPlaybackSync('pause');
         dispatch({ type: 'SET_USER_PAUSED', payload: true });
         dispatch({ type: 'CLOSE_PLAYER' });
     };
 
     const minimizePlayer = (): void => {
         if (state.playerRef) {
+            pauseReasonRef.current = 'user';
             state.playerRef.pauseVideo();
         }
+        broadcastPlaybackSync('pause');
         dispatch({ type: 'SET_USER_PAUSED', payload: true });
         dispatch({ type: 'MINIMIZE_PLAYER' });
     };
@@ -764,6 +877,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         maximizePlayer,
         updateTime,
         setIsTheaterMode,
+        markPlaybackStarted,
         playerContainerRef,
         setPlayerContainer
     };

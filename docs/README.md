@@ -1,43 +1,20 @@
-# Документация
+﻿# Документация
 
-В `docs/` лежат только короткие актуальные документы. Всё историческое, спорное, временное или снятое с поддержки должно жить только в `docs/backlog/`.
+В `docs/` оставлен только минимальный активный слой.
 
-## Читать в первую очередь
+## Оставляем только это
 
-1. [QUICKSTART.md](QUICKSTART.md)
-2. [STATUS_TRACKER.md](STATUS_TRACKER.md)
-3. [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)
-4. [REPO_STRUCTURE.md](REPO_STRUCTURE.md)
+1. [QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)
+2. [PROJECT_CONTEXT.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/PROJECT_CONTEXT.md)
+3. [architecture/TTS_ARCHITECTURE.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/architecture/TTS_ARCHITECTURE.md)
+4. [release/RELEASE_CHECKLIST.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
+5. [setup/LIVE_SMOKE_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
+6. [setup/TTS_SUPPORT_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/TTS_SUPPORT_RUNBOOK.md)
 
-## Активные разделы
+## Принцип
 
-- `setup/` — запуск, окружение, deployment, live smoke
-- `architecture/` — короткие опорные архитектурные контракты
-- `guides/` — инструкции для разработчика
+- один документ на одну задачу
+- без производных аудитов и промежуточных планов в активном слое
+- без параллельных инструкций с разными словами для одного и того же процесса
 
-## Активный слой
-
-В корне `docs/` должны оставаться только:
-
-- `README.md`
-- `QUICKSTART.md`
-- `PROJECT_CONTEXT.md`
-- `REPO_STRUCTURE.md`
-- `STATUS_TRACKER.md`
-
-В подпапках должны лежать только документы, которые реально используются при запуске, разработке и отгрузке.
-
-## Что сразу уводить в backlog
-
-- аудиты
-- временные планы
-- старые migration checklist
-- feature-заметки, которые дублируют код
-- старые справки по внешним API
-- заметки по уже удалённым функциям
-
-## Правила
-
-- активная документация пишется на русском языке
-- документ должен быть коротким и привязанным к текущему коду
-- если документ ссылается на удалённые маршруты, старые env или несуществующие файлы, он либо переписывается, либо уходит в `docs/backlog/`
+Всё производное, спорное или историческое должно жить только в `docs/backlog/`.

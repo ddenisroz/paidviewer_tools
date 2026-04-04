@@ -5,9 +5,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+_MENTION_RE = re.compile(r"@([A-Za-z0-9_\.]+)")
 
 
 def _normalize_vk_asset_url(url: Optional[str]) -> Optional[str]:
@@ -224,3 +226,96 @@ def build_message_text_and_emotes(parts: List[Dict[str, Any]]) -> Tuple[str, Lis
                 cursor += len(link_url)
 
     return message_text, emotes
+
+
+def extract_vk_mentioned_users(
+    parts: Optional[List[Dict[str, Any]]],
+    data_blocks: Optional[List[Dict[str, Any]]] = None,
+    fallback_text: Optional[str] = None,
+) -> List[str]:
+    normalized_parts = normalize_parts(parts, data_blocks)
+    mentioned_users: List[str] = []
+
+    for part in normalized_parts:
+        mention = part.get("mention")
+        if not isinstance(mention, dict):
+            continue
+        candidate = (
+            mention.get("nick")
+            or mention.get("name")
+            or mention.get("username")
+            or mention.get("login")
+        )
+        if not candidate:
+            continue
+        normalized = str(candidate).strip().lstrip("@").lower()
+        if normalized and normalized not in mentioned_users:
+            mentioned_users.append(normalized)
+
+    if fallback_text:
+        for match in _MENTION_RE.findall(fallback_text):
+            normalized = str(match).strip().lstrip("@").lower()
+            if normalized and normalized not in mentioned_users:
+                mentioned_users.append(normalized)
+
+    return mentioned_users
+
+
+def extract_vk_reply_metadata(message: Optional[Dict[str, Any]]) -> Dict[str, Optional[str] | bool]:
+    if not isinstance(message, dict):
+        return {
+            "is_reply": False,
+            "reply_to_author": None,
+            "reply_to_text": None,
+        }
+
+    reply_candidate = None
+    for key in ("reply", "reply_message", "replyMessage", "reply_to", "reply_to_message"):
+        candidate = message.get(key)
+        if isinstance(candidate, dict):
+            reply_candidate = candidate
+            break
+
+    if not isinstance(reply_candidate, dict):
+        return {
+            "is_reply": False,
+            "reply_to_author": None,
+            "reply_to_text": None,
+        }
+
+    author = reply_candidate.get("author")
+    reply_to_author = None
+    if isinstance(author, dict):
+        reply_to_author = (
+            author.get("nick")
+            or author.get("name")
+            or author.get("username")
+            or author.get("login")
+        )
+    if not reply_to_author:
+        reply_to_author = (
+            reply_candidate.get("author_nick")
+            or reply_candidate.get("author_name")
+            or reply_candidate.get("username")
+            or reply_candidate.get("nick")
+            or reply_candidate.get("name")
+        )
+
+    reply_to_text = (
+        reply_candidate.get("text")
+        or reply_candidate.get("message")
+        or reply_candidate.get("content")
+    )
+    if not reply_to_text:
+        reply_parts = normalize_parts(reply_candidate.get("parts"), reply_candidate.get("data"))
+        reply_to_text, _ = build_message_text_and_emotes(reply_parts)
+
+    normalized_text = str(reply_to_text).strip() if reply_to_text else None
+    if normalized_text:
+        normalized_text = normalized_text[:120]
+
+    return {
+        "is_reply": True,
+        "reply_to_author": str(reply_to_author).strip() if reply_to_author else None,
+        "reply_to_text": normalized_text,
+    }

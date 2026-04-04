@@ -78,7 +78,8 @@ const YoutubeIntegrationPage: React.FC = () => {
         nextVideo,
         setIsTheaterMode,
         loadQueue,
-        setPlayerContainer
+        setPlayerContainer,
+        markPlaybackStarted
     } = usePlayer();
 
     const sensors = useSensors(
@@ -136,16 +137,26 @@ const YoutubeIntegrationPage: React.FC = () => {
         }
     };
 
-    const handleDragEnd = (event: DragEndEvent) => {
+    const handleDragEnd = async (event: DragEndEvent) => {
         const { active, over } = event;
 
-        if (over && active.id !== over.id) {
-            // Note: In a real implementation you would call an API to reorder
-            // For now we just optimistically update the UI if we had a setQueue method, 
-            // but since queue comes from context/API, we might need to implement reorder API first
-            // or just let it snap back for now as a visual demo until API is ready.
-            logger.log('Reorder requested:', active.id, '->', over.id);
-            toast.info('Изменение порядка пока не сохраняется на сервере');
+        if (!over || active.id === over.id) {
+            return;
+        }
+
+        const activeQueueId = Number(active.id);
+        const overQueueId = Number(over.id);
+        if (!Number.isFinite(activeQueueId) || !Number.isFinite(overQueueId)) {
+            logger.warn('Invalid queue ids for reorder', { activeId: active.id, overId: over.id });
+            return;
+        }
+
+        try {
+            await youtubeService.reorderQueue(activeQueueId, overQueueId);
+            await loadQueue();
+        } catch (error) {
+            logger.error('Failed to reorder YouTube queue', error);
+            toast.error('Не удалось сохранить порядок очереди');
         }
     };
 
@@ -362,10 +373,8 @@ const YoutubeIntegrationPage: React.FC = () => {
     }, [lastJsonMessage]);
 
     const markUserStarted = useCallback((): void => {
-        if (typeof window !== 'undefined') {
-            window.ytUserStarted = true;
-        }
-    }, []);
+        markPlaybackStarted();
+    }, [markPlaybackStarted]);
 
     const handlePlayerSurfaceClick = useCallback((): void => {
         if (!hasVideo) {

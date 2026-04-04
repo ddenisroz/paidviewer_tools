@@ -132,6 +132,125 @@ class VKClient(BaseIntegrationClient):
             logger.error(f"[VK client] Failed to get user info: {e}")
             raise
 
+    async def get_chat_members(self, channel_url: str, token: TokenInfo, limit: int = 200) -> List[Dict[str, Any]]:
+        """Return currently visible chat/viewer members for a VK Live channel."""
+        base_candidates = [self.PROD_BASE_URL, self.DEV_BASE_URL]
+        channel_candidates = get_vk_channel_candidates(channel_url)
+        last_error: Optional[Exception] = None
+
+        for base_url in base_candidates:
+            for candidate in channel_candidates:
+                try:
+                    response = await self._request_with_base(
+                        base_url,
+                        "GET",
+                        "v1/chat/members",
+                        token=token,
+                        params={"channel_url": candidate, "limit": str(limit)},
+                    )
+                    data = response.get("data", {})
+                    users = data.get("users") if isinstance(data, dict) else None
+                    if isinstance(users, list):
+                        return users
+                except IntegrationError as error:
+                    last_error = error
+                    if error.status_code in {404, 405} or "channel_not_found" in str(error):
+                        continue
+                    raise
+
+        if last_error:
+            logger.warning(f"[VK client] Failed to load chat members for {channel_url}: {last_error}")
+        return []
+
+    async def get_chat_member(self, channel_url: str, user_id: Union[int, str], token: TokenInfo) -> Optional[Dict[str, Any]]:
+        """Return detailed chat-member information for a VK Live user."""
+        base_candidates = [self.PROD_BASE_URL, self.DEV_BASE_URL]
+        channel_candidates = get_vk_channel_candidates(channel_url)
+        last_error: Optional[Exception] = None
+
+        for base_url in base_candidates:
+            for candidate in channel_candidates:
+                try:
+                    response = await self._request_with_base(
+                        base_url,
+                        "GET",
+                        "v1/chat/member",
+                        token=token,
+                        params={"channel_url": candidate, "user_id": str(user_id)},
+                    )
+                    data = response.get("data")
+                    if isinstance(data, dict):
+                        return data
+                except IntegrationError as error:
+                    last_error = error
+                    if error.status_code in {404, 405} or "channel_not_found" in str(error):
+                        continue
+                    raise
+
+        if last_error:
+            logger.warning(f"[VK client] Failed to load chat member for {channel_url}/{user_id}: {last_error}")
+        return None
+
+    async def get_channel_roles(self, channel_url: str, token: TokenInfo) -> List[Dict[str, Any]]:
+        """Return available channel role definitions for a VK Live channel."""
+        base_candidates = [self.PROD_BASE_URL, self.DEV_BASE_URL]
+        channel_candidates = get_vk_channel_candidates(channel_url)
+        last_error: Optional[Exception] = None
+
+        for base_url in base_candidates:
+            for candidate in channel_candidates:
+                try:
+                    response = await self._request_with_base(
+                        base_url,
+                        "GET",
+                        "v1/channel_roles",
+                        token=token,
+                        params={"channel_url": candidate},
+                    )
+                    data = response.get("data", {})
+                    roles = data.get("roles") if isinstance(data, dict) else None
+                    if isinstance(roles, list):
+                        return roles
+                except IntegrationError as error:
+                    last_error = error
+                    if error.status_code in {404, 405} or "channel_not_found" in str(error):
+                        continue
+                    raise
+
+        if last_error:
+            logger.warning(f"[VK client] Failed to load channel roles for {channel_url}: {last_error}")
+        return []
+
+    async def get_channel_user_roles(self, channel_url: str, user_id: Union[int, str], token: TokenInfo) -> List[Dict[str, Any]]:
+        """Return role entries for a specific VK Live user on a channel."""
+        base_candidates = [self.PROD_BASE_URL, self.DEV_BASE_URL]
+        channel_candidates = get_vk_channel_candidates(channel_url)
+        last_error: Optional[Exception] = None
+
+        for base_url in base_candidates:
+            for candidate in channel_candidates:
+                try:
+                    response = await self._request_with_base(
+                        base_url,
+                        "GET",
+                        "v1/channel_roles/user",
+                        token=token,
+                        params={"channel_url": candidate, "user_id": str(user_id)},
+                    )
+                    data = response.get("data", {})
+                    roles = data.get("roles") if isinstance(data, dict) else None
+                    if isinstance(roles, list):
+                        return roles
+                except IntegrationError as error:
+                    last_error = error
+                    if error.status_code in {404, 405} or "channel_not_found" in str(error):
+                        continue
+                    raise
+
+        if last_error:
+            logger.warning(f"[VK client] Failed to load user channel roles for {channel_url}/{user_id}: {last_error}")
+        return []
+
     # ==================== Stream ====================
 
     async def get_stream_info(self, channel_url: str, token: TokenInfo) -> Dict[str, Any]:

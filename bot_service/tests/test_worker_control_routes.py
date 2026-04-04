@@ -16,8 +16,9 @@ def _activate_worker(client, pairing_code: str, *, supports_f5: bool, supports_q
             "capabilities": {
                 "providers": [provider for provider, enabled in (("f5", supports_f5), ("qwen", supports_qwen)) if enabled],
                 "runtime": "pytest",
+                "agent_version": "1.0.0",
             },
-            "runtime_metadata": {"hostname": "pytest-host"},
+            "runtime_metadata": {"hostname": "pytest-host", "agent_version": "1.0.0"},
         },
     )
     assert response.status_code == 200, response.text
@@ -34,9 +35,10 @@ def _poll_worker(client, auth_token: str, *, supports_f5: bool, supports_qwen: b
             "supports_f5": supports_f5,
             "supports_qwen": supports_qwen,
             "capabilities": {
-                "providers": [provider for provider, enabled in (("f5", supports_f5), ("qwen", supports_qwen)) if enabled]
+                "providers": [provider for provider, enabled in (("f5", supports_f5), ("qwen", supports_qwen)) if enabled],
+                "agent_version": "1.0.0",
             },
-            "runtime_metadata": {"hostname": "pytest-host"},
+            "runtime_metadata": {"hostname": "pytest-host", "agent_version": "1.0.0"},
         },
     )
     assert response.status_code == 200, response.text
@@ -111,6 +113,56 @@ def test_worker_pair_activate_and_complete_job(authenticated_client, db, test_us
     pairing_token_row = db.query(WorkerPairingToken).first()
     assert pairing_token_row is not None
     assert pairing_token_row.used_at is not None
+
+
+def test_user_can_create_provisioning_bundle(authenticated_client):
+    response = authenticated_client.post(
+        "/api/tts/workers/provisioning",
+        json={"label_hint": "Studio PC", "provider_hint": "qwen"},
+    )
+    assert response.status_code == 200, response.text
+
+    payload = response.json()
+    bundle = payload["provisioning_bundle"]
+
+    assert payload["download_filename"].startswith("paidviewer-worker-provisioning-qwen-")
+    assert bundle["kind"] == "paidviewer_worker_provisioning"
+    assert bundle["server_base_url"] == "http://testserver"
+    assert bundle["pairing_code"]
+    assert "http://localhost:5173" in bundle["trusted_origins"]
+    assert bundle["label"] == "Studio PC"
+    assert bundle["providers"]["f5"]["enabled"] is False
+    assert bundle["providers"]["qwen"]["enabled"] is True
+    assert bundle["providers"]["qwen"]["endpoint_url"] == "http://127.0.0.1:8012"
+    assert bundle["required_agent_version"]
+    assert payload["worker_agent_contract"]["recommended_path"] == "tts_worker_agent"
+
+
+def test_worker_activation_rejects_outdated_agent_version(authenticated_client, monkeypatch):
+    monkeypatch.setattr("api.tts.worker_routes.settings.tts_worker_agent_required_version", "9.9.9")
+
+    token_response = authenticated_client.post(
+        "/api/tts/workers/pairing-tokens",
+        json={"label_hint": "Old PC", "provider_hint": "f5"},
+    )
+    assert token_response.status_code == 200, token_response.text
+
+    response = authenticated_client.post(
+        "/api/worker-agent/activate",
+        json={
+            "pairing_code": token_response.json()["pairing_code"],
+            "label": "Old Worker",
+            "supports_f5": True,
+            "supports_qwen": False,
+            "capabilities": {"providers": ["f5"], "agent_version": "1.0.0"},
+            "runtime_metadata": {"hostname": "pytest-host", "agent_version": "1.0.0"},
+        },
+    )
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["code"] == "version_mismatch"
+    assert detail["required_agent_version"] == "9.9.9"
 
 
 def test_worker_poll_requeues_expired_jobs(authenticated_client, db):

@@ -472,6 +472,41 @@ class QueueService:
             if should_close:
                 db.close()
 
+    def reorder_queue_items(self, user_id: int, active_queue_id: int, over_queue_id: int, db: Session=None) -> bool:
+        """Move a pending queue item before/after another pending item by rebuilding positions."""
+        if db is None:
+            db = next(get_db())
+            should_close = True
+        else:
+            should_close = False
+        try:
+            queue_repo = YouTubeQueueRepository(db)
+            items = queue_repo.get_pending_ordered(user_id)
+            if not items:
+                return False
+
+            active_index = next((idx for (idx, item) in enumerate(items) if item.id == active_queue_id), None)
+            over_index = next((idx for (idx, item) in enumerate(items) if item.id == over_queue_id), None)
+            if active_index is None or over_index is None:
+                return False
+            if active_index == over_index:
+                return True
+
+            active_item = items.pop(active_index)
+            items.insert(over_index, active_item)
+            queue_repo.rebuild_positions(items)
+            db.commit()
+            logger.info(f'Reordered queue item {active_queue_id} relative to {over_queue_id}')
+            self._broadcast_queue_update_sync(user_id)
+            return True
+        except Exception:
+            db.rollback()
+            logger.exception('Error reordering queue items')
+            return False
+        finally:
+            if should_close:
+                db.close()
+
     async def get_current_video(self, user_id: int, db: Session=None) -> Optional[Dict[str, Any]]:
         """Get the current video (the first item in the queue)."""
         if db is None:

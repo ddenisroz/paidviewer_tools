@@ -23,8 +23,10 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
+import { getPlatformReleaseInfo } from '@/shared/utils/platformRelease';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
+import { formatBotAuthError } from '../utils/botAuthMessages';
 
 type Platform = 'twitch' | 'vk';
 
@@ -234,7 +236,8 @@ const AdminBotManagementPage: React.FC = () => {
 
   useEffect(() => {
     const success = searchParams.get('bot_auth_success');
-    const error = searchParams.get('bot_auth_error');
+    const errorCode = searchParams.get('bot_auth_error');
+    const error = errorCode ? formatBotAuthError(errorCode, 'ru') : null;
     const platform = searchParams.get('platform');
 
     if (success === 'true') {
@@ -332,6 +335,7 @@ const AdminBotManagementPage: React.FC = () => {
           const status = tokenStatus[platform];
           const badge = getBadge(platform);
           const meta = PLATFORM_META[platform];
+          const releaseInfo = getPlatformReleaseInfo(platform);
 
           return (
             <Card key={platform} className={ADMIN_CARD_CLASS}>
@@ -339,9 +343,16 @@ const AdminBotManagementPage: React.FC = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <PlatformIcon platform={platform} className="h-5 w-5" />
-                    <CardTitle className="text-base" style={{ color: meta.accent }}>
-                      {meta.label}
-                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base" style={{ color: meta.accent }}>
+                        {meta.label}
+                      </CardTitle>
+                      {releaseInfo.badgeLabel ? (
+                        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
+                          {releaseInfo.badgeLabel}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
                   <Badge variant={badge.variant}>{badge.label}</Badge>
                 </div>

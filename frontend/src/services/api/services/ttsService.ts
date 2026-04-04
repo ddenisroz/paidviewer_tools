@@ -417,6 +417,10 @@ export const ttsService = {
     return apiClient.get('/api/tts/workers');
   },
 
+  async createWorkerProvisioning(payload: { label_hint?: string; provider_hint?: 'f5' | 'qwen' | 'both' }): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post('/api/tts/workers/provisioning', payload);
+  },
+
   async createWorkerPairingToken(payload: { label_hint?: string; provider_hint?: 'f5' | 'qwen' }): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.post('/api/tts/workers/pairing-tokens', payload);
   },

@@ -84,16 +84,21 @@ class TestPlatformAbstraction:
             assert 'supportsPoints' in config
             assert 'supportsCategories' in config
             assert 'color' in config
+            assert 'capabilities' in config
         
         # Check specific platforms
         twitch_config = next((c for c in configs if c['name'] == 'twitch'), None)
         assert twitch_config is not None, "Twitch config not found"
         assert twitch_config['displayName'] == 'Twitch'
-        
+        assert twitch_config['capabilities']['rewards'] is True
+        assert twitch_config['capabilities']['moderation_actions'] is True
+
         vk_config = next((c for c in configs if c['name'] == 'vk'), None)
         assert vk_config is not None, "VK config not found"
         assert vk_config['displayName'] == 'VK Live'
-        
+        assert vk_config['capabilities']['reply_context'] is True
+        assert vk_config['capabilities']['badges'] is True
+
         print("[OK] Platform configs can be retrieved for frontend")
     
     def test_platform_registry_is_valid_platform(self):

@@ -182,6 +182,20 @@ class DropsHistory(Base):
             "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
             name="check_user_or_session_drops_history",
         ),
+        UniqueConstraint(
+            "user_id",
+            "channel_name",
+            "platform",
+            "source_event_id",
+            name="uq_drops_history_user_source_event",
+        ),
+        UniqueConstraint(
+            "session_id",
+            "channel_name",
+            "platform",
+            "source_event_id",
+            name="uq_drops_history_session_source_event",
+        ),
         {"extend_existing": True},
     )
 
@@ -207,6 +221,8 @@ class DropsHistory(Base):
     donation_amount = Column(Float, nullable=True)
     streak_days = Column(Integer, nullable=True)
     messages_count = Column(Integer, nullable=True)
+    stream_session_id = Column(Integer, ForeignKey("stream_sessions.id"), nullable=True, index=True)
+    source_event_id = Column(String, nullable=True, index=True)
 
     # External linkage data.
     donation_alert_id = Column(String, nullable=True)

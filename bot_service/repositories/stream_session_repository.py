@@ -88,6 +88,37 @@ class StreamSessionRepository(BaseRepository[StreamSession]):
             .first()
         )
 
+    def get_previous_session(
+        self,
+        channel_name: str,
+        platform: str,
+        user_id: int = None,
+        session_id: str = None,
+        exclude_session_id: int = None,
+    ) -> Optional[StreamSession]:
+        """Get the most recent session before the currently active one."""
+        filters = [
+            StreamSession.channel_name == channel_name,
+            StreamSession.platform == platform,
+        ]
+
+        if exclude_session_id is not None:
+            filters.append(StreamSession.id != exclude_session_id)
+
+        if user_id:
+            filters.append(StreamSession.user_id == user_id)
+        elif session_id:
+            filters.append(StreamSession.session_id == session_id)
+        else:
+            return None
+
+        return (
+            self.db.query(StreamSession)
+            .filter(and_(*filters))
+            .order_by(desc(StreamSession.started_at))
+            .first()
+        )
+
     def add_session(self, session: StreamSession) -> StreamSession:
         """Add new stream session."""
         self.db.add(session)

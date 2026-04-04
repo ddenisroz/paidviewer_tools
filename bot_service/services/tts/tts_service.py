@@ -24,6 +24,8 @@ from services.user_identity_service import UserIdentityService
 from services.voice_management_service import VoiceManagementService
 import random
 from services.tts.provider_utils import (
+    build_tts_mode_contract,
+    get_all_provider_capabilities,
     infer_provider_from_engine,
     normalize_provider,
     normalize_provider_mode,
@@ -509,6 +511,8 @@ class TTSService:
         has_local_setup = False
         has_local_setup_f5 = False
         has_local_setup_qwen = False
+        has_local_endpoint_f5 = False
+        has_local_endpoint_qwen = False
         has_worker_setup = False
         has_worker_setup_f5 = False
         has_worker_setup_qwen = False
@@ -553,6 +557,83 @@ class TTSService:
         except Exception:
             logger.exception("Failed to resolve whitelist status for user %s", user_id)
 
+        provider_capabilities = get_all_provider_capabilities()
+        provider_matrix = {
+            "f5": {
+                "cloud": build_tts_mode_contract(
+                    "f5",
+                    "cloud",
+                    available=True,
+                    is_whitelisted=is_whitelisted,
+                    capabilities=provider_capabilities["f5"],
+                ),
+                "self_host": build_tts_mode_contract(
+                    "f5",
+                    "local",
+                    available=has_local_setup_f5,
+                    is_whitelisted=is_whitelisted,
+                    degraded_reason=None if has_local_setup_f5 else "Self-host is not configured for F5 yet.",
+                    error_code=None if has_local_setup_f5 else "self_host_not_configured",
+                    capabilities=provider_capabilities["f5"],
+                    recommended_path="tts_worker_agent",
+                ),
+            },
+            "qwen": {
+                "cloud": build_tts_mode_contract(
+                    "qwen",
+                    "cloud",
+                    available=True,
+                    is_whitelisted=is_whitelisted,
+                    capabilities=provider_capabilities["qwen"],
+                ),
+                "self_host": build_tts_mode_contract(
+                    "qwen",
+                    "local",
+                    available=has_local_setup_qwen,
+                    is_whitelisted=is_whitelisted,
+                    degraded_reason=None if has_local_setup_qwen else "Self-host is not configured for Qwen yet.",
+                    error_code=None if has_local_setup_qwen else "self_host_not_configured",
+                    capabilities=provider_capabilities["qwen"],
+                    recommended_path="tts_worker_agent",
+                ),
+            },
+            "gcloud": {
+                "cloud": build_tts_mode_contract(
+                    "gcloud",
+                    "cloud",
+                    available=True,
+                    is_whitelisted=is_whitelisted,
+                    capabilities=provider_capabilities["gcloud"],
+                ),
+                "self_host": build_tts_mode_contract(
+                    "gcloud",
+                    "local",
+                    available=False,
+                    is_whitelisted=is_whitelisted,
+                    degraded_reason="Google Cloud TTS is cloud-only.",
+                    error_code="self_host_not_supported",
+                    capabilities=provider_capabilities["gcloud"],
+                    recommended_path="internal",
+                ),
+            },
+        }
+
+        active_contract = provider_matrix[provider]["self_host" if resolved_mode == "local" else "cloud"]
+        if provider == "qwen":
+            active_self_host_path = (
+                "tts_worker_agent"
+                if has_worker_setup_qwen
+                else ("raw_endpoint_compat" if has_local_endpoint_qwen else None)
+            )
+        elif provider == "f5":
+            active_self_host_path = (
+                "tts_worker_agent"
+                if has_worker_setup_f5
+                else ("raw_endpoint_compat" if has_local_endpoint_f5 else None)
+            )
+        else:
+            active_self_host_path = None
+
         return {
             "enabled": enabled,
             "listening_mode": listening_mode,
@@ -564,10 +645,20 @@ class TTSService:
             "has_local_setup": has_local_setup,
             "has_local_setup_f5": has_local_setup_f5,
             "has_local_setup_qwen": has_local_setup_qwen,
+            "has_local_endpoint_f5": has_local_endpoint_f5,
+            "has_local_endpoint_qwen": has_local_endpoint_qwen,
             "has_worker_setup": has_worker_setup,
             "has_worker_setup_f5": has_worker_setup_f5,
             "has_worker_setup_qwen": has_worker_setup_qwen,
             "is_whitelisted": is_whitelisted,
+            "official_modes": ["cloud", "self_host"],
+            "official_mode": active_contract["official_mode"],
+            "recommended_path": active_contract["recommended_path"],
+            "active_contract": active_contract,
+            "provider_matrix": provider_matrix,
+            "capabilities": provider_capabilities,
+            "active_self_host_path": active_self_host_path,
+            "legacy_mode_alias": resolved_mode,
         }
 
     # === Platform Settings ===

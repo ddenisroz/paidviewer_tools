@@ -65,6 +65,22 @@ class StreamSessionService:
             platform=platform,
         )
 
+    def get_previous_user_session(
+        self,
+        user_id: int,
+        channel_name: str = None,
+        platform: str = "twitch",
+        exclude_session_id: int = None,
+    ) -> Optional[StreamSession]:
+        """Active user-only wrapper for the previous session lookup."""
+        return self.get_previous_session(
+            user_id=user_id,
+            session_id=None,
+            channel_name=channel_name,
+            platform=platform,
+            exclude_session_id=exclude_session_id,
+        )
+
     def mark_viewer_attended_user_stream(
         self,
         user_id: int,
@@ -228,6 +244,23 @@ class StreamSessionService:
             session_id=session_id,
         )
 
+    def get_previous_session(
+        self,
+        user_id: int = None,
+        session_id: str = None,
+        channel_name: str = None,
+        platform: str = "twitch",
+        exclude_session_id: int = None,
+    ) -> Optional[StreamSession]:
+        """Return the last completed or previous active session for a channel/platform."""
+        return self.session_repo.get_previous_session(
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id,
+            exclude_session_id=exclude_session_id,
+        )
+
     def mark_viewer_attended_stream(
         self,
         user_id: int = None,
@@ -289,11 +322,19 @@ class StreamSessionService:
         if not viewer_id:
             return False
 
-        last_session = self.get_last_session(
+        active_session = self.get_active_session(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
             platform=platform,
+        )
+
+        last_session = self.get_previous_session(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+            exclude_session_id=active_session.id if active_session else None,
         )
 
         if not last_session:

@@ -235,6 +235,9 @@ temp/
 artifacts/
 *.tmp
 *.fixed
+tts_worker_agent/config.json
+tts_worker_agent/paidviewer-worker-provisioning*.json
+tts_worker_agent/tmp_*/
 
 # Logs
 logs

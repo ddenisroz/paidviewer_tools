@@ -90,6 +90,11 @@ def test_normalize_provider_mode(mode: str | None, expected: str):
     assert provider_utils.normalize_provider_mode(mode) == expected
 
 
+def test_normalize_provider_mode_accepts_self_host_alias():
+    assert provider_utils.normalize_provider_mode("self_host") == "local"
+    assert provider_utils.to_public_provider_mode("self_host") == "self_host"
+
+
 def test_resolve_provider_mode_for_settings_prefers_explicit_provider_mode_over_legacy_flag():
     provider, mode = provider_utils.resolve_provider_mode_for_settings(
         engine="f5tts",
@@ -285,6 +290,41 @@ def test_provider_capabilities_qwen_enables_voice_crud_with_qwen_tts_url(monkeyp
     capabilities = provider_utils.get_provider_capabilities("qwen")
     assert capabilities["voice_crud"] is True
     assert capabilities["voice_admin"] is True
+
+
+def test_provider_capabilities_expose_mode_first_flags(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
+    capabilities = provider_utils.get_provider_capabilities("f5")
+    assert capabilities["official_modes"] == ["cloud", "self_host"]
+    assert capabilities["official_cloud_path"] == "tts-gateway"
+    assert capabilities["official_self_host_path"] == "tts_worker_agent"
+    assert capabilities["supports_voice_clone"] is True
+
+
+def test_resolve_cloud_slot_policy_honors_whitelist_mode(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_cloud_slot_mode", "whitelist")
+    denied = provider_utils.resolve_cloud_slot_policy("qwen", is_whitelisted=False)
+    allowed = provider_utils.resolve_cloud_slot_policy("qwen", is_whitelisted=True)
+
+    assert denied["slot_allowed"] is False
+    assert denied["error_code"] == "cloud_slot_required"
+    assert allowed["slot_allowed"] is True
+
+
+def test_build_tts_mode_contract_prefers_self_host_when_cloud_slot_denied(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_cloud_slot_mode", "whitelist")
+    payload = provider_utils.build_tts_mode_contract(
+        "f5",
+        "cloud",
+        available=True,
+        is_whitelisted=False,
+    )
+
+    assert payload["official_mode"] == "cloud"
+    assert payload["slot_allowed"] is False
+    assert payload["available"] is False
+    assert payload["recommended_path"] == "tts_worker_agent"
+    assert payload["error_code"] == "cloud_slot_required"
 
 
 def test_normalize_local_tts_endpoint_url_accepts_allowed_host(monkeypatch):

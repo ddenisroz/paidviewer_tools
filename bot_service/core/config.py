@@ -150,6 +150,18 @@ class Settings(BaseSettings):
         default="127.0.0.0/8,::1/128",
         description="Allowed CIDRs for local TTS endpoint IPs when raw IP host is used (comma-separated)",
     )
+    tts_cloud_slot_mode: str = Field(
+        default="open",
+        description="Cloud TTS admission policy: open or whitelist",
+    )
+    tts_worker_agent_required_version: str = Field(
+        default="1.0.0",
+        description="Minimum required self-host worker-agent version",
+    )
+    tts_worker_agent_recommended_version: Optional[str] = Field(
+        default=None,
+        description="Recommended self-host worker-agent version shown in provisioning/diagnostics",
+    )
     worker_pairing_token_ttl_minutes: int = Field(
         default=15,
         description="One-time worker pairing token TTL in minutes",
@@ -429,6 +441,14 @@ class Settings(BaseSettings):
                 raise ValueError(f"Invalid LOCAL_TTS_ALLOWED_CIDRS value '{cidr}'") from error
 
         return v
+
+    @field_validator("tts_cloud_slot_mode")
+    @classmethod
+    def validate_tts_cloud_slot_mode(cls, v: str) -> str:
+        normalized = (v or "open").strip().lower()
+        if normalized not in {"open", "whitelist"}:
+            raise ValueError("TTS_CLOUD_SLOT_MODE must be either 'open' or 'whitelist'")
+        return normalized
 
     @field_validator("internal_service_jwt_ttl_seconds")
     @classmethod

@@ -39,6 +39,13 @@ class QueueResponse(BaseModel):
 
 class QueueManagementRequest(BaseModel):
     queue_id: int
+
+
+class QueueReorderRequest(BaseModel):
+    active_queue_id: int
+    over_queue_id: int
+
+
 queue_service = QueueService()
 youtube_service = YouTubeService()
 
@@ -197,6 +204,28 @@ async def play_queue_item(queue_id: int, user: dict=Depends(get_current_user), d
         raise
     except Exception:
         logger.exception('Error moving queue item to top via API')
+        raise HTTPException(status_code=500, detail='Internal server error.')
+
+
+@youtube_router.post('/queue/reorder')
+async def reorder_queue_items(request: QueueReorderRequest, user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
+    """Reorder pending queue items while keeping the current queue contract stable."""
+    try:
+        success = queue_service.reorder_queue_items(
+            user['id'],
+            request.active_queue_id,
+            request.over_queue_id,
+            db,
+        )
+        if not success:
+            raise HTTPException(status_code=404, detail='Failed to reorder the queue.')
+        updated_queue = queue_service.get_user_queue(user['id'], db=db)
+        current_video = updated_queue[0] if updated_queue and len(updated_queue) > 0 else None
+        return {'success': True, 'queue': updated_queue, 'current_video': current_video}
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception('Error reordering queue via API')
         raise HTTPException(status_code=500, detail='Internal server error.')
 
 @youtube_router.post('/queue/ban/{queue_id}')

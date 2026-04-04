@@ -41,6 +41,7 @@ const GlobalPlayer: React.FC = () => {
         minimizePlayer,
         maximizePlayer,
         setPlayerRef,
+        markPlaybackStarted,
         handlePlayerReady,
         handlePlayerStateChange,
         handlePlayerError,
@@ -141,9 +142,7 @@ const GlobalPlayer: React.FC = () => {
     const handleQueueSelect = async (video: DisplayVideo): Promise<void> => {
         try {
             if (!video?.id) return;
-            if (typeof window !== 'undefined') {
-                window.ytUserStarted = true;
-            }
+            markPlaybackStarted();
             await youtubeService.playQueueItem(Number(video.id));
             loadQueue(true);
             setShowQueue(false);
@@ -153,9 +152,7 @@ const GlobalPlayer: React.FC = () => {
     };
 
     const handlePlayerSurfaceInteract = (): void => {
-        if (typeof window !== 'undefined') {
-            window.ytUserStarted = true;
-        }
+        markPlaybackStarted();
     };
 
     useEffect(() => {

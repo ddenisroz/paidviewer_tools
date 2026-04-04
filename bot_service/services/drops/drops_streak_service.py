@@ -29,6 +29,7 @@ class DropsStreakMixin:
     def get_quality_by_name(self, name): pass
     def _get_random_reward(self, **kwargs): pass
     def _record_drops_history(self, **kwargs): pass
+    def _normalize_source_event_id(self, **kwargs): pass
     
     # Expected method from DropsMythicalMixin or self
     def _check_stream_online(self, **kwargs): pass
@@ -37,6 +38,46 @@ class DropsStreakMixin:
         if not getattr(self, 'history_repo', None):
              self.history_repo = DropsHistoryRepository(self.db)
         return self.history_repo
+
+    def _resolve_stream_session_id(
+        self,
+        user_id: int = None,
+        session_id: str = None,
+        channel_name: str = None,
+        platform: str = "twitch",
+        stream_session_id: int = None,
+        create_if_online: bool = False,
+    ) -> Optional[int]:
+        """Resolve the stream session used for reward history linkage."""
+        if stream_session_id is not None:
+            return stream_session_id
+
+        stream_session_service = StreamSessionService(self.db)
+        active_session = stream_session_service.get_active_session(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+        )
+        if active_session:
+            return active_session.id
+
+        if create_if_online and self._check_stream_online(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+        ):
+            active_session = stream_session_service.get_or_create_active_session(
+                user_id=user_id,
+                session_id=session_id,
+                channel_name=channel_name,
+                platform=platform,
+            )
+            if active_session:
+                return active_session.id
+
+        return None
 
     def get_user_streak_for_user(
         self,
@@ -99,6 +140,9 @@ class DropsStreakMixin:
         platform: str = "twitch",
         viewer_id: str = None,
         viewer_name: str = None,
+        source_event_id: str = None,
+        chat_message_id: int = None,
+        stream_session_id: int = None,
     ) -> Optional[Dict[str, Any]]:
         """Active user-only wrapper for streak drops processing."""
         return self.process_streak_drops(
@@ -108,6 +152,9 @@ class DropsStreakMixin:
             platform=platform,
             viewer_id=viewer_id,
             viewer_name=viewer_name,
+            source_event_id=source_event_id,
+            chat_message_id=chat_message_id,
+            stream_session_id=stream_session_id,
         )
 
     def process_donation_drops_for_user(
@@ -118,6 +165,9 @@ class DropsStreakMixin:
         viewer_id: str = None,
         viewer_name: str = None,
         donation_amount: float = None,
+        source_event_id: str = None,
+        donation_alert_id: str = None,
+        stream_session_id: int = None,
     ) -> Optional[Dict[str, Any]]:
         """Active user-only wrapper for donation drops processing."""
         return self.process_donation_drops(
@@ -128,6 +178,9 @@ class DropsStreakMixin:
             viewer_id=viewer_id,
             viewer_name=viewer_name,
             donation_amount=donation_amount,
+            source_event_id=source_event_id,
+            donation_alert_id=donation_alert_id,
+            stream_session_id=stream_session_id,
         )
 
     def get_user_streak(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None) -> Optional[UserStreak]:
@@ -188,26 +241,24 @@ class DropsStreakMixin:
             repo.update_streak(streak)
             return streak
 
-        stream_session_service.mark_viewer_attended_stream(
-            user_id=user_id,
-            session_id=session_id,
-            channel_name=channel_name,
-            platform=platform,
-            viewer_id=viewer_id
-        )
-
-        is_new_stream = streak.last_stream_session_id != active_session.id
+        previous_stream_session_id = streak.last_stream_session_id
+        is_new_stream = previous_stream_session_id != active_session.id
 
         if is_new_stream:
-            if streak.last_stream_session_id is None:
+            previous_session = stream_session_service.get_previous_session(
+                user_id=user_id,
+                session_id=session_id,
+                channel_name=channel_name,
+                platform=platform,
+                exclude_session_id=active_session.id,
+            )
+
+            if previous_stream_session_id is None and previous_session is None:
                 attended_previous = True
             else:
-                attended_previous = stream_session_service.check_viewer_attended_last_stream(
-                    user_id=user_id,
-                    session_id=session_id,
-                    channel_name=channel_name,
-                    platform=platform,
-                    viewer_id=viewer_id
+                attended_previous = (
+                    previous_session is not None
+                    and previous_stream_session_id == previous_session.id
                 )
 
             if attended_previous and streak.messages_this_stream >= config.streak_messages_required:
@@ -229,6 +280,8 @@ class DropsStreakMixin:
 
             streak.messages_this_stream = 0
 
+        streak.last_stream_session_id = active_session.id
+        streak.last_stream_attended_at = now
         streak.last_activity = now
         streak.updated_at = now
 
@@ -269,7 +322,7 @@ class DropsStreakMixin:
 
         return streak
 
-    def process_streak_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None) -> Optional[Dict[str, Any]]:
+    def process_streak_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, source_event_id: str = None, chat_message_id: int = None, stream_session_id: int = None) -> Optional[Dict[str, Any]]:
         """Process streak drops."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config:
@@ -283,6 +336,26 @@ class DropsStreakMixin:
 
         if not streak_enabled:
             return None
+
+        normalized_source_event_id = self._normalize_source_event_id(
+            source_event_id=source_event_id,
+            chat_message_id=chat_message_id,
+        )
+        if normalized_source_event_id:
+            existing_history = self._ensure_repo().get_history_by_source_event_id(
+                source_event_id=normalized_source_event_id,
+                channel_name=channel_name,
+                platform=platform,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            if existing_history:
+                logger.info(
+                    "[DROPS] Duplicate streak event skipped for %s (%s)",
+                    viewer_name,
+                    normalized_source_event_id,
+                )
+                return None
 
         streak = self.update_user_streak(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name)
 
@@ -298,10 +371,20 @@ class DropsStreakMixin:
         if not reward:
             return None
 
-        self._record_drops_history(
-            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
-            drops_type="streak", quality_id=quality.id, reward=reward, streak_days=streak.current_streak
+        resolved_stream_session_id = self._resolve_stream_session_id(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+            stream_session_id=stream_session_id,
         )
+        history_entry = self._record_drops_history(
+            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
+            drops_type="streak", quality_id=quality.id, reward=reward, streak_days=streak.current_streak,
+            stream_session_id=resolved_stream_session_id, source_event_id=normalized_source_event_id, chat_message_id=chat_message_id
+        )
+        if not history_entry:
+            return None
 
         return {
             "type": "streak",
@@ -311,15 +394,37 @@ class DropsStreakMixin:
             "reward_type": reward.reward_type,
             "reward_value": reward.reward_value,
             "streak_days": streak.current_streak,
+            "stream_session_id": resolved_stream_session_id,
+            "source_event_id": normalized_source_event_id,
             "sound_file": reward.sound_file,
             "sound_volume": reward.sound_volume
         }
 
-    def process_donation_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, donation_amount: float = None) -> Optional[Dict[str, Any]]:
+    def process_donation_drops(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, donation_amount: float = None, source_event_id: str = None, donation_alert_id: str = None, stream_session_id: int = None) -> Optional[Dict[str, Any]]:
         """Process donation drops shared across platforms."""
         config = self.get_config(user_id=user_id, session_id=session_id, channel_name=channel_name, platform=None)
         if not config or not config.donation_enabled:
             return None
+
+        normalized_source_event_id = self._normalize_source_event_id(
+            source_event_id=source_event_id,
+            donation_alert_id=donation_alert_id,
+        )
+        if normalized_source_event_id:
+            existing_history = self._ensure_repo().get_history_by_source_event_id(
+                source_event_id=normalized_source_event_id,
+                channel_name=channel_name,
+                platform=platform,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            if existing_history:
+                logger.info(
+                    "[DROPS] Duplicate donation event skipped for %s (%s)",
+                    viewer_name,
+                    normalized_source_event_id,
+                )
+                return None
 
         quality_name = self._get_donation_quality(donation_amount, config)
         if not quality_name:
@@ -333,10 +438,21 @@ class DropsStreakMixin:
         if not reward:
             return None
 
-        self._record_drops_history(
-            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
-            drops_type="donation", quality_id=quality.id, reward=reward, donation_amount=donation_amount
+        resolved_stream_session_id = self._resolve_stream_session_id(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+            stream_session_id=stream_session_id,
+            create_if_online=True,
         )
+        history_entry = self._record_drops_history(
+            user_id=user_id, session_id=session_id, channel_name=channel_name, platform=platform, viewer_id=viewer_id, viewer_name=viewer_name,
+            drops_type="donation", quality_id=quality.id, reward=reward, donation_amount=donation_amount,
+            stream_session_id=resolved_stream_session_id, source_event_id=normalized_source_event_id, donation_alert_id=donation_alert_id
+        )
+        if not history_entry:
+            return None
 
         return {
             "type": "donation",
@@ -346,6 +462,8 @@ class DropsStreakMixin:
             "reward_type": reward.reward_type,
             "reward_value": reward.reward_value,
             "donation_amount": donation_amount,
+            "stream_session_id": resolved_stream_session_id,
+            "source_event_id": normalized_source_event_id,
             "sound_file": reward.sound_file,
             "sound_volume": reward.sound_volume
         }

@@ -92,6 +92,7 @@ class PlatformRegistry:
         configs = []
         for platform in self._platforms.values():
             config = platform.config
+            capabilities = config.capabilities
             configs.append({
                 'name': config.name,
                 'displayName': config.display_name,
@@ -100,7 +101,18 @@ class PlatformRegistry:
                 'supportsTts': config.supports_tts,
                 'supportsPoints': config.supports_points,
                 'supportsCategories': config.supports_categories,
-                'color': config.color
+                'color': config.color,
+                'capabilities': {
+                    'roles': capabilities.roles,
+                    'badges': capabilities.badges,
+                    'reply_context': capabilities.reply_context,
+                    'mention_context': capabilities.mention_context,
+                    'moderation_actions': capabilities.moderation_actions,
+                    'rewards': capabilities.rewards,
+                    'bot_status': capabilities.bot_status,
+                    'supported_roles': list(capabilities.supported_roles),
+                    'moderation_actions_available': list(capabilities.moderation_actions_available),
+                },
             })
         return configs
 

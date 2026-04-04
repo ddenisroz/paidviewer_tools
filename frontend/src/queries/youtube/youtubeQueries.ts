@@ -181,6 +181,30 @@ export const useNextYoutubeVideo = (options?: Omit<UseMutationOptions<ApiRespons
 export const useSkipYoutubeVideo = useNextYoutubeVideo;
 
 /**
+ * Переключиться на конкретный элемент очереди YouTube
+ */
+export const usePlayYoutubeQueueItem = (options?: Omit<UseMutationOptions<ApiResponse, AxiosError, number, unknown>, 'mutationFn'>) => {
+  const queryClient = useQueryClient();
+
+  return useMutation<ApiResponse, AxiosError, number, unknown>({
+    mutationFn: (queueId: number) => unwrapResponse(youtubeService.playQueueItem(queueId)),
+    onSuccess: (_response, _queueId, _context) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.youtube.queue() });
+      if (!options?.onSuccess) {
+        toast.success('Переход к выбранному видео');
+      }
+    },
+    onError: (error: AxiosError, _queueId, _context) => {
+      logger.error('Error switching to queue item:', error);
+      if (!options?.onError) {
+        toast.error('Ошибка переключения видео');
+      }
+    },
+    ...options,
+  });
+};
+
+/**
  * Получить настройки YouTube
  */
 export const useYoutubeSettings = (options?: Omit<UseQueryOptions<YouTubeSettings, AxiosError>, 'queryKey' | 'queryFn'>) => {

@@ -229,6 +229,8 @@ class VKLiveBotCore:
             is_moderator = author.get("is_moderator", False)
             badges = message.get("badges")
             emotes = message.get("emotes")
+            is_reply = bool(message.get("is_reply"))
+            mentioned_users = message.get("mentioned_users") or []
             avatar_url = (
                 author.get("avatar_url")
                 or author.get("avatar")
@@ -444,14 +446,34 @@ class VKLiveBotCore:
                         db.close()
 
             # 5. Обработка TTS для обычных сообщений
-            await self._handle_vk_tts(message, channel_id, user, text, reward_id, reward_title)
+            await self._handle_vk_tts(
+                message,
+                channel_id,
+                user,
+                text,
+                reward_id,
+                reward_title,
+                is_reply=is_reply,
+                mentioned_users=mentioned_users,
+            )
 
         except Exception as e:
             logger.error(f"Error handling VK Live message: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
 
-    async def _handle_vk_tts(self, message: Dict[str, Any], channel_id: str, username: str, text: str, reward_id: str = None, reward_title: str = None):
+    async def _handle_vk_tts(
+        self,
+        message: Dict[str, Any],
+        channel_id: str,
+        username: str,
+        text: str,
+        reward_id: str = None,
+        reward_title: str = None,
+        *,
+        is_reply: bool = False,
+        mentioned_users: Optional[list[str]] = None,
+    ):
         """Обработка TTS для VK сообщений"""
         from utils.websocket_helper import handle_tts_for_message
 
@@ -472,6 +494,8 @@ class VKLiveBotCore:
             tts_api=self.tts_api,
             connection_manager=self.connection_manager,
             skip_if_command=False,  # Команды уже отфильтрованы в _handle_message
+            is_reply=is_reply,
+            mentioned_users=mentioned_users or [],
             reward_id=reward_id,  # Передаем reward_id если есть
             message_id=str(message.get("id") or message.get("message_id") or "").strip() or None,
         )

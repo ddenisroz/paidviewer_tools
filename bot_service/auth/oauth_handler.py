@@ -64,6 +64,26 @@ class OAuthHandler:
 
         return None
 
+    def _apply_vk_profile(self, user: User, user_data: OAuthUserData) -> None:
+        """Persist normalized VK profile and role metadata on the user record."""
+        vk_channel = self._resolve_vk_channel_name(user_data)
+        vk_display = user_data.username or vk_channel
+
+        if vk_channel:
+            user.vk_channel_name = vk_channel
+            user.vk_is_owner = True
+            logger.info(f"Updated VK channel_name: {vk_channel}")
+        else:
+            user.vk_channel_name = None
+            user.vk_is_owner = False
+            logger.info("Cleared stale VK channel_name (no channel slug in OAuth data)")
+
+        # VK moderator parity is only safe to set when the provider returns it explicitly.
+        user.vk_is_moderator = False
+
+        if vk_display:
+            user.vk_username = vk_display
+
     def _get_connection_manager(self):
         """Lazily import and cache the connection manager."""
         if self.connection_manager is None:
@@ -227,16 +247,7 @@ class OAuthHandler:
                     if platform == "twitch" and hasattr(user_data, 'username'):
                         unified_user.twitch_username = user_data.username
                     elif platform == "vk":
-                        vk_channel = self._resolve_vk_channel_name(user_data)
-                        vk_display = user_data.username or vk_channel
-                        if vk_channel:
-                            unified_user.vk_channel_name = vk_channel
-                            logger.info(f"Updated VK channel_name: {vk_channel}")
-                        else:
-                            unified_user.vk_channel_name = None
-                            logger.info("Cleared stale VK channel_name (no channel slug in OAuth data)")
-                        if vk_display:
-                            unified_user.vk_username = vk_display
+                        self._apply_vk_profile(unified_user, user_data)
 
                     db.commit()
                     logger.info(f"Updated {platform} tokens for user {unified_user.id}")
@@ -270,16 +281,7 @@ class OAuthHandler:
                     if platform == "twitch" and hasattr(user_data, 'username'):
                         unified_user.twitch_username = user_data.username
                     elif platform == "vk":
-                        vk_channel = self._resolve_vk_channel_name(user_data)
-                        vk_display = user_data.username or vk_channel
-                        if vk_channel:
-                            unified_user.vk_channel_name = vk_channel
-                            logger.info(f"Updated VK channel_name: {vk_channel}")
-                        else:
-                            unified_user.vk_channel_name = None
-                            logger.info("Cleared stale VK channel_name (no channel slug in OAuth data)")
-                        if vk_display:
-                            unified_user.vk_username = vk_display
+                        self._apply_vk_profile(unified_user, user_data)
 
                     db.commit()
                     logger.info(f"Added {platform} integration to user {unified_user.id}")
@@ -301,6 +303,10 @@ class OAuthHandler:
                         current_user_id=current_user.get('id') if current_user else None,
                         is_admin=False
                     )
+
+                    if platform == "vk":
+                        self._apply_vk_profile(unified_user, user_data)
+                        db.commit()
 
                     if unified_user and not is_linking:
                          logger.info(f"[SECURITY] Login via {platform} (User ID {unified_user.id}) - deactivating other platform tokens")

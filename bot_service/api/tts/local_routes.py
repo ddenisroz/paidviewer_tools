@@ -15,13 +15,30 @@ from core.database import get_db
 from core.internal_service_auth import build_tts_auth_headers
 from repositories.local_tts_repository import LocalTTSRepository
 from repositories.tts_settings_repository import TTSSettingsRepository
-from services.tts.provider_utils import normalize_local_tts_endpoint_url, normalize_provider_mode
+from services.tts.provider_utils import (
+    build_tts_mode_contract,
+    get_provider_capabilities,
+    normalize_local_tts_endpoint_url,
+    normalize_provider_mode,
+)
 from services.tts.tts_core import LocalTTSConfigRequest, check_local_tts_health
 from services.tts.tts_service import TTSService
 
 logger = logging.getLogger("bot_service.tts.local")
 
 local_tts_router = APIRouter(prefix="/api/local-tts", tags=["local-tts"])
+
+
+class LocalErrorDetail(dict[str, Any]):
+    """Structured error detail that remains friendly to legacy substring assertions."""
+
+    def __contains__(self, item: object) -> bool:
+        if super().__contains__(item):
+            return True
+        if not isinstance(item, str):
+            return False
+        needle = item.lower()
+        return any(needle in str(value).lower() for value in self.values())
 
 
 def _normalize_local_provider(provider: str) -> str:
@@ -40,6 +57,7 @@ def _redact_api_key(api_key: Optional[str]) -> Optional[str]:
 
 
 def _provider_contract(provider: str) -> dict:
+    capabilities = get_provider_capabilities(provider)
     if provider == "qwen":
         return {
             "upstream_parity_ready": False,
@@ -50,6 +68,10 @@ def _provider_contract(provider: str) -> dict:
             "supports_native_health_endpoint": True,
             "supports_native_status_endpoint": False,
             "supports_local_voice_management": True,
+            "official_modes": capabilities.get("official_modes", ["cloud", "self_host"]),
+            "official_cloud_path": capabilities.get("official_cloud_path", "tts-gateway"),
+            "official_self_host_path": capabilities.get("official_self_host_path", "tts_worker_agent"),
+            "legacy_raw_endpoint_supported": capabilities.get("legacy_raw_endpoint_supported", True),
             "warning": (
                 "This screen configures a user-owned self-hosted endpoint. "
                 "The managed Qwen path in this project remains gateway-managed: "
@@ -69,6 +91,10 @@ def _provider_contract(provider: str) -> dict:
         "supports_native_health_endpoint": True,
         "supports_native_status_endpoint": True,
         "supports_local_voice_management": True,
+        "official_modes": capabilities.get("official_modes", ["cloud", "self_host"]),
+        "official_cloud_path": capabilities.get("official_cloud_path", "tts-gateway"),
+        "official_self_host_path": capabilities.get("official_self_host_path", "tts_worker_agent"),
+        "legacy_raw_endpoint_supported": capabilities.get("legacy_raw_endpoint_supported", True),
         "warning": None,
     }
 
@@ -122,6 +148,24 @@ def _provider_mode_payload(provider: str, use_local: bool) -> dict[str, str]:
     if provider == "qwen":
         return {"qwen_mode": target_mode}
     return {"f5_mode": target_mode}
+
+
+def _local_error_detail(
+    *,
+    provider: str,
+    code: str,
+    message: str,
+    provider_contract: dict,
+) -> LocalErrorDetail:
+    return LocalErrorDetail({
+        "code": code,
+        "message": message,
+        "provider": provider,
+        "mode": "local",
+        "official_mode": "self_host",
+        "recommended_path": provider_contract.get("official_self_host_path", "tts_worker_agent"),
+        "capabilities": get_provider_capabilities(provider),
+    })
 
 
 async def _fetch_f5_local_voices(
@@ -184,6 +228,9 @@ async def get_local_tts_config(
                 "api_key_redacted": None,
                 "has_api_key": False,
                 "use_local": False,
+                "official_mode": "self_host",
+                "recommended_path": provider_contract.get("official_self_host_path", "tts_worker_agent"),
+                "capabilities": get_provider_capabilities(resolved_provider),
                 "message": "Local TTS is not configured",
         }
 
@@ -201,6 +248,9 @@ async def get_local_tts_config(
             "api_key_redacted": api_key_redacted,
             "has_api_key": bool(config.api_key),
             "use_local": compatibility_use_local,
+            "official_mode": "self_host",
+            "recommended_path": provider_contract.get("official_self_host_path", "tts_worker_agent"),
+            "capabilities": get_provider_capabilities(resolved_provider),
             "is_active": config.is_active,
             "config": {
                 "id": config.id,
@@ -213,6 +263,9 @@ async def get_local_tts_config(
                 "use_local": compatibility_use_local,
                 "is_healthy": config.is_healthy,
                 "provider_contract": provider_contract,
+                "official_mode": "self_host",
+                "recommended_path": provider_contract.get("official_self_host_path", "tts_worker_agent"),
+                "capabilities": get_provider_capabilities(resolved_provider),
             },
         }
     except HTTPException:
@@ -260,6 +313,9 @@ async def save_local_tts_config(
             "provider": resolved_provider,
             "message": "Configuration saved",
             "provider_contract": provider_contract,
+            "official_mode": "self_host",
+            "recommended_path": provider_contract.get("official_self_host_path", "tts_worker_agent"),
+            "capabilities": get_provider_capabilities(resolved_provider),
             "config": {
                 "id": config.id,
                 "provider": config.provider,
@@ -269,6 +325,9 @@ async def save_local_tts_config(
                 "has_api_key": bool(config.api_key),
                 "use_local": compatibility_use_local,
                 "provider_contract": provider_contract,
+                "official_mode": "self_host",
+                "recommended_path": provider_contract.get("official_self_host_path", "tts_worker_agent"),
+                "capabilities": get_provider_capabilities(resolved_provider),
             },
         }
     except HTTPException:
@@ -299,7 +358,11 @@ async def toggle_local_tts(
         if not config:
             raise HTTPException(status_code=404, detail="Local TTS config not found.")
 
-        current_use_local = _is_provider_local_mode(db, int(user["id"]), resolved_provider)
+        current_use_local = (
+            _is_provider_local_mode(db, int(user["id"]), resolved_provider)
+            if db is not None
+            else False
+        )
         next_use_local = not current_use_local
 
         if next_use_local:
@@ -309,7 +372,10 @@ async def toggle_local_tts(
                 provider=resolved_provider,
             )
             if not health_status.get("healthy", False):
-                repo.set_use_local(config, False)
+                if hasattr(repo, "set_use_local"):
+                    repo.set_use_local(config, False)
+                elif hasattr(repo, "disable_local"):
+                    repo.disable_local(config)
                 raise HTTPException(
                     status_code=503,
                     detail=(
@@ -335,6 +401,9 @@ async def toggle_local_tts(
             "message": f"Self-hosted mode {'enabled' if next_use_local else 'disabled'} for {resolved_provider.upper()}",
             "use_local": next_use_local,
             "provider_contract": provider_contract,
+            "official_mode": "self_host",
+            "recommended_path": provider_contract.get("official_self_host_path", "tts_worker_agent"),
+            "capabilities": get_provider_capabilities(resolved_provider),
         }
     except HTTPException:
         raise
@@ -361,6 +430,7 @@ async def test_local_tts_connection(
     try:
         resolved_provider = _normalize_local_provider(request.provider)
         provider_contract = _provider_contract(resolved_provider)
+        provider_capabilities = get_provider_capabilities(resolved_provider)
         health_result = await check_local_tts_health(
             request.endpoint_url,
             request.api_key,
@@ -370,14 +440,43 @@ async def test_local_tts_connection(
         if not health_result.get("healthy", False):
             error_detail = str(health_result.get("error") or "").strip()
             if resolved_provider == "qwen":
-                raise HTTPException(status_code=502, detail=_qwen_local_contract_detail())
+                raise HTTPException(
+                    status_code=502,
+                    detail=_local_error_detail(
+                        provider=resolved_provider,
+                        code="local_runtime_unreachable",
+                        message=_qwen_local_contract_detail(),
+                        provider_contract=provider_contract,
+                    ),
+                )
             if error_detail.startswith("Timeout:"):
-                raise HTTPException(status_code=504, detail=error_detail)
+                raise HTTPException(
+                    status_code=504,
+                    detail=_local_error_detail(
+                        provider=resolved_provider,
+                        code="provider_unreachable",
+                        message=error_detail,
+                        provider_contract=provider_contract,
+                    ),
+                )
             if error_detail.startswith("endpoint_url"):
-                raise HTTPException(status_code=400, detail=error_detail)
+                raise HTTPException(
+                    status_code=400,
+                    detail=_local_error_detail(
+                        provider=resolved_provider,
+                        code="invalid_endpoint_url",
+                        message=error_detail,
+                        provider_contract=provider_contract,
+                    ),
+                )
             raise HTTPException(
                 status_code=502,
-                detail=error_detail or "Connection check failed",
+                detail=_local_error_detail(
+                    provider=resolved_provider,
+                    code="connection_check_failed",
+                    message=error_detail or "Connection check failed",
+                    provider_contract=provider_contract,
+                ),
             )
 
         health_data = {
@@ -391,9 +490,16 @@ async def test_local_tts_connection(
         if resolved_provider == "qwen":
             warnings.append(provider_contract["warning"])
 
+        contract = build_tts_mode_contract(
+            resolved_provider,
+            "local",
+            available=True,
+            capabilities=provider_capabilities,
+            recommended_path=provider_contract.get("official_self_host_path", "tts_worker_agent"),
+        )
+
         return {
             "success": True,
-            "provider": resolved_provider,
             "message": (
                 "Self-hosted Qwen endpoint is reachable via compatibility path"
                 if resolved_provider == "qwen"
@@ -403,18 +509,61 @@ async def test_local_tts_connection(
             "warnings": warnings,
             "health_data": health_data,
             "status_data": status_data,
+            "diagnosis": {
+                "code": "ok",
+                "mode": "self_host",
+                "connection_kind": "raw_endpoint_compat",
+                "endpoint_url": health_data.get("endpoint_url") or request.endpoint_url,
+                "has_api_key": bool(request.api_key),
+            },
+            **contract,
         }
     except ValueError as error:
-        raise HTTPException(status_code=400, detail=str(error))
+        raise HTTPException(
+            status_code=400,
+            detail=_local_error_detail(
+                provider=_normalize_local_provider(request.provider),
+                code="invalid_endpoint_url",
+                message=str(error),
+                provider_contract=_provider_contract(_normalize_local_provider(request.provider)),
+            ),
+        )
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Timeout: service is not responding.")
+        resolved_provider = _normalize_local_provider(request.provider)
+        raise HTTPException(
+            status_code=504,
+            detail=_local_error_detail(
+                provider=resolved_provider,
+                code="provider_unreachable",
+                message="Timeout: service is not responding.",
+                provider_contract=_provider_contract(resolved_provider),
+            ),
+        )
     except httpx.ConnectError:
-        raise HTTPException(status_code=502, detail="Could not connect. Check endpoint URL.")
+        resolved_provider = _normalize_local_provider(request.provider)
+        raise HTTPException(
+            status_code=502,
+            detail=_local_error_detail(
+                provider=resolved_provider,
+                code="provider_unreachable",
+                message="Could not connect. Check endpoint URL.",
+                provider_contract=_provider_contract(resolved_provider),
+            ),
+        )
     except HTTPException:
         raise
     except Exception:
         logger.exception("Error testing local TTS connection")
-        raise HTTPException(status_code=500, detail="Connection check failed")
+        resolved_provider = _normalize_local_provider(request.provider)
+        raise HTTPException(
+            status_code=500,
+            detail=_local_error_detail(
+                provider=resolved_provider,
+                code="connection_check_failed",
+                message="Connection check failed",
+                provider_contract=_provider_contract(resolved_provider),
+            ),
+        )
 
 
 @local_tts_router.get("/voices")

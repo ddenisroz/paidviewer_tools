@@ -10,6 +10,7 @@ export { authService } from './authService';
 export { pointsService } from './pointsService';
 export { chatService } from './chatService';
 export { integrationsService } from './integrationsService';
+export { platformService } from './platformService';
 export { chatboxService } from './chatboxService';
 export { lootboxService } from './lootboxService';
 export { adminService } from './adminService';

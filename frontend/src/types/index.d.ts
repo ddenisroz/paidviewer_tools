@@ -13,4 +13,5 @@ export * from './youtube';
 export * from './chat';
 export * from './points';
 export * from './commands';
+export * from './platform';
 

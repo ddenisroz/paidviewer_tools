@@ -25,6 +25,7 @@ from core.database import (
 )
 from services.drops.drops_service import DropsService
 from services.drops.drops_calculation_service import DropsCalculationService
+from services.stream_session_service import StreamSessionService
 from repositories.drops_history_repository import DropsHistoryRepository
 from core.datetime_utils import utcnow_naive
 
@@ -324,6 +325,80 @@ class TestStreakTracking:
             f"[OK] Streak messages requirement tracking works: {streak.messages_this_stream}/{test_config.streak_messages_required}"
         )
 
+    def test_streak_progression_uses_previous_stream_session(
+        self, drops_service, test_config, test_rewards
+    ):
+        """Streak progression should be computed across stream_session boundaries."""
+        drops_service._check_stream_online = lambda **kwargs: True
+        session_service = StreamSessionService(drops_service.db)
+
+        first_session = session_service.get_or_create_active_session(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+        )
+        drops_service.update_user_streak(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+        )
+        for _ in range(test_config.streak_messages_required):
+            drops_service.increment_viewer_message_count(
+                user_id=1,
+                channel_name="test_channel",
+                platform="twitch",
+                viewer_id="viewer123",
+                viewer_name="TestViewer",
+            )
+
+        session_service.end_session(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+        )
+        second_session = session_service.get_or_create_active_session(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+        )
+
+        result = drops_service.process_streak_drops(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            chat_message_id=101,
+        )
+
+        assert first_session.id != second_session.id
+        assert result is not None
+        assert result["type"] == "streak"
+        assert result["streak_days"] == 1
+        assert result["stream_session_id"] == second_session.id
+        assert result["source_event_id"] == "chat_message:101"
+
+        streak = drops_service.get_user_streak(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+        )
+        assert streak.current_streak == 1
+        assert streak.last_stream_session_id == second_session.id
+
+        history = drops_service.get_drops_history(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            limit=10,
+        )
+        assert history[0].stream_session_id == second_session.id
+        assert history[0].source_event_id == "chat_message:101"
+        print("[OK] Streak progression uses previous stream session boundaries")
+
 
 class TestDonationDrops:
     """Test donation-triggered drops"""
@@ -492,6 +567,53 @@ class TestDropsHistory:
         assert stats["legendary_drops"] == stats["legendaryDrops"]
         assert stats["mythical_drops"] == stats["mythicalDrops"]
         print(f"[OK] Drops stats work: {stats}")
+
+    def test_donation_history_is_idempotent_by_source_event(
+        self, drops_service, test_config, test_rewards
+    ):
+        """Duplicate donation events should not create duplicate rewards/history."""
+        drops_service._check_stream_online = lambda **kwargs: True
+        session_service = StreamSessionService(drops_service.db)
+        active_session = session_service.get_or_create_active_session(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+        )
+
+        first_result = drops_service.process_donation_drops(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            donation_amount=100.0,
+            donation_alert_id="alert-1",
+        )
+        second_result = drops_service.process_donation_drops(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            viewer_id="viewer123",
+            viewer_name="TestViewer",
+            donation_amount=100.0,
+            donation_alert_id="alert-1",
+        )
+
+        history = drops_service.get_drops_history(
+            user_id=1,
+            channel_name="test_channel",
+            platform="twitch",
+            limit=10,
+        )
+
+        assert first_result is not None
+        assert first_result["stream_session_id"] == active_session.id
+        assert first_result["source_event_id"] == "donation_alert:alert-1"
+        assert second_result is None
+        assert len(history) == 1
+        assert history[0].stream_session_id == active_session.id
+        assert history[0].source_event_id == "donation_alert:alert-1"
+        print("[OK] Donation drops are idempotent per source event")
 
 
 class TestMythicalSessionRepository:

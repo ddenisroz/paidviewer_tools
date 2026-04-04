@@ -5,6 +5,21 @@
 /**
  * Статус TTS.
  */
+export interface TtsModeContract {
+  provider?: 'f5' | 'gcloud' | 'qwen';
+  mode?: 'cloud' | 'local';
+  official_mode?: 'cloud' | 'self_host';
+  available?: boolean;
+  healthy?: boolean;
+  status?: string;
+  degraded_reason?: string | null;
+  slot_allowed?: boolean;
+  recommended_path?: string | null;
+  official_path?: string | null;
+  error_code?: string | null;
+  capabilities?: Record<string, unknown>;
+}
+
 export interface TtsStatus {
   enabled: boolean;
   channel_name?: string;
@@ -18,7 +33,17 @@ export interface TtsStatus {
   has_local_setup?: boolean;
   has_local_setup_f5?: boolean;
   has_local_setup_qwen?: boolean;
+  has_local_endpoint_f5?: boolean;
+  has_local_endpoint_qwen?: boolean;
   is_whitelisted?: boolean;
+  official_mode?: 'cloud' | 'self_host';
+  official_modes?: Array<'cloud' | 'self_host'>;
+  recommended_path?: string;
+  active_contract?: TtsModeContract;
+  provider_matrix?: Record<string, Record<string, TtsModeContract>>;
+  capabilities?: Record<string, unknown>;
+  active_self_host_path?: 'tts_worker_agent' | 'raw_endpoint_compat' | null;
+  legacy_mode_alias?: 'cloud' | 'local';
 }
 
 /**
@@ -120,6 +145,9 @@ export interface LocalTtsConfig {
   enabled: boolean;
   provider?: 'f5' | 'qwen';
   use_local?: boolean;
+  official_mode?: 'self_host';
+  recommended_path?: string;
+  capabilities?: Record<string, unknown>;
   host?: string;
   port?: number;
   endpoint_url?: string;
@@ -138,9 +166,20 @@ export interface LocalTtsConfig {
     supports_native_health_endpoint?: boolean;
     supports_native_status_endpoint?: boolean;
     supports_local_voice_management?: boolean;
+    official_modes?: Array<'cloud' | 'self_host'>;
+    official_cloud_path?: string | null;
+    official_self_host_path?: string | null;
+    legacy_raw_endpoint_supported?: boolean;
     warning?: string | null;
   };
   warnings?: string[];
+  diagnosis?: {
+    code?: string;
+    mode?: 'self_host';
+    connection_kind?: string;
+    endpoint_url?: string;
+    has_api_key?: boolean;
+  };
   data?: {
     configured?: boolean;
     healthy?: boolean;

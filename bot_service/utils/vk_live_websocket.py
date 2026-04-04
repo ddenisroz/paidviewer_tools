@@ -7,7 +7,13 @@ import os
 from typing import Dict, Optional, Callable
 import structlog
 
-from utils.vk_chat_parser import build_message_text_and_emotes, extract_vk_badge_urls, normalize_parts
+from utils.vk_chat_parser import (
+    build_message_text_and_emotes,
+    extract_vk_badge_urls,
+    extract_vk_mentioned_users,
+    extract_vk_reply_metadata,
+    normalize_parts,
+)
 
 logger = structlog.get_logger(__name__)
 _VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
@@ -498,6 +504,8 @@ class VKLiveWebSocketClient:
 
             # Формируем текст сообщения
             message_text, emotes = build_message_text_and_emotes(parts)
+            mentioned_users = extract_vk_mentioned_users(parts, chat_payload.get("data"), message_text)
+            reply_metadata = extract_vk_reply_metadata(chat_payload)
 
             # Извлекаем информацию об авторе
             author_id = author.get("id")
@@ -521,7 +529,11 @@ class VKLiveWebSocketClient:
                     "message_id": message_id,
                     "created_at": created_at,
                     "badges": badges,
-                    "emotes": emotes or None
+                    "emotes": emotes or None,
+                    "is_reply": bool(reply_metadata.get("is_reply")),
+                    "mentioned_users": mentioned_users or None,
+                    "reply_to_author": reply_metadata.get("reply_to_author"),
+                    "reply_to_text": reply_metadata.get("reply_to_text"),
                 })
 
         except Exception as e:

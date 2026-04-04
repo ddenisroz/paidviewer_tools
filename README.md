@@ -1,22 +1,23 @@
-# Paidviewer Tools
+﻿# Paidviewer Tools
 
-Платформа для стримеров с `bot_service`, dashboard, TTS, YouTube queue, drops и интеграциями.
+Основной репозиторий Paidviewer: `bot_service`, `frontend`, `tts_worker_agent`, интеграции платформ, YouTube queue и drops/streaks.
 
 ## С чего начать
 
-- [docs/QUICKSTART.md](docs/QUICKSTART.md) — быстрый локальный запуск
-- [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md) — текущая архитектура и границы
-- [docs/STATUS_TRACKER.md](docs/STATUS_TRACKER.md) — что стабильно, что ещё открыто
-- [docs/README.md](docs/README.md) — индекс активной документации
+- [Быстрый старт](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)
+- [Контекст проекта](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/PROJECT_CONTEXT.md)
+- [Release checklist](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
+- [Live smoke runbook](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
+- [Индекс активной документации](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/README.md)
 
-## Кратко про архитектуру
+## Коротко
 
 - `frontend` общается только с `bot_service`
-- `bot_service` — центральный backend, auth, orchestration и бизнес-логика
-- `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm` — внешние TTS-сервисы
-- browser TTS работает только через отдельную вкладку `/tts-player`
+- `bot_service` — центральный backend и оркестратор
+- `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm` — внешний cloud TTS-контур
+- `tts_worker_agent` — официальный self-host путь
 
-## Быстрый локальный запуск
+## Базовые команды
 
 ```powershell
 python -m venv .venv
@@ -24,53 +25,22 @@ python -m venv .venv
 python -m pip install --upgrade pip
 python -m pip install -r bot_service/requirements.txt
 python -m pip install -r bot_service/requirements_dev.txt
+```
 
+```powershell
 cd frontend
 npm install
-cd ..
+npm run type-check
+npm run test:run
+npm run build
 ```
 
-Подготовь:
-
-- `bot_service/.env`
-- `frontend/.env`
-
-Запуск:
-
 ```powershell
-cd bot_service
+cd ..\bot_service
 alembic upgrade head
 python main.py
-
-cd ..\frontend
-npm run dev
-```
-
-## Полезные команды
-
-Гигиена базы данных:
-
-```powershell
-.\.venv\Scripts\python.exe bot_service\scripts\database_hygiene.py
-```
-
-Безопасное удаление пользователей:
-
-```powershell
-.\.venv\Scripts\python.exe bot_service\scripts\delete_users.py --list
-```
-
-Очистка репозитория перед commit или release:
-
-```powershell
-.\scripts\prepare-release.ps1
-.\scripts\prepare-release.ps1 -ApplyCleanup
 ```
 
 ## Документация
 
-В `docs/` лежит только активный короткий слой. История, аудиты, временные планы и снятые с поддержки заметки живут в `docs/backlog/`.
-
-## Лицензия
-
-MIT
+В `docs/` оставлен только короткий активный слой. Всё историческое и производное должно жить в `docs/backlog/`.

@@ -1,24 +1,26 @@
 ﻿# Live smoke runbook
 
-Последнее обновление: 2026-03-13
+Последнее обновление: 2026-03-31
 
 Это документ для первого end-to-end smoke без смешения инфраструктурных проблем, контрактных проблем и upstream gaps.
 
 ## Термины
 
-- `self-hosted endpoint` — пользовательский TTS endpoint, сохранённый в `local_tts_endpoints`
-- `project-hosted worker` — выделенный TTS runtime под инфраструктурой проекта
-- `gateway-managed` — `bot_service -> tts-gateway -> project-hosted workers`
+- `cloud` — `bot_service -> tts-gateway -> provider runtime`
+- `self_host` — `bot_service pairing/provisioning -> tts_worker_agent -> local runtime`
+- `raw endpoint compatibility` — запасной ручной путь через `local_tts_endpoints`; не основной пользовательский сценарий
 
 ## Что входит в первый smoke
 
 Обязательно:
 
-1. `gateway-managed` synth для `f5`
-2. `gateway-managed` synth для `qwen`
-3. `self-hosted endpoint` для `f5`
-4. `self-hosted endpoint` для `qwen` через compatibility path
-5. `qwen` voice/admin CRUD через backend/upstream contract
+1. `cloud` synth для `f5`
+2. `cloud` synth для `qwen`
+3. `self_host via tts_worker_agent` для `f5`
+4. `self_host via tts_worker_agent` для `qwen`
+5. `drops` duplicate-event/session-boundary
+6. `youtube` next/skip/reorder
+7. `vk` bot OAuth beta flow
 
 ## Preflight
 
@@ -41,7 +43,7 @@
 - что Redis реально доступен из `tts-gateway`
 - что F5 assets и weights реально присутствуют
 - что Qwen runtime реально поднят в Linux или WSL2
-- что пользователь уже авторизован и может включить self-hosted режим
+- что пользователь уже авторизован и может включить self-host режим
 
 ## Порядок запуска
 
@@ -64,57 +66,78 @@
 
 ## Сценарии
 
-### S1. Gateway-managed F5
+### S1. Cloud F5
 
 Ожидаемо:
 
 - `f5Mode = cloud`
 - `advancedProvider = f5`
 - `useLocalTTS = false`
-- synth проходит через gateway
+- synth проходит через `tts-gateway`
 
-### S2. Gateway-managed Qwen
+### S2. Cloud Qwen
 
 Ожидаемо:
 
 - `qwenMode = cloud`
 - `advancedProvider = qwen`
 - `useLocalTTS = false`
-- synth проходит через gateway
+- synth проходит через `tts-gateway`
 
-### S3. Self-hosted F5
+### S3. Self-host F5 via agent
 
 Ожидаемо:
 
-- local endpoint успешно проходит `test-connection`
-- конфиг сохраняется
-- synth идёт через пользовательский self-hosted endpoint
+- provisioning bundle создаётся успешно
+- `tts_worker_agent` активируется без `version_mismatch`
+- synth идёт через локальный агент и локальный runtime
 - upload smoke использует [female_1.wav](/H:/Programming/raw_code/AI/Python/paidviewer_tools/female_1.wav)
 
-### S4. Self-hosted Qwen
+### S4. Self-host Qwen via agent
 
 Ожидаемо:
 
-- `test-connection` проходит с compatibility warning
-- synth идёт через `/api/prepare -> /api/stream/{id}` adapter
-- это не считается ошибкой текущей фазы
+- provisioning bundle создаётся успешно
+- `tts_worker_agent` активируется без `version_mismatch`
+- synth идёт через локальный агент и локальный runtime
 - upload smoke использует [female_1.wav](/H:/Programming/raw_code/AI/Python/paidviewer_tools/female_1.wav) и валидный `API_KEY` worker-а
 
-### S5. Qwen voice/admin CRUD
+### S5. Drops duplicate-event/session-boundary
 
 Ожидаемо:
 
-- capabilities помечают Qwen admin как available
-- backend routes для global/admin voices отвечают успешно
-- UI не показывает admin-действия, если `voice_admin=false`
-- preview/test либо отрабатывает успешно, либо за разумное время возвращает понятный warmup/model-loading ответ; не должно быть многоминутного `pending`
+- повторный donation/chat event не создаёт вторую награду
+- streak progression опирается на `stream_session_id`
+- reconnect overlay не ломает историю и не дублирует reward emission
+
+### S6. YouTube queue/runtime
+
+Ожидаемо:
+
+- `Play now`, `next`, `skip` и reorder работают консистентно
+- reorder сохраняется на сервере
+- natural end не ломает переход на следующий ролик
+
+### S7. VK bot OAuth beta flow
+
+Ожидаемо:
+
+- bot OAuth возвращает нормализованные коды ошибок
+- успешный callback поднимает bot runtime или честно возвращает `restart_failed`
+- VK остаётся beta-tier, но без ложного success-state
 
 ## Критерий успеха
 
 Первый smoke считается успешным, если:
 
-1. `f5` и `qwen` synth работают через gateway-managed path
-2. `f5` self-hosted endpoint работает
-3. `qwen` self-hosted endpoint работает через compatibility path
-4. `qwen` voice/admin CRUD работает через backend/upstream contract
-5. frontend везде остаётся backend-only
+1. `f5` и `qwen` synth работают через `cloud`
+2. `f5` и `qwen` работают через `self_host` именно через `tts_worker_agent`
+3. `drops` не дублируют награды на повторных событиях
+4. `youtube` queue/runtime проходит smoke без ручного восстановления
+5. `vk` bot OAuth beta flow не даёт ложных success-state
+6. frontend везде остаётся backend-only
+
+## Для презентационного smoke
+
+- не меняй порядок шагов по ходу демонстрации
+- считай `VK Live` обязательным live-блоком, если он заявлен в сценарии презентации

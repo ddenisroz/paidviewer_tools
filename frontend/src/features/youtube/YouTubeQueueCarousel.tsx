@@ -9,7 +9,7 @@ import {
   useClearYoutubeQueue,
   useDeleteYoutubeVideo,
   useMarkYoutubeVideoAsPlayed,
-  useSkipYoutubeVideo,
+  usePlayYoutubeQueueItem,
   useYoutubeQueue
 } from '@/queries/youtube/youtubeQueries';
 import { Button } from '@/shared/components/ui/button';
@@ -111,7 +111,7 @@ const YouTubeQueueCarousel: React.FC = () => {
   });
 
   const removeVideoMutation = useDeleteYoutubeVideo();
-  const playVideoMutation = useSkipYoutubeVideo({
+  const playVideoMutation = usePlayYoutubeQueueItem({
     onSuccess: () => {
       window.dispatchEvent(new CustomEvent('youtube_event', {
         detail: { event: 'video_played' }
@@ -135,7 +135,7 @@ const YouTubeQueueCarousel: React.FC = () => {
 
   const playVideo = (_queueId: number) => {
     // Skip to this video
-    playVideoMutation.mutate();
+    playVideoMutation.mutate(_queueId);
   };
 
   const markAsPlayed = (queueId: number) => {

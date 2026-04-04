@@ -14,29 +14,31 @@
 
 ## Как сейчас устроен TTS
 
-В проекте используются три режима:
+Официальных пользовательских режимов только два:
 
-- `self-hosted endpoint` — пользователь сам поднимает TTS-сервис и подключает его URL
-- `project-hosted worker` — внешний воркер под инфраструктурой проекта
-- `gateway-managed` — путь `bot_service -> tts-gateway -> project-hosted worker`
+- `cloud` — `frontend -> bot_service -> tts-gateway -> provider runtime`
+- `self_host` — `frontend -> bot_service pairing/provisioning -> tts_worker_agent -> local runtime`
 
-Старые флаги `use_local`, `f5_local`, `qwen_local` сохранены только как совместимые алиасы; источник истины для routing — `advanced_provider` + provider-specific `f5_mode` / `qwen_mode`.
+Что важно:
+
+- `tts_worker_agent` — основной и рекомендуемый self-host путь для обоих провайдеров
+- ручной raw endpoint сохранён только как compatibility fallback для поддержки и диагностики
+- старые флаги `use_local`, `f5_local`, `qwen_local` и старые термины остаются только для совместимости
+- источник истины для routing — mode-first контракт `official_mode`, `recommended_path`, `provider_matrix`, capability flags и status/health ответы backend-а
 
 ## Провайдеры
 
 - `f5`
-  - управляемый путь: через `tts-gateway`
-  - собственный endpoint пользователя: поддерживается
-  - gateway возвращает gateway-hosted `audio_url`, а не прямой provider `audio_url`
-  - управление голосами: поддерживается через backend
+  - cloud и self-host используют тот же mode-first orchestration-контур, что и `qwen`
+  - управление голосами поддерживается через backend
 - `qwen`
-  - управляемый путь: через `tts-gateway`
-  - собственный endpoint пользователя: работает через слой совместимости
-  - управление голосами: поддерживается через backend/admin routes upstream-а
+  - cloud и self-host используют тот же orchestration-path, а различия живут в provider adapter/capabilities
+  - ручной self-host endpoint всё ещё работает через compatibility adapter, но пользовательский прод-путь — через `tts_worker_agent`
+  - управление голосами поддерживается через backend/admin routes upstream-а
   - admin/global voices доступны при настроенном `QWEN_TTS_SERVICE_URL` или `QWEN_VOICE_SERVICE_URL`
   - рекомендуемый общий env для согласования backend catalog и runtime allowlist: `QWEN_ALLOWED_MODELS`
   - cloud model catalog должен отражать runtime `/api/models`, отфильтрованный backend allowlist `QWEN_CLOUD_ALLOWED_MODELS` при его наличии
-  - self-hosted model catalog не режется backend allowlist-ом и отражает runtime пользовательского endpoint-а как есть
+- self-host model catalog не режется backend allowlist-ом и отражает runtime пользовательского compatibility endpoint-а как есть
   - `QWEN_VOICE_STORAGE_DIR` должен жить в общем persistent volume, чтобы sample-ы переживали смену `base` / `voice_design` / `custom_voice` runtime
 - `gcloud`
   - встроенный путь внутри `bot_service`
@@ -76,6 +78,6 @@
 
 ## Что ещё открыто
 
-- добить оставшиеся совместимые хвосты в смешанных доменах
-- пройти live smoke по основным TTS-путям
+- пройти staging/live smoke по матрице `cloud/self_host x f5/qwen`
+- довести CI и quality gates до полностью зелёного статуса
 - дальше сжимать основную документацию до короткого русского источника правды

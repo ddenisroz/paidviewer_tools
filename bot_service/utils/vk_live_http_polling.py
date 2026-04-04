@@ -11,7 +11,13 @@ import re
 from typing import Optional, Callable, Dict, Set
 
 from utils.vk_channel_url import extract_vk_channel_slug
-from utils.vk_chat_parser import build_message_text_and_emotes, extract_vk_badge_urls, normalize_parts
+from utils.vk_chat_parser import (
+    build_message_text_and_emotes,
+    extract_vk_badge_urls,
+    extract_vk_mentioned_users,
+    extract_vk_reply_metadata,
+    normalize_parts,
+)
 
 logger = logging.getLogger(__name__)
 _VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
@@ -352,6 +358,8 @@ class VKLiveHTTPPolling:
             parts = normalize_parts(message.get("parts", []), message.get("data"))
             message_text, emotes = build_message_text_and_emotes(parts)
             badges = extract_vk_badge_urls(author)
+            mentioned_users = extract_vk_mentioned_users(parts, message.get("data"), message_text)
+            reply_metadata = extract_vk_reply_metadata(message)
             emotes = await self._enrich_vk_text_emotes(message_text, emotes)
 
             # [OK] НЕ пропускаем сообщения, даже если текст пустой - возможно это только ссылка или эмодзи
@@ -373,7 +381,11 @@ class VKLiveHTTPPolling:
                 "channel": self.channel_url,
                 "platform": "vk",
                 "badges": badges,
-                "emotes": emotes or None
+                "emotes": emotes or None,
+                "is_reply": bool(reply_metadata.get("is_reply")),
+                "mentioned_users": mentioned_users or None,
+                "reply_to_author": reply_metadata.get("reply_to_author"),
+                "reply_to_text": reply_metadata.get("reply_to_text"),
             }
 
             # Отправляем в обработчик

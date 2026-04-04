@@ -82,6 +82,19 @@ export const youtubeService = {
   },
 
   /**
+   * Изменить порядок элементов в очереди
+   * @param activeQueueId - ID перетаскиваемого элемента
+   * @param overQueueId - ID элемента, над которым завершили перетаскивание
+   * @returns Promise с обновлённым состоянием очереди
+   */
+  async reorderQueue(activeQueueId: number, overQueueId: number): Promise<AxiosResponse<ApiResponse<{ current_video: YoutubeVideo | null; queue: YoutubeVideo[] }>>> {
+    return apiClient.post('/api/youtube/queue/reorder', {
+      active_queue_id: activeQueueId,
+      over_queue_id: overQueueId,
+    });
+  },
+
+  /**
    * Отметить видео как проигранное
    * @param queueId - ID видео в очереди
    * @returns Promise с ответом API

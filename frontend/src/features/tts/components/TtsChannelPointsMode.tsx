@@ -32,6 +32,84 @@ interface RewardForm {
   cooldown: number;
 }
 
+type RewardPlatformKey = 'twitch' | 'vk';
+
+interface RewardPlatformOption {
+  key: RewardPlatformKey;
+  label: string;
+  accentClassName: string;
+  Icon: typeof TwitchIcon;
+}
+
+interface RewardPlatformRowProps {
+  platform: RewardPlatformOption;
+  rewardId?: string;
+  isLoadingRewards: boolean;
+  onCreate: (platform: RewardPlatformKey) => void;
+  onDelete: (platform: RewardPlatformKey) => void;
+}
+
+const REWARD_PLATFORMS: RewardPlatformOption[] = [
+  { key: 'twitch', label: 'Twitch', accentClassName: 'text-purple-400', Icon: TwitchIcon },
+  { key: 'vk', label: 'VK Live', accentClassName: 'text-[#FF4444]', Icon: VKIcon },
+];
+
+const RewardPlatformRow: React.FC<RewardPlatformRowProps> = ({
+  platform,
+  rewardId,
+  isLoadingRewards,
+  onCreate,
+  onDelete,
+}) => (
+  <Card className="border-gray-700 bg-gray-800/30">
+    <CardContent className="p-3 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <platform.Icon className={`w-5 h-5 ${platform.accentClassName}`} />
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm text-white">{platform.label}</span>
+          {isLoadingRewards ? (
+            <Loader2 className="w-3 h-3 animate-spin text-gray-500" />
+          ) : rewardId ? (
+            <span className="text-[10px] bg-sky-500/10 text-sky-300 px-1.5 py-0.5 rounded border border-sky-500/20 font-medium whitespace-nowrap">
+              ВКЛ
+            </span>
+          ) : (
+            <span className="text-[10px] bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded border border-yellow-500/20 font-medium whitespace-nowrap">
+              ВЫКЛ
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center">
+        {isLoadingRewards ? (
+          <Button variant="ghost" size="sm" disabled className="h-7 text-xs opacity-50">
+            <Loader2 className="w-3 h-3 animate-spin" />
+          </Button>
+        ) : rewardId ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(platform.key)}
+            className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-2"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onCreate(platform.key)}
+            className="h-7 text-xs border-sky-600/50 text-sky-300 hover:bg-sky-600/10 hover:text-sky-200"
+          >
+            Создать
+          </Button>
+        )}
+      </div>
+    </CardContent>
+  </Card>
+);
+
 /**
  * Компонент для управления режимом TTS (все сообщения / за баллы канала)
  */
@@ -43,10 +121,10 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
   showRewards = true
 }) => {
   const { user } = useAuth();
-  const { integrations } = useIntegrations();
+  const { integrations, platformCapabilities } = useIntegrations();
   const queryClient = useQueryClient();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<RewardPlatformKey | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Форма создания награды
@@ -69,7 +147,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
   const ttsRewardIds = modeSettingsData?.tts_reward_ids || {};
 
   // Открыть диалог создания награды
-  const openCreateDialog = (platform: string) => {
+  const openCreateDialog = (platform: RewardPlatformKey) => {
     setSelectedPlatform(platform);
     setRewardForm({
       title: `TTS Озвучка сообщения`,
@@ -149,7 +227,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
   });
 
   // Удалить награду TTS
-  const handleDeleteReward = (platform: string) => {
+  const handleDeleteReward = (platform: RewardPlatformKey) => {
     if (!confirm(`Удалить TTS награду для ${platform.toUpperCase()}?`)) {
       return;
     }
@@ -172,12 +250,11 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
     deleteTtsRewardMutation.mutate(platform);
   };
 
-  const isTwitchConnected = integrations?.twitch?.enabled;
-  const isVkConnected = integrations?.vk?.enabled;
-
-  const connectedPlatforms: string[] = [];
-  if (isTwitchConnected) connectedPlatforms.push('twitch');
-  if (isVkConnected) connectedPlatforms.push('vk');
+  const connectedPlatforms = React.useMemo(
+    () => REWARD_PLATFORMS.filter(({ key }) => integrations?.[key]?.enabled && platformCapabilities[key].rewards),
+    [integrations, platformCapabilities]
+  );
+  const hasRewardPlatforms = connectedPlatforms.length > 0;
 
   return (
     <div className="space-y-3">
@@ -198,8 +275,8 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
 
           <button
             onClick={() => onModeChange('channel_points')}
-            disabled={isSaving || !isTwitchConnected}
-            className={`rounded-lg border p-3 text-left transition-colors ${!isTwitchConnected
+            disabled={isSaving || !hasRewardPlatforms}
+            className={`rounded-lg border p-3 text-left transition-colors ${!hasRewardPlatforms
               ? 'cursor-not-allowed border-border/60 bg-background/20 text-muted-foreground/70 opacity-40'
               : ttsMode === 'channel_points'
                 ? 'border-sky-500/50 bg-sky-500/10 text-sky-50'
@@ -207,8 +284,8 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
               }`}
           >
             <div className="font-semibold text-sm mb-0.5">За баллы канала</div>
-            <div className={`text-xs ${ttsMode === 'channel_points' && isTwitchConnected ? 'text-sky-200/80' : 'text-muted-foreground'}`}>
-              {!isTwitchConnected ? 'Требуется Twitch' : 'Только с наградой'}
+            <div className={`text-xs ${ttsMode === 'channel_points' && hasRewardPlatforms ? 'text-sky-200/80' : 'text-muted-foreground'}`}>
+              {!hasRewardPlatforms ? 'Подключите Twitch или VK Live' : 'Только с наградой'}
             </div>
           </button>
         </div>
@@ -218,67 +295,15 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
       {ttsMode === 'channel_points' && showRewards && (
         <div className={showModeSelector ? "pt-3 border-t border-gray-700/30" : "py-0"}>
           <div className="space-y-2">
-            {connectedPlatforms.map(platform => (
-              <Card key={platform} className="border-gray-700 bg-gray-800/30">
-                <CardContent className="p-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {platform === 'twitch' ? (
-                      <TwitchIcon className="w-5 h-5 text-purple-400" />
-                    ) : (
-                      <VKIcon className="w-5 h-5 text-[#FF4444]" />
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm text-white">
-                        {platform === 'twitch' ? 'Twitch' : 'VK Live'}
-                      </span>
-
-                      {isLoadingRewards ? (
-                        <Loader2 className="w-3 h-3 animate-spin text-gray-500" />
-                      ) : ttsRewardIds[platform] ? (
-                        <span className="text-[10px] bg-sky-500/10 text-sky-300 px-1.5 py-0.5 rounded border border-sky-500/20 font-medium whitespace-nowrap">
-                          ВКЛ
-                        </span>
-                      ) : (
-                        <span className="text-[10px] bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded border border-yellow-500/20 font-medium whitespace-nowrap">
-                          ВЫКЛ
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center">
-                    {isLoadingRewards ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled
-                        className="h-7 text-xs opacity-50"
-                      >
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      </Button>
-                    ) : ttsRewardIds[platform] ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteReward(platform)}
-                        className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 ml-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openCreateDialog(platform)}
-                        className="h-7 text-xs border-sky-600/50 text-sky-300 hover:bg-sky-600/10 hover:text-sky-200"
-                      >
-                        Создать
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+            {connectedPlatforms.map((platform) => (
+              <RewardPlatformRow
+                key={platform.key}
+                platform={platform}
+                rewardId={ttsRewardIds[platform.key]}
+                isLoadingRewards={isLoadingRewards}
+                onCreate={openCreateDialog}
+                onDelete={handleDeleteReward}
+              />
             ))}
 
             {connectedPlatforms.length === 0 && (

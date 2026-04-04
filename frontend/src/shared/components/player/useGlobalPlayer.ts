@@ -177,9 +177,8 @@ export function useGlobalPlayer({
             return;
         }
         endedVideoKeyRef.current = endedKey;
-        handlePlayerStateChange({ data: 2 }); // pause to avoid brief replay
         void nextVideo();
-    }, [displayVideo?.id, displayVideo?.video_id, handlePlayerStateChange, nextVideo]);
+    }, [displayVideo?.id, displayVideo?.video_id, nextVideo]);
 
     // Handle errors
     const handleError = useCallback((error: unknown) => {

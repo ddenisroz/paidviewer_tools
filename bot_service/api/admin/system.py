@@ -25,13 +25,14 @@ def _tts_auth_headers(
     *,
     upstream: str = "voice",
     use_gateway: bool | None = None,
+    strict: bool = True,
 ) -> dict:
     try:
         return build_tts_auth_headers(
             provider=provider,
             upstream=upstream,  # type: ignore[arg-type]
             use_gateway=use_gateway,
-            strict=True,
+            strict=strict,
         )
     except TTSAuthConfigError as error:
         raise HTTPException(
@@ -172,7 +173,7 @@ async def restart_tts_engine(
         except ProviderRoutingError as error:
             raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
         use_gateway = should_route_provider_via_gateway("f5")
-        headers = _tts_auth_headers("f5", upstream="synthesis", use_gateway=use_gateway)
+        headers = _tts_auth_headers("f5", upstream="synthesis", use_gateway=use_gateway, strict=False)
 
         try:
             async with httpx.AsyncClient(timeout=5.0, **build_tts_httpx_client_kwargs()) as client:

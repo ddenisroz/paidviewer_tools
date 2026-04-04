@@ -3,6 +3,8 @@
 import logging
 from typing import Any
 
+from utils.vk_channel_url import extract_vk_channel_slug
+
 logger = logging.getLogger("bot_service")
 
 
@@ -56,11 +58,23 @@ class PlatformRoleChecker:
     def get_vk_roles(author_data: dict[str, Any], channel_id: str) -> list[str]:
         """Return normalized VK Live roles for a chat author."""
 
-        del channel_id  # Reserved for future upstream parity.
         roles: list[str] = []
 
         try:
-            if author_data.get("is_owner", False):
+            author_name = str(
+                author_data.get("name")
+                or author_data.get("nick")
+                or author_data.get("login")
+                or ""
+            ).strip()
+            normalized_author = extract_vk_channel_slug(author_name) or author_name.lower()
+            normalized_channel = extract_vk_channel_slug(channel_id) or str(channel_id).strip().lower()
+
+            if (
+                author_data.get("is_owner", False)
+                or author_data.get("is_broadcaster", False)
+                or (normalized_author and normalized_channel and normalized_author == normalized_channel)
+            ):
                 roles.extend(["owner", "broadcaster"])
 
             if author_data.get("is_moderator", False):

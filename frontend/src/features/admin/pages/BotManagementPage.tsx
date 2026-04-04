@@ -18,8 +18,10 @@ import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
+import { getPlatformReleaseInfo } from '@/shared/utils/platformRelease';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
+import { formatBotAuthError } from '../utils/botAuthMessages';
 
 type Platform = 'twitch' | 'vk';
 
@@ -216,7 +218,7 @@ const BotManagementPage: React.FC = () => {
       toast.success(`${platform === 'vk' ? 'VK' : 'Twitch'} bot authorized`);
       navigate('/dashboard/dolbaebadmintts?tab=bots', { replace: true });
     } else if (error) {
-      toast.error(`Bot auth failed: ${error}`);
+      toast.error(`Bot auth failed: ${formatBotAuthError(error, 'en')}`);
       navigate('/dashboard/dolbaebadmintts?tab=bots', { replace: true });
     }
   }, [navigate, searchParams]);
@@ -301,6 +303,7 @@ const BotManagementPage: React.FC = () => {
           const status = tokenStatus[platform];
           const badge = getBadge(platform);
           const meta = PLATFORM_META[platform];
+          const releaseInfo = getPlatformReleaseInfo(platform);
 
           return (
             <Card key={platform} className={SURFACE_CARD_CLASS}>
@@ -308,9 +311,16 @@ const BotManagementPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <PlatformIcon platform={platform} className="h-5 w-5" />
-                    <CardTitle className="text-base" style={{ color: meta.color }}>
-                      {meta.label}
-                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-base" style={{ color: meta.color }}>
+                        {meta.label}
+                      </CardTitle>
+                      {releaseInfo.badgeLabel ? (
+                        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700">
+                          {releaseInfo.badgeLabel}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </div>
                   <Badge variant={badge.variant}>{badge.label}</Badge>
                 </div>
@@ -319,6 +329,11 @@ const BotManagementPage: React.FC = () => {
                     Bot: <strong>{status.bot_login || 'unknown'}</strong>
                   </CardDescription>
                 )}
+                {!status.configured && releaseInfo.helperText ? (
+                  <CardDescription className="mt-1">
+                    {releaseInfo.helperText}
+                  </CardDescription>
+                ) : null}
               </CardHeader>
 
               <CardContent className="pt-0 pb-4 space-y-3">

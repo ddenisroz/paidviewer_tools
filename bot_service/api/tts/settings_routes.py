@@ -20,10 +20,12 @@ from services.tts.google_cloud_tts import (
     normalize_gcloud_mood,
 )
 from services.tts.provider_utils import (
+    build_tts_mode_contract,
     ProviderRoutingError,
     QWEN_BASE_MODEL,
     QWEN_PROMPT_MODEL,
     filter_qwen_cloud_models,
+    get_provider_capabilities,
     get_synthesis_upstream_url,
     get_voice_management_upstream_params,
     get_voice_management_upstream_url,
@@ -74,13 +76,14 @@ def _tts_auth_headers(
     *,
     upstream: str = "voice",
     use_gateway: Optional[bool] = None,
+    strict: bool = True,
 ) -> dict:
     try:
         return build_tts_auth_headers(
             provider=provider,
             upstream=upstream,  # type: ignore[arg-type]
             use_gateway=use_gateway,
-            strict=True,
+            strict=strict,
         )
     except TTSAuthConfigError as error:
         raise HTTPException(
@@ -151,6 +154,15 @@ async def _fetch_qwen_models_payload(*, endpoint_url: str, headers: dict) -> dic
     return payload
 
 
+async def _resolve_user_whitelist_state(*, user_id: int, db: Session) -> bool:
+    try:
+        snapshot = await TTSService(db).get_tts_status(user_id=user_id)
+        return bool(snapshot.get("is_whitelisted"))
+    except Exception:
+        logger.exception("Failed to resolve user whitelist state user_id=%s", user_id)
+        return False
+
+
 _CANONICAL_ENGINE_TYPES = {
     "gtts",
     "gcloud",
@@ -181,6 +193,9 @@ async def _resolve_voice_proxy_provider(
 ) -> str:
     if requested_provider and requested_provider.strip():
         return normalize_provider(requested_provider)
+
+    if not hasattr(service, "get_tts_settings"):
+        return "f5"
 
     try:
         settings_dict = await service.get_tts_settings(user_id=user_id)
@@ -322,24 +337,34 @@ async def get_qwen_models_catalog(
     db: Session = Depends(get_db),
 ):
     normalized_mode = "local" if str(mode or "").strip().lower() == "local" else "cloud"
+    is_whitelisted = await _resolve_user_whitelist_state(user_id=int(user["id"]), db=db)
+    provider_capabilities = get_provider_capabilities("qwen")
 
     if normalized_mode == "local":
         repo = LocalTTSRepository(db)
         local_config = repo.get_by_user_id(int(user["id"]), provider="qwen")
         if not local_config:
+            contract = build_tts_mode_contract(
+                "qwen",
+                "local",
+                available=False,
+                is_whitelisted=is_whitelisted,
+                degraded_reason="Self-hosted Qwen endpoint is not configured for this user yet.",
+                error_code="qwen_local_not_configured",
+                capabilities=provider_capabilities,
+                recommended_path="tts_worker_agent",
+            )
             return {
                 "success": True,
-                "provider": "qwen",
-                "mode": "local",
                 "source": "local",
                 "configured": False,
-                "available": False,
                 "endpoint_url": None,
                 "models": [],
                 "detail": {
                     "code": "qwen_local_not_configured",
                     "message": "Self-hosted Qwen endpoint не настроен для этого пользователя.",
                 },
+                **contract,
             }
 
         endpoint_url = normalize_local_tts_endpoint_url(local_config.endpoint_url)
@@ -347,38 +372,53 @@ async def get_qwen_models_catalog(
     else:
         endpoint_url = (settings.qwen_tts_service_url or "").strip().rstrip("/")
         if not endpoint_url:
+            contract = build_tts_mode_contract(
+                "qwen",
+                "cloud",
+                available=False,
+                is_whitelisted=is_whitelisted,
+                degraded_reason="Managed Qwen cloud runtime is not configured.",
+                error_code="qwen_cloud_not_configured",
+                capabilities=provider_capabilities,
+            )
             return {
                 "success": True,
-                "provider": "qwen",
-                "mode": "cloud",
                 "source": "managed",
                 "configured": False,
-                "available": False,
                 "endpoint_url": None,
                 "models": [],
                 "detail": {
                     "code": "qwen_cloud_not_configured",
                     "message": "Облачный Qwen worker не настроен.",
                 },
+                **contract,
             }
         headers = _qwen_models_headers()
 
     try:
         payload = await _fetch_qwen_models_payload(endpoint_url=endpoint_url, headers=headers)
     except httpx.RequestError:
+        contract = build_tts_mode_contract(
+            "qwen",
+            normalized_mode,
+            available=False,
+            is_whitelisted=is_whitelisted,
+            degraded_reason="Qwen runtime is unreachable or still warming up.",
+            error_code="qwen_models_upstream_unreachable",
+            capabilities=provider_capabilities,
+            recommended_path="tts_worker_agent" if normalized_mode == "local" else None,
+        )
         return {
             "success": True,
-            "provider": "qwen",
-            "mode": normalized_mode,
             "source": "local" if normalized_mode == "local" else "managed",
             "configured": True,
-            "available": False,
             "endpoint_url": endpoint_url,
             "models": [],
             "detail": {
                 "code": "qwen_models_upstream_unreachable",
                 "message": "Qwen worker недоступен или ещё прогревается. Список моделей runtime временно недоступен.",
             },
+            **contract,
         }
 
     models = [
@@ -401,13 +441,20 @@ async def get_qwen_models_catalog(
 
     current_model_raw = str(payload.get("current_model") or "").strip()
     current_model = current_model_raw or None
+    contract = build_tts_mode_contract(
+        "qwen",
+        normalized_mode,
+        available=len(models) > 0,
+        is_whitelisted=is_whitelisted,
+        degraded_reason=None if len(models) > 0 else "Qwen runtime returned an empty model catalog.",
+        error_code=None if len(models) > 0 else "qwen_models_empty",
+        capabilities=provider_capabilities,
+        recommended_path="tts_worker_agent" if normalized_mode == "local" else None,
+    )
     return {
         "success": True,
-        "provider": "qwen",
-        "mode": normalized_mode,
         "source": "local" if normalized_mode == "local" else "managed",
         "configured": True,
-        "available": len(models) > 0,
         "endpoint_url": endpoint_url,
         "current_model": current_model,
         "models": models,
@@ -416,6 +463,7 @@ async def get_qwen_models_catalog(
             "base_model": QWEN_BASE_MODEL,
             "prompt_model": QWEN_PROMPT_MODEL,
         },
+        **contract,
     }
 
 
@@ -429,26 +477,45 @@ async def get_tts_upstream_health(
     """Provider-aware health check routed through bot_service."""
     normalized_provider = normalize_provider(provider)
     normalized_mode = normalize_provider_mode(mode)
+    is_whitelisted = await _resolve_user_whitelist_state(user_id=int(user["id"]), db=db)
+    provider_capabilities = get_provider_capabilities(normalized_provider)
+
+    def _attach_detail(payload: dict, *, fallback_message: str | None = None) -> dict:
+        if payload.get("available"):
+            return payload
+        detail_message = payload.get("degraded_reason") or fallback_message or "TTS provider is unavailable."
+        payload["detail"] = {
+            "code": payload.get("error_code"),
+            "message": detail_message,
+        }
+        return payload
 
     if normalized_provider == "gcloud":
         gcloud = get_google_cloud_tts()
         gcloud_result = await gcloud.list_voices(language_code="ru-RU")
         is_healthy = bool(gcloud_result.get("success"))
+        response_payload = build_tts_mode_contract(
+            "gcloud",
+            "cloud",
+            available=is_healthy,
+            is_whitelisted=is_whitelisted,
+            degraded_reason=None if is_healthy else (gcloud_result.get("error") or "Google Cloud TTS is unavailable."),
+            error_code=None if is_healthy else "gcloud_unhealthy",
+            capabilities=provider_capabilities,
+        )
         response_payload = {
             "success": True,
-            "provider": "gcloud",
-            "healthy": is_healthy,
-            "status": "healthy" if is_healthy else "unhealthy",
             "auth_mode": gcloud_result.get("auth_mode"),
             "cached": bool(gcloud_result.get("cached", False)),
+            **response_payload,
         }
         if not is_healthy:
-            response_payload["detail"] = {
-                "code": "gcloud_unhealthy",
-                "message": gcloud_result.get("error") or "Google Cloud TTS is unavailable.",
-                "hint": gcloud_result.get("hint"),
-                "status_code": gcloud_result.get("status_code"),
-            }
+            response_payload = _attach_detail(
+                response_payload,
+                fallback_message=gcloud_result.get("hint"),
+            )
+            response_payload["detail"]["hint"] = gcloud_result.get("hint")
+            response_payload["detail"]["status_code"] = gcloud_result.get("status_code")
         return response_payload
 
     manager = get_tts_manager()
@@ -467,19 +534,23 @@ async def get_tts_upstream_health(
                     managed_only=True,
                 )
             if managed_worker:
-                return {
-                    "success": True,
-                    "provider": normalized_provider,
-                    "mode": normalized_mode,
-                    "healthy": True,
-                    "status": "healthy",
-                    "upstream": {
+                payload = build_tts_mode_contract(
+                    normalized_provider,
+                    normalized_mode,
+                    available=True,
+                    is_whitelisted=is_whitelisted,
+                    capabilities=provider_capabilities,
+                    upstream={
                         "url": None,
-                        "via": "worker-agent",
+                        "via": "internal-managed-worker",
                         "worker_key": managed_worker.worker_key,
                         "worker_label": managed_worker.label,
                         "managed": True,
                     },
+                )
+                return {
+                    "success": True,
+                    **payload,
                 }
         except Exception:
             logger.exception("Failed to resolve managed worker-agent health provider=%s", normalized_provider)
@@ -502,58 +573,74 @@ async def get_tts_upstream_health(
 
         if not local_config or not str(local_config.endpoint_url or "").strip():
             if worker:
-                return {
-                    "success": True,
-                    "provider": normalized_provider,
-                    "mode": "local",
-                    "healthy": True,
-                    "status": "healthy",
-                    "upstream": {
+                payload = build_tts_mode_contract(
+                    normalized_provider,
+                    "local",
+                    available=True,
+                    is_whitelisted=is_whitelisted,
+                    capabilities=provider_capabilities,
+                    recommended_path="tts_worker_agent",
+                    upstream={
                         "url": None,
                         "via": "worker-agent",
                         "worker_key": worker.worker_key,
                         "worker_label": worker.label,
                     },
+                )
+                return {
+                    "success": True,
+                    **payload,
                 }
-            return {
+            payload = build_tts_mode_contract(
+                normalized_provider,
+                "local",
+                available=False,
+                is_whitelisted=is_whitelisted,
+                degraded_reason=f"Self-hosted {normalized_provider.upper()} endpoint is not configured.",
+                error_code="local_tts_not_configured",
+                capabilities=provider_capabilities,
+                recommended_path="tts_worker_agent",
+            )
+            return _attach_detail({
                 "success": True,
-                "provider": normalized_provider,
-                "mode": "local",
-                "healthy": False,
-                "status": "unavailable",
-                "detail": {
-                    "code": "local_tts_not_configured",
-                    "message": f"Local {normalized_provider.upper()} endpoint is not configured.",
-                },
-            }
+                **payload,
+            })
         try:
             local_endpoint_url = normalize_local_tts_endpoint_url(local_config.endpoint_url)
         except ValueError as error:
             if worker:
-                return {
-                    "success": True,
-                    "provider": normalized_provider,
-                    "mode": "local",
-                    "healthy": True,
-                    "status": "healthy",
-                    "upstream": {
+                payload = build_tts_mode_contract(
+                    normalized_provider,
+                    "local",
+                    available=True,
+                    is_whitelisted=is_whitelisted,
+                    capabilities=provider_capabilities,
+                    recommended_path="tts_worker_agent",
+                    upstream={
                         "url": None,
                         "via": "worker-agent",
                         "worker_key": worker.worker_key,
                         "worker_label": worker.label,
                     },
+                )
+                return {
+                    "success": True,
+                    **payload,
                 }
-            return {
+            payload = build_tts_mode_contract(
+                normalized_provider,
+                "local",
+                available=False,
+                is_whitelisted=is_whitelisted,
+                degraded_reason=str(error),
+                error_code="local_tts_invalid_endpoint",
+                capabilities=provider_capabilities,
+                recommended_path="tts_worker_agent",
+            )
+            return _attach_detail({
                 "success": True,
-                "provider": normalized_provider,
-                "mode": "local",
-                "healthy": False,
-                "status": "unavailable",
-                "detail": {
-                    "code": "local_tts_invalid_endpoint",
-                    "message": str(error),
-                },
-            }
+                **payload,
+            })
         local_api_key = str(local_config.api_key or "").strip() or None
         use_gateway = False
 
@@ -565,18 +652,19 @@ async def get_tts_upstream_health(
         )
     except ProviderRoutingError as error:
         if str(error) == "qwen_gateway_required":
-            return {
+            payload = build_tts_mode_contract(
+                "qwen",
+                normalized_mode,
+                available=False,
+                is_whitelisted=is_whitelisted,
+                degraded_reason="Qwen synthesis is available only via tts-gateway.",
+                error_code="qwen_gateway_required",
+                capabilities=provider_capabilities,
+            )
+            return _attach_detail({
                 "success": True,
-                "provider": "qwen",
-                "mode": normalized_mode,
-                "healthy": False,
-                "status": "unavailable",
-                "detail": {
-                    "code": "qwen_gateway_required",
-                    "message": "Qwen synthesis is available only via tts-gateway.",
-                    "hint": "Configure TTS_GATEWAY_URL and TTS_GATEWAY_API_KEY.",
-                },
-            }
+                **payload,
+            }, fallback_message="Configure TTS_GATEWAY_URL and TTS_GATEWAY_API_KEY.")
         raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
 
     if not local_endpoint_url:
@@ -604,32 +692,46 @@ async def get_tts_upstream_health(
                     managed_only=False,
                 )
             if worker:
-                return {
-                    "success": True,
-                    "provider": normalized_provider,
-                    "mode": "local",
-                    "healthy": True,
-                    "status": "healthy",
-                    "upstream": {
+                payload = build_tts_mode_contract(
+                    normalized_provider,
+                    "local",
+                    available=True,
+                    is_whitelisted=is_whitelisted,
+                    capabilities=provider_capabilities,
+                    recommended_path="tts_worker_agent",
+                    upstream={
                         "url": None,
                         "via": "worker-agent",
                         "worker_key": worker.worker_key,
                         "worker_label": worker.label,
                     },
+                )
+                return {
+                    "success": True,
+                    **payload,
                 }
         except Exception:
             logger.exception("Failed to resolve local worker-agent fallback provider=%s", normalized_provider)
-    return {
-        "success": True,
-        "provider": normalized_provider,
-        "mode": normalized_mode,
-        "healthy": bool(is_healthy),
-        "status": "healthy" if is_healthy else "unhealthy",
-        "upstream": {
+    payload = build_tts_mode_contract(
+        normalized_provider,
+        normalized_mode,
+        available=bool(is_healthy),
+        is_whitelisted=is_whitelisted,
+        degraded_reason=None if is_healthy else f"{normalized_provider.upper()} runtime did not respond to health checks.",
+        error_code=None if is_healthy else "tts_upstream_unhealthy",
+        capabilities=provider_capabilities,
+        upstream={
             "url": synthesis_url,
             "via": "local" if local_endpoint_url else ("gateway" if use_gateway else "direct"),
         },
+    )
+    response_payload = {
+        "success": True,
+        **payload,
     }
+    if not is_healthy:
+        response_payload = _attach_detail(response_payload)
+    return response_payload
 
 
 @router.post("/engine")
@@ -829,7 +931,7 @@ async def get_global_voices(
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             resp = await client.get(
                 f"{tts_url}/api/tts/voices/global",
-                headers=_tts_auth_headers(resolved_provider, upstream="voice"),
+                headers=_tts_auth_headers(resolved_provider, upstream="voice", strict=False),
                 params=get_voice_management_upstream_params(resolved_provider),
             )
             if resp.status_code == 200:
@@ -874,7 +976,7 @@ async def get_user_voices(
         async with httpx.AsyncClient(timeout=10.0, **build_tts_httpx_client_kwargs()) as client:
             resp = await client.get(
                 f"{tts_url}/api/tts/user/voices/{target_user_id}",
-                headers=_tts_auth_headers(resolved_provider, upstream="voice"),
+                headers=_tts_auth_headers(resolved_provider, upstream="voice", strict=False),
                 params=get_voice_management_upstream_params(resolved_provider),
             )
             if resp.status_code == 200:

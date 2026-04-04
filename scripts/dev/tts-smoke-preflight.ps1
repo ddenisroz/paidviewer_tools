@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('all', 'gateway-managed', 'self-hosted', 'project-hosted-direct')]
+    [ValidateSet('all', 'cloud', 'self_host', 'compatibility')]
     [string]$Scenario = 'all',
 
     [switch]$SkipComposeChecks
@@ -155,7 +155,7 @@ Test-EnvKeys -Map $frontendEnv -Area 'frontend' -RequiredKeys @(
 
 switch ($Scenario) {
     'all' {
-        Test-EnvKeys -Map $botEnv -Area 'managed' -RequiredKeys @(
+        Test-EnvKeys -Map $botEnv -Area 'cloud' -RequiredKeys @(
             'TTS_GATEWAY_URL',
             'TTS_GATEWAY_API_KEY',
             'F5_TTS_SERVICE_URL',
@@ -163,18 +163,18 @@ switch ($Scenario) {
             'QWEN_TTS_SERVICE_URL'
         ) -Results $results
 
-        Test-OptionalEnvKeys -Map $botEnv -Area 'managed' -OptionalKeys @(
+        Test-OptionalEnvKeys -Map $botEnv -Area 'cloud' -OptionalKeys @(
             'QWEN_TTS_SERVICE_API_KEY',
             'QWEN_VOICE_SERVICE_URL'
         ) -Results $results
 
-        Test-EnvKeys -Map $botEnv -Area 'self-hosted' -RequiredKeys @(
+        Test-EnvKeys -Map $botEnv -Area 'self_host' -RequiredKeys @(
             'LOCAL_TTS_ALLOWED_HOSTS',
             'LOCAL_TTS_ALLOWED_CIDRS'
         ) -Results $results
     }
-    'gateway-managed' {
-        Test-EnvKeys -Map $botEnv -Area 'managed' -RequiredKeys @(
+    'cloud' {
+        Test-EnvKeys -Map $botEnv -Area 'cloud' -RequiredKeys @(
             'TTS_GATEWAY_URL',
             'TTS_GATEWAY_API_KEY',
             'F5_TTS_SERVICE_URL',
@@ -182,35 +182,35 @@ switch ($Scenario) {
             'QWEN_TTS_SERVICE_URL'
         ) -Results $results
 
-        Test-OptionalEnvKeys -Map $botEnv -Area 'managed' -OptionalKeys @(
+        Test-OptionalEnvKeys -Map $botEnv -Area 'cloud' -OptionalKeys @(
             'QWEN_TTS_SERVICE_API_KEY'
         ) -Results $results
     }
-    'self-hosted' {
-        Test-EnvKeys -Map $botEnv -Area 'self-hosted' -RequiredKeys @(
+    'self_host' {
+        Test-EnvKeys -Map $botEnv -Area 'self_host' -RequiredKeys @(
             'LOCAL_TTS_ALLOWED_HOSTS',
             'LOCAL_TTS_ALLOWED_CIDRS'
         ) -Results $results
     }
-    'project-hosted-direct' {
-        Test-EnvKeys -Map $botEnv -Area 'project-hosted-direct' -RequiredKeys @(
+    'compatibility' {
+        Test-EnvKeys -Map $botEnv -Area 'compatibility' -RequiredKeys @(
             'F5_TTS_SERVICE_URL',
             'F5_TTS_SERVICE_API_KEY'
         ) -Results $results
 
-        Add-Result $results 'WARN' 'project-hosted-direct' 'Qwen direct managed worker is not the primary success path in current core runtime'
+        Add-Result $results 'WARN' 'compatibility' 'Compatibility mode is not part of the primary presentation or production success path'
     }
 }
 
-if ($Scenario -in @('all', 'gateway-managed')) {
+if ($Scenario -in @('all', 'cloud')) {
     Add-Result $results 'WARN' 'external' 'Redis reachability for tts-gateway is not verified by this script'
     Add-Result $results 'WARN' 'external' 'F5 vendor/assets/weights are not verified by this script'
     Add-Result $results 'WARN' 'external' 'Qwen Linux/WSL2 runtime readiness is not verified by this script'
 }
 
-if ($Scenario -in @('all', 'self-hosted')) {
-    Add-Result $results 'WARN' 'self-hosted' 'Per-user self-hosted endpoint config is stored in DB and is not verified by this script'
-    Add-Result $results 'WARN' 'self-hosted' 'Authenticated + whitelisted user state is not verified by this script'
+if ($Scenario -in @('all', 'self_host')) {
+    Add-Result $results 'WARN' 'self_host' 'Per-user self-host runtime config is stored in DB and is not verified by this script'
+    Add-Result $results 'WARN' 'self_host' 'Authenticated + whitelisted user state is not verified by this script'
 }
 
 if ($env:OS -like '*Windows*') {

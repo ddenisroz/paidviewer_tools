@@ -14,6 +14,7 @@ from core.database import User, ChannelReward
 from repositories.user_repository import UserRepository
 from repositories.user_token_repository import UserTokenRepository
 from repositories.points_repository import PointsRepository
+from utils.vk_channel_url import extract_vk_channel_slug
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,57 @@ class PlatformSyncService:
 
     def __init__(self):
         self.logger = logging.getLogger('platform_sync')
+
+    @staticmethod
+    def _resolve_vk_channel_slug(user: User, user_info: Optional[Dict]) -> Optional[str]:
+        """Resolve a VK channel slug from API data first, then stored user data."""
+        candidates = []
+        if isinstance(user_info, dict):
+            channel_obj = user_info.get("channel")
+            if isinstance(channel_obj, dict):
+                candidates.extend([
+                    channel_obj.get("url"),
+                    channel_obj.get("channel_url"),
+                ])
+
+            channels = user_info.get("channels")
+            if isinstance(channels, list):
+                for channel in channels:
+                    if isinstance(channel, dict):
+                        candidates.extend([
+                            channel.get("url"),
+                            channel.get("channel_url"),
+                        ])
+                        break
+
+            candidates.extend([
+                user_info.get("channel_url"),
+                user_info.get("channel"),
+            ])
+
+        candidates.extend([
+            getattr(user, "vk_channel_name", None),
+        ])
+
+        for candidate in candidates:
+            slug = extract_vk_channel_slug(candidate)
+            if slug and " " not in slug and "/" not in slug:
+                return slug
+        return None
+
+    @staticmethod
+    def _resolve_vk_display_name(user: User, user_info: Optional[Dict], channel_slug: Optional[str]) -> Optional[str]:
+        """Resolve a stable VK display name for UI/profile use."""
+        if isinstance(user_info, dict):
+            for key in ("nick", "login", "username", "screen_name", "name"):
+                value = user_info.get(key)
+                if value:
+                    return str(value).strip()
+
+        for candidate in (getattr(user, "vk_username", None), channel_slug):
+            if candidate:
+                return str(candidate).strip()
+        return None
 
     async def sync_user_roles(self, user: User, platform: str, db: Session) -> bool:
         """Synchronize user roles from platform API."""
@@ -94,7 +146,7 @@ class PlatformSyncService:
     async def _sync_vk_roles(self, user: User, db: Session) -> bool:
         """Synchronize VK-specific roles"""
         try:
-            if not user.vk_username:
+            if not user.vk_username and not user.vk_channel_name:
                 self.logger.debug(f"User {user.id} has no VK username, skipping sync")
                 return False
 
@@ -115,8 +167,13 @@ class PlatformSyncService:
                 self.logger.debug(f"No active VK token for user {user.id}")
                 return False
 
-            # Check if user is channel owner
-            user.vk_is_owner = bool(user.vk_channel_name)
+            resolved_channel = self._resolve_vk_channel_slug(user, None)
+            if resolved_channel:
+                user.vk_channel_name = resolved_channel
+            else:
+                user.vk_channel_name = None
+            user.vk_is_owner = bool(resolved_channel)
+            user.vk_is_moderator = False
 
             # Verify token and user info via API
             try:
@@ -128,14 +185,38 @@ class PlatformSyncService:
                     refresh_token=token.refresh_token,
                     scopes=token.scopes
                 )
-                
+
                 user_info = await vk_client.get_current_user(token_info)
                 if user_info:
-                    self.logger.info(f"Synced VK user {user.vk_username} (ID: {user_info.get('id')})")
+                    resolved_channel = self._resolve_vk_channel_slug(user, user_info)
+                    user.vk_channel_name = resolved_channel
+                    user.vk_is_owner = bool(resolved_channel)
+                    user.vk_is_moderator = bool(
+                        user_info.get("is_moderator") or user_info.get("moderator")
+                    )
+
+                    display_name = self._resolve_vk_display_name(user, user_info, resolved_channel)
+                    if display_name:
+                        user.vk_username = display_name
+
+                    self.logger.info(
+                        "Synced VK user %s (ID: %s, channel=%s, owner=%s, moderator=%s)",
+                        user.vk_username,
+                        user_info.get('id'),
+                        user.vk_channel_name,
+                        user.vk_is_owner,
+                        user.vk_is_moderator,
+                    )
             except Exception:
                 self.logger.exception("Error fetching VK user info")
 
-            self.logger.info(f"Synced VK roles for user {user.id}: owner={user.vk_is_owner}")
+            self.logger.info(
+                "Synced VK roles for user %s: owner=%s moderator=%s channel=%s",
+                user.id,
+                user.vk_is_owner,
+                user.vk_is_moderator,
+                user.vk_channel_name,
+            )
 
             db.commit()
             return True

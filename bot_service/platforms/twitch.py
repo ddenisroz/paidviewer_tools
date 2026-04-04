@@ -3,7 +3,7 @@ Twitch platform implementation
 """
 import logging
 from typing import Optional, Dict, Any, List
-from .base import StreamingPlatform, PlatformConfig
+from .base import PlatformCapabilities, PlatformConfig, StreamingPlatform
 
 # [REF] Integrations
 from integrations.twitch.client import TwitchClient
@@ -31,7 +31,18 @@ class TwitchPlatform(StreamingPlatform):
             supports_tts=True,
             supports_points=True,
             supports_categories=True,
-            color='#9146FF'
+            color='#9146FF',
+            capabilities=PlatformCapabilities(
+                roles=True,
+                badges=True,
+                reply_context=True,
+                mention_context=True,
+                moderation_actions=True,
+                rewards=True,
+                bot_status=True,
+                supported_roles=['owner', 'moderator', 'vip', 'subscriber', 'viewer'],
+                moderation_actions_available=['timeout', 'ban', 'mod', 'vip'],
+            ),
         )
         super().__init__(config)
 

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from core.database import DropsConfig, DropsReward, DropsQuality, DropsHistory
 from core.datetime_utils import utcnow_naive
+from repositories.drops_history_repository import DropsHistoryRepository
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,29 @@ class DropsConfigMixin:
         """Helper to get drops reward repo"""
         from repositories.drops_reward_repository import DropsRewardRepository
         return DropsRewardRepository(self.db)
+
+    def _get_history_repo(self):
+        """Helper to get drops history repo."""
+        return DropsHistoryRepository(self.db)
+
+    def _normalize_source_event_id(
+        self,
+        source_event_id: Optional[str] = None,
+        donation_alert_id: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
+    ) -> Optional[str]:
+        """Build one stable idempotency key regardless of event source shape."""
+        candidate = source_event_id
+        if not candidate and donation_alert_id:
+            candidate = f"donation_alert:{donation_alert_id}"
+        elif candidate is None and chat_message_id is not None:
+            candidate = f"chat_message:{chat_message_id}"
+
+        if candidate is None:
+            return None
+
+        normalized = str(candidate).strip()
+        return normalized or None
 
     def get_user_config(
         self,
@@ -374,7 +398,14 @@ class DropsConfigMixin:
 
     def _record_drops_history(self, user_id: int = None, session_id: str = None, channel_name: str = None, platform: str = "twitch", viewer_id: str = None, viewer_name: str = None, drops_type: str = None, quality_id: int = None, reward: DropsReward = None, **kwargs):
         """Write a Drops event to history."""
-        history_entry = DropsHistory(
+        history_kwargs = dict(kwargs)
+        history_repo = self._get_history_repo()
+        source_event_id = self._normalize_source_event_id(
+            source_event_id=history_kwargs.pop("source_event_id", None),
+            donation_alert_id=history_kwargs.get("donation_alert_id"),
+            chat_message_id=history_kwargs.get("chat_message_id"),
+        )
+        history_entry, _ = history_repo.get_or_create_history_entry(
             user_id=user_id,
             session_id=session_id,
             channel_name=channel_name,
@@ -387,9 +418,8 @@ class DropsConfigMixin:
             reward_name=reward.name if reward else "",
             reward_type=reward.reward_type if reward else "",
             reward_value=reward.reward_value if reward else "",
-            **kwargs
+            source_event_id=source_event_id,
+            **history_kwargs,
         )
-
-        self.db.add(history_entry)
-        self.db.commit()
+        return history_entry
 

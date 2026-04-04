@@ -4,7 +4,9 @@ OAuth authorization for VK Live bot with refresh token support.
 """
 
 import logging
+import re
 import secrets
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -25,6 +27,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 ADMIN_BOT_PAGE = f"{settings.frontend_url}/dashboard/dolbaebadmintts?tab=bots"
+_BOT_AUTH_ERROR_SANITIZER = re.compile(r"[^a-z0-9]+")
+
+
+def _normalize_bot_auth_error(error: str | None, fallback: str = "internal_error") -> str:
+    """Normalize provider/runtime error into a stable UI-safe code."""
+    if not error:
+        return fallback
+
+    normalized = _BOT_AUTH_ERROR_SANITIZER.sub("_", error.strip().lower()).strip("_")
+    return normalized or fallback
+
+
+def _build_admin_redirect(*, success: bool = False, error: str | None = None) -> RedirectResponse:
+    """Redirect back to the admin bots page with a stable auth result code."""
+    base_url = f"{ADMIN_BOT_PAGE}&platform=vk"
+    redirect_url = f"{base_url}&bot_auth_success=true" if success else (
+        f"{base_url}&bot_auth_error={quote(_normalize_bot_auth_error(error))}"
+    )
+
+    response = RedirectResponse(url=redirect_url)
+    response.delete_cookie("vk_bot_oauth_state")
+    return response
 
 
 @router.get("/auth/vk/bot/login")
@@ -50,7 +74,8 @@ async def login_vk_bot(request: Request):
             value=state,
             max_age=600,
             httponly=True,
-            secure=settings.environment == "production",
+            samesite="lax",
+            secure=settings.is_production,
         )
         return response
 
@@ -100,16 +125,16 @@ async def vk_bot_callback(
 
     if error:
         logger.warning(f"[VK BOT OAUTH] OAuth cancelled: {error} - {error_description}")
-        return RedirectResponse(url=f"{ADMIN_BOT_PAGE}&platform=vk&bot_auth_error=cancelled")
+        return _build_admin_redirect(error=error)
 
     if not code:
         logger.error("[VK BOT OAUTH] No authorization code received")
-        raise HTTPException(status_code=400, detail="No authorization code received")
+        return _build_admin_redirect(error="missing_code")
 
     saved_state = request.cookies.get("vk_bot_oauth_state")
     if not saved_state or saved_state != state:
         logger.error("[VK BOT OAUTH] Invalid state parameter")
-        raise HTTPException(status_code=400, detail="Invalid state parameter")
+        return _build_admin_redirect(error="invalid_state")
 
     try:
         logger.info("[VK BOT OAUTH] Exchanging code for tokens...")
@@ -142,7 +167,8 @@ async def vk_bot_callback(
             db=db,
         )
         if not success:
-            raise Exception("Failed to save VK bot tokens")
+            logger.error("[VK BOT OAUTH] Failed to save VK bot tokens")
+            return _build_admin_redirect(error="save_failed")
 
         logger.info("[OK] [VK BOT OAUTH] Bot tokens saved successfully")
 
@@ -159,18 +185,20 @@ async def vk_bot_callback(
             await registry.stop_vk_bot()
             logger.info("[VK BOT OAUTH] Old bot stopped")
 
-        await initialize_vk_bot(vk_channels)
+        started = await initialize_vk_bot(vk_channels)
+        if not started:
+            logger.error("[VK BOT OAUTH] Bot token saved, but VK bot restart failed")
+            return _build_admin_redirect(error="restart_failed")
+
         logger.info("[OK] [VK BOT OAUTH] Bot restarted with new token")
 
-        response = RedirectResponse(url=f"{ADMIN_BOT_PAGE}&platform=vk&bot_auth_success=true")
-        response.delete_cookie("vk_bot_oauth_state")
-        return response
+        return _build_admin_redirect(success=True)
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"[ERROR] [VK BOT OAUTH] Error during bot OAuth: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error during bot authentication")
+        return _build_admin_redirect(error="internal_error")
 
 
 @router.get("/api/admin/bot/vk/token-status")

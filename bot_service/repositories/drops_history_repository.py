@@ -2,6 +2,7 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc, func
+from sqlalchemy.exc import IntegrityError
 
 from repositories.base_repository import BaseRepository
 from core.database import DropsHistory, UserStreak
@@ -185,12 +186,13 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
 
     def create_history_entry(
         self,
-        user_id: int,
-        channel_name: str,
-        platform: str,
-        viewer_id: str,
-        viewer_name: str,
-        lootbox_type: str,
+        user_id: int = None,
+        session_id: str = None,
+        channel_name: str = None,
+        platform: str = None,
+        viewer_id: str = None,
+        viewer_name: str = None,
+        lootbox_type: str = None,
         quality_id: int = None,
         reward_id: int = None,
         reward_name: str = None,
@@ -199,10 +201,15 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
         donation_amount: float = None,
         streak_days: int = None,
         messages_count: int = None,
+        stream_session_id: int = None,
+        source_event_id: str = None,
+        donation_alert_id: str = None,
+        chat_message_id: int = None,
     ) -> DropsHistory:
         """Create a new drops history entry."""
-        entry = DropsHistory(
+        entry, _ = self.get_or_create_history_entry(
             user_id=user_id,
+            session_id=session_id,
             channel_name=channel_name,
             platform=platform,
             viewer_id=viewer_id,
@@ -216,11 +223,112 @@ class DropsHistoryRepository(BaseRepository[DropsHistory]):
             donation_amount=donation_amount,
             streak_days=streak_days,
             messages_count=messages_count,
+            stream_session_id=stream_session_id,
+            source_event_id=source_event_id,
+            donation_alert_id=donation_alert_id,
+            chat_message_id=chat_message_id,
+        )
+        return entry
+
+    def get_or_create_history_entry(
+        self,
+        user_id: int = None,
+        session_id: str = None,
+        channel_name: str = None,
+        platform: str = None,
+        viewer_id: str = None,
+        viewer_name: str = None,
+        lootbox_type: str = None,
+        quality_id: int = None,
+        reward_id: int = None,
+        reward_name: str = None,
+        reward_type: str = None,
+        reward_value: str = None,
+        donation_amount: float = None,
+        streak_days: int = None,
+        messages_count: int = None,
+        stream_session_id: int = None,
+        source_event_id: str = None,
+        donation_alert_id: str = None,
+        chat_message_id: int = None,
+    ) -> tuple[DropsHistory, bool]:
+        """Create a drops history entry once per external source event."""
+        existing_entry = self.get_history_by_source_event_id(
+            source_event_id=source_event_id,
+            channel_name=channel_name,
+            platform=platform,
+            user_id=user_id,
+            session_id=session_id,
+        )
+        if existing_entry:
+            return existing_entry, False
+
+        entry = DropsHistory(
+            user_id=user_id,
+            session_id=session_id,
+            channel_name=channel_name,
+            platform=platform,
+            viewer_id=viewer_id,
+            viewer_name=viewer_name,
+            lootbox_type=lootbox_type,
+            quality_id=quality_id,
+            reward_id=reward_id,
+            reward_name=reward_name,
+            reward_type=reward_type,
+            reward_value=reward_value,
+            donation_amount=donation_amount,
+            streak_days=streak_days,
+            messages_count=messages_count,
+            stream_session_id=stream_session_id,
+            source_event_id=source_event_id,
+            donation_alert_id=donation_alert_id,
+            chat_message_id=chat_message_id,
         )
         self.db.add(entry)
-        self.db.commit()
+        try:
+            self.db.commit()
+        except IntegrityError:
+            self.db.rollback()
+            existing_entry = self.get_history_by_source_event_id(
+                source_event_id=source_event_id,
+                channel_name=channel_name,
+                platform=platform,
+                user_id=user_id,
+                session_id=session_id,
+            )
+            if existing_entry:
+                return existing_entry, False
+            raise
         self.db.refresh(entry)
-        return entry
+        return entry, True
+
+    def get_history_by_source_event_id(
+        self,
+        source_event_id: str,
+        channel_name: str,
+        platform: str,
+        user_id: int = None,
+        session_id: str = None,
+    ) -> Optional[DropsHistory]:
+        """Return an existing history row for a stable external event identifier."""
+        if not source_event_id:
+            return None
+
+        query = self.db.query(DropsHistory).filter(
+            DropsHistory.channel_name == channel_name,
+            DropsHistory.platform == platform,
+            DropsHistory.source_event_id == source_event_id,
+        )
+
+        owner_filters = self._owner_scope_filters(
+            DropsHistory,
+            user_id=user_id,
+            session_id=session_id,
+        )
+        if not owner_filters:
+            return None
+
+        return query.filter(and_(*owner_filters)).first()
 
     # === DropsHistory ===
 

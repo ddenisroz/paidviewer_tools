@@ -10,6 +10,7 @@ import { useIntegrations } from '@/context/IntegrationsContext';
 import { authService } from '@/services/api/services/authService';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { Badge } from '@/shared/components/ui/badge';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 import { saveReturnUrl } from '@/utils/urlUtils';
@@ -18,7 +19,7 @@ import { Button } from '../ui/button';
 
 const Header: React.FC = () => {
     const { user, logout, isAuthenticated, refreshAuthStatus } = useAuth();
-    const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
+    const { integrations, platformRelease, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const location = useLocation();
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
@@ -180,7 +181,14 @@ const Header: React.FC = () => {
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <VKIcon width="24" height="24" className="text-[#FF4444]" />
-                                            <span className="text-sm">VK Live</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm">VK Live</span>
+                                                {platformRelease.vk.badgeLabel ? (
+                                                    <Badge variant="outline" className="h-5 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-300">
+                                                        {platformRelease.vk.badgeLabel}
+                                                    </Badge>
+                                                ) : null}
+                                            </div>
                                         </div>
                                         <button
                                             onClick={() => handleIntegrationToggle('vk')}

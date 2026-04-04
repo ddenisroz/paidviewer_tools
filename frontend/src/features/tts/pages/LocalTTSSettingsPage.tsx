@@ -81,7 +81,7 @@ const PROVIDER_META: Record<LocalTtsProvider, ProviderMeta> = {
         folder: 'nano-qwen3tts-vllm',
         installCommand: 'python -m pip install -r requirements.txt',
         runCommand: 'python api_server.py --host 0.0.0.0 --port 8012',
-        apiKeyHint: 'Если у self-hosted Qwen worker задан API_KEY, укажите тот же ключ здесь. Для project-hosted worker на localhost:8012 он обязателен.',
+        apiKeyHint: 'Если у self-hosted Qwen runtime задан API_KEY, укажите тот же ключ здесь.',
         docsUrl: 'https://github.com/calldatfate/nano-qwen3tts-vllm'
     }
 };
@@ -119,7 +119,7 @@ const DEFAULT_PROVIDER_CONTRACT: Record<LocalTtsProvider, ProviderContract> = {
         supports_native_health_endpoint: true,
         supports_native_status_endpoint: false,
         supports_local_voice_management: true,
-        warning: 'Этот экран настраивает self-hosted endpoint пользователя. Managed path для Qwen в проекте сейчас gateway-managed: bot_service -> tts-gateway -> project-hosted worker на localhost:8012. Для self-hosted endpoint synthesis по-прежнему идёт через compatibility adapter поверх /api/prepare -> /api/stream/{id}, но worker уже отдает health, model catalog и user voice CRUD.',
+        warning: 'Для релизного self-host сценария используйте pairing bundle и tts_worker_agent. Ручной Qwen endpoint ниже оставлен только как compatibility fallback для диагностики и поддержки.',
     },
 };
 
@@ -189,8 +189,27 @@ interface WorkersResponse {
     workers?: WorkerInfo[];
 }
 
-interface PairingTokenPayload {
+interface ProvisioningBundlePayload {
+    kind?: string;
+    format_version?: number;
+    server_base_url?: string;
     pairing_code?: string;
+    expires_at?: string | null;
+    trusted_origins?: string[];
+    label?: string;
+    poll_interval_sec?: number;
+    max_jobs_per_poll?: number;
+    wait_for_jobs?: boolean;
+    providers?: Record<string, {
+        enabled?: boolean;
+        endpoint_url?: string;
+        api_key?: string;
+    }>;
+}
+
+interface WorkerProvisioningResponse {
+    download_filename?: string;
+    provisioning_bundle?: ProvisioningBundlePayload;
     expires_at?: string | null;
 }
 
@@ -229,6 +248,7 @@ const TAB_TRIGGER_CLASS =
 const PROVIDER_SWITCH_TAB_CLASS =
     'appearance-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-[inset_0_-1px_0_0_rgba(14,165,233,1)]';
 const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
+const LOCAL_AGENT_API_URL = 'http://127.0.0.1:46321';
 const SPEED_PRESET_OPTIONS: VoiceSpeedPreset[] = ['very_slow', 'slow', 'normal', 'fast', 'very_fast'];
 
 const MANAGED_TOPOLOGY_LABELS: Record<NonNullable<ProviderContract['managed_topology']>, string> = {
@@ -355,7 +375,9 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [isUploadVoiceDialogOpen, setIsUploadVoiceDialogOpen] = useState<boolean>(false);
     const [isVoiceSettingsDialogOpen, setIsVoiceSettingsDialogOpen] = useState<boolean>(false);
     const [isPairingDialogOpen, setIsPairingDialogOpen] = useState<boolean>(false);
-    const [pairingCode, setPairingCode] = useState<string>('');
+    const [pairingDownloadFilename, setPairingDownloadFilename] = useState<string>('');
+    const [pairingStatusMessage, setPairingStatusMessage] = useState<string>('');
+    const [pairingUsedDownloadFallback, setPairingUsedDownloadFallback] = useState<boolean>(false);
     const [pairingCodeExpiresAt, setPairingCodeExpiresAt] = useState<string | null>(null);
     const [pairingLoading, setPairingLoading] = useState<boolean>(false);
     const [pairingError, setPairingError] = useState<string | null>(null);
@@ -404,7 +426,9 @@ const LocalTTSSettingsPage: React.FC = () => {
         setIsUploadVoiceDialogOpen(false);
         setIsVoiceSettingsDialogOpen(false);
         setIsPairingDialogOpen(false);
-        setPairingCode('');
+        setPairingDownloadFilename('');
+        setPairingStatusMessage('');
+        setPairingUsedDownloadFallback(false);
         setPairingCodeExpiresAt(null);
         setPairingError(null);
         setCurrentVoice(null);
@@ -499,10 +523,14 @@ const LocalTTSSettingsPage: React.FC = () => {
             setStatusData(null);
         },
         onError: (error) => {
-            const axiosError = error as AxiosError<{ detail?: string }>;
+            const axiosError = error as AxiosError<{ detail?: string | { message?: string } }>;
+            const detailPayload = axiosError.response?.data?.detail;
+            const detailMessage = typeof detailPayload === 'string'
+                ? detailPayload
+                : detailPayload?.message;
             setTestResult({
                 success: false,
-                message: axiosError.response?.data?.detail || 'Ошибка соединения с сервером'
+                message: detailMessage || 'Ошибка соединения с сервером'
             });
         },
         onMutate: () => {
@@ -567,25 +595,85 @@ const LocalTTSSettingsPage: React.FC = () => {
         toast.success('Скопировано в буфер обмена');
     };
 
+    const downloadProvisioningBundle = (bundle: ProvisioningBundlePayload, filename: string): void => {
+        const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+        const objectUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(objectUrl);
+    };
+
+    const provisionLocalAgent = async (bundle: ProvisioningBundlePayload): Promise<void> => {
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+        try {
+            const response = await fetch(`${LOCAL_AGENT_API_URL}/api/provision`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ provisioning_bundle: bundle }),
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                const detail = typeof payload?.detail === 'string' ? payload.detail : '';
+                throw new Error(detail || 'Локальный агент недоступен');
+            }
+        } finally {
+            window.clearTimeout(timeoutId);
+        }
+    };
+
     const requestPairingCode = async (): Promise<void> => {
         setPairingLoading(true);
         setPairingError(null);
-        setPairingCode('');
+        setPairingDownloadFilename('');
+        setPairingStatusMessage('');
+        setPairingUsedDownloadFallback(false);
         setPairingCodeExpiresAt(null);
         try {
-            const response = await ttsService.createWorkerPairingToken({ provider_hint: provider });
-            const payload = response.data as PairingTokenPayload;
-            const nextPairingCode = String(payload.pairing_code || '').trim();
-            if (!nextPairingCode) {
-                throw new Error('Сервер не вернул pairing code');
+            const response = await ttsService.createWorkerProvisioning({ provider_hint: provider });
+            const payload = response.data as WorkerProvisioningResponse;
+            const bundle = payload.provisioning_bundle;
+            const filename = String(payload.download_filename || '').trim();
+            if (!bundle || bundle.kind !== 'paidviewer_worker_provisioning') {
+                throw new Error('Сервер не вернул файл подключения');
             }
-            setPairingCode(nextPairingCode);
-            setPairingCodeExpiresAt(payload.expires_at || null);
+            if (!filename) {
+                throw new Error('Сервер не вернул имя файла подключения');
+            }
+
+            try {
+                await provisionLocalAgent(bundle);
+                setPairingStatusMessage('Локальный агент найден и подключается');
+                setPairingCodeExpiresAt(payload.expires_at || bundle.expires_at || null);
+                setIsPairingDialogOpen(true);
+                toast.success('Устройство передано локальному агенту');
+                window.setTimeout(() => {
+                    void refetchWorkerAgents();
+                }, 2500);
+                return;
+            } catch (localProvisionError) {
+                logger.warn('Local agent provisioning failed, falling back to download:', localProvisionError);
+            }
+
+            downloadProvisioningBundle(bundle, filename);
+            setPairingDownloadFilename(filename);
+            setPairingStatusMessage('Локальный агент не найден, скачан резервный файл подключения');
+            setPairingUsedDownloadFallback(true);
+            setPairingCodeExpiresAt(payload.expires_at || bundle.expires_at || null);
             setIsPairingDialogOpen(true);
+            toast.success('Файл подключения скачан');
             void refetchWorkerAgents();
         } catch (error) {
-            logger.error('Error creating worker pairing token:', error);
-            const message = error instanceof Error ? error.message : 'Не удалось создать код подключения';
+            logger.error('Error creating worker provisioning bundle:', error);
+            const message = error instanceof Error ? error.message : 'Не удалось скачать файл подключения';
             setPairingError(message);
             setIsPairingDialogOpen(true);
         } finally {
@@ -908,87 +996,117 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="endpoint_url">URL сервера</Label>
-                                <Input
-                                    id="endpoint_url"
-                                    value={config.endpoint_url}
-                                    onChange={(e) => setConfig({ ...config, endpoint_url: e.target.value })}
-                                    placeholder={providerMeta.defaultEndpoint}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="api_key">
-                                    {provider === 'qwen'
-                                        ? 'API ключ (если у worker задан API_KEY)'
-                                        : 'API ключ (если у сервиса включена авторизация)'}
-                                </Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        id="api_key"
-                                        type="password"
-                                        value={config.api_key}
-                                        onChange={(e) => setConfig({ ...config, api_key: e.target.value })}
-                                        placeholder={
-                                            provider === 'qwen'
-                                                ? 'Введите API_KEY из .env self-hosted Qwen worker'
-                                                : 'Введите API ключ, если включена авторизация'
-                                        }
-                                    />
-                                    {config.api_key && (
-                                        <Button
-                                            variant="outline"
-                                            size="icon"
-                                            onClick={() => copyToClipboard(config.api_key)}
-                                            className="border-blue-800/60 text-blue-300 hover:bg-blue-500/10"
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </Button>
-                                    )}
+                            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+                                <div className="flex items-center gap-2">
+                                    <Zap className="h-4 w-4 text-blue-300" />
+                                    <p className="text-sm font-semibold text-blue-200">Основной self-host путь</p>
                                 </div>
-                                {hasStoredApiKey && !config.api_key.trim() && (
-                                    <p className="text-xs text-amber-300">
-                                        Ключ уже сохранён. Поле можно оставить пустым.
-                                    </p>
-                                )}
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Для релизного сценария используйте pairing bundle и локальный <code>tts_worker_agent</code>.
+                                    Ручной URL ниже оставлен только как резервный compatibility path для диагностики и поддержки.
+                                </p>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <Badge variant="outline" className="border-blue-500/40 text-blue-300">
+                                        official_mode: self_host
+                                    </Badge>
+                                    <Badge variant="outline" className="border-blue-500/40 text-blue-300">
+                                        recommended_path: tts_worker_agent
+                                    </Badge>
+                                </div>
                             </div>
 
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={testConnection}
-                                    disabled={testing || !config.endpoint_url.trim()}
-                                    className="flex-1 border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
-                                >
-                                    {testing ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Проверка...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle className="w-4 h-4 mr-2" />
-                                            Тест соединения
-                                        </>
-                                    )}
-                                </Button>
+                            <details className="rounded-xl border border-border/70 bg-background/45 p-4" open={!hasReadyWorker && !hasSavedConfig}>
+                                <summary className="cursor-pointer list-none text-sm font-medium text-foreground">
+                                    Резервный ручной endpoint
+                                </summary>
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    Используйте этот блок только если локальный агент недоступен или вам нужно вручную проверить сохранённый self-hosted endpoint.
+                                </p>
 
-                                <Button
-                                    onClick={saveConfig}
-                                    disabled={saving || !config.endpoint_url.trim()}
-                                    variant="outline"
-                                    className="flex-1 border-blue-700 text-blue-300 hover:bg-blue-500/10"
-                                >
-                                    {saving ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                            Сохранение...
-                                        </>
-                                    ) : (
-                                        'Сохранить конфиг'
-                                    )}
-                                </Button>
-                            </div>
+                                <div className="mt-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="endpoint_url">URL self-hosted сервиса</Label>
+                                        <Input
+                                            id="endpoint_url"
+                                            value={config.endpoint_url}
+                                            onChange={(e) => setConfig({ ...config, endpoint_url: e.target.value })}
+                                            placeholder={providerMeta.defaultEndpoint}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="api_key">
+                                            {provider === 'qwen'
+                                                ? 'API ключ runtime (если у worker задан API_KEY)'
+                                                : 'API ключ runtime (если у сервиса включена авторизация)'}
+                                        </Label>
+                                        <div className="flex gap-2">
+                                            <Input
+                                                id="api_key"
+                                                type="password"
+                                                value={config.api_key}
+                                                onChange={(e) => setConfig({ ...config, api_key: e.target.value })}
+                                                placeholder={
+                                                    provider === 'qwen'
+                                                        ? 'Введите API_KEY из .env self-hosted Qwen worker'
+                                                        : 'Введите API ключ, если включена авторизация'
+                                                }
+                                            />
+                                            {config.api_key && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => copyToClipboard(config.api_key)}
+                                                    className="border-blue-800/60 text-blue-300 hover:bg-blue-500/10"
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {hasStoredApiKey && !config.api_key.trim() && (
+                                            <p className="text-xs text-amber-300">
+                                                Ключ уже сохранён. Поле можно оставить пустым.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={testConnection}
+                                            disabled={testing || !config.endpoint_url.trim()}
+                                            className="flex-1 border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
+                                        >
+                                            {testing ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Проверка...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                                    Тест соединения
+                                                </>
+                                            )}
+                                        </Button>
+
+                                        <Button
+                                            onClick={saveConfig}
+                                            disabled={saving || !config.endpoint_url.trim()}
+                                            variant="outline"
+                                            className="flex-1 border-blue-700 text-blue-300 hover:bg-blue-500/10"
+                                        >
+                                            {saving ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                    Сохранение...
+                                                </>
+                                            ) : (
+                                                'Сохранить конфиг'
+                                            )}
+                                        </Button>
+                                    </div>
+                                </div>
+                            </details>
 
                             {testResult && (
                                 <div className={`rounded-lg border p-4 ${testResult.success
@@ -1045,9 +1163,15 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     </div>
                                 ) : (
                                     <div className="rounded-xl border border-border/70 bg-background/55 p-4">
-                                        <code className="block text-center text-xl font-semibold tracking-[0.24em] text-foreground">
-                                            {pairingCode || '-'}
-                                        </code>
+                                        <div className="flex items-center justify-center gap-2 text-center text-sm text-foreground">
+                                            <CheckCircle className="h-4 w-4 text-emerald-400" />
+                                            <span>{pairingStatusMessage || pairingDownloadFilename || 'Устройство подключается'}</span>
+                                        </div>
+                                        {pairingUsedDownloadFallback && pairingDownloadFilename ? (
+                                            <p className="mt-3 text-center text-xs text-muted-foreground">
+                                                {pairingDownloadFilename}
+                                            </p>
+                                        ) : null}
                                     </div>
                                 )}
                             </div>
@@ -1060,16 +1184,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     className="border-blue-700 text-blue-300 hover:bg-blue-500/10"
                                     disabled={pairingLoading}
                                 >
-                                    Обновить код
-                                </Button>
-                                <Button
-                                    type="button"
-                                    onClick={() => copyToClipboard(pairingCode)}
-                                    disabled={!pairingCode || pairingLoading}
-                                    className="border border-blue-700 bg-blue-700 text-white hover:bg-blue-800"
-                                >
-                                    <Copy className="mr-2 h-4 w-4" />
-                                    Копировать
+                                    Скачать заново
                                 </Button>
                             </DialogFooter>
                         </DialogContent>
@@ -1218,9 +1333,8 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <div>
                                         <p className="font-medium">Endpoint сохранен для self-hosted {providerMeta.label}</p>
                                         <p className="text-sm text-muted-foreground">
-                                            Этот экран управляет только адресом сервиса, API ключом и проверкой здоровья.
-                                            Переключение между {MANAGED_TOPOLOGY_LABELS[providerContract.managed_topology || 'gateway_managed']} и self-hosted
-                                            теперь делается только на основной странице TTS.
+                                            Этот экран управляет только локальным runtime, API ключом и проверкой здоровья.
+                                            Переключение между cloud и self_host теперь делается только на основной странице TTS.
                                         </p>
                                     </div>
                                 </div>

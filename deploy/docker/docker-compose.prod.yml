@@ -3,6 +3,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: tts_postgres_prod
+    profiles: ["core"]
     environment:
       - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -20,6 +21,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: tts_redis_prod
+    profiles: ["core"]
     command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     volumes:
       - redis_data:/data
@@ -32,8 +34,9 @@ services:
 
   # TTS Service - генерация речи
   tts_service:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
+    image: ${F5_TTS_IMAGE:?F5_TTS_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_tts_service_prod
+    profiles: ["cloud-tts"]
     ports:
       - "127.0.0.1:8011:8011"
     environment:
@@ -67,10 +70,11 @@ services:
       start_period: 60s
 
   qwen_tts:
-    image: ${QWEN_TTS_IMAGE:-nano-qwen3tts-vllm:latest}
+    image: ${QWEN_TTS_IMAGE:?QWEN_TTS_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_qwen_service_prod
+    profiles: ["cloud-tts"]
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8002:8000"
     environment:
       - PORT=8000
       - API_KEY=${QWEN_TTS_SERVICE_API_KEY}
@@ -90,8 +94,9 @@ services:
       retries: 3
 
   tts_gateway:
-    image: ${TTS_GATEWAY_IMAGE:-tts-gateway:latest}
+    image: ${TTS_GATEWAY_IMAGE:?TTS_GATEWAY_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_gateway_prod
+    profiles: ["cloud-tts"]
     ports:
       - "127.0.0.1:8010:8010"
     environment:
@@ -113,108 +118,11 @@ services:
     restart: unless-stopped
 
   # TTS Workers - обработка очередей
-  tts_worker_1:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
-    container_name: tts_worker_1_prod
-    command: python worker.py
-    environment:
-      - ENVIRONMENT=production
-      - TTS_DEBUG=false
-      - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
-      - WORKER_ID=worker_1
-    volumes:
-      - tts_audio:/app/audio
-      - tts_logs:/app/logs
-      - tts_cache:/app/f5_tts_cache
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  tts_worker_2:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
-    container_name: tts_worker_2_prod
-    command: python worker.py
-    environment:
-      - ENVIRONMENT=production
-      - TTS_DEBUG=false
-      - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
-      - WORKER_ID=worker_2
-    volumes:
-      - tts_audio:/app/audio
-      - tts_logs:/app/logs
-      - tts_cache:/app/f5_tts_cache
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  tts_worker_3:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
-    container_name: tts_worker_3_prod
-    command: python worker.py
-    environment:
-      - ENVIRONMENT=production
-      - TTS_DEBUG=false
-      - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
-      - WORKER_ID=worker_3
-    volumes:
-      - tts_audio:/app/audio
-      - tts_logs:/app/logs
-      - tts_cache:/app/f5_tts_cache
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
-  tts_worker_4:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
-    container_name: tts_worker_4_prod
-    command: python worker.py
-    environment:
-      - ENVIRONMENT=production
-      - TTS_DEBUG=false
-      - TTS_LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - HF_HOME=/app/f5_tts_cache
-      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
-      - WORKER_ID=worker_4
-    volumes:
-      - tts_audio:/app/audio
-      - tts_logs:/app/logs
-      - tts_cache:/app/f5_tts_cache
-    depends_on:
-      redis:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-
   # Bot Service - основной API
   bot_service:
-    build:
-      context: ../../bot_service
-      dockerfile: Dockerfile.prod
+    image: ${BOT_SERVICE_IMAGE:?BOT_SERVICE_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_bot_service_prod
+    profiles: ["core"]
     ports:
       - "127.0.0.1:8000:8000"
     environment:
@@ -298,12 +206,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      tts_service:
-        condition: service_healthy
-      qwen_tts:
-        condition: service_healthy
-      tts_gateway:
-        condition: service_started
       postgres:
         condition: service_healthy
     restart: unless-stopped
@@ -315,13 +217,9 @@ services:
 
   # Frontend - React UI
   frontend:
-    build:
-      context: ../../frontend
-      dockerfile: Dockerfile.prod
-      args:
-        - VITE_BOT_SERVICE_URL=${BACKEND_URL:-https://yourdomain.com}
-        - VITE_BOT_SERVICE_WS_URL=${BACKEND_WS_URL:-wss://yourdomain.com}
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_frontend_prod
+    profiles: ["core"]
     ports:
       - "80:80"
       - "443:443"

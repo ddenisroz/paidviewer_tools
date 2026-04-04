@@ -3,10 +3,15 @@
 /* eslint-disable react-refresh/only-export-components */
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
 import { integrationsService } from '@/services/api/services/integrationsService';
+import { platformService } from '@/services/api/services/platformService';
+import { buildPlatformCapabilityMap, DEFAULT_PLATFORM_CAPABILITIES } from '@/shared/utils/platformCapabilities';
+import { PLATFORM_RELEASES, type PlatformReleaseMap } from '@/shared/utils/platformRelease';
 import { ttsService } from '@/services/api/services/ttsService';
 import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
+
+import type { ApiResponse, PlatformCapabilityMap, PlatformConfigResponse } from '@/types';
 
 interface IntegrationStatus {
     enabled: boolean;
@@ -21,6 +26,8 @@ interface IntegrationsState {
 
 interface IntegrationsContextValue {
     integrations: IntegrationsState;
+    platformCapabilities: PlatformCapabilityMap;
+    platformRelease: PlatformReleaseMap;
     isLoading: boolean;
     refreshIntegrations: () => Promise<void>;
     updateTwitchIntegration: (enabled: boolean, onClose?: (() => void) | null) => Promise<void>;
@@ -70,7 +77,22 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
     };
 
     const [integrations, setIntegrations] = useState<IntegrationsState>(getInitialIntegrations);
+    const [platformCapabilities, setPlatformCapabilities] = useState<PlatformCapabilityMap>(DEFAULT_PLATFORM_CAPABILITIES);
     const [isLoading, setIsLoading] = useState<boolean>(false);
+
+    const fetchPlatformConfigs = useCallback(async (): Promise<void> => {
+        try {
+            const response = await platformService.getPlatformConfigs();
+            const payload = response.data as ApiResponse<PlatformConfigResponse> | PlatformConfigResponse;
+            const platforms = (payload as PlatformConfigResponse).platforms
+                || (payload as ApiResponse<PlatformConfigResponse>).data?.platforms
+                || [];
+            setPlatformCapabilities(buildPlatformCapabilityMap(platforms));
+        } catch (error) {
+            logger.error('Error loading platform capabilities:', error);
+            setPlatformCapabilities(DEFAULT_PLATFORM_CAPABILITIES);
+        }
+    }, []);
 
     const fetchIntegrations = useCallback(async (): Promise<void> => {
         if (isAuthenticated === false) {
@@ -115,6 +137,10 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
     useEffect(() => {
         fetchIntegrations();
     }, [fetchIntegrations]);
+
+    useEffect(() => {
+        fetchPlatformConfigs();
+    }, [fetchPlatformConfigs]);
 
     useEffect(() => {
         if (integrationsNeedRefresh) {
@@ -217,12 +243,15 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
 
     const value = useMemo<IntegrationsContextValue>(() => ({
         integrations,
+        platformCapabilities,
+        platformRelease: PLATFORM_RELEASES,
         isLoading,
         refreshIntegrations: fetchIntegrations,
         updateTwitchIntegration,
         updateVkIntegration,
     }), [
         integrations,
+        platformCapabilities,
         isLoading,
         fetchIntegrations,
         updateTwitchIntegration,

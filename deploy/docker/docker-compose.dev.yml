@@ -90,7 +90,7 @@ services:
     restart: unless-stopped
 
   tts_gateway:
-    image: ${TTS_GATEWAY_IMAGE:-tts-gateway:latest}
+    image: ${TTS_GATEWAY_IMAGE:-tts-gateway:local}
     container_name: tts_gateway_dev
     ports:
       - "8010:8010"
@@ -113,7 +113,7 @@ services:
     restart: unless-stopped
 
   tts_service:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
+    image: ${F5_TTS_IMAGE:-f5-tts-service:local}
     container_name: tts_tts_service_dev
     ports:
       - "8011:8011"
@@ -139,7 +139,7 @@ services:
     restart: unless-stopped
 
   qwen_tts:
-    image: ${QWEN_TTS_IMAGE:-nano-qwen3tts-vllm:latest}
+    image: ${QWEN_TTS_IMAGE:-nano-qwen3tts-vllm:local}
     container_name: tts_qwen_service_dev
     ports:
       - "8012:8000"

@@ -1,13 +1,13 @@
-# Быстрый запуск
+﻿# Быстрый запуск
 
-Если сначала нужно понять структуру репозитория, открой [REPO_STRUCTURE.md](REPO_STRUCTURE.md). Если нужно понять текущее состояние проекта, открой [STATUS_TRACKER.md](STATUS_TRACKER.md).
+Если нужен только минимальный рабочий контур, подними `bot_service` и `frontend`. Расширенный TTS smoke и релизные проверки смотри в `LIVE_SMOKE_RUNBOOK.md` и `RELEASE_CHECKLIST.md`.
 
 ## Требования
 
-- Python 3.10+
-- Node.js 22+
+- Python 3.11+
+- Node.js 20+
 - PostgreSQL
-- для полного TTS-контура дополнительно:
+- для cloud TTS дополнительно:
   - `tts-gateway`
   - `f5-tts-service`
   - `nano-qwen3tts-vllm`
@@ -15,39 +15,34 @@
 ## 1. Подготовь репозиторий
 
 ```powershell
-git clone <repo>
-cd paidviewer_tools
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-## 2. Установи зависимости
-
-```powershell
 python -m pip install --upgrade pip
 python -m pip install -r bot_service/requirements.txt
 python -m pip install -r bot_service/requirements_dev.txt
+```
 
+```powershell
 cd frontend
 npm install
 cd ..
 ```
 
-## 3. Подготовь `.env`
+## 2. Подготовь env
 
 ```powershell
 Copy-Item bot_service/.env.example bot_service/.env
 Copy-Item frontend/.env.example frontend/.env
 ```
 
-Минимально для backend:
+Минимум для backend:
 
 - `DATABASE_URL`
 - `SECRET_KEY`
 - `TWITCH_CLIENT_ID`
 - `TWITCH_CLIENT_SECRET`
 
-Если используешь внешний TTS-контур:
+Если нужен cloud TTS:
 
 - `TTS_GATEWAY_URL`
 - `TTS_GATEWAY_API_KEY`
@@ -55,9 +50,8 @@ Copy-Item frontend/.env.example frontend/.env
 - `F5_TTS_SERVICE_API_KEY`
 - `QWEN_TTS_SERVICE_URL`
 - `QWEN_TTS_SERVICE_API_KEY`
-- опционально `QWEN_VOICE_SERVICE_URL`
 
-## 4. Прогони миграции
+## 3. Прогони миграции
 
 ```powershell
 cd bot_service
@@ -65,7 +59,7 @@ alembic upgrade head
 cd ..
 ```
 
-## 5. Запусти сервисы
+## 4. Запусти сервисы
 
 ```powershell
 # Терминал 1
@@ -77,32 +71,16 @@ cd frontend
 npm run dev
 ```
 
-## 6. Проверь базовый контур
+## 5. Проверь базовый контур
 
 1. Открой `http://localhost:5173`
 2. Проверь backend: `http://localhost:8000/health`
-3. Если подключён внешний TTS-контур:
+3. Если подключён cloud TTS:
    - `http://localhost:8000/api/tts/health?provider=f5`
    - `http://localhost:8000/api/tts/health?provider=qwen`
 
-## 7. Если нужен live smoke TTS
+## 6. Перед релизом
 
-Читай:
-
-- [setup/LOCAL_TTS_INTEGRATION.md](setup/LOCAL_TTS_INTEGRATION.md)
-- [setup/LIVE_SMOKE_RUNBOOK.md](setup/LIVE_SMOKE_RUNBOOK.md)
-- [setup/LIVE_SMOKE_BEGINNER_GUIDE_RU.md](setup/LIVE_SMOKE_BEGINNER_GUIDE_RU.md)
-
-## Очистка перед отгрузкой
-
-Preview:
-
-```powershell
-.\scripts\prepare-release.ps1
-```
-
-Очистка:
-
-```powershell
-.\scripts\prepare-release.ps1 -ApplyCleanup
-```
+- [release/RELEASE_CHECKLIST.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
+- [setup/LIVE_SMOKE_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
+- [setup/TTS_SUPPORT_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/TTS_SUPPORT_RUNBOOK.md)

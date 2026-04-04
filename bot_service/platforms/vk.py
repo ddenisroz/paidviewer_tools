@@ -3,7 +3,9 @@ VK Live platform implementation
 """
 import logging
 from typing import Optional, Dict, Any, List
-from .base import StreamingPlatform, PlatformConfig
+from sqlalchemy import func, or_
+
+from .base import PlatformCapabilities, PlatformConfig, StreamingPlatform
 
 # [REF] Integrations
 from integrations.vk.client import VKClient
@@ -29,7 +31,18 @@ class VKPlatform(StreamingPlatform):
             supports_tts=True,
             supports_points=True,
             supports_categories=True,
-            color='#0077FF'
+            color='#0077FF',
+            capabilities=PlatformCapabilities(
+                roles=True,
+                badges=True,
+                reply_context=True,
+                mention_context=True,
+                moderation_actions=False,
+                rewards=True,
+                bot_status=True,
+                supported_roles=['owner', 'moderator', 'viewer'],
+                moderation_actions_available=[],
+            ),
         )
         super().__init__(config)
 
@@ -417,5 +430,89 @@ class VKPlatform(StreamingPlatform):
         Returns:
             List of role strings (broadcaster, moderator, vip, viewer)
         """
-        logger.debug(f"get_user_roles called for {username} on {channel_name}")
-        return []
+        normalized_username = self._normalize_channel_slug(username) or str(username or "").strip().lower()
+        normalized_channel = self._normalize_channel_slug(channel_name) or str(channel_name or "").strip().lower()
+
+        roles: list[str] = []
+        if normalized_username and normalized_channel and normalized_username == normalized_channel:
+            roles.extend(["owner", "broadcaster"])
+
+        if not normalized_username:
+            return roles or ["viewer"]
+
+        db = next(get_db())
+        try:
+            username_lower = str(username or "").strip().lower()
+            user = db.query(User).filter(
+                or_(
+                    func.lower(User.vk_channel_name) == normalized_username,
+                    func.lower(User.vk_username) == username_lower,
+                )
+            ).first()
+
+            if user:
+                user_channel_slug = self._normalize_channel_slug(user.vk_channel_name) or ""
+                if user.vk_is_owner and (
+                    not normalized_channel
+                    or not user_channel_slug
+                    or user_channel_slug == normalized_channel
+                ):
+                    roles.extend(["owner", "broadcaster"])
+
+                if user.vk_is_moderator:
+                    roles.append("moderator")
+
+            if normalized_channel and "moderator" not in roles:
+                channel_owner = db.query(User).filter(
+                    or_(
+                        func.lower(User.vk_channel_name) == normalized_channel,
+                        func.lower(User.vk_username) == normalized_channel,
+                    )
+                ).first()
+
+                if channel_owner:
+                    token_record = self.user_service.get_user_token(channel_owner.id, 'vk', db)
+                    if token_record and token_record.access_token:
+                        decrypted_token = self.user_service.decrypt_access_token(token_record.access_token)
+                        token_info = TokenInfo(
+                            access_token=decrypted_token,
+                            refresh_token=token_record.refresh_token,
+                            scopes=token_record.scopes,
+                        )
+                        members = await self.client.get_chat_members(
+                            channel_owner.vk_channel_name or normalized_channel,
+                            token_info,
+                        )
+                        for member in members:
+                            if not isinstance(member, dict):
+                                continue
+                            member_candidates = [
+                                member.get("nick"),
+                                member.get("name"),
+                                member.get("login"),
+                            ]
+                            normalized_candidates = {
+                                (
+                                    self._normalize_channel_slug(candidate)
+                                    or str(candidate or "").strip().lower()
+                                )
+                                for candidate in member_candidates
+                                if candidate
+                            }
+                            if normalized_username not in normalized_candidates:
+                                continue
+
+                            if member.get("is_owner") or member.get("is_broadcaster"):
+                                roles.extend(["owner", "broadcaster"])
+                            if member.get("is_moderator"):
+                                roles.append("moderator")
+                            break
+        except Exception as error:
+            logger.error(f"Error getting VK roles: {error}")
+        finally:
+            db.close()
+
+        if not roles:
+            roles.append("viewer")
+
+        return list(dict.fromkeys(roles))

@@ -28,6 +28,9 @@ class TestTTSAPI:
         assert "enabled" in data
         assert "engine_type" in data
         assert "advanced_provider" in data
+        assert data.get("official_modes") == ["cloud", "self_host"]
+        assert "provider_matrix" in data
+        assert "active_contract" in data
 
     def test_tts_settings(self, authenticated_client):
         response = authenticated_client.get("/api/tts/settings")
@@ -87,6 +90,11 @@ class TestTTSAPI:
         assert f5_response.status_code in [200, 500]
         assert qwen_response.status_code in [200, 500]
         assert gcloud_response.status_code in [200, 500]
+        if f5_response.status_code == 200:
+            payload = f5_response.json()
+            assert "official_mode" in payload
+            assert "slot_allowed" in payload
+            assert "recommended_path" in payload
 
     def test_youtube_settings_endpoints_absent_or_legacy(self, authenticated_client):
         get_response = authenticated_client.get("/api/tts/youtube-settings")

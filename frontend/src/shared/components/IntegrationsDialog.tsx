@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDonationAlerts } from '@/context/DonationAlertsContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { Badge } from "@/shared/components/ui/badge";
 import { Button } from "@/shared/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Switch } from "@/shared/components/ui/switch";
@@ -21,7 +22,7 @@ interface IntegrationsDialogProps {
 
 const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenChange }) => {
     const navigate = useNavigate();
-    const { integrations, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
+    const { integrations, platformRelease, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
     // Проверяем, есть ли хотя бы одна основная платформа
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
@@ -107,16 +108,30 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                     </div>
 
                     {/* VK Live Integration */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                            <VKIcon className="text-[#FF4444]" />
-                            <p className="font-semibold">VK Live</p>
+                    <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                                <VKIcon className="text-[#FF4444]" />
+                                <div className="flex items-center gap-2">
+                                    <p className="font-semibold">VK Live</p>
+                                    {platformRelease.vk.badgeLabel ? (
+                                        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                                            {platformRelease.vk.badgeLabel}
+                                        </Badge>
+                                    ) : null}
+                                </div>
+                            </div>
+                            <Switch
+                                checked={integrations.vk?.enabled || false}
+                                onCheckedChange={handleVkToggle}
+                                disabled={isLoading || integrations.vk?.enabled === null}
+                            />
                         </div>
-                        <Switch
-                            checked={integrations.vk?.enabled || false}
-                            onCheckedChange={handleVkToggle}
-                            disabled={isLoading || integrations.vk?.enabled === null}
-                        />
+                        {platformRelease.vk.helperText ? (
+                            <p className="pl-7 text-xs text-muted-foreground">
+                                {platformRelease.vk.helperText}
+                            </p>
+                        ) : null}
                     </div>
 
                     {/* Разделитель */}

@@ -304,10 +304,12 @@ class Bot(TwitchBotCore):
     async def _handle_tts(self, message):
         """Обработка TTS для сообщений из Twitch"""
         from utils.websocket_helper import handle_tts_for_message
+        from utils.tts_message_context import extract_twitch_tts_context
         
         # Извлекаем reward_id из IRC tags если сообщение отправлено с наградой
         reward_id = None
         source_message_id = None
+        message_context = extract_twitch_tts_context(message)
         if hasattr(message, 'tags') and message.tags:
             reward_id = message.tags.get('custom-reward-id')
             source_message_id = str(message.tags.get("id") or "").strip() or None
@@ -322,6 +324,8 @@ class Bot(TwitchBotCore):
             tts_api=self.tts_api,
             connection_manager=self.connection_manager,
             skip_if_command=True,
+            is_reply=bool(message_context.get("is_reply")),
+            mentioned_users=message_context.get("mentioned_users") or [],
             reward_id=reward_id,
             message_id=source_message_id,
         )
