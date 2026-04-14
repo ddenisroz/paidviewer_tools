@@ -2,6 +2,7 @@
 """
 API tests for current TTS routes.
 """
+from models.tts import TTSBlockedUser
 from services.tts.tts_service import (
     BlockTargetNotFoundError,
     BlockTargetVerificationUnavailableError,
@@ -138,3 +139,23 @@ class TestTTSAPI:
 
         assert response.status_code == 503
         assert "Try again later" in response.json()["detail"]
+
+    def test_delete_blocked_user_by_id(self, authenticated_client, db, test_user):
+        blocked_user = TTSBlockedUser(
+            user_id=test_user.id,
+            channel_name=test_user.twitch_username,
+            platform="twitch",
+            username="annoying_viewer",
+        )
+        db.add(blocked_user)
+        db.commit()
+        db.refresh(blocked_user)
+
+        response = authenticated_client.delete(
+            f"/api/tts/blocked/{blocked_user.id}",
+            headers=_csrf_headers(authenticated_client),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert db.query(TTSBlockedUser).filter(TTSBlockedUser.id == blocked_user.id).first() is None

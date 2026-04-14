@@ -7,14 +7,14 @@ from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
 from core.database import get_db
-from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
+from core.internal_service_auth import build_tts_httpx_client_kwargs
 from repositories.user_voice_settings_repository import UserVoiceSettingsRepository
-from services.tts.provider_utils import (
-    ProviderRoutingError,
-    get_voice_management_upstream_params,
-    get_voice_management_upstream_url,
-    normalize_provider,
-    qwen_voice_crud_not_available_detail,
+from services.voice_management_upstream import (
+    ensure_voice_management_provider,
+    provider_admin_api_base,
+    provider_request_params,
+    raise_upstream_http_error,
+    tts_auth_headers,
 )
 from services.voice_management_service import VoiceManagementService
 
@@ -24,20 +24,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 
 def _tts_auth_headers(provider: str) -> dict:
-    try:
-        return build_tts_auth_headers(
-            provider=provider,
-            upstream="voice",
-            strict=True,
-        )
-    except TTSAuthConfigError as error:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "code": "tts_upstream_auth_not_configured",
-                "message": str(error),
-            },
-        ) from error
+    return tts_auth_headers(provider)
 
 
 def _is_admin(user: dict) -> bool:
@@ -50,54 +37,29 @@ def _require_admin(user: dict) -> None:
 
 
 def _resolve_provider(provider: Optional[str]) -> str:
-    normalized = normalize_provider(provider or "f5")
-    if normalized == "gcloud":
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "code": "gcloud_voice_management_not_supported",
-                "message": "Google Cloud provider does not support voice CRUD in bot_service.",
-            },
-        )
-    return "qwen" if normalized == "qwen" else "f5"
+    return ensure_voice_management_provider(provider or "f5")
 
 
 def _provider_base_url(provider: str) -> str:
-    try:
-        return get_voice_management_upstream_url(provider).rstrip("/")
-    except ProviderRoutingError as error:
-        if str(error) == "qwen_voice_crud_not_available":
-            raise HTTPException(status_code=501, detail=qwen_voice_crud_not_available_detail()) from error
-        raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
+    return provider_admin_api_base(provider).removesuffix("/api/admin")
 
 
 def _provider_params(provider: str, extra: Optional[dict] = None) -> dict:
-    return get_voice_management_upstream_params(provider, extra_params=extra)
+    return provider_request_params(provider, extra)
 
 
 def _raise_tts_upstream_error(response: httpx.Response, operation: str) -> None:
-    status_code = response.status_code
-    raw_body = (response.text or "").strip()
-    if raw_body:
-        logger.warning(
-            "TTS upstream error during %s: status=%s body=%s",
-            operation,
-            status_code,
-            raw_body[:500],
-        )
-    else:
-        logger.warning("TTS upstream error during %s: status=%s", operation, status_code)
-
-    if status_code == 400:
+    if response.status_code == 400:
         detail = "Invalid request to TTS service"
-    elif status_code in (401, 403):
-        detail = "TTS service authorization failed"
-    elif status_code == 404:
+    elif response.status_code == 404:
         detail = "Resource not found in TTS service"
     else:
         detail = "TTS service request failed"
-
-    raise HTTPException(status_code=status_code, detail=detail)
+    raise_upstream_http_error(
+        response=response,
+        operation=operation,
+        default_detail=detail,
+    )
 
 
 @router.put("/voices/{voice_id}/settings")

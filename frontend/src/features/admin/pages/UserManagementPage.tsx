@@ -9,8 +9,6 @@
  */
 
 import React, { useState } from 'react';
-
-/* eslint-disable no-alert */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Ban, CheckCircle, Edit, MessageCircle, Plus, RefreshCw, Shield,
@@ -18,6 +16,8 @@ import {
 } from 'lucide-react';
 
 import { AdminPageHeader } from '@/features/admin/components/admin-ui';
+import { UserDeleteDialog, WhitelistChannelDialog } from '@/features/admin/components/UserManagementDialogs';
+import { addChannelsToWhitelist } from '@/features/admin/utils/whitelistActions';
 import { adminService } from '@/services/api/services/adminService';
 import { DataTable, type DataTableBulkAction, type DataTableColumn, type DataTableFilter } from '@/shared/components';
 import { Badge } from '@/shared/components/ui/badge';
@@ -25,7 +25,6 @@ import { Button } from '@/shared/components/ui/button';
 import { Card } from '@/shared/components/ui/card';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
-import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { logger } from '@/shared/utils/prodLogger';
@@ -58,8 +57,10 @@ const UserManagementPage: React.FC = () => {
     // Dialogs state
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [whitelistDialogOpen, setWhitelistDialogOpen] = useState(false);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [userToDelete, setUserToDelete] = useState<User | null>(null);
     const [editForm, setEditForm] = useState<{ is_admin: boolean }>({ is_admin: false });
     const [blockForm, setBlockForm] = useState<{ reason: string }>({ reason: '' });
     const [whitelistForm, setWhitelistForm] = useState<{
@@ -139,6 +140,8 @@ const UserManagementPage: React.FC = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
             toast.success('Пользователь удален');
+            setDeleteDialogOpen(false);
+            setUserToDelete(null);
         },
         onError: (error: unknown) => {
             logger.error('Error deleting user:', error);
@@ -147,36 +150,8 @@ const UserManagementPage: React.FC = () => {
     });
 
     const addToWhitelistMutation = useMutation({
-        mutationFn: async ({ twitchChannel, vkChannel }: { twitchChannel: string; vkChannel: string }) => {
-            const results: string[] = [];
-            const errors: string[] = [];
-
-            if (twitchChannel && twitchChannel.trim()) {
-                try {
-                    await adminService.addToWhitelist({ username: twitchChannel.trim(), platform: 'twitch' });
-                    results.push(`Twitch: ${twitchChannel.trim()}`);
-                } catch (err) {
-                    const typedErr = err as { response?: { data?: { error?: string } }; message?: string };
-                    errors.push(`Twitch: ${typedErr.response?.data?.error || typedErr.message || 'Ошибка'}`);
-                }
-            }
-
-            if (vkChannel && vkChannel.trim()) {
-                try {
-                    await adminService.addToWhitelist({ username: vkChannel.trim(), platform: 'vk' });
-                    results.push(`VK: ${vkChannel.trim()}`);
-                } catch (err) {
-                    const typedErr = err as { response?: { data?: { error?: string } }; message?: string };
-                    errors.push(`VK: ${typedErr.response?.data?.error || typedErr.message || 'Ошибка'}`);
-                }
-            }
-
-            if (results.length === 0) {
-                throw new Error(errors.length > 0 ? errors.join('; ') : 'Укажите хотя бы один канал');
-            }
-
-            return { success: true, platforms: results, errors: errors.length > 0 ? errors : null };
-        },
+        mutationFn: async ({ twitchChannel, vkChannel }: { twitchChannel: string; vkChannel: string }) =>
+            addChannelsToWhitelist(twitchChannel, vkChannel),
         onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ['admin-users'] });
             if (data.errors) {
@@ -237,6 +212,11 @@ const UserManagementPage: React.FC = () => {
         setCurrentUser(user);
         setBlockForm({ reason: '' });
         setBlockDialogOpen(true);
+    };
+
+    const openDeleteDialog = (user: User): void => {
+        setUserToDelete(user);
+        setDeleteDialogOpen(true);
     };
 
     const handleEditUser = async (): Promise<void> => {
@@ -537,9 +517,7 @@ const UserManagementPage: React.FC = () => {
                         className={TABLE_ICON_BUTTON_CLASS}
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-                                deleteUserMutation.mutate(user.id);
-                            }
+                            openDeleteDialog(user);
                         }}
                         title="Удалить"
                     >
@@ -728,48 +706,6 @@ const UserManagementPage: React.FC = () => {
                                 Добавить в whitelist
                             </Button>
                         </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Добавить канал в whitelist</DialogTitle>
-                                <DialogDescription>
-                                    Укажите Twitch и/или VK Live канал для добавления в whitelist
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                                <div>
-                                    <Label htmlFor="twitch_channel">Twitch канал</Label>
-                                    <Input
-                                        id="twitch_channel"
-                                        value={whitelistForm.twitch_channel}
-                                        onChange={(e) => setWhitelistForm({ ...whitelistForm, twitch_channel: e.target.value })}
-                                        placeholder="Введите название Twitch канала..."
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="vk_channel">VK Live канал</Label>
-                                    <Input
-                                        id="vk_channel"
-                                        value={whitelistForm.vk_channel}
-                                        onChange={(e) => setWhitelistForm({ ...whitelistForm, vk_channel: e.target.value })}
-                                        placeholder="Введите название VK Live канала..."
-                                        className="mt-1"
-                                    />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    variant="outline"
-                                    className={ACTION_BUTTON_CLASS}
-                                    onClick={() => setWhitelistDialogOpen(false)}
-                                >
-                                    Отмена
-                                </Button>
-                                <Button className="h-9" onClick={handleAddToWhitelist}>
-                                    Добавить
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
                     </Dialog>
                     </div>
                 }
@@ -870,6 +806,31 @@ const UserManagementPage: React.FC = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <WhitelistChannelDialog
+                open={whitelistDialogOpen}
+                twitchChannel={whitelistForm.twitch_channel}
+                vkChannel={whitelistForm.vk_channel}
+                onOpenChange={setWhitelistDialogOpen}
+                onTwitchChange={(value) => setWhitelistForm({ ...whitelistForm, twitch_channel: value })}
+                onVkChange={(value) => setWhitelistForm({ ...whitelistForm, vk_channel: value })}
+                onSubmit={handleAddToWhitelist}
+            />
+            <UserDeleteDialog
+                open={deleteDialogOpen}
+                user={userToDelete}
+                isPending={deleteUserMutation.isPending}
+                onOpenChange={(open) => {
+                    setDeleteDialogOpen(open);
+                    if (!open) {
+                        setUserToDelete(null);
+                    }
+                }}
+                onDelete={() => {
+                    if (userToDelete) {
+                        deleteUserMutation.mutate(userToDelete.id);
+                    }
+                }}
+            />
         </div>
     );
 };

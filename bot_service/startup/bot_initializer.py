@@ -209,8 +209,15 @@ async def initialize_all_bots() -> None:
         logger.info(f"[STARTUP] Twitch channels: {twitch_channels}")
         logger.info(f"[STARTUP] VK channels: {vk_channels}")
 
-        await initialize_twitch_bot(twitch_channels)
-        await initialize_vk_bot(vk_channels)
+        if twitch_channels:
+            await initialize_twitch_bot(twitch_channels)
+        else:
+            logger.info("[STARTUP] No active Twitch channels found; skipping Twitch bot initialization")
+
+        if vk_channels:
+            await initialize_vk_bot(vk_channels)
+        else:
+            logger.info("[STARTUP] No active VK channels found; skipping VK bot initialization")
     except Exception as e:
         logger.error(f"[ERROR] Bot initialization failed: {e}")
     finally:

@@ -1,13 +1,13 @@
 ﻿# Live smoke runbook
 
-Последнее обновление: 2026-03-31
+Последнее обновление: 2026-04-05
 
 Это документ для первого end-to-end smoke без смешения инфраструктурных проблем, контрактных проблем и upstream gaps.
 
 ## Термины
 
 - `cloud` — `bot_service -> tts-gateway -> provider runtime`
-- `self_host` — `bot_service pairing/provisioning -> tts_worker_agent -> local runtime`
+- `self_host` — `bot_service -> provisioning/pairing -> tts_worker_agent -> local runtime`
 - `raw endpoint compatibility` — запасной ручной путь через `local_tts_endpoints`; не основной пользовательский сценарий
 
 ## Что входит в первый smoke
@@ -37,6 +37,8 @@
 - backend знает URL и API keys для TTS upstreams
 - provider-specific direct keys (`F5_TTS_SERVICE_API_KEY`, `QWEN_TTS_SERVICE_API_KEY`) не подменяются одним только `TTS_GATEWAY_API_KEY`
 - `LOCAL_TTS_ALLOWED_HOSTS` и `LOCAL_TTS_ALLOWED_CIDRS` настроены
+- `tts_worker_agent` поднимается вручную или через явно включённый opt-in автозапуск, а не за счёт скрытых startup side effects
+- Qwen runtime для smoke поднят на Linux или WSL2, если используется локальный/self-host путь
 
 ## Что preflight не гарантирует
 
@@ -62,6 +64,7 @@
 - `GET /api/tts/health?provider=f5`
 - `GET /api/tts/health?provider=qwen`
 - `GET /api/voices/providers/capabilities`
+- открыть `/dashboard/admin?tab=overview` и убедиться, что admin read-models загружаются
 - открыть `/tts-player`, потому что website-mode воспроизведение без него не стартует
 
 ## Сценарии
@@ -141,3 +144,4 @@
 
 - не меняй порядок шагов по ходу демонстрации
 - считай `VK Live` обязательным live-блоком, если он заявлен в сценарии презентации
+- не используй legacy admin route или raw endpoint fallback как часть основного сценария

@@ -1,83 +1,124 @@
 ﻿# Контекст проекта
 
-Последнее обновление: 2026-03-16
+Последнее обновление: 2026-04-05
 
 ## Что это за репозиторий
 
-Это основной продукт для стримеров:
+Это основной продуктовый репозиторий Paidviewer для стримеров:
 
-- `frontend` — пользовательский интерфейс и личный кабинет
-- `bot_service` — центральный backend: авторизация, настройки, бизнес-логика, оркестрация
-- внешние TTS-сервисы — `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm`
+- `frontend` — пользовательский кабинет, OBS-related screens и админ-центр
+- `bot_service` — центральный backend: авторизация, настройки, orchestration, бизнес-логика
+- `tts_worker_agent` — официальный self-host runtime
 
-`frontend` общается только с `bot_service`. Прямые обращения из frontend к внешним TTS-сервисам не допускаются.
+Внешний cloud TTS-контур живёт в отдельных репозиториях:
+
+- `tts-gateway`
+- `f5-tts-service`
+- `nano-qwen3tts-vllm`
+
+`frontend` общается только с `bot_service`. Прямые обращения из frontend к внешним TTS runtime не считаются рабочим контрактом.
+
+## Базовый runtime standard
+
+- Python `3.12` для `paidviewer_tools`, `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm`
+- Node.js `20+` для `frontend`
+- PostgreSQL и Redis обязательны для runtime
 
 ## Как сейчас устроен TTS
 
 Официальных пользовательских режимов только два:
 
 - `cloud` — `frontend -> bot_service -> tts-gateway -> provider runtime`
-- `self_host` — `frontend -> bot_service pairing/provisioning -> tts_worker_agent -> local runtime`
+- `self_host` — `frontend -> bot_service -> provisioning/pairing -> tts_worker_agent -> local runtime`
 
 Что важно:
 
-- `tts_worker_agent` — основной и рекомендуемый self-host путь для обоих провайдеров
-- ручной raw endpoint сохранён только как compatibility fallback для поддержки и диагностики
-- старые флаги `use_local`, `f5_local`, `qwen_local` и старые термины остаются только для совместимости
-- источник истины для routing — mode-first контракт `official_mode`, `recommended_path`, `provider_matrix`, capability flags и status/health ответы backend-а
+- `tts_worker_agent` — основной self-host путь для обоих провайдеров
+- raw endpoint сохранён только как compatibility fallback для поддержки и диагностики
+- источник истины для routing и UI-поведения — backend status/health/capability contract
 
 ## Провайдеры
 
 - `f5`
   - cloud и self-host используют тот же mode-first orchestration-контур, что и `qwen`
-  - управление голосами поддерживается через backend
+  - voice management поддерживается через backend/admin routes
 - `qwen`
-  - cloud и self-host используют тот же orchestration-path, а различия живут в provider adapter/capabilities
-  - ручной self-host endpoint всё ещё работает через compatibility adapter, но пользовательский прод-путь — через `tts_worker_agent`
-  - управление голосами поддерживается через backend/admin routes upstream-а
-  - admin/global voices доступны при настроенном `QWEN_TTS_SERVICE_URL` или `QWEN_VOICE_SERVICE_URL`
-  - рекомендуемый общий env для согласования backend catalog и runtime allowlist: `QWEN_ALLOWED_MODELS`
-  - cloud model catalog должен отражать runtime `/api/models`, отфильтрованный backend allowlist `QWEN_CLOUD_ALLOWED_MODELS` при его наличии
-- self-host model catalog не режется backend allowlist-ом и отражает runtime пользовательского compatibility endpoint-а как есть
-  - `QWEN_VOICE_STORAGE_DIR` должен жить в общем persistent volume, чтобы sample-ы переживали смену `base` / `voice_design` / `custom_voice` runtime
+  - cloud и self-host идут через тот же orchestration-path
+  - различия живут в provider adapter и capability flags
+  - `QWEN_VOICE_STORAGE_DIR` должен жить в persistent volume
+  - для Windows операторов штатный runtime-путь — Linux/WSL2
 - `gcloud`
-  - встроенный путь внутри `bot_service`
+  - встроенный provider path внутри `bot_service`
 
-## Авторизация и ограничения runtime
+## Платформы
+
+- `Twitch` — основной GA-контур
+- `VK Live` — beta-tier, но в единой capability-модели с Twitch
+
+Для VK сейчас ожидается:
+
+- `roles=true`
+- `badges=true`
+- `reply_context=true`
+- `mention_context=true`
+- `rewards=true`
+- `bot_status=true`
+- `moderation_actions=false`
+
+Поддерживаемые VK роли в продуктовой модели: `owner`, `moderator`, `viewer`.
+
+## Админка
+
+Активный admin shell теперь только один:
+
+- `/dashboard/admin`
+
+Вкладки админки:
+
+- `Overview`
+- `Runtime`
+- `TTS`
+- `Accounts`
+- `Channels`
+- `Logs`
+
+Legacy admin route `/dashboard/dolbaebadmintts/*` удалён из рабочего слоя.
+
+## Авторизация и runtime-ограничения
 
 - защищённый API использует cookie `session_id`
 - guest mode удалён из рабочего слоя
-- браузерная озвучка работает только через вкладку `/tts-player`
+- браузерная озвучка работает через `/tts-player`
 - одновременно реально воспроизводит звук только одна активная вкладка `/tts-player`
+- автозапуск `tts_worker_agent` — только opt-in; штатный сценарий по умолчанию предполагает ручной старт или явную установку с `-EnableAutostart`
 
 ## База данных
 
 - runtime и production работают на PostgreSQL
 - SQLite допустим только в тестах
-- очистка мусора и старых хвостов делается через `bot_service/scripts/database_hygiene.py`
+- очистка хвостов и сирот делается через `bot_service/scripts/database_hygiene.py`
 - безопасное удаление пользователей делается через `bot_service/scripts/delete_users.py`
 
-## Что уже очищено
+## Что уже доведено
 
 - frontend больше не ходит напрямую к TTS runtime
-- админка использует единый shell c вкладками `Обзор`, `Боты`, `Голоса`, `Пользователи`, `Каналы`, `Логи`, `Мониторинг`
-- прямые admin routes `/dashboard/dolbaebadmintts/channels` и `/dashboard/dolbaebadmintts/logs` должны оставаться рабочими вместе с query-tab навигацией
-- guest mode удалён из рабочего слоя
-- новые session-scoped записи не должны появляться в `user_settings`, `tts_user_settings`, `local_tts_endpoints`, `filtered_words`, `tts_blocked_users`
-- YouTube queue переведена на user-only путь
-- рабочий слой drops переведён на user-only wrappers
-- `QueueHandlerMixin` — единственный активный путь для YouTube-команд
-- голосование за `!skip` вынесено в `services/youtube/skip_vote_store.py`
-- пакет `bot_service/bots/command_handlers/*` больше не является частью рабочего слоя
+- TTS приведён к mode-first модели `cloud/self_host`
+- command cooldowns вынесены в Redis-backed store
+- YouTube reward-настройки нормализованы в один backend helper
+- drops/streaks используют `source_event_id` и `stream_session_id`
+- YouTube queue/runtime закрыт по `play now / next / reorder`
+- админка переведена на ops-center shell и агрегированные read-models
+- legacy admin route и неиспользуемые admin-страницы удалены
+- новые session-scoped записи не должны появляться в user-only таблицах
 
 ## Гигиена репозитория
 
-- рабочие текстовые файлы должны храниться в UTF-8 без битых строк и mojibake
-- runtime/debug артефакты (`tmp_runtime_logs/`, root-level `Qwen_logs.txt`, `bot_log.txt`, `F5_log.txt`) не считаются частью продукта и не должны попадать в git
-- `__pycache__/`, `pytest-cache-files-*`, `.ruff_cache/`, временные audio/log файлы должны очищаться перед фиксацией прогресса
+- активные текстовые файлы должны храниться в UTF-8 без mojibake
+- временные runtime/debug артефакты не считаются частью продукта и не должны ехать в git
+- `__pycache__/`, `.pytest_cache/`, `pytest-cache-files-*`, временные audio/log файлы должны очищаться перед фиксацией прогресса
 
 ## Что ещё открыто
 
 - пройти staging/live smoke по матрице `cloud/self_host x f5/qwen`
-- довести CI и quality gates до полностью зелёного статуса
-- дальше сжимать основную документацию до короткого русского источника правды
+- финально заморозить release image set
+- отдельно подтвердить pre-existing dirty state в `f5-tts-service/vendor/F5-TTS` перед релизным freeze

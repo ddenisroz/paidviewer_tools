@@ -15,6 +15,7 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 import { useLocation } from 'react-router-dom';
 
 import { API_BASE_URL } from '@/constants';
+import { isAdminPath } from '@/features/admin/utils/adminRoutes';
 import { type BotStatusType, useBotConnection } from '@/features/admin/hooks/useBotConnection';
 import { useChatHistory } from '@/features/chat/hooks/useChatHistory';
 import { useChatMessages } from '@/features/chat/hooks/useChatMessages';
@@ -72,7 +73,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     const isBotStatusPage =
         location.pathname.startsWith('/dashboard/chat-analysis') ||
-        location.pathname.startsWith('/dashboard/dolbaebadmintts');
+        isAdminPath(location.pathname);
     const botStatusPollInterval = isBotStatusPage ? 30000 : 120000;
     const shouldLoadChatHistory = location.pathname.startsWith('/chat-window');
 

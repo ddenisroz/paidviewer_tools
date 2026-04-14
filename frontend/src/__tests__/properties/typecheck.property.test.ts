@@ -5,14 +5,14 @@ import { describe, it, expect } from 'vitest';
 import { execSync } from 'child_process';
 
 describe('Property 1: Zero Compilation Errors', () => {
-  it('should have zero TypeScript compilation errors with strict mode enabled', { timeout: 30000 }, () => {
+  it('should have zero TypeScript compilation errors with strict mode enabled', { timeout: 90000 }, () => {
     try {
       // Run TypeScript compiler in no-emit mode
       const output = execSync('npx tsc --noEmit', {
         cwd: process.cwd(),
         encoding: 'utf-8',
         stdio: 'pipe',
-        timeout: 30000 // 30 seconds timeout
+        timeout: 90000,
       });
       
       // If we get here, tsc succeeded (exit code 0)

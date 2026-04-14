@@ -282,8 +282,9 @@ class GoogleCloudTTS:
         self._google_cloud_project_id = self._resolve_project_id()
         self._init_adc_credentials()
         if not self._adc_available and not self._get_api_key():
-            logger.warning(
-                "[WARN] Google Cloud TTS auth is not configured. "
+            log_fn = logger.info if settings.is_development else logger.warning
+            log_fn(
+                "[GCLOUD] Google Cloud TTS auth is not configured. "
                 "Set ADC (`gcloud auth application-default login`) or GOOGLE_CLOUD_API_KEY."
             )
         logger.info("[OK] Google Cloud TTS initialized. Temp dir: %s", self.temp_dir)

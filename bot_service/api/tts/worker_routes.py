@@ -125,6 +125,12 @@ def _resolve_server_base_url(request: Request) -> str:
     return "http://127.0.0.1:8000"
 
 
+def _resolve_default_provider_endpoint(provider: str) -> str:
+    if provider == "qwen":
+        return str(settings.worker_agent_default_qwen_endpoint_url or "").strip() or "http://127.0.0.1:8012"
+    return str(settings.worker_agent_default_f5_endpoint_url or "").strip() or "http://127.0.0.1:8011"
+
+
 def _build_provisioning_bundle(
     *,
     server_base_url: str,
@@ -158,12 +164,12 @@ def _build_provisioning_bundle(
         "providers": {
             "f5": {
                 "enabled": enable_f5,
-                "endpoint_url": "http://127.0.0.1:8011",
+                "endpoint_url": _resolve_default_provider_endpoint("f5"),
                 "api_key": "",
             },
             "qwen": {
                 "enabled": enable_qwen,
-                "endpoint_url": "http://127.0.0.1:8012",
+                "endpoint_url": _resolve_default_provider_endpoint("qwen"),
                 "api_key": "",
             },
         },
@@ -192,11 +198,20 @@ def _resolve_trusted_origins(request: Request, server_base_url: str) -> list[str
         _normalize_origin(request.headers.get("origin")),
         _normalize_origin(settings.frontend_url),
         _normalize_origin(server_base_url),
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
     ]
+
+    for configured_origin in settings.cors_origins_list:
+        candidates.append(_normalize_origin(configured_origin))
+
+    if settings.is_development or settings.testing:
+        candidates.extend(
+            [
+                "http://localhost:5173",
+                "http://127.0.0.1:5173",
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ]
+        )
 
     resolved: list[str] = []
     for candidate in candidates:

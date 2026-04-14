@@ -8,13 +8,12 @@ from .base import PlatformCapabilities, PlatformConfig, StreamingPlatform
 # [REF] Integrations
 from integrations.twitch.client import TwitchClient
 from integrations.twitch.oauth import TwitchOAuth
-from integrations.base import TokenInfo
+from integrations.base import TokenInfo, TokenExpiredError
 
 # [REF] Services
 from services.user_service import UserService
-from core.database import get_db
+from core.database import User, get_db
 from repositories.user_token_repository import UserTokenRepository
-from integrations.base import TokenInfo, TokenExpiredError
 
 logger = logging.getLogger(__name__)
 
@@ -268,10 +267,41 @@ class TwitchPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
-        # This would require bot integration
-        # For now, return False as it's not implemented in the abstraction
-        logger.warning("send_chat_message not yet implemented for Twitch platform abstraction")
-        return False
+        db = next(get_db())
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user or not user.twitch_username:
+                logger.warning("Cannot send Twitch chat message: user %s or channel is missing", user_id)
+                return False
+
+            from startup.bot_registry import get_bot_registry
+
+            registry = get_bot_registry()
+            bot = registry.twitch_bot
+            if not bot:
+                logger.warning("Cannot send Twitch chat message: bot runtime is not available")
+                return False
+
+            target_channel = next(
+                (
+                    channel
+                    for channel in getattr(bot, "connected_channels", [])
+                    if getattr(channel, "name", "").lower() == user.twitch_username.lower()
+                ),
+                None,
+            )
+
+            if target_channel is None:
+                logger.warning("Cannot send Twitch chat message: bot is not connected to %s", user.twitch_username)
+                return False
+
+            await target_channel.send(message)
+            return True
+        except Exception as error:
+            logger.error("Error sending Twitch chat message: %s", error)
+            return False
+        finally:
+            db.close()
 
     async def create_reward(self, user_id: int, reward_data: Dict) -> Optional[str]:
         """

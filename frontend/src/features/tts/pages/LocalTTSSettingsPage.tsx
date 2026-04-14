@@ -52,6 +52,7 @@ import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
 import type { AxiosError } from 'axios';
+import type { LocalTtsProviderContract } from '@/types';
 
 type LocalTtsProvider = 'f5' | 'qwen';
 
@@ -86,42 +87,30 @@ const PROVIDER_META: Record<LocalTtsProvider, ProviderMeta> = {
     }
 };
 
-interface ProviderContract {
-    upstream_parity_ready?: boolean;
-    requires_compatibility_adapter?: boolean;
-    managed_topology?: 'project_hosted_worker' | 'gateway_managed';
-    project_hosted_direct_supported?: boolean;
-    supports_native_strict_api_key?: boolean;
-    supports_native_health_endpoint?: boolean;
-    supports_native_status_endpoint?: boolean;
-    supports_local_voice_management?: boolean;
-    warning?: string | null;
-}
-
-const DEFAULT_PROVIDER_CONTRACT: Record<LocalTtsProvider, ProviderContract> = {
-    f5: {
-        upstream_parity_ready: true,
-        requires_compatibility_adapter: false,
-        managed_topology: 'gateway_managed',
-        project_hosted_direct_supported: true,
-        supports_native_strict_api_key: true,
-        supports_native_health_endpoint: true,
-        supports_native_status_endpoint: true,
-        supports_local_voice_management: true,
-        warning: null,
-    },
-    qwen: {
-        upstream_parity_ready: false,
-        requires_compatibility_adapter: true,
-        managed_topology: 'gateway_managed',
-        project_hosted_direct_supported: true,
-        supports_native_strict_api_key: false,
-        supports_native_health_endpoint: true,
-        supports_native_status_endpoint: false,
-        supports_local_voice_management: true,
-        warning: 'Для релизного self-host сценария используйте pairing bundle и tts_worker_agent. Ручной Qwen endpoint ниже оставлен только как compatibility fallback для диагностики и поддержки.',
-    },
+const FALLBACK_PROVIDER_CONTRACT: LocalTtsProviderContract = {
+    managed_topology: 'gateway_managed',
+    supports_native_health_endpoint: true,
+    supports_local_voice_management: true,
+    official_modes: ['cloud', 'self_host'],
+    official_cloud_path: 'tts-gateway',
+    official_self_host_path: 'tts_worker_agent',
+    legacy_raw_endpoint_supported: true,
 };
+
+const DEFAULT_SELF_HOST_WARNING = 'Для релизного сценария используйте pairing bundle и локальный tts_worker_agent. Ручной URL ниже оставлен только как резервный compatibility path для диагностики и поддержки.';
+
+const resolveLocalProviderContract = (
+    providerContract?: LocalTtsProviderContract | null,
+): LocalTtsProviderContract => ({
+    ...FALLBACK_PROVIDER_CONTRACT,
+    ...(providerContract || {}),
+});
+
+const resolveOfficialSelfHostPath = (providerContract: LocalTtsProviderContract): string =>
+    providerContract.official_self_host_path || 'tts_worker_agent';
+
+const resolveSelfHostWarning = (providerContract: LocalTtsProviderContract): string =>
+    providerContract.warning || DEFAULT_SELF_HOST_WARNING;
 
 interface LocalTtsConfigState {
     endpoint_url: string;
@@ -251,7 +240,7 @@ const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/
 const LOCAL_AGENT_API_URL = 'http://127.0.0.1:46321';
 const SPEED_PRESET_OPTIONS: VoiceSpeedPreset[] = ['very_slow', 'slow', 'normal', 'fast', 'very_fast'];
 
-const MANAGED_TOPOLOGY_LABELS: Record<NonNullable<ProviderContract['managed_topology']>, string> = {
+const MANAGED_TOPOLOGY_LABELS: Record<NonNullable<LocalTtsProviderContract['managed_topology']>, string> = {
     gateway_managed: 'gateway-managed',
     project_hosted_worker: 'project-hosted worker',
 };
@@ -326,7 +315,12 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [statusData, setStatusData] = useState<StatusData | null>(null);
     const [hasResolvedInitialConfig, setHasResolvedInitialConfig] = useState<boolean>(false);
     const { data: configData, isLoading: configLoading, error: configError } = useLocalTtsConfig(provider);
-    const providerContract = configData?.provider_contract || DEFAULT_PROVIDER_CONTRACT[provider];
+    const providerContract = React.useMemo<LocalTtsProviderContract>(
+        () => resolveLocalProviderContract(configData?.provider_contract),
+        [configData?.provider_contract],
+    );
+    const officialSelfHostPath = resolveOfficialSelfHostPath(providerContract);
+    const selfHostWarning = resolveSelfHostWarning(providerContract);
 
     const canManageVoices = providerContract.supports_local_voice_management !== false;
     const hasSavedConfig = configData?.configured === true;
@@ -1002,15 +996,14 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <p className="text-sm font-semibold text-blue-200">Основной self-host путь</p>
                                 </div>
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Для релизного сценария используйте pairing bundle и локальный <code>tts_worker_agent</code>.
-                                    Ручной URL ниже оставлен только как резервный compatibility path для диагностики и поддержки.
+                                    {selfHostWarning}
                                 </p>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     <Badge variant="outline" className="border-blue-500/40 text-blue-300">
                                         official_mode: self_host
                                     </Badge>
                                     <Badge variant="outline" className="border-blue-500/40 text-blue-300">
-                                        recommended_path: tts_worker_agent
+                                        recommended_path: {officialSelfHostPath}
                                     </Badge>
                                 </div>
                             </div>

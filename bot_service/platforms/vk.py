@@ -351,8 +351,32 @@ class VKPlatform(StreamingPlatform):
         Returns:
             True if successful, False otherwise
         """
-        logger.warning("send_chat_message not yet implemented for VK platform abstraction")
-        return False
+        db = next(get_db())
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                logger.warning("Cannot send VK chat message: user %s is missing", user_id)
+                return False
+
+            channel_name = user.vk_channel_name or user.vk_username
+            if not channel_name:
+                logger.warning("Cannot send VK chat message: no VK channel configured for user %s", user_id)
+                return False
+
+            from startup.bot_registry import get_bot_registry
+
+            registry = get_bot_registry()
+            bot = registry.vk_bot
+            if not bot or not registry.is_vk_running():
+                logger.warning("Cannot send VK chat message: VK bot runtime is not available")
+                return False
+
+            return await bot.send_message(channel_name, message)
+        except Exception as error:
+            logger.error("Error sending VK chat message: %s", error)
+            return False
+        finally:
+            db.close()
 
     async def create_reward(self, user_id: int, reward_data: Dict) -> Optional[str]:
         """

@@ -204,57 +204,8 @@ const App: React.FC = () => {
                             } />
 
                             {/* Admin Routes */}
-                            <Route path="dashboard/dolbaebadmintts" element={
+                            <Route path="dashboard/admin/*" element={
                                 <RouteErrorBoundary routeName="Admin">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/users" element={
-                                <RouteErrorBoundary routeName="Admin Users">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/workers" element={
-                                <RouteErrorBoundary routeName="Admin Workers">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/bots" element={
-                                <RouteErrorBoundary routeName="Admin Bots">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/voices" element={
-                                <RouteErrorBoundary routeName="Admin Voices">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/channels" element={
-                                <RouteErrorBoundary routeName="Admin Channels">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/logs" element={
-                                <RouteErrorBoundary routeName="Admin Logs">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/dolbaebadmintts/monitoring" element={
-                                <RouteErrorBoundary routeName="Admin Monitoring">
                                     <Suspense fallback={<MinimalFallback />}>
                                         <AdminPage />
                                     </Suspense>

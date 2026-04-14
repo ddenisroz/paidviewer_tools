@@ -1,9 +1,11 @@
 # bot_service/core/connection_manager.py
 """Main ConnectionManager module that combines all submodules."""
+import asyncio
+import inspect
 import logging
-from typing import List, TYPE_CHECKING
+from typing import Any, List, TYPE_CHECKING
 from fastapi import WebSocket
-from starlette.websockets import WebSocketDisconnect
+from starlette.websockets import WebSocketDisconnect, WebSocketState
 from .connection_manager_core import ConnectionManagerCore
 from core.log_sanitizer import mask_session_id
 
@@ -29,6 +31,79 @@ class ConnectionManager(ConnectionManagerCore):
     def __init__(self):
         super().__init__()
         logger.info("[CONNECTION] ConnectionManager initialized")
+
+    @staticmethod
+    def _channel_keys(channel_name: str) -> tuple[str, ...]:
+        raw_channel = str(channel_name or "").strip()
+        normalized_channel = raw_channel.lower()
+        return tuple(dict.fromkeys(key for key in (raw_channel, normalized_channel) if key))
+
+    @staticmethod
+    def _is_websocket_connected(websocket: Any) -> bool:
+        client_state = getattr(websocket, "client_state", None)
+        application_state = getattr(websocket, "application_state", None)
+        return (
+            client_state == WebSocketState.CONNECTED
+            and application_state != WebSocketState.DISCONNECTED
+        )
+
+    @staticmethod
+    def _run_awaitable_best_effort(awaitable) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            asyncio.run(awaitable)
+        else:
+            loop.create_task(awaitable)
+
+    @classmethod
+    def _close_websocket_best_effort(cls, websocket: Any) -> None:
+        close_method = getattr(websocket, "close", None)
+        if not callable(close_method):
+            return
+
+        try:
+            result = close_method()
+            if inspect.isawaitable(result):
+                cls._run_awaitable_best_effort(result)
+        except Exception:
+            logger.debug("Failed to close websocket during cleanup", exc_info=True)
+
+    def _cancel_pending_disconnects(self) -> None:
+        for user_id, task in list(self.pending_tts_disconnects.items()):
+            if task and not task.done():
+                task.cancel()
+                logger.debug("Cancelled pending TTS disconnect task for user %s during cleanup", user_id)
+        self.pending_tts_disconnects.clear()
+
+    def _clear_runtime_state(self) -> None:
+        for mapping in (
+            self.active_connections,
+            self.obs_connections,
+            self.youtube_obs_connections,
+            self.audio_connections,
+            self.youtube_queues,
+            self.current_videos,
+            self.pending_verifications,
+            self.active_vk_bots,
+            self.active_sessions,
+            self.tts_volume_settings,
+            self.voice_volume_settings,
+            self.youtube_settings,
+            self.twitch_cache,
+        ):
+            mapping.clear()
+
+        for collection in (
+            self.tts_enabled_channels,
+            self.tts_enabled_twitch,
+            self.tts_enabled_vk,
+            self.basic_tts_enabled_channels,
+            self.ai_tts_enabled_channels,
+            self.blocked_bots,
+            self.verified_sessions,
+        ):
+            collection.clear()
 
     async def connect(self, websocket: WebSocket, user_id: str):
         """Connect a user WebSocket."""
@@ -318,35 +393,75 @@ class ConnectionManager(ConnectionManagerCore):
     async def cleanup_inactive_channels(self):
         """Clean up inactive channels."""
         try:
-            # Placeholder cleanup logic for inactive channels.
-            logger.debug("Cleaning up inactive channels")
+            removed_channels = 0
+            for channel_name, sessions in list(self.active_sessions.items()):
+                normalized_sessions = {session_id for session_id in sessions if str(session_id or "").strip()}
+                if normalized_sessions:
+                    self.active_sessions[channel_name] = normalized_sessions
+                    continue
+
+                del self.active_sessions[channel_name]
+                removed_channels += 1
+
+                for channel_key in self._channel_keys(channel_name):
+                    self.tts_enabled_channels.discard(channel_key)
+                    self.tts_enabled_twitch.discard(channel_key)
+                    self.tts_enabled_vk.discard(channel_key)
+                    self.basic_tts_enabled_channels.discard(channel_key)
+                    self.ai_tts_enabled_channels.discard(channel_key)
+                    self.blocked_bots.discard(channel_key)
+                    self.tts_volume_settings.pop(channel_key, None)
+                    self.voice_volume_settings.pop(channel_key, None)
+                    self.youtube_settings.pop(channel_key, None)
+                    self.youtube_queues.pop(channel_key, None)
+                    self.current_videos.pop(channel_key, None)
+                    self.active_vk_bots.pop(channel_key, None)
+
+            logger.info("Inactive channel cleanup removed %s channel(s)", removed_channels)
+            return removed_channels
         except Exception as e:
             logger.error(f"Error cleaning up inactive channels: {e}")
+            return 0
 
     async def cleanup_inactive_clients(self):
         """Clean up inactive clients."""
         try:
-            # Placeholder cleanup logic for inactive clients.
-            logger.debug("Cleaning up inactive clients")
+            removed_clients = 0
+            connection_maps = (
+                self.active_connections,
+                self.obs_connections,
+                self.youtube_obs_connections,
+                self.audio_connections,
+            )
+
+            for mapping in connection_maps:
+                for key, websocket in list(mapping.items()):
+                    if self._is_websocket_connected(websocket):
+                        continue
+
+                    mapping.pop(key, None)
+                    removed_clients += 1
+
+            logger.info("Inactive client cleanup removed %s websocket connection(s)", removed_clients)
+            return removed_clients
         except Exception as e:
             logger.error(f"Error cleaning up inactive clients: {e}")
+            return 0
 
     def cleanup(self):
         """Clean up manager resources."""
         try:
-            # Close all connections.
-            for websocket in self.active_connections.values():
-                try:
-                    # websocket.close() is synchronous here.
-                    pass
-                except Exception:
-                    pass
+            all_websockets = (
+                list(self.active_connections.values())
+                + list(self.obs_connections.values())
+                + list(self.youtube_obs_connections.values())
+                + list(self.audio_connections.values())
+            )
+            for websocket in all_websockets:
+                self._close_websocket_best_effort(websocket)
 
-            self.active_connections.clear()
-            self.obs_connections.clear()
-            self.youtube_obs_connections.clear()
-            self.audio_connections.clear()
-            self.active_sessions.clear()
+            self._cancel_pending_disconnects()
+            self._clear_runtime_state()
 
             logger.info("ConnectionManager cleanup completed")
         except Exception as e:

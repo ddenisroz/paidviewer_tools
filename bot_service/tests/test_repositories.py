@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 
 from repositories.tts_settings_repository import TTSSettingsRepository
 from repositories.audio_settings_repository import AudioSettingsRepository
+from repositories.chat_message_repository import ChatMessageRepository
 from repositories.filtered_word_repository import FilteredWordRepository
 from repositories.local_tts_repository import LocalTTSRepository
 from repositories.blocked_user_repository import BlockedUserRepository
+from models.analytics import ChatMessage
 from models.tts import TTSUserSettings, AudioSettings, FilteredWord, LocalTTSEndpoint, TTSBlockedUser
 
 
@@ -210,3 +212,24 @@ class TestBlockedUserRepository:
         
         assert result is True
         assert repo.is_blocked('test_channel', 'twitch', 'bad_user', user_id=test_user.id) is False
+
+
+class TestChatMessageRepository:
+    """Tests for ChatMessageRepository."""
+
+    def test_create_persists_author_id(self, db: Session, test_user):
+        """Should store author_id when chat identity is available."""
+        repo = ChatMessageRepository(db)
+
+        message = repo.create(
+            user_id=test_user.id,
+            channel_name='test_channel',
+            platform='twitch',
+            message='hello chat',
+            author_username='viewer1',
+            author_id='123456',
+        )
+
+        stored = db.query(ChatMessage).filter(ChatMessage.id == message.id).one()
+        assert stored.author_username == 'viewer1'
+        assert stored.author_id == '123456'

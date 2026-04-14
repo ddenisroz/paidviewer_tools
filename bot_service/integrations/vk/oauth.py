@@ -27,7 +27,7 @@ class VKOAuth:
         but if needed, this would return the URL.
         """
         # Note: Actual auth flow might be frontend-driven or manual.
-        # This is a placeholder standard valid for many OAuth2 flows.
+        # State verification follows the standard OAuth2 CSRF protection flow.
         scope = "channel:write stream:write" # Example scopes
         return (
             f"https://api.live.vkvideo.ru/oauth/authorize"

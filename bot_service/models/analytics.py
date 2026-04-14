@@ -18,6 +18,7 @@ class ChatMessage(Base):
     channel_name = Column(String, nullable=False, index=True)
     platform = Column(String, nullable=False)
     author_username = Column(String, nullable=True, index=True)
+    author_id = Column(String, nullable=True, index=True)
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
     is_deleted = Column(Boolean, default=False)

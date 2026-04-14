@@ -4,6 +4,30 @@ import type { ApiResponse } from '../../../types';
 import type { AxiosResponse } from 'axios';
 
 export const adminService = {
+  async getOverview(): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/admin/overview');
+  },
+
+  async getRuntimeOverview(): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/admin/runtime');
+  },
+
+  async getTtsOverview(): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/admin/tts');
+  },
+
+  async getAccountsOverview(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/admin/accounts', { params });
+  },
+
+  async getChannelsOverview(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/admin/channels', { params });
+  },
+
+  async getLogsOverview(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.get('/api/admin/logs/overview', { params });
+  },
+
   async getAdminList(): Promise<AxiosResponse<ApiResponse>> {
     return apiClient.get('/api/admin/list');
   },

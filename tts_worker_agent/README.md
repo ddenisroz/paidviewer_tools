@@ -1,53 +1,70 @@
 ﻿# Paidviewer TTS Worker Agent
 
-`tts_worker_agent` is the official self-host runtime for Paidviewer.
+Официальный self-host агент для Paidviewer.
 
-## Production role
+## Кому нужен этот репозиторий
 
-- `cloud` mode: `frontend -> bot_service -> tts-gateway -> provider runtime`
-- `self_host` mode: `frontend -> bot_service provisioning/pairing -> tts_worker_agent -> local F5/Qwen runtime`
+Этот репозиторий нужен, если ты хочешь запускать локальную озвучку у себя на ПК или сервере и отдавать нагрузку на свой F5/Qwen runtime.
 
-The agent is the main self-host path for end users. Manual raw endpoint wiring is compatibility-only and should be used only for support/dev recovery.
+Если ты просто используешь Paidviewer как облачный сервис, этот репозиторий тебе обычно не нужен.
 
-## What the agent does
+## Что делает агент
 
-1. Imports a provisioning bundle from Paidviewer.
-2. Activates itself with a one-time pairing code.
-3. Polls `bot_service` for jobs.
-4. Sends synthesis to the local F5 or Qwen runtime.
-5. Uploads the generated audio/result back to `bot_service`.
+Агент:
 
-## Quick start
+1. получает provisioning bundle из Paidviewer
+2. проходит pairing по одноразовому коду
+3. забирает задания у `bot_service`
+4. отправляет их в локальный F5 или Qwen runtime
+5. возвращает результат обратно в Paidviewer
 
-1. Open `Local TTS` in Paidviewer.
-2. Use the worker-agent pairing flow and download `paidviewer-worker-provisioning-*.json`.
-3. Install the agent:
+## Рабочая модель
+
+- `cloud`: `frontend -> bot_service -> tts-gateway -> provider runtime`
+- `self_host`: `frontend -> bot_service -> provisioning/pairing -> tts_worker_agent -> local runtime`
+
+Основной пользовательский self-host путь — только через `tts_worker_agent`.
+`raw endpoint` остаётся только как compatibility-режим для поддержки и диагностики.
+
+## Быстрый старт
+
+Базовый runtime: Python `3.12`.
+
+1. Открой `Local TTS` в Paidviewer.
+2. Скачай provisioning bundle `paidviewer-worker-provisioning-*.json`.
+3. Подготовь окружение:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 ```
 
-4. Run the installer or the agent directly:
-
-```powershell
-.\install-agent.ps1
-```
-
-or
+4. Запусти агент вручную:
 
 ```powershell
 .venv\Scripts\python.exe .\main.py --config .\config.json
 ```
 
-On first run the agent looks for the newest provisioning bundle in the agent directory and then in `Downloads`.
+Если нужен installer-managed автозапуск, это отдельное явное действие:
 
-## Local diagnostics
+```powershell
+.\install-agent.ps1 -EnableAutostart -StartNow
+```
+
+Если нужно только подготовить окружение без автозапуска:
+
+```powershell
+.\install-agent.ps1
+```
+
+На первом запуске агент ищет provisioning bundle сначала рядом с собой, потом в `Downloads`.
+
+## Локальная диагностика
 
 - `GET http://127.0.0.1:46321/health`
 - `GET http://127.0.0.1:46321/diagnostics`
 
-Typical codes:
+Типовые коды:
 
 - `version_mismatch`
 - `provider_unreachable`
@@ -55,18 +72,13 @@ Typical codes:
 - `model_not_ready`
 - `voice_missing`
 
-## Local provider expectations
+## Что ожидается от локальных провайдеров
 
 - F5 runtime: `POST /api/tts/synthesize-channel`
-- Qwen runtime: `POST /api/prepare` then `GET /api/stream/{stream_id}`
+- Qwen runtime: `POST /api/prepare`, затем `GET /api/stream/{stream_id}`
 
-## Security notes
+## Важные замечания
 
-- On Windows the agent stores pairing/token/provider secrets using DPAPI best-effort protection.
-- Provisioning bundles carry the required/recommended agent version.
-- Activation and polling are rejected when the installed agent is older than the required server contract.
-
-## Support boundary
-
-- Main user contract: provisioning bundle + pairing + worker agent.
-- Legacy raw endpoint mode is not the primary UX and should not be presented as the default production setup.
+- На Windows секреты агента хранятся через DPAPI best-effort.
+- Сервер может отклонить activation/polling, если версия агента ниже обязательной.
+- Если self-host не нужен, не включай автозапуск.

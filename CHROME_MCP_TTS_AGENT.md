@@ -1,304 +1,246 @@
-# Chrome MCP TTS Test Agent
+﻿# Chrome MCP TTS Test Agent
 
-Инструкция для агента, который проводит живой прогон проекта через Chrome DevTools MCP и ищет runtime-баги. Основной приоритет: озвучка, voice management, переключение TTS-провайдеров и реальные сетевые ошибки.
+Internal guide for live browser checks through Chrome DevTools MCP.
+This is not a product doc for end users. It is a short runbook for finding runtime bugs that static code reading will miss.
 
-## Цель
+## Main Goal
 
-Агент должен находить баги, которые не видны по статическому чтению кода:
+Prioritize issues in this order:
 
-- неправильные запросы из frontend;
-- сломанные backend/frontend контракты;
-- ложные статусы `healthy`;
-- fallback в `gtts`, когда должен работать `f5` или `qwen`;
-- зависания preview/upload/test voice;
-- ошибки переключения `cloud` / `self-hosted`;
-- проблемы admin voice management;
-- ошибки воспроизведения в `/tts-player`;
-- regressions в UI админки, если они мешают рабочему сценарию.
+1. TTS synthesis and playback
+2. Voice management
+3. Provider and mode switching
+4. Admin runtime controls that affect TTS
+5. UI/runtime regressions that block the main scenario
 
-## Жёсткие правила
+## What Counts As A Real Bug
 
-- Не запускать и не перезапускать приложение самостоятельно, если пользователь не попросил явно.
-- Не делать destructive actions.
-- Не менять данные пользователя без необходимости.
-- Не удалять голоса, токены, каналы или настройки без прямого запроса пользователя.
-- Если страница после reload недоступна, зафиксировать это как инфраструктурный блокер, а не как frontend-баг по умолчанию.
-- Все выводы делать по наблюдаемому runtime-поведению: Network, Console, DOM, response payload, timing.
+Focus on observable runtime evidence:
 
-## Что прочитать перед прогоном
+- wrong frontend request shape
+- broken backend/frontend contracts
+- false `healthy` or false success states
+- silent fallback to the wrong provider
+- hanging preview/upload/test voice flows
+- broken `cloud` / `self_host` switching
+- broken audio fetch or playback in `/tts-player`
+- admin/TTS actions that look successful but are not
+
+Do not infer success from a toast alone. Confirm with network, console, DOM, and actual audio fetch behavior.
+
+## Hard Rules
+
+- Do not start, stop, or restart services unless the user explicitly asks.
+- Do not delete voices, tokens, channels, or user settings without direct approval.
+- Do not treat an unavailable frontend as a frontend bug by default. It may be an environment blocker.
+- Do not invent causes when runtime is unavailable. Record the blocker first.
+
+## Read Before Running
 
 1. `docs/PROJECT_CONTEXT.md`
 2. `AGENTS.md`
-3. При работе с TTS:
-   - `docs/setup/LOCAL_TTS_INTEGRATION.md`
-   - `docs/setup/LIVE_SMOKE_RUNBOOK.md`
+3. `docs/architecture/TTS_ARCHITECTURE.md`
+4. `docs/setup/LIVE_SMOKE_RUNBOOK.md`
 
-## Основные URL и разделы
+## Main Routes
 
-- Основной frontend:
+- Product:
   - `/dashboard/tts`
   - `/dashboard/tts/voices`
   - `/tts-player`
-- Админка:
-  - `/dashboard/dolbaebadmintts?tab=dashboard`
-  - `/dashboard/dolbaebadmintts?tab=bots`
-  - `/dashboard/dolbaebadmintts?tab=voices`
-  - `/dashboard/dolbaebadmintts?tab=users`
-  - `/dashboard/dolbaebadmintts?tab=channels`
-  - `/dashboard/dolbaebadmintts?tab=logs`
-  - `/dashboard/dolbaebadmintts?tab=monitoring`
+- Admin:
+  - `/dashboard/admin?tab=overview`
+  - `/dashboard/admin?tab=runtime`
+  - `/dashboard/admin?tab=tts`
+  - `/dashboard/admin?tab=accounts`
+  - `/dashboard/admin?tab=channels`
+  - `/dashboard/admin?tab=logs`
 
-## Приоритеты проверки
+## Priority Checks
 
-### P0. TTS synthesis path
+### P0. TTS Path
 
-Проверять в первую очередь:
+Always verify:
 
-- переключение провайдера;
-- `cloud` / `self-hosted`;
-- preview/test voice;
-- реальное воспроизведение аудио;
-- отсутствие неправильного fallback в `gtts`.
+- provider switching
+- `cloud` / `self_host`
+- preview/test voice
+- actual audio playback
+- absence of false fallback to `gtts`
 
-Что считать успехом:
+Success means:
 
-- synth/test request возвращает `200`;
-- затем приходит корректный `audio_url`;
-- браузер реально делает запрос к audio endpoint;
-- запрос к audio endpoint не падает на `401/403/404/5xx`;
-- UI не показывает ложный success;
-- фактический provider соответствует выбранному.
+- synth/test request returns `200`
+- backend returns a valid `audio_url`
+- browser actually requests the audio URL
+- audio request does not fail with `401/403/404/5xx`
+- UI status matches what happened
+- the real provider matches the selected one
 
-Что считать багом:
+Bug examples:
 
-- synth `200`, но audio fetch падает;
-- UI пишет успех, но сети/аудио нет;
-- выбрали `qwen`/`f5`, а runtime ушёл в `gtts` fallback;
-- после выбора режима UI откатывается сам назад;
-- режим `self-hosted` доступен при мёртвом локальном сервере;
-- provider health показывает `healthy=true`, но live synth зависает или падает.
+- synth is `200`, but audio fetch fails
+- UI says success, but no audio request was made
+- selected `qwen` or `f5`, but runtime fell back elsewhere
+- `self_host` is selectable while the worker/runtime is clearly unavailable
+- health says healthy while live synth hangs or fails
 
-### P1. Voice management
+### P1. Voice Management
 
-Особенно важно:
+Check:
 
-- admin upload global voice;
-- user voice upload;
-- list voices;
-- edit voice settings;
-- rename;
-- retranscribe;
-- test voice;
-- delete только если пользователь это разрешил.
+- provider-specific voice lists
+- admin/global voices
+- user voices
+- upload
+- rename
+- settings edit
+- preview/test
+- retranscribe if available
 
-Для `qwen` отдельно:
+For `qwen`, separately verify:
 
-- проверять global/admin voices;
-- проверять sample-based voices после переключения моделей;
-- проверять, что UI показывает только реально доступные модели runtime;
-- проверять, что сохранённые sample-ы переживают выключение/включение конкретной модели.
+- runtime model list matches what is actually usable
+- sample voices survive model changes
+- warmup/model-loading errors are readable and fail fast
 
-### P2. Bot/TTS runtime controls
+### P2. Admin Runtime Controls
 
-- bot runtime status;
-- bot OAuth status;
-- monitoring page;
-- logs page;
-- channels blocklist;
-- users page.
+Secondary to TTS, but still important if they affect the main path:
 
-Это вторично по сравнению с озвучкой, но нужно проверять, если связано с TTS pipeline или админскими действиями.
+- bot OAuth status
+- bot runtime status
+- channel status
+- logs
+- worker status
 
-## Обязательный порядок живого прогона
+## Required Live Order
 
-### 1. Проверка доступности frontend
+### 1. Frontend Availability
 
-Перед основным сценарием:
+Before deeper checks:
 
-- открыть текущую страницу;
-- если `ERR_CONNECTION_REFUSED`, `chrome-error://chromewebdata/` или blank page:
-  - зафиксировать блокер;
-  - не делать выводы о UI до восстановления frontend.
+- open the current page
+- if you see `ERR_CONNECTION_REFUSED`, `chrome-error://chromewebdata/`, or a blank page:
+  - record it as an environment blocker
+  - stop treating later failures as pure frontend bugs
 
-### 2. Авторизация
+### 2. Auth
 
-Если нужна пользовательская сессия:
+If a user session is needed:
 
-- использовать существующую авторизацию через Twitch;
-- если логин не сохранён, дождаться ручного входа пользователя;
-- не пытаться угадывать credentials.
+- use the existing login state
+- if login is missing, wait for the user to authenticate
+- do not guess credentials
 
-### 3. Проверка `/dashboard/tts`
+### 3. `/dashboard/tts`
 
-Минимум проверить:
+Minimum checks:
 
-- выбор провайдера;
-- выбор `cloud` / `self-hosted`;
-- список моделей для `qwen`;
-- доступность local mode только при реальном local endpoint;
-- переключение без ложных toast и rollback.
+- provider switch
+- `cloud` / `self_host`
+- model list for `qwen`
+- self-host availability only when runtime is actually available
+- no false success or silent rollback
 
-### 4. Проверка `/tts-player`
+### 4. `/tts-player`
 
-Нужно подтвердить:
+Confirm:
 
-- вкладка доступна;
-- при website mode аудио действительно приходит сюда;
-- нет бесконечной тишины при успешной генерации.
+- the route opens normally
+- in website mode, audio really arrives there
+- successful generation does not end in silent playback failure
 
-### 5. Проверка админки голосов
+### 5. Admin TTS Screen
 
-Маршрут:
+Route:
 
-- `/dashboard/dolbaebadmintts?tab=voices`
+- `/dashboard/admin?tab=tts`
 
-Проверять:
+Check:
 
-- provider switch;
-- список user/global voices;
-- upload voice;
-- test voice;
-- settings modal;
-- переименование;
-- retranscribe;
-- визуальные поломки, если мешают сценарию.
+- provider switch
+- user/global voice lists
+- upload
+- preview/test
+- settings modal
+- rename
+- retranscribe when supported
 
-## Сценарии, которые нужно прогонять для `f5`
+## What To Inspect In DevTools
 
-1. Health/capabilities.
-2. Preview existing voice.
-3. Upload global voice в админке.
-4. Preview uploaded voice.
-5. Проверка, что audio fetch идёт по корректному URL и не падает на auth.
+### DOM / Snapshot
 
-Красные флаги:
+Use for:
 
-- `Provider audio fetch failed`
-- `401 Invalid API key`
-- synth успешен, но preview не воспроизводится
-- UI показывает `Воспроизводится`, хотя сетевого audio request не было
-
-## Сценарии, которые нужно прогонять для `qwen`
-
-1. Проверить доступные runtime models.
-2. Проверить `cloud` / `self-hosted` mode switch.
-3. Проверить, что unavailable mode не выбирается ложно.
-4. Preview существующего sample voice.
-5. Upload global voice через админку.
-6. Preview uploaded voice.
-7. Проверить user/global voice lists.
-8. Проверить, что ошибка warmup/model-unavailable отображается понятным текстом.
-
-Красные флаги:
-
-- `504` на preview/test;
-- `404 Voice not found` для существующего голоса;
-- зависание upload request в `pending`;
-- worker warmup ломает обычные GET/voice info routes;
-- runtime advertising models, которых реально нельзя использовать;
-- `Speaker ... not implemented`;
-- UI даёт выбрать mode/model, которые реально не подняты.
-
-## Что смотреть в Chrome DevTools MCP
-
-### Snapshot / DOM
-
-Использовать для:
-
-- проверки фактического текста кнопок и статусов;
-- выявления сломанной сетки;
-- поиска обрезанного текста;
-- подтверждения, что новый UI реально подхватился.
+- real button text and status labels
+- confirming the right UI version loaded
+- broken layout only when it blocks the scenario
 
 ### Console
 
-Искать:
+Look for:
 
-- uncaught exceptions;
-- React errors;
-- failed audio play promises;
-- network-related runtime warnings;
-- provider-specific JS errors.
+- uncaught exceptions
+- React errors
+- failed audio play promises
+- runtime warnings that explain a broken flow
 
 ### Network
 
-Это главный источник истины.
+This is the main source of truth.
 
-Для каждого подозрительного сценария нужно смотреть:
+For any suspicious case, record:
 
-- URL;
-- method;
-- status;
-- request payload;
-- response payload;
-- pending/hanging requests;
-- дублирующиеся запросы;
-- порядок запросов `test -> audio_url fetch -> playback`.
+- URL
+- method
+- status
+- request payload
+- response payload
+- hanging requests
+- duplicate requests
+- request order such as `test -> audio_url fetch -> playback`
 
-Особенно отслеживать:
+Prioritize:
 
 - `/api/tts/*`
 - `/api/voices/*`
 - `/api/admin/*`
 - `/audio/*`
-- `audio_url` провайдера или gateway
+- playback URLs returned by backend/gateway
 
-## Как оформлять findings
+## How To Report Findings
 
-Если найден баг, писать коротко и конкретно:
+For each bug, record:
 
-1. Где воспроизводится.
-2. Что ожидалось.
-3. Что произошло фактически.
-4. Какие запросы это подтверждают.
-5. Есть ли это backend, frontend или contract mismatch.
+1. where it reproduces
+2. what was expected
+3. what actually happened
+4. which requests or console errors prove it
+5. whether it is frontend, backend, or contract mismatch
 
-Пример хорошего findings:
+Example:
 
-- `Qwen preview` в админке падает не из-за отсутствия голоса, а из-за timeout на voice lookup.
-- Воспроизводится на `/dashboard/dolbaebadmintts?tab=voices`.
-- `POST /api/voices/2/test?provider=qwen` возвращает `504` через 120s.
-- До этого `GET /api/tts/voices/2` висит слишком долго.
-- Это runtime/backend issue, не UI.
+- `Qwen preview` fails in admin TTS screen
+- reproduced on `/dashboard/admin?tab=tts`
+- `POST /api/voices/2/test?provider=qwen` returns `504`
+- the earlier lookup route hangs too long
+- this is a runtime/backend problem, not a pure UI problem
 
-## Когда агент должен предложить кодовый фикс
+## When A Code Fix Is Justified
 
-Только если есть достаточно подтверждения через runtime.
+Only propose a code fix when runtime evidence is strong enough:
 
-Нужный уровень уверенности:
+- there is a failing request, console stack, or clear broken contract
+- the failing layer is identifiable
+- the issue is not just an environment outage
 
-- есть конкретный failing request или console stack;
-- видно, какой контракт нарушен;
-- понятно, в каком слое проблема: frontend, backend или upstream integration.
+## Minimum Smoke Check After A Fix
 
-Если runtime недоступен, агент не должен выдумывать причины. Он должен зафиксировать блокер и только потом делать осторожные выводы по коду.
+Repeat the exact failing flow and confirm:
 
-## Минимальный smoke-check после правки
-
-После фикса агент должен по возможности повторить:
-
-1. открыть нужную страницу;
-2. повторить конкретный failing flow;
-3. подтвердить, что:
-   - ошибка исчезла;
-   - запросы стали корректными;
-   - UI не врёт о результате;
-   - не появилось нового regression рядом.
-
-## Отдельные правила по TTS
-
-- Не считать успешным сценарий, пока не подтверждено реальное получение/воспроизведение аудио.
-- Не считать health endpoint достаточным доказательством работоспособности.
-- Не считать UI toast достаточным доказательством успеха.
-- Для `qwen` всегда учитывать warmup и runtime model policy.
-- Для `f5` всегда проверять не только synth response, но и последующий audio fetch.
-
-## Что писать в итоговом отчёте
-
-- что проверено;
-- что прошло;
-- что не прошло;
-- какой exact runtime blocker есть сейчас;
-- какие запросы/страницы это подтверждают;
-- нужен ли rebuild/restart от пользователя;
-- какие следующие шаги дадут максимальный сигнал.
+1. the page still opens
+2. the original failure is gone
+3. requests are now correct
+4. the UI no longer lies about the result
+5. no nearby regression appeared

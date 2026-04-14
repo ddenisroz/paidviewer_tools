@@ -1,62 +1,42 @@
 ﻿import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 
-import { BarChart3, Bot, FileText, Mic, Monitor, Server, Shield, Slash, Users } from 'lucide-react';
+import { BarChart3, Bot, FileText, Mic, Shield, Slash, Users } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { AdminPageHeader, ADMIN_PAGE_CLASS } from '@/features/admin/components/admin-ui';
+import {
+  ADMIN_BASE_PATH,
+  type AdminTabId,
+  getAdminTabHref,
+  normalizeAdminTab,
+  resolveAdminTabFromPath,
+} from '@/features/admin/utils/adminRoutes';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import Skeleton from '@/shared/components/ui/skeleton';
 
-const AdminDashboard = lazy(() => import('./AdminDashboard'));
-const VoiceManagement = lazy(() => import('../components/VoiceManagement'));
+const AdminOverviewPage = lazy(() => import('./AdminOverviewPage'));
+const AdminRuntimePage = lazy(() => import('./AdminRuntimePage'));
+const AdminTtsPage = lazy(() => import('./AdminTtsPage'));
 const UserManagementPage = lazy(() => import('./UserManagementPage'));
-const BotManagementPage = lazy(() => import('./AdminBotManagementPage'));
-const BlockedChannelsPage = lazy(() => import('./AdminChannelsPage'));
-const SystemLogsPage = lazy(() => import('./AdminSystemLogsPage'));
-const MonitoringPage = lazy(() => import('./AdminMonitoringPage'));
-const AdminWorkersPage = lazy(() => import('./AdminWorkersPage'));
-
-type TabId = 'dashboard' | 'bots' | 'voices' | 'users' | 'workers' | 'channels' | 'logs' | 'monitoring';
+const AdminChannelsOpsPage = lazy(() => import('./AdminChannelsOpsPage'));
+const AdminLogsOverviewPage = lazy(() => import('./AdminLogsOverviewPage'));
 
 interface Tab {
-  id: TabId;
+  id: AdminTabId;
   label: string;
   icon: React.ElementType;
 }
 
 const VISIBLE_TABS: Tab[] = [
-  { id: 'dashboard', label: 'Обзор', icon: BarChart3 },
-  { id: 'bots', label: 'Боты', icon: Bot },
-  { id: 'voices', label: 'Голоса', icon: Mic },
-  { id: 'users', label: 'Пользователи', icon: Users },
-  { id: 'workers', label: 'Воркеры', icon: Server },
+  { id: 'overview', label: 'Overview', icon: BarChart3 },
+  { id: 'runtime', label: 'Runtime', icon: Bot },
+  { id: 'tts', label: 'TTS', icon: Mic },
+  { id: 'accounts', label: 'Аккаунты', icon: Users },
   { id: 'channels', label: 'Каналы', icon: Slash },
   { id: 'logs', label: 'Логи', icon: FileText },
-  { id: 'monitoring', label: 'Мониторинг', icon: Monitor },
 ];
-
-const isTabId = (value: string | null): value is TabId =>
-  value === 'dashboard' ||
-  value === 'bots' ||
-  value === 'voices' ||
-  value === 'users' ||
-  value === 'workers' ||
-  value === 'channels' ||
-  value === 'logs' ||
-  value === 'monitoring';
-
-const tabFromPath = (pathname: string): TabId => {
-  if (pathname.endsWith('/bots')) return 'bots';
-  if (pathname.endsWith('/voices')) return 'voices';
-  if (pathname.endsWith('/users')) return 'users';
-  if (pathname.endsWith('/workers')) return 'workers';
-  if (pathname.endsWith('/channels')) return 'channels';
-  if (pathname.endsWith('/monitoring')) return 'monitoring';
-  if (pathname.endsWith('/logs')) return 'logs';
-  return 'dashboard';
-};
 
 const TabSkeleton: React.FC = () => (
   <Card>
@@ -68,26 +48,22 @@ const TabSkeleton: React.FC = () => (
   </Card>
 );
 
-const TabContent: React.FC<{ activeTab: TabId }> = ({ activeTab }) => {
+const TabContent: React.FC<{ activeTab: AdminTabId }> = ({ activeTab }) => {
   switch (activeTab) {
-    case 'dashboard':
-      return <AdminDashboard />;
-    case 'bots':
-      return <BotManagementPage />;
-    case 'voices':
-      return <VoiceManagement />;
-    case 'users':
+    case 'overview':
+      return <AdminOverviewPage />;
+    case 'runtime':
+      return <AdminRuntimePage />;
+    case 'tts':
+      return <AdminTtsPage />;
+    case 'accounts':
       return <UserManagementPage />;
-    case 'workers':
-      return <AdminWorkersPage />;
     case 'channels':
-      return <BlockedChannelsPage />;
+      return <AdminChannelsOpsPage />;
     case 'logs':
-      return <SystemLogsPage />;
-    case 'monitoring':
-      return <MonitoringPage />;
+      return <AdminLogsOverviewPage />;
     default:
-      return <AdminDashboard />;
+      return <AdminOverviewPage />;
   }
 };
 
@@ -98,21 +74,47 @@ const AdminPage: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.is_admin === true;
 
-  const initialTab = useMemo<TabId>(() => {
+  const initialTab = useMemo<AdminTabId>(() => {
     const searchTab = searchParams.get('tab');
-    if (isTabId(searchTab)) return searchTab;
-    return tabFromPath(location.pathname);
+    return searchTab ? normalizeAdminTab(searchTab) : resolveAdminTabFromPath(location.pathname);
   }, [location.pathname, searchParams]);
 
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const [activeTab, setActiveTab] = useState<AdminTabId>(initialTab);
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  const handleTabChange = (tabId: TabId) => {
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    const rawTab = searchParams.get('tab');
+    const normalizedTab = rawTab ? normalizeAdminTab(rawTab) : initialTab;
+    const isWrongPath = location.pathname !== ADMIN_BASE_PATH;
+    const isWrongTab = rawTab ? normalizedTab !== rawTab : initialTab !== 'overview';
+
+    if (!isWrongPath && !isWrongTab) {
+      return;
+    }
+
+    if (normalizedTab === 'overview') {
+      params.delete('tab');
+    } else {
+      params.set('tab', normalizedTab);
+    }
+
+    const search = params.toString();
+    navigate(
+      {
+        pathname: ADMIN_BASE_PATH,
+        search: search ? `?${search}` : '',
+      },
+      { replace: true },
+    );
+  }, [initialTab, location.pathname, navigate, searchParams]);
+
+  const handleTabChange = (tabId: AdminTabId) => {
     setActiveTab(tabId);
-    navigate(`/dashboard/dolbaebadmintts?tab=${tabId}`, { replace: true });
+    navigate(getAdminTabHref(tabId), { replace: true });
   };
 
   if (!isAdmin) {
@@ -133,8 +135,8 @@ const AdminPage: React.FC = () => {
     <div className={cn('p-4', ADMIN_PAGE_CLASS)}>
       <div className="mx-auto w-full max-w-6xl space-y-4">
         <AdminPageHeader
-          title="Админ-панель"
-          description="Управление системой, голосами и bot runtime в одном месте."
+          title="Админ-центр"
+          description="Минималистичный ops-center: runtime, TTS, аккаунты, каналы и логи в одном согласованном контуре."
         />
 
         <div className="rounded-2xl border border-border/70 bg-card/60 p-1.5">

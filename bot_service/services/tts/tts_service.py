@@ -472,6 +472,10 @@ class TTSService:
             user_id=user_id,
         )
 
+    async def remove_blocked_user_by_id(self, user_id: int, blocked_user_id: int) -> bool:
+        """Remove a blocked-user row by identifier for the current owner."""
+        return self.blocked_user_repo.remove_by_id(blocked_user_id, user_id=user_id)
+
     # === TTS Status ===
 
     async def get_tts_status(self, user_id: int) -> dict:

@@ -13,6 +13,7 @@ from core.config import settings
 from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
 from constants import DEFAULT_ENABLED_PLATFORMS
 from repositories.local_tts_repository import LocalTTSRepository
+from services.voice_management_upstream import provider_admin_api_base
 from services.tts.tts_service import TTSService
 from services.tts.google_cloud_tts import (
     get_google_cloud_tts,
@@ -28,12 +29,10 @@ from services.tts.provider_utils import (
     get_provider_capabilities,
     get_synthesis_upstream_url,
     get_voice_management_upstream_params,
-    get_voice_management_upstream_url,
     infer_provider_from_engine,
     normalize_local_tts_endpoint_url,
     normalize_provider,
     normalize_provider_mode,
-    qwen_voice_crud_not_available_detail,
     should_route_provider_via_gateway,
 )
 from services.tts.tts_manager import get_tts_manager
@@ -113,13 +112,7 @@ def _normalize_voice_provider(provider: str) -> str:
 
 
 def _voice_management_base_url(provider: str) -> str:
-    resolved_provider = _normalize_voice_provider(provider)
-    try:
-        return get_voice_management_upstream_url(resolved_provider).rstrip("/")
-    except ProviderRoutingError as error:
-        if str(error) == "qwen_voice_crud_not_available":
-            raise HTTPException(status_code=501, detail=qwen_voice_crud_not_available_detail()) from error
-        raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
+    return provider_admin_api_base(_normalize_voice_provider(provider)).removesuffix("/api/admin")
 
 
 def _qwen_models_headers(*, local_api_key: Optional[str] = None, local: bool = False) -> dict:

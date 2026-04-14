@@ -1,4 +1,4 @@
-name: Tests
+﻿name: Tests
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
     - name: Report quality check results
       if: failure()
       run: |
-        echo "❌ Frontend quality checks failed!"
+        echo "Frontend quality checks failed."
         echo "Please run 'npm run check:all' locally to see detailed errors"
         exit 1
 
@@ -42,7 +42,7 @@ jobs:
     
     strategy:
       matrix:
-        python-version: [3.9, 3.10, 3.11]
+        python-version: [3.12]
     
     steps:
     - uses: actions/checkout@v4
@@ -117,7 +117,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11
+        python-version: 3.12
     
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -166,7 +166,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11
+        python-version: 3.12
     
     - name: Install security tools
       run: |
@@ -195,7 +195,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: 3.11
+        python-version: 3.12
     
     - name: Install dependencies
       run: |

@@ -1,99 +1,78 @@
 ﻿# TTS Architecture
 
-Last updated: 2026-03-31
+Последнее обновление: 2026-04-06
 
-## Runtime topology
+Этот документ нужен для понимания общей схемы TTS в Paidviewer.
 
-- `frontend` talks only to `bot_service`.
-- `bot_service` is the source of truth for auth, settings, routing policy, slot gating, health, and playback contracts.
-- `tts-gateway` is the shared cloud orchestrator for `f5` and `qwen`.
-- `f5-tts-service` is the F5 runtime and F5 voice/admin API.
-- `nano-qwen3tts-vllm` is the Qwen runtime.
-- `tts_worker_agent` is the official self-host runtime bridge.
+Если тебе нужно просто запустить проект, начни с [QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md).
 
-## Official TTS modes
+## Коротко
 
-Only two user-facing modes are official:
+В продукте есть только два официальных режима озвучки:
 
 - `cloud`
 - `self_host`
 
-### Cloud
+Никакие старые названия вроде `self-hosted endpoint`, `project-hosted worker`, `gateway-managed` больше не считаются основным сценарием.
 
-`frontend -> bot_service -> tts-gateway -> provider runtime`
+## Как идёт запрос в cloud
 
-This is the only official cloud path for both `f5` and `qwen`.
+```text
+frontend -> bot_service -> tts-gateway -> provider runtime
+```
 
-### Self-host
+Это общий cloud-путь и для `f5`, и для `qwen`.
 
-`frontend -> bot_service provisioning/pairing -> tts_worker_agent -> local runtime`
+## Как идёт запрос в self-host
 
-This is the only official self-host path for both `f5` and `qwen`.
+```text
+frontend -> bot_service -> provisioning/pairing -> tts_worker_agent -> local runtime
+```
 
-## Compatibility-only paths
+Это общий self-host путь и для `f5`, и для `qwen`.
 
-The following terms are legacy/compatibility-only and must not be treated as primary production topology:
+## Кто за что отвечает
 
-- `self-hosted endpoint`
-- `project-hosted worker`
-- `gateway-managed`
+`frontend`
+- показывает настройки и статусы
+- не ходит напрямую в TTS runtime
 
-Legacy flags like `use_local`, `f5_local`, `qwen_local` remain compatibility names only. Product language should use `cloud` and `self_host`.
+`bot_service`
+- хранит пользовательские настройки
+- решает, куда направить запрос
+- отдаёт `status`, `health`, capability flags
+- создаёт provisioning bundle и pairing flow
 
-## Public backend contract
+`tts-gateway`
+- общий cloud-оркестратор
+- управляет очередью и вызовами provider runtime
+
+`f5-tts-service`
+- F5 runtime
+- F5 voice/admin APIs
+
+`nano-qwen3tts-vllm`
+- Qwen runtime
+- streaming synthesis
+- хранение Qwen voice samples
+
+`tts_worker_agent`
+- официальный self-host агент
+- связывает `bot_service` с локальным runtime пользователя
+
+## Какие backend endpoints считаются основными
 
 - `GET /api/tts/status`
 - `GET /api/tts/health`
 - `GET /api/voices/providers/capabilities`
 - `POST /api/local-tts/test-connection`
 
-The TTS status/health shape is mode-first and provider-agnostic:
+UI и support должны опираться именно на них.
 
-- `available`
-- `degraded_reason`
-- `slot_allowed`
-- `recommended_path`
-- `capabilities`
-- `error_code`
+## Что важно помнить
 
-## Ownership boundaries
-
-`bot_service` owns:
-
-- user settings
-- routing policy
-- slot gating
-- provider selection
-- self-host provisioning/pairing
-
-`tts-gateway` owns:
-
-- cloud orchestration
-- queue/scheduler behavior
-- provider runtime calls
-
-`f5-tts-service` owns only F5-local operational state:
-
-- F5 synthesis
-- F5 voice/admin operations
-- F5-local usage/limits
-
-`nano-qwen3tts-vllm` owns only Qwen runtime state:
-
-- runtime model exposure
-- streaming synthesis
-- persistent voice sample storage required by Qwen base mode
-
-`tts_worker_agent` owns:
-
-- self-host activation
-- worker polling
-- local diagnostics
-- dispatch to local F5/Qwen runtimes
-
-## Production notes
-
-- `tts-gateway` requires Redis.
-- `nano-qwen3tts-vllm` should be treated as Linux/WSL-first.
-- `Qwen` production runtime should stay single-model-first unless there is an explicit need for a broader catalog.
-- Frontend must not rely on direct provider URLs.
+- `frontend` не должен использовать прямые provider URL
+- `tts-gateway` нужен только для `cloud`
+- `tts_worker_agent` — основной self-host путь
+- raw endpoint нужен только как запасной compatibility-сценарий для поддержки
+- Qwen runtime в production лучше считать Linux/WSL-first

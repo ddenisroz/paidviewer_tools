@@ -13,23 +13,26 @@ from core.database import get_db
 from core.config import settings
 from auth.auth import get_current_user
 from core.permissions import require_permission, Permission
-from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
+from core.internal_service_auth import build_tts_httpx_client_kwargs
 from core.project_paths import TEMP_DIR
 from services.tts.tts_core import check_user_whitelisted
 from services.voice_management_service import VoiceManagementService
 from repositories.user_repository import UserRepository
 from repositories.local_tts_repository import LocalTTSRepository
 from repositories.tts_settings_repository import TTSSettingsRepository
+from services.voice_management_upstream import (
+    ensure_voice_management_provider,
+    provider_request_params,
+    provider_tts_api_base,
+    raise_upstream_http_error,
+    tts_auth_headers,
+)
 from services.tts.provider_utils import (
-    ProviderRoutingError,
     get_all_provider_capabilities,
     get_qwen_model_family,
-    get_voice_management_upstream_params,
-    get_voice_management_upstream_url,
     normalize_provider,
     normalize_qwen_model_selection,
     QWEN_BASE_MODEL,
-    qwen_voice_crud_not_available_detail,
 )
 logger = logging.getLogger('bot_service')
 voices_router = APIRouter(prefix='/api/voices', tags=['voices'])
@@ -61,20 +64,7 @@ def _current_user_id(user: dict) -> int:
     return user_id
 
 def _tts_auth_headers(provider: str) -> dict:
-    try:
-        return build_tts_auth_headers(
-            provider=provider,
-            upstream='voice',
-            strict=True,
-        )
-    except TTSAuthConfigError as error:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                'code': 'tts_upstream_auth_not_configured',
-                'message': str(error),
-            },
-        ) from error
+    return tts_auth_headers(provider)
 
 def _is_admin(user: dict) -> bool:
     return user.get('role') == 'admin' or bool(user.get('is_admin', False))
@@ -92,18 +82,11 @@ def _normalize_voice_provider(provider: Optional[str]) -> str:
     return 'qwen' if normalized == 'qwen' else 'f5'
 
 def _provider_base_url(provider: str) -> str:
-    resolved_provider = _normalize_voice_provider(provider)
-    try:
-        return get_voice_management_upstream_url(resolved_provider)
-    except ProviderRoutingError as error:
-        if str(error) == 'qwen_voice_crud_not_available':
-            raise HTTPException(status_code=501, detail=qwen_voice_crud_not_available_detail()) from error
-        raise HTTPException(status_code=400, detail={'code': str(error), 'message': str(error)}) from error
+    return provider_tts_api_base(_normalize_voice_provider(provider)).removesuffix('/api/tts')
 
 
 def _provider_upstream_params(provider: str, extra_params: Optional[dict] = None) -> dict:
-    resolved_provider = _normalize_voice_provider(provider)
-    return get_voice_management_upstream_params(resolved_provider, extra_params=extra_params)
+    return provider_request_params(_normalize_voice_provider(provider), extra_params)
 
 
 def _raise_tts_upstream_error(
@@ -112,33 +95,11 @@ def _raise_tts_upstream_error(
     operation: str,
     default_detail: str,
 ) -> None:
-    status_code = response.status_code
-    raw_body = (response.text or "").strip()
-    if raw_body:
-        logger.warning(
-            "TTS upstream error during %s: status=%s body=%s",
-            operation,
-            status_code,
-            raw_body[:500],
-        )
-    else:
-        logger.warning("TTS upstream error during %s: status=%s", operation, status_code)
-
-    detail = default_detail
-    try:
-        payload = response.json()
-        if isinstance(payload, dict):
-            detail = (
-                str(payload.get("detail") or payload.get("message") or payload.get("error") or "").strip()
-                or default_detail
-            )
-    except Exception:
-        pass
-
-    if status_code in (401, 403):
-        raise HTTPException(status_code=503, detail="TTS service authorization failed")
-
-    raise HTTPException(status_code=status_code, detail=detail)
+    raise_upstream_http_error(
+        response=response,
+        operation=operation,
+        default_detail=default_detail,
+    )
 
 
 def _guess_audio_suffix(*, audio_url: str, content_type: Optional[str]) -> str:

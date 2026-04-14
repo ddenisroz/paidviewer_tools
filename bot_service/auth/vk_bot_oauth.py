@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-ADMIN_BOT_PAGE = f"{settings.frontend_url}/dashboard/dolbaebadmintts?tab=bots"
+ADMIN_BOT_PAGE = f"{settings.frontend_url}/dashboard/admin?tab=runtime"
 _BOT_AUTH_ERROR_SANITIZER = re.compile(r"[^a-z0-9]+")
 
 

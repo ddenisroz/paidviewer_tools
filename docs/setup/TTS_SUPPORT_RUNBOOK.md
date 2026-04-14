@@ -1,41 +1,90 @@
 ﻿# TTS Support Runbook
 
+Это короткая памятка для типовых проблем TTS.
+
+Если ты обычный пользователь проекта, а не support/ops, чаще всего тебе нужен только раздел с симптомом и простым действием.
+
 ## `cloud_slot_required`
 
-- Symptom: `GET /api/tts/status` returns `slot_allowed=false`.
-- Action: move the user to `self_host` onboarding through the provisioning bundle flow.
-- Do not manually force-enable cloud capacity for all providers as a support shortcut.
+Что это значит:
+- cloud-режим сейчас недоступен для этого пользователя
+
+Как выглядит:
+- `GET /api/tts/status` возвращает `slot_allowed=false`
+
+Что делать:
+- перевести пользователя в `self_host`
+- использовать provisioning bundle + `tts_worker_agent`
 
 ## `version_mismatch`
 
-- Symptom: `tts_worker_agent` receives `409` on activation or poll.
-- Action: compare the bundle `required_agent_version` with the locally installed agent version.
-- Resolution: update the agent. Lower the required version only as a temporary rollback action if the new rollout is not yet fully deployed.
+Что это значит:
+- установленный `tts_worker_agent` слишком старый
+
+Как выглядит:
+- агент получает `409` на activation или poll
+
+Что делать:
+- сравнить `required_agent_version` из bundle с версией установленного агента
+- обновить агент
+- понижать required version только как временный rollback
 
 ## `provider_unreachable`
 
-- Symptom: `test-connection` or synthesis fails with upstream/connect timeout.
-- Action: verify `endpoint_url`, `api_key`, runtime health, and local firewall/network path.
-- For cloud mode: check `tts-gateway` plus the provider runtime.
-- For self-host mode: check the user's local runtime and localhost diagnostics.
+Что это значит:
+- runtime недоступен или не отвечает вовремя
+
+Что проверить:
+- `endpoint_url`
+- `api_key`
+- health runtime
+- firewall / сеть
+
+Если это `cloud`:
+- проверить `tts-gateway`
+- проверить provider runtime
+
+Если это `self_host`:
+- проверить локальный runtime у пользователя
+- проверить `http://127.0.0.1:46321/diagnostics`
 
 ## `worker_offline`
 
-- Symptom: the worker exists in the backend but is inactive or has not polled recently.
-- Action: ask the user to open local diagnostics and restart `tts_worker_agent`.
-- Verify provisioning bundle import, `worker_token`, agent version, and backend URL reachability.
+Что это значит:
+- backend знает о worker, но он давно не опрашивал сервер
+
+Что делать:
+- попросить пользователя открыть локальную диагностику
+- перезапустить `tts_worker_agent`
+- проверить bundle import, `worker_token`, версию агента и доступность backend URL
 
 ## `voice_missing`
 
-- Symptom: synthesis cannot resolve the requested voice.
-- Action: verify provider, voice id/name, and runtime storage state.
-- For Qwen, explicitly verify the persistent `QWEN_VOICE_STORAGE_DIR` volume.
+Что это значит:
+- runtime не нашёл нужный голос
+
+Что делать:
+- проверить provider
+- проверить voice id / voice name
+- проверить, что voice storage не потерян
+- для Qwen отдельно проверить `QWEN_VOICE_STORAGE_DIR`
 
 ## `vk_bot_auth_failed`
 
-- Symptom: VK bot OAuth returns `access_denied`, `invalid_state`, `save_failed`, or `restart_failed`.
-- Action:
-  1. verify the state cookie and callback URL
-  2. verify token persistence in backend storage
-  3. verify that VK bot runtime was able to restart after callback
-- `restart_failed` is not a successful auth outcome. Treat it as a separate bot-runtime incident.
+Что это значит:
+- VK bot OAuth завершился ошибкой
+
+Типовые коды:
+- `access_denied`
+- `invalid_state`
+- `save_failed`
+- `restart_failed`
+
+Что делать:
+1. проверить state cookie и callback URL
+2. проверить, что токен сохранился в backend
+3. проверить, смог ли bot runtime реально подняться после callback
+
+Важно:
+- `restart_failed` не считается успешной авторизацией
+- это отдельный runtime-инцидент, а не “почти success”

@@ -194,10 +194,8 @@ async def remove_blocked_user(
     """Delete blocked user by id."""
     try:
         tts_service = TTSService(db)
-        if not hasattr(tts_service, "remove_blocked_user_by_id"):
-            raise HTTPException(status_code=501, detail="remove_blocked_user_by_id is not implemented")
-
-        success = await tts_service.remove_blocked_user_by_id(current_user["id"], blocked_user_id)
+        user_id = _resolve_identity(current_user)
+        success = await tts_service.remove_blocked_user_by_id(user_id, blocked_user_id)
         if success:
             return {"success": True, "message": "Blocked user removed"}
 

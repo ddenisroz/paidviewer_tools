@@ -5,6 +5,7 @@ import { ChevronRight, Coins, Command, Headphones, Home, Laugh, LucideIcon, Menu
 import { NavLink, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
+import { ADMIN_BASE_PATH } from '@/features/admin/utils/adminRoutes';
 import { createPreloadHandler } from '@/shared/utils/preloadRoute';
 
 interface NavSubItem {
@@ -34,16 +35,16 @@ const routePreloaders: Record<string, () => void> = {
     '/dashboard/tts': createPreloadHandler(() => import('@/features/tts/pages/TtsMainPage'), 'tts-main'),
     '/dashboard/tts/voices': createPreloadHandler(() => import('@/features/tts/pages/VoiceManagementPage'), 'tts-voices'),
     '/dashboard/tts/local': createPreloadHandler(() => import('@/features/tts/pages/LocalTTSSettingsPage'), 'tts-local'),
-    '/dashboard/youtube': createPreloadHandler(() => import('@/pages/media/YoutubeIntegrationPage'), 'youtube'),
+    '/dashboard/media': createPreloadHandler(() => import('@/pages/media/YoutubeIntegrationPage'), 'youtube'),
     '/dashboard/points': createPreloadHandler(() => import('@/pages/PointsManagementPage'), 'points'),
     '/dashboard/drops': createPreloadHandler(() => import('@/features/drops/pages/DropsMainPage'), 'drops'),
     '/dashboard/chat-analysis': createPreloadHandler(() => import('@/pages/AnalyticsPage'), 'analytics'),
     '/dashboard/commands': createPreloadHandler(() => import('@/pages/CommandsPage'), 'commands'),
     '/dashboard/settings': createPreloadHandler(() => import('@/pages/SettingsMainPage'), 'settings'),
-    '/dashboard/dolbaebadmintts': createPreloadHandler(() => import('@/features/admin/pages/AdminPage'), 'admin'),
+    [ADMIN_BASE_PATH]: createPreloadHandler(() => import('@/features/admin/pages/AdminPage'), 'admin'),
 };
 
-const getNavItems = (isYourchy: boolean): NavItem[] => {
+const getNavItems = (isAdminUser: boolean): NavItem[] => {
     const baseItems: NavItem[] = [
         { to: '/dashboard', label: 'Главная', icon: Home },
         {
@@ -70,9 +71,9 @@ const getNavItems = (isYourchy: boolean): NavItem[] => {
         { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
     ];
 
-    // Добавляем админ панель только для пользователя yourchy
-    if (isYourchy) {
-        baseItems.push({ to: '/dashboard/dolbaebadmintts', label: 'Админ панель', icon: Shield });
+    // Show the admin entry only to users with admin access.
+    if (isAdminUser) {
+        baseItems.push({ to: ADMIN_BASE_PATH, label: 'Админ панель', icon: Shield });
     }
 
     return baseItems;

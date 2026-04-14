@@ -6,12 +6,11 @@ Following Clean Architecture - business logic only, no direct DB access.
 import logging
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
-from datetime import timedelta
 
 from core.database import BotCommand, User
 from core.permissions import PlatformRole, PLATFORM_ROLE_HIERARCHY, get_platform_roles
-from core.datetime_utils import utcnow_naive
 from repositories.command_repository import CommandRepository
+from services.command_cooldown_store import CommandCooldownStore, get_command_cooldown_store
 from validators.input_validators import sanitize_input
 
 logger = logging.getLogger('bot_service')
@@ -24,7 +23,11 @@ class CommandService:
     Uses the repository pattern for data access.
     """
 
-    def __init__(self, command_repo: Optional[CommandRepository] = None):
+    def __init__(
+        self,
+        command_repo: Optional[CommandRepository] = None,
+        cooldown_store: Optional[CommandCooldownStore] = None,
+    ):
         """
         Initialize CommandService.
         
@@ -34,8 +37,7 @@ class CommandService:
         """
         self.logger = logger
         self._command_repo = command_repo
-        # Cooldowns stored in-memory (TODO: move to Redis for persistence)
-        self._cooldowns: Dict[str, Dict[str, Any]] = {}
+        self._cooldown_store = cooldown_store or get_command_cooldown_store()
 
     def _get_repo(self, db: Session) -> CommandRepository:
         """Get repository instance, creating one if needed."""
@@ -503,20 +505,7 @@ class CommandService:
     def check_cooldown(self, command: BotCommand, user_id: str) -> bool:
         """Check the command cooldown."""
         try:
-            if command.cooldown_seconds <= 0:
-                return True
-
-            command_id = str(command.id)
-            if command_id not in self._cooldowns:
-                self._cooldowns[command_id] = {}
-
-            if user_id not in self._cooldowns[command_id]:
-                return True
-
-            last_used = self._cooldowns[command_id][user_id]
-            cooldown_expires = last_used + timedelta(seconds=command.cooldown_seconds)
-            
-            return utcnow_naive() >= cooldown_expires
+            return self._cooldown_store.is_available(command, user_id)
 
         except Exception:
             self.logger.exception("Error checking cooldown")
@@ -525,14 +514,7 @@ class CommandService:
     def update_cooldown(self, command: BotCommand, user_id: str):
         """Update cooldown after command execution."""
         try:
-            if command.cooldown_seconds <= 0:
-                return
-
-            command_id = str(command.id)
-            if command_id not in self._cooldowns:
-                self._cooldowns[command_id] = {}
-            
-            self._cooldowns[command_id][user_id] = utcnow_naive()
+            self._cooldown_store.mark_used(command, user_id)
 
         except Exception:
             self.logger.exception("Error updating cooldown")

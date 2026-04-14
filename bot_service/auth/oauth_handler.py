@@ -463,13 +463,8 @@ class OAuthHandler:
             connection_manager = get_connection_manager()
 
             logger.info(f"[BOT] Attempting auto-connect for {platform} bot to channel {channel_name}")
-
             has_sessions = connection_manager.is_channel_active(channel_name)
             logger.info(f"[BOT] Active sessions for {channel_name}: {has_sessions}")
-
-            # if not has_sessions:
-            #     logger.info(f"[ERROR] No active sessions for channel {channel_name}, skipping bot connection")
-            #     return
 
             if platform == Platform.TWITCH:
                 logger.info(f"[BOT] Connecting Twitch bot to {channel_name}")
@@ -478,7 +473,7 @@ class OAuthHandler:
                 logger.info(f"[BOT] Connecting VK Live bot to {channel_name}")
                 await self._connect_vk_bot(channel_name)
             else:
-                logger.warning(f"[WARN] Auto-connect not implemented for platform: {platform}")
+                logger.info(f"[BOT] No bot auto-connect flow is defined for platform: {platform}")
 
         except Exception as e:
             logger.error(f"[ERROR] Error auto-connecting {platform} bot to {channel_name}: {e}")

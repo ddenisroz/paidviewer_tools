@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from api.admin import dashboard, users, channels, system, voices
+from api.admin import channels, dashboard, read_models, system, users, voices
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 router = APIRouter()
 
 router.include_router(dashboard.router)
+router.include_router(read_models.router)
 router.include_router(users.router)
 router.include_router(channels.router)
 router.include_router(system.router)

@@ -146,7 +146,7 @@ class ChatMessageRepository(BaseRepository[ChatMessage]):
             platform=platform,
             message=message,
             author_username=author_username,
-            # author_id=author_id, # TODO: Uncomment after migration applied
+            author_id=author_id,
             role=role,
             badges=badges,
             timestamp=datetime.utcnow(),

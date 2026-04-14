@@ -1,49 +1,66 @@
-﻿# Быстрый запуск
+﻿# Быстрый старт
 
-Если нужен только минимальный рабочий контур, подними `bot_service` и `frontend`. Расширенный TTS smoke и релизные проверки смотри в `LIVE_SMOKE_RUNBOOK.md` и `RELEASE_CHECKLIST.md`.
+Этот документ описывает запуск **всего проекта**, а не только `bot_service` и `frontend`.
+
+Под “весь проект” здесь понимается:
+
+- `postgres`
+- `redis`
+- `bot_service`
+- `frontend`
+- `tts-gateway`
+- `f5-tts-service`
+- `nano-qwen3tts-vllm`
+- `tts_worker_agent` при проверке `self_host`
 
 ## Требования
 
-- Python 3.11+
-- Node.js 20+
-- PostgreSQL
-- для cloud TTS дополнительно:
-  - `tts-gateway`
-  - `f5-tts-service`
-  - `nano-qwen3tts-vllm`
+- Python `3.12`
+- Node.js `20+`
+- Docker Desktop + Docker Compose
+- PostgreSQL и Redis, если запускаешь не через docker compose
+- Linux/WSL2 для штатного запуска `nano-qwen3tts-vllm`
 
-## 1. Подготовь репозиторий
+## Репозитории
+
+- основной продукт: [paidviewer_tools](/H:/Programming/raw_code/AI/Python/paidviewer_tools)
+- cloud gateway: [tts-gateway](/H:/Programming/raw_code/AI/Python/tts-gateway)
+- F5 runtime: [f5-tts-service](/H:/Programming/raw_code/AI/Python/f5-tts-service)
+- Qwen runtime: [nano-qwen3tts-vllm](/H:/Programming/raw_code/AI/Python/nano-qwen3tts-vllm)
+
+## Рекомендуемый путь: полный Docker-контур
+
+Это основной локальный сценарий для всего проекта.
+
+### 1. Подготовь основной репозиторий
+Для основного Docker-сценария локальная установка Python-зависимостей и `npm install` не нужны.
+
+Достаточно перейти в основной репозиторий:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r bot_service/requirements.txt
-python -m pip install -r bot_service/requirements_dev.txt
+cd H:\Programming\raw_code\AI\Python\paidviewer_tools
 ```
 
-```powershell
-cd frontend
-npm install
-cd ..
-```
+### 2. Подготовь `.env`
 
-## 2. Подготовь env
+Если `.env` уже настроены, **не перезаписывай их**.
+
+Если файлов нет:
 
 ```powershell
 Copy-Item bot_service/.env.example bot_service/.env
 Copy-Item frontend/.env.example frontend/.env
 ```
 
-Минимум для backend:
+Минимум для `bot_service/.env`:
 
 - `DATABASE_URL`
+- `REDIS_URL`
 - `SECRET_KEY`
 - `TWITCH_CLIENT_ID`
 - `TWITCH_CLIENT_SECRET`
-
-Если нужен cloud TTS:
-
+- `VK_CLIENT_ID`
+- `VK_CLIENT_SECRET`
 - `TTS_GATEWAY_URL`
 - `TTS_GATEWAY_API_KEY`
 - `F5_TTS_SERVICE_URL`
@@ -51,35 +68,79 @@ Copy-Item frontend/.env.example frontend/.env
 - `QWEN_TTS_SERVICE_URL`
 - `QWEN_TTS_SERVICE_API_KEY`
 
-## 3. Прогони миграции
+### 3. Подними весь dev-контур
 
 ```powershell
-cd bot_service
-alembic upgrade head
-cd ..
+cd H:\Programming\raw_code\AI\Python\paidviewer_tools
+docker compose -f deploy/docker/docker-compose.dev.yml up --build
 ```
 
-## 4. Запусти сервисы
+Контур поднимет:
+
+- `postgres` на `5432`
+- `redis` на `6379`
+- `bot_service` на `8000`
+- `tts-gateway` на `8010`
+- `f5-tts-service` на `8011`
+- `qwen_tts` на `8012` через Docker
+- `frontend` на `80`
+
+### 4. Проверь базовые точки
+
+- `http://localhost`
+- `http://localhost:8000/health`
+- `http://localhost:8000/api/tts/health?provider=f5`
+- `http://localhost:8000/api/tts/health?provider=qwen`
+- `http://localhost:8010/health/ready`
+- `http://localhost:8011/health/ready`
+- `http://localhost:8012/health/ready`
+
+## Вариант B. Запуск self-host агента
+
+Основной стек остаётся Docker-first, но `tts_worker_agent` по своей природе запускается отдельно на машине пользователя.
+
+## Если нужен именно локальный dev без Docker
+
+Этот путь больше не считается основным стартовым сценарием.
+
+Используй его только если осознанно отлаживаешь backend/frontend вне контейнеров.
+
+## Self-host путь через `tts_worker_agent`
+
+Если нужно проверить `self_host`, поднимай агент отдельно. Автозапуск теперь **только opt-in**.
 
 ```powershell
-# Терминал 1
-cd bot_service
-python main.py
-
-# Терминал 2
-cd frontend
-npm run dev
+cd H:\Programming\raw_code\AI\Python\paidviewer_tools\tts_worker_agent
+python -m venv .venv
+.\.venv\Scripts\pip install -r requirements.txt
+.\.venv\Scripts\python.exe .\main.py --config .\config.json
 ```
 
-## 5. Проверь базовый контур
+Активация:
 
-1. Открой `http://localhost:5173`
-2. Проверь backend: `http://localhost:8000/health`
-3. Если подключён cloud TTS:
-   - `http://localhost:8000/api/tts/health?provider=f5`
-   - `http://localhost:8000/api/tts/health?provider=qwen`
+1. Открой `Local TTS` в интерфейсе Paidviewer
+2. Скачай provisioning bundle
+3. Выполни pairing flow
+4. Проверь локальную диагностику:
+   - `http://127.0.0.1:46321/health`
+   - `http://127.0.0.1:46321/diagnostics`
 
-## 6. Перед релизом
+Если нужен installer-managed автозапуск, это отдельное явное действие:
+
+```powershell
+.\install-agent.ps1 -EnableAutostart -StartNow
+```
+
+## Минимальная последовательность проверки после запуска
+
+1. Открой UI и войди в систему
+2. Проверь `/api/tts/health` и `/api/tts/status`
+3. Прогони один `cloud F5` synth
+4. Прогони один `cloud Qwen` synth
+5. Если нужен self-host smoke, подними `tts_worker_agent` и прогони `self_host F5` и `self_host Qwen`
+6. Проверь YouTube queue, drops и VK bot status
+
+## Перед релизом
 
 - [release/RELEASE_CHECKLIST.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
 - [setup/LIVE_SMOKE_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)

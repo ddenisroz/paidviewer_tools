@@ -22,7 +22,7 @@ services:
 
   # Provider-owned F5 API
   tts_service:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
+    image: ${F5_TTS_IMAGE:-f5-tts-service:local}
     container_name: f5_tts_service_advanced
     ports:
       - "127.0.0.1:8011:8011"
@@ -63,7 +63,7 @@ services:
 
   # Cloudflare Tunnel for secure remote access
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: ${CLOUDFLARED_IMAGE:?CLOUDFLARED_IMAGE is required}
     container_name: f5_cloudflared
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:

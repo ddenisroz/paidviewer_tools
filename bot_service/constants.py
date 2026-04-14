@@ -4,14 +4,7 @@ Only static values live here; dynamic URLs and environment values come from core
 """
 
 from core.config import settings
-from enum import Enum
-
-# Backport StrEnum for Python < 3.11
-try:
-    from enum import StrEnum
-except ImportError:
-    class StrEnum(str, Enum):
-        pass
+from enum import StrEnum
 
 
 # URL constants

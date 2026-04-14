@@ -320,7 +320,7 @@ async def check_local_tts_health(
             if normalized_provider == "qwen":
                 compatibility_note = (
                     "This endpoint is treated as a user's self-hosted Qwen endpoint. "
-                    "The managed project path remains gateway-managed through a project-hosted worker. "
+                    "The official cloud path remains bot_service -> tts-gateway -> qwen runtime. "
                     "The self-hosted path still uses a compatibility flow via /api/prepare -> /api/stream/{id}, "
                     "but the worker now exposes health, model catalog and user voice CRUD endpoints."
                 )

@@ -34,6 +34,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useChat } from '@/context/ChatContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { usePlayer } from '@/context/PlayerContext';
+import { buildYoutubeRewardPayload, resolveYoutubeRewardState } from '@/features/youtube/utils/rewardSettings';
 import { cn } from '@/lib/utils';
 import { youtubeService } from '@/services/api/services/youtubeService';
 import { pointsApi } from '@/services/pointsApi';
@@ -227,19 +228,11 @@ const YoutubeIntegrationPage: React.FC = () => {
                 setVolumeRef.current(volumeLevel);
             }
             setRequestsCommandEnabled(response.data.requests_command_enabled ?? true);
-            const legacyPlatform = (response.data as { requests_reward_platform?: string }).requests_reward_platform === 'vk' ? 'vk' : 'twitch';
-            const legacyEnabled = response.data.requests_reward_enabled ?? false;
-            const legacyId = response.data.requests_reward_id || '';
-
-            const twitchEnabled = (response.data as { requests_reward_twitch_enabled?: boolean }).requests_reward_twitch_enabled;
-            const vkEnabled = (response.data as { requests_reward_vk_enabled?: boolean }).requests_reward_vk_enabled;
-            const twitchId = (response.data as { requests_reward_twitch_id?: string | null }).requests_reward_twitch_id;
-            const vkId = (response.data as { requests_reward_vk_id?: string | null }).requests_reward_vk_id;
-
-            setRequestsRewardTwitchEnabled(twitchEnabled ?? (legacyEnabled && legacyPlatform === 'twitch'));
-            setRequestsRewardVkEnabled(vkEnabled ?? (legacyEnabled && legacyPlatform === 'vk'));
-            setRequestsRewardTwitchId(twitchId ?? (legacyPlatform === 'twitch' ? legacyId : ''));
-            setRequestsRewardVkId(vkId ?? (legacyPlatform === 'vk' ? legacyId : ''));
+            const rewardState = resolveYoutubeRewardState(response.data);
+            setRequestsRewardTwitchEnabled(rewardState.requestsRewardTwitchEnabled);
+            setRequestsRewardVkEnabled(rewardState.requestsRewardVkEnabled);
+            setRequestsRewardTwitchId(rewardState.requestsRewardTwitchId);
+            setRequestsRewardVkId(rewardState.requestsRewardVkId);
         } catch (error) {
             logger.error('Error loading YouTube settings:', error);
         }
@@ -247,17 +240,14 @@ const YoutubeIntegrationPage: React.FC = () => {
 
     const handleSaveSettings = async (): Promise<void> => {
         try {
-            const legacyPlatform = requestsRewardVkEnabled && !requestsRewardTwitchEnabled ? 'vk' : 'twitch';
-            const legacyRewardId = legacyPlatform === 'vk' ? requestsRewardVkId : requestsRewardTwitchId;
             await youtubeService.saveSettings({
                 requests_command_enabled: requestsCommandEnabled,
-                requests_reward_enabled: requestsRewardTwitchEnabled || requestsRewardVkEnabled,
-                requests_reward_id: legacyRewardId,
-                requests_reward_platform: legacyPlatform,
-                requests_reward_twitch_enabled: requestsRewardTwitchEnabled,
-                requests_reward_twitch_id: requestsRewardTwitchId,
-                requests_reward_vk_enabled: requestsRewardVkEnabled,
-                requests_reward_vk_id: requestsRewardVkId,
+                ...buildYoutubeRewardPayload({
+                    requestsRewardTwitchEnabled,
+                    requestsRewardVkEnabled,
+                    requestsRewardTwitchId,
+                    requestsRewardVkId,
+                }),
             });
             toast.success('Настройки сохранены');
             setIsSettingsDialogOpen(false);
@@ -283,15 +273,14 @@ const YoutubeIntegrationPage: React.FC = () => {
         setRequestsRewardVkEnabled(nextVkReward);
         setIsOrdersSaving(true);
         try {
-            const legacyPlatform = nextVkReward && !nextTwitchReward ? 'vk' : 'twitch';
-            const legacyRewardId = legacyPlatform === 'vk' ? requestsRewardVkId : requestsRewardTwitchId;
             await youtubeService.saveSettings({
                 requests_command_enabled: nextCommand,
-                requests_reward_enabled: nextTwitchReward || nextVkReward,
-                requests_reward_platform: legacyPlatform,
-                requests_reward_id: legacyRewardId,
-                requests_reward_twitch_enabled: nextTwitchReward,
-                requests_reward_vk_enabled: nextVkReward,
+                ...buildYoutubeRewardPayload({
+                    requestsRewardTwitchEnabled: nextTwitchReward,
+                    requestsRewardVkEnabled: nextVkReward,
+                    requestsRewardTwitchId,
+                    requestsRewardVkId,
+                }),
             });
             toast.success(successMessage);
         } catch (error) {

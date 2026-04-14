@@ -1,46 +1,52 @@
 ﻿# Paidviewer Tools
 
-Основной репозиторий Paidviewer: `bot_service`, `frontend`, `tts_worker_agent`, интеграции платформ, YouTube queue и drops/streaks.
+Основной продуктовый репозиторий Paidviewer.
+
+Содержит:
+
+- `bot_service` — центральный backend, авторизация, orchestration, бизнес-логика
+- `frontend` — пользовательский кабинет и админ-центр
+- `tts_worker_agent` — официальный self-host runtime для локального TTS
+- интеграции Twitch, VK Live, YouTube, drops/streaks и OBS overlays
+
+## Базовый стек
+
+- Python `3.12`
+- Node.js `20+`
+- PostgreSQL
+- Redis
+
+Внешний cloud TTS-контур живёт в отдельных репозиториях:
+
+- [tts-gateway](/H:/Programming/raw_code/AI/Python/tts-gateway)
+- [f5-tts-service](/H:/Programming/raw_code/AI/Python/f5-tts-service)
+- [nano-qwen3tts-vllm](/H:/Programming/raw_code/AI/Python/nano-qwen3tts-vllm)
+
+## Официальные TTS-режимы
+
+- `cloud` — `frontend -> bot_service -> tts-gateway -> provider runtime`
+- `self_host` — `frontend -> bot_service -> provisioning/pairing -> tts_worker_agent -> local runtime`
+
+`raw endpoint` остаётся только compatibility-путём для поддержки. Основной пользовательский self-host сценарий — только через `tts_worker_agent`.
 
 ## С чего начать
 
-- [Быстрый старт](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)
+- [Быстрый старт и запуск всего проекта](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)
 - [Контекст проекта](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/PROJECT_CONTEXT.md)
 - [Release checklist](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
 - [Live smoke runbook](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
 - [Индекс активной документации](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/README.md)
 
-## Коротко
-
-- `frontend` общается только с `bot_service`
-- `bot_service` — центральный backend и оркестратор
-- `tts-gateway`, `f5-tts-service`, `nano-qwen3tts-vllm` — внешний cloud TTS-контур
-- `tts_worker_agent` — официальный self-host путь
-
-## Базовые команды
+## Самый короткий локальный старт
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r bot_service/requirements.txt
-python -m pip install -r bot_service/requirements_dev.txt
+cd H:\Programming\raw_code\AI\Python\paidviewer_tools
+docker compose -f deploy/docker/docker-compose.dev.yml up --build
 ```
 
-```powershell
-cd frontend
-npm install
-npm run type-check
-npm run test:run
-npm run build
-```
-
-```powershell
-cd ..\bot_service
-alembic upgrade head
-python main.py
-```
+Дальше смотри [docs/QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md): там описан актуальный запуск всего контура.
+Сейчас основной рекомендуемый путь для локальной разработки — полный Docker-контур через `docker compose -f deploy/docker/docker-compose.dev.yml up --build`, включая `nano-qwen3tts-vllm`.
 
 ## Документация
 
-В `docs/` оставлен только короткий активный слой. Всё историческое и производное должно жить в `docs/backlog/`.
+В `docs/` оставлен только активный слой. Исторические планы, аудиты и промежуточные материалы не должны быть источником правды для запуска или релиза.

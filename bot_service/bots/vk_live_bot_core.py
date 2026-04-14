@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from core.connection_manager import ConnectionManager
 from utils.vk_live_websocket import VKLiveWebSocketClient
 from utils.vk_channel_url import normalize_vk_channel_url
+from services.youtube.reward_settings import get_platform_reward_configuration
 
 logger = logging.getLogger('bot_service')
 _VK_INSECURE_SSL = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
@@ -409,17 +410,12 @@ class VKLiveBotCore:
 
                             # Обработка награды для заказа YouTube
                             youtube_settings = getattr(tts_settings, 'youtube_settings', None) or {}
-                            legacy_platform = youtube_settings.get('requests_reward_platform', 'twitch')
-                            legacy_enabled = bool(youtube_settings.get('requests_reward_enabled'))
-                            legacy_reward_id = (youtube_settings.get('requests_reward_id') or '').strip()
-
-                            vk_reward_enabled = youtube_settings.get('requests_reward_vk_enabled')
-                            if vk_reward_enabled is None:
-                                vk_reward_enabled = legacy_enabled and legacy_platform == 'vk'
-
-                            configured_reward = (youtube_settings.get('requests_reward_vk_id') or '').strip()
-                            if not configured_reward and legacy_platform == 'vk':
-                                configured_reward = legacy_reward_id
+                            reward_config = get_platform_reward_configuration(
+                                youtube_settings,
+                                platform='vk',
+                            )
+                            vk_reward_enabled = bool(reward_config.get('enabled'))
+                            configured_reward = str(reward_config.get('reward_value') or '').strip()
 
                             if vk_reward_enabled:
                                 if configured_reward and configured_reward.lower() == reward_title.lower():

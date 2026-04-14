@@ -20,7 +20,7 @@ services:
       retries: 5
 
   tts_service:
-    image: ${F5_TTS_IMAGE:-f5-tts-service:latest}
+    image: ${F5_TTS_IMAGE:-f5-tts-service:local}
     container_name: f5_tts_service_simple
     ports:
       - "8011:8011"

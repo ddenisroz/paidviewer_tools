@@ -113,3 +113,20 @@ class BlockedUserRepository(BaseRepository[TTSBlockedUser]):
         self.db.delete(blocked)
         self.db.commit()
         return True
+
+    def remove_by_id(self, blocked_user_id: int, *, user_id: int) -> bool:
+        """Delete a blocked-user row by id for the owner user."""
+        blocked = (
+            self.db.query(TTSBlockedUser)
+            .filter(
+                TTSBlockedUser.id == blocked_user_id,
+                TTSBlockedUser.user_id == user_id,
+            )
+            .first()
+        )
+        if not blocked:
+            return False
+
+        self.db.delete(blocked)
+        self.db.commit()
+        return True

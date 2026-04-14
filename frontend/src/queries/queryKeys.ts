@@ -104,6 +104,12 @@ export const queryKeys = {
   // Admin
   admin: {
     all: ['admin'] as const,
+    overview: () => ['admin', 'overview'] as const,
+    runtimeOverview: () => ['admin', 'runtime-overview'] as const,
+    ttsOverview: () => ['admin', 'tts-overview'] as const,
+    accountsOverview: (params?: Record<string, unknown>) => ['admin', 'accounts-overview', params] as const,
+    channelsOverview: (params?: Record<string, unknown>) => ['admin', 'channels-overview', params] as const,
+    logsOverview: (params?: Record<string, unknown>) => ['admin', 'logs-overview', params] as const,
     list: () => ['admin', 'list'] as const,
     whitelist: () => ['admin', 'whitelist'] as const,
     cacheStats: () => ['admin', 'cache-stats'] as const,

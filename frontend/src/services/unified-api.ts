@@ -43,8 +43,9 @@ export const testVoice = (
   voiceId: number,
   text: string,
   provider: 'f5' | 'qwen' = 'f5',
+  options?: { cfg_strength?: number; speed_preset?: string },
 ): Promise<AxiosResponse<ApiResponse>> =>
-  ttsService.testVoice(voiceId, text, provider);
+  ttsService.testVoice(voiceId, text, provider, options);
 
 // Admin voice management functions
 export const getAdminVoices = async (provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse<TtsVoice[]>>> => {

@@ -73,12 +73,13 @@ def _provider_contract(provider: str) -> dict:
             "official_self_host_path": capabilities.get("official_self_host_path", "tts_worker_agent"),
             "legacy_raw_endpoint_supported": capabilities.get("legacy_raw_endpoint_supported", True),
             "warning": (
-                "This screen configures a user-owned self-hosted endpoint. "
-                "The managed Qwen path in this project remains gateway-managed: "
-                "bot_service -> tts-gateway -> project-hosted worker on localhost:8012. "
-                "Self-hosted Qwen endpoints now expose model catalog and user voice CRUD, "
-                "but synthesis still uses a compatibility adapter over /api/prepare -> /api/stream/{id}. "
-                "Health endpoints are available; native status remains limited."
+                "This screen configures a user-owned self-host Qwen runtime. "
+                "The official managed path stays cloud-first through "
+                "bot_service -> tts-gateway -> qwen runtime. "
+                "Self-host Qwen runtimes expose model catalog and user voice CRUD, "
+                "while synthesis currently uses the compatibility adapter over "
+                "/api/prepare -> /api/stream/{id}. Health endpoints are available; "
+                "native status parity is still partial."
             ),
         }
 
@@ -102,7 +103,7 @@ def _provider_contract(provider: str) -> dict:
 def _qwen_local_contract_detail() -> str:
     return (
         "This endpoint is treated as a user-owned self-hosted Qwen endpoint. "
-        "The project-managed path remains gateway-managed through a project-hosted worker. "
+        "The official cloud path remains bot_service -> tts-gateway -> qwen runtime. "
         "This repository still uses a compatibility adapter for synthesis, but the worker now exposes "
         "/health/live, /health/ready, /api/models and user voice CRUD endpoints. Native status/auth parity remains partial."
     )
@@ -134,6 +135,23 @@ def _get_local_config_or_404(
     if not config:
         raise HTTPException(status_code=404, detail="Local TTS is not configured")
     return config
+
+
+def _require_local_voice_runtime(
+    *,
+    db: Session,
+    user_id: int,
+    provider: str,
+) -> tuple[dict[str, Any], Any, str, dict[str, str]]:
+    provider_contract = _provider_contract(provider)
+    if not provider_contract["supports_local_voice_management"]:
+        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
+
+    repo = LocalTTSRepository(db)
+    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=provider)
+    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
+    headers = _build_local_headers(provider, config.api_key)
+    return provider_contract, config, endpoint, headers
 
 
 def _is_provider_local_mode(db: Session, user_id: int, provider: str) -> bool:
@@ -574,15 +592,11 @@ async def list_local_tts_voices(
 ):
     resolved_provider = _normalize_local_provider(provider)
     user_id = _require_authenticated_user_id(user)
-    provider_contract = _provider_contract(resolved_provider)
-
-    if not provider_contract["supports_local_voice_management"]:
-        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
-
-    repo = LocalTTSRepository(db)
-    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
-    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
-    headers = _build_local_headers(resolved_provider, config.api_key)
+    _, _, endpoint, headers = _require_local_voice_runtime(
+        db=db,
+        user_id=user_id,
+        provider=resolved_provider,
+    )
 
     try:
         voices = await _fetch_f5_local_voices(endpoint=endpoint, headers=headers, user_id=user_id)
@@ -611,15 +625,11 @@ async def upload_local_tts_voice(
 ):
     resolved_provider = _normalize_local_provider(provider)
     user_id = _require_authenticated_user_id(user)
-    provider_contract = _provider_contract(resolved_provider)
-
-    if not provider_contract["supports_local_voice_management"]:
-        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
-
-    repo = LocalTTSRepository(db)
-    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
-    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
-    headers = _build_local_headers(resolved_provider, config.api_key)
+    _, _, endpoint, headers = _require_local_voice_runtime(
+        db=db,
+        user_id=user_id,
+        provider=resolved_provider,
+    )
 
     files = {"file": (file.filename or "voice.wav", await file.read(), file.content_type or "application/octet-stream")}
     data = {
@@ -667,15 +677,11 @@ async def delete_local_tts_voice(
 ):
     resolved_provider = _normalize_local_provider(provider)
     user_id = _require_authenticated_user_id(user)
-    provider_contract = _provider_contract(resolved_provider)
-
-    if not provider_contract["supports_local_voice_management"]:
-        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
-
-    repo = LocalTTSRepository(db)
-    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
-    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
-    headers = _build_local_headers(resolved_provider, config.api_key)
+    _, _, endpoint, headers = _require_local_voice_runtime(
+        db=db,
+        user_id=user_id,
+        provider=resolved_provider,
+    )
 
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
@@ -712,15 +718,11 @@ async def update_local_tts_voice_settings(
 ):
     resolved_provider = _normalize_local_provider(provider)
     user_id = _require_authenticated_user_id(user)
-    provider_contract = _provider_contract(resolved_provider)
-
-    if not provider_contract["supports_local_voice_management"]:
-        raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
-
-    repo = LocalTTSRepository(db)
-    config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
-    endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
-    headers = _build_local_headers(resolved_provider, config.api_key)
+    _, _, endpoint, headers = _require_local_voice_runtime(
+        db=db,
+        user_id=user_id,
+        provider=resolved_provider,
+    )
 
     allowed_keys = {"reference_text", "cfg_strength", "speed_preset"}
     payload = {key: value for key, value in settings_data.items() if key in allowed_keys}
@@ -764,15 +766,11 @@ async def sync_global_voices_to_local(
     try:
         resolved_provider = _normalize_local_provider(provider)
         user_id = _require_authenticated_user_id(user)
-
-        repo = LocalTTSRepository(db)
-        config = _get_local_config_or_404(repo=repo, user_id=user_id, provider=resolved_provider)
-        provider_contract = _provider_contract(resolved_provider)
-        if not provider_contract["supports_local_voice_management"]:
-            raise HTTPException(status_code=501, detail="Voice management is not available for this provider")
-
-        headers = _build_local_headers(resolved_provider, config.api_key)
-        endpoint = normalize_local_tts_endpoint_url(config.endpoint_url)
+        _, _, endpoint, headers = _require_local_voice_runtime(
+            db=db,
+            user_id=user_id,
+            provider=resolved_provider,
+        )
 
         try:
             local_voices = await _fetch_f5_local_voices(

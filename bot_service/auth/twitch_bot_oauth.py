@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-ADMIN_BOT_PAGE = f"{settings.frontend_url}/dashboard/dolbaebadmintts?tab=bots"
+ADMIN_BOT_PAGE = f"{settings.frontend_url}/dashboard/admin?tab=runtime"
 
 
 @router.get("/auth/twitch/bot/login")

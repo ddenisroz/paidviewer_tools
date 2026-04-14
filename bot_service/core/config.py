@@ -162,6 +162,14 @@ class Settings(BaseSettings):
         default=None,
         description="Recommended self-host worker-agent version shown in provisioning/diagnostics",
     )
+    worker_agent_default_f5_endpoint_url: str = Field(
+        default="http://127.0.0.1:8011",
+        description="Default local F5 runtime URL suggested in worker-agent provisioning bundles",
+    )
+    worker_agent_default_qwen_endpoint_url: str = Field(
+        default="http://127.0.0.1:8012",
+        description="Default local Qwen runtime URL suggested in worker-agent provisioning bundles",
+    )
     worker_pairing_token_ttl_minutes: int = Field(
         default=15,
         description="One-time worker pairing token TTL in minutes",

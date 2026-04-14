@@ -36,10 +36,16 @@ def _redirect_with_state_cleanup(url: str) -> RedirectResponse:
 
 
 if not DA_CLIENT_ID:
-    logger.warning("DONATIONALERTS_CLIENT_ID not configured - DonationAlerts integration disabled")
+    if settings.is_development:
+        logger.info("DONATIONALERTS_CLIENT_ID not configured - DonationAlerts integration disabled")
+    else:
+        logger.warning("DONATIONALERTS_CLIENT_ID not configured - DonationAlerts integration disabled")
 
 if not DA_CLIENT_SECRET:
-    logger.warning("DONATIONALERTS_CLIENT_SECRET not configured - DonationAlerts integration disabled")
+    if settings.is_development:
+        logger.info("DONATIONALERTS_CLIENT_SECRET not configured - DonationAlerts integration disabled")
+    else:
+        logger.warning("DONATIONALERTS_CLIENT_SECRET not configured - DonationAlerts integration disabled")
 
 
 @router.get("/auth/donationalerts/callback")

@@ -323,8 +323,21 @@ export const ttsService = {
    * @param text - Текст для тестирования
    * @returns Promise с ответом API
    */
-  async testVoice(voiceId: number, text: string, provider: 'f5' | 'qwen' = 'f5'): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post(`/api/voices/${voiceId}/test`, { text }, { params: { provider } });
+  async testVoice(
+    voiceId: number,
+    text: string,
+    provider: 'f5' | 'qwen' = 'f5',
+    options?: { cfg_strength?: number; speed_preset?: string },
+  ): Promise<AxiosResponse<ApiResponse>> {
+    return apiClient.post(
+      `/api/voices/${voiceId}/test`,
+      {
+        text,
+        ...(options?.cfg_strength !== undefined ? { cfg_strength: options.cfg_strength } : {}),
+        ...(options?.speed_preset ? { speed_preset: options.speed_preset } : {}),
+      },
+      { params: { provider } },
+    );
   },
 
   /**

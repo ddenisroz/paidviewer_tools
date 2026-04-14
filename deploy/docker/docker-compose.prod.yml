@@ -86,12 +86,14 @@ services:
     volumes:
       - qwen_hf_cache:/root/.cache/huggingface
       - qwen_voice_storage:/app/runtime/qwen_voices
+    gpus: all
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
   tts_gateway:
     image: ${TTS_GATEWAY_IMAGE:?TTS_GATEWAY_IMAGE must be pinned to a tested tag or digest}

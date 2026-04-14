@@ -34,7 +34,7 @@ const Header: React.FC = () => {
         '/dashboard/points': 'Баллы канала',
         '/dashboard/settings': 'Настройки',
         '/dashboard/chat-analysis': 'Аналитика чата',
-        '/dashboard/dolbaebadmintts': '',
+        '/dashboard/admin': '',
         '/dashboard': '',
     }), []);
 

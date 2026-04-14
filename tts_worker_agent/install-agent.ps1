@@ -1,5 +1,7 @@
-param(
+﻿param(
     [string]$ProvisioningFile = "",
+    [switch]$EnableAutostart,
+    [switch]$StartNow,
     [switch]$NoStart
 )
 
@@ -195,20 +197,23 @@ if ($ResolvedProvisioningFile) {
 
 $TaskName = "PaidviewerTTSAgent"
 $RunArguments = "`"$Root\\main.py`" --config `"$ConfigPath`""
-$InstalledMode = ""
+$InstalledMode = "manual"
 $StartedMode = ""
 $ScheduleError = $null
+$ShouldStartNow = $StartNow.IsPresent -and -not $NoStart.IsPresent
 
-try {
-    Register-UserScheduledTask -TaskName $TaskName -ExecutablePath $VenvPython -Arguments $RunArguments
-    $InstalledMode = "scheduled_task"
-} catch {
-    $ScheduleError = $_
-    Install-StartupFallback -ExecutablePath $VenvPython -Arguments $RunArguments
-    $InstalledMode = "startup_folder"
+if ($EnableAutostart) {
+    try {
+        Register-UserScheduledTask -TaskName $TaskName -ExecutablePath $VenvPython -Arguments $RunArguments
+        $InstalledMode = "scheduled_task"
+    } catch {
+        $ScheduleError = $_
+        Install-StartupFallback -ExecutablePath $VenvPython -Arguments $RunArguments
+        $InstalledMode = "startup_folder"
+    }
 }
 
-if (-not $NoStart) {
+if ($ShouldStartNow) {
     if ($InstalledMode -eq "scheduled_task") {
         try {
             Start-ScheduledTask -TaskName $TaskName -ErrorAction Stop
@@ -230,17 +235,19 @@ if ($ResolvedProvisioningFile) {
 Write-Host "Config path: $ConfigPath"
 if ($InstalledMode -eq "scheduled_task") {
     Write-Host "Autostart mode: Scheduled Task"
-} else {
+} elseif ($InstalledMode -eq "startup_folder") {
     Write-Host "Autostart mode: Startup folder fallback"
     Write-Host "Startup file: $StartupCmdPath"
     if ($ScheduleError) {
         Write-Warning "Scheduled Task registration failed, fallback installed instead: $($ScheduleError.Exception.Message)"
     }
+} else {
+    Write-Host "Autostart mode: disabled (manual start only)"
 }
 if (-not $ResolvedProvisioningFile) {
-    Write-Host "Provisioning file not found yet. Start the app and click 'Подключить устройство' to complete pairing."
+    Write-Host "Provisioning file not found yet. Start Paidviewer and use the 'Подключить устройство' action to complete pairing."
 }
-if (-not $NoStart) {
+if ($ShouldStartNow) {
     if ($StartedMode -eq "scheduled_task") {
         Write-Host "Agent started via Scheduled Task."
     } elseif ($StartedMode -eq "direct_process") {
@@ -249,6 +256,8 @@ if (-not $NoStart) {
 } else {
     if ($InstalledMode -eq "scheduled_task") {
         Write-Host "Start later with: Start-ScheduledTask -TaskName $TaskName"
+    } elseif ($InstalledMode -eq "startup_folder") {
+        Write-Host "The agent will start automatically on the next Windows login."
     } else {
         Write-Host "Start later with: Start-Process -FilePath `"$VenvPython`" -ArgumentList '$RunArguments'"
     }

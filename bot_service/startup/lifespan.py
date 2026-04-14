@@ -23,7 +23,11 @@ logger = logging.getLogger(__name__)
 async def _startup_database() -> None:
     """Initialize the database layer."""
 
-    init_db(create_schema=False, strict=True)
+    create_schema = bool(settings.is_development)
+    if create_schema:
+        logger.info("Development mode detected: ensuring database schema before seeding")
+
+    init_db(create_schema=create_schema, strict=True)
     logger.info("Database initialized")
 
 

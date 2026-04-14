@@ -208,16 +208,23 @@ async def get_system_logs(
 async def restart_system(
     user: dict = Depends(get_current_user),
 ):
-    """Runtime restart command placeholder."""
+    """Explicitly unsupported process restart surface."""
     try:
         if not (user.get("role") == "admin" or user.get("is_admin", False)):
             raise HTTPException(status_code=403, detail="Admin access required")
 
         logger.warning("System restart requested by user %s", user["id"])
-        return {
-            "success": True,
-            "message": "Restart command sent (not implemented in development)",
-        }
+        raise HTTPException(
+            status_code=501,
+            detail={
+                "code": "supervisor_restart_not_supported",
+                "message": "Process-level restart is not implemented by this API. Use infrastructure restart or the dedicated bot/TTS admin actions.",
+                "supported_actions": [
+                    "/api/admin/bot-service/restart",
+                    "/api/admin/tts/restart",
+                ],
+            },
+        )
     except HTTPException:
         raise
     except Exception:

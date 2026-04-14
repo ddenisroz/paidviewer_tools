@@ -8,6 +8,7 @@ from .twitch_bot_core import TwitchBotCore
 from .universal_command_handler import UniversalCommandHandler
 from services.tts.tts_core import TTSAPI
 from services.youtube.youtube_service import YouTubeService
+from services.youtube.reward_settings import get_platform_reward_configuration
 from services.drops.drops_service import DropsService
 
 logger = logging.getLogger('bot_service')
@@ -228,18 +229,10 @@ class Bot(TwitchBotCore):
                         tts_repo = TTSSettingsRepository(db)
                         tts_settings = tts_repo.get_or_create(user_id=user.id)
                         yt_settings = getattr(tts_settings, 'youtube_settings', {}) or {}
-                        
-                        legacy_platform = yt_settings.get('requests_reward_platform', 'twitch')
-                        legacy_enabled = bool(yt_settings.get('requests_reward_enabled'))
-                        legacy_reward_id = (yt_settings.get('requests_reward_id') or '').strip()
 
-                        twitch_reward_enabled = yt_settings.get('requests_reward_twitch_enabled')
-                        if twitch_reward_enabled is None:
-                            twitch_reward_enabled = legacy_enabled and legacy_platform == 'twitch'
-
-                        twitch_reward_id = (yt_settings.get('requests_reward_twitch_id') or '').strip()
-                        if not twitch_reward_id and legacy_platform == 'twitch':
-                            twitch_reward_id = legacy_reward_id
+                        reward_config = get_platform_reward_configuration(yt_settings, platform='twitch')
+                        twitch_reward_enabled = bool(reward_config.get('enabled'))
+                        twitch_reward_id = str(reward_config.get('reward_value') or '').strip()
 
                         if twitch_reward_enabled and twitch_reward_id and twitch_reward_id == reward_id:
                             logger.info(f"[YOUTUBE] Detected Request via Reward: {reward_id}")
