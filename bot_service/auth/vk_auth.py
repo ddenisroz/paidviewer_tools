@@ -25,7 +25,7 @@ router = APIRouter()
 # VK Live OAuth settings from centralized configuration
 VK_CLIENT_ID = settings.vk_client_id
 VK_CLIENT_SECRET = settings.vk_client_secret
-BACKEND_URL = settings.backend_url
+VK_REDIRECT_URI = settings.vk_redirect_uri
 FRONTEND_URL = settings.frontend_url
 VK_AUTH_BASE_URL = settings.vk_auth_base_url
 SECRET_KEY = settings.secret_key
@@ -49,7 +49,7 @@ async def vk_auth(request: Request):
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
         f"client_id={VK_CLIENT_ID}&"
-        f"redirect_uri={BACKEND_URL}/auth/vk/callback&"
+        f"redirect_uri={VK_REDIRECT_URI}&"
         f"response_type=code&"
         f"scope={scopes}&"
         f"state={state}"
@@ -81,15 +81,13 @@ async def login_vk(request: Request):
     scopes = OAUTH_SCOPES["vk"]
     logger.info(f"VK OAuth requested with scopes: {scopes}")
 
-    redirect_uri = f"{BACKEND_URL}/auth/vk/callback"
-
     # Generate a CSRF protection state token.
     state = secrets.token_urlsafe(16)
 
     auth_url = (
         f"{VK_AUTH_BASE_URL}?"
         f"client_id={VK_CLIENT_ID}&"
-        f"redirect_uri={redirect_uri}&"
+        f"redirect_uri={VK_REDIRECT_URI}&"
         f"response_type=code&"
         f"scope={scopes}&"
         f"state={state}"
@@ -129,9 +127,6 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     if not state or state != expected_state:
         logger.warning("VK OAuth CSRF state mismatch")
         raise HTTPException(status_code=400, detail="Invalid OAuth state (CSRF protection)")
-
-    # Use centralized OAuth settings.
-    VK_REDIRECT_URI = f"{BACKEND_URL}/auth/vk/callback"
 
     if not all([VK_CLIENT_ID, VK_CLIENT_SECRET]):
         logger.error(f"VK credentials not configured. VK_CLIENT_ID: {'[OK]' if VK_CLIENT_ID else '[X]'}, VK_CLIENT_SECRET: {'[OK]' if VK_CLIENT_SECRET else '[X]'}")

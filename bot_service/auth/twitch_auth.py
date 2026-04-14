@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 TWITCH_CLIENT_ID = settings.twitch_client_id
 TWITCH_CLIENT_SECRET = settings.twitch_client_secret
-BACKEND_URL = settings.backend_url
+TWITCH_REDIRECT_URI = settings.twitch_redirect_uri
 FRONTEND_URL = settings.frontend_url
 
 @router.get('/auth/twitch/login')
@@ -31,10 +31,9 @@ async def login_twitch(request: Request):
         from constants import OAUTH_SCOPES
         scopes = OAUTH_SCOPES['twitch']
         logger.info(f'Twitch OAuth requested with scopes: {scopes}')
-        redirect_uri = f'{BACKEND_URL}/auth/twitch/callback'
         import secrets
         state = secrets.token_urlsafe(16)
-        auth_url = f'https://id.twitch.tv/oauth2/authorize?client_id={TWITCH_CLIENT_ID}&redirect_uri={redirect_uri}&response_type=code&scope={scopes}&state={state}'
+        auth_url = f'https://id.twitch.tv/oauth2/authorize?client_id={TWITCH_CLIENT_ID}&redirect_uri={TWITCH_REDIRECT_URI}&response_type=code&scope={scopes}&state={state}'
         logger.info('Twitch OAuth login URL generated')
         from fastapi.responses import RedirectResponse
         response = RedirectResponse(url=auth_url)
@@ -64,9 +63,8 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
         raise HTTPException(status_code=500, detail='Twitch integration is not configured')
     logger.info('Twitch authorization code received')
     try:
-        redirect_uri = f'{BACKEND_URL}/auth/twitch/callback'
         async with httpx.AsyncClient(timeout=30.0) as client:
-            token_response = await client.post('https://id.twitch.tv/oauth2/token', params={'client_id': TWITCH_CLIENT_ID, 'client_secret': TWITCH_CLIENT_SECRET, 'code': code, 'grant_type': 'authorization_code', 'redirect_uri': redirect_uri})
+            token_response = await client.post('https://id.twitch.tv/oauth2/token', params={'client_id': TWITCH_CLIENT_ID, 'client_secret': TWITCH_CLIENT_SECRET, 'code': code, 'grant_type': 'authorization_code', 'redirect_uri': TWITCH_REDIRECT_URI})
             logger.info(f'Twitch token response status: {token_response.status_code}')
             if token_response.status_code != 200:
                 logger.error(f'Twitch token exchange failed. Status: {token_response.status_code}')
