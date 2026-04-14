@@ -34,6 +34,8 @@ services:
       context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_dev
+    env_file:
+      - ../../bot_service/.env
     ports:
       - "8000:8000"
     environment:
@@ -57,17 +59,9 @@ services:
       - QWEN_CLOUD_ALLOWED_MODELS=${QWEN_CLOUD_ALLOWED_MODELS:-}
       - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
       - REDIS_URL=redis://redis:6379/0
-      - TWITCH_CLIENT_ID=${TWITCH_CLIENT_ID:-}
-      - TWITCH_CLIENT_SECRET=${TWITCH_CLIENT_SECRET:-}
       - TWITCH_REDIRECT_URI=http://localhost:8000/auth/twitch/callback
-      - VK_CLIENT_ID=${VK_CLIENT_ID:-}
-      - VK_CLIENT_SECRET=${VK_CLIENT_SECRET:-}
       - VK_REDIRECT_URI=http://localhost:8000/auth/vk/callback
       - VK_AUTH_BASE_URL=https://auth.live.vkvideo.ru/app/oauth2/authorize
-      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
-      - DONATIONALERTS_CLIENT_ID=${DONATIONALERTS_CLIENT_ID:-}
-      - DONATIONALERTS_CLIENT_SECRET=${DONATIONALERTS_CLIENT_SECRET:-}
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-}
       - CORS_ORIGINS=http://127.0.0.1,http://localhost,http://localhost:3000,http://localhost:5173
       - SESSION_COOKIE_SECURE=false
       - SESSION_COOKIE_HTTPONLY=false
