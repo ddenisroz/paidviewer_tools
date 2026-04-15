@@ -69,6 +69,7 @@ async def vk_auth(request: Request):
     )
     return response
 
+@router.get("/api/auth/vk/login")
 @router.get("/auth/vk/login")
 @limiter.limit(settings.rate_limit_login)
 async def login_vk(request: Request):
@@ -106,6 +107,7 @@ async def login_vk(request: Request):
     )
     return response
 
+@router.get("/api/auth/vk/callback")
 @router.get("/auth/vk/callback")
 @limiter.limit("20/minute")
 async def vk_callback(request: Request, db: Session = Depends(get_db), code: str = None, state: str = None, error: str = None, error_description: str = None, current_user: Optional[Dict[str, Any]] = Depends(get_current_user_optional)):

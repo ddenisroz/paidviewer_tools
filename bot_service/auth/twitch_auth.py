@@ -20,6 +20,7 @@ TWITCH_CLIENT_SECRET = settings.twitch_client_secret
 TWITCH_REDIRECT_URI = settings.twitch_redirect_uri
 FRONTEND_URL = settings.frontend_url
 
+@router.get('/api/auth/twitch/login')
 @router.get('/auth/twitch/login')
 @limiter.limit(settings.rate_limit_login)
 async def login_twitch(request: Request):
@@ -43,6 +44,7 @@ async def login_twitch(request: Request):
         logger.error(f'Error generating Twitch login URL: {e}')
         raise HTTPException(status_code=500, detail='Internal server error')
 
+@router.get('/api/auth/twitch/callback')
 @router.get('/auth/twitch/callback')
 @limiter.limit('20/minute')
 async def twitch_callback(request: Request, db: Session=Depends(get_db), code: str=None, state: str=None, error: str=None, error_description: str=None, current_user: Optional[Dict[str, Any]]=Depends(get_current_user_optional)):

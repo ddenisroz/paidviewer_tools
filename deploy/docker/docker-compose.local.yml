@@ -42,12 +42,12 @@ services:
       QWEN_CLOUD_ALLOWED_MODELS: ${QWEN_CLOUD_ALLOWED_MODELS:-}
       QWEN_TTS_ALLOWED_MODELS: ${QWEN_TTS_ALLOWED_MODELS:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev-password}@redis:6379/0
-      TWITCH_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/twitch/callback
-      TWITCH_BOT_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/twitch/bot/callback
-      VK_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/vk/callback
-      VK_BOT_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/vk/bot/callback
+      TWITCH_REDIRECT_URI: ${TWITCH_REDIRECT_URI:-http://localhost/auth/twitch/callback}
+      TWITCH_BOT_REDIRECT_URI: ${TWITCH_BOT_REDIRECT_URI:-http://localhost/auth/twitch/bot/callback}
+      VK_REDIRECT_URI: ${VK_REDIRECT_URI:-http://localhost/auth/vk/callback}
+      VK_BOT_REDIRECT_URI: ${VK_BOT_REDIRECT_URI:-http://localhost/auth/vk/bot/callback}
       VK_AUTH_BASE_URL: https://auth.live.vkvideo.ru/app/oauth2/authorize
-      DONATIONALERTS_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/donationalerts/callback
+      DONATIONALERTS_REDIRECT_URI: ${DONATIONALERTS_REDIRECT_URI:-http://localhost/auth/donationalerts/callback}
       CORS_ORIGINS: ${LOCAL_APP_ORIGIN:-http://localhost},http://localhost:3000,http://localhost:5173
       RATE_LIMIT_LOGIN: 60/minute
       SESSION_COOKIE_SECURE: "false"
