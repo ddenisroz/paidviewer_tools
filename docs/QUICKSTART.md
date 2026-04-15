@@ -68,11 +68,21 @@ Copy-Item frontend/.env.example frontend/.env
 - `QWEN_TTS_SERVICE_URL`
 - `QWEN_TTS_SERVICE_API_KEY`
 
-### 3. Подними весь dev-контур
+### 3. Подними локальный Docker-контур
 
 ```powershell
 cd H:\Programming\raw_code\AI\Python\paidviewer_tools
-docker compose -f deploy/docker/docker-compose.dev.yml up --build
+docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
+  -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
+  --profile core --profile cloud-tts up --build
+```
+
+Если нужен только core без TTS runtime профиля:
+
+```powershell
+docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
+  -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
+  --profile core up --build
 ```
 
 Контур поднимет:
@@ -85,7 +95,25 @@ docker compose -f deploy/docker/docker-compose.dev.yml up --build
 - `qwen_tts` на `8012` через Docker
 - `frontend` на `80`
 
-### 4. Проверь базовые точки
+### 4. Зафиксируй локальный origin для OAuth
+
+Локально открывай приложение только через:
+
+- `http://localhost`
+
+Не смешивай `localhost` и `127.0.0.1`: для OAuth это разные origin, и это ломает cookie/state-проверку.
+
+Локальные redirect URI у провайдеров должны быть такими:
+
+- `http://localhost/auth/twitch/callback`
+- `http://localhost/auth/twitch/bot/callback`
+- `http://localhost/auth/vk/callback`
+- `http://localhost/auth/vk/bot/callback`
+- `http://localhost/auth/donationalerts/callback`
+
+`web-push URL` в VK Live не является OAuth callback и настраивается отдельно.
+
+### 5. Проверь базовые точки
 
 - `http://localhost`
 - `http://localhost:8000/health`
@@ -94,6 +122,8 @@ docker compose -f deploy/docker/docker-compose.dev.yml up --build
 - `http://localhost:8010/health/ready`
 - `http://localhost:8011/health/ready`
 - `http://localhost:8012/health/ready`
+
+Старый `deploy/docker/docker-compose.dev.yml` оставлен только как совместимый локальный compose, но официальный путь теперь production-first: `docker-compose.prod.yml + docker-compose.local.yml`.
 
 ## Вариант B. Запуск self-host агента
 

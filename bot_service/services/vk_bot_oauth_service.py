@@ -37,7 +37,7 @@ class VkBotOAuthService:
         import urllib.parse
         
         scopes = ','.join(VkBotOAuthService.BOT_SCOPES)
-        redirect_uri = f"{settings.backend_url}/auth/vk/bot/callback"
+        redirect_uri = settings.vk_bot_redirect_uri
         
         params = {
             "client_id": settings.vk_client_id,
@@ -59,7 +59,7 @@ class VkBotOAuthService:
         if not all([settings.vk_client_id, settings.vk_client_secret]):
             raise ValueError("VK credentials not configured")
         
-        redirect_uri = f"{settings.backend_url}/auth/vk/bot/callback"
+        redirect_uri = settings.vk_bot_redirect_uri
         
         # Basic Auth
         credentials = f"{settings.vk_client_id}:{settings.vk_client_secret}"

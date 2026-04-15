@@ -50,7 +50,7 @@ class TwitchBotOAuthService:
             raise ValueError("TWITCH_CLIENT_ID not configured")
         
         scopes = ' '.join(TwitchBotOAuthService.BOT_SCOPES)
-        redirect_uri = f"{settings.backend_url}/auth/twitch/bot/callback"
+        redirect_uri = settings.twitch_bot_redirect_uri
         
         auth_url = (
             f"https://id.twitch.tv/oauth2/authorize"
@@ -69,7 +69,7 @@ class TwitchBotOAuthService:
         if not all([settings.twitch_client_id, settings.twitch_client_secret]):
             raise ValueError("Twitch credentials not configured")
         
-        redirect_uri = f"{settings.backend_url}/auth/twitch/bot/callback"
+        redirect_uri = settings.twitch_bot_redirect_uri
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(

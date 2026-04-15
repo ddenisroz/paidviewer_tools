@@ -14,7 +14,6 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 
 import { useLocation } from 'react-router-dom';
 
-import { API_BASE_URL } from '@/constants';
 import { isAdminPath } from '@/features/admin/utils/adminRoutes';
 import { type BotStatusType, useBotConnection } from '@/features/admin/hooks/useBotConnection';
 import { useChatHistory } from '@/features/chat/hooks/useChatHistory';
@@ -23,7 +22,6 @@ import { useChatWebSocket } from '@/features/chat/hooks/useChatWebSocket';
 import { useToast } from '@/shared/components/ui/toast';
 import { useAudioUnlock } from '@/shared/hooks/useAudioUnlock';
 import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
-import { logger } from '@/shared/utils/prodLogger';
 
 
 import { useAuth } from './AuthContext';
@@ -180,23 +178,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     // Context value
     const value = useMemo<ChatContextValue>(() => {
-        if (!API_BASE_URL) {
-            logger.error('VITE_BOT_SERVICE_URL environment variable is required');
-            return {
-                messages: [],
-                lastJsonMessage: null,
-                isConnected: false,
-                botStatus: 'disconnected' as BotStatusType,
-                error: 'Ошибка конфигурации: отсутствует URL сервиса',
-                sendMessage: () => { },
-                connectBotToChannels: async () => { },
-                disconnectBotFromChannels: async () => { },
-                getBotConnectionStatus: async () => ({ status: 'disconnected' as BotStatusType }),
-                clearMessages: () => { },
-                setMessages: () => { }
-            };
-        }
-
         return {
             messages,
             lastJsonMessage,

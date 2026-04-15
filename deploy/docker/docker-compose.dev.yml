@@ -1,3 +1,10 @@
+#
+# Compatibility local stack.
+# Official local path is now:
+# docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
+#   -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
+#   --profile core --profile cloud-tts up --build
+#
 services:
   redis:
     image: redis:7-alpine
@@ -46,8 +53,8 @@ services:
       - SECRET_KEY=dev_secret_key_change_in_production
       - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY:-2bD0gYfJwRo_-esxNUFDXL9uBeb5GsyhQOdE31jj4n4=}
       - ALGORITHM=HS256
-      - BACKEND_URL=http://127.0.0.1
-      - FRONTEND_URL=http://127.0.0.1
+      - BACKEND_URL=http://localhost
+      - FRONTEND_URL=http://localhost
       - TTS_GATEWAY_URL=${TTS_GATEWAY_URL:-http://tts_gateway:8010}
       - TTS_GATEWAY_API_KEY=${TTS_GATEWAY_API_KEY:-gateway-dev-key}
       - F5_TTS_SERVICE_URL=${F5_TTS_SERVICE_URL:-http://tts_service:8011}
@@ -59,10 +66,13 @@ services:
       - QWEN_CLOUD_ALLOWED_MODELS=${QWEN_CLOUD_ALLOWED_MODELS:-}
       - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
       - REDIS_URL=redis://redis:6379/0
-      - TWITCH_REDIRECT_URI=http://127.0.0.1/auth/twitch/callback
-      - VK_REDIRECT_URI=http://127.0.0.1/auth/vk/callback
+      - TWITCH_REDIRECT_URI=http://localhost/auth/twitch/callback
+      - TWITCH_BOT_REDIRECT_URI=http://localhost/auth/twitch/bot/callback
+      - VK_REDIRECT_URI=http://localhost/auth/vk/callback
+      - VK_BOT_REDIRECT_URI=http://localhost/auth/vk/bot/callback
       - VK_AUTH_BASE_URL=https://auth.live.vkvideo.ru/app/oauth2/authorize
-      - CORS_ORIGINS=http://127.0.0.1,http://localhost,http://localhost:3000,http://localhost:5173
+      - DONATIONALERTS_REDIRECT_URI=http://localhost/auth/donationalerts/callback
+      - CORS_ORIGINS=http://localhost,http://localhost:3000,http://localhost:5173
       - SESSION_COOKIE_SECURE=false
       - SESSION_COOKIE_HTTPONLY=false
       - ENABLE_SECURITY_HEADERS=false
@@ -174,8 +184,7 @@ services:
       context: ../../frontend
       dockerfile: Dockerfile.prod
       args:
-        - VITE_BOT_SERVICE_URL=http://127.0.0.1
-        - VITE_BOT_SERVICE_WS_URL=ws://127.0.0.1
+        VITE_LOCAL_TTS_AGENT_URL: http://localhost:46321
     container_name: tts_frontend_dev
     ports:
       - "80:80"

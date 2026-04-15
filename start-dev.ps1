@@ -1,9 +1,31 @@
-﻿# Script to run development Docker stack
-Write-Host "[START] Starting TTS system in development mode..." -ForegroundColor Green
+param(
+    [switch]$CoreOnly
+)
 
-$composeFile = "deploy/docker/docker-compose.dev.yml"
+Write-Host "[START] Starting Paidviewer local Docker stack..." -ForegroundColor Green
 
-# Check Docker availability
+$envFiles = @(
+    "--env-file", "bot_service/.env",
+    "--env-file", "deploy/docker/compose.local.env"
+)
+
+$composeFiles = @(
+    "-f", "deploy/docker/docker-compose.prod.yml",
+    "-f", "deploy/docker/docker-compose.local.yml"
+)
+
+$profileArgs = @("--profile", "core")
+if (-not $CoreOnly) {
+    $profileArgs += @("--profile", "cloud-tts")
+}
+
+$composeArgs = $envFiles + $composeFiles + $profileArgs
+
+if (-not (Test-Path "bot_service/.env")) {
+    Write-Host "[ERROR] Missing bot_service/.env. Copy bot_service/.env.example first." -ForegroundColor Red
+    exit 1
+}
+
 try {
     docker version | Out-Null
     Write-Host "[OK] Docker is available" -ForegroundColor Green
@@ -12,27 +34,32 @@ try {
     exit 1
 }
 
-# Stop existing containers
 Write-Host "[STOP] Stopping existing containers..." -ForegroundColor Yellow
-docker-compose -f $composeFile down
+docker compose @composeArgs down --remove-orphans
 
-# Build and start containers
 Write-Host "[BUILD] Building and starting containers..." -ForegroundColor Yellow
-docker-compose -f $composeFile up --build -d
+docker compose @composeArgs up --build -d
 
-# Wait for startup
 Write-Host "[WAIT] Waiting for services to start..." -ForegroundColor Yellow
 Start-Sleep -Seconds 10
 
-# Show status
 Write-Host "[STATUS] Services status:" -ForegroundColor Cyan
-docker-compose -f $composeFile ps
+docker compose @composeArgs ps
 
 Write-Host ""
-Write-Host "[OK] System started" -ForegroundColor Green
+Write-Host "[OK] Local stack started" -ForegroundColor Green
 Write-Host "[WEB] Frontend: http://localhost" -ForegroundColor Cyan
 Write-Host "[API] Bot API: http://localhost:8000" -ForegroundColor Cyan
-Write-Host "[TTS] TTS API: http://localhost:8001" -ForegroundColor Cyan
+Write-Host "[AUTH] Local OAuth callbacks must use http://localhost/... only" -ForegroundColor Cyan
+
+if (-not $CoreOnly) {
+    Write-Host "[TTS] Gateway: http://localhost:8010" -ForegroundColor Cyan
+    Write-Host "[TTS] F5 runtime: http://localhost:8011" -ForegroundColor Cyan
+    Write-Host "[TTS] Qwen runtime: http://localhost:8012" -ForegroundColor Cyan
+} else {
+    Write-Host "[INFO] Started core profile only. Re-run without -CoreOnly to include cloud TTS." -ForegroundColor Yellow
+}
+
 Write-Host ""
-Write-Host "[LOG] Logs: docker-compose -f $composeFile logs -f" -ForegroundColor Yellow
-Write-Host "[STOP] Stop: docker-compose -f $composeFile down" -ForegroundColor Yellow
+Write-Host "[LOG] Logs: docker compose $($composeArgs -join ' ') logs -f" -ForegroundColor Yellow
+Write-Host "[STOP] Stop: docker compose $($envFiles -join ' ') $($composeFiles -join ' ') down --remove-orphans" -ForegroundColor Yellow

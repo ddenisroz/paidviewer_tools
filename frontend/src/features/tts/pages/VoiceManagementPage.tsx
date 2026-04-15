@@ -75,9 +75,7 @@ const PROVIDER_TAB_CLASS =
     'inline-flex items-center -mb-px appearance-none rounded-none border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 text-sm font-medium transition-colors';
 const PROVIDER_TAB_ACTIVE_CLASS = 'border-b-sky-400 text-sky-400';
 const PROVIDER_TAB_INACTIVE_CLASS = 'text-muted-foreground hover:text-sky-300';
-const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-none';
 const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
-const SECTION_DIVIDER_CLASS = 'border-t border-border/70';
 
 const extractApiErrorMessage = (error: unknown): string | null => {
     if (!error) return null;

@@ -4,7 +4,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
     AlertCircle,
-    AlertTriangle,
     CheckCircle,
     Copy,
     Cpu,
@@ -237,12 +236,11 @@ const TAB_TRIGGER_CLASS =
 const PROVIDER_SWITCH_TAB_CLASS =
     'appearance-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-[inset_0_-1px_0_0_rgba(14,165,233,1)]';
 const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
-const LOCAL_AGENT_API_URL = 'http://127.0.0.1:46321';
 const SPEED_PRESET_OPTIONS: VoiceSpeedPreset[] = ['very_slow', 'slow', 'normal', 'fast', 'very_fast'];
 
-const MANAGED_TOPOLOGY_LABELS: Record<NonNullable<LocalTtsProviderContract['managed_topology']>, string> = {
-    gateway_managed: 'gateway-managed',
-    project_hosted_worker: 'project-hosted worker',
+const getConfiguredLocalAgentApiUrl = (): string | null => {
+    const configuredUrl = (import.meta.env.VITE_LOCAL_TTS_AGENT_URL as string | undefined)?.trim();
+    return configuredUrl ? configuredUrl.replace(/\/+$/, '') : null;
 };
 
 const getVoiceType = (voice: Voice): 'base' | 'custom' => (
@@ -602,10 +600,15 @@ const LocalTTSSettingsPage: React.FC = () => {
     };
 
     const provisionLocalAgent = async (bundle: ProvisioningBundlePayload): Promise<void> => {
+        const localAgentApiUrl = getConfiguredLocalAgentApiUrl();
+        if (!localAgentApiUrl) {
+            throw new Error('Local TTS agent URL is not configured');
+        }
+
         const controller = new AbortController();
         const timeoutId = window.setTimeout(() => controller.abort(), 4000);
         try {
-            const response = await fetch(`${LOCAL_AGENT_API_URL}/api/provision`, {
+            const response = await fetch(`${localAgentApiUrl}/api/provision`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

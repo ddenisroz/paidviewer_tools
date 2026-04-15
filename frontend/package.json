@@ -89,7 +89,7 @@
     "fast-check": "^4.5.2",
     "globals": "^16.3.0",
     "jsdom": "^27.3.0",
-    "openapi-typescript": "^6.7.3",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.46.4",

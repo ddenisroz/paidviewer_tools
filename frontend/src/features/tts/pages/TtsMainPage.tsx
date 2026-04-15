@@ -32,7 +32,6 @@ import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Checkbox } from '@/shared/components/ui/checkbox';
-import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Switch } from '@/shared/components/ui/switch';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -296,7 +295,7 @@ const TtsFilterSwitchRow = React.memo(function TtsFilterSwitchRow({
             <div className="text-sm font-medium text-foreground">{label}</div>
             <Switch
                 checked={checked}
-                onCheckedChange={(nextChecked) => onToggle(settingKey, invert ? !Boolean(nextChecked) : Boolean(nextChecked))}
+                onCheckedChange={(nextChecked) => onToggle(settingKey, invert ? !nextChecked : nextChecked)}
             />
         </div>
     );

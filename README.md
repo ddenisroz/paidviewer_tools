@@ -41,11 +41,13 @@
 
 ```powershell
 cd H:\Programming\raw_code\AI\Python\paidviewer_tools
-docker compose -f deploy/docker/docker-compose.dev.yml up --build
+docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
+  -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
+  --profile core --profile cloud-tts up --build
 ```
 
 Дальше смотри [docs/QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md): там описан актуальный запуск всего контура.
-Сейчас основной рекомендуемый путь для локальной разработки — полный Docker-контур через `docker compose -f deploy/docker/docker-compose.dev.yml up --build`, включая `nano-qwen3tts-vllm`.
+Локальный OAuth теперь должен жить только на `http://localhost`: не смешивай `localhost` и `127.0.0.1`, иначе провайдерские callback/cookies будут ломать `state`.
 
 ## Документация
 

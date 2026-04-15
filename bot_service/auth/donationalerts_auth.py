@@ -1,6 +1,8 @@
 ﻿"""DonationAlerts OAuth integration."""
 
 import logging
+import secrets
+from urllib.parse import urlencode, urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -17,11 +19,37 @@ from core.token_encryption import encrypt_token
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+_DONATIONALERTS_ALLOWED_AUTH_HOSTS = {"www.donationalerts.com", "donationalerts.com"}
+_DONATIONALERTS_SCOPES = "oauth-user-show oauth-donation-subscribe oauth-donation-index"
 
-DA_CLIENT_ID = settings.donationalerts_client_id
-DA_CLIENT_SECRET = settings.donationalerts_client_secret
-DA_REDIRECT_URI = settings.donationalerts_redirect_uri
-FRONTEND_URL = settings.frontend_url
+def _is_safe_donationalerts_auth_url(url: str) -> bool:
+    if not isinstance(url, str) or any(ch in url for ch in ("\r", "\n", "\t")):
+        return False
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    return parsed.scheme == "https" and (parsed.netloc or "").lower() in _DONATIONALERTS_ALLOWED_AUTH_HOSTS
+
+
+def _build_donationalerts_auth_url(state: str) -> str:
+    client_id = settings.donationalerts_client_id
+    redirect_uri = settings.donationalerts_redirect_uri
+    if not client_id or not redirect_uri:
+        logger.error("DonationAlerts integration is not configured")
+        raise HTTPException(status_code=503, detail="DonationAlerts integration is not configured")
+
+    auth_url = "https://www.donationalerts.com/oauth/authorize?" + urlencode({
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": _DONATIONALERTS_SCOPES,
+        "state": state,
+    })
+    if not _is_safe_donationalerts_auth_url(auth_url):
+        logger.error("Unsafe DonationAlerts auth URL generated")
+        raise HTTPException(status_code=500, detail="Failed to generate secure auth URL")
+    return auth_url
 
 
 def _redirect_with_state_cleanup(url: str) -> RedirectResponse:
@@ -35,17 +63,41 @@ def _redirect_with_state_cleanup(url: str) -> RedirectResponse:
     return response
 
 
-if not DA_CLIENT_ID:
+if not settings.donationalerts_client_id:
     if settings.is_development:
         logger.info("DONATIONALERTS_CLIENT_ID not configured - DonationAlerts integration disabled")
     else:
         logger.warning("DONATIONALERTS_CLIENT_ID not configured - DonationAlerts integration disabled")
 
-if not DA_CLIENT_SECRET:
+if not settings.donationalerts_client_secret:
     if settings.is_development:
         logger.info("DONATIONALERTS_CLIENT_SECRET not configured - DonationAlerts integration disabled")
     else:
         logger.warning("DONATIONALERTS_CLIENT_SECRET not configured - DonationAlerts integration disabled")
+
+
+@router.get("/auth/donationalerts/login")
+@limiter.limit("5/minute")
+async def donationalerts_login(
+    request: Request,
+    current_user: dict = Depends(get_current_user_optional),
+):
+    """Start DonationAlerts OAuth for an authenticated app user."""
+    user_id = current_user.get("id") if current_user else None
+    if not user_id or user_id <= 0:
+        return RedirectResponse(url=f"{settings.frontend_url}/login?auth_error=not_authenticated")
+
+    state = secrets.token_urlsafe(16)
+    response = RedirectResponse(url=_build_donationalerts_auth_url(state))
+    response.set_cookie(
+        key="oauth_state_da",
+        value=state,
+        max_age=600,
+        httponly=True,
+        samesite="lax",
+        secure=settings.is_production,
+    )
+    return response
 
 
 @router.get("/auth/donationalerts/callback")
@@ -74,24 +126,27 @@ async def donationalerts_callback(
             bool(state),
             bool(expected_state),
         )
-        return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?auth_error=invalid_state")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=invalid_state")
 
     if error:
         logger.warning("DonationAlerts OAuth cancelled: %s - %s", error, error_description)
-        return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?auth_error=cancelled")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=cancelled")
 
     if not code:
         logger.error("No authorization code received from DonationAlerts")
         raise HTTPException(status_code=400, detail="No authorization code received")
 
-    if not all([DA_CLIENT_ID, DA_CLIENT_SECRET, DA_REDIRECT_URI]):
+    client_id = settings.donationalerts_client_id
+    client_secret = settings.donationalerts_client_secret
+    redirect_uri = settings.donationalerts_redirect_uri
+    if not all([client_id, client_secret, redirect_uri]):
         logger.error("DonationAlerts credentials not configured")
         raise HTTPException(status_code=500, detail="DonationAlerts integration is not configured")
 
     user_id = current_user.get("id") if current_user else None
     if not user_id or user_id <= 0:
         logger.info("DonationAlerts callback without authenticated session")
-        return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?auth_error=not_authenticated")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=not_authenticated")
 
     try:
         logger.info("DonationAlerts callback for user %s", user_id)
@@ -99,14 +154,14 @@ async def donationalerts_callback(
         async with httpx.AsyncClient(timeout=30.0) as client:
             import base64
 
-            credentials = f"{DA_CLIENT_ID}:{DA_CLIENT_SECRET}"
+            credentials = f"{client_id}:{client_secret}"
             base64_credentials = base64.b64encode(credentials.encode()).decode()
 
             token_response = await client.post(
                 "https://www.donationalerts.com/oauth/token",
                 data={
                     "grant_type": "authorization_code",
-                    "redirect_uri": DA_REDIRECT_URI,
+                    "redirect_uri": redirect_uri,
                     "code": code,
                 },
                 headers={
@@ -184,7 +239,7 @@ async def donationalerts_callback(
 
             db.commit()
             logger.info("[OK] DonationAlerts integration completed for user %s", user_id)
-            return _redirect_with_state_cleanup(url=f"{FRONTEND_URL}/dashboard?da_connected=true")
+            return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?da_connected=true")
 
     except HTTPException:
         raise

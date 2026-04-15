@@ -1,0 +1,132 @@
+services:
+  redis:
+    container_name: tts_redis_local
+    ports: !override
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-redis-dev-password} ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    container_name: tts_postgres_local
+    ports: !override
+      - "5432:5432"
+
+  bot_service:
+    build:
+      context: ../../bot_service
+      dockerfile: Dockerfile.prod
+    container_name: tts_bot_service_local
+    env_file: !override
+      - ../../bot_service/.env
+    ports: !override
+      - "8000:8000"
+    environment: !override
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      ALGORITHM: HS256
+      BACKEND_URL: ${LOCAL_APP_ORIGIN:-http://localhost}
+      FRONTEND_URL: ${LOCAL_APP_ORIGIN:-http://localhost}
+      TTS_GATEWAY_URL: ${TTS_GATEWAY_URL:-http://tts_gateway:8010}
+      TTS_GATEWAY_API_KEY: ${TTS_GATEWAY_API_KEY:-gateway-dev-key}
+      F5_TTS_SERVICE_URL: ${F5_TTS_SERVICE_URL:-http://tts_service:8011}
+      F5_TTS_SERVICE_API_KEY: ${F5_TTS_SERVICE_API_KEY:-f5-dev-key}
+      QWEN_TTS_SERVICE_URL: ${QWEN_TTS_SERVICE_URL:-http://qwen_tts:8000}
+      QWEN_TTS_SERVICE_API_KEY: ${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
+      QWEN_VOICE_SERVICE_URL: ${QWEN_VOICE_SERVICE_URL:-}
+      QWEN_ALLOWED_MODELS: ${QWEN_ALLOWED_MODELS:-}
+      QWEN_CLOUD_ALLOWED_MODELS: ${QWEN_CLOUD_ALLOWED_MODELS:-}
+      QWEN_TTS_ALLOWED_MODELS: ${QWEN_TTS_ALLOWED_MODELS:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev-password}@redis:6379/0
+      TWITCH_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/twitch/callback
+      TWITCH_BOT_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/twitch/bot/callback
+      VK_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/vk/callback
+      VK_BOT_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/vk/bot/callback
+      VK_AUTH_BASE_URL: https://auth.live.vkvideo.ru/app/oauth2/authorize
+      DONATIONALERTS_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/donationalerts/callback
+      CORS_ORIGINS: ${LOCAL_APP_ORIGIN:-http://localhost},http://localhost:3000,http://localhost:5173
+      SESSION_COOKIE_SECURE: "false"
+      SESSION_COOKIE_HTTPONLY: "false"
+      ENABLE_SECURITY_HEADERS: "false"
+      ENABLE_JSON_LOGS: "false"
+      ENABLE_LOG_ROTATION: "false"
+
+  tts_gateway:
+    build:
+      context: ../../../tts-gateway
+      dockerfile: Dockerfile
+    container_name: tts_gateway_local
+    ports: !override
+      - "8010:8010"
+    environment: !override
+      TTS_GATEWAY_PORT: 8010
+      TTS_GATEWAY_PUBLIC_BASE_URL: http://tts_gateway:8010
+      TTS_GATEWAY_API_KEYS: ${TTS_GATEWAY_API_KEY:-gateway-dev-key}
+      TTS_GATEWAY_REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev-password}@redis:6379/0
+      TTS_GATEWAY_F5_URL: http://tts_service:8011
+      TTS_GATEWAY_F5_API_KEY: ${F5_TTS_SERVICE_API_KEY:-f5-dev-key}
+      TTS_GATEWAY_QWEN_URL: http://qwen_tts:8000
+      TTS_GATEWAY_QWEN_API_KEY: ${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
+
+  tts_service:
+    build:
+      context: ../../../f5-tts-service
+      dockerfile: Dockerfile
+    container_name: tts_tts_service_local
+    ports: !override
+      - "8011:8011"
+    environment: !override
+      F5_TTS_SERVICE_PORT: 8011
+      F5_TTS_SERVICE_PUBLIC_BASE_URL: http://tts_service:8011
+      F5_TTS_SERVICE_API_KEYS: ${F5_TTS_SERVICE_API_KEY:-f5-dev-key}
+      F5_TTS_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      F5_TTS_DATABASE_ECHO: "false"
+      F5_TTS_BASE_DIR: /app
+      F5_TTS_ENGINE_MODE: real
+      F5_TTS_ENABLE_PREWARM: "true"
+      F5_TTS_RUACCENT_ENABLED: "false"
+      F5_TTS_MAX_INPUT_TEXT_LENGTH: "2000"
+      HUGGINGFACE_TOKEN: ${HUGGINGFACE_TOKEN:-}
+      HF_TOKEN: ${HUGGINGFACE_TOKEN:-}
+      HF_HOME: /app/f5_tts_cache
+    volumes: !override
+      - tts_audio:/app/audio
+      - tts_logs:/app/logs
+      - tts_cache:/app/f5_tts_cache
+
+  qwen_tts:
+    build:
+      context: ../../../nano-qwen3tts-vllm
+      dockerfile: Dockerfile
+    container_name: tts_qwen_service_local
+    ports: !override
+      - "8012:8000"
+    environment: !override
+      PORT: 8000
+      API_KEY: ${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
+      HF_HOME: /root/.cache/huggingface
+      QWEN_VOICE_STORAGE_DIR: /app/runtime/qwen_voices
+      QWEN_ALLOWED_MODELS: ${QWEN_ALLOWED_MODELS:-}
+      QWEN3_TTS_MODEL_PATH: ${QWEN3_TTS_MODEL_PATH:-}
+      QWEN_TTS_ALLOWED_MODELS: ${QWEN_TTS_ALLOWED_MODELS:-}
+
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_LOCAL_TTS_AGENT_URL: http://localhost:46321
+    container_name: tts_frontend_local
+    ports: !override
+      - "80:80"
+    volumes: !override
+      - ../../deploy/nginx/nginx-dev.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

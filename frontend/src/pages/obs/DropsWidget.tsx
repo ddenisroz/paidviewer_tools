@@ -3,6 +3,7 @@
 import { useParams } from 'react-router-dom';
 
 import { dropsService } from '@/services/api/services/dropsService';
+import { getChatWebSocketUrl } from '@/shared/utils/urlUtils';
 import { logger } from '@/shared/utils/prodLogger';
 
 import CommonOpened from '../../images/lootboxes/common/common_opened.png';
@@ -281,15 +282,6 @@ const DropsWidget: React.FC = () => {
       return;
     }
 
-    const wsBaseUrl = import.meta.env.VITE_BOT_SERVICE_WS_URL;
-    const apiUrl = import.meta.env.VITE_BOT_SERVICE_URL;
-
-    if (!wsBaseUrl || !apiUrl) {
-      logger.error('Missing environment variables');
-      setStatus('Ошибка: WebSocket URL не настроен');
-      return;
-    }
-
     const fetchUserId = async (): Promise<void> => {
       try {
         const response = await dropsService.getUserFromToken(token);
@@ -299,7 +291,13 @@ const DropsWidget: React.FC = () => {
         channelNameRef.current = data.channel_name || null;
         platformRef.current = data.platform || null;
 
-        if (userId && data.channel_name && data.platform) {
+        if (!userId) {
+          logger.error('Drops token response is missing user_id');
+          setStatus('Ошибка: Некорректный токен виджета');
+          return;
+        }
+
+        if (data.channel_name && data.platform) {
           try {
             const configResponse = await dropsService.getConfigWithToken(data.channel_name, {
               platform: data.platform,
@@ -320,7 +318,7 @@ const DropsWidget: React.FC = () => {
 
         void loadMythicalSession(data.channel_name || null);
 
-        const wsUrl = `${wsBaseUrl}/ws/chat/${userId}`;
+        const wsUrl = getChatWebSocketUrl(userId);
         const websocket = new WebSocket(wsUrl);
 
         websocket.onopen = (): void => {

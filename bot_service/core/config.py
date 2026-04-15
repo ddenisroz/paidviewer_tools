@@ -241,16 +241,24 @@ class Settings(BaseSettings):
     twitch_client_id: Optional[str] = Field(default=None, description="Twitch client ID")
     twitch_client_secret: Optional[str] = Field(default=None, description="Twitch client secret")
     twitch_redirect_uri: str = Field(
-        default="http://localhost:8000/auth/twitch/callback",
+        default="",
         description="Twitch OAuth redirect URI"
+    )
+    twitch_bot_redirect_uri: str = Field(
+        default="",
+        description="Twitch bot OAuth redirect URI",
     )
 
     # === VK LIVE INTEGRATION ===
     vk_client_id: Optional[str] = Field(default=None, description="VK client ID")
     vk_client_secret: Optional[str] = Field(default=None, description="VK client secret")
     vk_redirect_uri: str = Field(
-        default="http://localhost:8000/auth/vk/callback",
+        default="",
         description="VK OAuth redirect URI"
+    )
+    vk_bot_redirect_uri: str = Field(
+        default="",
+        description="VK bot OAuth redirect URI",
     )
     vk_auth_base_url: str = Field(
         default="https://auth.live.vkvideo.ru/app/oauth2/authorize",
@@ -264,7 +272,7 @@ class Settings(BaseSettings):
     donationalerts_client_id: Optional[str] = Field(default=None, description="DonationAlerts client ID")
     donationalerts_client_secret: Optional[str] = Field(default=None, description="DonationAlerts client secret")
     donationalerts_redirect_uri: str = Field(
-        default="http://localhost:8000/auth/donationalerts/callback",
+        default="",
         description="DonationAlerts OAuth redirect URI"
     )
     donationalerts_webhook_secret: Optional[str] = Field(
@@ -337,16 +345,20 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse effective CORS origins into list (supports legacy ALLOWED_ORIGINS alias)."""
-        default_cors = "http://localhost:5173,http://localhost:3000"
         configured_cors = (self.cors_origins or "").strip()
         legacy_cors = (self.allowed_origins or "").strip()
+        default_cors = ",".join(
+            origin
+            for origin in [self.frontend_url.strip(), "http://localhost:5173", "http://localhost:3000"]
+            if origin
+        )
 
-        if configured_cors and (configured_cors != default_cors or not legacy_cors):
+        if configured_cors:
             origins_raw = configured_cors
         elif legacy_cors:
             origins_raw = legacy_cors
         else:
-            origins_raw = configured_cors or default_cors
+            origins_raw = default_cors
 
         return [origin.strip() for origin in origins_raw.split(",") if origin.strip()]
 
@@ -425,6 +437,37 @@ class Settings(BaseSettings):
             raise ValueError("Only PostgreSQL is supported for runtime DATABASE_URL")
 
         return v
+
+    @field_validator("backend_url", "frontend_url")
+    @classmethod
+    def normalize_base_urls(cls, v: str) -> str:
+        """Normalize base URLs to avoid accidental double slashes in derived links."""
+        return (v or "").strip().rstrip("/")
+
+    @field_validator(
+        "twitch_redirect_uri",
+        "twitch_bot_redirect_uri",
+        "vk_redirect_uri",
+        "vk_bot_redirect_uri",
+        "donationalerts_redirect_uri",
+        mode="before",
+    )
+    @classmethod
+    def default_oauth_redirect_uris(cls, v: Optional[str], info) -> str:
+        """Derive OAuth callback URLs from BACKEND_URL when explicit redirect URIs are empty."""
+        raw_value = (v or "").strip()
+        if raw_value:
+            return raw_value
+
+        backend_url = str(info.data.get("backend_url") or "http://localhost:8000").strip().rstrip("/")
+        suffix_by_field = {
+            "twitch_redirect_uri": "/auth/twitch/callback",
+            "twitch_bot_redirect_uri": "/auth/twitch/bot/callback",
+            "vk_redirect_uri": "/auth/vk/callback",
+            "vk_bot_redirect_uri": "/auth/vk/bot/callback",
+            "donationalerts_redirect_uri": "/auth/donationalerts/callback",
+        }
+        return f"{backend_url}{suffix_by_field[info.field_name]}"
 
     @field_validator('bot_service_port')
     @classmethod

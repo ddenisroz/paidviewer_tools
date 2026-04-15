@@ -2,17 +2,27 @@
  * URL utilities
  */
 
-export const getApiBaseUrl = (): string => {
-  const url = import.meta.env.VITE_BOT_SERVICE_URL as string | undefined;
-  if (!url) {
-    throw new Error('VITE_BOT_SERVICE_URL environment variable is required');
+const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
+
+const getBrowserOrigin = (): string => {
+  if (typeof window === 'undefined' || !window.location?.origin || window.location.origin === 'null') {
+    return '';
   }
-  return url.replace(/\/+$/, '');
+  return trimTrailingSlashes(window.location.origin);
+};
+
+export const getApiBaseUrl = (): string => {
+  const browserOrigin = getBrowserOrigin();
+  if (browserOrigin) {
+    return browserOrigin;
+  }
+
+  throw new Error('Unable to resolve API base URL from window.location.origin');
 };
 
 export const getWebSocketBaseUrl = (): string => {
   const apiUrl = getApiBaseUrl();
-  const wsProtocol = apiUrl.startsWith('https') ? 'wss' : 'ws';
+  const wsProtocol = apiUrl.startsWith('https://') ? 'wss' : 'ws';
   const wsBaseUrl = apiUrl.replace(/^https?:\/\//, '');
   return `${wsProtocol}://${wsBaseUrl}`;
 };

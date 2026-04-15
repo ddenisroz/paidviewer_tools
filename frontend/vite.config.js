@@ -9,17 +9,27 @@ const __dirname = path.dirname(__filename)
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  envPrefix: [
+    "VITE_APP_",
+    "VITE_CHAT_",
+    "VITE_DEFAULT_",
+    "VITE_ENABLE_",
+    "VITE_LOCAL_TTS_AGENT_",
+    "VITE_SENTRY_",
+    "VITE_TTS_",
+    "VITE_WS_",
+  ],
   server: {
     port: 5173,
-    strictPort: true, // This will fail if the port is in use, rather than trying another one
+    strictPort: true,
     proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
+      "/api": {
+        target: "http://localhost:8000",
         changeOrigin: true,
         secure: false,
       },
-      '/ws': {
-        target: 'ws://localhost:8000',
+      "/ws": {
+        target: "ws://localhost:8000",
         ws: true,
         changeOrigin: true,
       },
@@ -33,38 +43,32 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        // Automatic chunking is usually better for modern HTTP/2+
-      }
+        // Automatic chunking is usually better for modern HTTP/2+.
+      },
     },
-    // Оптимизация размера чанков
+    // Keep large media/player chunks from failing the release build.
     chunkSizeWarningLimit: 1000,
-
-    // Минификация (esbuild быстрее чем terser)
-    minify: 'esbuild',
-
-    // Увеличиваем производительность сборки
-    target: 'esnext',
+    // esbuild is faster than terser and enough for this Vite bundle.
+    minify: "esbuild",
+    // Modern target keeps bundle output smaller for current browsers.
+    target: "esnext",
     cssCodeSplit: true,
-
-    // Включаем source maps только для разработки
+    // Production images should not ship source maps by default.
     sourcemap: false,
-
-    // Оптимизация ассетов
-    assetsInlineLimit: 4096, // Инлайним маленькие файлы
-
-    // Дополнительная оптимизация
-    reportCompressedSize: false, // Ускоряет сборку
+    // Inline only small assets.
+    assetsInlineLimit: 4096,
+    // Avoid gzip/brotli size work during local Docker builds.
+    reportCompressedSize: false,
   },
-
-  // Оптимизация для разработки
+  // Pre-bundle common dependencies for faster local Vite startup.
   optimizeDeps: {
     include: [
-      'react',
-      'react-dom',
-      'react-router-dom',
-      'axios',
-      '@tanstack/react-query'
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "axios",
+      "@tanstack/react-query",
     ],
-    exclude: ['recharts'] // Исключаем тяжелые библиотеки из предварительной оптимизации
-  }
+    exclude: ["recharts"],
+  },
 })

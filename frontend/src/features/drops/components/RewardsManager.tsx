@@ -97,7 +97,6 @@ const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur
 const CONTROL_TRIGGER_CLASS = 'h-9 border-border/70 bg-transparent shadow-none';
 const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
 const MAX_REWARD_WEIGHT = 2000;
-const BLUE_TEXT_BUTTON_CLASS = 'border-border/70 bg-transparent text-sky-300 hover:bg-transparent hover:text-sky-200';
 
 const QUALITY_CARD_SKELETON_COUNT = 4;
 
