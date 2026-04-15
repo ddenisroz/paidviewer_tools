@@ -4,6 +4,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse
 
+from core.config import settings
 from services.advanced_rate_limiter import advanced_rate_limiter
 
 logger = logging.getLogger(__name__)
@@ -16,6 +17,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        if not settings.rate_limit_enabled:
+            return await call_next(request)
+
         # Skip rate limiting for static files and specific paths if needed.
         path = request.url.path
         if request.method.upper() == "OPTIONS":

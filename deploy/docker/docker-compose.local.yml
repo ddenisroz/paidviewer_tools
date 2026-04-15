@@ -49,6 +49,7 @@ services:
       VK_AUTH_BASE_URL: https://auth.live.vkvideo.ru/app/oauth2/authorize
       DONATIONALERTS_REDIRECT_URI: ${LOCAL_APP_ORIGIN:-http://localhost}/auth/donationalerts/callback
       CORS_ORIGINS: ${LOCAL_APP_ORIGIN:-http://localhost},http://localhost:3000,http://localhost:5173
+      RATE_LIMIT_LOGIN: 60/minute
       SESSION_COOKIE_SECURE: "false"
       SESSION_COOKIE_HTTPONLY: "false"
       ENABLE_SECURITY_HEADERS: "false"

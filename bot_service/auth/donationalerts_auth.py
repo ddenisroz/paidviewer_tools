@@ -77,7 +77,7 @@ if not settings.donationalerts_client_secret:
 
 
 @router.get("/auth/donationalerts/login")
-@limiter.limit("5/minute")
+@limiter.limit(settings.rate_limit_login)
 async def donationalerts_login(
     request: Request,
     current_user: dict = Depends(get_current_user_optional),

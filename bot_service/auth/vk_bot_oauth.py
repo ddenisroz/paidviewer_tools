@@ -52,7 +52,7 @@ def _build_admin_redirect(*, success: bool = False, error: str | None = None) ->
 
 
 @router.get("/auth/vk/bot/login")
-@limiter.limit("5/minute")
+@limiter.limit(settings.rate_limit_login)
 async def login_vk_bot(request: Request):
     """Start VK Live bot OAuth authorization flow."""
     try:
@@ -87,7 +87,7 @@ async def login_vk_bot(request: Request):
 
 
 @router.get("/api/admin/bot/vk/login-link")
-@limiter.limit("10/minute")
+@limiter.limit(settings.rate_limit_login)
 async def create_vk_bot_login_link(request: Request):
     """Create short-lived VK bot OAuth login link for use in another browser/profile."""
     session_data, _ = authorize_bot_oauth_login(request, platform="vk")

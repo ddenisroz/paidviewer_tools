@@ -29,7 +29,7 @@ ADMIN_BOT_PAGE = f"{settings.frontend_url}/dashboard/admin?tab=runtime"
 
 
 @router.get("/auth/twitch/bot/login")
-@limiter.limit("5/minute")
+@limiter.limit(settings.rate_limit_login)
 async def login_twitch_bot(request: Request):
     """Start Twitch bot OAuth authorization flow."""
     try:
@@ -63,7 +63,7 @@ async def login_twitch_bot(request: Request):
 
 
 @router.get("/api/admin/bot/twitch/login-link")
-@limiter.limit("10/minute")
+@limiter.limit(settings.rate_limit_login)
 async def create_twitch_bot_login_link(request: Request):
     """Create short-lived Twitch bot OAuth login link for use in another browser/profile."""
     session_data, _ = authorize_bot_oauth_login(request, platform="twitch")

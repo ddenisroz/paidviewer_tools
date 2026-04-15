@@ -35,10 +35,10 @@ class AdvancedRateLimiter:
         self.strategy = MovingWindowRateLimiter(self.storage)
         self.storage_backend = storage_backend
         self.limits = {
-            "default": "60/minute",
-            "login": "5/15minutes",
+            "default": settings.rate_limit_default or "60/minute",
+            "login": settings.rate_limit_login or "5/15minute",
             "api": "100/minute",
-            "tts": "30/minute",
+            "tts": settings.rate_limit_tts or "30/minute",
             "upload": "10/minute",
         }
         logger.info("[RATE-LIMITER] Advanced Rate Limiter initialized with limits library (storage=%s)", storage_backend)

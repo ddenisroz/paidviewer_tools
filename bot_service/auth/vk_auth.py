@@ -32,7 +32,7 @@ SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 
 @router.get("/auth/vk")
-@limiter.limit("10/minute")
+@limiter.limit(settings.rate_limit_login)
 async def vk_auth(request: Request):
     """Start the full VK Live OAuth flow."""
     if not VK_CLIENT_ID:
@@ -70,7 +70,7 @@ async def vk_auth(request: Request):
     return response
 
 @router.get("/auth/vk/login")
-@limiter.limit("10/minute")
+@limiter.limit(settings.rate_limit_login)
 async def login_vk(request: Request):
     """Frontend-compatible entrypoint for VK login."""
     if not VK_CLIENT_ID:

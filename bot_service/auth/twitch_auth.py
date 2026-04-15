@@ -21,7 +21,7 @@ TWITCH_REDIRECT_URI = settings.twitch_redirect_uri
 FRONTEND_URL = settings.frontend_url
 
 @router.get('/auth/twitch/login')
-@limiter.limit('10/minute')
+@limiter.limit(settings.rate_limit_login)
 async def login_twitch(request: Request):
     """Twitch OAuth login entrypoint."""
     try:

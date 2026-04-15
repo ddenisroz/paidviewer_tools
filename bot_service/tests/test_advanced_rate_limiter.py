@@ -5,6 +5,8 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
+from services import advanced_rate_limiter as limiter_module
+from services.advanced_rate_limiter import AdvancedRateLimiter
 from services.advanced_rate_limiter import advanced_rate_limiter
 
 
@@ -17,6 +19,18 @@ class TestAdvancedRateLimiter:
         assert hasattr(advanced_rate_limiter, 'check_rate_limit')
         assert hasattr(advanced_rate_limiter, 'reset_rate_limit')
         assert hasattr(advanced_rate_limiter, 'get_remaining_requests')
+
+    def test_login_limit_comes_from_settings(self, monkeypatch):
+        monkeypatch.setattr(limiter_module.settings, "redis_url", "")
+        monkeypatch.setattr(limiter_module.settings, "rate_limit_default", "11/minute")
+        monkeypatch.setattr(limiter_module.settings, "rate_limit_login", "12/minute")
+        monkeypatch.setattr(limiter_module.settings, "rate_limit_tts", "13/minute")
+
+        limiter = AdvancedRateLimiter()
+
+        assert limiter.limits["default"] == "11/minute"
+        assert limiter.limits["login"] == "12/minute"
+        assert limiter.limits["tts"] == "13/minute"
     
     def test_check_rate_limit_first_request(self):
         """Тест проверки rate limit для первого запроса"""
