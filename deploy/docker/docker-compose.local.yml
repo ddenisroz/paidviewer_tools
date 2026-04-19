@@ -28,6 +28,8 @@ services:
       context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_local
+    env_file:
+      - ../../bot_service/.env
     ports: !override
       - "8000:8000"
     environment: !override
