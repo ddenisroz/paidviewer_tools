@@ -6,8 +6,12 @@ Requirements: 1.1, 1.2
 
 import pytest
 import os
+from pathlib import Path
 from unittest.mock import patch, MagicMock
 from pydantic import ValidationError
+
+BOT_SERVICE_DIR = Path(__file__).resolve().parents[1]
+REPO_ROOT = BOT_SERVICE_DIR.parent
 
 
 class TestConfigurationLoading:
@@ -163,18 +167,18 @@ class TestMigrationScript:
     def test_env_example_files_exist(self):
         """Verify .env.example templates exist for all services"""
         required_env_examples = [
-            '.env.example',
-            '../frontend/.env.example',
+            BOT_SERVICE_DIR / '.env.example',
+            REPO_ROOT / 'frontend' / '.env.example',
         ]
         
         for env_file in required_env_examples:
-            assert os.path.exists(env_file), f"{env_file} not found"
+            assert env_file.exists(), f"{env_file} not found"
     
     def test_env_example_has_all_variables(self):
         """Verify .env.example has all required variables documented"""
-        env_example_path = '.env.example'
+        env_example_path = BOT_SERVICE_DIR / '.env.example'
         
-        if not os.path.exists(env_example_path):
+        if not env_example_path.exists():
             pytest.skip(f"{env_example_path} not found")
         
         with open(env_example_path, 'r', encoding='utf-8') as f:
@@ -241,8 +245,8 @@ class TestConfigurationValidation:
         import glob
         
         # Check main.py for hardcoded values
-        main_py_path = 'bot_service/main.py'
-        if os.path.exists(main_py_path):
+        main_py_path = BOT_SERVICE_DIR / 'main.py'
+        if main_py_path.exists():
             with open(main_py_path, 'r') as f:
                 content = f.read()
             
@@ -257,26 +261,26 @@ class TestDockerConfiguration:
     def test_docker_compose_files_exist(self):
         """Verify Docker Compose files exist"""
         required_compose_files = [
-            '../deploy/docker/docker-compose.bot.yml',
-            '../deploy/docker/docker-compose.tts-advanced.yml',
-            '../deploy/docker/docker-compose.tts-simple.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.bot.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-advanced.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-simple.yml',
         ]
         
         for compose_file in required_compose_files:
-            assert os.path.exists(compose_file), f"{compose_file} not found"
+            assert compose_file.exists(), f"{compose_file} not found"
     
     def test_docker_compose_syntax(self):
         """Test Docker Compose files have valid syntax"""
         import yaml
         
         compose_files = [
-            '../deploy/docker/docker-compose.bot.yml',
-            '../deploy/docker/docker-compose.tts-advanced.yml',
-            '../deploy/docker/docker-compose.tts-simple.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.bot.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-advanced.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-simple.yml',
         ]
         
         for compose_file in compose_files:
-            if not os.path.exists(compose_file):
+            if not compose_file.exists():
                 continue
             
             try:

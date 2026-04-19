@@ -33,6 +33,22 @@ def test_legacy_twitch_login_alias_uses_configured_redirect_uri(client, monkeypa
     assert "oauth_state=" in response.headers.get("set-cookie", "")
 
 
+def test_twitch_login_reports_not_configured(client, monkeypatch):
+    import auth.twitch_auth as twitch_auth
+
+    monkeypatch.setattr(twitch_auth, "TWITCH_CLIENT_ID", "")
+    monkeypatch.setattr(twitch_auth, "TWITCH_REDIRECT_URI", "http://localhost/auth/twitch/callback")
+
+    response = client.get("/auth/twitch/login", follow_redirects=False)
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == {
+        "code": "integration_not_configured",
+        "platform": "twitch",
+        "message": "Twitch OAuth is not configured",
+    }
+
+
 def test_vk_login_uses_configured_redirect_uri(client, monkeypatch):
     import auth.vk_auth as vk_auth
 

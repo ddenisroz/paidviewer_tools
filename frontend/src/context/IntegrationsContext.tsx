@@ -4,9 +4,9 @@
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { platformService } from '@/services/api/services/platformService';
+import { ttsService } from '@/services/api/services/ttsService';
 import { buildPlatformCapabilityMap, DEFAULT_PLATFORM_CAPABILITIES } from '@/shared/utils/platformCapabilities';
 import { PLATFORM_RELEASES, type PlatformReleaseMap } from '@/shared/utils/platformRelease';
-import { ttsService } from '@/services/api/services/ttsService';
 import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
@@ -139,8 +139,13 @@ export const IntegrationsProvider: React.FC<IntegrationsProviderProps> = ({ chil
     }, [fetchIntegrations]);
 
     useEffect(() => {
-        fetchPlatformConfigs();
-    }, [fetchPlatformConfigs]);
+        if (isAuthenticated) {
+            fetchPlatformConfigs();
+            return;
+        }
+
+        setPlatformCapabilities(DEFAULT_PLATFORM_CAPABILITIES);
+    }, [fetchPlatformConfigs, isAuthenticated]);
 
     useEffect(() => {
         if (integrationsNeedRefresh) {

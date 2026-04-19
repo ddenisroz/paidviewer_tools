@@ -19,6 +19,11 @@ TWITCH_CLIENT_ID = settings.twitch_client_id
 TWITCH_CLIENT_SECRET = settings.twitch_client_secret
 TWITCH_REDIRECT_URI = settings.twitch_redirect_uri
 FRONTEND_URL = settings.frontend_url
+TWITCH_OAUTH_NOT_CONFIGURED_DETAIL = {
+    "code": "integration_not_configured",
+    "platform": "twitch",
+    "message": "Twitch OAuth is not configured",
+}
 
 @router.get('/api/auth/twitch/login')
 @router.get('/auth/twitch/login')
@@ -26,9 +31,9 @@ FRONTEND_URL = settings.frontend_url
 async def login_twitch(request: Request):
     """Twitch OAuth login entrypoint."""
     try:
-        if not TWITCH_CLIENT_ID:
-            logger.error('TWITCH_CLIENT_ID not configured')
-            raise HTTPException(status_code=500, detail='Twitch integration is not configured')
+        if not TWITCH_CLIENT_ID or not TWITCH_REDIRECT_URI:
+            logger.warning('Twitch OAuth requested before integration was configured')
+            raise HTTPException(status_code=503, detail=TWITCH_OAUTH_NOT_CONFIGURED_DETAIL)
         from constants import OAUTH_SCOPES
         scopes = OAUTH_SCOPES['twitch']
         logger.info(f'Twitch OAuth requested with scopes: {scopes}')
@@ -40,6 +45,8 @@ async def login_twitch(request: Request):
         response = RedirectResponse(url=auth_url)
         response.set_cookie(key='oauth_state', value=state, max_age=600, httponly=True, samesite='lax', secure=settings.is_production)
         return response
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f'Error generating Twitch login URL: {e}')
         raise HTTPException(status_code=500, detail='Internal server error')
@@ -60,9 +67,9 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
     if not state or state != expected_state:
         logger.warning('Twitch OAuth CSRF state mismatch')
         raise HTTPException(status_code=400, detail='Invalid OAuth state (CSRF protection)')
-    if not all([TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET]):
-        logger.error('Twitch credentials not configured')
-        raise HTTPException(status_code=500, detail='Twitch integration is not configured')
+    if not all([TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET, TWITCH_REDIRECT_URI]):
+        logger.warning('Twitch callback received before integration was configured')
+        raise HTTPException(status_code=503, detail=TWITCH_OAUTH_NOT_CONFIGURED_DETAIL)
     logger.info('Twitch authorization code received')
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
