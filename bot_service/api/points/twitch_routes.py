@@ -16,6 +16,24 @@ logger = logging.getLogger('bot_service')
 
 points_twitch_router = APIRouter(tags=["points_twitch"])
 
+TWITCH_REWARDS_REQUIRED_ROLE = "affiliate_or_partner"
+TWITCH_REWARDS_UNAVAILABLE_REASON = "Для создания наград нужен Twitch Affiliate или Partner"
+
+
+def _twitch_rewards_capability_response(can_create: bool, reason: str | None, rewards: list | None = None) -> JSONResponse:
+    return JSONResponse(content={
+        "success": True,
+        "platform": "twitch",
+        "capability": {
+            "can_create": can_create,
+            "reason": reason,
+            "required_role": TWITCH_REWARDS_REQUIRED_ROLE,
+            "platform": "twitch",
+        },
+        "rewards": rewards or [],
+    })
+
+
 @points_twitch_router.get("/rewards/twitch")
 async def get_twitch_rewards(
     user: dict = Depends(get_current_user),
@@ -25,19 +43,15 @@ async def get_twitch_rewards(
     try:
         rewards = await get_platform_rewards_service().get_rewards(user['id'], 'twitch', db)
         
-        return JSONResponse(content={
-            "success": True,
-            "platform": "twitch",
-            "capability": {
-                "can_create": True,
-                "reason": None,
-                "required_role": "affiliate_or_partner",
-                "platform": "twitch",
-            },
-            "rewards": rewards
-        })
+        return _twitch_rewards_capability_response(True, None, rewards)
 
-    except HTTPException:
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            return _twitch_rewards_capability_response(
+                False,
+                TWITCH_REWARDS_UNAVAILABLE_REASON,
+                [],
+            )
         raise
     except Exception:
         logger.exception("[ERROR] [TWITCH REWARDS] Error")

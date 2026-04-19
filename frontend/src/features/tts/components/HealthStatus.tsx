@@ -64,7 +64,7 @@ const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, chec
                             Ваш канал не в белом списке (whitelist). Доступна только базовая озвучка (gTTS).
                         </p>
                         <p className="text-xs text-gray-400 mt-2">
-                            [INFO] Для использования F5-TTS настройте локальный TTS (`tts_service`, single-node профиль) или обратитесь к администратору для whitelist.
+          Для использования F5-TTS настройте локальный TTS (`tts_service`, single-node профиль) или обратитесь к администратору для whitelist.
                         </p>
                     </div>
                 </div>

@@ -541,7 +541,7 @@ const ChatWindow: React.FC = () => {
                 opacity: 0.6,
                 textAlign: 'center'
             }}>
-                [INFO] Это окно использует общее WebSocket соединение (Leader Election)
+                    Это окно использует общее WebSocket соединение (Leader Election)
             </div>
         </div>
     );

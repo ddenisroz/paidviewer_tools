@@ -334,6 +334,31 @@ def test_normalize_local_tts_endpoint_url_accepts_allowed_host(monkeypatch):
     assert provider_utils.normalize_local_tts_endpoint_url("http://localhost:8001/") == "http://localhost:8001"
 
 
+def test_get_local_tts_probe_endpoints_adds_docker_fallbacks_for_loopback(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost,host.docker.internal,tts_service,qwen_tts")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")
+
+    assert provider_utils.get_local_tts_probe_endpoints("http://localhost:8011", "f5") == [
+        "http://localhost:8011",
+        "http://host.docker.internal:8011",
+        "http://tts_service:8011",
+    ]
+    assert provider_utils.get_local_tts_probe_endpoints("http://127.0.0.1:8012", "qwen") == [
+        "http://127.0.0.1:8012",
+        "http://host.docker.internal:8012",
+        "http://qwen_tts:8012",
+    ]
+
+
+def test_get_local_tts_probe_endpoints_keeps_non_loopback_singleton(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "tts_service,host.docker.internal")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "")
+
+    assert provider_utils.get_local_tts_probe_endpoints("http://tts_service:8011", "f5") == [
+        "http://tts_service:8011",
+    ]
+
+
 def test_normalize_local_tts_endpoint_url_rejects_path(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost")
     monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")

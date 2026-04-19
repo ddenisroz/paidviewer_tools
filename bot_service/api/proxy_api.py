@@ -13,20 +13,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/proxy", tags=["proxy"])
 
 ALLOWED_DOMAINS = [
+    "7tv.io",
+    "api.7tv.app",
     "cdn.7tv.app",
     "emotes.7tv.app",
     "media.7tv.app",
 ]
 
 CACHE_CONTROL = "public, max-age=86400"  # 24 hours
+METADATA_CACHE_CONTROL = "public, max-age=900"  # 15 minutes
 
 
 @router.get("/7tv/{path:path}")
 async def proxy_7tv(path: str):
     """
-    Proxy requests to 7TV CDN.
+    Proxy requests to 7TV API/CDN.
 
-    Path format: cdn.7tv.app/emotes/...
+    Path format: cdn.7tv.app/emotes/... or api.7tv.app/v3/...
     """
     try:
         normalized_path = path.lstrip("/")
@@ -63,7 +66,10 @@ async def proxy_7tv(path: str):
         response.raise_for_status()
 
         content_type = response.headers.get("Content-Type", "image/webp")
-        if not content_type.lower().startswith("image/"):
+        content_type_lower = content_type.lower()
+        is_image = content_type_lower.startswith("image/")
+        is_json = content_type_lower.startswith("application/json")
+        if not (is_image or is_json):
             raise HTTPException(status_code=502, detail="Unexpected upstream content type")
 
         async def generate_content():
@@ -73,7 +79,7 @@ async def proxy_7tv(path: str):
             generate_content(),
             media_type=content_type,
             headers={
-                "Cache-Control": CACHE_CONTROL,
+                "Cache-Control": CACHE_CONTROL if is_image else METADATA_CACHE_CONTROL,
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET",
                 "Access-Control-Allow-Headers": "*",

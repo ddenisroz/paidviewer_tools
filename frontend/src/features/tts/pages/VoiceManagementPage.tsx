@@ -947,7 +947,7 @@ const VoiceManagementPageContent: React.FC = () => {
                             Обратитесь к администратору для получения доступа.
                         </p>
                         <p className="text-orange-200/60 text-xs mt-2">
-                            [INFO] Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
+                            Вам доступна только базовая озвучка (gTTS) через основные настройки TTS.
                         </p>
                     </div>
                 </div>

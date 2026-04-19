@@ -12,7 +12,7 @@ from __future__ import annotations
 import ipaddress
 import os
 from typing import Any, Dict, Literal, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 
 from core.config import settings
 
@@ -130,6 +130,7 @@ _DEFAULT_LOCAL_TTS_ALLOWED_HOSTS = (
     "qwen_service",
 )
 _DEFAULT_LOCAL_TTS_ALLOWED_CIDRS = ("127.0.0.0/8", "::1/128")
+_LOOPBACK_LOCAL_TTS_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 class ProviderRoutingError(ValueError):
@@ -750,3 +751,33 @@ def normalize_local_tts_endpoint_url(endpoint_url: str) -> str:
     host_for_url = f"[{host}]" if ":" in host and not host.startswith("[") else host
     netloc = f"{host_for_url}:{port}" if port else host_for_url
     return f"{parsed.scheme}://{netloc}"
+
+
+def get_local_tts_probe_endpoints(endpoint_url: str, provider: Optional[str] = None) -> list[str]:
+    """Return safe server-side probe URLs for a user-facing local endpoint.
+
+    Browser users naturally enter localhost for a host-machine TTS runtime. When
+    bot_service runs in Docker, that same hostname points back at the container,
+    so health checks need a Docker-aware fallback without storing a different URL.
+    """
+
+    endpoint = normalize_local_tts_endpoint_url(endpoint_url)
+    parsed = urlparse(endpoint)
+    host = (parsed.hostname or "").strip().lower().strip(".")
+    if host not in _LOOPBACK_LOCAL_TTS_HOSTS:
+        return [endpoint]
+
+    normalized_provider = normalize_provider(provider)
+    docker_service_host = "qwen_tts" if normalized_provider == "qwen" else "tts_service"
+    candidates = [endpoint]
+
+    for replacement_host in ("host.docker.internal", docker_service_host):
+        if not is_local_tts_host_allowed(replacement_host):
+            continue
+        host_for_url = f"[{replacement_host}]" if ":" in replacement_host else replacement_host
+        netloc = f"{host_for_url}:{parsed.port}" if parsed.port else host_for_url
+        candidate = urlunparse((parsed.scheme, netloc, "", "", "", ""))
+        if candidate not in candidates:
+            candidates.append(candidate)
+
+    return candidates

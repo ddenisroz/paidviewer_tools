@@ -94,7 +94,7 @@ const ImageLootboxTab: React.FC<ImageLootboxTabProps> = ({
             </div>
 
             <div className="mt-8 p-4 bg-gray-700 rounded-lg">
-                <h4 className="text-sm font-semibold text-white mb-2">[INFO] О системе анимации</h4>
+            <h4 className="text-sm font-semibold text-white mb-2">О системе анимации</h4>
                 <p className="text-sm text-gray-300">
                     Система использует смену картинок для создания эффекта открытия лутбокса.
                     Каждый лутбокс имеет набор картинок: закрытый → этапы открытия → открытый.

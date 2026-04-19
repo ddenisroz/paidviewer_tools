@@ -15,7 +15,7 @@ from core.database import get_db
 from core.internal_service_auth import build_tts_auth_headers
 from auth.auth import get_current_user
 from services.tts.tts_manager import get_tts_manager
-from services.tts.provider_utils import normalize_local_tts_endpoint_url
+from services.tts.provider_utils import get_local_tts_probe_endpoints, normalize_local_tts_endpoint_url
 
 logger = logging.getLogger('bot_service.tts')
 
@@ -309,6 +309,7 @@ async def check_local_tts_health(
     try:
         endpoint = normalize_local_tts_endpoint_url(endpoint_url)
         normalized_provider = (provider or "f5").strip().lower()
+        probe_endpoints = get_local_tts_probe_endpoints(endpoint, provider=normalized_provider)
         headers = build_tts_auth_headers(
             provider=normalized_provider,
             upstream="local",
@@ -324,88 +325,118 @@ async def check_local_tts_health(
                     "The self-hosted path still uses a compatibility flow via /api/prepare -> /api/stream/{id}, "
                     "but the worker now exposes health, model catalog and user voice CRUD endpoints."
                 )
-                for health_path in ("/health/ready", "/health/live", "/health"):
+                last_error = "Connection check failed"
+                for probe_endpoint in probe_endpoints:
+                    for health_path in ("/health/ready", "/health/live", "/health"):
+                        try:
+                            health_probe = await client.get(f"{probe_endpoint}{health_path}", headers=headers)
+                            if health_probe.status_code == 200:
+                                health_payload = health_probe.json()
+                                result = {
+                                    "healthy": True,
+                                    "status": health_payload.get("status", "healthy"),
+                                    "compatibility_mode": "qwen_prepare_stream",
+                                    "warning": compatibility_note,
+                                    "version": health_payload.get("version"),
+                                    "ready": health_payload.get("ready"),
+                                    "phase": health_payload.get("phase"),
+                                    "percent": health_payload.get("percent"),
+                                    "message": health_payload.get("message"),
+                                    "current_model": health_payload.get("current_model"),
+                                    "target_model": health_payload.get("target_model"),
+                                    "endpoint_url": endpoint,
+                                    "probed_endpoint_url": probe_endpoint,
+                                }
+                                if fetch_status:
+                                    result["status_data"] = None
+                                return result
+                            last_error = f"HTTP {health_probe.status_code}"
+                        except httpx.TimeoutException:
+                            last_error = "Timeout: service is not responding"
+                        except httpx.RequestError as error:
+                            last_error = str(error) or "Could not connect"
+
                     try:
-                        health_probe = await client.get(f"{endpoint}{health_path}", headers=headers)
-                        if health_probe.status_code == 200:
-                            health_payload = health_probe.json()
+                        prepare_probe = await client.get(f"{probe_endpoint}/api/prepare", headers=headers)
+                        if prepare_probe.status_code in {405, 422}:
                             result = {
                                 "healthy": True,
-                                "status": health_payload.get("status", "healthy"),
+                                "status": "healthy",
                                 "compatibility_mode": "qwen_prepare_stream",
                                 "warning": compatibility_note,
-                                "version": health_payload.get("version"),
-                                "ready": health_payload.get("ready"),
-                                "phase": health_payload.get("phase"),
-                                "percent": health_payload.get("percent"),
-                                "message": health_payload.get("message"),
-                                "current_model": health_payload.get("current_model"),
-                                "target_model": health_payload.get("target_model"),
+                                "endpoint_url": endpoint,
+                                "probed_endpoint_url": probe_endpoint,
+                            }
+                            if fetch_status:
+                                try:
+                                    status_probe = await client.get(f"{probe_endpoint}/api/status/__healthcheck__", headers=headers)
+                                    result["status_data"] = status_probe.json() if status_probe.status_code == 200 else None
+                                except Exception:
+                                    result["status_data"] = None
+                            return result
+                        last_error = f"HTTP {prepare_probe.status_code}"
+                    except httpx.TimeoutException:
+                        last_error = "Timeout: service is not responding"
+                    except httpx.RequestError as error:
+                        last_error = str(error) or "Could not connect"
+
+                    try:
+                        root_response = await client.get(f"{probe_endpoint}/", headers=headers)
+                        if root_response.status_code == 200:
+                            result = {
+                                "healthy": True,
+                                "status": "healthy",
+                                "compatibility_mode": "qwen_prepare_stream",
+                                "warning": compatibility_note,
+                                "endpoint_url": endpoint,
+                                "probed_endpoint_url": probe_endpoint,
                             }
                             if fetch_status:
                                 result["status_data"] = None
                             return result
-                    except httpx.RequestError:
-                        pass
+                        last_error = f"HTTP {root_response.status_code}"
+                    except httpx.TimeoutException:
+                        last_error = "Timeout: service is not responding"
+                    except httpx.RequestError as error:
+                        last_error = str(error) or "Could not connect"
 
+                return {"healthy": False, "error": last_error}
+
+            last_error = "Connection check failed"
+            for probe_endpoint in probe_endpoints:
                 try:
-                    prepare_probe = await client.get(f"{endpoint}/api/prepare", headers=headers)
-                    if prepare_probe.status_code in {405, 422}:
+                    response = await client.get(f"{probe_endpoint}/health", headers=headers)
+
+                    if response.status_code == 200:
+                        data = response.json()
                         result = {
                             "healthy": True,
-                            "status": "healthy",
-                            "compatibility_mode": "qwen_prepare_stream",
-                            "warning": compatibility_note,
+                            "status": data.get('status', 'healthy'),
+                            "version": data.get('version'),
+                            "gpu_info": data.get('gpu_info'),
+                            "ready": data.get("ready"),
+                            "phase": data.get("phase"),
+                            "percent": data.get("percent"),
+                            "message": data.get("message"),
+                            "current_model": data.get("current_model"),
+                            "target_model": data.get("target_model"),
+                            "endpoint_url": endpoint,
+                            "probed_endpoint_url": probe_endpoint,
                         }
                         if fetch_status:
                             try:
-                                status_probe = await client.get(f"{endpoint}/api/status/__healthcheck__", headers=headers)
-                                result["status_data"] = status_probe.json() if status_probe.status_code == 200 else None
+                                status_response = await client.get(f"{probe_endpoint}/api/tts/status", headers=headers)
+                                result["status_data"] = status_response.json() if status_response.status_code == 200 else None
                             except Exception:
                                 result["status_data"] = None
                         return result
-                except httpx.RequestError:
-                    pass
+                    last_error = f"HTTP {response.status_code}"
+                except httpx.TimeoutException:
+                    last_error = "Timeout: service is not responding"
+                except httpx.RequestError as error:
+                    last_error = str(error) or "Could not connect"
 
-                root_response = await client.get(f"{endpoint}/", headers=headers)
-                if root_response.status_code == 200:
-                    result = {
-                        "healthy": True,
-                        "status": "healthy",
-                        "compatibility_mode": "qwen_prepare_stream",
-                        "warning": compatibility_note,
-                    }
-                    if fetch_status:
-                        result["status_data"] = None
-                    return result
-
-                return {"healthy": False, "error": f"HTTP {root_response.status_code}"}
-
-            response = await client.get(f"{endpoint}/health", headers=headers)
-
-            if response.status_code == 200:
-                data = response.json()
-                result = {
-                    "healthy": True,
-                    "status": data.get('status', 'healthy'),
-                    "version": data.get('version'),
-                    "gpu_info": data.get('gpu_info'),
-                    "ready": data.get("ready"),
-                    "phase": data.get("phase"),
-                    "percent": data.get("percent"),
-                    "message": data.get("message"),
-                    "current_model": data.get("current_model"),
-                    "target_model": data.get("target_model"),
-                }
-                if fetch_status:
-                    try:
-                        status_response = await client.get(f"{endpoint}/api/tts/status", headers=headers)
-                        result["status_data"] = status_response.json() if status_response.status_code == 200 else None
-                    except Exception:
-                        result["status_data"] = None
-                return result
-            else:
-                return {"healthy": False, "error": f"HTTP {response.status_code}"}
+            return {"healthy": False, "error": last_error}
 
     except ValueError as error:
         return {"healthy": False, "error": str(error)}

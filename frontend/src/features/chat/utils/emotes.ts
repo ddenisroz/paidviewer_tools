@@ -1,8 +1,8 @@
 import { API_BASE_URL } from '@/constants';
 import { logger } from '@/shared/utils/prodLogger';
 
-const SEVENTV_REST_BASE = 'https://7tv.io/v3';
-const SEVENTV_REST_API_BASE = 'https://api.7tv.app/v3';
+const SEVENTV_REST_BASE = `${API_BASE_URL}/api/proxy/7tv/7tv.io/v3`;
+const SEVENTV_REST_API_BASE = `${API_BASE_URL}/api/proxy/7tv/api.7tv.app/v3`;
 const REQUEST_TIMEOUT = 3500;
 const EMOTES_CACHE_TTL_MS = 15 * 60 * 1000;
 const EMPTY_CACHE_TTL_MS = 90 * 1000;
