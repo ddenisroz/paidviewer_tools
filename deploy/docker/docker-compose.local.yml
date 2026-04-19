@@ -1,6 +1,8 @@
 services:
   redis:
+    image: redis:7-alpine
     container_name: tts_redis_local
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis-dev-password}
     ports: !override
       - "6379:6379"
     healthcheck:
@@ -10,17 +12,22 @@ services:
       retries: 5
 
   postgres:
+    image: postgres:15-alpine
     container_name: tts_postgres_local
+    environment: !override
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-app_data}
     ports: !override
       - "5432:5432"
+    volumes: !override
+      - postgres_data:/var/lib/postgresql/data
 
   bot_service:
     build:
       context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_local
-    env_file: !override
-      - ../../bot_service/.env
     ports: !override
       - "8000:8000"
     environment: !override
@@ -28,6 +35,8 @@ services:
       DEBUG: "true"
       LOG_LEVEL: DEBUG
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
+      SECRET_KEY: ${SECRET_KEY:-dev_secret_key_change_in_production}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-2bD0gYfJwRo_-esxNUFDXL9uBeb5GsyhQOdE31jj4n4=}
       ALGORITHM: HS256
       BACKEND_URL: ${LOCAL_APP_ORIGIN:-http://localhost}
       FRONTEND_URL: ${LOCAL_APP_ORIGIN:-http://localhost}
@@ -131,3 +140,17 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  tts_audio:
+    driver: local
+  tts_logs:
+    driver: local
+  tts_cache:
+    driver: local
+  qwen_hf_cache:
+    driver: local
+  qwen_voice_storage:
+    driver: local

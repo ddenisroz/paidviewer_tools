@@ -1,7 +1,7 @@
 #
 # Compatibility local stack.
 # Official local path is now:
-# docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
+# docker compose --env-file deploy/docker/compose.local.env `
 #   -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
 #   --profile core --profile cloud-tts up --build
 #
@@ -41,8 +41,6 @@ services:
       context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_dev
-    env_file:
-      - ../../bot_service/.env
     ports:
       - "8000:8000"
     environment:
