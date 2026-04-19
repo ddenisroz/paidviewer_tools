@@ -12,6 +12,7 @@ from api.vk.vk_stream import VKStream
 from api.vk.vk_rewards import VKRewards
 from core.database import get_db
 from auth.auth import get_current_user, get_current_user_optional
+from services.stream_info_service import StreamInfoService
 logger = logging.getLogger(__name__)
 
 class VKLiveAPI(VKRewards, VKStream, VKAuth):
@@ -106,14 +107,12 @@ async def get_vk_categories(search: str='', current_user: dict=Depends(get_curre
 
 @router.get('/stream-info')
 async def get_vk_stream_info(current_user: dict=Depends(get_current_user), db: Session=Depends(get_db)):
-    """Get VK Live stream info"""
+    """Get VK Live stream info using the shared normalized contract."""
     try:
-        user_id = str(current_user.get('id'))
+        user_id = current_user.get('id')
         session_id = current_user.get('session_id')
-        stream_info = await vk_api.get_stream_info(user_id, session_id)
-        if stream_info:
-            return JSONResponse(content=stream_info)
-        raise HTTPException(status_code=404, detail='VK stream info not found')
+        stream_info = await StreamInfoService(db).get_stream_info(user_id, "vk", session_id)
+        return JSONResponse(content={"data": stream_info})
     except HTTPException:
         raise
     except Exception:

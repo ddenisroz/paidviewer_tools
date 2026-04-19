@@ -310,7 +310,7 @@ const Sidebar: React.FC = () => {
 
             {/* Sidebar */}
             <div className={`
-                fixed md:relative h-full w-[min(18rem,85vw)] md:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
+                fixed md:relative h-full w-full sm:w-[18rem] md:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                 md:block
             `}>

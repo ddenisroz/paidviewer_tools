@@ -37,6 +37,15 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     const twitchStream = streamData?.twitch;
     const vkStream = streamData?.vk;
     const STATUS_BADGE_BASE = 'inline-flex h-8 min-w-[132px] justify-center';
+    const CARD_BODY_CLASS = 'min-h-[76px] p-3 sm:p-4';
+    const twitchSubtitle = twitchStream?.gameName?.trim() || '';
+    const vkSubtitle = vkStream?.gameName?.trim() || '';
+
+    const renderSubtitle = (text: string): React.ReactNode => (
+        <div className="min-h-[1rem] text-xs text-muted-foreground truncate" title={text || undefined}>
+            {text || <span className="invisible">.</span>}
+        </div>
+    );
 
 
 
@@ -88,24 +97,20 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     }
 
     return (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
-            {/* Twitch статус */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
+                {/* Twitch статус */}
             <Card className={`card-glass transition-colors duration-300 ${twitchEnabled ? 'bg-purple-500/10 border-purple-500/20' : ''}`}>
-                <CardContent className="p-3">
+                <CardContent className={CARD_BODY_CLASS}>
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                             <TwitchIcon className="h-8 w-8 text-[#9146FF] flex-shrink-0" />
-                            <div className="flex flex-col min-w-0">
+                            <div className="flex min-h-[2.5rem] min-w-0 flex-col justify-center">
                                 <div className="font-medium text-sm text-white">Twitch</div>
-                                {twitchStream?.gameName && (
-                                    <div className="text-xs text-muted-foreground truncate" title={twitchStream.gameName}>
-                                        {twitchStream.gameName}
-                                    </div>
-                                )}
+                                {renderSubtitle(twitchSubtitle)}
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="flex min-h-[2.5rem] items-center gap-3 flex-shrink-0">
                             {twitchEnabled ? (
                                 twitchStream?.isLive ? (
                                     <div className="flex flex-col items-end gap-1">
@@ -138,21 +143,17 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
 
             {/* VK Live статус */}
             <Card className={`card-glass transition-colors duration-300 ${vkEnabled ? 'bg-red-500/10 border-red-500/20' : ''}`}>
-                <CardContent className="p-3">
+                <CardContent className={CARD_BODY_CLASS}>
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                             <VKIcon className="h-8 w-8 text-[#FF4444] flex-shrink-0" />
-                            <div className="flex flex-col min-w-0">
+                            <div className="flex min-h-[2.5rem] min-w-0 flex-col justify-center">
                                 <div className="font-medium text-sm text-white">VK Live</div>
-                                {vkStream?.gameName || vkEnabled ? (
-                                    <div className="text-xs text-muted-foreground truncate" title={vkStream?.gameName || 'Нет категории'}>
-                                        {vkStream?.gameName || 'Нет категории'}
-                                    </div>
-                                ) : null}
+                                {renderSubtitle(vkSubtitle)}
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3 flex-shrink-0 min-h-[32px]">
+                        <div className="flex min-h-[2.5rem] items-center gap-3 flex-shrink-0">
                             {vkEnabled ? (
                                 vkStream?.isLive ? (
                                     <div className="flex flex-col items-end gap-1">

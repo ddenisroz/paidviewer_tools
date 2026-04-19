@@ -226,6 +226,39 @@ function cloneStreamData(data: StreamData): StreamData {
     };
 }
 
+function buildStreamCategory(
+    categoryId: unknown,
+    rawCategory: unknown,
+    fallbackName?: unknown,
+    assets?: { box_art_url?: unknown; cover_url?: unknown }
+): StreamCategory | null {
+    const categoryRecord = typeof rawCategory === 'object' && rawCategory !== null
+        ? rawCategory as Record<string, unknown>
+        : null;
+
+    const resolvedId = categoryId ?? categoryRecord?.id ?? '';
+    const resolvedName = String(
+        categoryRecord?.title
+        ?? categoryRecord?.name
+        ?? fallbackName
+        ?? (typeof rawCategory === 'string' ? rawCategory : '')
+    ).trim();
+    const boxArtUrl = String(categoryRecord?.box_art_url ?? assets?.box_art_url ?? '').trim();
+    const coverUrl = String(categoryRecord?.cover_url ?? assets?.cover_url ?? '').trim();
+
+    if (!resolvedName && !resolvedId) {
+        return null;
+    }
+
+    return {
+        id: String(resolvedId ?? ''),
+        name: resolvedName,
+        title: resolvedName || undefined,
+        box_art_url: boxArtUrl || undefined,
+        cover_url: coverUrl || undefined,
+    };
+}
+
 function applyPayloadFieldsForPlatform(
     target: StreamData,
     source: StreamData,
@@ -406,24 +439,30 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const twitch = twitchData.data as any;
             data.twitch.title = twitch.title || '';
-            data.twitch.category = twitch.game_id ? {
-                id: twitch.game_id,
-                name: twitch.game || twitch.game_name || '',
-                box_art_url: twitch.game_box_art_url || twitch.box_art_url
-            } : null;
+            data.twitch.category = buildStreamCategory(
+                twitch.game_id ?? twitch.category_id,
+                twitch.category,
+                twitch.game || twitch.game_name || twitch.category_name,
+                {
+                    box_art_url: twitch.game_box_art_url || twitch.box_art_url,
+                    cover_url: twitch.cover_url,
+                }
+            );
         }
 
         if (vkData?.data) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vk = vkData.data as any;
             data.vk.title = vk.title || '';
-            const cat = vk.category;
-            data.vk.category = vk.category_id ? {
-                id: vk.category_id,
-                name: vk.category?.title || vk.category || '',
-                box_art_url: cat?.box_art_url,
-                cover_url: cat?.cover_url
-            } : null;
+            data.vk.category = buildStreamCategory(
+                vk.category_id,
+                vk.category,
+                vk.category_name,
+                {
+                    box_art_url: vk.category?.box_art_url,
+                    cover_url: vk.category?.cover_url || vk.category_img_url,
+                }
+            );
         }
 
         return data;

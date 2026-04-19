@@ -21,7 +21,7 @@ import type { StreamCategory } from '@/types/stream';
 
 const StreamCategoryCard: React.FC = () => {
     const { integrations } = useIntegrations();
-    const { initialData, currentData, setCurrentData, saveChanges, status, categories, searchCategories } = useData();
+    const { initialData, currentData, setCurrentData, saveChanges, status, categories, loading, searchCategories } = useData();
     const { getCombineSettings, updateSetting } = useUserSettings();
     const { combine_categories: combineCategories } = getCombineSettings();
 
@@ -253,43 +253,24 @@ const StreamCategoryCard: React.FC = () => {
         setShowDropdown({ twitch: false, vk: false });
     };
 
-    const handleSave = async (mode: 'both' | 'individual') => {
+    const handleSave = async () => {
         const payload: Record<string, unknown> = {};
         const getCatId = (cat: unknown) => (cat as StreamCategory | undefined)?.id || null;
 
-        if (mode === 'both') {
-            if (twitchEnabled) payload.twitch = { category_id: getCatId(currentData.twitch?.category) };
-            if (vkEnabled) {
-                const vkCat = currentData.vk?.category as StreamCategory;
-                if (vkCat) {
-                    payload.vk = {
-                        category: {
-                            id: vkCat.id,
-                            name: vkCat.name || vkCat.title || "",
-                            title: vkCat.name || vkCat.title || "",
-                            type: vkCat.type || "games",
-                            cover_url: vkCat.box_art_url || vkCat.cover_url || ""
-                        },
-                        category_id: vkCat.id
-                    };
-                }
-            }
-        } else {
-            if (twitchEnabled) payload.twitch = { category_id: getCatId(currentData.twitch?.category) };
-            if (vkEnabled) {
-                const vkCat = currentData.vk?.category as StreamCategory;
-                if (vkCat) {
-                    payload.vk = {
-                        category: {
-                            id: vkCat.id,
-                            name: vkCat.name || vkCat.title || "",
-                            title: vkCat.name || vkCat.title || "",
-                            type: vkCat.type || "games",
-                            cover_url: vkCat.box_art_url || vkCat.cover_url || ""
-                        },
-                        category_id: vkCat.id
-                    };
-                }
+        if (twitchEnabled) payload.twitch = { category_id: getCatId(currentData.twitch?.category) };
+        if (vkEnabled) {
+            const vkCat = currentData.vk?.category as StreamCategory;
+            if (vkCat) {
+                payload.vk = {
+                    category: {
+                        id: vkCat.id,
+                        name: vkCat.name || vkCat.title || "",
+                        title: vkCat.name || vkCat.title || "",
+                        type: vkCat.type || "games",
+                        cover_url: vkCat.box_art_url || vkCat.cover_url || ""
+                    },
+                    category_id: vkCat.id
+                };
             }
         }
 
@@ -324,7 +305,7 @@ const StreamCategoryCard: React.FC = () => {
 
     const Footer = (
         <Button
-            onClick={() => handleSave(isLinked && bothEnabled ? 'both' : 'individual')}
+            onClick={handleSave}
             disabled={isSaving || !isChanged || !isUserDirty}
             size="sm"
             className={`w-full flex items-center gap-2 h-7 text-sm font-medium shadow-sm transition-all duration-300 ${
@@ -420,6 +401,8 @@ const StreamCategoryCard: React.FC = () => {
                             {showDropdown.twitch && (
                                 <StreamCategoryDropdown
                                     platform="twitch"
+                                    isOpen={showDropdown.twitch}
+                                    isLoading={loading.categories}
                                     search={searchTerms.twitch}
                                     onSelect={handleStreamCategorySelect}
                                     results={(categories as { twitch?: StreamCategory[] })?.twitch || []}
@@ -487,6 +470,8 @@ const StreamCategoryCard: React.FC = () => {
                                 {showDropdown.vk && showVkField && (
                                     <StreamCategoryDropdown
                                         platform="vk"
+                                        isOpen={showDropdown.vk}
+                                        isLoading={loading.categories}
                                         search={searchTerms.vk}
                                         onSelect={handleStreamCategorySelect}
                                         results={(categories as { vk?: StreamCategory[] })?.vk || []}

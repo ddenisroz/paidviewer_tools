@@ -278,7 +278,7 @@ class TestOAuth:
             "redirect_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/dashboard",
         }
 
-        response = client.get("/auth/twitch/callback?code=test_code")
+        response = client.get("/auth/twitch/callback?code=test_code", follow_redirects=False)
         # Может быть 307 (redirect), 400 (error), или 500 (server error)
         assert response.status_code in [307, 400, 500]
 
@@ -290,7 +290,7 @@ class TestOAuth:
             "redirect_url": f"{os.getenv('FRONTEND_URL', 'http://localhost:5173')}/dashboard",
         }
 
-        response = client.get("/auth/vk/callback?code=test_code")
+        response = client.get("/auth/vk/callback?code=test_code", follow_redirects=False)
         # Может быть 307 (redirect), 400 (error), или 500 (server error)
         assert response.status_code in [307, 400, 500]
 

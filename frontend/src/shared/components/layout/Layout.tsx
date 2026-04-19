@@ -58,12 +58,12 @@ const LayoutContent: React.FC = () => {
   const showPlayerPadding = isVisible && !isTheaterMode && !isOnYoutubePage;
 
   return (
-    <div className="grid h-screen w-full grid-cols-1 md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr] overflow-hidden">
+    <div className="grid h-screen w-full grid-cols-1 md:grid-cols-[240px_1fr] xl:grid-cols-[280px_1fr] overflow-hidden">
       <Sidebar />
       <div className="flex flex-col h-full overflow-hidden">
         <Header />
         <main
-          className={`flex flex-1 flex-col gap-2 sm:gap-4 p-2 sm:p-4 lg:gap-6 lg:p-6 bg-background/95 relative transition-all duration-300 overflow-y-auto ${showPlayerPadding ? 'pb-24' : ''
+          className={`flex flex-1 flex-col gap-3 p-3 sm:p-4 xl:gap-6 xl:p-6 bg-background/95 relative transition-all duration-300 overflow-y-auto ${showPlayerPadding ? 'pb-24' : ''
             }`}
           style={{ scrollbarGutter: 'stable both-edges' }}
         >

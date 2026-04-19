@@ -45,7 +45,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { DASHBOARD_TABS_LIST_CLASS, DASHBOARD_TAB_TRIGGER_CLASS, Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Textarea } from '@/shared/components/ui/textarea';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
@@ -231,8 +231,6 @@ interface VoiceSettingsDraft {
     speedPreset: VoiceSpeedPreset;
 }
 
-const TAB_TRIGGER_CLASS =
-    'rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none';
 const PROVIDER_SWITCH_TAB_CLASS =
     'appearance-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-[inset_0_-1px_0_0_rgba(14,165,233,1)]';
 const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
@@ -904,9 +902,9 @@ const LocalTTSSettingsPage: React.FC = () => {
     return (
         <PageWrapper title="Локальный TTS">
             <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="min-w-0 space-y-6">
-                <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none bg-transparent p-0 border-b border-border">
-                    <TabsTrigger value="connection" className={`flex shrink-0 items-center gap-2 ${TAB_TRIGGER_CLASS}`}><Server className="w-4 h-4" />Подключение</TabsTrigger>
-                    <TabsTrigger value="voices" className={`flex shrink-0 items-center gap-2 ${TAB_TRIGGER_CLASS}`} disabled={!canOpenVoiceManagement}><Mic className="w-4 h-4" />Управление голосами</TabsTrigger>
+                <TabsList className={DASHBOARD_TABS_LIST_CLASS}>
+                    <TabsTrigger value="connection" className={`flex shrink-0 items-center gap-2 ${DASHBOARD_TAB_TRIGGER_CLASS}`}><Server className="w-4 h-4" />Подключение</TabsTrigger>
+                    <TabsTrigger value="voices" className={`flex shrink-0 items-center gap-2 ${DASHBOARD_TAB_TRIGGER_CLASS}`} disabled={!canOpenVoiceManagement}><Mic className="w-4 h-4" />Управление голосами</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="connection" className="space-y-4">

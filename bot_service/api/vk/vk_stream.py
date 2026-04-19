@@ -61,7 +61,7 @@ class VKStream(VKAuth):
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
         }
-        categories: List[Dict[str, Any]] = []
+        deduped_categories: Dict[str, Dict[str, Any]] = {}
         try:
             async with aiohttp.ClientSession(timeout=VK_API_TIMEOUT) as session:
                 for cat_type in ["game", "irl"]:
@@ -80,16 +80,23 @@ class VKStream(VKAuth):
                             logger.warning("[VK SEARCH] Unexpected category response shape")
                             continue
                         for item in items:
-                            categories.append({
+                            category = {
                                 "id": item.get("id"),
                                 "name": item.get("title") or item.get("name"),
                                 "viewers": item.get("viewers", 0),
                                 "box_art_url": item.get("coverUrl") or item.get("cover_url")
-                            })
+                            }
+                            dedupe_key = str(category["id"] or "").strip() or str(category["name"] or "").strip().lower()
+                            if not dedupe_key:
+                                continue
+                            previous = deduped_categories.get(dedupe_key)
+                            if previous is None or int(category.get("viewers") or 0) > int(previous.get("viewers") or 0):
+                                deduped_categories[dedupe_key] = category
         except Exception:
             logger.exception("[VK SEARCH] Prod category search error")
             return []
 
+        categories = list(deduped_categories.values())
         logger.info(f"[VK SEARCH] Found {len(categories)} categories via prod search")
         return categories
 

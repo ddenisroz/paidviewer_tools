@@ -730,18 +730,28 @@ async def test_vk_categories_returns_503_when_no_token(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_vk_stream_info_returns_404_when_missing(monkeypatch):
-    async def _missing(_user_id, _session_id):
-        return None
+async def test_vk_stream_info_returns_normalized_payload(monkeypatch):
+    from services.stream_info_service import StreamInfoService
 
-    monkeypatch.setattr(vk_api_module.vk_api, "get_stream_info", _missing)
+    async def _fake_get_stream_info(self, _user_id, _platform_name, _session_id=None):
+        return {"title": "Offline", "category": {"name": "Just Chatting", "title": "Just Chatting"}}
 
-    with pytest.raises(HTTPException) as exc_info:
-        await vk_api_module.get_vk_stream_info(
-            current_user={"id": 1, "session_id": "s"},
-            db=None,
-        )
-    assert exc_info.value.status_code == 404
+    monkeypatch.setattr(StreamInfoService, "get_stream_info", _fake_get_stream_info)
+
+    response = await vk_api_module.get_vk_stream_info(
+        current_user={"id": 1, "session_id": "s"},
+        db=None,
+    )
+    assert response.status_code == 200
+    assert json.loads(response.body) == {
+        "data": {
+            "title": "Offline",
+            "category": {
+                "name": "Just Chatting",
+                "title": "Just Chatting",
+            },
+        }
+    }
 
 
 @pytest.mark.asyncio

@@ -128,29 +128,28 @@ const Header: React.FC = () => {
     };
 
     return (
-        <header className="relative flex h-14 items-center gap-2 bg-transparent px-3 sm:gap-4 sm:px-6 lg:h-16">
-            <div className="flex-1"></div>
+        <header className="flex h-14 items-center gap-2 bg-transparent px-3 sm:gap-4 sm:px-6 lg:h-16">
+            <div className="min-w-0 flex-1">
+                {pageTitle && (
+                    <h1
+                        className="truncate pr-2 text-center text-xl font-extrabold text-cyan-300 sm:pr-4 sm:text-2xl lg:text-4xl"
+                        style={{ fontFamily: "'Orbitron', 'Rajdhani', 'Exo 2', 'Inter', sans-serif" }}
+                    >
+                        {pageTitle}
+                    </h1>
+                )}
+            </div>
 
-            {pageTitle && (
-                <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl sm:text-3xl lg:text-4xl font-extrabold text-cyan-300 tracking-wide"
-                    style={{
-                        fontFamily: "'Orbitron', 'Rajdhani', 'Exo 2', 'Inter', sans-serif",
-                        letterSpacing: '0.08em'
-                    }}>
-                    {pageTitle}
-                </h1>
-            )}
-
-            <div className="flex-1 flex items-center justify-end gap-2 sm:gap-4">
+            <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-4">
                 {isAuthenticated && (
                     <div className="relative integrations-menu">
                         <Button
                             variant="outline"
-                            className="flex h-10 items-center gap-2 border-none bg-transparent px-4 text-foreground shadow-none transition-colors duration-200 hover:bg-transparent hover:text-blue-400 active:scale-100 active:transform-none"
+                            className="flex h-10 items-center gap-2 border-none bg-transparent px-2 text-foreground shadow-none transition-colors duration-200 hover:bg-transparent hover:text-blue-400 active:scale-100 active:transform-none sm:px-4"
                             onClick={() => setIntegrationsOpen(!integrationsOpen)}
                         >
                             <Settings className="h-4 w-4" />
-                            <span>Интеграции</span>
+                            <span className="hidden sm:inline">Интеграции</span>
                             <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${integrationsOpen ? 'rotate-180' : ''}`} />
                         </Button>
 

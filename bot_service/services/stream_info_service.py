@@ -19,6 +19,75 @@ class StreamInfoService:
         self.session_service = StreamSessionService(db)
         self.last_error_by_platform: Dict[str, str] = {}
 
+    @staticmethod
+    def _normalize_category_id(value: Optional[Any]) -> Optional[str]:
+        """Normalize category identifiers from mixed provider payloads."""
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        if not normalized or normalized.lower() in {"none", "null", "undefined"}:
+            return None
+        return normalized
+
+    @staticmethod
+    def _normalize_category_name(value: Optional[Any]) -> Optional[str]:
+        """Normalize category display names from strings or nested objects."""
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            candidate = value.get("title") or value.get("name")
+        else:
+            candidate = value
+        if candidate is None:
+            return None
+        normalized = str(candidate).strip()
+        return normalized or None
+
+    def _apply_category_contract(self, platform_name: str, result: Dict[str, Any]) -> None:
+        """Normalize stream info so frontend always receives one category contract."""
+        if platform_name == "twitch":
+            category_id = self._normalize_category_id(result.get("game_id") or result.get("category_id"))
+            category_name = self._normalize_category_name(result.get("game") or result.get("game_name"))
+            box_art_url = result.get("game_box_art_url") or result.get("box_art_url")
+
+            category_payload: Dict[str, Any] = {}
+            if category_id:
+                category_payload["id"] = category_id
+            if category_name:
+                category_payload["name"] = category_name
+                category_payload["title"] = category_name
+            if box_art_url:
+                category_payload["box_art_url"] = box_art_url
+
+            result["game_id"] = category_id
+            result["category_id"] = category_id
+            result["game"] = category_name
+            result["category_name"] = category_name
+            result["category"] = category_payload if category_payload else None
+            return
+
+        category_payload: Dict[str, Any] = {}
+        raw_category = result.get("category")
+        category_id = self._normalize_category_id(result.get("category_id"))
+        category_name = self._normalize_category_name(result.get("category_name")) or self._normalize_category_name(raw_category)
+
+        if isinstance(raw_category, dict):
+            category_id = category_id or self._normalize_category_id(raw_category.get("id"))
+            if raw_category.get("box_art_url"):
+                category_payload["box_art_url"] = raw_category.get("box_art_url")
+            if raw_category.get("cover_url"):
+                category_payload["cover_url"] = raw_category.get("cover_url")
+
+        if category_id:
+            category_payload["id"] = category_id
+        if category_name:
+            category_payload["name"] = category_name
+            category_payload["title"] = category_name
+
+        result["category_id"] = category_id
+        result["category_name"] = category_name
+        result["category"] = category_payload if category_payload else None
+
     async def get_stream_info(self, user_id: int, platform_name: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get stream info and update session tracking.
@@ -137,7 +206,9 @@ class StreamInfoService:
                         game_id,
                         exc_info=True,
                     )
-        
+
+        self._apply_category_contract(platform_name, result)
+
         logger.info(f"[STREAM_INFO] Final result: title={result.get('title')}, game={result.get('game')}, is_live={result.get('is_live')}")
         return result
 
@@ -188,6 +259,8 @@ class StreamInfoService:
             "title": "",
             "game_id": None,
             "game": None,
+            "category_id": None,
+            "category_name": None,
             "category": None,
             "viewers": 0,
             "started_at": None,

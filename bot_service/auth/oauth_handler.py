@@ -1,7 +1,8 @@
 """Shared OAuth handler for unified cross-platform authorization flows."""
 import logging
-from typing import Optional, Dict
+from typing import Optional, Dict, Any, List
 from datetime import datetime
+from urllib.parse import urlencode
 from core.datetime_utils import utcnow_naive
 from fastapi import Request, HTTPException
 from fastapi.responses import RedirectResponse
@@ -120,6 +121,149 @@ class OAuthHandler:
 
         logger.info(f"[DEACTIVATE] Marked for deactivation for user {user_id}: {deactivated_platforms}")
 
+    def get_error_redirect_url(self, platform: str, error_code: str, is_linking: bool = False) -> str:
+        """Build a frontend redirect URL for recoverable OAuth errors."""
+        base_url = FRONTEND_REDIRECTS["settings"] if is_linking else FRONTEND_REDIRECTS["login"]
+        return f"{base_url}?{urlencode({'auth_error': error_code, 'platform': platform})}"
+
+    def _get_monitored_channel(self, platform: str, user_data: OAuthUserData) -> str:
+        """Resolve the monitored channel slug used for session correlation."""
+        if platform == Platform.VK:
+            vk_channel = self._resolve_vk_channel_name(user_data) or user_data.platform_user_id
+            return vk_channel.lower()
+        return (user_data.username or user_data.platform_user_id).lower()
+
+    def _get_active_session_for_channel(self, db: Session, channel_name: str) -> Optional[UserSession]:
+        """Find an active session already associated with the monitored channel."""
+        from sqlalchemy import text
+
+        json_query = "device_info->>'monitored_channel' = :channel"
+        return db.query(UserSession).filter(
+            UserSession.is_active,
+            text(json_query)
+        ).params(channel=channel_name).first()
+
+    def _find_identity_matches(self, db: Session, platform: str, user_data: OAuthUserData) -> List[User]:
+        """Collect users that already own the current OAuth identity."""
+        from sqlalchemy import func
+
+        users_by_id: Dict[int, User] = {}
+
+        matching_tokens = db.query(UserToken).filter(
+            UserToken.platform == platform,
+            UserToken.platform_user_id == user_data.platform_user_id,
+        ).all()
+        for token in matching_tokens:
+            if not token.user_id:
+                continue
+            user = db.query(User).filter(User.id == token.user_id).first()
+            if user:
+                users_by_id[user.id] = user
+
+        if platform == Platform.TWITCH and user_data.username:
+            twitch_user = db.query(User).filter(
+                func.lower(User.twitch_username) == user_data.username.lower()
+            ).first()
+            if twitch_user:
+                users_by_id[twitch_user.id] = twitch_user
+
+        if platform == Platform.VK:
+            if user_data.username:
+                vk_user = db.query(User).filter(
+                    func.lower(User.vk_username) == user_data.username.lower()
+                ).first()
+                if vk_user:
+                    users_by_id[vk_user.id] = vk_user
+
+            vk_channel = self._resolve_vk_channel_name(user_data)
+            if vk_channel:
+                channel_user = db.query(User).filter(
+                    func.lower(User.vk_channel_name) == vk_channel.lower()
+                ).first()
+                if channel_user:
+                    users_by_id[channel_user.id] = channel_user
+
+        return list(users_by_id.values())
+
+    def _merge_users_into_target(self, target_user: User, source_users: List[User], db: Session) -> None:
+        """Merge all conflicting users into the resolved target account."""
+        seen_user_ids = {target_user.id}
+        for source_user in source_users:
+            if not source_user or source_user.id in seen_user_ids:
+                continue
+            seen_user_ids.add(source_user.id)
+            session_manager._merge_user_accounts(source_user.id, target_user.id, db, commit=False)
+
+    def _create_user_shell(self, db: Session) -> User:
+        """Create a new empty user record for a first-time OAuth login."""
+        user = User(role="user", is_active=True)
+        db.add(user)
+        db.flush()
+        logger.info("[OAUTH] Created new user shell %s", user.id)
+        return user
+
+    def _upsert_platform_token(
+        self,
+        db: Session,
+        user: User,
+        platform: str,
+        user_data: OAuthUserData,
+    ) -> bool:
+        """Create or refresh a platform token within the current transaction."""
+        encrypted_access_token = encrypt_token(user_data.access_token)
+        encrypted_refresh_token = encrypt_token(user_data.refresh_token) if user_data.refresh_token else None
+
+        token_record = db.query(UserToken).filter(
+            UserToken.user_id == user.id,
+            UserToken.platform == platform,
+        ).first()
+        token_existed = token_record is not None
+
+        if token_record is None:
+            token_record = db.query(UserToken).filter(
+                UserToken.platform == platform,
+                UserToken.platform_user_id == user_data.platform_user_id,
+            ).first()
+            if token_record and token_record.user_id != user.id:
+                token_record.user_id = user.id
+                token_existed = True
+
+        if token_record is None:
+            token_record = UserToken(
+                user_id=user.id,
+                platform=platform,
+                platform_user_id=user_data.platform_user_id,
+                avatar_url=user_data.avatar_url,
+                access_token=encrypted_access_token,
+                refresh_token=encrypted_refresh_token,
+                expires_at=user_data.expires_at,
+                scopes=user_data.scopes,
+                auth_type="full",
+                is_active=True,
+            )
+            db.add(token_record)
+            logger.info("[OAUTH] Created %s token for user %s", platform, user.id)
+            return False
+
+        token_record.platform_user_id = user_data.platform_user_id
+        token_record.avatar_url = user_data.avatar_url
+        token_record.access_token = encrypted_access_token
+        if encrypted_refresh_token is not None:
+            token_record.refresh_token = encrypted_refresh_token
+        token_record.expires_at = user_data.expires_at
+        token_record.scopes = user_data.scopes
+        token_record.auth_type = "full"
+        token_record.is_active = True
+        logger.info("[OAUTH] Updated %s token for user %s", platform, user.id)
+        return token_existed
+
+    def _apply_platform_profile(self, user: User, platform: str, user_data: OAuthUserData) -> None:
+        """Persist platform-specific profile fields on the unified user."""
+        if platform == Platform.TWITCH and user_data.username:
+            user.twitch_username = user_data.username
+        elif platform == Platform.VK:
+            self._apply_vk_profile(user, user_data)
+
     async def handle_oauth_callback(
         self,
         request: Request,
@@ -144,184 +288,62 @@ class OAuthHandler:
             OAuthResult with the resolved user and redirect metadata.
         """
         try:
-            unified_user = None
             is_linking = current_user is not None
-
             session_id = request.cookies.get('session_id')
             logger.info("[OAUTH START] session_id from cookie: %s", mask_session_id(session_id))
 
-            platform_fingerprint = f"{platform}:{user_data.platform_user_id}"
-            logger.info(f"Checking platform fingerprint: {platform_fingerprint}")
-
-            existing_token = None
-
-
-            if platform == "vk":
-                vk_channel = self._resolve_vk_channel_name(user_data) or user_data.platform_user_id
-                channel_name = vk_channel.lower() if vk_channel else user_data.platform_user_id.lower()
-            else:
-                channel_name = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
-            from sqlalchemy import text
-            json_query = "device_info->>'monitored_channel' = :channel"
-
-            active_session = db.query(UserSession).filter(
-                UserSession.is_active,
-                text(json_query)
-            ).params(channel=channel_name).first()
-
+            monitored_channel = self._get_monitored_channel(platform, user_data)
+            active_session = self._get_active_session_for_channel(db, monitored_channel)
+            active_session_user = None
             if active_session:
+                active_session_user = db.query(User).filter(User.id == active_session.user_id).first()
                 logger.info(
-                    "Found active session %s for channel %s",
+                    "[OAUTH] Active session %s found for %s (user=%s)",
                     mask_session_id(active_session.session_id),
-                    channel_name,
+                    monitored_channel,
+                    active_session.user_id,
                 )
-                existing_user = db.query(User).filter(User.id == active_session.user_id).first()
 
-                if is_linking and current_user and existing_user.id != current_user['id']:
-                    logger.warning(f"Channel {channel_name} already served by user {existing_user.id}, replacing session")
-
-                    active_session.is_active = False
-                    active_session.ended_at = utcnow_naive()
-
-                    device_info = {
-                        "user_agent": request.headers.get("user-agent"),
-                        "ip": getattr(request.client, 'host', 'unknown'),
-                        "monitored_channel": channel_name,
-                        "platform": platform,
-                        "replaced_session": active_session.session_id
-                    }
-
-                    session_id = session_manager.create_session(
-                        user_id=current_user['id'],
-                        device_info=device_info
+            current_authenticated_user = None
+            if is_linking:
+                current_authenticated_user = db.query(User).filter(User.id == current_user["id"]).first()
+                if not current_authenticated_user:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=ErrorMessages.USER_NOT_FOUND
                     )
-                    logger.info("[OK] Created replacement session: %s", mask_session_id(session_id))
 
-                    if existing_user.id != current_user['id']:
-                        session_manager._merge_user_accounts(existing_user.id, current_user['id'], db)
-                        db.delete(existing_user)
+            identity_matches = self._find_identity_matches(db, platform, user_data)
+            logger.info(
+                "[OAUTH] Identity matches for %s:%s -> %s",
+                platform,
+                user_data.platform_user_id,
+                [user.id for user in identity_matches],
+            )
 
-                    unified_user = db.query(User).filter(User.id == current_user['id']).first()
-                    logger.info(f"Replaced session for channel {channel_name}")
-
-                else:
-                    logger.info(f"Updating tokens for existing user {existing_user.id}")
-                    unified_user = existing_user
-
-                    if not is_linking:
-                        logger.info("[SECURITY] New login detected - deactivating other platform tokens")
-                        self._deactivate_other_platform_tokens(existing_user.id, platform, db)
-                    else:
-                        logger.info("[LINK] Linking integration - keeping other tokens active")
-
-                    existing_token = db.query(UserToken).filter(
-                        UserToken.user_id == existing_user.id,
-                        UserToken.platform == platform
-                    ).first()
-
-                    if existing_token:
-                        existing_token.access_token = encrypt_token(user_data.access_token)
-                        existing_token.refresh_token = encrypt_token(user_data.refresh_token) if user_data.refresh_token else existing_token.refresh_token
-                        existing_token.expires_at = user_data.expires_at
-                        existing_token.scopes = user_data.scopes
-                        existing_token.avatar_url = user_data.avatar_url
-                        existing_token.is_active = True
-                        logger.info(f"[OK] Token updated for platform {platform}")
-                    else:
-                        session_manager.save_user_tokens(
-                            user_id=existing_user.id,
-                            platform=platform,
-                            platform_user_id=user_data.platform_user_id,
-                            avatar_url=user_data.avatar_url,
-                            access_token=user_data.access_token,
-                            refresh_token=user_data.refresh_token,
-                            expires_at=user_data.expires_at,
-                            scopes=user_data.scopes
-                        )
-                        logger.info(f"[OK] New token created for platform {platform}")
-
-                    from core.token_validation_cache import token_validation_cache
-                    token_validation_cache.invalidate(existing_user.id, platform)
-                    logger.info(f"[CACHE] Token validation cache invalidated for user {existing_user.id}, platform {platform}")
-
-                    if platform == "twitch" and hasattr(user_data, 'username'):
-                        unified_user.twitch_username = user_data.username
-                    elif platform == "vk":
-                        self._apply_vk_profile(unified_user, user_data)
-
-                    db.commit()
-                    logger.info(f"Updated {platform} tokens for user {unified_user.id}")
-
-
+            unified_user = current_authenticated_user or active_session_user or (identity_matches[0] if identity_matches else None)
+            if unified_user is None:
+                logger.info("[OAUTH] No unified user found, creating a new account shell")
+                unified_user = self._create_user_shell(db)
             else:
-                if is_linking and current_user:
-                    logger.info(f"Linking {platform} to existing user {current_user['id']}")
-                    unified_user = db.query(User).filter(User.id == current_user['id']).first()
+                logger.info("[OAUTH] Using unified user %s for %s callback", unified_user.id, platform)
 
-                    if not unified_user:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=ErrorMessages.USER_NOT_FOUND
-                        )
+            merge_candidates: List[User] = []
+            if active_session_user and active_session_user.id != unified_user.id:
+                merge_candidates.append(active_session_user)
+            merge_candidates.extend(identity_matches)
+            self._merge_users_into_target(unified_user, merge_candidates, db)
 
-                    session_manager.save_user_tokens(
-                        user_id=unified_user.id,
-                        platform=platform,
-                        platform_user_id=user_data.platform_user_id,
-                        avatar_url=user_data.avatar_url,
-                        access_token=user_data.access_token,
-                        refresh_token=user_data.refresh_token,
-                        expires_at=user_data.expires_at,
-                        scopes=user_data.scopes
-                    )
-                    from core.token_validation_cache import token_validation_cache
-                    token_validation_cache.invalidate(unified_user.id, platform)
-                    logger.info("[CACHE] Token validation cache invalidated after session creation")
+            if not is_linking:
+                logger.info("[SECURITY] Fresh login for user %s via %s", unified_user.id, platform)
+                self._deactivate_other_platform_tokens(unified_user.id, platform, db)
+            else:
+                logger.info("[LINK] Linking %s to existing user %s", platform, unified_user.id)
 
-                    if platform == "twitch" and hasattr(user_data, 'username'):
-                        unified_user.twitch_username = user_data.username
-                    elif platform == "vk":
-                        self._apply_vk_profile(unified_user, user_data)
-
-                    db.commit()
-                    logger.info(f"Added {platform} integration to user {unified_user.id}")
-
-                else:
-                    logger.info(f"Creating new user for {platform} ID {user_data.platform_user_id}")
-                    from core.user_creation_service import user_creation_service
-
-                    unified_user = await user_creation_service.find_or_create_user(
-                        db=db,
-                        platform=platform,
-                        platform_user_id=user_data.platform_user_id,
-                        username=user_data.username,
-                        avatar_url=user_data.avatar_url,
-                        access_token=user_data.access_token,
-                        refresh_token=user_data.refresh_token,
-                        expires_at=user_data.expires_at,
-                        scopes=user_data.scopes,
-                        current_user_id=current_user.get('id') if current_user else None,
-                        is_admin=False
-                    )
-
-                    if platform == "vk":
-                        self._apply_vk_profile(unified_user, user_data)
-                        db.commit()
-
-                    if unified_user and not is_linking:
-                         logger.info(f"[SECURITY] Login via {platform} (User ID {unified_user.id}) - deactivating other platform tokens")
-                         self._deactivate_other_platform_tokens(unified_user.id, platform, db)
-                         db.commit()
-
-            if not unified_user:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=ErrorMessages.USER_CREATION_FAILED
-                )
-
-            # NOTE: Token save and username update are already handled in each branch above
-            # (active session update, linking, or new user creation).
-            # We only need to invalidate cache and commit here.
+            self._upsert_platform_token(db, unified_user, platform, user_data)
+            self._apply_platform_profile(unified_user, platform, user_data)
+            unified_user.is_active = True
+            db.flush()
 
             from core.token_validation_cache import token_validation_cache
             token_validation_cache.invalidate(unified_user.id, platform)
@@ -334,49 +356,18 @@ class OAuthHandler:
 
             if not is_linking:
                 is_new_session = True
-
-                if existing_token:
-                    logger.info(f"[SECURITY] New login detected for user {unified_user.id}. Terminating ALL old sessions...")
-                    session_manager.terminate_user_sessions(unified_user.id, "new_device_login", db)
-                    logger.info("[OK] All old sessions terminated. Creating new session...")
-
-                    if platform == "vk":
-                        vk_channel = self._resolve_vk_channel_name(user_data) or user_data.platform_user_id
-                        monitored_channel = vk_channel.lower()
-                    else:
-                        monitored_channel = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
-                    device_info = {
-                        "user_agent": request.headers.get("user-agent"),
-                        "ip": getattr(request.client, 'host', 'unknown'),
-                        "monitored_channel": monitored_channel,
-                        "platform": platform
-                    }
-                    session_id = session_manager.create_session(
-                        user_id=unified_user.id,
-                        device_info=device_info
-                    )
-                    logger.info("[OK] New session created: %s", mask_session_id(session_id))
-                else:
-                    logger.info(f"[SECURITY] New user login. Terminating all sessions for user {unified_user.id}...")
-                    session_manager.terminate_user_sessions(unified_user.id, "new_login", db)
-
-                    if platform == "vk":
-                        vk_channel = self._resolve_vk_channel_name(user_data) or user_data.platform_user_id
-                        monitored_channel = vk_channel.lower()
-                    else:
-                        monitored_channel = user_data.username.lower() if user_data.username else user_data.platform_user_id.lower()
-                    device_info = {
-                        "user_agent": request.headers.get("user-agent"),
-                        "ip": getattr(request.client, 'host', 'unknown'),
-                        "monitored_channel": monitored_channel,
-                        "platform": platform
-                    }
-                    logger.info(f"Creating session with device_info: {device_info}")
-                    session_id = session_manager.create_session(
-                        user_id=unified_user.id,
-                        device_info=device_info
-                    )
-                    logger.info("[OK] New session created: %s", mask_session_id(session_id))
+                device_info = {
+                    "user_agent": request.headers.get("user-agent"),
+                    "ip": getattr(request.client, 'host', 'unknown'),
+                    "monitored_channel": monitored_channel,
+                    "platform": platform
+                }
+                logger.info("[OAUTH] Creating session for user %s with device_info=%s", unified_user.id, device_info)
+                session_id = session_manager.create_session(
+                    user_id=unified_user.id,
+                    device_info=device_info
+                )
+                logger.info("[OK] New session created: %s", mask_session_id(session_id))
 
                 try:
                     from core.connection_manager import get_connection_manager
@@ -446,7 +437,7 @@ class OAuthHandler:
     def _get_redirect_url(self, platform: str, is_linking: bool, is_new_session: bool) -> str:
         """Resolve the frontend redirect URL for the current auth flow."""
         if is_linking:
-            return f"{FRONTEND_REDIRECTS['dashboard']}?auth_link={platform}&success=1"
+            return f"{FRONTEND_REDIRECTS['settings']}?auth_link={platform}&success=1"
         else:
             return f"{FRONTEND_REDIRECTS['dashboard']}?auth={platform}&success=1"
 

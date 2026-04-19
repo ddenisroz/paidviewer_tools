@@ -54,7 +54,7 @@ import { PageLoader } from '@/shared/components/ui/loader';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Switch } from '@/shared/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { DASHBOARD_TABS_LIST_CLASS, DASHBOARD_TAB_TRIGGER_CLASS, Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Textarea } from '@/shared/components/ui/textarea';
 
 
@@ -125,9 +125,6 @@ interface CommandCardProps {
 const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
 const CONTROL_TRIGGER_CLASS = 'h-9 w-full border-sky-500/25 bg-transparent text-sky-100 shadow-none data-[state=open]:border-sky-500/55';
 const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
-const TAB_TRIGGER_CLASS =
-    'shrink-0 rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none';
-
 const TRIGGER_MODE_LABELS: Record<'command' | 'keyword' | 'timer', string> = {
     command: 'По !команде',
     keyword: 'По слову',
@@ -712,22 +709,22 @@ const CommandsPage: React.FC = () => {
     return (
         <PageWrapper>
             <Tabs defaultValue="basic" className="min-w-0 space-y-6">
-                <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none bg-transparent p-0 border-b border-border">
+                <TabsList className={DASHBOARD_TABS_LIST_CLASS}>
                     <TabsTrigger
                         value="basic"
-                        className={TAB_TRIGGER_CLASS}
+                        className={DASHBOARD_TAB_TRIGGER_CLASS}
                     >
                         Базовые команды
                     </TabsTrigger>
                     <TabsTrigger
                         value="custom"
-                        className={TAB_TRIGGER_CLASS}
+                        className={DASHBOARD_TAB_TRIGGER_CLASS}
                     >
                         Кастомные команды
                     </TabsTrigger>
                     <TabsTrigger
                         value="history"
-                        className={TAB_TRIGGER_CLASS}
+                        className={DASHBOARD_TAB_TRIGGER_CLASS}
                     >
                         История
                     </TabsTrigger>

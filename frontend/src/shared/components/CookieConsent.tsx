@@ -1,44 +1,42 @@
 import React, { useEffect, useState } from 'react';
 
+const COOKIE_STORAGE_KEY = 'AcceptCookies';
+
 const CookieConsent: React.FC = () => {
     const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
-        // Проверяем, есть ли уже согласие в localStorage
-        const hasAccepted = localStorage.getItem('AcceptCookies');
+        const hasAccepted = localStorage.getItem(COOKIE_STORAGE_KEY);
         if (!hasAccepted) {
             setIsVisible(true);
         }
     }, []);
 
-    const handleAccept = () => {
-        // Сохраняем согласие в localStorage
-        localStorage.setItem('AcceptCookies', 'true');
+    const handleAccept = (): void => {
+        localStorage.setItem(COOKIE_STORAGE_KEY, 'true');
         setIsVisible(false);
     };
 
-    if (!isVisible) return null;
+    if (!isVisible) {
+        return null;
+    }
 
     return (
-        <div className="fixed bottom-4 right-4 z-50 max-w-xs">
-            <div className="relative bg-popover/95 backdrop-blur-sm border border-border/70 rounded-xl p-3 shadow-2xl animate-in slide-in-from-left-4 duration-500">
-                {/* Иконка печенья */}
+        <div className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-xs">
+            <div className="relative rounded-lg border border-border/70 bg-popover/95 p-3 shadow-2xl backdrop-blur-sm">
                 <div className="absolute -top-5 -right-2">
-                    <div className="bg-amber-500/20 rounded-full px-2 py-1 flex items-center justify-center border border-amber-500/30">
-                        <span className="text-amber-400 text-[10px] font-bold tracking-wider">COOKIE</span>
+                    <div className="flex items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/20 px-2 py-1">
+                        <span className="text-[10px] font-bold tracking-wider text-amber-400">COOKIES</span>
                     </div>
                 </div>
 
-                {/* Контент */}
                 <div className="pr-2 pt-1">
-                    <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                        Сайт использует Cookies для передачи данных об авторизации на сервер.
+                    <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+                        Cookies нужны для входа, сохранения сессии и ваших настроек.
                     </p>
-
-                    {/* Кнопка */}
                     <button
                         onClick={handleAccept}
-                        className="w-full bg-blue-700 hover:bg-blue-800 text-white text-xs font-medium py-2 px-3 rounded-lg transition-all duration-200 hover:shadow-lg"
+                        className="w-full rounded-lg bg-blue-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-800"
                     >
                         Принять
                     </button>
@@ -49,4 +47,3 @@ const CookieConsent: React.FC = () => {
 };
 
 export default CookieConsent;
-

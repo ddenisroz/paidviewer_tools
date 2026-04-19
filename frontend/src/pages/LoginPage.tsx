@@ -1,12 +1,13 @@
 ﻿// src/pages/LoginPage.tsx
 import React, { useEffect, useState } from 'react';
 
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL } from '@/constants';
 import { useAuth } from '@/context/AuthContext';
 import LoginOAuthButtons from '@/features/auth/components/LoginOAuthButtons';
 import { type OAuthPlatform, useOAuthAvailability } from '@/features/auth/hooks/useOAuthAvailability';
+import { getOAuthErrorMessage } from '@/features/auth/utils/oauthFeedback';
 import CookieConsent from '@/shared/components/CookieConsent';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
 import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
@@ -17,6 +18,7 @@ const LOGIN_FEATURES = ['TTS озвучка', 'Медиа запросы', 'Ан
 const LoginPage: React.FC = () => {
     const { isAuthenticated, isCheckingAuth } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [title, setTitle] = useState<string>('');
     const [isTyping, setIsTyping] = useState<boolean>(true);
     const [subtitleText, setSubtitleText] = useState<string>('');
@@ -24,6 +26,8 @@ const LoginPage: React.FC = () => {
     const [currentFeatureIndex, setCurrentFeatureIndex] = useState<number>(0);
     const oauthAvailability = useOAuthAvailability();
     const fullTitle = 'Paidviewer_tools';
+    const searchParams = new URLSearchParams(location.search);
+    const authErrorMessage = getOAuthErrorMessage(searchParams.get('platform'), searchParams.get('auth_error'));
 
     useEffect(() => {
         if (!isCheckingAuth && isAuthenticated) {
@@ -130,7 +134,12 @@ const LoginPage: React.FC = () => {
                         </p>
                     </div>
                 </CardHeader>
-                <CardContent className="px-8 pb-8 h-[min(140px,35vh)]">
+                <CardContent className="px-8 pb-8 space-y-4">
+                    {authErrorMessage && (
+                        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                            {authErrorMessage}
+                        </div>
+                    )}
                     <LoginOAuthButtons availability={oauthAvailability} onLogin={handleLogin} />
                 </CardContent>
             </Card>

@@ -1,63 +1,76 @@
 /* eslint-disable no-alert */
 import React, { useState } from 'react';
 
-import { AlertCircle, Settings, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { API_BASE_URL } from '@/constants';
 import { useAuth } from '@/context/AuthContext';
 import { useDonationAlerts } from '@/context/DonationAlertsContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
-import DeleteAccountModal from '@/shared/components/DeleteAccountModal';
-import PageWrapper from '@/shared/components/PageWrapper';
-import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
-import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent } from '@/shared/components/ui/card';
-import { Label } from '@/shared/components/ui/label';
-import { Switch } from '@/shared/components/ui/switch';
+import { getOAuthErrorMessage, getOAuthLinkSuccessMessage } from '@/features/auth/utils/oauthFeedback';
+import SettingsAccessCard from '@/pages/settings/components/SettingsAccessCard';
+import SettingsDashboard from '@/pages/settings/components/SettingsDashboard';
 import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
+const MAIN_PLATFORM_REQUIRED_MESSAGE = 'Сначала подключите хотя бы одну основную платформу: Twitch или VK Live.';
+
+function buildSettingsAuthMessages(searchParams: URLSearchParams): {
+    authErrorMessage: string | null;
+    authSuccessMessage: string | null;
+} {
+    return {
+        authErrorMessage: getOAuthErrorMessage(searchParams.get('platform'), searchParams.get('auth_error')),
+        authSuccessMessage: searchParams.get('success') === '1'
+            ? getOAuthLinkSuccessMessage(searchParams.get('auth_link'))
+            : null,
+    };
+}
+
+function redirectToPlatformAuth(platform: 'twitch' | 'vk'): void {
+    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, `/auth/${platform}/login`);
+    if (!safeUrl) {
+        logger.error('[SETTINGS] Blocked unsafe platform auth redirect URL', { platform, API_BASE_URL });
+        return;
+    }
+
+    window.location.href = safeUrl;
+}
+
+function createPlatformToggleHandler(
+    platform: 'twitch' | 'vk',
+    isEnabled: boolean | undefined,
+    updateIntegration: (checked: boolean, onClose?: (() => void) | null) => Promise<void> | void,
+): (checked: boolean) => void {
+    return (checked: boolean) => {
+        if (checked && !isEnabled) {
+            redirectToPlatformAuth(platform);
+            return;
+        }
+
+        updateIntegration(checked, null);
+    };
+}
+
 const SettingsMainPage: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { user, isAuthenticated } = useAuth();
     const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
     const { isConnected: daConnected, isLoading: daLoading, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
-
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+    const searchParams = new URLSearchParams(location.search);
+    const { authErrorMessage, authSuccessMessage } = buildSettingsAuthMessages(searchParams);
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
-    const twitchLabel = integrations.twitch?.username || user?.twitch_username;
-    const vkLabel = integrations.vk?.username || user?.vk_channel_name || user?.vk_username;
-
-    const handlePlatformConnect = (platform: 'twitch' | 'vk'): void => {
-        const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, `/auth/${platform}/login`);
-        if (!safeUrl) {
-            logger.error('[SETTINGS] Blocked unsafe platform auth redirect URL', { platform, API_BASE_URL });
-            return;
-        }
-        window.location.href = safeUrl;
-    };
-
-    const handleTwitchToggle = (checked: boolean): void => {
-        if (checked && !integrations.twitch?.enabled) {
-            handlePlatformConnect('twitch');
-            return;
-        }
-        updateTwitchIntegration(checked, null);
-    };
-
-    const handleVkToggle = (checked: boolean): void => {
-        if (checked && !integrations.vk?.enabled) {
-            handlePlatformConnect('vk');
-            return;
-        }
-        updateVkIntegration(checked, null);
-    };
+    const twitchLabel = integrations.twitch?.username || user?.twitch_username || 'Не подключено';
+    const vkLabel = integrations.vk?.username || user?.vk_channel_name || user?.vk_username || 'Не подключено';
+    const handleTwitchToggle = createPlatformToggleHandler('twitch', integrations.twitch?.enabled, updateTwitchIntegration);
+    const handleVkToggle = createPlatformToggleHandler('vk', integrations.vk?.enabled, updateVkIntegration);
 
     const handleDonationAlertsToggle = async (checked: boolean): Promise<void> => {
         if (!hasMainIntegration) {
-            alert('Сначала подключите хотя бы одну основную платформу (Twitch или VK Live).');
+            alert(MAIN_PLATFORM_REQUIRED_MESSAGE);
             return;
         }
 
@@ -70,121 +83,28 @@ const SettingsMainPage: React.FC = () => {
     };
 
     if (!isAuthenticated) {
-        return (
-            <PageWrapper title="Настройки">
-                <Card className="card-glass border-border/70 bg-card/70">
-                    <CardContent className="pt-16 pb-16 flex flex-col items-center justify-center text-center space-y-6">
-                        <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
-                            <AlertCircle className="w-10 h-10 text-muted-foreground" />
-                        </div>
-                        <div className="space-y-2 max-w-md">
-                            <h3 className="text-xl font-semibold text-foreground">Требуется авторизация</h3>
-                            <p className="text-muted-foreground text-sm">Для доступа к настройкам необходимо войти в систему.</p>
-                        </div>
-                        <Button onClick={() => navigate('/login')} className="gap-2">
-                            <Settings className="w-4 h-4" />
-                            Войти в систему
-                        </Button>
-                    </CardContent>
-                </Card>
-            </PageWrapper>
-        );
+        return <SettingsAccessCard onLogin={() => navigate('/login')} />;
     }
 
     return (
-        <PageWrapper title="Настройки">
-            <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="card-glass p-4 flex flex-col justify-between h-full">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <TwitchIcon width="32" height="32" className="text-[#9146FF]" />
-                                <div className="flex flex-col">
-                                    <Label className="text-base font-medium text-foreground">Twitch</Label>
-                                    <span className="text-xs text-muted-foreground">{twitchLabel || 'Не подключено'}</span>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={integrations.twitch?.enabled || false}
-                                onCheckedChange={handleTwitchToggle}
-                                className="data-[state=checked]:border-[#9146FF] data-[state=checked]:bg-[#9146FF]"
-                            />
-                        </div>
-                    </Card>
-
-                    <Card className="card-glass p-4 flex flex-col justify-between h-full">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <VKIcon width="32" height="32" className="text-[#FF4444]" />
-                                <div className="flex flex-col">
-                                    <Label className="text-base font-medium text-foreground">VK Live</Label>
-                                    <span className="text-xs text-muted-foreground">{vkLabel || 'Не подключено'}</span>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={integrations.vk?.enabled || false}
-                                onCheckedChange={handleVkToggle}
-                                className="data-[state=checked]:border-[#FF4444] data-[state=checked]:bg-[#FF4444]"
-                            />
-                        </div>
-                    </Card>
-
-                    <Card className="card-glass p-4 flex flex-col justify-between h-full">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <DonationAlertsIcon width="32" height="32" />
-                                <div className="flex flex-col">
-                                    <Label className="text-base font-medium text-foreground">DonationAlerts</Label>
-                                    <span className="text-xs text-muted-foreground">{daConnected ? 'Подключено' : 'Не подключено'}</span>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={daConnected}
-                                onCheckedChange={handleDonationAlertsToggle}
-                                disabled={daLoading || !hasMainIntegration}
-                                className="data-[state=checked]:border-orange-500 data-[state=checked]:bg-orange-500"
-                            />
-                        </div>
-                    </Card>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="card-glass flex flex-col gap-2 p-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground text-sm">ID пользователя:</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-lg text-foreground">{user?.id}</span>
-                        </div>
-                    </Card>
-
-                    <Card className="card-glass flex flex-col gap-3 p-4 border-red-500/30 bg-red-500/10">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Trash2 className="h-5 w-5 text-red-500 flex-shrink-0" />
-                                <span className="text-sm font-semibold text-red-500">Опасная зона</span>
-                            </div>
-                            <Button
-                                variant="destructive"
-                                onClick={() => setShowDeleteModal(true)}
-                                className="bg-red-600 hover:bg-red-700 h-8 text-xs"
-                                size="sm"
-                            >
-                                Удалить аккаунт
-                            </Button>
-                        </div>
-                        <div className="flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 text-red-400/80 flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-red-400/80 leading-relaxed">
-                                Необратимое действие. Удаление аккаунта приведет к полной потере данных.
-                            </p>
-                        </div>
-                    </Card>
-                </div>
-
-                <DeleteAccountModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} />
-            </div>
-        </PageWrapper>
+        <SettingsDashboard
+            authErrorMessage={authErrorMessage}
+            authSuccessMessage={authSuccessMessage}
+            daConnected={daConnected}
+            daLoading={daLoading}
+            hasMainIntegration={hasMainIntegration}
+            onCloseDeleteModal={() => setShowDeleteModal(false)}
+            onDonationAlertsToggle={handleDonationAlertsToggle}
+            onOpenDeleteModal={() => setShowDeleteModal(true)}
+            onTwitchToggle={handleTwitchToggle}
+            onVkToggle={handleVkToggle}
+            showDeleteModal={showDeleteModal}
+            twitchEnabled={integrations.twitch?.enabled || false}
+            twitchLabel={twitchLabel}
+            userId={user?.id}
+            vkEnabled={integrations.vk?.enabled || false}
+            vkLabel={vkLabel}
+        />
     );
 };
 

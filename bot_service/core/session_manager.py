@@ -25,7 +25,7 @@ class SessionManager:
         self.session_timeout = timedelta(days=3650)  # 10 years, effectively infinite for runtime purposes.
 
 
-    def _merge_user_accounts(self, source_user_id: int, target_user_id: int, db: Session):
+    def _merge_user_accounts(self, source_user_id: int, target_user_id: int, db: Session, *, commit: bool = True):
         """Merge two accounts by moving all data from source to target."""
         try:
             logger.info(f"Merging user {source_user_id} into user {target_user_id}")
@@ -37,11 +37,48 @@ class SessionManager:
             if not source_user or not target_user:
                 raise ValueError("Source or target user not found")
 
-            # Copy platform usernames if they are missing on the target user.
-            if not target_user.twitch_username and source_user.twitch_username:
-                target_user.twitch_username = source_user.twitch_username
-            if not target_user.vk_username and source_user.vk_username:
-                target_user.vk_username = source_user.vk_username
+            # Move unique platform identifiers in two steps so unique constraints
+            # cannot trip before the source row is deleted.
+            source_twitch_username = source_user.twitch_username
+            source_vk_username = source_user.vk_username
+            source_vk_channel_name = source_user.vk_channel_name
+
+            if not target_user.twitch_username and source_twitch_username:
+                source_user.twitch_username = None
+            if not target_user.vk_username and source_vk_username:
+                source_user.vk_username = None
+            if not target_user.vk_channel_name and source_vk_channel_name:
+                source_user.vk_channel_name = None
+
+            db.flush()
+
+            if not target_user.twitch_username and source_twitch_username:
+                target_user.twitch_username = source_twitch_username
+            if not target_user.vk_username and source_vk_username:
+                target_user.vk_username = source_vk_username
+            if not target_user.vk_channel_name and source_vk_channel_name:
+                target_user.vk_channel_name = source_vk_channel_name
+
+            # Preserve the most privileged platform flags and global account state.
+            target_user.is_admin = bool(target_user.is_admin or source_user.is_admin)
+            target_user.is_active = bool(target_user.is_active or source_user.is_active)
+            target_user.is_blocked = bool(target_user.is_blocked or source_user.is_blocked)
+            if source_user.blocked_reason and not target_user.blocked_reason:
+                target_user.blocked_reason = source_user.blocked_reason
+            if source_user.blocked_at and not target_user.blocked_at:
+                target_user.blocked_at = source_user.blocked_at
+            if source_user.role == "admin" and target_user.role != "admin":
+                target_user.role = source_user.role
+
+            target_user.twitch_is_broadcaster = bool(target_user.twitch_is_broadcaster or source_user.twitch_is_broadcaster)
+            target_user.twitch_is_moderator = bool(target_user.twitch_is_moderator or source_user.twitch_is_moderator)
+            target_user.twitch_is_vip = bool(target_user.twitch_is_vip or source_user.twitch_is_vip)
+            target_user.twitch_is_subscriber = bool(target_user.twitch_is_subscriber or source_user.twitch_is_subscriber)
+            target_user.vk_is_owner = bool(target_user.vk_is_owner or source_user.vk_is_owner)
+            target_user.vk_is_moderator = bool(target_user.vk_is_moderator or source_user.vk_is_moderator)
+
+            target_user.combine_titles = bool(target_user.combine_titles or source_user.combine_titles)
+            target_user.combine_categories = bool(target_user.combine_categories or source_user.combine_categories)
 
             # Move tokens.
             source_tokens = db.query(UserToken).filter(UserToken.user_id == source_user_id).all()
@@ -78,6 +115,9 @@ class SessionManager:
                         source_value = getattr(source_settings, column.name)
                         if source_value is not None:
                             setattr(target_settings, column.name, source_value)
+                db.delete(source_settings)
+            elif source_settings and not target_settings:
+                source_settings.user_id = target_user_id
 
             # Merge TTS settings.
             source_tts_settings = db.query(TTSUserSettings).filter(TTSUserSettings.user_id == source_user_id).first()
@@ -90,6 +130,9 @@ class SessionManager:
                         source_value = getattr(source_tts_settings, column.name)
                         if source_value is not None:
                             setattr(target_tts_settings, column.name, source_value)
+                db.delete(source_tts_settings)
+            elif source_tts_settings and not target_tts_settings:
+                source_tts_settings.user_id = target_user_id
 
             # Reassign sessions.
             db.query(UserSession).filter(UserSession.user_id == source_user_id).update({
@@ -102,7 +145,10 @@ class SessionManager:
             db.delete(source_user)
             logger.info(f"[DELETE] Source user {source_user_id} deleted after merge")
 
-            db.commit()
+            if commit:
+                db.commit()
+            else:
+                db.flush()
             logger.info(f"Successfully merged user {source_user_id} into user {target_user_id}")
 
         except Exception as e:
