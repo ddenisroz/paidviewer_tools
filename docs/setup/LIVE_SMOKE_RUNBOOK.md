@@ -20,7 +20,7 @@
 4. `self_host via tts_worker_agent` для `qwen`
 5. `drops` duplicate-event/session-boundary
 6. `youtube` next/skip/reorder
-7. `vk` bot OAuth beta flow
+7. `vk` bot OAuth GA flow
 
 ## Preflight
 
@@ -121,13 +121,13 @@
 - reorder сохраняется на сервере
 - natural end не ломает переход на следующий ролик
 
-### S7. VK bot OAuth beta flow
+### S7. VK bot OAuth GA flow
 
 Ожидаемо:
 
 - bot OAuth возвращает нормализованные коды ошибок
 - успешный callback поднимает bot runtime или честно возвращает `restart_failed`
-- VK остаётся beta-tier, но без ложного success-state
+- VK работает как GA-интеграция; отсутствующие возможности должны отражаться capability flags, а не beta-статусом
 
 ## Критерий успеха
 
@@ -137,7 +137,7 @@
 2. `f5` и `qwen` работают через `self_host` именно через `tts_worker_agent`
 3. `drops` не дублируют награды на повторных событиях
 4. `youtube` queue/runtime проходит smoke без ручного восстановления
-5. `vk` bot OAuth beta flow не даёт ложных success-state
+5. `vk` bot OAuth GA flow не даёт ложных success-state
 6. frontend везде остаётся backend-only
 
 ## Для презентационного smoke

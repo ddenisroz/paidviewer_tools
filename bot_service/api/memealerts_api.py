@@ -136,8 +136,18 @@ async def get_memealerts_status(
                     "platform_user_id": token.platform_user_id
                 }
             except ValueError:
-                # Token is invalid, but exists
-                return {"success": True, "connected": True}
+                if token.platform_user_id:
+                    return {
+                        "success": True,
+                        "connected": True,
+                        "streamer_id": token.platform_user_id,
+                        "platform_user_id": token.platform_user_id,
+                    }
+                return {
+                    "success": True,
+                    "connected": False,
+                    "reason": "MemeAlerts token must be reconnected",
+                }
         
         return {"success": True, "connected": False}
     except Exception:
@@ -289,7 +299,7 @@ async def connect_memealerts(
         try:
             decoded = decode_memealerts_token(access_token)
         except ValueError:
-            logger.warning("MemeAlerts token is not a decodable JWT, proceeding with fallback platform_user_id")
+            logger.warning("MemeAlerts token is not a decodable JWT; validation requires an existing streamer id")
 
         claimed_streamer_id = (
             decoded.get("id")
@@ -302,28 +312,28 @@ async def connect_memealerts(
         streamer_id = trusted_streamer_id or claimed_streamer_id
         token_scope = decoded.get("scope")
 
-        # platform_user_id is non-nullable in user_tokens; keep connect flow resilient.
         if not streamer_id:
-            streamer_id = f"user-{user_id}"
-            logger.warning(
-                "MemeAlerts token has no streamer id claim; using fallback platform_user_id=%s",
-                streamer_id,
+            raise HTTPException(
+                status_code=400,
+                detail="MemeAlerts token does not include a streamer id. Reconnect through MemeAlerts and try again.",
             )
-        elif trusted_streamer_id:
+
+        service = MemeAlertsService(db)
+        try:
+            await service.validate_access_token(access_token, str(streamer_id))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        if trusted_streamer_id:
             logger.info("MemeAlerts connect: preserving existing trusted streamer_id for user %s", user_id)
         else:
-            logger.info(f"MemeAlerts token decoded (unverified claims): streamer_id={streamer_id}, scope={token_scope}")
-
-        # Optional: Validate token by making a test API call
-        # This verifies the token is actually valid and not expired
-        # Commenting out for now as we don't know a safe endpoint
-        # async with httpx.AsyncClient() as client:
-        #     response = await client.get(
-        #         f"{MEMEALERTS_API_BASE}/user/me",
-        #         headers={"Authorization": f"Bearer {access_token}"}
-        #     )
-        #     if response.status_code != 200:
-        #         raise HTTPException(status_code=400, detail="Token validation failed")
+            logger.info(
+                "MemeAlerts token validated for streamer_id=%s, scope=%s",
+                streamer_id,
+                token_scope,
+            )
 
         # Store token in database
         token_repo = UserTokenRepository(db)

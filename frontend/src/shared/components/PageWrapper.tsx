@@ -22,7 +22,7 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({
     hideTitle = true
 }) => {
     return (
-        <div className={`container mx-auto px-6 py-4 space-y-6 min-h-[600px] ${className}`} style={{ scrollbarGutter: 'stable' }}>
+        <div className={`container mx-auto w-full max-w-full px-4 py-4 space-y-6 min-h-[600px] sm:px-6 ${className}`} style={{ scrollbarGutter: 'stable' }}>
             {/* Page title */}
             {(title && !hideTitle) && (
                 <div className="mb-6">
@@ -47,7 +47,7 @@ export const PageWrapper: React.FC<PageWrapperProps> = ({
             )}
 
             {/* Page content */}
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6">
                 {children}
             </div>
         </div>

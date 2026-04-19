@@ -38,6 +38,33 @@ class UserTokenRepository(BaseRepository[UserToken]):
             UserToken.platform == platform
         ).first()
 
+    def get_by_platform_identity(self, platform: str, platform_user_id: str) -> Optional[UserToken]:
+        """Get a token by external platform identity."""
+        return self.db.query(UserToken).filter(
+            UserToken.platform == platform,
+            UserToken.platform_user_id == str(platform_user_id),
+            UserToken.user_id.isnot(None),
+        ).first()
+
+    def get_identity_conflict(
+        self,
+        *,
+        user_id: int,
+        platform: str,
+        platform_user_id: str,
+        token_id: Optional[int] = None,
+    ) -> Optional[UserToken]:
+        """Find another user-owned token for the same external identity."""
+        query = self.db.query(UserToken).filter(
+            UserToken.platform == platform,
+            UserToken.platform_user_id == str(platform_user_id),
+            UserToken.user_id.isnot(None),
+            UserToken.user_id != user_id,
+        )
+        if token_id is not None:
+            query = query.filter(UserToken.id != token_id)
+        return query.first()
+
     def get_active_token(self, user_id: int, platform: str) -> Optional[UserToken]:
         """Get an active user token for the selected platform."""
         return self.db.query(UserToken).filter(
@@ -74,13 +101,25 @@ class UserTokenRepository(BaseRepository[UserToken]):
     ) -> UserToken:
         """Create or update a token."""
         token = self.get_by_user_and_platform(user_id, platform)
+        normalized_platform_user_id = str(platform_user_id).strip() if platform_user_id else None
+        if normalized_platform_user_id:
+            conflict = self.get_identity_conflict(
+                user_id=user_id,
+                platform=platform,
+                platform_user_id=normalized_platform_user_id,
+                token_id=token.id if token else None,
+            )
+            if conflict:
+                raise ValueError(
+                    f"{platform} identity {normalized_platform_user_id} is already linked to another user"
+                )
         
         if token:
             token.access_token = access_token
             if refresh_token:
                 token.refresh_token = refresh_token
-            if platform_user_id:
-                token.platform_user_id = platform_user_id
+            if normalized_platform_user_id:
+                token.platform_user_id = normalized_platform_user_id
             if expires_at:
                 token.expires_at = expires_at
             if scopes is not None:
@@ -93,7 +132,7 @@ class UserTokenRepository(BaseRepository[UserToken]):
                 platform=platform,
                 access_token=access_token,
                 refresh_token=refresh_token,
-                platform_user_id=platform_user_id,
+                platform_user_id=normalized_platform_user_id,
                 expires_at=expires_at,
                 scopes=scopes or [],
                 avatar_url=avatar_url,

@@ -19,6 +19,13 @@ from repositories.bot_token_repository import BotTokenRepository
 logger = logging.getLogger(__name__)
 
 
+def _current_settings():
+    """Return the live settings object instead of a stale import captured before tests reload config."""
+    from core.config import settings as live_settings
+
+    return live_settings
+
+
 class VkBotOAuthService:
     """Service for VK Live bot OAuth authorization with refresh-token support."""
     REFRESH_IF_NEEDED_THRESHOLD_SECONDS = 15 * 60
@@ -35,12 +42,13 @@ class VkBotOAuthService:
     def get_authorization_url(state: str) -> str:
         """Build the VK Live bot OAuth authorization URL."""
         import urllib.parse
+        app_settings = _current_settings()
         
         scopes = ','.join(VkBotOAuthService.BOT_SCOPES)
-        redirect_uri = settings.vk_bot_redirect_uri
+        redirect_uri = app_settings.vk_bot_redirect_uri
         
         params = {
-            "client_id": settings.vk_client_id,
+            "client_id": app_settings.vk_client_id,
             "redirect_uri": redirect_uri,
             "response_type": "code",
             "scope": scopes,
@@ -56,13 +64,14 @@ class VkBotOAuthService:
     @staticmethod
     async def exchange_code_for_token(code: str) -> Dict[str, Any]:
         """Exchange an authorization code for access and refresh tokens."""
-        if not all([settings.vk_client_id, settings.vk_client_secret]):
+        app_settings = _current_settings()
+        if not all([app_settings.vk_client_id, app_settings.vk_client_secret]):
             raise ValueError("VK credentials not configured")
         
-        redirect_uri = settings.vk_bot_redirect_uri
+        redirect_uri = app_settings.vk_bot_redirect_uri
         
         # Basic Auth
-        credentials = f"{settings.vk_client_id}:{settings.vk_client_secret}"
+        credentials = f"{app_settings.vk_client_id}:{app_settings.vk_client_secret}"
         base64_credentials = base64.b64encode(credentials.encode()).decode()
 
         headers = {
@@ -96,27 +105,8 @@ class VkBotOAuthService:
     @staticmethod
     async def get_bot_user_info(access_token: str) -> Dict[str, Any]:
         """Fetch bot account information from the VK API."""
-        ssl_verify = settings.is_production
-        # Check dev API first, then prod
-        async with httpx.AsyncClient(timeout=10.0, verify=ssl_verify) as client:
-            # Try Dev API
-            try:
-                 response = await client.get(
-                      "https://apidev.live.vkvideo.ru/v1/current_user",
-                      headers={"Authorization": f"Bearer {access_token}"}
-                 )
-                 if response.status_code == 200:
-                      data = response.json()
-                      user = data.get("data", {}).get("user", {})
-                      return {
-                           'id': str(user.get('id')),
-                           'login': user.get('nick'),
-                           'display_name': user.get('nick')
-                      }
-            except Exception as e:
-                 logger.exception("Dev API check failed")
-
-            # Try Prod API fallback
+        async with httpx.AsyncClient(timeout=10.0, verify=True) as client:
+            # Try Prod API first; dev is an explicit fallback.
             try:
                  response = await client.get(
                       "https://api.live.vkvideo.ru/v1/current_user",
@@ -132,6 +122,23 @@ class VkBotOAuthService:
                       }
             except Exception as e:
                  logger.exception("Prod API check failed")
+
+            # Try Dev API fallback
+            try:
+                 response = await client.get(
+                      "https://apidev.live.vkvideo.ru/v1/current_user",
+                      headers={"Authorization": f"Bearer {access_token}"}
+                 )
+                 if response.status_code == 200:
+                      data = response.json()
+                      user = data.get("data", {}).get("user", {})
+                      return {
+                           'id': str(user.get('id')),
+                           'login': user.get('nick'),
+                           'display_name': user.get('nick')
+                      }
+            except Exception as e:
+                 logger.exception("Dev API fallback failed")
 
             raise Exception("Failed to get VK user info")
     

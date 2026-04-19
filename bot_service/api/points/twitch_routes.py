@@ -28,6 +28,12 @@ async def get_twitch_rewards(
         return JSONResponse(content={
             "success": True,
             "platform": "twitch",
+            "capability": {
+                "can_create": True,
+                "reason": None,
+                "required_role": "affiliate_or_partner",
+                "platform": "twitch",
+            },
             "rewards": rewards
         })
 

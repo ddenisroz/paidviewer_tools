@@ -40,7 +40,7 @@ class RateLimiter:
 class VKBase:
     """Base class for VK API modules."""
     
-    BASE_URL = "https://apidev.live.vkvideo.ru"
+    BASE_URL = "https://api.live.vkvideo.ru"
 
 
     

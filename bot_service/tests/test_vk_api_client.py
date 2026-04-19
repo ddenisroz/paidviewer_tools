@@ -25,7 +25,7 @@ class TestVKLiveAPIClient:
     async def test_client_initialization(self):
         """Тест инициализации клиента"""
         client = VKLiveAPIClient()
-        assert client.base_url == "https://apidev.live.vkvideo.ru"
+        assert client.base_url == "https://api.live.vkvideo.ru"
         assert client.client is not None
         await client.close()
         

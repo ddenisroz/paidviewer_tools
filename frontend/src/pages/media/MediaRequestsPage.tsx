@@ -6,7 +6,6 @@ import { MemeAlertsRewards } from '@/features/drops/components/MemeAlertsRewards
 import DropsMainPage from '@/features/drops/pages/DropsMainPage';
 import YoutubeIntegrationPage from '@/pages/media/YoutubeIntegrationPage';
 import PageWrapper from '@/shared/components/PageWrapper';
-import { Card, CardContent } from '@/shared/components/ui/card';
 
 const MediaRequestsPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -19,13 +18,7 @@ const MediaRequestsPage: React.FC = () => {
             case 'youtube':
                 return <YoutubeIntegrationPage />;
             case 'memealerts':
-                return (
-                    <Card className="card-glass">
-                        <CardContent className="pt-6">
-                            <MemeAlertsRewards />
-                        </CardContent>
-                    </Card>
-                );
+                return <MemeAlertsRewards />;
             case 'drops':
                 return <DropsMainPage />;
             default:

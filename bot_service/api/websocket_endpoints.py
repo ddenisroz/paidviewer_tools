@@ -17,6 +17,7 @@ from core.database import ChatMessage, get_db
 from core.connection_manager import get_connection_manager
 from core.session_manager import session_manager
 from services.memory_websocket_manager import get_memory_websocket_manager
+from repositories.chatbox_repository import ChatBoxRepository
 from repositories.user_repository import UserRepository
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,119 @@ async def _resolve_authenticated_user_id(websocket: WebSocket) -> Optional[int]:
     return user_id
 
 
+async def _resolve_chatbox_token_user_id(token: str) -> Optional[int]:
+    """Resolve a public OBS ChatBox token to its owner user_id."""
+    cleaned_token = (token or "").strip()
+    if not cleaned_token:
+        return None
+
+    def _db_query() -> Optional[int]:
+        db = next(get_db())
+        try:
+            settings_row = ChatBoxRepository(db).get_by_token(cleaned_token)
+            if not settings_row:
+                return None
+            return int(settings_row.user_id)
+        finally:
+            db.close()
+
+    return await asyncio.to_thread(_db_query)
+
+
+async def _run_chat_connection(
+    websocket: WebSocket,
+    user_id_int: int,
+    *,
+    client_role: str,
+    presence_only: bool,
+    display_user_id: str,
+    manage_tts_disconnect: bool,
+) -> None:
+    """Run the shared chat websocket loop after auth/token validation."""
+    await websocket.accept()
+
+    manager = get_memory_websocket_manager()
+    conn_mgr = get_connection_manager()
+
+    if manage_tts_disconnect:
+        conn_mgr.cancel_tts_disconnect(user_id_int)
+
+    conn_id = await manager.add_connection(
+        websocket,
+        user_id_int,
+        f"user_{user_id_int}",
+        "chat",
+        client_role=client_role,
+        presence_only=presence_only,
+    )
+    logger.info(
+        "[WS] Connected: %s (User: %s, role=%s, presence_only=%s)",
+        conn_id,
+        display_user_id,
+        client_role,
+        presence_only,
+    )
+
+    history_task: asyncio.Task | None = None
+    if not presence_only:
+        history_task = asyncio.create_task(_send_chat_history(websocket, user_id_int))
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+
+            try:
+                message = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+
+            if message.get("type") == "ping":
+                await manager.handle_ping(conn_id)
+                continue
+
+            # Keep non-heartbeat client chatter out of warning/error logs.
+            msg_type = message.get("type", "unknown")
+            if msg_type != "pong":
+                logger.debug("[WS] User %s sent: %s", display_user_id, msg_type)
+
+    except Exception as e:
+        e_str = str(e)
+        if "1000" in e_str or "1001" in e_str or "closed" in e_str.lower():
+            logger.info("[WS] Disconnected cleanly: %s", display_user_id)
+        else:
+            logger.warning("[WS] Error user %s: %s", display_user_id, e)
+
+    finally:
+        if history_task and not history_task.done():
+            history_task.cancel()
+
+        await manager.remove_connection(conn_id)
+
+        if not manage_tts_disconnect:
+            return
+
+        remaining = manager.get_user_connections(user_id_int)
+        if not remaining:
+            pending = conn_mgr.pending_tts_disconnects.get(user_id_int)
+            if pending and not pending.done():
+                logger.debug(
+                    "[WS] TTS disconnect already scheduled for %s, skipping duplicate schedule",
+                    display_user_id,
+                )
+            else:
+                logger.info(
+                    "[WS] No active connections for %s, scheduling TTS disconnect",
+                    display_user_id,
+                )
+                await _schedule_tts_disconnect(user_id_int)
+        else:
+            logger.debug(
+                "[WS] User %s still has %s connections, skipping disconnect timer",
+                display_user_id,
+                len(remaining),
+            )
+
+
 @router.websocket("/ws/chat/{user_id}")
 async def websocket_chat(websocket: WebSocket, user_id: str):
     """
@@ -169,92 +283,40 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
         await websocket.close(code=4403)
         return
 
-    await websocket.accept()
-
-    manager = get_memory_websocket_manager()
-    conn_mgr = get_connection_manager()
     client_role = (websocket.query_params.get("client_role") or "dashboard").strip().lower()
     presence_only_raw = websocket.query_params.get("presence_only")
     presence_only = str(presence_only_raw).strip().lower() in {"1", "true", "yes", "on"}
 
-    # Zombie Check: Close existing chat connections for this user to prevent duplicates
-    # This is a basic implementation; for multiple tabs support, we might need a different strategy.
-    # But for stability, ensuring 1 main connection is safer.
-    # DISABLED to prevent infinite loops during stabilization
-    # active_conns = manager.get_active_connections(user_id_int)
-    # for conn in active_conns:
-    #     if conn.connection_type == 'chat':
-    #         logger.info(f"[WS] Closing stale connection {conn.connection_id} for user {user_id}")
-    #         # We can't easily close the *socket* of the other task here without access to it, 
-    #         # but we can remove it from manager so it stops receiving broadcasts.
-    #         # Ideally the client handles single-tab logic.
-    #         pass 
-
-    # Cancel TTS disconnect timer
-    conn_mgr.cancel_tts_disconnect(user_id_int)
-    
-    # Register connection
-    conn_id = await manager.add_connection(
+    await _run_chat_connection(
         websocket,
         user_id_int,
-        f"user_{user_id}",
-        "chat",
         client_role=client_role,
-        presence_only=presence_only
+        presence_only=presence_only,
+        display_user_id=user_id,
+        manage_tts_disconnect=True,
     )
-    logger.info(
-        f"[WS] Connected: {conn_id} (User: {user_id}, role={client_role}, presence_only={presence_only})"
+
+
+@router.websocket("/ws/chat-overlay/{token}")
+async def websocket_chat_overlay(websocket: WebSocket, token: str):
+    """Token-scoped OBS chat overlay websocket; no session cookie required."""
+    token_preview = (token or "")[:8]
+    logger.info("[WS] Overlay connection request for token %s...", token_preview)
+
+    user_id_int = await _resolve_chatbox_token_user_id(token)
+    if not user_id_int:
+        logger.warning("[WS] Invalid chat overlay token %s..., closing", token_preview)
+        await websocket.close(code=4401)
+        return
+
+    await _run_chat_connection(
+        websocket,
+        user_id_int,
+        client_role="overlay",
+        presence_only=False,
+        display_user_id=f"overlay:{user_id_int}",
+        manage_tts_disconnect=False,
     )
-    
-    history_task: asyncio.Task | None = None
-    if not presence_only:
-        history_task = asyncio.create_task(_send_chat_history(websocket, user_id_int))
-    
-    try:
-        while True:
-            # heartbeat logic could go here if not handled by standard ping/pong
-            data = await websocket.receive_text()
-            
-            try:
-                message = json.loads(data)
-                if message.get("type") == "ping":
-                    await manager.handle_ping(conn_id)
-                    continue
-                
-                # Basic validation to avoid log spam
-                msg_type = message.get('type', 'unknown')
-                if msg_type != 'pong':
-                     logger.debug(f"[WS] User {user_id} sent: {msg_type}")
-
-            except json.JSONDecodeError:
-                pass
-                
-    except Exception as e:
-        # Normal disconnects (1000, 1001) raise exceptions in starlette/fastapi sometimes
-        # check string to avoid scary logs for normal disconnects
-        e_str = str(e)
-        if "1000" in e_str or "1001" in e_str or "closed" in e_str.lower():
-            logger.info(f"[WS] Disconnected cleanly: {user_id}")
-        else:
-            logger.warning(f"[WS] Error user {user_id}: {e}")
-            
-    finally:
-        if history_task and not history_task.done():
-            history_task.cancel()
-
-        await manager.remove_connection(conn_id)
-        
-        # Schedule TTS disconnect if no other connections remain
-        remaining = manager.get_user_connections(user_id_int)
-        if not remaining:
-            pending = conn_mgr.pending_tts_disconnects.get(user_id_int)
-            if pending and not pending.done():
-                logger.debug(f"[WS] TTS disconnect already scheduled for {user_id}, skipping duplicate schedule")
-            else:
-                logger.info(f"[WS] No active connections for {user_id}, scheduling TTS disconnect")
-                await _schedule_tts_disconnect(user_id_int)
-        else:
-             logger.debug(f"[WS] User {user_id} still has {len(remaining)} connections, skipping disconnect timer")
 
 
 async def _schedule_tts_disconnect(user_id: int) -> None:

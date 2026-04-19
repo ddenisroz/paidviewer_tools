@@ -6,7 +6,7 @@
 - pinned `BOT_SERVICE_IMAGE`, `FRONTEND_IMAGE`, `TTS_GATEWAY_IMAGE`, `F5_TTS_IMAGE`, `QWEN_TTS_IMAGE` are set
 - `docker-compose.prod.yml` validates and contains no host-port conflicts
 - migrations apply without manual patching
-- `VK Live` is marked `beta`, while `Twitch` remains the primary GA platform
+- `VK Live` and `Twitch` are both GA platform integrations
 - canonical admin route is only `/dashboard/admin`
 
 ## Env contract
@@ -32,7 +32,7 @@
 4. `self_host x qwen via tts_worker_agent`
 5. `drops duplicate-event/session-boundary`
 6. `youtube next/skip/reorder`
-7. `vk bot OAuth beta flow`
+7. `vk bot OAuth GA flow`
 
 ## Demo gate
 
@@ -50,6 +50,6 @@
 ## Known issues
 
 - raw endpoint mode remains compatibility-only and is not the primary UX
-- `VK Live` stays beta-tier and may expose fewer badges/moderation capabilities than Twitch
+- `VK Live` has a GA smoke gate; platform capability gaps must be represented by explicit capability flags, not beta copy
 - large legacy frontend screens still need a separate tech-debt refactor sprint after release
 - `f5-tts-service/vendor/F5-TTS` must be explicitly reviewed before any release freeze if its git state is not clean

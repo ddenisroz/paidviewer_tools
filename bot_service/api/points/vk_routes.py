@@ -27,6 +27,12 @@ async def get_vk_rewards(
         return JSONResponse(content={
             "success": True,
             "platform": "vk",
+            "capability": {
+                "can_create": True,
+                "reason": None,
+                "required_role": "channel_owner",
+                "platform": "vk",
+            },
             "rewards": rewards
         })
 

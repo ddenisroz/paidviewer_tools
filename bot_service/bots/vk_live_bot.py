@@ -72,11 +72,7 @@ class VKLiveBot(VKLiveBotCore):
             # channel_id usually comes as slug (e.g. "yourchy"), but we ensure it
             slug = extract_vk_channel_slug(channel_id) or channel_id
             
-            url = "https://apidev.live.vkvideo.ru/v1/chat/message/send"
-            # Fallback to prod if dev fails? usually dev is safer for testing
-            # But let's check which one we should use. 
-            # VKLiveHTTPPolling uses instance var. Here we check config or try both?
-            # Let's start with proper URL construction similar to HTTP Polling
+            url = "https://api.live.vkvideo.ru/v1/chat/message/send"
             
             headers = {
                 "Authorization": f"Bearer {self.user_access_token}",
@@ -115,16 +111,16 @@ class VKLiveBot(VKLiveBotCore):
                         text = await response.text()
                         logger.error(f"[VK BOT] Failed to send message: {response.status} - {text}")
                         
-                        # Fallback to PROD API if DEV failed (common issue)
+                        # Fallback to DEV API only when production does not know the endpoint/channel.
                         if response.status == 404:
-                            prod_url = "https://api.live.vkvideo.ru/v1/chat/message/send"
-                            async with session.post(prod_url, headers=headers, params=params, json=json_body) as prod_resp:
-                                if prod_resp.status == 200:
-                                    logger.info(f"[VK BOT] Message sent to {slug} (PROD API): {message}")
+                            dev_url = "https://apidev.live.vkvideo.ru/v1/chat/message/send"
+                            async with session.post(dev_url, headers=headers, params=params, json=json_body) as dev_resp:
+                                if dev_resp.status == 200:
+                                    logger.info(f"[VK BOT] Message sent to {slug} (DEV API fallback): {message}")
                                     return True
                                 else:
-                                    prod_text = await prod_resp.text()
-                                    logger.error(f"[VK BOT] PROD API Failed too: {prod_resp.status} - {prod_text}")
+                                    dev_text = await dev_resp.text()
+                                    logger.error(f"[VK BOT] DEV API fallback failed: {dev_resp.status} - {dev_text}")
                                     return False
                         return False
 

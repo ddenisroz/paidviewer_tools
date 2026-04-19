@@ -52,8 +52,8 @@
 
 ## Платформы
 
-- `Twitch` — основной GA-контур
-- `VK Live` — beta-tier, но в единой capability-модели с Twitch
+- `Twitch` — GA-контур
+- `VK Live` — GA-контур в единой capability-модели с Twitch
 
 Для VK сейчас ожидается:
 

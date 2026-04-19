@@ -808,7 +808,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                     </p>
                 </CardHeader>
                 <CardContent className="mt-auto px-3.5 pb-3.5 pt-0">
-                    <div className="grid grid-cols-2 gap-1.5">
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -903,16 +903,10 @@ const LocalTTSSettingsPage: React.FC = () => {
 
     return (
         <PageWrapper title="Локальный TTS">
-            <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="space-y-6">
-                <TabsList className="h-auto w-full justify-start rounded-none bg-transparent p-0 border-b border-border">
-                    <TabsTrigger value="connection" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`}>
-                        <Server className="w-4 h-4" />
-                        Подключение
-                    </TabsTrigger>
-                    <TabsTrigger value="voices" className={`flex items-center gap-2 ${TAB_TRIGGER_CLASS}`} disabled={!canOpenVoiceManagement}>
-                        <Mic className="w-4 h-4" />
-                        Управление голосами
-                    </TabsTrigger>
+            <Tabs value={currentTab} onValueChange={(value) => setCurrentTab(value as 'connection' | 'voices')} className="min-w-0 space-y-6">
+                <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none bg-transparent p-0 border-b border-border">
+                    <TabsTrigger value="connection" className={`flex shrink-0 items-center gap-2 ${TAB_TRIGGER_CLASS}`}><Server className="w-4 h-4" />Подключение</TabsTrigger>
+                    <TabsTrigger value="voices" className={`flex shrink-0 items-center gap-2 ${TAB_TRIGGER_CLASS}`} disabled={!canOpenVoiceManagement}><Mic className="w-4 h-4" />Управление голосами</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="connection" className="space-y-4">
@@ -1132,7 +1126,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                     </div>
 
                     <Dialog open={isPairingDialogOpen} onOpenChange={setIsPairingDialogOpen}>
-                        <DialogContent className="max-w-sm">
+                        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
                             <DialogHeader>
                                 <DialogTitle>Подключить устройство</DialogTitle>
                             </DialogHeader>
@@ -1377,7 +1371,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                                 Загрузить свой голос
                                             </Button>
                                         </DialogTrigger>
-                                        <DialogContent className="max-w-lg">
+                                            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
                                             <DialogHeader>
                                                 <DialogTitle>Загрузка пользовательского голоса</DialogTitle>
                                             </DialogHeader>
@@ -1454,7 +1448,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                 </TabsContent>
 
                 <Dialog open={isVoiceSettingsDialogOpen} onOpenChange={closeVoiceSettings}>
-                    <DialogContent className="max-w-xl">
+                    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
                         <DialogHeader>
                             <DialogTitle>{currentVoice ? `Настройки голоса "${currentVoice.name}"` : 'Настройки голоса'}</DialogTitle>
                         </DialogHeader>

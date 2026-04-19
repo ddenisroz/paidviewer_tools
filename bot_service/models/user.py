@@ -1,6 +1,6 @@
 ﻿"""User, session, and token models."""
 
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint, text
 
 from core.datetime_utils import utcnow_naive
 from models.base import Base
@@ -134,6 +134,14 @@ class UserToken(Base):
         CheckConstraint(
             "(user_id IS NOT NULL AND session_id IS NULL) OR (user_id IS NULL AND session_id IS NOT NULL)",
             name="check_user_or_session_token",
+        ),
+        Index(
+            "uq_user_tokens_platform_identity",
+            "platform",
+            "platform_user_id",
+            unique=True,
+            postgresql_where=text("user_id IS NOT NULL"),
+            sqlite_where=text("user_id IS NOT NULL"),
         ),
         {"extend_existing": True},
     )

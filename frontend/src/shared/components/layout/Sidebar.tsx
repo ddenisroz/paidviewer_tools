@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { ChevronRight, Coins, Command, Headphones, Home, Laugh, LucideIcon, Menu, MessageSquare, Mic, Monitor, Settings, Shield, Sparkles, X, Youtube } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { ADMIN_BASE_PATH } from '@/features/admin/utils/adminRoutes';
@@ -81,13 +81,15 @@ const getNavItems = (isAdminUser: boolean): NavItem[] => {
 
 const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setOpenSection, onMobileMenuClose }) => {
     const location = useLocation();
+    const navigate = useNavigate();
     const hasSubmenu = item.submenu && item.submenu.length > 0;
+    const firstSubItem = hasSubmenu ? item.submenu![0] : null;
 
     // Проверяем активен ли какой-то из подпунктов
     const isParentActive = hasSubmenu
         ? item.submenu!.some(sub => {
-            // Точное совпадение или путь начинается с sub.to + '/'
-            return location.pathname === sub.to || location.pathname.startsWith(`${sub.to}/`);
+            const subPath = sub.to.split('?')[0];
+            return location.pathname === subPath || location.pathname.startsWith(`${subPath}/`);
         })
         : location.pathname === item.to;
 
@@ -101,12 +103,64 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
         }
     };
 
+    const handleParentNavigate = () => {
+        if (!firstSubItem) return;
+
+        const preloader = routePreloaders[firstSubItem.to.split('?')[0]];
+        if (preloader) preloader();
+        navigate(firstSubItem.to);
+        setOpenSection(null);
+        onMobileMenuClose();
+    };
+
     // Keyboard navigation для accessibility
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (hasSubmenu && (e.key === 'Enter' || e.key === ' ')) {
+        if (hasSubmenu && e.key === 'Enter') {
+            e.preventDefault();
+            handleParentNavigate();
+        } else if (hasSubmenu && e.key === ' ') {
             e.preventDefault();
             setOpenSection(isOpen ? null : item.label);
         }
+    };
+
+    const renderSubItem = (subItem: NavSubItem, mode: 'mobile' | 'desktop') => {
+        const subPath = subItem.to.split('?')[0];
+        const isSubItemActive = location.pathname === subPath &&
+            (subItem.to.includes('?')
+                ? location.search === `?${subItem.to.split('?')[1]}`
+                : location.search === '' || location.search === '?tab=youtube');
+
+        return (
+            <NavLink
+                key={`${mode}-${subItem.to}`}
+                to={subItem.to}
+                end
+                onClick={() => {
+                    setOpenSection(null);
+                    onMobileMenuClose();
+                }}
+                onMouseEnter={() => {
+                    const preloader = routePreloaders[subPath];
+                    if (preloader) preloader();
+                }}
+                className={() =>
+                    `group relative flex w-full items-center gap-3 whitespace-nowrap px-4 transition-colors ${mode === 'mobile'
+                        ? 'py-2 text-sm font-medium'
+                        : 'py-2.5 text-lg font-semibold'
+                    } ${isSubItemActive
+                        ? 'bg-blue-500/20 text-blue-200'
+                        : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
+                    }`
+                }
+            >
+                {isSubItemActive && (
+                    <span className="absolute inset-y-0 left-0 w-0.5 bg-blue-300/95" />
+                )}
+                {subItem.icon && <subItem.icon className="h-4 w-4 flex-shrink-0" />}
+                {subItem.label}
+            </NavLink>
+        );
     };
 
     if (hasSubmenu) {
@@ -121,12 +175,12 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                         ? 'bg-blue-500/20 text-blue-200'
                         : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
                         }`}
-                    onClick={() => setOpenSection(isOpen ? null : item.label)}
+                    onClick={handleParentNavigate}
                     onKeyDown={handleKeyDown}
                     tabIndex={0}
                     role="button"
                     aria-expanded={isOpen}
-                    aria-label={`${item.label} ${isOpen ? 'свернуть' : 'развернуть'}`}
+                    aria-label={`Открыть ${item.label}`}
                 >
                     {/* Индикатор активной подстраницы - показываем только если меню закрыто */}
                     {isParentActive && !isOpen && (
@@ -141,6 +195,10 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                     </div>
                 </div>
 
+                <div className="md:hidden ml-4 border-l border-border/70 py-1">
+                    {item.submenu!.map((subItem) => renderSubItem(subItem, 'mobile'))}
+                </div>
+
                 {/* Submenu появляется СПРАВА от родителя (GitHub-style, без gap) */}
                 {isOpen && (
                     <>
@@ -150,44 +208,10 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                             onMouseEnter={handleMouseEnter}
                         />
                         <div
-                            className="absolute left-full top-0 w-72 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-0 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden"
+                            className="hidden md:block absolute left-full top-0 w-72 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-0 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden"
                             onMouseEnter={handleMouseEnter}
                         >
-                            {item.submenu!.map((subItem) => {
-                                // Custom active check for query params support
-                                const isSubItemActive = location.pathname === subItem.to.split('?')[0] &&
-                                    (subItem.to.includes('?')
-                                        ? location.search === `?${subItem.to.split('?')[1]}`
-                                        : location.search === '' || location.search === '?tab=youtube'); // Handle default tab logic if needed
-
-                                return (
-                                    <NavLink
-                                        key={subItem.to}
-                                        to={subItem.to}
-                                        end
-                                        onClick={() => {
-                                            setOpenSection(null);
-                                            onMobileMenuClose();
-                                        }}
-                                        onMouseEnter={() => {
-                                            const preloader = routePreloaders[subItem.to.split('?')[0]]; // Preload base route
-                                            if (preloader) preloader();
-                                        }}
-                                    className={() =>
-                                            `group relative flex w-full items-center gap-3 whitespace-nowrap px-4 py-2.5 text-lg font-semibold transition-colors ${isSubItemActive
-                                                ? 'bg-blue-500/20 text-blue-200'
-                                                : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
-                                            }`
-                                        }
-                                    >
-                                        {isSubItemActive && (
-                                            <span className="absolute inset-y-0 left-0 w-0.5 bg-blue-300/95" />
-                                        )}
-                                        {subItem.icon && <subItem.icon className="h-4 w-4 flex-shrink-0" />}
-                                        {subItem.label}
-                                    </NavLink>
-                                );
-                            })}
+                            {item.submenu!.map((subItem) => renderSubItem(subItem, 'desktop'))}
                         </div>
                     </>
                 )}
@@ -286,7 +310,7 @@ const Sidebar: React.FC = () => {
 
             {/* Sidebar */}
             <div className={`
-                fixed md:relative h-full w-64 md:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
+                fixed md:relative h-full w-[min(18rem,85vw)] md:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
                 md:block
             `}>
@@ -298,7 +322,7 @@ const Sidebar: React.FC = () => {
                             </span>
                         </NavLink>
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden">
                         <nav className="grid w-full text-sm font-medium">
                             {navItems.map((item) => (
                                 <SidebarNavItem

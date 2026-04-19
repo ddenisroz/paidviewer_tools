@@ -18,10 +18,10 @@ export const PLATFORM_RELEASES: PlatformReleaseMap = {
     isStable: true,
   },
   vk: {
-    stage: 'beta',
-    badgeLabel: 'Beta',
-    helperText: 'VK Live работает в beta: возможны ограничения и неполная parity с Twitch.',
-    isStable: false,
+    stage: 'ga',
+    badgeLabel: null,
+    helperText: null,
+    isStable: true,
   },
 };
 

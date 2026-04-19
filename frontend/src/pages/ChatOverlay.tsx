@@ -5,21 +5,15 @@ import { useSearchParams } from 'react-router-dom';
 import MessageContent from '@/features/chat/components/MessageContent';
 import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
 import { chatboxService } from '@/services/api/services/chatboxService';
-import { chatService } from '@/services/api/services/chatService';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { VkRoleBadge } from '@/shared/components/RoleBadge';
-import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
 import { logger } from '@/shared/utils/prodLogger';
+import { useChatOverlayWebSocket } from './useChatOverlayWebSocket';
 
 import type { ApiResponse } from '@/types/api';
-import type { ChatBoxSettings, ChatMessage, ContextMenu, WebSocketMessage } from '@/types/chat';
+import type { ChatBoxSettings, ChatMessage, WebSocketMessage } from '@/types/chat';
 import type { AxiosError } from 'axios';
-
-interface ChatHistoryApiResponse {
-    success: boolean;
-    messages: ChatMessage[];
-}
 
 interface Emotes {
     channelEmotes: Map<string, unknown>;
@@ -356,10 +350,8 @@ const ChatOverlay: React.FC = () => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
     const [channelName, setChannelName] = useState<string | null>(null);
     const [lastAddedMessageId, setLastAddedMessageId] = useState<string | null>(null);
-    const [userId, setUserId] = useState<number | null>(null);
 
     const [emotes, setEmotes] = useState<Emotes>({ channelEmotes: new Map(), globalEmotes: new Map() });
 
@@ -467,7 +459,7 @@ const ChatOverlay: React.FC = () => {
 
 
      
-    const loadSettings = useCallback(async (isPolling: boolean = false): Promise<void> => {
+    const loadSettings = useCallback(async (): Promise<void> => {
         if (!token) return;
 
         try {
@@ -512,27 +504,20 @@ const ChatOverlay: React.FC = () => {
                 border_radius: borderRadius
             };
 
-            if (!isPolling) {
-                logger.log(`[OK] [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
-                logger.log(`[OK] [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
-            }
+            logger.log(`[OK] [SETTINGS] Animation: ${normalizedSettings.animation_type} (${normalizedSettings.animation_duration}ms)`);
+            logger.log(`[OK] [SETTINGS] Chat direction: ${normalizedSettings.chat_direction}`);
 
             setSettings(normalizedSettings);
 
             const resolvedChannelName = data.channel_name || normalizedSettings.channel_name || null;
             setChannelName(resolvedChannelName);
-            setUserId(normalizedSettings.user_id ?? null);
         } catch (error: unknown) {
             const axiosError = error as AxiosError<{ detail?: string }>;
             logger.error('[ERROR] Error loading ChatBox settings:', error);
             logger.error('Full error:', axiosError.response?.data || axiosError.message);
-            if (!isPolling) {
-                setError(`Ошибка загрузки настроек: ${axiosError.response?.data?.detail || axiosError.message}`);
-            }
+            setError(`Ошибка загрузки настроек: ${axiosError.response?.data?.detail || axiosError.message}`);
         } finally {
-            if (!isPolling) {
-                setLoading(false);
-            }
+            setLoading(false);
         }
     }, [token]);
 
@@ -556,6 +541,8 @@ const ChatOverlay: React.FC = () => {
 
     useEffect(() => {
         const loadEmotes = async (): Promise<void> => {
+            if (!settings) return;
+
             if (settings?.show_7tv_emotes === false) {
                 setEmotes({ channelEmotes: new Map(), globalEmotes: new Map() });
                 return;
@@ -589,68 +576,11 @@ const ChatOverlay: React.FC = () => {
         }
 
         loadSettings();
-
-        const pollInterval = setInterval(() => {
-            loadSettings(true);
-        }, 30000);
-
-        return () => clearInterval(pollInterval);
     }, [token, loadSettings]);
-
-    useEffect(() => {
-        if (!userId || !settings || historyLoadedRef.current) return;
-
-        const timeoutId = setTimeout(async () => {
-            if (messages.length === 0 && !historyLoadedRef.current) {
-                logger.log('[CHATOVERLAY] WebSocket history not received, loading via API...');
-                try {
-                    const response = await chatService.getChatHistory({
-                        limit: settings.max_messages || 50
-                    });
-
-                    const apiResponse = response.data as ChatHistoryApiResponse;
-                    if (apiResponse.success && apiResponse.messages && apiResponse.messages.length > 0) {
-                        const seenIds = new Set<string>();
-                        const uniqueMessages = apiResponse.messages.filter((msg) => {
-                            const uniqueKey = msg.id || `${msg.timestamp}-${msg.author}-${msg.message}`;
-                            if (seenIds.has(uniqueKey)) return false;
-                            seenIds.add(uniqueKey);
-                            return true;
-                        });
-
-                        setMessages(uniqueMessages);
-                        processedMessageIds.current = new Set(uniqueMessages.map(msg =>
-                            msg.id || `${msg.timestamp}-${msg.author}-${msg.message || msg.content}`
-                        ));
-                        historyLoadedRef.current = true;
-                        const inferredChannel = uniqueMessages[0]?.channel_name || uniqueMessages[0]?.channel;
-                        if (inferredChannel) {
-                            setChannelName(prev => prev || inferredChannel);
-                        }
-
-                        setTimeout(() => {
-                            messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-                        }, 100);
-
-                        logger.log(`[CHATOVERLAY] Loaded ${uniqueMessages.length} messages via API fallback`);
-                    }
-                } catch (error: unknown) {
-                    logger.error('[ERROR] [CHATOVERLAY] Error loading history via API:', error);
-                }
-            }
-        }, 3000);
-
-        return () => clearTimeout(timeoutId);
-    }, [userId, settings, messages.length]);
 
      
     const handleWebSocketMessage = useCallback((data: WebSocketMessage): void => {
         if (data.type === 'cache_invalidate') {
-            logger.log('[REFRESH] [CACHE] Received cache invalidation:', data.cache_key);
-            if (data.cache_key === 'cache_chatbox_settings') {
-                logger.log('[REFRESH] [CHATBOX] Reloading settings due to backend update...');
-                loadSettings(true);
-            }
             return;
         }
 
@@ -723,9 +653,6 @@ const ChatOverlay: React.FC = () => {
 
             if (updateData?.channel_name) {
                 setChannelName(updateData.channel_name);
-            }
-            if (updateData?.user_id !== undefined) {
-                setUserId(updateData.user_id || null);
             }
             return;
         }
@@ -821,9 +748,9 @@ const ChatOverlay: React.FC = () => {
                 messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
             }, 100);
         }
-    }, [settings, loadSettings]);
+    }, [settings]);
 
-    useSharedWebSocket(userId, handleWebSocketMessage as (message: Record<string, unknown>) => void);
+    useChatOverlayWebSocket(settings ? token : null, handleWebSocketMessage as (message: Record<string, unknown>) => void);
 
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -864,14 +791,6 @@ const ChatOverlay: React.FC = () => {
         return () => clearInterval(interval);
     }, [settings?.message_fade_seconds]);
 
-    useEffect(() => {
-        const handleClickOutside = () => setContextMenu(null);
-        if (contextMenu) {
-            document.addEventListener('click', handleClickOutside);
-            return () => document.removeEventListener('click', handleClickOutside);
-        }
-    }, [contextMenu]);
-
     // Move hooks before early returns to comply with rules-of-hooks
     const truncateWords = useCallback((text: string | undefined, maxWords: number = 6): string => {
         if (!text) return '';
@@ -880,14 +799,9 @@ const ChatOverlay: React.FC = () => {
         return `${words.slice(0, maxWords).join(' ')}...`;
     }, []);
 
-    const handleNicknameClick = useCallback((e: React.MouseEvent, username: string, platform: 'twitch' | 'vk' | 'youtube'): void => {
+    const handleNicknameClick = useCallback((e: React.MouseEvent): void => {
         e.preventDefault();
         e.stopPropagation();
-
-        const x = e.clientX + 5;
-        const y = e.clientY + 5;
-
-        setContextMenu({ x, y, username, platform });
     }, []);
 
     if (loading) {
@@ -899,14 +813,12 @@ const ChatOverlay: React.FC = () => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                background: 'transparent',
                 color: '#fff',
                 fontFamily: 'Inter, sans-serif',
                 gap: '16px'
             }}>
-                <div style={{ fontSize: '48px' }}>⏳</div>
-                <div style={{ fontSize: '18px' }}>Загрузка настроек ChatBox...</div>
-                <div style={{ fontSize: '12px', opacity: 0.7 }}>Токен виджета скрыт из соображений безопасности</div>
+                <div style={{ fontSize: '18px', textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>Загрузка ChatBox...</div>
             </div>
         );
     }
@@ -920,19 +832,17 @@ const ChatOverlay: React.FC = () => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                background: 'transparent',
                 color: '#fff',
                 fontFamily: 'Inter, sans-serif',
                 padding: '20px',
                 textAlign: 'center',
                 gap: '16px'
             }}>
-                <div style={{ fontSize: '48px' }}>[ERROR]</div>
                 <div style={{ fontSize: '18px', fontWeight: 'bold' }}>Ошибка загрузки настроек</div>
                 <div style={{ fontSize: '14px', maxWidth: '600px', background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '8px' }}>
                     {error}
                 </div>
-                <div style={{ fontSize: '12px', opacity: 0.7 }}>Откройте консоль (F12) для деталей</div>
             </div>
         );
     }
@@ -946,16 +856,14 @@ const ChatOverlay: React.FC = () => {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%)',
-                color: '#2d3436',
+                background: 'transparent',
+                color: '#fff',
                 fontFamily: 'Inter, sans-serif',
                 padding: '20px',
                 textAlign: 'center',
                 gap: '16px'
             }}>
-                <div style={{ fontSize: '48px' }}>[WARN]</div>
                 <div style={{ fontSize: '18px' }}>Настройки не найдены</div>
-                <div style={{ fontSize: '12px', opacity: 0.7 }}>Проверьте токен виджета в настройках панели</div>
             </div>
         );
     }
@@ -1104,63 +1012,6 @@ const ChatOverlay: React.FC = () => {
                 )}
             </div>
 
-            {contextMenu && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: `${contextMenu.y}px`,
-                        left: `${contextMenu.x}px`,
-                        backgroundColor: '#1a1a1a',
-                        border: '1px solid #444',
-                        borderRadius: '8px',
-                        padding: '8px 0',
-                        zIndex: 9999,
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
-                        minWidth: '180px'
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div style={{
-                        padding: '8px 16px',
-                        borderBottom: '1px solid #333',
-                        color: '#fff',
-                        fontSize: '14px',
-                        fontWeight: 'bold'
-                    }}>
-                        {contextMenu.username}
-                    </div>
-
-                    <button
-                        onClick={async () => {
-                            try {
-                                await chatService.toggleMute({
-                                    username: contextMenu.username,
-                                    platform: contextMenu.platform,
-                                    channel_name: channelName || 'unknown'
-                                });
-                                setContextMenu(null);
-                            } catch (error: unknown) {
-                                logger.error('Ошибка переключения TTS:', error);
-                            }
-                        }}
-                        style={{
-                            width: '100%',
-                            padding: '10px 16px',
-                            backgroundColor: 'transparent',
-                            border: 'none',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            textAlign: 'left',
-                            fontSize: '14px',
-                            transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => (e.target as HTMLButtonElement).style.backgroundColor = '#2a2a2a'}
-                        onMouseLeave={(e) => (e.target as HTMLButtonElement).style.backgroundColor = 'transparent'}
-                    >
-                        Заглушить/Разглушить TTS
-                    </button>
-                </div>
-            )}
         </>
     );
 };

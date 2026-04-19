@@ -580,6 +580,31 @@ class MemeAlertsService:
                 method, url, params=params, json=json, headers=headers
             )
 
+    async def validate_access_token(self, access_token: str, streamer_id: str) -> Dict[str, Any]:
+        """Validate a MemeAlerts token with a read-only API call before storing it."""
+        normalized_streamer_id = self._clean_optional_str(streamer_id)
+        if not access_token or not normalized_streamer_id:
+            raise ValueError("MemeAlerts token validation requires a streamer id")
+
+        response = await self._request(
+            "POST",
+            "/supporters",
+            access_token,
+            json={"streamerId": normalized_streamer_id, "limit": 1, "skip": 0},
+        )
+        if response.status_code in (200, 201):
+            return {"streamer_id": normalized_streamer_id}
+
+        if response.status_code in (401, 403):
+            raise ValueError("MemeAlerts token validation failed")
+
+        logger.warning(
+            "MemeAlerts token validation unavailable: status=%s body=%s",
+            response.status_code,
+            response.text[:500],
+        )
+        raise RuntimeError("MemeAlerts token validation is temporarily unavailable")
+
     @staticmethod
     def _has_antibot_cookie(response: httpx.Response) -> bool:
         return any(

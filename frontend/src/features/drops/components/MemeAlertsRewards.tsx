@@ -4,6 +4,7 @@ import { AlertCircle, Coins, ExternalLink, Loader2, RefreshCw } from 'lucide-rea
 import { toast } from 'sonner';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
+import { parseMemeAlertsTokenPayload } from '@/features/drops/utils/memealertsToken';
 import { cn } from '@/lib/utils';
 import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
 import { Button } from '@/shared/components/ui/button';
@@ -75,49 +76,14 @@ const DEFAULT_AUTOMATION_SETTINGS: MemeAlertsAutomationSettings = {
 const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 const FIELD_CLASS = 'h-9 border-border/70 bg-card/70 text-foreground placeholder:text-muted-foreground';
 
-const parseMemeAlertsTokenPayload = (
-    raw: string
-): { accessToken?: string; refreshToken?: string } => {
-    const value = raw.trim();
-    if (!value) return {};
+const ConnectionNote: React.FC<{ note: string | null }> = ({ note }) => {
+    if (!note) return null;
 
-    const extractFromParams = (params: URLSearchParams) => {
-        const accessToken =
-            params.get('access_token') ||
-            params.get('accessToken') ||
-            params.get('token') ||
-            params.get('auth_token') ||
-            params.get('jwt') ||
-            undefined;
-        const refreshToken = params.get('refresh_token') || params.get('refreshToken') || undefined;
-        return { accessToken, refreshToken };
-    };
-
-    try {
-        const url = new URL(value);
-        const fromQuery = extractFromParams(url.searchParams);
-        if (fromQuery.accessToken) return fromQuery;
-        if (url.hash) {
-            const hash = url.hash.replace(/^#/, '');
-            const fromHash = extractFromParams(new URLSearchParams(hash));
-            if (fromHash.accessToken) return fromHash;
-        }
-    } catch {
-        // ignore invalid URL format and continue with fallback parsing
-    }
-
-    try {
-        const fromText = extractFromParams(new URLSearchParams(value.replace(/^[#?]/, '')));
-        if (fromText.accessToken) return fromText;
-    } catch {
-        // ignore
-    }
-
-    if (value.split('.').length === 3 || value.length > 30) {
-        return { accessToken: value };
-    }
-
-    return {};
+    return (
+        <p className="rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
+            {note}
+        </p>
+    );
 };
 
 export const MemeAlertsRewards: React.FC = () => {
@@ -126,6 +92,7 @@ export const MemeAlertsRewards: React.FC = () => {
 
     const [statusLoading, setStatusLoading] = useState(true);
     const [isConnected, setIsConnected] = useState(false);
+    const [connectionNote, setConnectionNote] = useState<string | null>(null);
     const [connecting, setConnecting] = useState(false);
     const [grantTarget, setGrantTarget] = useState('');
     const [grantValue, setGrantValue] = useState<number>(10);
@@ -184,6 +151,7 @@ export const MemeAlertsRewards: React.FC = () => {
             const response = await fetch(`${MEMEALERTS_API_BASE}/status`);
             const data = await response.json();
             setIsConnected(data.connected);
+            setConnectionNote(data.reason || null);
             if (!data.connected) {
                 setAutomationSettings(DEFAULT_AUTOMATION_SETTINGS);
             }
@@ -318,17 +286,20 @@ export const MemeAlertsRewards: React.FC = () => {
                     refresh_token: refreshToken
                 })
             });
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
 
-            if (data.success && data.connected) {
+            if (response.ok && data.success && data.connected) {
                 setIsConnected(true);
+                setConnectionNote(null);
                 toast.success("MemeAlerts подключен!", {
                     description: "Теперь вы можете выдавать мемкоины"
                 });
                 return true;
             } else {
-                toast.error(data.error || "Не удалось сохранить токен", {
-                    description: "Ошибка подключения"
+                const message = data.detail || data.error || "MemeAlerts не подтвердил токен";
+                setConnectionNote(message);
+                toast.error(message, {
+                    description: "Токен не сохранен"
                 });
                 return false;
             }
@@ -597,10 +568,10 @@ export const MemeAlertsRewards: React.FC = () => {
                         <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-200">
                             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                             <p>
-                                Нажмите «Подключить MemeAlerts» и войдите в popup-окне.
-                                После успешного входа подключение завершится автоматически.
+                                Подключение работает через токен MemeAlerts. Токен сохраняется только после live-проверки.
                             </p>
                         </div>
+                        <ConnectionNote note={connectionNote} />
 
                         <Button onClick={handleConnect} disabled={connecting} className="w-full h-9 bg-[#9146FF] hover:bg-[#7f3ee8] text-white">
                             {connecting ? (
@@ -679,7 +650,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                         Редим с обязательным ником саппортера, после чего выдаются мемкоины автоматически.
                                     </p>
 
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <Button
                                             variant="outline"
                                             size="sm"
@@ -717,7 +688,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <div className="space-y-1.5">
                                             <Label className="text-xs">Цена</Label>
                                             <Input
@@ -804,7 +775,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                         </p>
                                     )}
 
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <div className="space-y-1.5">
                                             <Label className="text-xs">Курс</Label>
                                             <Input

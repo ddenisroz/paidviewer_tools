@@ -40,7 +40,7 @@ import { youtubeService } from '@/services/api/services/youtubeService';
 import { pointsApi } from '@/services/pointsApi';
 import PageWrapper from '@/shared/components/PageWrapper';
 import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Card, CardContent } from '@/shared/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
 import { Input } from "@/shared/components/ui/input";
 import { Label } from "@/shared/components/ui/label";
@@ -790,9 +790,6 @@ const YoutubeIntegrationPage: React.FC = () => {
                     </Card >
 
                     <Card className="card-glass flex flex-col overflow-hidden max-h-[min(520px,65vh)]">
-                        <CardHeader className="pb-3">
-                            <CardTitle>Очередь ({queue.length})</CardTitle>
-                        </CardHeader>
                         <CardContent className="p-0 flex-1 overflow-hidden">
                             <DndContext
                                 sensors={sensors}

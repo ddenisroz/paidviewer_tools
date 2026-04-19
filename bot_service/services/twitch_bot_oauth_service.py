@@ -10,6 +10,7 @@ import logging
 import httpx
 from datetime import timedelta
 from typing import Optional, Dict, Any
+from urllib.parse import urlencode
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,13 @@ from core.datetime_utils import utcnow_naive
 from repositories.bot_token_repository import BotTokenRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _current_settings():
+    """Return the live settings object instead of a stale import captured before tests reload config."""
+    from core.config import settings as live_settings
+
+    return live_settings
 
 
 class TwitchBotOAuthService:
@@ -46,37 +54,34 @@ class TwitchBotOAuthService:
     @staticmethod
     def get_authorization_url(state: str) -> str:
         """Build the Twitch bot OAuth authorization URL."""
-        if not settings.twitch_client_id:
+        app_settings = _current_settings()
+        if not app_settings.twitch_client_id:
             raise ValueError("TWITCH_CLIENT_ID not configured")
         
-        scopes = ' '.join(TwitchBotOAuthService.BOT_SCOPES)
-        redirect_uri = settings.twitch_bot_redirect_uri
-        
-        auth_url = (
-            f"https://id.twitch.tv/oauth2/authorize"
-            f"?client_id={settings.twitch_client_id}"
-            f"&redirect_uri={redirect_uri}"
-            f"&response_type=code"
-            f"&scope={scopes}"
-            f"&state={state}"
-        )
-        
-        return auth_url
+        params = {
+            "client_id": app_settings.twitch_client_id,
+            "redirect_uri": app_settings.twitch_bot_redirect_uri,
+            "response_type": "code",
+            "scope": " ".join(TwitchBotOAuthService.BOT_SCOPES),
+            "state": state,
+        }
+        return f"https://id.twitch.tv/oauth2/authorize?{urlencode(params)}"
     
     @staticmethod
     async def exchange_code_for_token(code: str) -> Dict[str, Any]:
         """Exchange an authorization code for access and refresh tokens."""
-        if not all([settings.twitch_client_id, settings.twitch_client_secret]):
+        app_settings = _current_settings()
+        if not all([app_settings.twitch_client_id, app_settings.twitch_client_secret]):
             raise ValueError("Twitch credentials not configured")
         
-        redirect_uri = settings.twitch_bot_redirect_uri
+        redirect_uri = app_settings.twitch_bot_redirect_uri
         
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 "https://id.twitch.tv/oauth2/token",
                 params={
-                    "client_id": settings.twitch_client_id,
-                    "client_secret": settings.twitch_client_secret,
+                    "client_id": app_settings.twitch_client_id,
+                    "client_secret": app_settings.twitch_client_secret,
                     "code": code,
                     "grant_type": "authorization_code",
                     "redirect_uri": redirect_uri

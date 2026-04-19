@@ -5,6 +5,7 @@ VK Live API Client с retry logic и обработкой ошибок
 Дата создания: 27 декабря 2025
 """
 import httpx
+import os
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 from typing import Any, Dict, Optional, List
@@ -67,18 +68,19 @@ class VKLiveAPIClient:
         'reward_limit_reached': 'Достигнут лимит использования награды',
     }
     
-    def __init__(self, base_url: str = "https://apidev.live.vkvideo.ru"):
+    PROD_BASE_URL = "https://api.live.vkvideo.ru"
+    DEV_BASE_URL = "https://apidev.live.vkvideo.ru"
+
+    def __init__(self, base_url: str = PROD_BASE_URL):
         """
         Инициализация клиента
         
         Args:
             base_url: Базовый URL API (из docs/vk/API.md)
         """
-        from core.config import settings
-        
         self.base_url = base_url
-        # VK Dev API uses self-signed certificate, disable verify only in development
-        ssl_verify = settings.is_production
+        insecure_dev_ssl = os.getenv("VK_INSECURE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
+        ssl_verify = not insecure_dev_ssl
         self.client = httpx.AsyncClient(
             base_url=base_url,
             timeout=httpx.Timeout(30.0, connect=10.0),
