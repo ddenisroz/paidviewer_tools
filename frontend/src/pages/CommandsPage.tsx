@@ -161,6 +161,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
     const safeCommandName = toSafeText(command.name, 'unknown');
     const safeDescription = toSafeText(command.description, 'Описание команды недоступно');
     const safeResponse = toSafeText(command.response, '');
+    const showResponsePreview = type === 'custom' && safeResponse.length > 0;
     const commandSettings = (command.extra_settings || {}) as Record<string, unknown>;
     const triggerMode = (commandSettings.trigger_mode as 'command' | 'keyword' | 'timer' | undefined) || 'command';
     const triggerKeyword = String(commandSettings.trigger_keyword || '').trim();
@@ -256,7 +257,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     {safeDescription}
                 </p>
 
-                {safeResponse && (
+                {showResponsePreview && (
                     <div className="p-2 bg-muted/30 rounded-md border-l-2 border-primary/20">
                         <p className="text-xs font-medium text-primary mb-1">Ответ:</p>
                         <p className="text-xs text-muted-foreground line-clamp-2">"{safeResponse}"</p>
