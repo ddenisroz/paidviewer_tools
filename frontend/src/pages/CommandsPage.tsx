@@ -857,7 +857,7 @@ const CommandsPage: React.FC = () => {
                                 </div>
                             </div>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
                                 {getFilteredBasicCommands().map((command: ChatCommand) => (
                                     <div key={command.id || command.name}>
                                         <CommandCard
@@ -1163,7 +1163,7 @@ const CommandsPage: React.FC = () => {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
                                     {getFilteredCustomCommands().map((command: ChatCommand) => (
                                         <div key={command.id || command.name}>
                                             <CommandCard

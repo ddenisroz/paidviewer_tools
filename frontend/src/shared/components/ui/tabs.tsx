@@ -5,10 +5,10 @@ import * as TabsPrimitive from "@radix-ui/react-tabs"
 import { cn } from "@/lib/utils"
 
 export const DASHBOARD_TABS_LIST_CLASS =
-  "h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b border-border bg-transparent p-0"
+  "h-auto w-full flex-wrap justify-start gap-2 overflow-visible rounded-none border-b border-border bg-transparent p-0 pb-2"
 
 export const DASHBOARD_TAB_TRIGGER_CLASS =
-  "shrink-0 rounded-none -mb-px border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none"
+  "min-h-10 shrink-0 rounded-md border border-transparent px-3 py-2 text-center text-sm font-medium leading-tight text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500/60 data-[state=active]:bg-sky-500/10 data-[state=active]:text-sky-300 data-[state=active]:shadow-none sm:px-4"
 
 const Tabs = TabsPrimitive.Root
 

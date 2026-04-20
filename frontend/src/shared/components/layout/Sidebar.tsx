@@ -195,7 +195,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                     </div>
                 </div>
 
-                <div className="md:hidden ml-4 border-l border-border/70 py-1">
+                <div className={`${isParentActive ? 'lg:block' : 'lg:hidden'} ml-4 border-l border-border/70 py-1`}>
                     {item.submenu!.map((subItem) => renderSubItem(subItem, 'mobile'))}
                 </div>
 
@@ -208,7 +208,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                             onMouseEnter={handleMouseEnter}
                         />
                         <div
-                            className="hidden md:block absolute left-full top-0 w-72 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-0 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden"
+                            className="hidden lg:block absolute left-full top-0 w-72 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-0 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden"
                             onMouseEnter={handleMouseEnter}
                         >
                             {item.submenu!.map((subItem) => renderSubItem(subItem, 'desktop'))}
@@ -289,7 +289,7 @@ const Sidebar: React.FC = () => {
         <>
             {/* Мобильная кнопка меню */}
             <button
-                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-card/90 border border-border/70 hover:bg-accent rounded-lg transition-colors"
+                className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-card/90 border border-border/70 hover:bg-accent rounded-lg transition-colors"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 aria-label="Открыть меню"
             >
@@ -303,16 +303,16 @@ const Sidebar: React.FC = () => {
             {/* Overlay для мобильных */}
             {isMobileMenuOpen && (
                 <div
-                    className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+                    className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
                     onClick={() => setIsMobileMenuOpen(false)}
                 />
             )}
 
             {/* Sidebar */}
             <div className={`
-                fixed md:relative h-full w-full sm:w-[18rem] md:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
-                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-                md:block
+                fixed lg:relative h-full w-full sm:w-[18rem] lg:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
+                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+                lg:block
             `}>
                 <div className="flex h-full max-h-screen flex-col gap-2 relative">
                     <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
