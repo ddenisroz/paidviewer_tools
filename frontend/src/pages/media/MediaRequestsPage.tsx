@@ -11,8 +11,6 @@ const MediaRequestsPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || 'youtube';
 
-    // Render content based on tab query parameter
-    // Navigation is handled by sidebar, no need for tabs UI
     const renderContent = () => {
         switch (activeTab) {
             case 'youtube':

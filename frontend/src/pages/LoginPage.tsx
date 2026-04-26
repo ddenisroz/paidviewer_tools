@@ -126,7 +126,7 @@ const LoginPage: React.FC = () => {
                 <CardHeader className="text-center pt-10 pb-4">
                     <h1 className="brand-wordmark select-none mb-3 h-10 whitespace-nowrap text-[1.7rem] leading-none text-green-400 sm:text-[2.1rem]">
                         {title}
-                        <span className="blinking-cursor">{!isTyping ? '_' : ''}</span>
+                        {isTyping ? <span className="blinking-cursor" aria-hidden="true">|</span> : null}
                     </h1>
                     <div className="relative h-6 w-full">
                         <p className={`text-slate-400 text-sm absolute inset-0 flex items-center justify-center subtitle-fade ${subtitleVisible ? 'opacity-100' : 'opacity-0'}`}>

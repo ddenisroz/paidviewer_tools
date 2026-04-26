@@ -6,6 +6,13 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter, useLocation } from 'react-router-dom'
 
 import { ToastProvider } from '@/shared/components/ui/toast'
+import '@fontsource/geist-sans/400.css'
+import '@fontsource/geist-sans/500.css'
+import '@fontsource/geist-sans/600.css'
+import '@fontsource/geist-sans/700.css'
+import '@fontsource/rajdhani/500.css'
+import '@fontsource/rajdhani/600.css'
+import '@fontsource/rajdhani/700.css'
 import App from './App'
 import './App.css'
 import './styles/design-system.css'
@@ -96,8 +103,8 @@ root.render(
 
   // Force font load check to prevent layout shift
   if (document.fonts && document.fonts.check) {
-    // Check if Inter font is loaded, if not it will use fallback seamlessly
-    const fontLoaded = document.fonts.check('1em Inter');
+    // Check if the bundled primary font is loaded, if not it will use fallback seamlessly
+    const fontLoaded = document.fonts.check('1em Geist Sans');
     if (!fontLoaded && document.fonts.ready) {
       document.fonts.ready.then(() => {
         // Font loaded, ensure no layout shift

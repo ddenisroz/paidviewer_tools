@@ -12,6 +12,11 @@ from core.database import get_db
 from core.security_modern import limiter
 
 router = APIRouter(prefix="/api/widgets", tags=["widgets"])
+DEPRECATED_WIDGET_DETAIL = {
+    "code": "legacy_widgets_disabled",
+    "message": "Legacy widgets are disabled. Use /api/chatbox/settings and /chat-overlay?token=... instead.",
+    "replacement": "/api/chatbox/settings",
+}
 
 
 class WidgetConfig(BaseModel):
@@ -58,6 +63,8 @@ async def save_chat_config(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    raise HTTPException(status_code=410, detail=DEPRECATED_WIDGET_DETAIL)
+
     user_id = _extract_user_id(current_user)
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -92,6 +99,8 @@ async def get_chat_config(
     user_id: Optional[str] = None,
     current_user: Optional[dict] = Depends(get_current_user_optional),
 ):
+    raise HTTPException(status_code=410, detail=DEPRECATED_WIDGET_DETAIL)
+
     current_user_id = _extract_user_id(current_user)
     if not user_id and current_user_id:
         user_id = current_user_id
@@ -146,6 +155,8 @@ async def list_widget_configs(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    raise HTTPException(status_code=410, detail=DEPRECATED_WIDGET_DETAIL)
+
     user_id = _extract_user_id(current_user)
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -174,6 +185,8 @@ async def delete_widget_config(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    raise HTTPException(status_code=410, detail=DEPRECATED_WIDGET_DETAIL)
+
     user_id = _extract_user_id(current_user)
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -193,7 +206,8 @@ async def widgets_health():
         users_count = len(user_widget_configs)
 
     return {
-        "status": "healthy",
+        "status": "deprecated",
+        "detail": DEPRECATED_WIDGET_DETAIL,
         "users_count": users_count,
         "configs_count": total_configs,
         "timestamp": datetime.now().isoformat(),

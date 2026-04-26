@@ -1,6 +1,6 @@
 import React, { lazy, Suspense, useContext } from 'react';
 
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
 import { AuthContext } from '@/context/AuthContext';
@@ -9,17 +9,14 @@ import RouteErrorBoundary from '@/shared/components/ErrorBoundary/RouteErrorBoun
 import Layout from '@/shared/components/layout/Layout';
 import { useCacheWebSocketSync } from '@/shared/hooks/useCacheWebSocketSync';
 
-// Critical pages - загружаем сразу (только auth flow)
 import AuthCallbackPage from './pages/AuthCallbackPage';
 import DonationAlertsCallback from './pages/DonationAlertsCallback';
 import LoginPage from './pages/LoginPage';
 import MemeAlertsCallback from './pages/MemeAlertsCallback';
 import AuthGuard from './shared/components/AuthGuard';
 
-// Minimal loading - no skeletons, pages appear instantly
 const MinimalFallback = () => <div className="min-h-screen" />;
 
-// All other pages - lazy loading for better initial load performance
 const HomePage = lazy(() => import('./pages/HomePage'));
 const SettingsPage = lazy(() => import('./pages/SettingsMainPage'));
 const TtsMainPage = lazy(() => import('./features/tts/pages/TtsMainPage'));
@@ -42,181 +39,242 @@ const DropsWidget = lazy(() => import('./pages/obs/DropsWidget'));
 
 const App: React.FC = () => {
     const authContext = useContext(AuthContext);
+    const location = useLocation();
     const userId = authContext?.user?.id;
+    const isRealtimeRoute =
+        location.pathname.startsWith('/dashboard') ||
+        location.pathname.startsWith('/chat-window') ||
+        location.pathname.startsWith('/tts-player');
+    const shouldEnableCacheSync =
+        Boolean(userId) &&
+        Boolean(authContext?.isAuthenticated) &&
+        !authContext?.isCheckingAuth &&
+        isRealtimeRoute;
 
-    // Инициализируем WebSocket синхронизацию кэша
-    useCacheWebSocketSync(userId);
+    useCacheWebSocketSync(shouldEnableCacheSync ? userId : undefined);
 
     return (
         <>
             <AppErrorBoundary>
                 <Routes>
-                    {/* Public Routes */}
-                    <Route path="/login" element={
-                        <RouteErrorBoundary routeName="Login">
-                            <LoginPage />
-                        </RouteErrorBoundary>
-                    } />
-                    <Route path="/auth/callback" element={
-                        <RouteErrorBoundary routeName="Auth Callback">
-                            <AuthCallbackPage />
-                        </RouteErrorBoundary>
-                    } />
-                    <Route path="/auth/vk/callback" element={
-                        <RouteErrorBoundary routeName="VK Auth Callback">
-                            <AuthCallbackPage />
-                        </RouteErrorBoundary>
-                    } />
-                    <Route path="/donationalerts/callback" element={
-                        <RouteErrorBoundary routeName="DonationAlerts Callback">
-                            <DonationAlertsCallback />
-                        </RouteErrorBoundary>
-                    } />
-                    <Route path="/memealerts/callback" element={
-                        <RouteErrorBoundary routeName="MemeAlerts Callback">
-                            <MemeAlertsCallback />
-                        </RouteErrorBoundary>
-                    } />
+                    <Route
+                        path="/login"
+                        element={(
+                            <RouteErrorBoundary routeName="Login">
+                                <LoginPage />
+                            </RouteErrorBoundary>
+                        )}
+                    />
+                    <Route
+                        path="/auth/callback"
+                        element={(
+                            <RouteErrorBoundary routeName="Auth Callback">
+                                <AuthCallbackPage />
+                            </RouteErrorBoundary>
+                        )}
+                    />
+                    <Route
+                        path="/auth/vk/callback"
+                        element={(
+                            <RouteErrorBoundary routeName="VK Auth Callback">
+                                <AuthCallbackPage />
+                            </RouteErrorBoundary>
+                        )}
+                    />
+                    <Route
+                        path="/donationalerts/callback"
+                        element={(
+                            <RouteErrorBoundary routeName="DonationAlerts Callback">
+                                <DonationAlertsCallback />
+                            </RouteErrorBoundary>
+                        )}
+                    />
+                    <Route
+                        path="/memealerts/callback"
+                        element={(
+                            <RouteErrorBoundary routeName="MemeAlerts Callback">
+                                <MemeAlertsCallback />
+                            </RouteErrorBoundary>
+                        )}
+                    />
 
-
-                    {/* OBS Widgets - minimal loading */}
-                    <Route path="/tts-obs/:token" element={
-                        <RouteErrorBoundary routeName="TTS OBS Widget">
-                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                <ObsTtsPage />
-                            </Suspense>
-                        </RouteErrorBoundary>
-                    } />
-
-                    <Route path="/drops-widget/:token" element={
-                        <RouteErrorBoundary routeName="Drops Widget">
-                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                <DropsWidget />
-                            </Suspense>
-                        </RouteErrorBoundary>
-                    } />
-                    <Route path="/chat-overlay" element={
-                        <RouteErrorBoundary routeName="Chat Overlay">
-                            <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
-                                <ChatOverlay />
-                            </Suspense>
-                        </RouteErrorBoundary>
-                    } />
-                    <Route path="/chat-window" element={
-                        <RouteErrorBoundary routeName="Chat Window">
-                            <Suspense fallback={<MinimalFallback />}>
-                                <ChatWindow />
-                            </Suspense>
-                        </RouteErrorBoundary>
-                    } />
-
-                    {/* Protected Routes with Layout */}
-                    <Route path="/" element={<AuthGuard />}>
-                        <Route path="tts-player" element={
-                            <RouteErrorBoundary routeName="TTS Player">
-                                <Suspense fallback={<MinimalFallback />}>
-                                    <TtsPlayerPage />
+                    <Route
+                        path="/tts-obs/:token"
+                        element={(
+                            <RouteErrorBoundary routeName="TTS OBS Widget">
+                                <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
+                                    <ObsTtsPage />
                                 </Suspense>
                             </RouteErrorBoundary>
-                        } />
+                        )}
+                    />
+
+                    <Route
+                        path="/drops-widget/:token"
+                        element={(
+                            <RouteErrorBoundary routeName="Drops Widget">
+                                <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
+                                    <DropsWidget />
+                                </Suspense>
+                            </RouteErrorBoundary>
+                        )}
+                    />
+                    <Route
+                        path="/chat-overlay"
+                        element={(
+                            <RouteErrorBoundary routeName="Chat Overlay">
+                                <Suspense fallback={<div className="min-h-screen bg-transparent" />}>
+                                    <ChatOverlay />
+                                </Suspense>
+                            </RouteErrorBoundary>
+                        )}
+                    />
+                    <Route
+                        path="/chat-window"
+                        element={(
+                            <RouteErrorBoundary routeName="Chat Window">
+                                <Suspense fallback={<MinimalFallback />}>
+                                    <ChatWindow />
+                                </Suspense>
+                            </RouteErrorBoundary>
+                        )}
+                    />
+
+                    <Route path="/" element={<AuthGuard />}>
+                        <Route
+                            path="tts-player"
+                            element={(
+                                <RouteErrorBoundary routeName="TTS Player">
+                                    <Suspense fallback={<MinimalFallback />}>
+                                        <TtsPlayerPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            )}
+                        />
 
                         <Route element={<Layout />}>
                             <Route index element={<Navigate to="/dashboard" replace />} />
 
-                            {/* Dashboard - main page */}
-                            <Route path="dashboard" element={
-                                <RouteErrorBoundary routeName="Dashboard">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <HomePage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
+                            <Route
+                                path="dashboard"
+                                element={(
+                                    <RouteErrorBoundary routeName="Dashboard">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <HomePage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
 
-                            {/* TTS Routes */}
-                            <Route path="dashboard/tts" element={
-                                <RouteErrorBoundary routeName="TTS">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <TtsMainPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/tts/voices" element={
-                                <RouteErrorBoundary routeName="Voice Management">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <VoiceManagementPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/tts/local" element={
-                                <RouteErrorBoundary routeName="Local TTS Settings">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <LocalTTSSettingsPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
+                            <Route
+                                path="dashboard/tts"
+                                element={(
+                                    <RouteErrorBoundary routeName="TTS">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <TtsMainPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
+                            <Route
+                                path="dashboard/tts/voices"
+                                element={(
+                                    <RouteErrorBoundary routeName="Voice Management">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <VoiceManagementPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
+                            <Route
+                                path="dashboard/tts/local"
+                                element={(
+                                    <RouteErrorBoundary routeName="Local TTS Settings">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <LocalTTSSettingsPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
 
-                            {/* Settings */}
-                            <Route path="dashboard/settings" element={
-                                <RouteErrorBoundary routeName="Settings">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <SettingsPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
+                            <Route
+                                path="dashboard/settings"
+                                element={(
+                                    <RouteErrorBoundary routeName="Settings">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <SettingsPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
 
-                            {/* Media Routes */}
-                            <Route path="dashboard/media" element={
-                                <RouteErrorBoundary routeName="Media Requests">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <MediaRequestsPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/points" element={
-                                <RouteErrorBoundary routeName="Points">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <PointsManagementPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/drops" element={
-                                <RouteErrorBoundary routeName="Drops">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <DropsMainPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
+                            <Route
+                                path="dashboard/media"
+                                element={(
+                                    <RouteErrorBoundary routeName="Media Requests">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <MediaRequestsPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
+                            <Route
+                                path="dashboard/points"
+                                element={(
+                                    <RouteErrorBoundary routeName="Points">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <PointsManagementPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
+                            <Route
+                                path="dashboard/drops"
+                                element={(
+                                    <RouteErrorBoundary routeName="Drops">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <DropsMainPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
 
-                            {/* Analytics & Commands */}
-                            <Route path="dashboard/chat-analysis" element={
-                                <RouteErrorBoundary routeName="Analytics">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AnalyticsPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
-                            <Route path="dashboard/commands" element={
-                                <RouteErrorBoundary routeName="Commands">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <CommandsPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
+                            <Route
+                                path="dashboard/chat-analysis"
+                                element={(
+                                    <RouteErrorBoundary routeName="Analytics">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <AnalyticsPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
+                            <Route
+                                path="dashboard/commands"
+                                element={(
+                                    <RouteErrorBoundary routeName="Commands">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <CommandsPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
 
-                            {/* Admin Routes */}
-                            <Route path="dashboard/admin/*" element={
-                                <RouteErrorBoundary routeName="Admin">
-                                    <Suspense fallback={<MinimalFallback />}>
-                                        <AdminPage />
-                                    </Suspense>
-                                </RouteErrorBoundary>
-                            } />
+                            <Route
+                                path="dashboard/admin/*"
+                                element={(
+                                    <RouteErrorBoundary routeName="Admin">
+                                        <Suspense fallback={<MinimalFallback />}>
+                                            <AdminPage />
+                                        </Suspense>
+                                    </RouteErrorBoundary>
+                                )}
+                            />
                         </Route>
                     </Route>
                 </Routes>
             </AppErrorBoundary>
 
-            {/* Toast Manager - premium aesthetic at the end of DOM */}
             <Toaster
                 position="bottom-right"
                 expand={false}
@@ -227,7 +285,6 @@ const App: React.FC = () => {
                 richColors={false}
                 toastOptions={{
                     className: 'group toast-group',
-                    // Styles are now handled by toast-overrides.css
                     classNames: {
                         toast: 'group-[.toaster]:backdrop-blur-xl group-[.toaster]:shadow-2xl',
                         description: 'group-[.toast]:text-muted-foreground',
@@ -238,6 +295,6 @@ const App: React.FC = () => {
             />
         </>
     );
-}
+};
 
 export default App;

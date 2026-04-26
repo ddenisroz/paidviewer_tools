@@ -5,10 +5,10 @@ import * as TabsPrimitive from "@radix-ui/react-tabs"
 import { cn } from "@/lib/utils"
 
 export const DASHBOARD_TABS_LIST_CLASS =
-  "h-auto w-full flex-wrap justify-start gap-2 overflow-visible rounded-none border-b border-border bg-transparent p-0 pb-2"
+  "h-auto w-full justify-start gap-0 overflow-x-auto overflow-y-hidden rounded-none border-b border-border bg-transparent p-0"
 
 export const DASHBOARD_TAB_TRIGGER_CLASS =
-  "min-h-10 shrink-0 rounded-md border border-transparent px-3 py-2 text-center text-sm font-medium leading-tight text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500/60 data-[state=active]:bg-sky-500/10 data-[state=active]:text-sky-300 data-[state=active]:shadow-none sm:px-4"
+  "-mb-px min-h-10 shrink-0 rounded-none border-0 border-b-2 border-transparent bg-transparent px-4 pb-3 pt-2 text-center text-sm font-medium leading-tight text-muted-foreground shadow-none transition-colors hover:text-cyan-300 data-[state=active]:border-cyan-400 data-[state=active]:bg-transparent data-[state=active]:text-cyan-300 data-[state=active]:shadow-none"
 
 const Tabs = TabsPrimitive.Root
 
@@ -19,7 +19,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
+      "inline-flex h-9 items-center justify-center rounded-none bg-transparent p-0 text-muted-foreground",
       className
     )}
     {...props} />
@@ -33,7 +33,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-none bg-transparent px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none",
       className
     )}
     {...props} />

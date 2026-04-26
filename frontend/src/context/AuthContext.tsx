@@ -1,7 +1,6 @@
 ﻿import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
 import { authLogger as logger } from '../shared/utils/prodLogger';
-import { getSharedWebSocket } from '../shared/utils/sharedWebSocket';
 import { useAuthStore } from '../store/useAuthStore';
 
 import type { User } from '@/types/user';
@@ -66,19 +65,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             initAuth();
         }
     }, [checkAuth, initialCheckDone]);
-
-    // WebSocket management
-    useEffect(() => {
-        if (user?.id) {
-            logger.info(`[AuthContext] Initializing WebSocket for user ${user.id}`);
-            const wsManager = getSharedWebSocket(user.id);
-
-            return () => {
-                logger.info('[AuthContext] Cleaning up WebSocket');
-                wsManager.cleanup();
-            };
-        }
-    }, [user?.id]);
 
     const isWhitelisted = (platform: string, channel: string): boolean => {
         if (!user) return false;

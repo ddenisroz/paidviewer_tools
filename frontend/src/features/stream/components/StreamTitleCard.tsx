@@ -38,7 +38,7 @@ const StreamTitleCard: React.FC = () => {
     const bothEnabled = useMemo(() => twitchEnabled && vkEnabled, [twitchEnabled, vkEnabled]);
 
     const isLinked = localCombine && bothEnabled;
-    const twitchInputPadding = isLinked && bothEnabled ? 'pl-[4.1rem]' : 'pl-[3.15rem]';
+    const twitchInputPadding = isLinked && bothEnabled ? 'pl-[4.75rem]' : 'pl-[3.15rem]';
     const vkInputPadding = 'pl-[3.15rem]';
     const STREAM_FIELD_CLASS = 'border-border/70 bg-background/60 text-foreground placeholder:text-muted-foreground';
     const isSaving = status.saveTitle === 'loading';
@@ -46,8 +46,6 @@ const StreamTitleCard: React.FC = () => {
     const showVkField = !(isLinked && bothEnabled);
     const [isUserDirty, setIsUserDirty] = useState(false);
     const normalizeTitle = (value?: string) => (value ?? '').trim();
-    const focusRestoreRef = useRef<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
-    const clearedOnFocusRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
     const saveButtonRef = useRef<HTMLButtonElement | null>(null);
     const suppressBlurRestoreRef = useRef(false);
 
@@ -150,9 +148,10 @@ const StreamTitleCard: React.FC = () => {
             let success = false;
             if (isLinked) {
                 if (!isChanged) return;
+                const linkedTitle = currentData.twitch?.title ?? currentData.vk?.title ?? '';
                 success = await saveChanges({
-                    twitch: { title: currentData.twitch?.title },
-                    vk: { title: currentData.twitch?.title } // Sync VK to Twitch
+                    twitch: { title: linkedTitle },
+                    vk: { title: linkedTitle }
                 }, 'saveTitle');
             } else {
                 if (!hasPlatformChange(platform)) return;
@@ -191,23 +190,6 @@ const StreamTitleCard: React.FC = () => {
         }
     };
 
-    const revertToFocusedValue = (platform: 'twitch' | 'vk') => {
-        const restoreValue = focusRestoreRef.current[platform];
-        lastSyncedTitleRef.current = restoreValue;
-        if (isLinked && bothEnabled) {
-            setCurrentData(prev => ({
-                ...prev,
-                twitch: { ...prev.twitch!, title: restoreValue },
-                vk: { ...prev.vk!, title: restoreValue }
-            }));
-        } else if (platform === 'twitch') {
-            setCurrentData(prev => ({ ...prev, twitch: { ...prev.twitch!, title: restoreValue } }));
-        } else {
-            setCurrentData(prev => ({ ...prev, vk: { ...prev.vk!, title: restoreValue } }));
-        }
-        clearedOnFocusRef.current[platform] = false;
-    };
-
     const handleInputBlur = (platform: 'twitch' | 'vk', e: React.FocusEvent<HTMLInputElement>) => {
         isEditingRef.current = false;
 
@@ -220,22 +202,12 @@ const StreamTitleCard: React.FC = () => {
         if (nextFocused && saveButtonRef.current?.contains(nextFocused)) {
             return;
         }
-
-        // Clicking outside input cancels edit and restores previous value.
-        revertToFocusedValue(platform);
     };
 
     const handleInputFocus = (platform: 'twitch' | 'vk', e: React.FocusEvent<HTMLInputElement>) => {
         isEditingRef.current = true;
-        const currentValue = getTitleValue(platform);
-        focusRestoreRef.current[platform] = currentValue;
-        if (currentValue.trim() !== '') {
-            clearedOnFocusRef.current[platform] = true;
-            handleTitleChange(platform, '');
-        } else {
-            clearedOnFocusRef.current[platform] = false;
-        }
-        e.target.setSelectionRange(0, 0);
+        lastSyncedTitleRef.current = getTitleValue(platform);
+        e.target.select();
     };
 
     const isChanged = useMemo(() => {
@@ -310,7 +282,7 @@ const StreamTitleCard: React.FC = () => {
                 {/* Twitch / Main Input */}
                 <div className="space-y-4 relative">
                     <div className="relative">
-                        <div className={`absolute left-3 top-1/2 z-20 flex -translate-y-1/2 items-center pointer-events-none ${isLinked && bothEnabled ? 'w-[3.25rem] gap-1' : 'w-6'}`}>
+                        <div className={`absolute left-3 top-1/2 z-20 flex -translate-y-1/2 items-center pointer-events-none ${isLinked && bothEnabled ? 'w-[3.75rem] gap-2' : 'w-6'}`}>
                             <TwitchIcon width={24} height={24} className="text-white/80 shrink-0" />
                             {isLinked && bothEnabled && (
                                 <VKIcon width={24} height={24} className="text-white/80 shrink-0" />

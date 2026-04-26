@@ -36,7 +36,7 @@ services:
   tts_service:
     image: ${F5_TTS_IMAGE:?F5_TTS_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_tts_service_prod
-    profiles: ["cloud-tts"]
+    profiles: ["cloud-tts-real"]
     ports:
       - "127.0.0.1:8011:8011"
     environment:
@@ -72,7 +72,7 @@ services:
   qwen_tts:
     image: ${QWEN_TTS_IMAGE:?QWEN_TTS_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_qwen_service_prod
-    profiles: ["cloud-tts"]
+    profiles: ["cloud-tts-real"]
     ports:
       - "127.0.0.1:8002:8000"
     environment:
@@ -98,7 +98,7 @@ services:
   tts_gateway:
     image: ${TTS_GATEWAY_IMAGE:?TTS_GATEWAY_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_gateway_prod
-    profiles: ["cloud-tts"]
+    profiles: ["cloud-tts-fake", "cloud-tts-real"]
     ports:
       - "127.0.0.1:8010:8010"
     environment:
@@ -112,10 +112,6 @@ services:
       - TTS_GATEWAY_QWEN_API_KEY=${QWEN_TTS_SERVICE_API_KEY:?QWEN_TTS_SERVICE_API_KEY is required}
     depends_on:
       redis:
-        condition: service_healthy
-      tts_service:
-        condition: service_healthy
-      qwen_tts:
         condition: service_healthy
     restart: unless-stopped
 

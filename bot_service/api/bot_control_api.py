@@ -42,7 +42,7 @@ async def get_bot_status(
     """Get bot status."""
     try:
         user_id, user_record = _get_user_or_404(db, user)
-        return bot_service.get_bot_status(user_id, user_record)
+        return bot_service.get_bot_status(user_id, user_record, db)
     except HTTPException:
         raise
     except Exception:
@@ -60,7 +60,7 @@ async def connect_chat(
     try:
         user_id, user_record = _get_user_or_404(db, user)
         logger.info("Chat connect requested by user %s", user_id)
-        return bot_service.connect_chat(user_id, user_record)
+        return bot_service.connect_chat(user_id, user_record, db)
     except HTTPException:
         raise
     except Exception:
@@ -78,7 +78,7 @@ async def disconnect_chat(
     try:
         user_id, user_record = _get_user_or_404(db, user)
         logger.info("Chat disconnect requested by user %s", user_id)
-        return bot_service.disconnect_chat(user_id, user_record)
+        return bot_service.disconnect_chat(user_id, user_record, db)
     except HTTPException:
         raise
     except Exception:
@@ -95,7 +95,7 @@ async def get_chat_status(
     """Get chat status."""
     try:
         user_id, user_record = _get_user_or_404(db, user)
-        return bot_service.get_chat_status(user_id, user_record)
+        return bot_service.get_chat_status(user_id, user_record, db)
     except HTTPException:
         raise
     except Exception:
@@ -113,7 +113,7 @@ async def reconnect_chat(
     try:
         user_id, user_record = _get_user_or_404(db, user)
         logger.info("Chat reconnect requested by user %s", user_id)
-        return bot_service.reconnect_chat(user_id, user_record)
+        return bot_service.reconnect_chat(user_id, user_record, db)
     except HTTPException:
         raise
     except Exception:

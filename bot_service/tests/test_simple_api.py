@@ -68,4 +68,6 @@ class TestSimpleAPI:
         
         response = client.get("/auth/vk")
         # Может быть 307 (редирект), 400 (ошибка конфигурации), 404 (not found), или 500 (server error)
-        assert response.status_code in [307, 400, 404, 500]
+        assert response.status_code in [307, 400, 404, 503]
+        if response.status_code == 503:
+            assert response.json()["detail"]["code"] == "integration_not_configured"

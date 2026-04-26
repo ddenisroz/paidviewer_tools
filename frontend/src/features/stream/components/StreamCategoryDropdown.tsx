@@ -38,10 +38,17 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
             const rect = inputRef.getBoundingClientRect();
             const width = Math.min(rect.width, window.innerWidth - 16);
             const left = Math.min(rect.left, window.innerWidth - width - 8);
-            const maxHeight = Math.max(160, Math.min(320, window.innerHeight - rect.bottom - 12));
+            const spaceBelow = window.innerHeight - rect.bottom - 12;
+            const spaceAbove = rect.top - 12;
+            const openUpward = spaceBelow < 220 && spaceAbove > spaceBelow;
+            const availableHeight = openUpward ? spaceAbove : spaceBelow;
+            const maxHeight = Math.max(120, Math.min(320, availableHeight));
+            const top = openUpward
+                ? Math.max(8, rect.top - maxHeight - 4)
+                : rect.bottom + 4;
 
             setPosition({
-                top: rect.bottom + 4,
+                top,
                 left: Math.max(8, left),
                 width,
                 maxHeight,
@@ -63,7 +70,7 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
     const dropdownContent = (
         <div
             data-category-dropdown="true"
-            className="fixed z-[9999] overflow-y-auto rounded-md border border-border bg-popover shadow-lg animate-in fade-in zoom-in-95 duration-100"
+            className="fixed z-[9999] overflow-y-auto overscroll-contain rounded-md border border-border/80 bg-popover/98 shadow-2xl ring-1 ring-border/50 backdrop-blur-md"
             style={{
                 top: `${position.top}px`,
                 left: `${position.left}px`,
@@ -99,7 +106,7 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
                                 <img
                                     src={cat.box_art_url?.replace('{width}x{height}', '40x56') || cat.cover_url}
                                     alt={cat.name}
-                                    className="h-10 w-8 rounded object-cover border border-white/10"
+                                    className="h-10 w-8 rounded border border-white/10 object-cover"
                                     onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                                         const img = e.currentTarget;
                                         const parent = img.parentElement;

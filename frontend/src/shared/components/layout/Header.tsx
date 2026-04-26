@@ -128,19 +128,19 @@ const Header: React.FC = () => {
     };
 
     return (
-        <header className="flex h-14 items-center gap-2 bg-transparent px-3 sm:gap-4 sm:px-6 lg:h-16">
-            <div className="min-w-0 flex-1">
+        <header className="grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-2 bg-transparent px-3 sm:gap-4 sm:px-6 lg:h-16">
+            <div className="col-start-2 min-w-0 justify-self-center">
                 {pageTitle && (
                     <h1
-                        className="truncate pr-2 text-center text-xl font-extrabold text-cyan-300 sm:pr-4 sm:text-2xl lg:text-4xl"
-                        style={{ fontFamily: "'Orbitron', 'Rajdhani', 'Exo 2', 'Inter', sans-serif" }}
+                        className="truncate text-center text-xl font-extrabold text-cyan-300 sm:text-2xl"
+                        style={{ fontFamily: 'var(--font-family-brand)' }}
                     >
                         {pageTitle}
                     </h1>
                 )}
             </div>
 
-            <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-4">
+            <div className="col-start-3 flex shrink-0 items-center justify-end gap-2 justify-self-end sm:gap-4">
                 {isAuthenticated && (
                     <div className="relative integrations-menu">
                         <Button

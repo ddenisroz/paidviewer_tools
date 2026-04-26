@@ -51,8 +51,6 @@ const StreamCategoryCard: React.FC = () => {
     const skipNextSyncRef = useRef(false);
     const suppressSyncUntilRef = useRef(0);
     const suppressBlurRestoreRef = useRef(false);
-    const focusRestoreRef = useRef<{ twitch: string; vk: string }>({ twitch: '', vk: '' });
-    const clearedOnFocusRef = useRef<{ twitch: boolean; vk: boolean }>({ twitch: false, vk: false });
 
     const getCategoryName = (category: StreamCategory | undefined | null) =>
         category?.name || category?.title || '';
@@ -256,10 +254,29 @@ const StreamCategoryCard: React.FC = () => {
     const handleSave = async () => {
         const payload: Record<string, unknown> = {};
         const getCatId = (cat: unknown) => (cat as StreamCategory | undefined)?.id || null;
+        const twitchCat = currentData.twitch?.category as StreamCategory | undefined;
+        let vkCat = currentData.vk?.category as StreamCategory | undefined;
 
-        if (twitchEnabled) payload.twitch = { category_id: getCatId(currentData.twitch?.category) };
+        if (isLinked && bothEnabled && twitchCat) {
+            const mappedName = categoryMapping[twitchCat.name] || twitchCat.name || twitchCat.title || '';
+            if (mappedName) {
+                try {
+                    const searchResults = await searchCategories('vk', mappedName) as StreamCategory[];
+                    if (searchResults?.[0]) {
+                        vkCat = searchResults[0];
+                        setCurrentData(prev => ({
+                            ...prev,
+                            vk: { ...prev.vk, category: searchResults[0] },
+                        }));
+                    }
+                } catch (error) {
+                    logger.error('[SYNC ERROR] VK category lookup failed before save:', error);
+                }
+            }
+        }
+
+        if (twitchEnabled) payload.twitch = { category_id: getCatId(twitchCat) };
         if (vkEnabled) {
-            const vkCat = currentData.vk?.category as StreamCategory;
             if (vkCat) {
                 payload.vk = {
                     category: {
@@ -295,7 +312,7 @@ const StreamCategoryCard: React.FC = () => {
     }, [initialData, currentData, twitchEnabled, vkEnabled]);
 
     const isDataLoaded = currentData && (currentData.twitch || currentData.vk);
-    const twitchInputPadding = isLinked && bothEnabled ? 'pl-[4.1rem]' : 'pl-[3.15rem]';
+    const twitchInputPadding = isLinked && bothEnabled ? 'pl-[4.75rem]' : 'pl-[3.15rem]';
     const vkInputPadding = 'pl-[3.15rem]';
     const STREAM_FIELD_CLASS = 'border-border/70 bg-background/60 text-foreground placeholder:text-muted-foreground';
     const isSaving = status.saveCategory === 'loading';
@@ -346,7 +363,7 @@ const StreamCategoryCard: React.FC = () => {
                     {/* Twitch / General Field */}
                     <div className="space-y-4 relative">
                         <div className="relative">
-                            <div className={`absolute left-3 top-1/2 z-20 flex -translate-y-1/2 items-center pointer-events-none ${isLinked && bothEnabled ? 'w-[3.25rem] gap-1' : 'w-6'}`}>
+                            <div className={`absolute left-3 top-1/2 z-20 flex -translate-y-1/2 items-center pointer-events-none ${isLinked && bothEnabled ? 'w-[3.75rem] gap-2' : 'w-6'}`}>
                                 <TwitchIcon width={24} height={24} className="text-white/80 shrink-0" />
                                 {isLinked && bothEnabled && (
                                     <VKIcon width={24} height={24} className="text-white/80 shrink-0" />
@@ -361,14 +378,6 @@ const StreamCategoryCard: React.FC = () => {
                                 onChange={(e) => handleSearchChange('twitch', e.target.value)}
                                 onFocus={() => {
                                     isEditingRef.current = { twitch: true, vk: isLinked && bothEnabled };
-                                    const currentValue = searchTerms.twitch;
-                                    focusRestoreRef.current.twitch = currentValue;
-                                    if (currentValue.trim() !== '') {
-                                        clearedOnFocusRef.current.twitch = true;
-                                        setSearchTerms(prev => ({ ...prev, twitch: '' }));
-                                    } else {
-                                        clearedOnFocusRef.current.twitch = false;
-                                    }
                                     if (twitchEnabled) setShowDropdown({ twitch: true, vk: false });
                                 }}
                                 onBlur={() => {
@@ -381,11 +390,6 @@ const StreamCategoryCard: React.FC = () => {
                                         : { ...isEditingRef.current, twitch: false };
                                     if (!showDropdown.twitch) {
                                         const twitchName = getCategoryName(currentData.twitch?.category as StreamCategory | undefined);
-                                        if (clearedOnFocusRef.current.twitch && searchTerms.twitch.trim() === '') {
-                                            setSearchTerms(prev => ({ ...prev, twitch: twitchName || focusRestoreRef.current.twitch }));
-                                            clearedOnFocusRef.current.twitch = false;
-                                            return;
-                                        }
                                         setSearchTerms(prev => ({ ...prev, twitch: twitchName }));
                                     }
                                 }}
@@ -430,14 +434,6 @@ const StreamCategoryCard: React.FC = () => {
                                     onChange={(e) => handleSearchChange('vk', e.target.value)}
                                     onFocus={() => {
                                         isEditingRef.current = { ...isEditingRef.current, vk: true };
-                                        const currentValue = searchTerms.vk;
-                                        focusRestoreRef.current.vk = currentValue;
-                                        if (currentValue.trim() !== '') {
-                                            clearedOnFocusRef.current.vk = true;
-                                            setSearchTerms(prev => ({ ...prev, vk: '' }));
-                                        } else {
-                                            clearedOnFocusRef.current.vk = false;
-                                        }
                                         if (vkEnabled) {
                                             setShowDropdown({ twitch: false, vk: true });
                                         }
@@ -450,11 +446,6 @@ const StreamCategoryCard: React.FC = () => {
                                         isEditingRef.current = { ...isEditingRef.current, vk: false };
                                         if (!showDropdown.vk) {
                                             const vkName = getCategoryName(currentData.vk?.category as StreamCategory | undefined);
-                                            if (clearedOnFocusRef.current.vk && searchTerms.vk.trim() === '') {
-                                                setSearchTerms(prev => ({ ...prev, vk: vkName || focusRestoreRef.current.vk }));
-                                                clearedOnFocusRef.current.vk = false;
-                                                return;
-                                            }
                                             setSearchTerms(prev => ({ ...prev, vk: vkName }));
                                         }
                                     }}

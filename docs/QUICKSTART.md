@@ -28,9 +28,9 @@
 - F5 runtime: [f5-tts-service](/H:/Programming/raw_code/AI/Python/f5-tts-service)
 - Qwen runtime: [nano-qwen3tts-vllm](/H:/Programming/raw_code/AI/Python/nano-qwen3tts-vllm)
 
-## Рекомендуемый путь: полный Docker-контур
+## Рекомендуемый путь: лёгкий Docker-контур
 
-Это основной локальный сценарий для всего проекта.
+Это основной локальный сценарий для dashboard-разработки. Он не собирает и не запускает тяжёлые F5/Qwen runtimes.
 
 ### 1. Подготовь основной репозиторий
 Для основного Docker-сценария локальная установка Python-зависимостей и `npm install` не нужны.
@@ -68,21 +68,11 @@ Copy-Item frontend/.env.example frontend/.env
 - `QWEN_TTS_SERVICE_URL`
 - `QWEN_TTS_SERVICE_API_KEY`
 
-### 3. Подними локальный Docker-контур
+### 3. Подними локальный core-контур
 
 ```powershell
 cd H:\Programming\raw_code\AI\Python\paidviewer_tools
-docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
-  -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
-  --profile core --profile cloud-tts up --build
-```
-
-Если нужен только core без TTS runtime профиля:
-
-```powershell
-docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
-  -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
-  --profile core up --build
+.\start-dev.ps1
 ```
 
 Контур поднимет:
@@ -90,12 +80,29 @@ docker compose --env-file bot_service/.env --env-file deploy/docker/compose.loca
 - `postgres` на `5432`
 - `redis` на `6379`
 - `bot_service` на `8000`
+- `frontend` на `80`
+
+### 4. Опционально включи TTS-профиль
+
+Gateway-only профиль нужен для проверки UI и маршрутизации без сборки тяжёлых model runtimes:
+
+```powershell
+.\start-dev.ps1 -WithCloudTtsFake
+```
+
+Полный TTS-профиль собирает и запускает тяжёлые F5/Qwen runtimes. Используй его только для TTS smoke или разработки TTS:
+
+```powershell
+.\start-dev.ps1 -WithCloudTtsReal
+```
+
+Полный профиль добавит:
+
 - `tts-gateway` на `8010`
 - `f5-tts-service` на `8011`
 - `qwen_tts` на `8012` через Docker
-- `frontend` на `80`
 
-### 4. Зафиксируй локальный origin для OAuth
+### 5. Зафиксируй локальный origin для OAuth
 
 Локально открывай приложение только через:
 
@@ -113,17 +120,43 @@ docker compose --env-file bot_service/.env --env-file deploy/docker/compose.loca
 
 `web-push URL` в VK Live не является OAuth callback и настраивается отдельно.
 
-### 5. Проверь базовые точки
+### 6. Проверь базовые точки
 
 - `http://localhost`
 - `http://localhost:8000/health`
-- `http://localhost:8000/api/tts/health?provider=f5`
-- `http://localhost:8000/api/tts/health?provider=qwen`
-- `http://localhost:8010/health/ready`
-- `http://localhost:8011/health/ready`
-- `http://localhost:8012/health/ready`
+- `http://localhost:8000/api/tts/health?provider=f5` только если включён TTS-профиль
+- `http://localhost:8000/api/tts/health?provider=qwen` только если включён TTS-профиль
+- `http://localhost:8010/health/ready` для `-WithCloudTtsFake` или `-WithCloudTtsReal`
+- `http://localhost:8011/health/ready` только для `-WithCloudTtsReal`
+- `http://localhost:8012/health/ready` только для `-WithCloudTtsReal`
 
-Старый `deploy/docker/docker-compose.dev.yml` оставлен только как совместимый локальный compose, но официальный путь теперь production-first: `docker-compose.prod.yml + docker-compose.local.yml`.
+Старый `deploy/docker/docker-compose.dev.yml` оставлен только как совместимый локальный compose, но официальный путь теперь `start-dev.ps1`, который использует `docker-compose.prod.yml + docker-compose.local.yml`.
+
+## Безопасная остановка и очистка Docker
+
+Обычная остановка не удаляет контейнеры, volumes, БД и model cache:
+
+```powershell
+.\stop-dev.ps1
+```
+
+Убрать stopped containers/orphans, но сохранить volumes:
+
+```powershell
+.\stop-dev.ps1 -CleanContainers
+```
+
+Освободить место от dangling `<none>` images и build cache:
+
+```powershell
+.\stop-dev.ps1 -PruneImages
+```
+
+Volumes удаляй только после бэкапа. Там могут быть локальные пользователи, токены, Postgres и кэши моделей:
+
+```powershell
+.\stop-dev.ps1 -PruneVolumes -ConfirmVolumes
+```
 
 ## Вариант B. Запуск self-host агента
 

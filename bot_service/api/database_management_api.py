@@ -2,10 +2,11 @@
 """Database maintenance and hygiene endpoints."""
 
 import logging
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from auth.auth import get_current_user
@@ -35,6 +36,68 @@ def _require_admin(current_user: dict) -> None:
         raise HTTPException(status_code=403, detail="Access denied.")
 
 
+def _scalar(db: Session, sql: str, params: dict[str, Any] | None = None) -> int:
+    return int(db.execute(text(sql), params or {}).scalar() or 0)
+
+
+def _rows(db: Session, sql: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    return [dict(row) for row in db.execute(text(sql), params or {}).mappings().all()]
+
+
+def _build_user_diagnostics(db: Session) -> dict[str, Any]:
+    duplicate_identities = _rows(
+        db,
+        """
+        SELECT platform, platform_user_id, COUNT(*) AS token_count,
+               COUNT(DISTINCT user_id) AS linked_users
+        FROM user_tokens
+        WHERE user_id IS NOT NULL
+          AND platform_user_id IS NOT NULL
+          AND platform_user_id <> ''
+        GROUP BY platform, platform_user_id
+        HAVING COUNT(*) > 1
+        ORDER BY token_count DESC, platform ASC
+        """,
+    )
+
+    return {
+        "mode": "read_only",
+        "automatic_deletes": False,
+        "users": {
+            "total": _scalar(db, "SELECT COUNT(*) FROM users"),
+            "active": _scalar(db, "SELECT COUNT(*) FROM users WHERE is_active IS TRUE"),
+            "inactive": _scalar(db, "SELECT COUNT(*) FROM users WHERE is_active IS NOT TRUE"),
+            "admins": _scalar(db, "SELECT COUNT(*) FROM users WHERE is_admin IS TRUE OR role = 'admin'"),
+            "blocked": _scalar(db, "SELECT COUNT(*) FROM users WHERE is_blocked IS TRUE"),
+        },
+        "sessions": {
+            "total": _scalar(db, "SELECT COUNT(*) FROM user_sessions"),
+            "active": _scalar(db, "SELECT COUNT(*) FROM user_sessions WHERE is_active IS TRUE"),
+            "linked_users": _scalar(db, "SELECT COUNT(DISTINCT user_id) FROM user_sessions WHERE user_id IS NOT NULL"),
+        },
+        "tokens_by_platform": _rows(
+            db,
+            """
+            SELECT platform, COUNT(*) AS token_count, COUNT(DISTINCT user_id) AS linked_users
+            FROM user_tokens
+            GROUP BY platform
+            ORDER BY token_count DESC, platform ASC
+            """,
+        ),
+        "duplicate_identities": duplicate_identities,
+        "commands": {
+            "total": _scalar(db, "SELECT COUNT(*) FROM bot_commands"),
+            "global": _scalar(db, "SELECT COUNT(*) FROM bot_commands WHERE user_id IS NULL"),
+            "disabled": _scalar(db, "SELECT COUNT(*) FROM bot_commands WHERE is_enabled IS NOT TRUE"),
+        },
+        "dry_run_cleanup": {
+            "would_delete_users": 0,
+            "duplicate_identity_groups_to_resolve": len(duplicate_identities),
+            "note": "No rows are modified by this endpoint.",
+        },
+    }
+
+
 @router.get("/stats")
 async def get_database_stats(
     current_user: dict = Depends(get_current_user),
@@ -57,6 +120,27 @@ async def get_database_stats(
         raise
     except Exception:
         logger.exception("Error getting database stats")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/users/diagnostics")
+async def get_user_database_diagnostics(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return read-only user/session/token diagnostics and duplicate identity hints."""
+    try:
+        _require_admin(current_user)
+
+        return {
+            "success": True,
+            "data": _build_user_diagnostics(db),
+            "timestamp": utcnow_naive().isoformat(),
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error getting user diagnostics")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

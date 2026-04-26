@@ -34,3 +34,10 @@ def test_chat_overlay_websocket_rejects_invalid_token(client, db, monkeypatch):
             pass
 
     assert exc_info.value.code == 4401
+
+
+def test_legacy_widgets_api_is_disabled(client):
+    response = client.get("/api/widgets/chat/config/legacy")
+
+    assert response.status_code == 410
+    assert response.json()["detail"]["code"] == "legacy_widgets_disabled"

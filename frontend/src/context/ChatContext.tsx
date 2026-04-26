@@ -74,6 +74,12 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         isAdminPath(location.pathname);
     const botStatusPollInterval = isBotStatusPage ? 30000 : 120000;
     const shouldLoadChatHistory = location.pathname.startsWith('/chat-window');
+    const shouldUseSharedWebSocket =
+        shouldLoadChatHistory ||
+        isBotStatusPage ||
+        location.pathname.startsWith('/dashboard/media') ||
+        location.pathname.startsWith('/dashboard/tts') ||
+        location.pathname.startsWith('/dashboard/points');
 
     // State
     const [error, setError] = useState<string | null>(null);
@@ -122,14 +128,14 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
     // WebSocket connection
     const { send: wsSendMessage } = useSharedWebSocket(
-        userId,
+        shouldUseSharedWebSocket ? userId : null,
         handleWebSocketMessage as (message: Record<string, unknown>) => void
     );
 
     // Connection status
     useEffect(() => {
-        setIsConnected(!!(userId && isAuthenticated));
-    }, [userId, isAuthenticated]);
+        setIsConnected(!!(shouldUseSharedWebSocket && userId && isAuthenticated));
+    }, [shouldUseSharedWebSocket, userId, isAuthenticated]);
 
     // Chat history loading
     useChatHistory({

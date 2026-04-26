@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 const COOKIE_STORAGE_KEY = 'AcceptCookies';
+const COOKIE_MESSAGE = 'Cookies нужны для входа, сохранения сессии и ваших настроек.';
 
 const CookieConsent: React.FC = () => {
     const [isVisible, setIsVisible] = useState(false);
@@ -24,15 +25,15 @@ const CookieConsent: React.FC = () => {
     return (
         <div className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-xs">
             <div className="relative rounded-lg border border-border/70 bg-popover/95 p-3 shadow-2xl backdrop-blur-sm">
-                <div className="absolute -top-5 -right-2">
+                <div className="absolute -right-2 -top-5">
                     <div className="flex items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/20 px-2 py-1">
-                        <span className="text-[10px] font-bold tracking-wider text-amber-400">COOKIES</span>
+                        <span className="text-[10px] font-bold tracking-wider text-amber-400">Cookies</span>
                     </div>
                 </div>
 
                 <div className="pr-2 pt-1">
                     <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-                        Cookies нужны для входа, сохранения сессии и ваших настроек.
+                        {COOKIE_MESSAGE}
                     </p>
                     <button
                         onClick={handleAccept}

@@ -40,7 +40,9 @@ class TestAuthAPI:
         """Тест редиректа на VK авторизацию"""
         response = client.get("/auth/vk")
         # Может быть 307 (redirect), 404 (not found), или 500 (server error)
-        assert response.status_code in [307, 404, 500]
+        assert response.status_code in [307, 404, 503]
+        if response.status_code == 503:
+            assert response.json()["detail"]["code"] == "integration_not_configured"
     
     def test_twitch_callback_invalid_code(self, client, db_session):
         """Тест обработки неверного кода Twitch"""

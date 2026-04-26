@@ -58,7 +58,7 @@ const LayoutContent: React.FC = () => {
   const showPlayerPadding = isVisible && !isTheaterMode && !isOnYoutubePage;
 
   return (
-    <div className="grid h-screen w-full grid-cols-1 lg:grid-cols-[240px_1fr] xl:grid-cols-[280px_1fr] overflow-hidden">
+    <div className="grid h-screen w-full grid-cols-[56px_1fr] md:grid-cols-[64px_1fr] xl:grid-cols-[280px_1fr] overflow-hidden">
       <Sidebar />
       <div className="flex flex-col h-full overflow-hidden">
         <Header />

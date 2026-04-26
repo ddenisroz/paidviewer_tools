@@ -1,8 +1,3 @@
-// src/hooks/useBotConnection.ts
-/**
- * Хук для управления подключением бота к каналам.
- * Отвечает за: connect/disconnect, статус бота, React Query mutations.
- */
 import { useCallback, useEffect, useState } from 'react';
 
 import { useBotStatus, useConnectBot, useDisconnectBot } from '@/queries/chat/chatQueries';
@@ -10,6 +5,32 @@ import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
 
 type BotStatusType = 'connected' | 'disconnected';
+
+interface PlatformBotStatus {
+    connected?: boolean;
+    ready?: boolean;
+    reason?: string | null;
+    action?: string | null;
+    bot_oauth?: {
+        configured?: boolean;
+        expired?: boolean;
+        login?: string | null;
+        auth_path?: string | null;
+    };
+}
+
+interface BotStatusPayload {
+    connected?: boolean;
+    ready?: boolean;
+    success?: boolean;
+    code?: string;
+    message?: string;
+    action?: string | null;
+    twitch?: PlatformBotStatus;
+    vk?: PlatformBotStatus;
+    status?: BotStatusPayload;
+    data?: BotStatusPayload;
+}
 
 interface UseBotConnectionOptions {
     isAuthenticated: boolean;
@@ -26,6 +47,37 @@ interface UseBotConnectionReturn {
     getBotConnectionStatus: () => Promise<{ status: BotStatusType;[key: string]: unknown }>;
 }
 
+const getPayload = (response: unknown): BotStatusPayload => {
+    const payload = response as BotStatusPayload | undefined;
+    return payload?.data ?? payload ?? {};
+};
+
+const getStatusPayload = (response: unknown): BotStatusPayload => {
+    const payload = getPayload(response);
+    return payload.status ?? payload;
+};
+
+const getStatusFromPayload = (payload: BotStatusPayload): BotStatusType => {
+    return payload.connected && payload.ready !== false ? 'connected' : 'disconnected';
+};
+
+const getBotMessage = (payload: BotStatusPayload): string => {
+    if (payload.message) return payload.message;
+
+    const problem = payload.twitch?.reason ?? payload.vk?.reason ?? payload.code;
+    const messages: Record<string, string> = {
+        platform_not_connected: 'Сначала подключите Twitch или VK Live.',
+        bot_oauth_missing: 'Нужно подключить отдельную авторизацию бота.',
+        bot_oauth_expired: 'Авторизация бота истекла, подключите ее заново.',
+        bot_runtime_offline: 'Сервис бота сейчас не запущен.',
+        channel_not_joined: 'Бот еще не присоединился к каналу.',
+        channel_missing: 'У интеграции нет имени канала.',
+        bot_not_ready: 'Бот пока не готов к работе с чатом.',
+    };
+
+    return problem ? messages[problem] ?? messages.bot_not_ready : messages.bot_not_ready;
+};
+
 export function useBotConnection({
     isAuthenticated,
     isCheckingAuth = false,
@@ -35,7 +87,6 @@ export function useBotConnection({
     const { addToast } = useToast();
     const [botStatus, setBotStatus] = useState<BotStatusType>('disconnected');
 
-    // React Query for bot status
     const shouldPoll = pollingEnabled ?? true;
     const resolvedInterval = shouldPoll ? (pollingInterval ?? 30000) : false;
 
@@ -47,16 +98,12 @@ export function useBotConnection({
         refetchOnWindowFocus: false,
     });
 
-    // Update status from query data
     useEffect(() => {
         if (botStatusData) {
-            const statusResponse = (botStatusData as { data?: { connected?: boolean } })?.data ||
-                botStatusData as { connected?: boolean };
-            setBotStatus(statusResponse.connected ? 'connected' : 'disconnected');
+            setBotStatus(getStatusFromPayload(getStatusPayload(botStatusData)));
         }
     }, [botStatusData]);
 
-    // Handle query errors
     useEffect(() => {
         if (botStatusError) {
             logger.error('Error getting bot status:', botStatusError);
@@ -64,18 +111,28 @@ export function useBotConnection({
         }
     }, [botStatusError]);
 
-    // Connect mutation
     const connectBotMutation = useConnectBot({
         onSuccess: (response: unknown) => {
-            const responseData = response as { data?: { success?: boolean } };
-            if (responseData.data?.success) {
-                setBotStatus('connected');
+            const payload = getPayload(response);
+            const statusPayload = getStatusPayload(response);
+
+            if (payload.success === false) {
+                setBotStatus('disconnected');
                 addToast({
-                    type: 'success',
-                    title: 'Бот подключен',
-                    message: 'Бот успешно подключен'
+                    type: 'warning',
+                    title: 'Бот не готов',
+                    message: getBotMessage({ ...statusPayload, ...payload }),
                 });
+                return;
             }
+
+            const nextStatus = getStatusFromPayload(statusPayload);
+            setBotStatus(nextStatus);
+            addToast({
+                type: nextStatus === 'connected' ? 'success' : 'warning',
+                title: nextStatus === 'connected' ? 'Бот подключен' : 'Бот запускается',
+                message: payload.message ?? getBotMessage(statusPayload),
+            });
         },
         onError: (error) => {
             logger.error('Error connecting bot:', error);
@@ -87,16 +144,15 @@ export function useBotConnection({
         },
     });
 
-    // Disconnect mutation
     const disconnectBotMutation = useDisconnectBot({
         onSuccess: (response: unknown) => {
-            const responseData = response as { data?: { success?: boolean } };
-            if (responseData.data?.success) {
+            const payload = getPayload(response);
+            if (payload.success !== false) {
                 setBotStatus('disconnected');
                 addToast({
                     type: 'success',
                     title: 'Бот отключен',
-                    message: 'Бот успешно отключен от всех каналов'
+                    message: payload.message ?? 'Бот отключен от каналов'
                 });
             }
         },
@@ -124,19 +180,13 @@ export function useBotConnection({
         if (!isAuthenticated) return { status: 'disconnected' };
 
         const result = await refetchBotStatus();
-        const statusResponse = (result.data as { data?: Record<string, unknown> })?.data ||
-            result.data as unknown as Record<string, unknown>;
+        const payload = getStatusPayload(result.data);
+        const nextStatus = getStatusFromPayload(payload);
 
-        if (statusResponse && typeof statusResponse === 'object' && 'connected' in statusResponse && statusResponse.connected) {
-            setBotStatus('connected');
-            return { status: 'connected', ...(statusResponse as Record<string, unknown>) };
-        } else {
-            setBotStatus('disconnected');
-            return { status: 'disconnected', ...(statusResponse as Record<string, unknown> || {}) };
-        }
+        setBotStatus(nextStatus);
+        return { status: nextStatus, ...(payload as Record<string, unknown>) };
     }, [isAuthenticated, refetchBotStatus]);
 
-    // Initial status check
     useEffect(() => {
         if (isAuthenticated && !isCheckingAuth) {
             getBotConnectionStatus();

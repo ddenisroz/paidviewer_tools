@@ -41,12 +41,13 @@
 
 ```powershell
 cd H:\Programming\raw_code\AI\Python\paidviewer_tools
-docker compose --env-file bot_service/.env --env-file deploy/docker/compose.local.env `
-  -f deploy/docker/docker-compose.prod.yml -f deploy/docker/docker-compose.local.yml `
-  --profile core --profile cloud-tts up --build
+.\start-dev.ps1
 ```
 
-Дальше смотри [docs/QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md): там описан актуальный запуск всего контура.
+По умолчанию поднимается только лёгкий `core`: Postgres, Redis, backend и frontend.
+Тяжёлые TTS runtimes запускаются явно: `.\start-dev.ps1 -WithCloudTtsReal`.
+
+Дальше смотри [docs/QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md): там описан актуальный запуск всего контура и безопасная очистка Docker.
 Локальный OAuth теперь должен жить только на `http://localhost`: не смешивай `localhost` и `127.0.0.1`, иначе провайдерские callback/cookies будут ломать `state`.
 
 ## Документация

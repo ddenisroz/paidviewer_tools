@@ -144,7 +144,10 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
     except httpx.RequestError as e:
         logger.error(f'Twitch auth network error: {e}', exc_info=True)
         return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.TWITCH, 'provider_unreachable', is_linking))
-    except HTTPException:
+    except HTTPException as e:
+        logger.warning("Twitch OAuth callback failed with HTTP %s: %s", e.status_code, e.detail)
+        if e.status_code >= 500:
+            return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.TWITCH, 'internal_error', is_linking))
         raise
     except Exception as e:
         logger.error(f'Twitch auth error: {e}', exc_info=True)

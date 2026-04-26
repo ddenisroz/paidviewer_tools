@@ -38,23 +38,19 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     const vkStream = streamData?.vk;
     const STATUS_BADGE_BASE = 'inline-flex h-8 min-w-[132px] justify-center';
     const CARD_BODY_CLASS = 'min-h-[76px] p-3 sm:p-4';
-    const twitchSubtitle = twitchStream?.gameName?.trim() || '';
-    const vkSubtitle = vkStream?.gameName?.trim() || '';
-
-    const renderSubtitle = (text: string): React.ReactNode => (
-        <div className="min-h-[1rem] text-xs text-muted-foreground truncate" title={text || undefined}>
-            {text || <span className="invisible">.</span>}
-        </div>
-    );
+    const normalizeSubtitle = (value?: string): string => !value || ['нет категории', 'без категории'].includes(value.trim().toLowerCase()) ? '' : value.trim();
+    const twitchSubtitle = normalizeSubtitle(twitchStream?.gameName);
+    const vkSubtitle = normalizeSubtitle(vkStream?.gameName);
+    const renderSubtitle = (text: string): React.ReactNode => <div className="min-h-[1rem] truncate text-xs text-muted-foreground" title={text || undefined}>{text || <span className="invisible">.</span>}</div>;
 
 
 
     // Если загружается, показываем пустые карточки с анимацией
     if (isLoading) {
         return (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
+            <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto items-stretch sm:grid-cols-2">
                 {/* Пустая Twitch карточка */}
-                <Card className="border-muted-foreground/20 bg-muted/5">
+                <Card className="h-full border-muted-foreground/20 bg-muted/5">
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -74,7 +70,7 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
                 </Card>
 
                 {/* Пустая VK карточка */}
-                <Card className="border-muted-foreground/20 bg-muted/5">
+                <Card className="h-full border-muted-foreground/20 bg-muted/5">
                     <CardContent className="p-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -97,13 +93,13 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
     }
 
     return (
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto">
+            <div className="grid grid-cols-1 gap-4 max-w-2xl mx-auto items-stretch sm:grid-cols-2">
                 {/* Twitch статус */}
-            <Card className={`card-glass transition-colors duration-300 ${twitchEnabled ? 'bg-purple-500/10 border-purple-500/20' : ''}`}>
+            <Card className={`h-full card-glass transition-colors duration-300 ${twitchEnabled ? 'bg-purple-500/10 border-purple-500/20' : ''}`}>
                 <CardContent className={CARD_BODY_CLASS}>
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <TwitchIcon className="h-8 w-8 text-[#9146FF] flex-shrink-0" />
+                            <TwitchIcon className={`h-8 w-8 flex-shrink-0 ${twitchEnabled ? 'text-[#9146FF]' : 'text-muted-foreground'}`} />
                             <div className="flex min-h-[2.5rem] min-w-0 flex-col justify-center">
                                 <div className="font-medium text-sm text-white">Twitch</div>
                                 {renderSubtitle(twitchSubtitle)}
@@ -142,11 +138,11 @@ const StreamStatus: React.FC<StreamStatusProps> = ({ integrations, streamData, i
             </Card>
 
             {/* VK Live статус */}
-            <Card className={`card-glass transition-colors duration-300 ${vkEnabled ? 'bg-red-500/10 border-red-500/20' : ''}`}>
+            <Card className={`h-full card-glass transition-colors duration-300 ${vkEnabled ? 'bg-red-500/10 border-red-500/20' : ''}`}>
                 <CardContent className={CARD_BODY_CLASS}>
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <VKIcon className="h-8 w-8 text-[#FF4444] flex-shrink-0" />
+                            <VKIcon className={`h-8 w-8 flex-shrink-0 ${vkEnabled ? 'text-[#FF4444]' : 'text-muted-foreground'}`} />
                             <div className="flex min-h-[2.5rem] min-w-0 flex-col justify-center">
                                 <div className="font-medium text-sm text-white">VK Live</div>
                                 {renderSubtitle(vkSubtitle)}

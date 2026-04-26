@@ -1,7 +1,21 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-import { ChevronRight, Coins, Command, Headphones, Home, Laugh, LucideIcon, Menu, MessageSquare, Mic, Monitor, Settings, Shield, Sparkles, X, Youtube } from 'lucide-react';
+import {
+    CaretRight,
+    ChatCircleText,
+    Coins,
+    GearSix,
+    Headphones,
+    House,
+    MicrophoneStage,
+    Monitor,
+    ShieldCheck,
+    Smiley,
+    Sparkle,
+    TerminalWindow,
+    YoutubeLogo,
+} from '@phosphor-icons/react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
@@ -11,13 +25,13 @@ import { createPreloadHandler } from '@/shared/utils/preloadRoute';
 interface NavSubItem {
     to: string;
     label: string;
-    icon: LucideIcon;
+    icon: React.ElementType;
 }
 
 interface NavItem {
     to?: string;
     label: string;
-    icon: LucideIcon;
+    icon: React.ElementType;
     submenu?: NavSubItem[];
 }
 
@@ -46,34 +60,34 @@ const routePreloaders: Record<string, () => void> = {
 
 const getNavItems = (isAdminUser: boolean): NavItem[] => {
     const baseItems: NavItem[] = [
-        { to: '/dashboard', label: 'Главная', icon: Home },
+        { to: '/dashboard', label: 'Главная', icon: House },
         {
             label: 'TTS ИИ озвучка',
-            icon: Mic,
+            icon: MicrophoneStage,
             submenu: [
-                { to: '/dashboard/tts', label: 'Основные настройки', icon: Settings },
+                { to: '/dashboard/tts', label: 'Основные настройки', icon: GearSix },
                 { to: '/dashboard/tts/voices', label: 'Управление голосами', icon: Headphones },
                 { to: '/dashboard/tts/local', label: 'Локальный движок', icon: Monitor },
             ]
         },
         {
             label: 'Медиа запросы',
-            icon: Sparkles,
+            icon: Sparkle,
             submenu: [
-                { to: '/dashboard/media', label: 'YouTube заказы', icon: Youtube },
-                { to: '/dashboard/media?tab=memealerts', label: 'MemeAlerts', icon: Laugh },
-                { to: '/dashboard/drops', label: 'Drops система', icon: Sparkles },
+                { to: '/dashboard/media', label: 'YouTube заказы', icon: YoutubeLogo },
+                { to: '/dashboard/media?tab=memealerts', label: 'MemeAlerts', icon: Smiley },
+                { to: '/dashboard/drops', label: 'Drops система', icon: Sparkle },
             ]
         },
         { to: '/dashboard/points', label: 'Баллы канала', icon: Coins },
-        { to: '/dashboard/chat-analysis', label: 'Аналитика чата', icon: MessageSquare },
-        { to: '/dashboard/commands', label: 'Команды', icon: Command },
-        { to: '/dashboard/settings', label: 'Настройки', icon: Settings },
+        { to: '/dashboard/chat-analysis', label: 'Аналитика чата', icon: ChatCircleText },
+        { to: '/dashboard/commands', label: 'Команды', icon: TerminalWindow },
+        { to: '/dashboard/settings', label: 'Настройки', icon: GearSix },
     ];
 
     // Show the admin entry only to users with admin access.
     if (isAdminUser) {
-        baseItems.push({ to: ADMIN_BASE_PATH, label: 'Админ панель', icon: Shield });
+        baseItems.push({ to: ADMIN_BASE_PATH, label: 'Админ панель', icon: ShieldCheck });
     }
 
     return baseItems;
@@ -145,10 +159,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                     if (preloader) preloader();
                 }}
                 className={() =>
-                    `group relative flex w-full items-center gap-3 whitespace-nowrap px-4 transition-colors ${mode === 'mobile'
-                        ? 'py-2 text-sm font-medium'
-                        : 'py-2.5 text-lg font-semibold'
-                    } ${isSubItemActive
+                    `group relative flex w-full items-center gap-3 whitespace-nowrap px-4 py-2.5 text-sm font-semibold transition-colors ${isSubItemActive
                         ? 'bg-blue-500/20 text-blue-200'
                         : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
                     }`
@@ -157,7 +168,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 {isSubItemActive && (
                     <span className="absolute inset-y-0 left-0 w-0.5 bg-blue-300/95" />
                 )}
-                {subItem.icon && <subItem.icon className="h-4 w-4 flex-shrink-0" />}
+                {subItem.icon && <subItem.icon className="h-4 w-4 flex-shrink-0" weight="duotone" />}
                 {subItem.label}
             </NavLink>
         );
@@ -171,7 +182,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 onMouseLeave={() => setOpenSection(null)}
             >
                 <div
-                    className={`relative w-full cursor-pointer px-4 py-2.5 text-lg font-semibold transition-colors ${(isParentActive || isOpen)
+                    className={`relative w-full cursor-pointer px-0 py-3 text-base font-semibold transition-colors xl:px-4 xl:py-2.5 xl:text-lg ${(isParentActive || isOpen)
                         ? 'bg-blue-500/20 text-blue-200'
                         : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
                         }`}
@@ -181,22 +192,19 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                     role="button"
                     aria-expanded={isOpen}
                     aria-label={`Открыть ${item.label}`}
+                    title={item.label}
                 >
                     {/* Индикатор активной подстраницы - показываем только если меню закрыто */}
                     {isParentActive && !isOpen && (
                         <div className="pointer-events-none absolute inset-y-0 left-0 w-0.5 bg-blue-300/95" />
                     )}
-                    <div className="flex items-center justify-between gap-4 pointer-events-none">
-                        <div className="flex items-center gap-4">
-                            <item.icon className="h-5 w-5" />
-                            {item.label}
+                    <div className="pointer-events-none flex items-center justify-center gap-3 xl:justify-between xl:gap-4">
+                        <div className="flex min-w-0 items-center justify-center gap-0 xl:justify-start xl:gap-4">
+                            <item.icon className="h-5 w-5 flex-shrink-0" weight="duotone" />
+                            <span className="hidden truncate xl:inline">{item.label}</span>
                         </div>
-                        <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-90 opacity-100' : 'opacity-40'}`} />
+                        <CaretRight className={`hidden h-4 w-4 transition-transform xl:block ${isOpen ? 'rotate-90 opacity-100' : 'opacity-40'}`} weight="bold" />
                     </div>
-                </div>
-
-                <div className={`${isParentActive ? 'lg:block' : 'lg:hidden'} ml-4 border-l border-border/70 py-1`}>
-                    {item.submenu!.map((subItem) => renderSubItem(subItem, 'mobile'))}
                 </div>
 
                 {/* Submenu появляется СПРАВА от родителя (GitHub-style, без gap) */}
@@ -208,7 +216,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                             onMouseEnter={handleMouseEnter}
                         />
                         <div
-                            className="hidden lg:block absolute left-full top-0 w-72 bg-popover/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50 p-0 animate-in fade-in slide-in-from-left-2 duration-200 overflow-hidden"
+                            className="absolute left-full top-0 z-50 w-[min(18rem,calc(100vw-4rem))] overflow-hidden rounded-lg border border-border bg-popover/95 p-0 shadow-xl backdrop-blur-sm animate-in fade-in slide-in-from-left-2 duration-200"
                             onMouseEnter={handleMouseEnter}
                         >
                             {item.submenu!.map((subItem) => renderSubItem(subItem, 'desktop'))}
@@ -232,15 +240,16 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, openSection, setO
                 }
             }}
             className={({ isActive }) =>
-                `relative flex w-full items-center gap-4 px-4 py-2.5 text-lg font-semibold transition-colors ${isActive
+                `relative flex w-full items-center justify-center gap-0 px-0 py-3 text-base font-semibold transition-colors xl:justify-start xl:gap-4 xl:px-4 xl:py-2.5 xl:text-lg ${isActive
                     ? 'bg-blue-500/20 text-blue-200'
                     : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-100'
                 }`
             }
+            title={item.label}
         >
             <span className={`absolute inset-y-0 left-0 w-0.5 bg-blue-300/95 transition-opacity ${location.pathname === item.to ? 'opacity-100' : 'opacity-0'}`} />
-            <item.icon className="h-5 w-5" />
-            {item.label}
+            <item.icon className="h-5 w-5 flex-shrink-0" weight="duotone" />
+            <span className="hidden truncate xl:inline">{item.label}</span>
         </NavLink>
     );
 };
@@ -282,47 +291,20 @@ const Sidebar: React.FC = () => {
         }
     }, [location.pathname, navItems]);
 
-    // Состояние для мобильного меню
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
     return (
-        <>
-            {/* Мобильная кнопка меню */}
-            <button
-                className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-card/90 border border-border/70 hover:bg-accent rounded-lg transition-colors"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                aria-label="Открыть меню"
-            >
-                {isMobileMenuOpen ? (
-                    <X className="h-6 w-6 text-white" />
-                ) : (
-                    <Menu className="h-6 w-6 text-white" />
-                )}
-            </button>
-
-            {/* Overlay для мобильных */}
-            {isMobileMenuOpen && (
-                <div
-                    className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                />
-            )}
-
-            {/* Sidebar */}
-            <div className={`
-                fixed lg:relative h-full w-full sm:w-[18rem] lg:w-auto bg-card border-r border-border/70 z-50 transform transition-transform duration-300 ease-in-out
-                ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                lg:block
-            `}>
+        <div className="relative z-50 h-full w-14 border-r border-border/70 bg-card md:w-16 xl:w-[280px]">
                 <div className="flex h-full max-h-screen flex-col gap-2 relative">
-                    <div className="flex h-16 items-center px-4 lg:h-[70px] lg:px-6">
-                        <NavLink to="/dashboard" className="flex items-center gap-2 font-semibold">
-                            <span className="brand-wordmark whitespace-nowrap text-xl text-green-400">
+                    <div className="flex h-16 items-center justify-center px-2 xl:h-[70px] xl:justify-start xl:px-6">
+                        <NavLink to="/dashboard" className="flex min-w-0 items-center gap-2 font-semibold" title="Paidviewer_tools">
+                            <span className="brand-wordmark text-lg text-green-400 xl:hidden">
+                                PV
+                            </span>
+                            <span className="brand-wordmark hidden whitespace-nowrap text-xl text-green-400 xl:inline">
                                 Paidviewer_tools
                             </span>
                         </NavLink>
                     </div>
-                    <div className="flex-1 overflow-y-auto overflow-x-hidden">
+                    <div className="flex-1 overflow-visible">
                         <nav className="grid w-full text-sm font-medium">
                             {navItems.map((item) => (
                                 <SidebarNavItem
@@ -330,7 +312,7 @@ const Sidebar: React.FC = () => {
                                     item={item}
                                     openSection={openSection}
                                     setOpenSection={setOpenSection}
-                                    onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+                                    onMobileMenuClose={() => undefined}
                                 />
                             ))}
                         </nav>
@@ -343,7 +325,6 @@ const Sidebar: React.FC = () => {
 
                 </div>
             </div>
-        </>
     );
 }
 

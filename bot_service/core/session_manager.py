@@ -354,7 +354,7 @@ class SessionManager:
                 _terminate(new_db)
 
     def clear_user_tokens(self, user_id: int) -> bool:
-        """Remove all integration tokens for a user during logout."""
+        """Remove all integration tokens for explicit destructive cleanup only."""
         try:
             with db_session() as db:
                 tokens = db.query(UserToken).filter_by(user_id=user_id).all()
@@ -469,7 +469,7 @@ class SessionManager:
             return None
 
     def clear_all_user_tokens(self, user_id: int) -> bool:
-        """Delete all user tokens on logout. Alias for ``clear_user_tokens``."""
+        """Delete all user tokens. Alias kept for legacy explicit cleanup paths."""
         return self.clear_user_tokens(user_id)
 
     async def _notify_all_sessions_terminated_for_channel(self, channel_name: str, reason: str):

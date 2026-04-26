@@ -33,6 +33,11 @@ FRONTEND_URL = settings.frontend_url
 VK_AUTH_BASE_URL = settings.vk_auth_base_url
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
+VK_OAUTH_NOT_CONFIGURED_DETAIL = {
+    "code": "integration_not_configured",
+    "platform": "vk",
+    "message": "VK Live OAuth is not configured",
+}
 
 
 async def _vk_request_with_retry(method: str, url: str, **kwargs) -> httpx.Response:
@@ -60,8 +65,9 @@ async def _vk_request_with_retry(method: str, url: str, **kwargs) -> httpx.Respo
 @limiter.limit(settings.rate_limit_login)
 async def vk_auth(request: Request):
     """Start the full VK Live OAuth flow."""
-    if not VK_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="VK_CLIENT_ID not configured")
+    if not VK_CLIENT_ID or not VK_REDIRECT_URI:
+        logger.warning("VK OAuth requested before integration was configured")
+        raise HTTPException(status_code=503, detail=VK_OAUTH_NOT_CONFIGURED_DETAIL)
 
     from constants import OAUTH_SCOPES
 
@@ -99,8 +105,9 @@ async def vk_auth(request: Request):
 @limiter.limit(settings.rate_limit_login)
 async def login_vk(request: Request):
     """Frontend-compatible entrypoint for VK login."""
-    if not VK_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="VK_CLIENT_ID not configured")
+    if not VK_CLIENT_ID or not VK_REDIRECT_URI:
+        logger.warning("VK OAuth requested before integration was configured")
+        raise HTTPException(status_code=503, detail=VK_OAUTH_NOT_CONFIGURED_DETAIL)
 
     from constants import OAUTH_SCOPES
 
@@ -156,9 +163,9 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
         logger.warning("VK OAuth CSRF state mismatch")
         return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.VK, "invalid_state", is_linking))
 
-    if not all([VK_CLIENT_ID, VK_CLIENT_SECRET]):
+    if not all([VK_CLIENT_ID, VK_CLIENT_SECRET, VK_REDIRECT_URI]):
         logger.error(f"VK credentials not configured. VK_CLIENT_ID: {'[OK]' if VK_CLIENT_ID else '[X]'}, VK_CLIENT_SECRET: {'[OK]' if VK_CLIENT_SECRET else '[X]'}")
-        raise HTTPException(status_code=500, detail="VK integration is not configured.")
+        raise HTTPException(status_code=503, detail=VK_OAUTH_NOT_CONFIGURED_DETAIL)
 
     logger.info("VK credentials loaded")
     logger.info("VK authorization code received")
@@ -368,7 +375,10 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
     except httpx.RequestError as e:
         logger.error(f"VK auth network error: {e}", exc_info=True)
         return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.VK, "provider_unreachable", is_linking))
-    except HTTPException:
+    except HTTPException as e:
+        logger.warning("VK OAuth callback failed with HTTP %s: %s", e.status_code, e.detail)
+        if e.status_code >= 500:
+            return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.VK, "internal_error", is_linking))
         raise
     except Exception as e:
         logger.error(f"VK auth error: {e}", exc_info=True)

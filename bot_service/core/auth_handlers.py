@@ -161,7 +161,7 @@ class AuthHandlers:
             raise HTTPException(status_code=500, detail='Authentication failed')
 
     async def logout(self, current_user: dict=Depends(get_current_user), db: Session | None=None):
-        """Logout user and terminate all sessions/tokens."""
+        """Logout user and terminate sessions without deleting integration tokens."""
         from fastapi.responses import JSONResponse
         from core.database import User
         from core.session_manager import session_manager
@@ -196,10 +196,6 @@ class AuthHandlers:
                                     logger.info(f'[OK] VK Live bot disconnected from {user.vk_channel_name}')
                             except Exception as e:
                                 logger.error(f'[ERROR] Error disconnecting VK Live bot: {e}')
-                if user_id > 0:
-                    logger.info(f'[DELETE] Logout: Deleting ALL tokens for user {user_id}')
-                    session_manager.clear_all_user_tokens(user_id)
-                    logger.info(f'[OK] Tokens deleted. User {user_id} will need to re-authenticate')
                 logger.info(f'[DELETE] Logout: Terminating all sessions for user {user_id}')
                 try:
                     session_manager.terminate_user_sessions(user_id, 'user_logout', db_session)
@@ -209,7 +205,7 @@ class AuthHandlers:
         finally:
             if owns_db_session:
                 db_session.close()
-        response = JSONResponse(content={'success': True, 'message': 'Logged out successfully', 'tokens_deleted': True})
+        response = JSONResponse(content={'success': True, 'message': 'Logged out successfully', 'tokens_deleted': False})
         response.delete_cookie(key='session_id', httponly=True, samesite='lax')
         logger.info(f'[LOGOUT] User {user_id} logged out successfully')
         return response

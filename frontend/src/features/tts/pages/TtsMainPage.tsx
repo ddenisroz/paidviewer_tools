@@ -246,23 +246,20 @@ const SourcePlatformToggleRow = React.memo(function SourcePlatformToggleRow({
     onToggle,
 }: SourcePlatformToggleRowProps) {
     const title = platform === 'twitch' ? 'Twitch' : 'VK Live';
-    const iconTone = platform === 'twitch'
-        ? 'bg-violet-500/15 text-violet-200'
-        : 'bg-rose-500/15 text-rose-200';
+    const activeIconTone = platform === 'twitch'
+        ? 'text-[#9146FF]'
+        : 'text-[#FF4444]';
+    const iconTone = isConnected && isEnabled ? activeIconTone : 'text-muted-foreground';
 
     return (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/60 px-4 py-3">
             <div className="flex min-w-0 items-center gap-3">
-                <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconTone}`}>
-                    {platform === 'twitch' ? <TwitchIcon className="h-5 w-5" /> : <VKIcon className="h-5 w-5" />}
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-background/70">
+                    {platform === 'twitch' ? <TwitchIcon className={`h-5 w-5 ${iconTone}`} /> : <VKIcon className={`h-5 w-5 ${iconTone}`} />}
                 </div>
                 <div className="min-w-0">
                     <div className="text-sm font-semibold text-foreground">{title}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                        {isConnected
-                            ? (isEnabled ? 'Озвучка включена' : 'Озвучка выключена')
-                            : 'Не подключена'}
-                    </div>
+                    {!isConnected && <div className="mt-1 text-xs text-muted-foreground">Не подключена</div>}
                 </div>
             </div>
 
