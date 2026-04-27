@@ -92,7 +92,7 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                   variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0 hover:bg-accent"
-                  onClick={() => handleAmountChange(quality.id, -50)}
+                  onClick={() => handleAmountChange(quality.id, -1)}
                 >
                   <Minus className="h-3 w-3" />
                 </Button>
@@ -103,13 +103,14 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) =>
                   className="h-8 w-20 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min="0"
                   max={maxValue}
+                  step="1"
                 />
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0 hover:bg-accent"
-                  onClick={() => handleAmountChange(quality.id, 50)}
+                  onClick={() => handleAmountChange(quality.id, 1)}
                 >
                   <Plus className="h-3 w-3" />
                 </Button>

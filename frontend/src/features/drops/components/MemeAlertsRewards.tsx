@@ -75,6 +75,10 @@ const DEFAULT_AUTOMATION_SETTINGS: MemeAlertsAutomationSettings = {
 
 const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
 const FIELD_CLASS = 'h-9 border-border/70 bg-card/70 text-foreground placeholder:text-muted-foreground';
+const REWARD_SWITCH_VARIANT = {
+    twitch: 'twitch',
+    vk: 'vk',
+} as const;
 
 const ConnectionNote: React.FC<{ note: string | null }> = ({ note }) => {
     if (!note) return null;
@@ -725,6 +729,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                                 Автовыдача {selectedRewardPlatform === 'twitch' ? 'Twitch' : 'VK'}
                                             </span>
                                             <Switch
+                                                variant={REWARD_SWITCH_VARIANT[selectedRewardPlatform]}
                                                 checked={currentRewardSettings.enabled}
                                                 onCheckedChange={(checked) => handleToggleRewardPlatform(selectedRewardPlatform, checked)}
                                                 disabled={settingsSaving}
@@ -753,9 +758,10 @@ export const MemeAlertsRewards: React.FC = () => {
                                 <CardContent className="space-y-3">
                                     <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-card/60 px-3 py-2">
                                         <p className="text-xs text-foreground">Включить автоконвертацию донатов</p>
-                                        <Switch
-                                            checked={automationSettings.donation_auto.enabled}
-                                            onCheckedChange={(checked) => {
+                                            <Switch
+                                                variant="donation"
+                                                checked={automationSettings.donation_auto.enabled}
+                                                onCheckedChange={(checked) => {
                                                 if (checked && !donationAlertsConnected) {
                                                     toast.error('Подключите DonationAlerts перед включением автоконвертации');
                                                     return;
@@ -780,6 +786,8 @@ export const MemeAlertsRewards: React.FC = () => {
                                             <Label className="text-xs">Курс</Label>
                                             <Input
                                                 type="number"
+                                                min="0.01"
+                                                step="0.01"
                                                 value={automationSettings.donation_auto.coins_per_currency}
                                                 onChange={(e) => setAutomationSettings((prev) => ({
                                                     ...prev,
@@ -795,6 +803,8 @@ export const MemeAlertsRewards: React.FC = () => {
                                             <Label className="text-xs">Мин. донат</Label>
                                             <Input
                                                 type="number"
+                                                min="0"
+                                                step="1"
                                                 value={automationSettings.donation_auto.min_donation_amount}
                                                 onChange={(e) => setAutomationSettings((prev) => ({
                                                     ...prev,

@@ -190,7 +190,9 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
         donor_name = data.get('username', 'Anonymous')
         donor_id = data.get('user_id', 'unknown')
         message = data.get('message', '')
-        alert_id = data.get('id', '')
+        alert_id = str(data.get('id') or data.get('alert_id') or data.get('uuid') or '').strip()
+        if not alert_id:
+            alert_id = f"{data.get('user_id', 'unknown')}:{donor_name}:{donation_amount}:{data.get('created_at') or data.get('date') or message}"
         logger.info(f'[DONATION DROPS] Received donation: {donor_name} - {donation_amount}')
         user_repo = UserRepository(db)
         user_token = user_repo.get_token_by_platform('donationalerts', data.get('user_id', ''))
@@ -206,16 +208,21 @@ async def donationalerts_webhook(request: Request, db: Session=Depends(get_db)):
         memealerts_result = None
         try:
             existing_donation = db.query(DonationAlert).filter(DonationAlert.alert_id == alert_id).with_for_update().first()
+            if existing_donation and existing_donation.is_processed:
+                logger.info(f'[DONATION RECORD] Donation {alert_id} already processed')
+                return {'success': True, 'processed': False, 'duplicate': True, 'message': 'Donation already processed.'}
             if not existing_donation:
                 donation_record = DonationAlert(user_id=user_token.user_id, channel_name=channel_name, amount=float(donation_amount), currency=data.get('currency', 'RUB'), message=message, alert_id=alert_id, is_processed=False)
                 db.add(donation_record)
                 logger.info(f'[DONATION RECORD] Saved donation {alert_id}')
             else:
+                donation_record = existing_donation
                 logger.info(f'[DONATION RECORD] Donation {alert_id} already recorded')
             drops_service = DropsService(db)
             result = drops_service.process_donation_drops_for_user(user_id=user_token.user_id, channel_name=channel_name, platform='donationalerts', viewer_id=donor_id, viewer_name=donor_name, donation_amount=donation_amount)
             memealerts_service = MemeAlertsService(db)
             memealerts_result = await memealerts_service.process_donation_auto_grant(user_id=user_token.user_id, channel_name=channel_name, donor_name=donor_name, donation_amount=donation_amount)
+            donation_record.is_processed = True
             db.commit()
         except Exception:
             db.rollback()

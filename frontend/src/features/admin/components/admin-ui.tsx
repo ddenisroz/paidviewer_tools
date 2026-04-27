@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/shared/components/ui/card';
+import { TooltipHelp } from '@/shared/components/ui/tooltip-help';
 
 export const ADMIN_PAGE_CLASS = 'space-y-6 font-sans';
 export const ADMIN_CARD_CLASS = 'border-border/70 bg-card/80 shadow-none';
@@ -31,8 +32,8 @@ export const AdminPageHeader: React.FC<AdminPageHeaderProps> = ({
       <div className="flex items-center gap-3">
         {Icon ? <Icon className="h-5 w-5 text-muted-foreground" /> : null}
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">{title}</h1>
+        {description ? <TooltipHelp content={description} /> : null}
       </div>
-      {description ? <p className="max-w-2xl text-sm text-muted-foreground">{description}</p> : null}
       {meta ? <div className="flex flex-wrap gap-2">{meta}</div> : null}
     </div>
     {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}

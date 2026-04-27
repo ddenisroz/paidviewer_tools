@@ -37,20 +37,19 @@ const TypingAnimation: React.FC<TypingAnimationProps> = ({
         {text}
         {showCursor ? '_' : ''}
       </span>
-      <span className="col-start-1 row-start-1 whitespace-pre">
-        {displayedText}
+      <span className="col-start-1 row-start-1 flex whitespace-pre">
+        <span>{displayedText}</span>
+        {showCursor && (
+          <span
+            className={cn(
+              "text-green-400",
+              cursorBlink && "animate-pulse",
+            )}
+          >
+            _
+          </span>
+        )}
       </span>
-      {showCursor && (
-        <span 
-          className={cn(
-            "col-start-1 row-start-1 self-auto text-green-400",
-            cursorBlink && "animate-pulse",
-          )}
-          style={{ transform: `translateX(${displayedText.length}ch)` }}
-        >
-          _
-        </span>
-      )}
     </span>
   );
 };

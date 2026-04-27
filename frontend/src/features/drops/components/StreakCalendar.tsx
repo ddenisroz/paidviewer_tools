@@ -85,7 +85,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                         variant="ghost"
                                         size="sm"
                                         className="h-8 w-8 p-0 hover:bg-accent"
-                                        onClick={() => handleDayChange(quality.id, -5)}
+                                        onClick={() => handleDayChange(quality.id, -1)}
                                     >
                                         <Minus className="w-3 h-3" />
                                     </Button>
@@ -96,13 +96,14 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                         className="w-16 h-8 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                         min="1"
                                         max={maxStreakDays}
+                                        step="1"
                                     />
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
                                         className="h-8 w-8 p-0 hover:bg-accent"
-                                        onClick={() => handleDayChange(quality.id, 5)}
+                                        onClick={() => handleDayChange(quality.id, 1)}
                                     >
                                         <Plus className="w-3 h-3" />
                                     </Button>

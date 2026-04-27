@@ -569,7 +569,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                     type="number"
                     min="500"
                     max={String(mythicalDonationMax)}
-                    step="100"
+                    step="1"
                     value={formData.mythical_donation_amount[0]}
                     onChange={(e) => setMythicalDonationAmount(parseInt(e.target.value, 10) || 500)}
                     className="w-20 text-center"

@@ -24,7 +24,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { LocalTtsConnectionGuide } from '@/features/tts/components/LocalTtsConnectionGuide';
-import { LocalTtsTutorialDialog } from '@/features/tts/components/LocalTtsTutorialDialog';
 import {
     useDeleteVoiceMutation,
     useLocalVoicesQuery,
@@ -236,7 +235,6 @@ interface VoiceSettingsDraft {
 const PROVIDER_SWITCH_TAB_CLASS =
     'appearance-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-[inset_0_-1px_0_0_rgba(14,165,233,1)]';
 const VOICE_CARD_CLASS = 'overflow-hidden rounded-lg border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
-const LOCAL_TTS_TUTORIAL_STORAGE_KEY = 'paidviewer.localTtsTutorial.v1';
 const SPEED_PRESET_OPTIONS: VoiceSpeedPreset[] = ['very_slow', 'slow', 'normal', 'fast', 'very_fast'];
 
 const getConfiguredLocalAgentApiUrl = (): string | null => {
@@ -368,7 +366,6 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [isUploadVoiceDialogOpen, setIsUploadVoiceDialogOpen] = useState<boolean>(false);
     const [isVoiceSettingsDialogOpen, setIsVoiceSettingsDialogOpen] = useState<boolean>(false);
     const [isPairingDialogOpen, setIsPairingDialogOpen] = useState<boolean>(false);
-    const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
     const [pairingDownloadFilename, setPairingDownloadFilename] = useState<string>('');
     const [pairingStatusMessage, setPairingStatusMessage] = useState<string>('');
     const [pairingUsedDownloadFallback, setPairingUsedDownloadFallback] = useState<boolean>(false);
@@ -411,28 +408,6 @@ const LocalTTSSettingsPage: React.FC = () => {
     const providerLampClass = hasReadyWorker
         ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]'
         : 'bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.18)]';
-
-    useEffect(() => {
-        if (currentTab !== 'connection') {
-            return;
-        }
-        try {
-            if (window.localStorage.getItem(LOCAL_TTS_TUTORIAL_STORAGE_KEY) !== 'done') {
-                setIsTutorialOpen(true);
-            }
-        } catch {
-            setIsTutorialOpen(true);
-        }
-    }, [currentTab]);
-
-    const closeTutorial = (): void => {
-        try {
-            window.localStorage.setItem(LOCAL_TTS_TUTORIAL_STORAGE_KEY, 'done');
-        } catch {
-            // Local storage can be unavailable in hardened browser profiles.
-        }
-        setIsTutorialOpen(false);
-    };
 
     useEffect(() => {
         setTestResult(null);
@@ -943,44 +918,9 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     <TooltipHelp content="Локальный движок нужен, когда голоса генерируются на вашем компьютере, а сайт только отправляет задания." />
                                 </div>
 
-                                <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        onClick={() => setIsTutorialOpen(true)}
-                                        className="text-cyan-300 hover:bg-cyan-500/10 hover:text-cyan-200"
-                                    >
-                                        Обучение
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={requestPairingCode}
-                                        disabled={pairingLoading}
-                                        className="border-blue-700 text-blue-300 hover:bg-blue-500/10"
-                                    >
-                                        <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${providerLampClass}`} />
-                                        Подключить устройство
-                                        {pairingLoading ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : null}
-                                    </Button>
-                                    <a
-                                        href={PROVIDER_META.f5.docsUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-2 text-sky-300 hover:text-sky-200"
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5" />
-                                        Репозиторий F5
-                                    </a>
-                                    <a
-                                        href={PROVIDER_META.qwen.docsUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-2 text-sky-300 hover:text-sky-200"
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5" />
-                                        Репозиторий Qwen
-                                    </a>
+                                <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-muted-foreground">
+                                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${providerLampClass}`} />
+                                    {hasReadyWorker ? 'Локальный агент онлайн' : 'Агент еще не связан'}
                                 </div>
                             </div>
 
@@ -1006,8 +946,13 @@ const LocalTTSSettingsPage: React.FC = () => {
 
                         <div className="space-y-4">
                             <LocalTtsConnectionGuide
+                                canOpenVoiceManagement={canOpenVoiceManagement}
                                 officialSelfHostPath={officialSelfHostPath}
+                                onOpenVoices={() => setCurrentTab('voices')}
+                                onRequestPairing={requestPairingCode}
+                                pairingLoading={pairingLoading}
                                 providerLabel={providerMeta.label}
+                                providerLampClass={providerLampClass}
                                 selfHostWarning={selfHostWarning}
                             />
 
@@ -1018,6 +963,28 @@ const LocalTTSSettingsPage: React.FC = () => {
 
                                 <div className="mt-4 space-y-4">
                                     <div className="space-y-2">
+                                        <div className="flex flex-wrap gap-3 text-sm">
+                                            <a
+                                                href={PROVIDER_META.f5.docsUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-2 text-sky-300 hover:text-sky-200"
+                                            >
+                                                <ExternalLink className="h-3.5 w-3.5" />
+                                                Репозиторий F5
+                                            </a>
+                                            <a
+                                                href={PROVIDER_META.qwen.docsUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-2 text-sky-300 hover:text-sky-200"
+                                            >
+                                                <ExternalLink className="h-3.5 w-3.5" />
+                                                Репозиторий Qwen
+                                            </a>
+                                        </div>
+
+                                        <div className="space-y-2">
                                         <div className="flex items-center gap-2">
                                             <Label htmlFor="endpoint_url">URL self-hosted сервиса</Label>
                                             <TooltipHelp content="Нужно только для ручного подключения без worker-agent." />
@@ -1028,6 +995,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                                             onChange={(e) => setConfig({ ...config, endpoint_url: e.target.value })}
                                             placeholder={providerMeta.defaultEndpoint}
                                         />
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2">
@@ -1129,8 +1097,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                             )}
                         </div>
                     </div>
-
-                    <LocalTtsTutorialDialog open={isTutorialOpen} onClose={closeTutorial} onOpenChange={(open) => (open ? setIsTutorialOpen(true) : closeTutorial())} />
 
                     <Dialog open={isPairingDialogOpen} onOpenChange={setIsPairingDialogOpen}>
                         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">
