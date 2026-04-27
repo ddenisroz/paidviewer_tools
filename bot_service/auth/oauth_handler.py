@@ -7,6 +7,7 @@ from core.datetime_utils import utcnow_naive
 from fastapi import Request, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from core.config import settings
 from core.database import User, UserSession, UserToken
 from core.session_manager import session_manager
 from core.token_encryption import encrypt_token
@@ -264,6 +265,50 @@ class OAuthHandler:
         elif platform == Platform.VK:
             self._apply_vk_profile(user, user_data)
 
+    def _configured_admin_entries(self) -> set[tuple[str, str]]:
+        """Return configured platform identities that should become app admins."""
+        entries: set[tuple[str, str]] = set()
+        for raw_entry in (settings.admin_users or "").split(","):
+            entry = raw_entry.strip()
+            if not entry or ":" not in entry:
+                continue
+            platform, value = entry.split(":", 1)
+            platform = platform.strip().lower()
+            value = value.strip().lower()
+            if platform and value:
+                entries.add((platform, value))
+        return entries
+
+    def _is_configured_admin_identity(self, platform: str, user_data: OAuthUserData) -> bool:
+        """Check whether OAuth identity matches the configured admin allowlist."""
+        normalized_platform = str(platform).lower()
+        values = {
+            str(user_data.platform_user_id or "").strip().lower(),
+            str(user_data.username or "").strip().lower(),
+            str(user_data.channel_name or "").strip().lower(),
+        }
+        values.discard("")
+
+        return any(
+            entry_platform == normalized_platform and entry_value in values
+            for entry_platform, entry_value in self._configured_admin_entries()
+        )
+
+    def _apply_admin_bootstrap(self, user: User, platform: str, user_data: OAuthUserData) -> None:
+        """Promote configured OAuth identities to app admin during login."""
+        if not self._is_configured_admin_identity(platform, user_data):
+            return
+
+        if user.role != "admin" or not user.is_admin:
+            logger.warning(
+                "[ADMIN BOOTSTRAP] Promoting user %s via %s:%s",
+                user.id,
+                platform,
+                user_data.platform_user_id,
+            )
+        user.role = "admin"
+        user.is_admin = True
+
     async def handle_oauth_callback(
         self,
         request: Request,
@@ -342,6 +387,7 @@ class OAuthHandler:
 
             self._upsert_platform_token(db, unified_user, platform, user_data)
             self._apply_platform_profile(unified_user, platform, user_data)
+            self._apply_admin_bootstrap(unified_user, platform, user_data)
             unified_user.is_active = True
             db.flush()
 

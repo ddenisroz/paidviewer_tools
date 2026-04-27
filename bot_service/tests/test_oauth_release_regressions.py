@@ -113,6 +113,73 @@ def test_vk_login_reports_not_configured_without_internal_server_error(client, m
     }
 
 
+def test_vk_callback_accepts_user_info_without_request_level_verify(client, monkeypatch):
+    import auth.vk_auth as vk_auth
+
+    monkeypatch.setattr(vk_auth, "VK_CLIENT_ID", "vk-client")
+    monkeypatch.setattr(vk_auth, "VK_CLIENT_SECRET", "vk-secret")
+    monkeypatch.setattr(vk_auth, "VK_REDIRECT_URI", "http://localhost/auth/vk/callback")
+
+    class VkClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def request(self, method, url, **kwargs):
+            assert "verify" not in kwargs
+            if "oauth/server/token" in url:
+                return httpx.Response(
+                    200,
+                    json={
+                        "access_token": "vk-access",
+                        "refresh_token": "vk-refresh",
+                        "expires_in": 3600,
+                        "scope": "",
+                    },
+                    request=httpx.Request(method, url),
+                )
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        "user": {
+                            "id": 20416992,
+                            "nick": "Zavtra_Zavod",
+                            "avatar_url": "https://example.com/vk.png",
+                        },
+                        "channel": {"url": "https://live.vkvideo.ru/yourchy"},
+                    }
+                },
+                request=httpx.Request(method, url),
+            )
+
+    async def successful_handler(**kwargs):
+        assert kwargs["platform"] == Platform.VK
+        assert kwargs["user_data"].platform_user_id == "20416992"
+        assert kwargs["user_data"].username == "Zavtra_Zavod"
+        assert kwargs["user_data"].channel_name == "yourchy"
+        return SimpleNamespace(user=SimpleNamespace(id=9), session_id=None, redirect_url="http://localhost/dashboard")
+
+    monkeypatch.setattr(vk_auth.httpx, "AsyncClient", lambda *args, **kwargs: VkClient())
+    monkeypatch.setattr(vk_auth.oauth_handler, "handle_oauth_callback", successful_handler)
+    monkeypatch.setattr(
+        vk_auth.oauth_handler,
+        "create_oauth_response",
+        lambda result: vk_auth.RedirectResponse(url=result.redirect_url),
+    )
+
+    client.cookies.set("oauth_state_vk", "release-state")
+    response = client.get(
+        "/auth/vk/callback?code=test-code&state=release-state",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "http://localhost/dashboard"
+
+
 def test_logout_preserves_platform_tokens(authenticated_client, db_session, test_user):
     db_session.add(
         UserToken(
@@ -201,6 +268,49 @@ async def test_oauth_handler_merges_conflicting_twitch_identity_into_current_use
     assert db_session.query(User).filter(User.id == source_user.id).first() is None
     assert len(merged_token) == 1
     assert merged_token[0].platform_user_id == "75969278"
+
+
+@pytest.mark.asyncio
+async def test_oauth_handler_promotes_configured_admin_identity(db_session, monkeypatch):
+    monkeypatch.setattr(
+        "auth.oauth_handler.settings.admin_users",
+        "twitch:75969278,vk:20416992",
+        raising=False,
+    )
+    user = User(role="user")
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    request = SimpleNamespace(
+        cookies={},
+        headers={"user-agent": "pytest"},
+        client=SimpleNamespace(host="127.0.0.1"),
+    )
+    oauth_user_data = OAuthUserData(
+        platform_user_id="75969278",
+        avatar_url="https://example.com/admin.png",
+        access_token="fresh-token",
+        refresh_token="fresh-refresh",
+        expires_at=None,
+        scopes=["channel:manage:broadcast"],
+        username="yourchy",
+    )
+
+    result = await oauth_handler.handle_oauth_callback(
+        request=request,
+        db=db_session,
+        platform=Platform.TWITCH,
+        user_data=oauth_user_data,
+        current_user={"id": user.id},
+        auto_connect_bot=False,
+    )
+
+    db_session.expire_all()
+    admin_user = db_session.query(User).filter(User.id == result.user.id).one()
+
+    assert admin_user.role == "admin"
+    assert admin_user.is_admin is True
 
 
 def test_stream_info_service_normalizes_vk_category_without_real_id(db_session):

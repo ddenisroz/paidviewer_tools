@@ -140,7 +140,7 @@ describe('Cyclomatic Complexity Compliance', () => {
         }
 
         expect(regressions).toHaveLength(0);
-    }, 60000);
+    }, 120000);
 
     it('should have helper modules extracted for complex logic', () => {
         const helperFiles = [

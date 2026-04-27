@@ -43,9 +43,17 @@ VK_OAUTH_NOT_CONFIGURED_DETAIL = {
 async def _vk_request_with_retry(method: str, url: str, **kwargs) -> httpx.Response:
     """Perform a VK OAuth request with a short retry on transient network errors."""
     last_error: Optional[httpx.RequestError] = None
+    verify = kwargs.pop("verify", None)
+    client_kwargs: Dict[str, Any] = {
+        "trust_env": False,
+        "timeout": 30.0,
+    }
+    if verify is not None:
+        client_kwargs["verify"] = verify
+
     for attempt in range(1, 3):
         try:
-            async with httpx.AsyncClient(trust_env=False, timeout=30.0) as client:
+            async with httpx.AsyncClient(**client_kwargs) as client:
                 return await client.request(method, url, **kwargs)
         except httpx.RequestError as exc:
             last_error = exc

@@ -17,13 +17,14 @@ import {
     Trash2,
     Upload,
     User,
-    XCircle,
-    Zap
+    XCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
+import { LocalTtsConnectionGuide } from '@/features/tts/components/LocalTtsConnectionGuide';
+import { LocalTtsTutorialDialog } from '@/features/tts/components/LocalTtsTutorialDialog';
 import {
     useDeleteVoiceMutation,
     useLocalVoicesQuery,
@@ -47,6 +48,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { DASHBOARD_TABS_LIST_CLASS, DASHBOARD_TAB_TRIGGER_CLASS, Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 import { Textarea } from '@/shared/components/ui/textarea';
+import { TooltipHelp } from '@/shared/components/ui/tooltip-help';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
 
@@ -233,7 +235,8 @@ interface VoiceSettingsDraft {
 
 const PROVIDER_SWITCH_TAB_CLASS =
     'appearance-none rounded-none border-0 bg-transparent px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-[inset_0_-1px_0_0_rgba(14,165,233,1)]';
-const VOICE_CARD_CLASS = 'overflow-hidden rounded-2xl border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
+const VOICE_CARD_CLASS = 'overflow-hidden rounded-lg border border-emerald-500/20 bg-emerald-950/10 backdrop-blur-sm shadow-none';
+const LOCAL_TTS_TUTORIAL_STORAGE_KEY = 'paidviewer.localTtsTutorial.v1';
 const SPEED_PRESET_OPTIONS: VoiceSpeedPreset[] = ['very_slow', 'slow', 'normal', 'fast', 'very_fast'];
 
 const getConfiguredLocalAgentApiUrl = (): string | null => {
@@ -365,6 +368,7 @@ const LocalTTSSettingsPage: React.FC = () => {
     const [isUploadVoiceDialogOpen, setIsUploadVoiceDialogOpen] = useState<boolean>(false);
     const [isVoiceSettingsDialogOpen, setIsVoiceSettingsDialogOpen] = useState<boolean>(false);
     const [isPairingDialogOpen, setIsPairingDialogOpen] = useState<boolean>(false);
+    const [isTutorialOpen, setIsTutorialOpen] = useState<boolean>(false);
     const [pairingDownloadFilename, setPairingDownloadFilename] = useState<string>('');
     const [pairingStatusMessage, setPairingStatusMessage] = useState<string>('');
     const [pairingUsedDownloadFallback, setPairingUsedDownloadFallback] = useState<boolean>(false);
@@ -407,6 +411,28 @@ const LocalTTSSettingsPage: React.FC = () => {
     const providerLampClass = hasReadyWorker
         ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.2)]'
         : 'bg-red-500 shadow-[0_0_0_3px_rgba(239,68,68,0.18)]';
+
+    useEffect(() => {
+        if (currentTab !== 'connection') {
+            return;
+        }
+        try {
+            if (window.localStorage.getItem(LOCAL_TTS_TUTORIAL_STORAGE_KEY) !== 'done') {
+                setIsTutorialOpen(true);
+            }
+        } catch {
+            setIsTutorialOpen(true);
+        }
+    }, [currentTab]);
+
+    const closeTutorial = (): void => {
+        try {
+            window.localStorage.setItem(LOCAL_TTS_TUTORIAL_STORAGE_KEY, 'done');
+        } catch {
+            // Local storage can be unavailable in hardened browser profiles.
+        }
+        setIsTutorialOpen(false);
+    };
 
     useEffect(() => {
         setTestResult(null);
@@ -908,15 +934,24 @@ const LocalTTSSettingsPage: React.FC = () => {
                 </TabsList>
 
                 <TabsContent value="connection" className="space-y-4">
-                    <div className="space-y-4 rounded-2xl border border-border/70 bg-card/75 p-6 shadow-none backdrop-blur-sm">
+                    <div className="space-y-4 rounded-lg border border-border/70 bg-card/75 p-5 shadow-none backdrop-blur-sm">
                         <div className="space-y-4">
                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                 <div className="flex items-center gap-2">
                                     <Server className="w-5 h-5" />
                                     <h3 className="text-lg font-semibold text-foreground">Подключение</h3>
+                                    <TooltipHelp content="Локальный движок нужен, когда голоса генерируются на вашем компьютере, а сайт только отправляет задания." />
                                 </div>
 
                                 <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        onClick={() => setIsTutorialOpen(true)}
+                                        className="text-cyan-300 hover:bg-cyan-500/10 hover:text-cyan-200"
+                                    >
+                                        Обучение
+                                    </Button>
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -970,50 +1005,23 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </div>
 
                         <div className="space-y-4">
-                            <div className="grid gap-3 md:grid-cols-2">
-                                <div className="rounded-xl border border-border/70 bg-background/55 p-4">
-                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">Папка</p>
-                                    <code className="block rounded-lg bg-[#13192b] px-3 py-2 text-sm text-slate-100">
-                                        cd {providerMeta.folder}
-                                    </code>
-                                </div>
-                                <div className="rounded-xl border border-border/70 bg-background/55 p-4">
-                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-sky-300">Запуск</p>
-                                    <code className="block rounded-lg bg-[#13192b] px-3 py-2 text-sm text-slate-100">
-                                        {providerMeta.runCommand}
-                                    </code>
-                                </div>
-                            </div>
+                            <LocalTtsConnectionGuide
+                                officialSelfHostPath={officialSelfHostPath}
+                                providerLabel={providerMeta.label}
+                                selfHostWarning={selfHostWarning}
+                            />
 
-                            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-                                <div className="flex items-center gap-2">
-                                    <Zap className="h-4 w-4 text-blue-300" />
-                                    <p className="text-sm font-semibold text-blue-200">Основной self-host путь</p>
-                                </div>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    {selfHostWarning}
-                                </p>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <Badge variant="outline" className="border-blue-500/40 text-blue-300">
-                                        official_mode: self_host
-                                    </Badge>
-                                    <Badge variant="outline" className="border-blue-500/40 text-blue-300">
-                                        recommended_path: {officialSelfHostPath}
-                                    </Badge>
-                                </div>
-                            </div>
-
-                            <details className="rounded-xl border border-border/70 bg-background/45 p-4" open={!hasReadyWorker && !hasSavedConfig}>
+                            <details className="rounded-lg border border-border/70 bg-background/45 p-4">
                                 <summary className="cursor-pointer list-none text-sm font-medium text-foreground">
-                                    Резервный ручной endpoint
+                                    Расширенные настройки
                                 </summary>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Используйте этот блок только если локальный агент недоступен или вам нужно вручную проверить сохранённый self-hosted endpoint.
-                                </p>
 
                                 <div className="mt-4 space-y-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="endpoint_url">URL self-hosted сервиса</Label>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="endpoint_url">URL self-hosted сервиса</Label>
+                                            <TooltipHelp content="Нужно только для ручного подключения без worker-agent." />
+                                        </div>
                                         <Input
                                             id="endpoint_url"
                                             value={config.endpoint_url}
@@ -1023,11 +1031,10 @@ const LocalTTSSettingsPage: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="api_key">
-                                            {provider === 'qwen'
-                                                ? 'API ключ runtime (если у worker задан API_KEY)'
-                                                : 'API ключ runtime (если у сервиса включена авторизация)'}
-                                        </Label>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="api_key">API ключ runtime</Label>
+                                            <TooltipHelp content={providerMeta.apiKeyHint} />
+                                        </div>
                                         <div className="flex gap-2">
                                             <Input
                                                 id="api_key"
@@ -1122,6 +1129,8 @@ const LocalTTSSettingsPage: React.FC = () => {
                             )}
                         </div>
                     </div>
+
+                    <LocalTtsTutorialDialog open={isTutorialOpen} onClose={closeTutorial} onOpenChange={(open) => (open ? setIsTutorialOpen(true) : closeTutorial())} />
 
                     <Dialog open={isPairingDialogOpen} onOpenChange={setIsPairingDialogOpen}>
                         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-sm">

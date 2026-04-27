@@ -1,7 +1,7 @@
 ﻿// src/components/IntegrationsDialog.tsx
 import React from 'react';
 
-import { AlertCircle, Gift, X } from 'lucide-react';
+import { Gift, WarningCircle, X } from '@phosphor-icons/react';
 import { useNavigate } from 'react-router-dom';
 
 import { useDonationAlerts } from '@/context/DonationAlertsContext';
@@ -101,6 +101,7 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                             <p className="font-semibold">Twitch</p>
                         </div>
                         <Switch
+                            variant="twitch"
                             checked={integrations.twitch?.enabled || false}
                             onCheckedChange={handleTwitchToggle}
                             disabled={isLoading || integrations.twitch?.enabled === null}
@@ -122,6 +123,7 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                                 </div>
                             </div>
                             <Switch
+                                variant="vk"
                                 checked={integrations.vk?.enabled || false}
                                 onCheckedChange={handleVkToggle}
                                 disabled={isLoading || integrations.vk?.enabled === null}
@@ -161,6 +163,7 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                             </div>
                             <div className="flex items-center">
                                 <Switch
+                                    variant="donation"
                                     checked={daConnected}
                                     onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
                                     disabled={daLoading || !hasMainIntegration}
@@ -170,7 +173,7 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
 
                         {!hasMainIntegration && (
                             <div className="flex items-center space-x-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
-                                <AlertCircle className="w-4 h-4 text-yellow-600" />
+                                <WarningCircle className="w-4 h-4 text-yellow-600" />
                                 <p className="text-sm text-yellow-700 dark:text-yellow-300">
                                     Подключите Twitch или VK Live для доступа к DonationAlerts
                                 </p>
@@ -178,7 +181,7 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                         )}
                         {daError && (
                             <div className="flex items-center space-x-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
-                                <AlertCircle className="w-4 h-4 text-red-600" />
+                                <WarningCircle className="w-4 h-4 text-red-600" />
                                 <p className="text-sm text-red-700 dark:text-red-300">
                                     {daError}
                                 </p>

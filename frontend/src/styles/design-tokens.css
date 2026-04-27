@@ -73,9 +73,9 @@
   --input-padding-y: 0.25rem;    /* 4px - py-1 */
 
   /* Cards */
-  --card-padding: 1.5rem;        /* 24px - p-6 */
+  --card-padding: 1rem;          /* 16px - p-4 */
   --card-gap: 1rem;              /* 16px - gap-4 */
-  --card-radius: 1rem;           /* 16px - rounded-2xl */
+  --card-radius: 0.5rem;         /* 8px - rounded-lg */
 
   /* Modals/Dialogs */
   --modal-padding: 1.5rem;       /* 24px - p-6 */

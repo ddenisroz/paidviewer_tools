@@ -31,10 +31,9 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
   const [saving, setSaving] = React.useState(false);
   const [key, setKey] = React.useState(0);
 
-  // Reset form when dialog opens/closes or reward changes
   useEffect(() => {
     if (open) {
-      setKey(prev => prev + 1);
+      setKey((prev) => prev + 1);
     }
   }, [open, reward]);
 
@@ -75,13 +74,13 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
         name: 'title',
         label: 'Название',
         type: 'text',
-        placeholder: 'Например: Выбрать испытание',
+        placeholder: 'Например: выбрать испытание',
       },
       {
         name: 'description',
-        label: 'Описание (опционально)',
+        label: 'Описание',
         type: 'textarea',
-        placeholder: 'Что произойдет после активации этой награды?',
+        placeholder: 'Что произойдет после активации?',
         rows: 2,
       },
       {
@@ -98,62 +97,61 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
         ...commonFields,
         {
           name: 'repair_timeout',
-          label: 'Кулдаун (секунды)',
+          label: 'Кулдаун',
           type: 'number',
           min: 0,
           placeholder: '0 = без ограничений',
-          description: 'Время повторной покупки награды (0 = без ограничений)',
+          description: 'Секунды до повторной покупки',
         },
         {
           name: 'max_uses_count',
-          label: 'Макс. активаций',
+          label: 'Лимит активаций',
           type: 'number',
           min: 0,
           placeholder: '0 = без лимита',
-          description: 'Лимит (0 = ∞)',
+          description: 'Общий лимит награды',
         },
         {
           name: 'max_uses_count_per_user',
-          label: 'Макс. на пользователя',
+          label: 'Лимит на зрителя',
           type: 'number',
           min: 0,
           placeholder: '0 = без лимита',
-          description: 'На 1 пользователя (0 = ∞)',
+          description: 'Сколько раз один зритель может купить награду',
         },
         {
           name: 'is_message_required',
-          label: 'Требовать сообщение от зрителя',
+          label: 'Требовать сообщение',
           type: 'checkbox',
         },
       ];
     }
 
-    // Twitch fields
     return [
       ...commonFields,
       {
         name: 'global_cooldown_seconds',
-        label: 'Глобальный кулдаун (секунды)',
+        label: 'Глобальный кулдаун',
         type: 'number',
         min: 0,
         placeholder: '0 = без ограничений',
-        description: 'Через какое время награду снова можно активировать',
+        description: 'Секунды до следующей активации',
       },
       {
         name: 'max_per_stream',
-        label: 'Макс. за стрим',
+        label: 'Лимит за стрим',
         type: 'number',
         min: 0,
         placeholder: '0 = без лимита',
-        description: 'Лимит (0 = ∞)',
+        description: 'Общий лимит на один стрим',
       },
       {
         name: 'max_per_user_per_stream',
-        label: 'Макс. на зрителя за стрим',
+        label: 'Лимит на зрителя',
         type: 'number',
         min: 0,
         placeholder: '0 = без лимита',
-        description: 'На 1 пользователя (0 = ∞)',
+        description: 'Сколько раз один зритель может активировать награду за стрим',
       },
       {
         name: 'should_redemptions_skip_request_queue',
@@ -171,7 +169,7 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
         description: data.description,
         cost: data.cost,
         is_user_input_required: data.is_message_required,
-        platform: platform,
+        platform,
         channel_name: '',
       };
 
@@ -208,7 +206,7 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
       onClose();
     } catch (err) {
       logger.error('Error saving reward:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Ошибка сохранения награды';
+      const errorMessage = err instanceof Error ? err.message : 'Не удалось сохранить награду';
       toast.error(errorMessage);
     } finally {
       setSaving(false);
@@ -217,15 +215,15 @@ export const RewardFormDialog: React.FC<RewardFormDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{reward ? 'Редактирование награды' : 'Создание награды'}</DialogTitle>
           <DialogDescription>
-            {reward ? 'Измените параметры награды' : 'Создайте новую награду'}
+            {platform === 'twitch' ? 'Twitch Channel Points' : 'VK Live баллы'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="py-2">
           <FormBuilder
             key={key}
             schema={rewardSchema}

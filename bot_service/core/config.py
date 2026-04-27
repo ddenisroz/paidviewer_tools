@@ -39,6 +39,13 @@ class Settings(BaseSettings):
         default="your-encryption-key-here-generate-with-fernet",
         description="Fernet key for OAuth token encryption"
     )
+    admin_users: str = Field(
+        default="",
+        description=(
+            "Comma-separated OAuth identities that are promoted to admin on login. "
+            "Use platform:id or platform:username, for example twitch:75969278,vk:20416992."
+        ),
+    )
 
     # === SERVICE URLS ===
     bot_service_host: str = Field(default="0.0.0.0", description="Bot service host")

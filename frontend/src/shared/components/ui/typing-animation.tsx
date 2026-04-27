@@ -32,14 +32,21 @@ const TypingAnimation: React.FC<TypingAnimationProps> = ({
   }, [currentIndex, text, speed]);
 
   return (
-    <span className={cn("inline-block", className)} {...props}>
-      {displayedText}
+    <span className={cn("relative inline-grid align-baseline", className)} {...props}>
+      <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden="true">
+        {text}
+        {showCursor ? '_' : ''}
+      </span>
+      <span className="col-start-1 row-start-1 whitespace-pre">
+        {displayedText}
+      </span>
       {showCursor && (
         <span 
           className={cn(
-            "ml-1 text-green-400",
-            cursorBlink && "animate-pulse"
+            "col-start-1 row-start-1 self-auto text-green-400",
+            cursorBlink && "animate-pulse",
           )}
+          style={{ transform: `translateX(${displayedText.length}ch)` }}
         >
           _
         </span>
