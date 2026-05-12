@@ -209,7 +209,7 @@ async def test_save_tts_settings_keeps_provider_mode_authoritative_over_legacy_u
 
 
 @pytest.mark.asyncio
-async def test_save_tts_settings_preserves_exact_qwen_model_id(tts_service):
+async def test_save_tts_settings_clamps_qwen_cloud_model_to_supported_product_default(tts_service):
     tts_service.settings_repo = MagicMock()
     tts_service.user_repo = MagicMock()
     tts_service.token_repo = MagicMock()
@@ -229,13 +229,50 @@ async def test_save_tts_settings_preserves_exact_qwen_model_id(tts_service):
     tts_service.user_repo.get_by_id.return_value = disabled_user
     tts_service.token_repo.get_all_by_user.return_value = []
 
-    custom_model = "Qwen/Qwen3-TTS-12Hz-9.9B-Base"
+    custom_model = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
     with patch("services.memory_websocket_manager.get_memory_websocket_manager") as mock_get_ws_manager:
         mock_ws_manager = AsyncMock()
         mock_get_ws_manager.return_value = mock_ws_manager
         result = await tts_service.save_tts_settings(
             user_id=1,
             advanced_provider="qwen",
+            qwen_model=custom_model,
+        )
+
+    assert result["success"] is True
+    saved_payload = tts_service.settings_repo.update_settings.call_args.args[1]
+    assert saved_payload["qwen_model"] == "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
+
+
+@pytest.mark.asyncio
+async def test_save_tts_settings_preserves_exact_qwen_model_id_for_local_mode(tts_service):
+    tts_service.settings_repo = MagicMock()
+    tts_service.user_repo = MagicMock()
+    tts_service.token_repo = MagicMock()
+
+    current_settings = MagicMock()
+    current_settings.version = 1
+    current_settings.engine = "qwen"
+    current_settings.advanced_provider = "qwen"
+    current_settings.f5_mode = "cloud"
+    current_settings.qwen_mode = "local"
+    tts_service.settings_repo.get_or_create.return_value = current_settings
+    tts_service.settings_repo.update_settings.side_effect = lambda settings, payload: MagicMock(**payload, version=2)
+
+    disabled_user = MagicMock()
+    disabled_user.tts_enabled = False
+    disabled_user.twitch_username = None
+    tts_service.user_repo.get_by_id.return_value = disabled_user
+    tts_service.token_repo.get_all_by_user.return_value = []
+
+    custom_model = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
+    with patch("services.memory_websocket_manager.get_memory_websocket_manager") as mock_get_ws_manager:
+        mock_ws_manager = AsyncMock()
+        mock_get_ws_manager.return_value = mock_ws_manager
+        result = await tts_service.save_tts_settings(
+            user_id=1,
+            advanced_provider="qwen",
+            qwen_mode="local",
             qwen_model=custom_model,
         )
 

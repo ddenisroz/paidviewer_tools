@@ -90,10 +90,16 @@ class Settings(BaseSettings):
     qwen_cloud_allowed_models: str = Field(
         default=os.getenv(
             "QWEN_CLOUD_ALLOWED_MODELS",
-            os.getenv("QWEN_ALLOWED_MODELS", os.getenv("QWEN_TTS_ALLOWED_MODELS", "")),
+            os.getenv(
+                "QWEN_ALLOWED_MODELS",
+                os.getenv(
+                    "QWEN_TTS_ALLOWED_MODELS",
+                    "Qwen/Qwen3-TTS-12Hz-0.6B-Base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+                ),
+            ),
         ),
         description=(
-            "Optional backend allowlist for managed Qwen runtime models "
+            "Backend allowlist for managed Qwen runtime models "
             "(comma-separated family aliases and/or exact model ids)"
         ),
     )

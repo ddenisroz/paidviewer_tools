@@ -32,7 +32,6 @@
 ## С чего начать
 
 - [Быстрый старт и запуск всего проекта](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)
-- [Контекст проекта](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/PROJECT_CONTEXT.md)
 - [Release checklist](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
 - [Live smoke runbook](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
 - [Индекс активной документации](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/README.md)
@@ -45,11 +44,21 @@ cd H:\Programming\raw_code\AI\Python\paidviewer_tools
 ```
 
 По умолчанию поднимается только лёгкий `core`: Postgres, Redis, backend и frontend.
+По умолчанию запуск теперь быстрый: без принудительного `down` и без лишнего rebuild.
 Тяжёлые TTS runtimes запускаются явно: `.\start-dev.ps1 -WithCloudTtsReal`.
 
-Дальше смотри [docs/QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md): там описан актуальный запуск всего контура и безопасная очистка Docker.
+Самые полезные быстрые режимы:
+
+```powershell
+.\start-dev.ps1 -WithCloudTtsReal
+.\start-dev.ps1 -WithCloudTtsReal -Services bot_service qwen_tts
+.\start-dev.ps1 -WithCloudTtsReal -Build -Services bot_service
+.\start-dev.ps1 -WithCloudTtsReal -Reset
+```
+
+Дальше смотри [docs/QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md): там описан актуальный запуск всего контура, путь к зеркальным Docker-логам и безопасная очистка Docker.
 Локальный OAuth теперь должен жить только на `http://localhost`: не смешивай `localhost` и `127.0.0.1`, иначе провайдерские callback/cookies будут ломать `state`.
 
 ## Документация
 
-В `docs/` оставлен только активный слой. Исторические планы, аудиты и промежуточные материалы не должны быть источником правды для запуска или релиза.
+В `docs/` оставлен только активный операционный слой. Исторические планы, внутренние заметки и промежуточные материалы не должны быть источником правды для запуска или релиза.

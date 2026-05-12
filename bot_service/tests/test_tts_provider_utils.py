@@ -201,6 +201,36 @@ def test_filter_qwen_cloud_models_filters_runtime_catalog(monkeypatch):
     assert result["filtering"]["source"] == "settings"
 
 
+def test_resolve_qwen_cloud_model_selection_downgrades_1_7_base_to_0_6_base(monkeypatch):
+    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
+    monkeypatch.setattr(
+        provider_utils.settings,
+        "qwen_cloud_allowed_models",
+        "Qwen/Qwen3-TTS-12Hz-0.6B-Base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    )
+
+    resolved = provider_utils.resolve_qwen_cloud_model_selection(provider_utils.QWEN_BASE_17_MODEL)
+
+    assert resolved == provider_utils.QWEN_BASE_06_MODEL
+
+
+def test_resolve_qwen_cloud_model_selection_keeps_supported_0_6_customvoice(monkeypatch):
+    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
+    monkeypatch.setattr(
+        provider_utils.settings,
+        "qwen_cloud_allowed_models",
+        "Qwen/Qwen3-TTS-12Hz-0.6B-Base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
+    )
+
+    resolved = provider_utils.resolve_qwen_cloud_model_selection(provider_utils.QWEN_CUSTOMVOICE_06_MODEL)
+
+    assert resolved == provider_utils.QWEN_CUSTOMVOICE_06_MODEL
+
+
 def test_get_provider_service_url_prefers_qwen_url(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8011")
     monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8001")

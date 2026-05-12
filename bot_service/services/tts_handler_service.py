@@ -24,6 +24,7 @@ from services.tts.provider_utils import (
     infer_provider_from_engine,
     normalize_provider_mode,
     normalize_qwen_model_selection,
+    resolve_qwen_cloud_model_selection,
 )
 
 # API (for specific legacy checks if needed)
@@ -429,6 +430,11 @@ class TTSHandlerService:
         tts_settings = user_data["tts_settings"]
         resolved_trace_id = trace_id or get_correlation_id()
         
+        qwen_mode = getattr(tts_settings, "qwen_mode", engine_config.get("qwen_mode", "cloud"))
+        qwen_model = normalize_qwen_model_selection(getattr(tts_settings, "qwen_model", None))
+        if normalize_provider_mode(qwen_mode) == "cloud":
+            qwen_model = resolve_qwen_cloud_model_selection(qwen_model)
+
         tts_settings_dict = {
             "enable7TV": tts_settings.enable_7tv,
             "enableTwitch": tts_settings.enable_twitch,
@@ -438,11 +444,11 @@ class TTSHandlerService:
             "voice": tts_settings.voice,
             "advanced_provider": getattr(tts_settings, "advanced_provider", engine_config.get("advanced_provider", "f5")),
             "f5_mode": getattr(tts_settings, "f5_mode", engine_config.get("f5_mode", "cloud")),
-            "qwen_mode": getattr(tts_settings, "qwen_mode", engine_config.get("qwen_mode", "cloud")),
+            "qwen_mode": qwen_mode,
             "gcloud_voices": getattr(tts_settings, "gcloud_voices", []) or [],
             "gcloud_mood": getattr(tts_settings, "gcloud_mood", "neutral") or "neutral",
             "qwen_voice": getattr(tts_settings, "qwen_voice", "default") or "default",
-            "qwen_model": normalize_qwen_model_selection(getattr(tts_settings, "qwen_model", None)),
+            "qwen_model": qwen_model,
             "trace_id": resolved_trace_id,
             "source_message_id": source_message_id,
             "source_platform": platform,

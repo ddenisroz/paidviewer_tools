@@ -9,7 +9,11 @@ from typing import Any, Optional
 import aiohttp
 
 from services.tts.provider_utils import (
+    QWEN_BASE_06_MODEL,
+    QWEN_BASE_17_MODEL,
     QWEN_BASE_MODEL,
+    QWEN_CUSTOMVOICE_06_MODEL,
+    QWEN_CUSTOMVOICE_17_MODEL,
     QWEN_CUSTOMVOICE_MODEL,
     QWEN_DEFAULT_MODEL,
     QWEN_VOICEDESIGN_MODEL,
@@ -21,11 +25,11 @@ QWEN_LOCAL_DEFAULT_MODEL = QWEN_DEFAULT_MODEL
 QWEN_LOCAL_DEFAULT_SPEAKER = "serena"
 QWEN_LOCAL_DEFAULT_INSTRUCTION = "Neutral natural voice."
 QWEN_LOCAL_MODEL_ALIASES = {
-    "0.6b-customvoice": QWEN_CUSTOMVOICE_MODEL,
-    "1.7b-customvoice": QWEN_CUSTOMVOICE_MODEL,
+    "0.6b-customvoice": QWEN_CUSTOMVOICE_06_MODEL,
+    "1.7b-customvoice": QWEN_CUSTOMVOICE_17_MODEL,
     "1.7b-voicedesign": QWEN_VOICEDESIGN_MODEL,
-    "0.6b-base": QWEN_BASE_MODEL,
-    "1.7b-base": QWEN_BASE_MODEL,
+    "0.6b-base": QWEN_BASE_06_MODEL,
+    "1.7b-base": QWEN_BASE_17_MODEL,
     "customvoice": QWEN_CUSTOMVOICE_MODEL,
     "voicedesign": QWEN_VOICEDESIGN_MODEL,
     "base": QWEN_BASE_MODEL,
@@ -38,7 +42,13 @@ def normalize_qwen_local_model(raw_model: Optional[str]) -> str:
         return QWEN_LOCAL_DEFAULT_MODEL
 
     normalized_selection = normalize_qwen_model_selection(candidate)
-    if normalized_selection in {QWEN_BASE_MODEL, QWEN_VOICEDESIGN_MODEL, QWEN_CUSTOMVOICE_MODEL}:
+    if normalized_selection in {
+        QWEN_BASE_06_MODEL,
+        QWEN_BASE_17_MODEL,
+        QWEN_CUSTOMVOICE_06_MODEL,
+        QWEN_CUSTOMVOICE_17_MODEL,
+        QWEN_VOICEDESIGN_MODEL,
+    }:
         return normalized_selection
 
     normalized = candidate.lower().replace("_", "").replace(" ", "").replace("/", "")

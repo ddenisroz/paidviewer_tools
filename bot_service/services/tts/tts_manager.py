@@ -54,6 +54,7 @@ from services.tts.provider_utils import (
     get_synthesis_upstream_url,
     normalize_local_tts_endpoint_url,
     normalize_provider,
+    resolve_qwen_cloud_model_selection,
     normalize_qwen_model_selection,
     should_route_provider_via_gateway,
 )
@@ -1041,7 +1042,12 @@ class TTSManager:
                     tts_endpoint_api_key=tts_endpoint_api_key,
                 )
 
-            timeout = aiohttp.ClientTimeout(total=30, connect=10)
+            request_timeout_total = 300 if normalized_provider == "qwen" else 30
+            timeout = aiohttp.ClientTimeout(
+                total=request_timeout_total,
+                connect=10,
+                sock_read=request_timeout_total,
+            )
 
             request_settings = dict(tts_settings or {})
             request_settings.setdefault("advanced_provider", normalized_provider)
@@ -1049,6 +1055,8 @@ class TTSManager:
             source_message_id = str(request_settings.get("source_message_id") or "").strip()
             f5_voice = str(request_settings.get("voice") or "").strip()
             qwen_model = normalize_qwen_model_selection(request_settings.get("qwen_model"))
+            if normalized_provider == "qwen" and not tts_endpoint:
+                qwen_model = resolve_qwen_cloud_model_selection(qwen_model)
             qwen_family = get_qwen_model_family(qwen_model)
             request_settings["qwen_model"] = qwen_model
             raw_qwen_voice = str(request_settings.get("qwen_voice") or "").strip()

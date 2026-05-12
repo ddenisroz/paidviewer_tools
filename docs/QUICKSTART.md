@@ -75,6 +75,12 @@ cd H:\Programming\raw_code\AI\Python\paidviewer_tools
 .\start-dev.ps1
 ```
 
+`start-dev.ps1` теперь работает в быстром режиме по умолчанию:
+
+- не делает принудительный `down`, если ты явно не попросил `-Reset`
+- не делает принудительный rebuild, если ты явно не попросил `-Build`
+- умеет поднимать только нужные сервисы через `-Services`
+
 Контур поднимет:
 
 - `postgres` на `5432`
@@ -96,6 +102,21 @@ Gateway-only профиль нужен для проверки UI и маршр�
 .\start-dev.ps1 -WithCloudTtsReal
 ```
 
+Если менялся только один сервис, лучше не гонять весь стек:
+
+```powershell
+.\start-dev.ps1 -WithCloudTtsReal -Services bot_service
+.\start-dev.ps1 -WithCloudTtsReal -Services qwen_tts
+.\start-dev.ps1 -WithCloudTtsReal -Build -Services qwen_tts
+```
+
+Полный жёсткий перезапуск нужен только когда действительно надо пересобрать всё или очистить старые контейнеры:
+
+```powershell
+.\start-dev.ps1 -WithCloudTtsReal -Reset
+.\start-dev.ps1 -WithCloudTtsReal -Reset -Build
+```
+
 Полный профиль добавит:
 
 - `tts-gateway` на `8010`
@@ -110,13 +131,15 @@ Gateway-only профиль нужен для проверки UI и маршр�
 
 Не смешивай `localhost` и `127.0.0.1`: для OAuth это разные origin, и это ломает cookie/state-проверку.
 
-Локальные redirect URI у провайдеров должны быть такими:
+Для Docker core открывай приложение через `http://localhost`, поэтому локальные redirect URI у провайдеров должны быть такими:
 
 - `http://localhost/auth/twitch/callback`
 - `http://localhost/auth/twitch/bot/callback`
 - `http://localhost/auth/vk/callback`
 - `http://localhost/auth/vk/bot/callback`
 - `http://localhost/auth/donationalerts/callback`
+
+Если запускаешь backend напрямую без nginx, можно использовать `http://localhost:8000/auth/...`, но тогда тот же origin должен быть указан в настройках OAuth-приложений.
 
 `web-push URL` в VK Live не является OAuth callback и настраивается отдельно.
 
@@ -130,7 +153,27 @@ Gateway-only профиль нужен для проверки UI и маршр�
 - `http://localhost:8011/health/ready` только для `-WithCloudTtsReal`
 - `http://localhost:8012/health/ready` только для `-WithCloudTtsReal`
 
-Старый `deploy/docker/docker-compose.dev.yml` оставлен только как совместимый локальный compose, но официальный путь теперь `start-dev.ps1`, который использует `docker-compose.prod.yml + docker-compose.local.yml`.
+Официальный локальный путь теперь только `start-dev.ps1`, который использует `docker-compose.prod.yml + docker-compose.local.yml`.
+
+## Где смотреть логи
+
+После `.\start-dev.ps1` локальный стек автоматически зеркалит Docker-логи в:
+
+```text
+paidviewer_tools/logs/docker/
+```
+
+Основные файлы:
+
+- `logs/docker/bot_service.log`
+- `logs/docker/frontend.log`
+- `logs/docker/postgres.log`
+- `logs/docker/redis.log`
+- `logs/docker/tts_gateway.log`
+- `logs/docker/tts_service.log`
+- `logs/docker/qwen_tts.log`
+
+Это основной локальный путь для диагностики из IDE. Внутренние Docker log-файлы вручную читать не нужно.
 
 ## Безопасная остановка и очистка Docker
 

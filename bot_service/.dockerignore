@@ -6,6 +6,8 @@
 __pycache__/
 **/__pycache__/
 .pytest_cache/
+.pytest_tmp/
+_pytest_tmp/
 .ruff_cache/
 .mypy_cache/
 tests/

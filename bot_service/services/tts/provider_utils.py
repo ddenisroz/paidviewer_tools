@@ -28,11 +28,15 @@ QWEN_BASE_06_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 QWEN_BASE_17_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-Base"
 QWEN_CUSTOMVOICE_06_MODEL = "Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"
 QWEN_CUSTOMVOICE_17_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
-QWEN_BASE_MODEL = QWEN_BASE_17_MODEL
+QWEN_BASE_MODEL = QWEN_BASE_06_MODEL
 QWEN_VOICEDESIGN_MODEL = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign"
-QWEN_CUSTOMVOICE_MODEL = QWEN_CUSTOMVOICE_17_MODEL
+QWEN_CUSTOMVOICE_MODEL = QWEN_CUSTOMVOICE_06_MODEL
 QWEN_PROMPT_MODEL = QWEN_VOICEDESIGN_MODEL
 QWEN_DEFAULT_MODEL = QWEN_BASE_MODEL
+QWEN_CLOUD_DEFAULT_MODELS = (
+    QWEN_BASE_06_MODEL,
+    QWEN_CUSTOMVOICE_06_MODEL,
+)
 
 _QWEN_MODEL_ALIASES = {
     "default": QWEN_DEFAULT_MODEL,
@@ -45,8 +49,8 @@ _QWEN_MODEL_ALIASES = {
     "0.6base": QWEN_BASE_06_MODEL,
     "06 base": QWEN_BASE_06_MODEL,
     "06base": QWEN_BASE_06_MODEL,
-    "1.7 base": QWEN_BASE_MODEL,
-    "1.7base": QWEN_BASE_MODEL,
+    "1.7 base": QWEN_BASE_17_MODEL,
+    "1.7base": QWEN_BASE_17_MODEL,
     "base": QWEN_BASE_MODEL,
     "0.6 customvoice": QWEN_CUSTOMVOICE_06_MODEL,
     "0.6customvoice": QWEN_CUSTOMVOICE_06_MODEL,
@@ -82,7 +86,7 @@ QWEN_MODEL_CATALOG = [
         "description": "Fast Base runtime for voice cloning from a stored sample and reference_text.",
     },
     {
-        "id": QWEN_BASE_MODEL,
+        "id": QWEN_BASE_17_MODEL,
         "label": "1.7 Base",
         "family": "base",
         "supports_voice_cloning": True,
@@ -109,7 +113,7 @@ QWEN_MODEL_CATALOG = [
         "description": "Позволяет описать голос через prompt.",
     },
     {
-        "id": QWEN_CUSTOMVOICE_MODEL,
+        "id": QWEN_CUSTOMVOICE_17_MODEL,
         "label": "1.7 CustomVoice",
         "family": "custom_voice",
         "supports_voice_cloning": False,
@@ -131,10 +135,47 @@ _DEFAULT_LOCAL_TTS_ALLOWED_HOSTS = (
 )
 _DEFAULT_LOCAL_TTS_ALLOWED_CIDRS = ("127.0.0.0/8", "::1/128")
 _LOOPBACK_LOCAL_TTS_HOSTS = {"localhost", "127.0.0.1", "::1"}
+_DOCKER_SERVICE_URLS = {
+    "gateway": ("tts_gateway", 8010),
+    "f5": ("tts_service", 8011),
+    "qwen": ("qwen_tts", 8000),
+}
 
 
 class ProviderRoutingError(ValueError):
     """Raised when provider routing is invalid for current deployment contract."""
+
+
+def _is_running_in_container() -> bool:
+    return (
+        os.path.exists("/.dockerenv")
+        or str(os.getenv("PAIDVIEWER_IN_DOCKER", "")).strip().lower() in {"1", "true", "yes", "on"}
+    )
+
+
+def _runtime_service_url(raw_url: str, service: str) -> str:
+    """Return a Docker-reachable URL when an in-container process received a host loopback URL."""
+
+    url = (raw_url or "").strip().rstrip("/")
+    if not url:
+        return ""
+
+    if not _is_running_in_container():
+        return url
+
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").strip().lower().strip(".")
+    if host not in _LOOPBACK_LOCAL_TTS_HOSTS:
+        return url
+
+    replacement = _DOCKER_SERVICE_URLS.get(service)
+    if not replacement:
+        return url
+
+    replacement_host, replacement_port = replacement
+    host_for_url = f"[{replacement_host}]" if ":" in replacement_host else replacement_host
+    netloc = f"{host_for_url}:{replacement_port}"
+    return urlunparse((parsed.scheme or "http", netloc, "", "", "", ""))
 
 
 def qwen_voice_crud_not_available_detail() -> Dict[str, str]:
@@ -355,6 +396,56 @@ def resolve_cloud_slot_policy(
     }
 
 
+def resolve_qwen_cloud_model_selection(raw_model: Optional[str]) -> str:
+    requested_model = normalize_qwen_model_selection(raw_model)
+    allow_config = get_qwen_cloud_allowed_models()
+    if not allow_config["enabled"]:
+        return requested_model
+
+    allowed_families = set(allow_config["families"])
+    allowed_exact_ids = set(allow_config["exact_ids"])
+
+    requested_entry = {
+        "id": requested_model,
+        "family": get_qwen_model_family(requested_model),
+    }
+    if is_qwen_cloud_model_allowed(
+        requested_entry,
+        allowed_families=allowed_families,
+        allowed_exact_ids=allowed_exact_ids,
+    ):
+        return requested_model
+
+    for candidate in QWEN_MODEL_CATALOG:
+        if not is_qwen_cloud_model_allowed(
+            candidate,
+            allowed_families=allowed_families,
+            allowed_exact_ids=allowed_exact_ids,
+        ):
+            continue
+        if get_qwen_model_family(candidate.get("id")) == requested_entry["family"]:
+            return str(candidate["id"])
+
+    for default_model in QWEN_CLOUD_DEFAULT_MODELS:
+        default_entry = {
+            "id": default_model,
+            "family": get_qwen_model_family(default_model),
+        }
+        if is_qwen_cloud_model_allowed(
+            default_entry,
+            allowed_families=allowed_families,
+            allowed_exact_ids=allowed_exact_ids,
+        ):
+            return default_model
+
+    filtered_payload = filter_qwen_cloud_models(get_qwen_model_catalog())
+    filtered_models = filtered_payload["models"]
+    if filtered_models:
+        return str(filtered_models[0].get("id") or QWEN_DEFAULT_MODEL)
+
+    return QWEN_DEFAULT_MODEL
+
+
 def build_tts_mode_contract(
     provider: Optional[str],
     mode: Optional[str],
@@ -417,9 +508,15 @@ def build_tts_mode_contract(
         "official_path": official_path,
         "error_code": final_error_code,
         "capabilities": resolved_capabilities,
+        "voice_admin": bool(resolved_capabilities.get("voice_admin", False)),
     }
     if upstream is not None:
         payload["upstream"] = upstream
+        payload["upstream_url"] = upstream.get("url")
+        payload["via_gateway"] = upstream.get("via") == "gateway"
+    else:
+        payload["upstream_url"] = resolved_capabilities.get("synthesis_upstream_url")
+        payload["via_gateway"] = resolved_capabilities.get("synthesis_via") == "gateway"
     payload["slot_policy"] = {
         "policy": slot_policy["policy"],
         "slot_allowed": slot_allowed,
@@ -474,28 +571,28 @@ def resolve_provider_mode_for_settings(
 
 def get_tts_gateway_url() -> str:
     """Return normalized gateway URL when configured."""
-    return (settings.tts_gateway_url or "").strip().rstrip("/")
+    return _runtime_service_url(settings.tts_gateway_url or "", "gateway")
 
 
 def get_provider_service_url(provider: Optional[str]) -> str:
     """Direct provider URL (not gateway) for synthesis fallback/local compatibility."""
     normalized_provider = normalize_provider(provider)
     if normalized_provider == "qwen":
-        qwen_url = (settings.qwen_tts_service_url or "").strip()
+        qwen_url = _runtime_service_url(settings.qwen_tts_service_url or "", "qwen")
         if qwen_url:
             return qwen_url
 
-    f5_url = (settings.f5_tts_service_url or "").strip()
+    f5_url = _runtime_service_url(settings.f5_tts_service_url or "", "f5")
     if f5_url:
         return f5_url
-    return "http://localhost:8011"
+    return _runtime_service_url("http://localhost:8011", "f5")
 
 
 def get_qwen_voice_service_url() -> str:
-    voice_url = (settings.qwen_voice_service_url or "").strip().rstrip("/")
+    voice_url = _runtime_service_url(settings.qwen_voice_service_url or "", "qwen")
     if voice_url:
         return voice_url
-    return (settings.qwen_tts_service_url or "").strip().rstrip("/")
+    return _runtime_service_url(settings.qwen_tts_service_url or "", "qwen")
 
 
 def is_qwen_voice_service_enabled() -> bool:
@@ -568,6 +665,18 @@ def get_provider_capabilities(provider: Optional[str]) -> Dict[str, Any]:
     normalized_provider = normalize_provider(provider)
     gateway_configured = bool(get_tts_gateway_url())
     qwen_voice_enabled = is_qwen_voice_service_enabled()
+    synthesis_upstream_url = ""
+    voice_upstream_url = ""
+
+    if normalized_provider in {"f5", "qwen"}:
+        try:
+            synthesis_upstream_url = get_synthesis_upstream_url(normalized_provider)
+        except ProviderRoutingError:
+            synthesis_upstream_url = ""
+        try:
+            voice_upstream_url = get_voice_management_upstream_url(normalized_provider)
+        except ProviderRoutingError:
+            voice_upstream_url = ""
 
     if normalized_provider == "gcloud":
         return {
@@ -602,9 +711,11 @@ def get_provider_capabilities(provider: Optional[str]) -> Dict[str, Any]:
             "synthesis_available": gateway_configured,
             "synthesis_requires_gateway": True,
             "synthesis_via": "gateway" if gateway_configured else "unavailable",
+            "synthesis_upstream_url": synthesis_upstream_url,
             "voice_crud": qwen_voice_enabled,
             "voice_admin": qwen_voice_enabled,
             "voice_upstream_configured": qwen_voice_enabled,
+            "voice_upstream_url": voice_upstream_url,
             "supports_streaming": True,
             "supports_voice_clone": True,
             "supports_voice_design": True,
@@ -636,9 +747,11 @@ def get_provider_capabilities(provider: Optional[str]) -> Dict[str, Any]:
         "synthesis_available": True,
         "synthesis_requires_gateway": False,
         "synthesis_via": "gateway" if gateway_configured else "direct",
+        "synthesis_upstream_url": synthesis_upstream_url,
         "voice_crud": True,
         "voice_admin": True,
         "voice_upstream_configured": True,
+        "voice_upstream_url": voice_upstream_url,
         "supports_streaming": False,
         "supports_voice_clone": True,
         "supports_voice_design": False,

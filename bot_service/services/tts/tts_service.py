@@ -30,6 +30,7 @@ from services.tts.provider_utils import (
     normalize_provider,
     normalize_provider_mode,
     normalize_qwen_model_selection,
+    resolve_qwen_cloud_model_selection,
     resolve_provider_mode_for_settings,
 )
 
@@ -420,6 +421,11 @@ class TTSService:
         else:
             normalized["use_local_tts"] = False
 
+        if provider == "qwen" and normalize_provider_mode(normalized.get("qwen_mode")) == "cloud":
+            normalized["qwen_model"] = resolve_qwen_cloud_model_selection(
+                normalized.get("qwen_model") or getattr(settings, "qwen_model", None)
+            )
+
         if engine in {"gtts", "gcloud"}:
             normalized["use_local_tts"] = False
 
@@ -643,6 +649,8 @@ class TTSService:
             "listening_mode": listening_mode,
             "listeningMode": listening_mode,
             "engine_type": engine_type,
+            "provider": provider,
+            "mode": resolved_mode,
             "advanced_provider": provider,
             "f5_mode": f5_mode,
             "qwen_mode": qwen_mode,
@@ -659,6 +667,10 @@ class TTSService:
             "official_mode": active_contract["official_mode"],
             "recommended_path": active_contract["recommended_path"],
             "active_contract": active_contract,
+            "upstream_url": active_contract.get("upstream_url"),
+            "via_gateway": bool(active_contract.get("via_gateway", False)),
+            "voice_admin": bool(active_contract.get("voice_admin", False)),
+            "error_code": active_contract.get("error_code"),
             "provider_matrix": provider_matrix,
             "capabilities": provider_capabilities,
             "active_self_host_path": active_self_host_path,
