@@ -1042,7 +1042,7 @@ class TTSManager:
                     tts_endpoint_api_key=tts_endpoint_api_key,
                 )
 
-            request_timeout_total = 300 if normalized_provider == "qwen" else 30
+            request_timeout_total = 900 if normalized_provider == "qwen" else 30
             timeout = aiohttp.ClientTimeout(
                 total=request_timeout_total,
                 connect=10,
@@ -1063,15 +1063,16 @@ class TTSManager:
             if normalized_provider == "qwen" and qwen_family != "base":
                 request_settings["qwen_instruction"] = str(
                     request_settings.get("qwen_instruction") or raw_qwen_voice
-                ).strip() or _QWEN_LOCAL_DEFAULT_INSTRUCTION
+                ).strip() or QWEN_LOCAL_DEFAULT_INSTRUCTION
             qwen_voice = raw_qwen_voice or f5_voice
+            default_qwen_speaker = self._normalize_qwen_local_speaker(None)
             voice_map = {}
             if f5_voice:
                 voice_map["f5"] = f5_voice
-            if qwen_voice and not (normalized_provider == "qwen" and qwen_family != "base"):
+            if qwen_voice:
                 voice_map["qwen"] = qwen_voice
             if normalized_provider == "qwen":
-                selected_request_voice = voice_map.get("qwen") or "default"
+                selected_request_voice = voice_map.get("qwen") or default_qwen_speaker
             else:
                 selected_request_voice = voice_map.get("f5") or f5_voice or "default_voice"
 
