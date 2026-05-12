@@ -7,81 +7,80 @@
 
 /* Spacing Utility Classes - Use these for consistent spacing */
 @layer utilities {
+    /* Card spacing utilities */
+    .card-padding {
+        padding: var(--card-padding);
+    }
 
-  /* Card spacing utilities */
-  .card-padding {
-    padding: var(--card-padding);
-  }
+    .card-gap {
+        gap: var(--card-gap);
+    }
 
-  .card-gap {
-    gap: var(--card-gap);
-  }
+    /* Section spacing utilities */
+    .section-gap {
+        gap: var(--section-gap);
+    }
 
-  /* Section spacing utilities */
-  .section-gap {
-    gap: var(--section-gap);
-  }
+    .section-spacing {
+        margin-bottom: var(--section-gap);
+    }
 
-  .section-spacing {
-    margin-bottom: var(--section-gap);
-  }
+    /* Form spacing utilities */
+    .form-field-gap {
+        gap: var(--form-field-gap);
+    }
 
-  /* Form spacing utilities */
-  .form-field-gap {
-    gap: var(--form-field-gap);
-  }
+    .form-spacing {
+        margin-bottom: var(--form-field-gap);
+    }
 
-  .form-spacing {
-    margin-bottom: var(--form-field-gap);
-  }
+    /* List spacing utilities */
+    .list-gap {
+        gap: var(--list-item-gap);
+    }
 
-  /* List spacing utilities */
-  .list-gap {
-    gap: var(--list-item-gap);
-  }
-
-  /* Button spacing utilities */
-  .button-padding {
-    padding: var(--button-padding-y) var(--button-padding-x);
-  }
+    /* Button spacing utilities */
+    .button-padding {
+        padding: var(--button-padding-y) var(--button-padding-x);
+    }
 }
 
 /* View Transitions API - современные плавные переходы между страницами */
 @view-transition {
-  navigation: auto;
+    navigation: auto;
 }
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 300ms;
-  animation-timing-function: ease-in-out;
+    animation-duration: 300ms;
+    animation-timing-function: ease-in-out;
 }
 
 ::view-transition-old(root) {
-  z-index: 1;
+    z-index: 1;
 }
 
 ::view-transition-new(root) {
-  z-index: 2;
+    z-index: 2;
 }
 
 /* Reset стили */
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 html {
-  height: 100%;
-  overflow-y: auto;
+    height: 100%;
+    overflow-y: auto;
 }
 
 body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
 }
 
 /* Keep dark input styling when browser autofill is enabled */
@@ -91,322 +90,440 @@ input:-webkit-autofill:focus,
 textarea:-webkit-autofill,
 textarea:-webkit-autofill:hover,
 textarea:-webkit-autofill:focus {
-  -webkit-text-fill-color: hsl(var(--foreground));
-  -webkit-box-shadow: 0 0 0px 1000px hsl(var(--background)) inset;
-  box-shadow: 0 0 0px 1000px hsl(var(--background)) inset;
-  transition: background-color 9999s ease-out 0s;
+    -webkit-text-fill-color: hsl(var(--foreground));
+    -webkit-box-shadow: 0 0 0px 1000px hsl(var(--background)) inset;
+    box-shadow: 0 0 0px 1000px hsl(var(--background)) inset;
+    transition: background-color 9999s ease-out 0s;
+}
+
+/* Hide mouse spinner controls for numeric inputs across the whole app */
+input[type='number'] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
 }
 
 /* Inline chat emotes: large visually, stable line-height footprint */
 .chat-inline-emote {
-  display: inline-block;
-  height: 1.35em;
-  width: auto;
-  max-height: 1.35em;
-  min-width: 1em;
-  min-height: 1.35em;
-  vertical-align: middle;
-  object-fit: contain;
-  margin-inline: 0.1em;
-  margin-block: 0;
-  line-height: 1;
+    display: inline-block;
+    height: 1.35em;
+    width: auto;
+    max-height: 1.35em;
+    min-width: 1em;
+    min-height: 1.35em;
+    vertical-align: middle;
+    object-fit: contain;
+    margin-inline: 0.1em;
+    margin-block: 0;
+    line-height: 1;
 }
 
 .chat-message-content {
-  display: inline;
-  line-height: 1.25;
-  white-space: pre-wrap;
+    display: inline;
+    line-height: 1.25;
+    white-space: pre-wrap;
 }
 
 /* Кастомные анимации для авторизации */
 @keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
 
-  to {
-    transform: rotate(360deg);
-  }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes pulse-ring {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.8;
-  }
+    0% {
+        transform: scale(0.9);
+        opacity: 0.8;
+    }
 
-  100% {
-    transform: scale(1.1);
-    opacity: 0;
-  }
+    100% {
+        transform: scale(1.1);
+        opacity: 0;
+    }
 }
 
 /* Убрали анимации pulse */
 
 .auth-spinner {
-  animation: spin-slow 2s linear infinite;
+    animation: spin-slow 2s linear infinite;
 }
 
 .auth-pulse {
-  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes pv-fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes pv-fade-out {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes pv-dialog-in {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+@keyframes pv-dialog-out {
+    from {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.98);
+    }
+}
+
+@keyframes pv-anchor-in {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes pv-anchor-out {
+    from {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+}
+
+.pv-overlay[data-state='open'] {
+    animation: pv-fade-in 140ms ease-out both;
+}
+
+.pv-overlay[data-state='closed'] {
+    animation: pv-fade-out 100ms ease-in both;
+}
+
+.pv-dialog-surface {
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.pv-dialog-surface[data-state='open'] {
+    animation: pv-dialog-in 150ms ease-out both;
+}
+
+.pv-dialog-surface[data-state='closed'] {
+    animation: pv-dialog-out 100ms ease-in both;
+}
+
+.pv-anchor-surface {
+    transform-origin: center;
+}
+
+.pv-anchor-surface[data-state='open'] {
+    animation: pv-anchor-in 130ms ease-out both;
+}
+
+.pv-anchor-surface[data-state='closed'] {
+    animation: pv-anchor-out 90ms ease-in both;
+}
+
+.pv-static-anchor-in {
+    animation: pv-anchor-in 130ms ease-out both;
 }
 
 @layer base {
-  :root {
-    --background: 260 24% 11%;
-    /* Base layer */
-    --foreground: 270 20% 95%;
-    /* Light Lavender */
+    :root {
+        --background: 260 24% 11%;
+        /* Base layer */
+        --foreground: 270 20% 95%;
+        /* Light Lavender */
 
-    --card: 260 30% 8%;
-    --card-foreground: 270 20% 95%;
+        --card: 260 30% 8%;
+        --card-foreground: 270 20% 95%;
 
-    --popover: 260 30% 8%;
-    --popover-foreground: 270 20% 95%;
+        --popover: 260 30% 8%;
+        --popover-foreground: 270 20% 95%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 270 20% 98%;
+        --primary: 217 91% 60%;
+        --primary-foreground: 270 20% 98%;
 
-    --secondary: 260 22% 14%;
-    --secondary-foreground: 270 20% 98%;
+        --secondary: 260 22% 14%;
+        --secondary-foreground: 270 20% 98%;
 
-    --muted: 260 22% 14%;
-    --muted-foreground: 270 20% 70%;
+        --muted: 260 22% 14%;
+        --muted-foreground: 270 20% 70%;
 
-    --accent: 260 22% 16%;
-    --accent-foreground: 270 20% 98%;
+        --accent: 260 22% 16%;
+        --accent-foreground: 270 20% 98%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 0 86% 97%;
+        --destructive: 0 63% 31%;
+        --destructive-foreground: 0 86% 97%;
 
-    --border: 260 22% 21%;
-    --input: 260 22% 15%;
-    --ring: 217 91% 66%;
+        --border: 260 22% 21%;
+        --input: 260 22% 15%;
+        --ring: 217 91% 66%;
 
-    --radius: 0.5rem;
+        --radius: 0.5rem;
 
-    /* Quality colors для Drops системы - стандартизированные */
-    --quality-common: 215 16% 47%;
-    /* #6B7280 */
-    --quality-rare: 217 91% 60%;
-    /* #3B82F6 */
-    --quality-epic: 262 83% 58%;
-    /* #8B5CF6 */
-    --quality-legendary: 38 92% 50%;
-    /* #F59E0B */
-    --quality-mythical: 310 70% 55%;
-    /* Мифический */
+        /* Quality colors для Drops системы - стандартизированные */
+        --quality-common: 215 16% 47%;
+        /* #6B7280 */
+        --quality-rare: 217 91% 60%;
+        /* #3B82F6 */
+        --quality-epic: 262 83% 58%;
+        /* #8B5CF6 */
+        --quality-legendary: 38 92% 50%;
+        /* #F59E0B */
+        --quality-mythical: 310 70% 55%;
+        /* Мифический */
 
-    /* Typography - стандартизированные шрифты */
-    /* Font families with consistent fallbacks to prevent layout shift */
-    --font-family-base: 'Geist Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-    --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
-    --font-family-brand: 'Rajdhani', 'Geist Sans', 'JetBrains Mono', monospace;
+        /* Typography - стандартизированные шрифты */
+        /* Font families with consistent fallbacks to prevent layout shift */
+        --font-family-base:
+            'Tektur', 'Geist Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        --font-family-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+        --font-family-brand: 'Tektur', 'Rajdhani', 'Geist Sans', 'JetBrains Mono', monospace;
+        --font-family-nav: 'Tektur', 'Chakra Petch', 'Rajdhani', 'Geist Sans', system-ui, sans-serif;
 
-    /* Font rendering optimization */
-    --font-smoothing: antialiased;
-    --font-feature-settings: 'cv11', 'ss01';
+        /* Font rendering optimization */
+        --font-smoothing: antialiased;
+        --font-feature-settings: 'cv11', 'ss01';
 
-    /* Spacing System - 8px grid for consistent spacing across the application */
-    /* Use these variables for padding, margin, gap, and other spacing properties */
-    --spacing-0: 0;
-    /* 0px - No spacing */
-    --spacing-1: 0.5rem;
-    /* 8px - Minimal spacing */
-    --spacing-2: 1rem;
-    /* 16px - Small spacing */
-    --spacing-3: 1.5rem;
-    /* 24px - Medium spacing */
-    --spacing-4: 2rem;
-    /* 32px - Large spacing */
-    --spacing-5: 2.5rem;
-    /* 40px - Extra large spacing */
-    --spacing-6: 3rem;
-    /* 48px - XXL spacing */
-    --spacing-8: 4rem;
-    /* 64px - Section spacing */
-    --spacing-10: 5rem;
-    /* 80px - Large section spacing */
-    --spacing-12: 6rem;
-    /* 96px - Page spacing */
+        /* Spacing System - 8px grid for consistent spacing across the application */
+        /* Use these variables for padding, margin, gap, and other spacing properties */
+        --spacing-0: 0;
+        /* 0px - No spacing */
+        --spacing-1: 0.5rem;
+        /* 8px - Minimal spacing */
+        --spacing-2: 1rem;
+        /* 16px - Small spacing */
+        --spacing-3: 1.5rem;
+        /* 24px - Medium spacing */
+        --spacing-4: 2rem;
+        /* 32px - Large spacing */
+        --spacing-5: 2.5rem;
+        /* 40px - Extra large spacing */
+        --spacing-6: 3rem;
+        /* 48px - XXL spacing */
+        --spacing-8: 4rem;
+        /* 64px - Section spacing */
+        --spacing-10: 5rem;
+        /* 80px - Large section spacing */
+        --spacing-12: 6rem;
+        /* 96px - Page spacing */
 
-    /* Component-specific spacing presets */
-    --card-padding: var(--spacing-4);
-    /* 32px - Standard card padding */
-    --card-gap: var(--spacing-3);
-    /* 24px - Gap between card elements */
-    --section-gap: var(--spacing-6);
-    /* 48px - Gap between sections */
-    --form-field-gap: var(--spacing-2);
-    /* 16px - Gap between form fields */
-    --button-padding-x: var(--spacing-3);
-    /* 24px - Button horizontal padding */
-    --button-padding-y: var(--spacing-2);
-    /* 16px - Button vertical padding */
-    --list-item-gap: var(--spacing-2);
-    /* 16px - Gap between list items */
-  }
+        /* Component-specific spacing presets */
+        --card-padding: var(--spacing-4);
+        /* 32px - Standard card padding */
+        --card-gap: var(--spacing-3);
+        /* 24px - Gap between card elements */
+        --section-gap: var(--spacing-6);
+        /* 48px - Gap between sections */
+        --form-field-gap: var(--spacing-2);
+        /* 16px - Gap between form fields */
+        --button-padding-x: var(--spacing-3);
+        /* 24px - Button horizontal padding */
+        --button-padding-y: var(--spacing-2);
+        /* 16px - Button vertical padding */
+        --list-item-gap: var(--spacing-2);
+        /* 16px - Gap between list items */
+    }
 
-  .dark {
-    /* Same as root for a forced dark theme */
-    --background: 260 24% 11%;
-    --foreground: 270 20% 95%;
+    .dark {
+        /* Same as root for a forced dark theme */
+        --background: 260 24% 11%;
+        --foreground: 270 20% 95%;
 
-    --card: 260 30% 8%;
-    --card-foreground: 270 20% 95%;
+        --card: 260 30% 8%;
+        --card-foreground: 270 20% 95%;
 
-    --popover: 260 30% 8%;
-    --popover-foreground: 270 20% 95%;
+        --popover: 260 30% 8%;
+        --popover-foreground: 270 20% 95%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 270 20% 98%;
+        --primary: 217 91% 60%;
+        --primary-foreground: 270 20% 98%;
 
-    --secondary: 260 22% 14%;
-    --secondary-foreground: 270 20% 98%;
+        --secondary: 260 22% 14%;
+        --secondary-foreground: 270 20% 98%;
 
-    --muted: 260 22% 14%;
-    --muted-foreground: 270 20% 70%;
+        --muted: 260 22% 14%;
+        --muted-foreground: 270 20% 70%;
 
-    --accent: 260 22% 16%;
-    --accent-foreground: 270 20% 98%;
+        --accent: 260 22% 16%;
+        --accent-foreground: 270 20% 98%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 0 86% 97%;
+        --destructive: 0 63% 31%;
+        --destructive-foreground: 0 86% 97%;
 
-    --border: 260 22% 21%;
-    --input: 260 22% 15%;
-    --ring: 217 91% 66%;
-  }
+        --border: 260 22% 21%;
+        --input: 260 22% 15%;
+        --ring: 217 91% 66%;
+    }
 }
 
 /* Правильный перенос эмоджи и Unicode символов */
 @layer base {
+    /* Улучшенная обработка переноса для эмоджи и Unicode */
+    p,
+    span,
+    div,
+    textarea {
+        word-break: normal;
+        overflow-wrap: break-word;
+    }
 
-  /* Улучшенная обработка переноса для эмоджи и Unicode */
-  p,
-  span,
-  div,
-  textarea {
-    word-break: normal;
-    overflow-wrap: break-word;
-  }
+    /* Специально для сообщений в тикетах и чате */
+    .ticket-message,
+    .chat-message,
+    [class*='whitespace-pre-wrap'] {
+        word-break: normal;
+        overflow-wrap: break-word;
+        /* Сохраняем переносы строк, но правильно обрабатываем эмоджи */
+        white-space: pre-wrap;
+    }
 
-  /* Специально для сообщений в тикетах и чате */
-  .ticket-message,
-  .chat-message,
-  [class*="whitespace-pre-wrap"] {
-    word-break: normal;
-    overflow-wrap: break-word;
-    /* Сохраняем переносы строк, но правильно обрабатываем эмоджи */
-    white-space: pre-wrap;
-  }
-
-  .break-anywhere {
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
+    .break-anywhere {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+    * {
+        @apply border-border;
+    }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-family-base) !important;
-    font-size: 14px !important;
-    /* Базовый размер по умолчанию */
-    line-height: 1.5 !important;
-    -webkit-font-smoothing: var(--font-smoothing);
-    -moz-osx-font-smoothing: grayscale;
-    font-feature-settings: var(--font-feature-settings);
-    /* Prevent font size changes during render */
-    text-size-adjust: 100%;
-    -webkit-text-size-adjust: 100%;
-  }
+    body {
+        @apply bg-background text-foreground;
+        font-family: var(--font-family-base) !important;
+        font-size: 14px !important;
+        /* Базовый размер по умолчанию */
+        line-height: 1.5 !important;
+        -webkit-font-smoothing: var(--font-smoothing);
+        -moz-osx-font-smoothing: grayscale;
+        font-feature-settings: var(--font-feature-settings);
+        /* Prevent font size changes during render */
+        text-size-adjust: 100%;
+        -webkit-text-size-adjust: 100%;
+    }
 
-  /* Устанавливаем базовые размеры для предотвращения FOUT */
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-size: inherit;
-    font-weight: inherit;
-    line-height: inherit;
-  }
+    /* Устанавливаем базовые размеры для предотвращения FOUT */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        font-size: inherit;
+        font-weight: inherit;
+        line-height: inherit;
+    }
 }
 
 /* === Toast уведомления (Sonner) === */
 /* Контейнер для всех toast - правильное позиционирование */
 [data-sonner-toaster] {
-  position: fixed !important;
-  z-index: 13000 !important;
-  pointer-events: none !important;
+    position: fixed !important;
+    z-index: 13000 !important;
+    pointer-events: none !important;
 }
 
-[data-sonner-toaster][data-x-position="right"] {
-  right: 16px !important;
+[data-sonner-toaster][data-x-position='right'] {
+    right: 16px !important;
 }
 
-[data-sonner-toaster][data-y-position="top"] {
-  top: 120px !important;
-  /* Увеличено для header (64px) + отступ (56px) */
+[data-sonner-toaster][data-y-position='top'] {
+    top: 120px !important;
+    /* Увеличено для header (64px) + отступ (56px) */
 }
 
-[data-sonner-toaster][data-y-position="bottom"] {
-  bottom: 16px !important;
+[data-sonner-toaster][data-y-position='bottom'] {
+    bottom: 16px !important;
 }
 
 /* Стандартизированные стили для всех toast - базовые правила позиционирования и анимации */
 [data-sonner-toast] {
-  pointer-events: auto !important;
-  margin-bottom: 8px !important;
-  animation: toast-in 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+    pointer-events: auto !important;
+    margin-bottom: 8px !important;
+    animation: toast-in 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
 }
 
-[data-sonner-toast][data-swiping="true"] {
-  transform: translateX(var(--radix-toast-swipe-end-x));
+[data-sonner-toast][data-swiping='true'] {
+    transform: translateX(var(--radix-toast-swipe-end-x));
 }
 
-[data-sonner-toast][data-swipe="end"][data-swiping="false"] {
-  animation: toast-out 0.2s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
+[data-sonner-toast][data-swipe='end'][data-swiping='false'] {
+    animation: toast-out 0.2s cubic-bezier(0.06, 0.71, 0.55, 1) forwards;
 }
 
 @keyframes toast-in {
-  from {
-    transform: translateX(calc(100% + 1rem));
-    opacity: 0;
-  }
+    from {
+        transform: translateX(calc(100% + 1rem));
+        opacity: 0;
+    }
 
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 @keyframes toast-out {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
 
-  to {
-    opacity: 0;
-    transform: translateX(calc(100% + 1rem));
-  }
+    to {
+        opacity: 0;
+        transform: translateX(calc(100% + 1rem));
+    }
 }
 
 /* Скрываем скроллбар для html и body (главный скролл страницы) */
-html, body {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+html,
+body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
-  display: none;
+    display: none;
 }
 
 /* Тонкий скроллбар для внутренних элементов (поповеры, списки и т.д.) */
@@ -414,47 +531,47 @@ body::-webkit-scrollbar {
 .overflow-auto,
 [data-radix-scroll-area-viewport],
 [data-radix-popover-content] .max-h-64 {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
 }
 .overflow-y-auto::-webkit-scrollbar,
 .overflow-auto::-webkit-scrollbar {
-  display: block;
-  width: 6px;
+    display: block;
+    width: 6px;
 }
 .overflow-y-auto::-webkit-scrollbar-track,
 .overflow-auto::-webkit-scrollbar-track {
-  background: transparent;
+    background: transparent;
 }
 .overflow-y-auto::-webkit-scrollbar-thumb,
 .overflow-auto::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
-  border-radius: 3px;
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
 }
 .overflow-y-auto::-webkit-scrollbar-thumb:hover,
 .overflow-auto::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+    background: hsl(var(--muted-foreground) / 0.5);
 }
 
 /* Скрытый скроллбар для горизонтальных табов/панелей */
 .hide-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
 .hide-scrollbar::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 /* Body font - использует CSS переменную */
 body {
-  font-family: var(--font-family-base);
-  font-size: 14px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  /* Body visibility is controlled by inline CSS in index.html */
+    font-family: var(--font-family-base);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Body visibility is controlled by inline CSS in index.html */
 }
 
 /* Font sizes are defined in index.html inline CSS with !important */
@@ -462,392 +579,466 @@ body {
 
 /* Оптимизация рендеринга - приоритет отрисовки видимого контента */
 * {
-  will-change: auto;
+    will-change: auto;
 }
 
-/* Content visibility is controlled by body.fonts-loaded.loaded class in index.html */
-/* No additional animations or hiding needed - everything is hidden until ready */
+body {
+    opacity: 0;
+    visibility: hidden;
+}
+
+body.app-ready {
+    opacity: 1;
+    visibility: visible;
+}
+
+#root {
+    min-height: 100vh;
+}
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
 
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 @keyframes progress-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
+    0% {
+        background-position: -200% 0;
+    }
 
-  100% {
-    background-position: 200% 0;
-  }
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 .animate-fade-in {
-  animation: fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation: fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 .animate-progress-shimmer {
-  background: linear-gradient(90deg,
-      transparent,
-      rgba(255, 255, 255, 0.2),
-      transparent);
-  background-size: 200% 100%;
-  animation: progress-shimmer 2s infinite;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    background-size: 200% 100%;
+    animation: progress-shimmer 2s infinite;
 }
 
 /* Кастомные анимации для индикатора авторизации */
 @keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
 
-  to {
-    transform: rotate(360deg);
-  }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes spin-reverse {
-  from {
-    transform: rotate(360deg);
-  }
+    from {
+        transform: rotate(360deg);
+    }
 
-  to {
-    transform: rotate(0deg);
-  }
+    to {
+        transform: rotate(0deg);
+    }
 }
 
 @keyframes pulse-glow {
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
 
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  50% {
-    opacity: 0.7;
-    transform: scale(1.1);
-  }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.1);
+    }
 }
 
 @keyframes orbit {
-  0% {
-    transform: rotate(0deg) translateX(30px) rotate(0deg);
-  }
+    0% {
+        transform: rotate(0deg) translateX(30px) rotate(0deg);
+    }
 
-  100% {
-    transform: rotate(360deg) translateX(30px) rotate(-360deg);
-  }
+    100% {
+        transform: rotate(360deg) translateX(30px) rotate(-360deg);
+    }
 }
 
 .animate-spin-slow {
-  animation: spin-slow 3s linear infinite;
+    animation: spin-slow 3s linear infinite;
 }
 
 .animate-spin-reverse {
-  animation: spin-reverse 2s linear infinite;
+    animation: spin-reverse 2s linear infinite;
 }
 
 .animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+    animation: pulse-glow 2s ease-in-out infinite;
 }
 
 .animate-orbit {
-  animation: orbit 4s linear infinite;
+    animation: orbit 4s linear infinite;
 }
 
 .brand-wordmark {
-  font-family: var(--font-family-brand) !important;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: none;
-  font-feature-settings: normal;
-  text-rendering: geometricPrecision;
+    font-family: var(--font-family-brand) !important;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    font-feature-settings: normal;
+    font-synthesis: none;
+    text-rendering: geometricPrecision;
+}
+
+.app-brand-title {
+    font-family: var(--font-family-brand) !important;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.app-heading-page {
+    font-family: var(--font-family-base);
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.1;
+    text-wrap: balance;
+}
+
+.app-heading-section {
+    font-family: var(--font-family-base);
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.2;
+}
+
+.app-body-text {
+    font-family: var(--font-family-base);
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.5;
+}
+
+.app-nav-text {
+    font-family: var(--font-family-nav) !important;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.12;
+    font-feature-settings: normal;
+    text-rendering: optimizeLegibility;
+    font-synthesis: none;
+}
+
+.app-nav-text * {
+    font-family: var(--font-family-nav) !important;
 }
 
 /* Стили для страницы логина, как на скриншоте */
 .login-page-bg {
-  background: hsl(var(--background));
+    background: hsl(var(--background));
 }
 
 @keyframes gentle-glow {
-  0% {
-    background-position: 0% 50%;
-    filter: brightness(1);
-  }
+    0% {
+        background-position: 0% 50%;
+        filter: brightness(1);
+    }
 
-  25% {
-    background-position: 50% 0%;
-    filter: brightness(1.1);
-  }
+    25% {
+        background-position: 50% 0%;
+        filter: brightness(1.1);
+    }
 
-  50% {
-    background-position: 100% 50%;
-    filter: brightness(1.05);
-  }
+    50% {
+        background-position: 100% 50%;
+        filter: brightness(1.05);
+    }
 
-  75% {
-    background-position: 50% 100%;
-    filter: brightness(1.1);
-  }
+    75% {
+        background-position: 50% 100%;
+        filter: brightness(1.1);
+    }
 
-  100% {
-    background-position: 0% 50%;
-    filter: brightness(1);
-  }
+    100% {
+        background-position: 0% 50%;
+        filter: brightness(1);
+    }
 }
 
 .login-card {
-  position: relative;
-  background: hsl(248 44% 7%) !important;
-  border: 1px solid hsl(var(--border) / 0.75) !important;
-  border-radius: 12px !important;
-  backdrop-filter: none;
-  overflow: hidden;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
-  transition: all 0.3s ease;
+    position: relative;
+    background: hsl(248 44% 7%) !important;
+    border: 1px solid hsl(var(--border) / 0.75) !important;
+    border-radius: 8px !important;
+    backdrop-filter: none;
+    overflow: hidden;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.36);
+    transition: all 0.3s ease;
 }
 
 .login-card:hover {
-  border-color: hsl(var(--border) / 0.9) !important;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
+    border-color: hsl(var(--border) / 0.9) !important;
+    box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
 }
 
 /* Анимация появления/исчезания текста */
 .subtitle-fade {
-  transition: opacity 0.5s ease-in-out;
+    transition: opacity 0.5s ease-in-out;
 }
 
 /* Эффект свечения сверху */
 .login-card::before {
-  display: none;
+    display: none;
 }
 
-.login-card>* {
-  position: relative;
-  z-index: 1;
+.login-card > * {
+    position: relative;
+    z-index: 1;
 }
 
 @keyframes rotate-glow {
-  from {
-    transform: rotate(0deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
 
-  to {
-    transform: rotate(360deg);
-  }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Анимация курсора для заголовка */
 .blinking-cursor {
-  animation: blink 1s step-end infinite;
+    animation: blink 1s step-end infinite;
+}
+
+.typing-caret {
+    display: inline-block;
+    width: 0.6ch;
+    flex: 0 0 0.6ch;
+    margin-left: 0;
+    text-align: left;
+    line-height: 1;
+    opacity: 1;
+}
+
+.typing-caret--blink {
+    animation: typing-caret-blink 1s steps(1, end) infinite;
+}
+
+@keyframes typing-caret-blink {
+    0%,
+    45% {
+        opacity: 1;
+    }
+
+    46%,
+    100% {
+        opacity: 0;
+    }
 }
 
 @keyframes blink {
+    from,
+    to {
+        color: transparent;
+    }
 
-  from,
-  to {
-    color: transparent;
-  }
-
-  50% {
-    color: #34D399;
-    /* Зеленый цвет курсора */
-  }
+    50% {
+        color: #34d399;
+        /* Зеленый цвет курсора */
+    }
 }
 
 /* Анимации для уведомлений */
 @keyframes slide-in-bottom {
-  from {
-    transform: translate(-50%, 20px);
-    opacity: 0;
-  }
+    from {
+        transform: translate(-50%, 20px);
+        opacity: 0;
+    }
 
-  to {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
 }
 
 @keyframes slide-out-bottom {
-  from {
-    transform: translate(-50%, 0);
-    opacity: 1;
-  }
+    from {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
 
-  to {
-    transform: translate(-50%, 20px);
-    opacity: 0;
-  }
+    to {
+        transform: translate(-50%, 20px);
+        opacity: 0;
+    }
 }
 
 .animate-slide-in-right {
-  animation: slide-in-bottom 0.3s ease-out forwards;
+    animation: slide-in-bottom 0.3s ease-out forwards;
 }
 
 .animate-slide-out-right {
-  animation: slide-out-bottom 0.3s ease-in forwards;
+    animation: slide-out-bottom 0.3s ease-in forwards;
 }
 
 /* Анимации для лутбоксов с картинками */
 @keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
+    0% {
+        transform: translateX(-100%);
+    }
 
-  100% {
-    transform: translateX(100%);
-  }
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 .animate-shimmer {
-  animation: shimmer 1.5s ease-in-out infinite;
+    animation: shimmer 1.5s ease-in-out infinite;
 }
 
 /* Анимация появления лутбокса */
 @keyframes lootbox-appear {
-  0% {
-    opacity: 0;
-    transform: scale(0.8) rotateY(180deg);
-  }
+    0% {
+        opacity: 0;
+        transform: scale(0.8) rotateY(180deg);
+    }
 
-  50% {
-    opacity: 0.8;
-    transform: scale(1.1) rotateY(90deg);
-  }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.1) rotateY(90deg);
+    }
 
-  100% {
-    opacity: 1;
-    transform: scale(1) rotateY(0deg);
-  }
+    100% {
+        opacity: 1;
+        transform: scale(1) rotateY(0deg);
+    }
 }
 
 .animate-lootbox-appear {
-  animation: lootbox-appear 0.8s ease-out forwards;
+    animation: lootbox-appear 0.8s ease-out forwards;
 }
 
 /* Анимация открытия лутбокса */
 @keyframes lootbox-open {
-  0% {
-    transform: scale(1) rotateY(0deg);
-  }
+    0% {
+        transform: scale(1) rotateY(0deg);
+    }
 
-  25% {
-    transform: scale(1.1) rotateY(90deg);
-  }
+    25% {
+        transform: scale(1.1) rotateY(90deg);
+    }
 
-  50% {
-    transform: scale(1.2) rotateY(180deg);
-  }
+    50% {
+        transform: scale(1.2) rotateY(180deg);
+    }
 
-  75% {
-    transform: scale(1.1) rotateY(270deg);
-  }
+    75% {
+        transform: scale(1.1) rotateY(270deg);
+    }
 
-  100% {
-    transform: scale(1) rotateY(360deg);
-  }
+    100% {
+        transform: scale(1) rotateY(360deg);
+    }
 }
 
 .animate-lootbox-open {
-  animation: lootbox-open 1.2s ease-in-out forwards;
+    animation: lootbox-open 1.2s ease-in-out forwards;
 }
 
 /* Эффект свечения для редких лутбоксов */
 .lootbox-glow-rare {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
 }
 
 .lootbox-glow-epic {
-  box-shadow: 0 0 25px rgba(147, 51, 234, 0.6);
+    box-shadow: 0 0 25px rgba(147, 51, 234, 0.6);
 }
 
 .lootbox-glow-legendary {
-  box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
-  animation: legendary-pulse 2s ease-in-out infinite;
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+    animation: legendary-pulse 2s ease-in-out infinite;
 }
 
 @keyframes legendary-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
+    }
 
-  0%,
-  100% {
-    box-shadow: 0 0 30px rgba(251, 191, 36, 0.7);
-  }
-
-  50% {
-    box-shadow: 0 0 40px rgba(251, 191, 36, 0.9);
-  }
+    50% {
+        box-shadow: 0 0 40px rgba(251, 191, 36, 0.9);
+    }
 }
 
 /* Анимация смены картинок */
 @keyframes image-transition {
-  0% {
-    opacity: 1;
-    transform: scale(1);
-  }
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
 
-  50% {
-    opacity: 0.7;
-    transform: scale(1.05);
-  }
+    50% {
+        opacity: 0.7;
+        transform: scale(1.05);
+    }
 
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .animate-image-transition {
-  animation: image-transition 0.3s ease-in-out;
+    animation: image-transition 0.3s ease-in-out;
 }
 
 /* Эффект блеска при открытии */
 @keyframes sparkle {
-  0% {
-    opacity: 0;
-    transform: scale(0) rotate(0deg);
-  }
+    0% {
+        opacity: 0;
+        transform: scale(0) rotate(0deg);
+    }
 
-  50% {
-    opacity: 1;
-    transform: scale(1.2) rotate(180deg);
-  }
+    50% {
+        opacity: 1;
+        transform: scale(1.2) rotate(180deg);
+    }
 
-  100% {
-    opacity: 0;
-    transform: scale(0) rotate(360deg);
-  }
+    100% {
+        opacity: 0;
+        transform: scale(0) rotate(360deg);
+    }
 }
 
 .animate-sparkle {
-  animation: sparkle 0.6s ease-out;
+    animation: sparkle 0.6s ease-out;
 }
 
 /* Предотвращение сдвига верстки для DropdownMenu */
 [data-radix-dropdown-menu-content] {
-  position: absolute !important;
-  z-index: 10020 !important;
+    position: absolute !important;
+    z-index: 10020 !important;
 }
 
 /* Предотвращение сдвига контента при открытии модальных окон */
 body:has([data-radix-dialog-content]),
 body:has([data-radix-dropdown-menu-content]) {
-  overflow: hidden !important;
+    overflow: hidden !important;
 }
 
 /* Восстановление прокрутки после закрытия модальных окон */
 body:not(:has([data-radix-dialog-content])):not(:has([data-radix-dropdown-menu-content])) {
-  overflow: auto !important;
+    overflow: auto !important;
 }
-
 
 /* Убрали правила моргания - они мешали */
 
@@ -859,57 +1050,56 @@ body:not(:has([data-radix-dialog-content])):not(:has([data-radix-dropdown-menu-c
 
 /* Предотвращаем видимую загрузку плейсхолдеров */
 input[placeholder] {
-  color: inherit !important;
-  background-color: inherit !important;
+    color: inherit !important;
+    background-color: inherit !important;
 }
 
 /* Убираем только проблемные анимации */
 .animate-pulse {
-  animation: none !important;
+    animation: none !important;
 }
 
 /* Оставляем анимацию bounce для точек загрузки */
 .animate-bounce {
-  animation: bounce 1s infinite !important;
+    animation: bounce 1s infinite !important;
 }
 
 @keyframes bounce {
+    0%,
+    20%,
+    53%,
+    80%,
+    100% {
+        transform: translate3d(0, 0, 0);
+    }
 
-  0%,
-  20%,
-  53%,
-  80%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
+    40%,
+    43% {
+        transform: translate3d(0, -8px, 0);
+    }
 
-  40%,
-  43% {
-    transform: translate3d(0, -8px, 0);
-  }
+    70% {
+        transform: translate3d(0, -4px, 0);
+    }
 
-  70% {
-    transform: translate3d(0, -4px, 0);
-  }
-
-  90% {
-    transform: translate3d(0, -2px, 0);
-  }
+    90% {
+        transform: translate3d(0, -2px, 0);
+    }
 }
 
 /* Оставляем только анимацию загрузки */
 .animate-spin {
-  animation: spin 1s linear infinite !important;
+    animation: spin 1s linear infinite !important;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
 
-  to {
-    transform: rotate(360deg);
-  }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Убираем transitions только для некоторых элементов */
@@ -917,76 +1107,76 @@ input[placeholder] {
 
 /* Скрываем контент до полной загрузки */
 .content-hidden {
-  visibility: hidden;
+    visibility: hidden;
 }
 
 .content-visible {
-  visibility: visible;
+    visibility: visible;
 }
 
 /* Кастомный скроллбар для ChatBox предпросмотра */
 .chatbox-preview-scroll::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-  display: block !important;
+    width: 8px;
+    height: 8px;
+    display: block !important;
 }
 
 .chatbox-preview-scroll::-webkit-scrollbar-track {
-  background: #1F2937;
-  border-radius: 4px;
+    background: #1f2937;
+    border-radius: 4px;
 }
 
 .chatbox-preview-scroll::-webkit-scrollbar-thumb {
-  background: #4B5563;
-  border-radius: 4px;
+    background: #4b5563;
+    border-radius: 4px;
 }
 
 .chatbox-preview-scroll::-webkit-scrollbar-thumb:hover {
-  background: #6B7280;
+    background: #6b7280;
 }
 
 @keyframes fade {
-  from {
-    opacity: 0;
-  }
+    from {
+        opacity: 0;
+    }
 
-  to {
-    opacity: 1;
-  }
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes slide-right {
-  from {
-    transform: translateX(-20px);
-    opacity: 0;
-  }
+    from {
+        transform: translateX(-20px);
+        opacity: 0;
+    }
 
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 @keyframes slide-left {
-  from {
-    transform: translateX(20px);
-    opacity: 0;
-  }
+    from {
+        transform: translateX(20px);
+        opacity: 0;
+    }
 
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 @keyframes scale {
-  from {
-    transform: scale(0.95);
-    opacity: 0;
-  }
+    from {
+        transform: scale(0.95);
+        opacity: 0;
+    }
 
-  to {
-    transform: scale(1);
-    opacity: 1;
-  }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
