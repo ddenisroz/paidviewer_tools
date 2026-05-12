@@ -1,24 +1,40 @@
-import React, { useCallback, useEffect, useState } from 'react';
+﻿import React, { useCallback, useEffect, useState } from 'react';
 
-import { AlertCircle, Coins, ExternalLink, Loader2, RefreshCw } from 'lucide-react';
+import {
+    ArrowsClockwise,
+    CheckCircle,
+    CurrencyCircleDollar,
+    Gift,
+    HandCoins,
+    LinkSimple,
+    SpinnerGap,
+    XCircle,
+} from '@phosphor-icons/react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
+import { AutomationCard, ConnectionNote } from '@/features/drops/components/MemeAlertsAutomationCard';
 import { parseMemeAlertsTokenPayload } from '@/features/drops/utils/memealertsToken';
 import { cn } from '@/lib/utils';
+import apiClient from '@/services/api/client';
 import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
+import { SliderWithInput } from '@/shared/components/ui/slider-with-input';
 import { Switch } from '@/shared/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { TooltipHelp } from '@/shared/components/ui/tooltip-help';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
-
+import type { AxiosError } from 'axios';
 
 const MEMEALERTS_API_BASE = '/api/memealerts';
+const POPUP_STATUS_POLL_MS = 2_000;
+const POPUP_STATUS_TIMEOUT_MS = 120_000;
 
 type MemeAlertsHistoryItem = {
     id?: string | number;
@@ -56,41 +72,35 @@ const DEFAULT_AUTOMATION_SETTINGS: MemeAlertsAutomationSettings = {
             reward_id: null,
             reward_title: null,
             coins_amount: 10,
-            reward_cost: 500
+            reward_cost: 500,
         },
         vk: {
             enabled: false,
             reward_id: null,
             reward_title: null,
             coins_amount: 10,
-            reward_cost: 500
-        }
+            reward_cost: 500,
+        },
     },
     donation_auto: {
         enabled: false,
         coins_per_currency: 1,
-        min_donation_amount: 1
-    }
+        min_donation_amount: 1,
+    },
 };
 
-const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm shadow-black/10';
 const FIELD_CLASS = 'h-9 border-border/70 bg-card/70 text-foreground placeholder:text-muted-foreground';
+const MUTED_PANEL_CLASS = 'rounded-lg border border-border/70 bg-background/45';
 const REWARD_SWITCH_VARIANT = {
     twitch: 'twitch',
     vk: 'vk',
 } as const;
 
-const ConnectionNote: React.FC<{ note: string | null }> = ({ note }) => {
-    if (!note) return null;
-
-    return (
-        <p className="rounded-md border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
-            {note}
-        </p>
-    );
-};
+// The file still owns legacy MemeAlerts data flow; UI sections are extracted above to keep the page readable.
 
 export const MemeAlertsRewards: React.FC = () => {
+    const navigate = useNavigate();
     const { integrations } = useIntegrations();
     const donationAlertsConnected = !!integrations?.donationalerts?.enabled;
 
@@ -112,8 +122,9 @@ export const MemeAlertsRewards: React.FC = () => {
     const [rewardTitle, setRewardTitle] = useState('MemeCoins');
     const [rewardCost, setRewardCost] = useState(500);
     const [rewardCoinsAmount, setRewardCoinsAmount] = useState(10);
-    const [rewardCooldownSeconds, setRewardCooldownSeconds] = useState(0);
-    const [automationSettings, setAutomationSettings] = useState<MemeAlertsAutomationSettings>(DEFAULT_AUTOMATION_SETTINGS);
+    const [rewardCooldownSeconds, _setRewardCooldownSeconds] = useState(0);
+    const [automationSettings, setAutomationSettings] =
+        useState<MemeAlertsAutomationSettings>(DEFAULT_AUTOMATION_SETTINGS);
     const [history, setHistory] = useState<{
         grants: MemeAlertsHistoryItem[];
         purchases: MemeAlertsHistoryItem[];
@@ -121,60 +132,117 @@ export const MemeAlertsRewards: React.FC = () => {
     }>({
         grants: [],
         purchases: [],
-        unknown: []
+        unknown: [],
     });
     const popupRef = React.useRef<Window | null>(null);
     const popupWatcherRef = React.useRef<number | null>(null);
+    const popupWatcherStartedAtRef = React.useRef(0);
+    const detachedPopupPollingRef = React.useRef(false);
+    const statusPollingRef = React.useRef(false);
     const manualTokenInputRef = React.useRef<HTMLInputElement | null>(null);
 
-    const stopPopupWatcher = useCallback(() => {
+    const stopPopupWatcher = useCallback((clearPopup = true) => {
         if (popupWatcherRef.current !== null) {
             window.clearInterval(popupWatcherRef.current);
             popupWatcherRef.current = null;
         }
-        popupRef.current = null;
+        popupWatcherStartedAtRef.current = 0;
+        detachedPopupPollingRef.current = false;
+        if (clearPopup) {
+            popupRef.current = null;
+        }
     }, []);
 
-    const startPopupWatcher = useCallback(() => {
-        stopPopupWatcher();
-        popupWatcherRef.current = window.setInterval(() => {
-            const popup = popupRef.current;
-            if (!popup || popup.closed) {
-                stopPopupWatcher();
-                setConnecting(false);
-            }
-        }, 500);
-    }, [stopPopupWatcher]);
-
-    useEffect(() => {
-        checkStatus();
-    }, []);
-
-    const checkStatus = async () => {
+    const checkStatus = useCallback(async (): Promise<boolean> => {
         try {
-            const response = await fetch(`${MEMEALERTS_API_BASE}/status`);
-            const data = await response.json();
-            setIsConnected(data.connected);
+            const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/status`);
+            const connected = Boolean(data.connected);
+            setIsConnected(connected);
             setConnectionNote(data.reason || null);
-            if (!data.connected) {
+            if (!connected) {
                 setAutomationSettings(DEFAULT_AUTOMATION_SETTINGS);
             }
+            return connected;
         } catch (error) {
             logger.error('Status check error', error);
+            return false;
         } finally {
             setStatusLoading(false);
         }
-    };
+    }, []);
+
+    const startPopupWatcher = useCallback((detachedPopup = false) => {
+        stopPopupWatcher(false);
+        detachedPopupPollingRef.current = detachedPopup;
+        popupWatcherStartedAtRef.current = Date.now();
+        popupWatcherRef.current = window.setInterval(() => {
+            if (Date.now() - popupWatcherStartedAtRef.current > POPUP_STATUS_TIMEOUT_MS) {
+                stopPopupWatcher();
+                setConnecting(false);
+                setConnectionNote(
+                    'MemeAlerts не вернул подтверждение. Повторите вход или вставьте полную ссылку вручную.'
+                );
+                return;
+            }
+            if (statusPollingRef.current) return;
+            statusPollingRef.current = true;
+            void checkStatus()
+                .then((connected) => {
+                    if (connected) {
+                        toast.success('MemeAlerts подключен');
+                        if (popupRef.current && !popupRef.current.closed) {
+                            popupRef.current.close();
+                        }
+                        stopPopupWatcher();
+                        setConnecting(false);
+                        return;
+                    }
+
+                    const popup = popupRef.current;
+                    if (!detachedPopupPollingRef.current && (!popup || popup.closed)) {
+                        stopPopupWatcher();
+                        setConnecting(false);
+                    }
+                })
+                .finally(() => {
+                    statusPollingRef.current = false;
+                });
+        }, POPUP_STATUS_POLL_MS);
+    }, [checkStatus, stopPopupWatcher]);
+
+    const handleProxyAuthResult = useCallback(
+        async (data: { ok?: boolean; status?: number; source?: string }) => {
+            const connected = data.ok ? await checkStatus() : false;
+            if (connected) {
+                if (popupRef.current && !popupRef.current.closed) {
+                    popupRef.current.close();
+                }
+                stopPopupWatcher();
+                setConnecting(false);
+                toast.success('MemeAlerts подключен');
+            } else if (data.ok === false) {
+                setConnectionNote('MemeAlerts не подтвердил токен. Повторите подключение.');
+                stopPopupWatcher(false);
+                setConnecting(false);
+            }
+        },
+        [checkStatus, stopPopupWatcher]
+    );
+
+    useEffect(() => {
+        void checkStatus();
+    }, [checkStatus]);
 
     const fetchHistory = async () => {
         try {
             setHistoryLoading(true);
-            const response = await fetch(`${MEMEALERTS_API_BASE}/history?limit=50`);
-            const data = await response.json();
+            const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/history`, {
+                params: { limit: 50 },
+            });
             setHistory({
                 grants: data.grants || [],
                 purchases: data.purchases || [],
-                unknown: data.unknown || []
+                unknown: data.unknown || [],
             });
         } catch (error) {
             logger.error('History load error', error);
@@ -187,8 +255,7 @@ export const MemeAlertsRewards: React.FC = () => {
         if (!isConnected) return;
         try {
             setSettingsLoading(true);
-            const response = await fetch(`${MEMEALERTS_API_BASE}/settings`);
-            const data = await response.json();
+            const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/settings`);
             if (data?.success && data?.settings) {
                 setAutomationSettings(data.settings as MemeAlertsAutomationSettings);
             } else {
@@ -204,13 +271,8 @@ export const MemeAlertsRewards: React.FC = () => {
     const saveSettingsPatch = useCallback(async (payload: Record<string, unknown>) => {
         try {
             setSettingsSaving(true);
-            const response = await fetch(`${MEMEALERTS_API_BASE}/settings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const data = await response.json();
-            if (!response.ok || !data?.success) {
+            const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/settings`, payload);
+            if (!data?.success) {
                 throw new Error(data?.detail || data?.error || 'Не удалось сохранить настройки');
             }
             setAutomationSettings(data.settings as MemeAlertsAutomationSettings);
@@ -236,19 +298,14 @@ export const MemeAlertsRewards: React.FC = () => {
             }
 
             setRewardCreating(true);
-            const response = await fetch(`${MEMEALERTS_API_BASE}/rewards/create`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    platform: selectedRewardPlatform,
-                    title: rewardTitle,
-                    cost: rewardCost,
-                    coins_amount: rewardCoinsAmount,
-                    cooldown_seconds: rewardCooldownSeconds
-                })
+            const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/rewards/create`, {
+                platform: selectedRewardPlatform,
+                title: rewardTitle,
+                cost: rewardCost,
+                coins_amount: rewardCoinsAmount,
+                cooldown_seconds: rewardCooldownSeconds,
             });
-            const data = await response.json();
-            if (!response.ok || !data?.success) {
+            if (!data?.success) {
                 throw new Error(data?.detail || data?.error || 'Не удалось создать награду');
             }
             toast.success(`Награда ${selectedRewardPlatform.toUpperCase()} создана`);
@@ -257,8 +314,8 @@ export const MemeAlertsRewards: React.FC = () => {
                     ...prev,
                     points_reward: {
                         ...prev.points_reward,
-                        [selectedRewardPlatform]: data.data.settings as PlatformRewardSettings
-                    } as MemeAlertsAutomationSettings['points_reward']
+                        [selectedRewardPlatform]: data.data.settings as PlatformRewardSettings,
+                    } as MemeAlertsAutomationSettings['points_reward'],
                 }));
             } else {
                 await fetchSettings();
@@ -277,38 +334,40 @@ export const MemeAlertsRewards: React.FC = () => {
         rewardCooldownSeconds,
         rewardCost,
         rewardTitle,
-        selectedRewardPlatform
+        selectedRewardPlatform,
     ]);
 
     const saveTokenToBackend = useCallback(async (accessToken: string, refreshToken?: string) => {
         try {
-            const response = await fetch(`${MEMEALERTS_API_BASE}/connect`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    access_token: accessToken,
-                    refresh_token: refreshToken
-                })
+            const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/connect`, {
+                access_token: accessToken,
+                refresh_token: refreshToken,
             });
-            const data = await response.json().catch(() => ({}));
 
-            if (response.ok && data.success && data.connected) {
+            if (data.success && data.connected) {
                 setIsConnected(true);
                 setConnectionNote(null);
-                toast.success("MemeAlerts подключен!", {
-                    description: "Теперь вы можете выдавать мемкоины"
+                toast.success('MemeAlerts подключен!', {
+                    description: 'Теперь вы можете выдавать мемкоины',
                 });
                 return true;
             } else {
-                const message = data.detail || data.error || "MemeAlerts не подтвердил токен";
+                const message = data.detail || data.error || 'MemeAlerts не подтвердил токен';
                 setConnectionNote(message);
                 toast.error(message, {
-                    description: "Токен не сохранен"
+                    description: 'Токен не сохранен',
                 });
                 return false;
             }
-        } catch {
-            toast.error("Ошибка сети при сохранении токена");
+        } catch (error) {
+            const axiosError = error as AxiosError<{ detail?: string; error?: string }>;
+            const backendMessage = axiosError.response?.data?.detail || axiosError.response?.data?.error;
+            const message =
+                axiosError.response?.status === 400
+                    ? 'Токен MemeAlerts не подходит. Повторите вход и вставьте полную ссылку после авторизации.'
+                    : backendMessage || 'Ошибка сети при сохранении токена';
+            setConnectionNote(message);
+            toast.error(message);
             return false;
         }
     }, []);
@@ -325,6 +384,9 @@ export const MemeAlertsRewards: React.FC = () => {
                 type?: string;
                 access_token?: string;
                 refresh_token?: string;
+                ok?: boolean;
+                status?: number;
+                source?: string;
             };
 
             if (data.type === 'memealerts_token' && data.access_token) {
@@ -343,6 +405,8 @@ export const MemeAlertsRewards: React.FC = () => {
                 }
                 stopPopupWatcher();
                 setConnecting(false);
+            } else if (data.type === 'memealerts_proxy_result') {
+                await handleProxyAuthResult(data);
             }
         };
 
@@ -351,7 +415,23 @@ export const MemeAlertsRewards: React.FC = () => {
             window.removeEventListener('message', handleMessage);
             stopPopupWatcher();
         };
-    }, [saveTokenToBackend, stopPopupWatcher]);
+    }, [handleProxyAuthResult, saveTokenToBackend, stopPopupWatcher]);
+
+    useEffect(() => {
+        if (!('BroadcastChannel' in window)) return undefined;
+
+        const channel = new BroadcastChannel('memealerts-auth');
+        channel.onmessage = (event) => {
+            const data = event?.data as { type?: string; ok?: boolean; status?: number; source?: string } | undefined;
+            if (data?.type === 'memealerts_proxy_result') {
+                void handleProxyAuthResult(data);
+            }
+        };
+
+        return () => {
+            channel.close();
+        };
+    }, [handleProxyAuthResult]);
 
     useEffect(() => {
         if (isConnected) {
@@ -369,19 +449,36 @@ export const MemeAlertsRewards: React.FC = () => {
     useEffect(() => {
         const platformSettings = automationSettings.points_reward[selectedRewardPlatform];
         setRewardTitle(
-            platformSettings.reward_title ||
-            (selectedRewardPlatform === 'twitch' ? 'MemeCoins' : 'Награда MemeCoins')
+            platformSettings.reward_title || (selectedRewardPlatform === 'twitch' ? 'MemeCoins' : 'Награда MemeCoins')
         );
         setRewardCost(platformSettings.reward_cost || 500);
         setRewardCoinsAmount(platformSettings.coins_amount || 10);
     }, [automationSettings.points_reward, selectedRewardPlatform]);
 
     const handleConnect = useCallback(async () => {
+        const popupFeatures = 'width=500,height=700,scrollbars=yes,resizable=yes';
+        const popup = window.open('', 'memealerts-auth', popupFeatures);
+
         try {
             setConnecting(true);
-            const response = await fetch(`${MEMEALERTS_API_BASE}/connect-url`);
-            const data = await response.json();
-            if (!response.ok || !data?.success || !data?.auth_url) {
+            setConnectionNote(null);
+
+            if (popup) {
+                popupRef.current = popup;
+                try {
+                    popup.document.title = 'MemeAlerts';
+                    popup.document.body.innerHTML = `
+                        <div style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#140f1e;color:#f4f0ff;font:16px system-ui,sans-serif;">
+                            Подключаем MemeAlerts...
+                        </div>
+                    `;
+                } catch {
+                    // Ignore popup document access issues before navigation.
+                }
+            }
+
+            const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/connect-url`);
+            if (!data?.success || !data?.auth_url) {
                 throw new Error(data?.error || 'Не удалось получить ссылку подключения');
             }
 
@@ -390,36 +487,39 @@ export const MemeAlertsRewards: React.FC = () => {
                 throw new Error('Небезопасный URL авторизации');
             }
 
-            const popup = window.open(safeUrl, '_blank', 'width=500,height=700,scrollbars=yes,resizable=yes,noopener,noreferrer');
             if (!popup) {
-                toast.error("Не удалось открыть окно", {
-                    description: "Разрешите всплывающие окна в настройках браузера"
+                toast.info('Открываем MemeAlerts в этой вкладке', {
+                    description: 'Браузер заблокировал всплывающее окно, поэтому продолжаем подключение без popup',
                 });
-                setConnecting(false);
+                window.location.href = safeUrl;
                 return;
             }
 
-            popupRef.current = popup;
+            popup.location.href = safeUrl;
+            popup.focus();
             startPopupWatcher();
-            toast.info("Авторизуйтесь в MemeAlerts", {
-                description: "После входа окно закроется автоматически"
+            toast.info('Окно авторизации открыто', {
+                description: 'Если статус не обновится, используйте ручную ссылку',
             });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Ошибка запуска авторизации';
+            if (popup && !popup.closed) {
+                popup.close();
+            }
             toast.error(message);
+            stopPopupWatcher();
             setConnecting(false);
         }
-    }, [startPopupWatcher]);
+    }, [startPopupWatcher, stopPopupWatcher]);
 
     const handleDisconnect = async () => {
         try {
             setConnecting(true);
-            const response = await fetch(`${MEMEALERTS_API_BASE}/disconnect`, { method: 'POST' });
-            const data = await response.json();
+            const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/disconnect`);
             if (data.success) {
                 setIsConnected(false);
                 setAutomationSettings(DEFAULT_AUTOMATION_SETTINGS);
-                toast.success("MemeAlerts отключен");
+                toast.success('MemeAlerts отключен');
             }
         } catch (error) {
             logger.error('Disconnect error', error);
@@ -435,8 +535,8 @@ export const MemeAlertsRewards: React.FC = () => {
         }
         const parsed = parseMemeAlertsTokenPayload(rawValue);
         if (!parsed.accessToken) {
-            toast.error("Не найден access token", {
-                description: "Вставьте полную ссылку из окна MemeAlerts после авторизации"
+            toast.error('Не найден access token', {
+                description: 'Вставьте полную ссылку из окна MemeAlerts после авторизации',
             });
             return;
         }
@@ -446,11 +546,11 @@ export const MemeAlertsRewards: React.FC = () => {
             const success = await saveTokenToBackend(parsed.accessToken, parsed.refreshToken);
             if (success) {
                 setManualAuthUrl('');
-                stopPopupWatcher();
-                setConnecting(false);
                 if (popupRef.current && !popupRef.current.closed) {
                     popupRef.current.close();
                 }
+                stopPopupWatcher();
+                setConnecting(false);
             }
         } finally {
             setManualSubmitLoading(false);
@@ -459,34 +559,29 @@ export const MemeAlertsRewards: React.FC = () => {
 
     const handleGrant = async () => {
         if (!grantTarget || !grantValue) {
-            toast.error("Укажите никнейм/ID и количество монет");
+            toast.error('Укажите никнейм/ID и количество монет');
             return;
         }
 
         try {
             setGranting(true);
-            const response = await fetch(`${MEMEALERTS_API_BASE}/grant`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    nickname: grantTarget,
-                    value: grantValue
-                })
+            const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/grant`, {
+                nickname: grantTarget,
+                value: grantValue,
             });
-            const data = await response.json();
 
             if (data.success) {
                 toast.success(`Отправлено ${grantValue} монет пользователю ${grantTarget}`, {
-                    description: "Монеты выданы!"
+                    description: 'Монеты выданы!',
                 });
                 fetchHistory();
             } else {
-                toast.error(data.error || "Не удалось выдать монеты", {
-                    description: "Ошибка"
+                toast.error(data.error || 'Не удалось выдать монеты', {
+                    description: 'Ошибка',
                 });
             }
         } catch {
-            toast.error("Ошибка связи с сервером");
+            toast.error('Ошибка связи с сервером');
         } finally {
             setGranting(false);
         }
@@ -495,8 +590,8 @@ export const MemeAlertsRewards: React.FC = () => {
     const handleToggleRewardPlatform = async (platform: 'twitch' | 'vk', enabled: boolean) => {
         const success = await saveSettingsPatch({
             [platform]: {
-                enabled
-            }
+                enabled,
+            },
         });
         if (success) {
             toast.success(enabled ? `Автовыдача по ${platform} включена` : `Автовыдача по ${platform} отключена`);
@@ -513,8 +608,8 @@ export const MemeAlertsRewards: React.FC = () => {
             donation_auto: {
                 enabled: automationSettings.donation_auto.enabled,
                 coins_per_currency: automationSettings.donation_auto.coins_per_currency,
-                min_donation_amount: automationSettings.donation_auto.min_donation_amount
-            }
+                min_donation_amount: automationSettings.donation_auto.min_donation_amount,
+            },
         });
         if (success) {
             toast.success('Настройки донатов сохранены');
@@ -535,21 +630,38 @@ export const MemeAlertsRewards: React.FC = () => {
     };
 
     const currentRewardSettings = automationSettings.points_reward[selectedRewardPlatform];
+    const selectedPlatformConnected =
+        selectedRewardPlatform === 'twitch' ? !!integrations?.twitch?.enabled : !!integrations?.vk?.enabled;
+    const selectedPlatformName = selectedRewardPlatform === 'twitch' ? 'Twitch' : 'VK Live';
+    const rewardIdLabel = currentRewardSettings.reward_id || 'награда ещё не создана';
 
     if (statusLoading) {
-        return <div className="flex justify-center p-8"><Loader2 className="h-6 w-6 animate-spin" /></div>;
+        return (
+            <div className="flex justify-center p-8">
+                <SpinnerGap className="h-6 w-6 animate-spin" />
+            </div>
+        );
     }
 
     return (
-        <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-card/70 px-1 py-1">
-                <div className="flex items-center gap-2">
-                    <MemeAlertsLogo className="h-10 w-auto" />
+        <div className="mx-auto w-full max-w-6xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/70 px-3 py-2">
+                <div className="flex min-w-0 items-center gap-3">
+                    <MemeAlertsLogo className="h-9 w-auto shrink-0" />
+                    <div className="min-w-0">
+                        <p className="font-brand text-sm font-bold tracking-wide text-foreground">MemeAlerts</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className={`px-2.5 py-1 rounded-full text-xs font-medium border flex items-center gap-1.5 ${isConnected ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' : 'bg-red-500/10 text-red-300 border-red-500/30'}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-red-400'}`} />
-                        {isConnected ? 'Подключено' : 'Не подключено'}
+                    <div
+                        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${isConnected ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}
+                    >
+                        {isConnected ? (
+                            <CheckCircle className="h-3.5 w-3.5" weight="fill" />
+                        ) : (
+                            <XCircle className="h-3.5 w-3.5" weight="fill" />
+                        )}
+                        {isConnected ? 'Токен активен' : 'Токен не подключен'}
                     </div>
                     {isConnected && (
                         <Button
@@ -559,7 +671,7 @@ export const MemeAlertsRewards: React.FC = () => {
                             disabled={connecting}
                             className="h-8 border-border/70 bg-card/70 hover:bg-accent"
                         >
-                            {connecting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                            {connecting && <SpinnerGap className="mr-2 h-3.5 w-3.5 animate-spin" />}
                             Отключить
                         </Button>
                     )}
@@ -567,274 +679,297 @@ export const MemeAlertsRewards: React.FC = () => {
             </div>
 
             {!isConnected ? (
-                <div className={SURFACE_CARD_CLASS}>
-                    <div className="space-y-3 p-4">
-                        <div className="flex items-start gap-2 rounded-md border border-blue-500/20 bg-blue-500/5 p-3 text-xs text-blue-200">
-                            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                            <p>
-                                Подключение работает через токен MemeAlerts. Токен сохраняется только после live-проверки.
-                            </p>
-                        </div>
+                <Card className={SURFACE_CARD_CLASS}>
+                    <CardContent className="space-y-3 p-4">
                         <ConnectionNote note={connectionNote} />
 
-                        <Button onClick={handleConnect} disabled={connecting} className="w-full h-9 bg-[#9146FF] hover:bg-[#7f3ee8] text-white">
+                        <Button
+                            onClick={handleConnect}
+                            disabled={connecting}
+                            className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
+                        >
                             {connecting ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Ожидание авторизации...
+                                    <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
+                                    Ожидание авторизации
                                 </>
                             ) : (
                                 <>
-                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    <LinkSimple className="mr-2 h-4 w-4" weight="bold" />
                                     Подключить MemeAlerts
                                 </>
                             )}
                         </Button>
 
-                        <Input
-                            ref={manualTokenInputRef}
-                            value={manualAuthUrl}
-                            onChange={(e) => setManualAuthUrl(e.target.value)}
-                            placeholder="https://memealerts.com/auth/redirect?accessToken=..."
-                            className={FIELD_CLASS}
-                        />
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={handleManualTokenApply}
-                            disabled={manualSubmitLoading || !manualAuthUrl.trim()}
-                            className="w-full h-8 border-border/70 bg-card/70 hover:bg-accent"
-                        >
-                            {manualSubmitLoading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
-                            Применить ссылку вручную
-                        </Button>
-                    </div>
-                </div>
+                        <details className={cn(MUTED_PANEL_CLASS, 'p-3')}>
+                            <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground">
+                                Ручная ссылка
+                            </summary>
+                            <div className="mt-3 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <Label className="text-xs">Ссылка после входа</Label>
+                                    <TooltipHelp content="Нужно только если окно MemeAlerts не передало токен автоматически." />
+                                </div>
+                                <Input
+                                    ref={manualTokenInputRef}
+                                    value={manualAuthUrl}
+                                    onChange={(e) => setManualAuthUrl(e.target.value)}
+                                    placeholder="https://memealerts.com/auth/redirect?accessToken=..."
+                                    className={FIELD_CLASS}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleManualTokenApply}
+                                    disabled={manualSubmitLoading || !manualAuthUrl.trim()}
+                                    className="h-8 w-full border-border/70 bg-card/70 hover:bg-accent"
+                                >
+                                    {manualSubmitLoading && <SpinnerGap className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                                    Применить
+                                </Button>
+                            </div>
+                        </details>
+                    </CardContent>
+                </Card>
             ) : (
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
                     <div className="space-y-4">
-                        <Card className={SURFACE_CARD_CLASS}>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-base flex items-center gap-2">
-                                    <Coins className="h-4 w-4 text-primary" />
-                                    Быстрая выдача мемкоинов
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_120px_auto]">
-                                    <Input
-                                        placeholder="nickname или 12345"
-                                        value={grantTarget}
-                                        onChange={(e) => setGrantTarget(e.target.value)}
-                                        className={FIELD_CLASS}
-                                    />
-                                    <Input
-                                        type="number"
-                                        placeholder="10"
-                                        value={grantValue}
-                                        onChange={(e) => setGrantValue(Number(e.target.value))}
-                                        className={FIELD_CLASS}
-                                    />
-                                    <Button onClick={handleGrant} disabled={granting} className="h-9 md:min-w-[140px] bg-blue-700 hover:bg-blue-800 text-white">
-                                        {granting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Выдать
+                        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+                            <AutomationCard icon={HandCoins} title="Ручная выдача">
+                                <Input
+                                    placeholder="nickname или 12345"
+                                    value={grantTarget}
+                                    onChange={(e) => setGrantTarget(e.target.value)}
+                                    className={FIELD_CLASS}
+                                />
+                                <SliderWithInput
+                                    value={grantValue}
+                                    onChange={setGrantValue}
+                                    min={1}
+                                    max={500}
+                                    step={1}
+                                    unit="coins"
+                                    inputWidth={86}
+                                    ariaLabel="Количество мемкоинов для ручной выдачи"
+                                />
+                                <Button
+                                    onClick={handleGrant}
+                                    disabled={granting}
+                                    className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
+                                >
+                                    {granting && <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />}
+                                    Выдать
+                                </Button>
+                            </AutomationCard>
+
+                            <AutomationCard icon={Gift} title="Награда за баллы">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedRewardPlatform('twitch')}
+                                        className={cn(
+                                            'h-8 border-border/70',
+                                            selectedRewardPlatform === 'twitch'
+                                                ? 'border-[#9146FF] bg-[#9146FF] text-white hover:bg-[#7f3ee8]'
+                                                : 'bg-card/70 hover:bg-accent'
+                                        )}
+                                    >
+                                        Twitch
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedRewardPlatform('vk')}
+                                        className={cn(
+                                            'h-8 border-border/70',
+                                            selectedRewardPlatform === 'vk'
+                                                ? 'border-[#FF4444] bg-[#FF4444] text-white hover:bg-[#e13d3d]'
+                                                : 'bg-card/70 hover:bg-accent'
+                                        )}
+                                    >
+                                        VK Live
                                     </Button>
                                 </div>
-                            </CardContent>
-                        </Card>
 
-                        <div className="grid gap-4 lg:grid-cols-2">
-                            <Card className={SURFACE_CARD_CLASS}>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base">Награда за баллы Twitch/VK</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <p className="text-xs text-muted-foreground">
-                                        Редим с обязательным ником саппортера, после чего выдаются мемкоины автоматически.
-                                    </p>
-
-                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setSelectedRewardPlatform('twitch')}
-                                            className={cn(
-                                                'h-8 border-border/70',
-                                                selectedRewardPlatform === 'twitch'
-                                                    ? 'bg-[#9146FF] border-[#9146FF] text-white hover:bg-[#7f3ee8]'
-                                                    : 'bg-card/70 hover:bg-accent'
-                                            )}
-                                        >
-                                            Twitch
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => setSelectedRewardPlatform('vk')}
-                                            className={cn(
-                                                'h-8 border-border/70',
-                                                selectedRewardPlatform === 'vk'
-                                                    ? 'bg-[#FF4444] border-[#FF4444] text-white hover:bg-[#e13d3d]'
-                                                    : 'bg-card/70 hover:bg-accent'
-                                            )}
-                                        >
-                                            VK Live
-                                        </Button>
+                                {!selectedPlatformConnected && (
+                                    <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-2.5 text-xs text-amber-200">
+                                        Подключите {selectedPlatformName}, чтобы создать награду.
                                     </div>
+                                )}
 
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <Label className="text-xs">Название</Label>
+                                        <TooltipHelp content="Это название увидит зритель в наградах канала." />
+                                    </div>
+                                    <Input
+                                        value={rewardTitle}
+                                        onChange={(e) => setRewardTitle(e.target.value)}
+                                        className={FIELD_CLASS}
+                                    />
+                                </div>
+
+                                <div className="grid gap-3">
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs">Название награды</Label>
-                                        <Input
-                                            value={rewardTitle}
-                                            onChange={(e) => setRewardTitle(e.target.value)}
-                                            className={FIELD_CLASS}
+                                        <Label className="text-xs">Цена награды</Label>
+                                        <SliderWithInput
+                                            value={rewardCost}
+                                            onChange={setRewardCost}
+                                            min={1}
+                                            max={10000}
+                                            step={1}
+                                            inputWidth={88}
+                                            ariaLabel="Цена награды"
                                         />
                                     </div>
-
-                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs">Цена</Label>
-                                            <Input
-                                                type="number"
-                                                value={rewardCost}
-                                                onChange={(e) => setRewardCost(Number(e.target.value))}
-                                                className={FIELD_CLASS}
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs">Мемкоины</Label>
-                                            <Input
-                                                type="number"
-                                                value={rewardCoinsAmount}
-                                                onChange={(e) => setRewardCoinsAmount(Number(e.target.value))}
-                                                className={FIELD_CLASS}
-                                            />
-                                        </div>
-                                    </div>
-
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs">Кулдаун (сек)</Label>
-                                        <Input
-                                            type="number"
-                                            value={rewardCooldownSeconds}
-                                            onChange={(e) => setRewardCooldownSeconds(Number(e.target.value))}
-                                            className={FIELD_CLASS}
+                                        <Label className="text-xs">Мемкоины за покупку</Label>
+                                        <SliderWithInput
+                                            value={rewardCoinsAmount}
+                                            onChange={setRewardCoinsAmount}
+                                            min={1}
+                                            max={1000}
+                                            step={1}
+                                            inputWidth={88}
+                                            ariaLabel="Мемкоины за покупку награды"
                                         />
                                     </div>
+                                </div>
 
-                                    <div className="rounded-md border border-border/70 bg-card/60 p-2.5 space-y-1.5">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs text-foreground">
-                                                Автовыдача {selectedRewardPlatform === 'twitch' ? 'Twitch' : 'VK'}
-                                            </span>
-                                            <Switch
-                                                variant={REWARD_SWITCH_VARIANT[selectedRewardPlatform]}
-                                                checked={currentRewardSettings.enabled}
-                                                onCheckedChange={(checked) => handleToggleRewardPlatform(selectedRewardPlatform, checked)}
-                                                disabled={settingsSaving}
-                                            />
-                                        </div>
-                                        <p className="text-[11px] text-muted-foreground">
-                                            Reward ID: {currentRewardSettings.reward_id || 'не задан'}
-                                        </p>
-                                    </div>
-
-                                    <Button
-                                        onClick={handleCreatePointsReward}
-                                        disabled={rewardCreating || settingsLoading}
-                                        className="h-9 w-full bg-blue-700 hover:bg-blue-800 text-white"
-                                    >
-                                        {rewardCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Создать/обновить награду
-                                    </Button>
-                                </CardContent>
-                            </Card>
-
-                            <Card className={SURFACE_CARD_CLASS}>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base">Автоконвертация DonationAlerts</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-card/60 px-3 py-2">
-                                        <p className="text-xs text-foreground">Включить автоконвертацию донатов</p>
-                                            <Switch
-                                                variant="donation"
-                                                checked={automationSettings.donation_auto.enabled}
-                                                onCheckedChange={(checked) => {
-                                                if (checked && !donationAlertsConnected) {
-                                                    toast.error('Подключите DonationAlerts перед включением автоконвертации');
-                                                    return;
-                                                }
-                                                setAutomationSettings((prev) => ({
-                                                    ...prev,
-                                                    donation_auto: { ...prev.donation_auto, enabled: checked }
-                                                }));
-                                            }}
-                                            disabled={!donationAlertsConnected && !automationSettings.donation_auto.enabled}
+                                <div className={cn(MUTED_PANEL_CLASS, 'space-y-2 p-2.5')}>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <span className="text-xs text-foreground">
+                                            Автовыдача {selectedPlatformName}
+                                        </span>
+                                        <Switch
+                                            variant={REWARD_SWITCH_VARIANT[selectedRewardPlatform]}
+                                            checked={currentRewardSettings.enabled}
+                                            onCheckedChange={(checked) =>
+                                                handleToggleRewardPlatform(selectedRewardPlatform, checked)
+                                            }
+                                            disabled={settingsSaving || !selectedPlatformConnected}
                                         />
                                     </div>
+                                    <p className="truncate text-[11px] text-muted-foreground">{rewardIdLabel}</p>
+                                </div>
 
-                                    {!donationAlertsConnected && (
-                                        <p className="text-xs text-amber-300">
-                                            Сначала подключите DonationAlerts в интеграциях.
-                                        </p>
+                                <Button
+                                    onClick={handleCreatePointsReward}
+                                    disabled={rewardCreating || settingsLoading || !selectedPlatformConnected}
+                                    className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
+                                >
+                                    {rewardCreating && <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />}
+                                    Создать или обновить
+                                </Button>
+                            </AutomationCard>
+
+                            <AutomationCard
+                                icon={CurrencyCircleDollar}
+                                title="Кэшбек за донаты"
+                                disabled={!donationAlertsConnected}
+                            >
+                                <div
+                                    className={cn(
+                                        MUTED_PANEL_CLASS,
+                                        'flex items-center justify-between gap-3 px-3 py-2'
                                     )}
+                                >
+                                    <span className="text-xs text-foreground">Автоконвертация</span>
+                                    <Switch
+                                        variant="donation"
+                                        checked={automationSettings.donation_auto.enabled}
+                                        onCheckedChange={(checked) => {
+                                            if (checked && !donationAlertsConnected) {
+                                                toast.error(
+                                                    'Подключите DonationAlerts перед включением автоконвертации'
+                                                );
+                                                return;
+                                            }
+                                            setAutomationSettings((prev) => ({
+                                                ...prev,
+                                                donation_auto: { ...prev.donation_auto, enabled: checked },
+                                            }));
+                                        }}
+                                        disabled={!donationAlertsConnected && !automationSettings.donation_auto.enabled}
+                                    />
+                                </div>
 
-                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs">Курс</Label>
-                                            <Input
-                                                type="number"
-                                                min="0.01"
-                                                step="0.01"
-                                                value={automationSettings.donation_auto.coins_per_currency}
-                                                onChange={(e) => setAutomationSettings((prev) => ({
-                                                    ...prev,
-                                                    donation_auto: {
-                                                        ...prev.donation_auto,
-                                                        coins_per_currency: Number(e.target.value)
-                                                    }
-                                                }))}
-                                                className={FIELD_CLASS}
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-xs">Мин. донат</Label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                step="1"
-                                                value={automationSettings.donation_auto.min_donation_amount}
-                                                onChange={(e) => setAutomationSettings((prev) => ({
-                                                    ...prev,
-                                                    donation_auto: {
-                                                        ...prev.donation_auto,
-                                                        min_donation_amount: Number(e.target.value)
-                                                    }
-                                                }))}
-                                                className={FIELD_CLASS}
-                                            />
-                                        </div>
+                                {!donationAlertsConnected && (
+                                    <div className="space-y-2 rounded-lg border border-orange-500/25 bg-orange-500/10 p-2.5">
+                                        <p className="text-xs text-orange-200">
+                                            DonationAlerts не подключен. Кэшбек включится после подключения интеграции.
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => navigate('/dashboard/settings?focus=donationalerts')}
+                                            className="h-8 w-full border-orange-500/35 bg-orange-500/10 text-orange-100 hover:bg-orange-500/15"
+                                        >
+                                            Подключить DA
+                                        </Button>
                                     </div>
+                                )}
 
-                                    <Button
-                                        onClick={handleSaveDonationAuto}
-                                        disabled={settingsSaving || (!donationAlertsConnected && !automationSettings.donation_auto.enabled)}
-                                        className="h-9 w-full bg-blue-700 hover:bg-blue-800 text-white"
-                                    >
-                                        {settingsSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Сохранить настройки
-                                    </Button>
-                                </CardContent>
-                            </Card>
+                                <div className="space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <Label className="text-xs">Курс</Label>
+                                        <TooltipHelp content="Сколько мемкоинов начислять за 1 единицу доната." />
+                                    </div>
+                                    <SliderWithInput
+                                        value={automationSettings.donation_auto.coins_per_currency}
+                                        onChange={(value) =>
+                                            setAutomationSettings((prev) => ({
+                                                ...prev,
+                                                donation_auto: { ...prev.donation_auto, coins_per_currency: value },
+                                            }))
+                                        }
+                                        min={0.01}
+                                        max={100}
+                                        step={0.01}
+                                        inputWidth={86}
+                                        ariaLabel="Курс мемкоинов за донат"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs">Мин. донат</Label>
+                                    <SliderWithInput
+                                        value={automationSettings.donation_auto.min_donation_amount}
+                                        onChange={(value) =>
+                                            setAutomationSettings((prev) => ({
+                                                ...prev,
+                                                donation_auto: { ...prev.donation_auto, min_donation_amount: value },
+                                            }))
+                                        }
+                                        min={0}
+                                        max={5000}
+                                        step={1}
+                                        inputWidth={86}
+                                        ariaLabel="Минимальная сумма доната"
+                                    />
+                                </div>
+
+                                <Button
+                                    onClick={handleSaveDonationAuto}
+                                    disabled={
+                                        settingsSaving ||
+                                        (!donationAlertsConnected && !automationSettings.donation_auto.enabled)
+                                    }
+                                    className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
+                                >
+                                    {settingsSaving && <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />}
+                                    Сохранить
+                                </Button>
+                            </AutomationCard>
                         </div>
                     </div>
 
                     <Card className={`${SURFACE_CARD_CLASS} h-fit`}>
                         <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">История мемкоинов</CardTitle>
+                            <div className="flex items-center justify-between gap-3">
+                                <CardTitle className="text-base">История</CardTitle>
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -842,28 +977,43 @@ export const MemeAlertsRewards: React.FC = () => {
                                     disabled={historyLoading}
                                     className="h-8 border-border/70 bg-card/70 hover:bg-accent"
                                 >
-                                    <RefreshCw className={`mr-2 h-3.5 w-3.5 ${historyLoading ? 'animate-spin' : ''}`} />
+                                    <ArrowsClockwise
+                                        className={`mr-2 h-3.5 w-3.5 ${historyLoading ? 'animate-spin' : ''}`}
+                                    />
                                     Обновить
                                 </Button>
                             </div>
                         </CardHeader>
                         <CardContent className="pt-0">
-                            <Tabs value={historyTab} onValueChange={(value) => setHistoryTab(value as 'grants' | 'purchases')}>
-                                <TabsList className="grid w-full grid-cols-2 h-8">
-                                    <TabsTrigger value="grants" className="text-xs">Выдачи ({history.grants.length})</TabsTrigger>
-                                    <TabsTrigger value="purchases" className="text-xs">Покупки ({history.purchases.length})</TabsTrigger>
+                            <Tabs
+                                value={historyTab}
+                                onValueChange={(value) => setHistoryTab(value as 'grants' | 'purchases')}
+                            >
+                                <TabsList className="grid h-8 w-full grid-cols-2 rounded-none border-b border-border bg-transparent p-0">
+                                    <TabsTrigger
+                                        value="grants"
+                                        className="rounded-none border-b-2 border-transparent text-xs data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-300"
+                                    >
+                                        Выдачи ({history.grants.length})
+                                    </TabsTrigger>
+                                    <TabsTrigger
+                                        value="purchases"
+                                        className="rounded-none border-b-2 border-transparent text-xs data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-300"
+                                    >
+                                        Покупки ({history.purchases.length})
+                                    </TabsTrigger>
                                 </TabsList>
                                 <TabsContent value="grants" className="mt-3">
                                     <div className="max-h-[360px] space-y-1.5 overflow-y-auto pr-1">
                                         {history.grants.length === 0 && (
-                                            <p className="rounded-md border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
-                                                Выдач пока нет. Они появятся после команды `!givema` или ручной выдачи через кнопку «Выдать».
+                                            <p className="rounded-lg border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
+                                                Выдач пока нет.
                                             </p>
                                         )}
                                         {history.grants.map((item, index) => (
                                             <div
                                                 key={`${item.id || index}`}
-                                                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-border/70 bg-card/60 px-3 py-2"
+                                                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border/70 bg-card/60 px-3 py-2"
                                             >
                                                 <div className="min-w-0">
                                                     <p className="truncate text-sm font-medium text-foreground">
@@ -874,8 +1024,12 @@ export const MemeAlertsRewards: React.FC = () => {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-semibold text-emerald-300">+{formatAmount(item.amount)}</p>
-                                                    <p className="text-[11px] text-muted-foreground">{item.type || 'grant'}</p>
+                                                    <p className="text-sm font-semibold text-emerald-300">
+                                                        +{formatAmount(item.amount)}
+                                                    </p>
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                        {item.type || 'grant'}
+                                                    </p>
                                                 </div>
                                             </div>
                                         ))}
@@ -884,14 +1038,14 @@ export const MemeAlertsRewards: React.FC = () => {
                                 <TabsContent value="purchases" className="mt-3">
                                     <div className="max-h-[360px] space-y-1.5 overflow-y-auto pr-1">
                                         {history.purchases.length === 0 && (
-                                            <p className="rounded-md border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
-                                                Нет данных по покупкам.
+                                            <p className="rounded-lg border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
+                                                Покупок пока нет.
                                             </p>
                                         )}
                                         {history.purchases.map((item, index) => (
                                             <div
                                                 key={`${item.id || index}`}
-                                                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-border/70 bg-card/60 px-3 py-2"
+                                                className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-border/70 bg-card/60 px-3 py-2"
                                             >
                                                 <div className="min-w-0">
                                                     <p className="truncate text-sm font-medium text-foreground">
@@ -902,8 +1056,12 @@ export const MemeAlertsRewards: React.FC = () => {
                                                     </p>
                                                 </div>
                                                 <div className="text-right">
-                                                    <p className="text-sm font-semibold text-violet-300">{formatAmount(item.amount)}</p>
-                                                    <p className="text-[11px] text-muted-foreground">{item.type || 'purchase'}</p>
+                                                    <p className="text-sm font-semibold text-violet-300">
+                                                        {formatAmount(item.amount)}
+                                                    </p>
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                        {item.type || 'purchase'}
+                                                    </p>
                                                 </div>
                                             </div>
                                         ))}

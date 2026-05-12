@@ -1,15 +1,27 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 
 /* eslint-disable no-alert */
-import { CheckCircle2, Clock, Edit, Gift, Loader2, MessageCircle, Plus, Power, PowerOff, Trash2, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock,
+    Edit,
+    Gift,
+    Loader2,
+    MessageCircle,
+    Plus,
+    Power,
+    PowerOff,
+    Trash2,
+    XCircle,
+} from 'lucide-react';
 
 import { PLATFORM_COLORS } from '@/constants/uiConstants';
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { cn } from '@/lib/utils';
 import pointsApi from '@/services/pointsApi';
-import RewardDialog from '@/shared/components/points/RewardDialog';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import RewardDialog from '@/shared/components/points/RewardDialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
@@ -17,7 +29,6 @@ import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
-
 
 import type { PlatformReward, RewardDemand } from '@/types/points';
 
@@ -32,12 +43,16 @@ interface RedemptionQueueProps {
     platform: 'twitch' | 'vk';
 }
 
-const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
-const CONTROL_TRIGGER_CLASS = 'h-9 border-border/70 bg-background/80 shadow-none';
-const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90';
+const CONTROL_TRIGGER_CLASS =
+    'h-9 border-sky-400/45 bg-background/85 shadow-[0_0_0_1px_rgba(14,165,233,0.12)] data-[state=open]:border-sky-400/75 data-[state=open]:bg-background';
+const CONTROL_CONTENT_CLASS = 'border-sky-400/40 bg-[#0b0712] shadow-2xl shadow-black/60 ring-1 ring-white/10';
 const TAB_BUTTON_BASE =
-    'inline-flex shrink-0 items-center px-4 py-2 text-sm font-medium transition-colors border-b-2 border-transparent -mb-px';
-const TAB_ACTIVE_CLASS = 'border-sky-500 text-sky-400 shadow-[inset_0_-2px_0_0_rgba(14,165,233,1)]';
+    'relative inline-flex shrink-0 items-center px-4 py-2 text-sm font-medium text-muted-foreground transition-colors';
+const TAB_ACTIVE_CLASS =
+    'text-sky-400 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-sky-400';
+const PLATFORM_TAB_BASE =
+    'relative inline-flex h-9 shrink-0 items-center gap-1.5 px-3 text-sm font-medium text-muted-foreground transition-colors';
 
 const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRefresh }) => {
     const [deleting, setDeleting] = useState<boolean>(false);
@@ -52,7 +67,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
                 try {
                     logger.log(`[REFRESH] [DELETE] Attempting to disable VK reward ${reward.id} before deletion`);
                     await pointsApi.toggleReward(platform, String(reward.id), false);
-                    await new Promise(resolve => setTimeout(resolve, 800));
+                    await new Promise((resolve) => setTimeout(resolve, 800));
                 } catch (toggleErr) {
                     logger.warn('Toggle before delete failed (backend will handle it):', toggleErr);
                 }
@@ -112,9 +127,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
                 </div>
 
                 {reward.description && (
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                        {reward.description}
-                    </p>
+                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{reward.description}</p>
                 )}
 
                 <div className="flex gap-2 pt-3 border-t border-border">
@@ -154,11 +167,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
                         disabled={deleting}
                         className="flex-shrink-0 h-9 px-3 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                     >
-                        {deleting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <Trash2 className="w-4 h-4" />
-                        )}
+                        {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                     </Button>
                 </div>
             </CardContent>
@@ -173,11 +182,13 @@ interface RewardsResponse {
 }
 
 interface DemandsResponse {
-    demands?: RewardDemand[] | {
-        items?: RewardDemand[];
-        demands?: RewardDemand[];
-        [key: string]: unknown;
-    };
+    demands?:
+        | RewardDemand[]
+        | {
+              items?: RewardDemand[];
+              demands?: RewardDemand[];
+              [key: string]: unknown;
+          };
 }
 
 interface RewardCapability {
@@ -199,9 +210,44 @@ const enabledRewardCapability = (platform: 'twitch' | 'vk'): RewardCapability =>
     reason: null,
 });
 
+const getCapabilityBadgeTone = (platform: 'twitch' | 'vk', canCreate: boolean): string => {
+    if (canCreate) {
+        return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+    }
+
+    return platform === 'twitch'
+        ? 'border-[#9146FF]/30 bg-[#9146FF]/10 text-[#c9a9ff]'
+        : 'border-[#FF4444]/30 bg-[#FF4444]/10 text-[#ffb4b4]';
+};
+
+const normalizeCapabilityReason = (platform: 'twitch' | 'vk', error: { message?: string; status?: number }): string => {
+    const message = error.message?.trim();
+
+    if (message) {
+        return message;
+    }
+
+    if (error.status === 404) {
+        return platform === 'vk'
+            ? 'Подключите VK Live, чтобы управлять наградами и очередью запросов.'
+            : 'Подключите Twitch, чтобы управлять наградами канала.';
+    }
+
+    if (platform === 'twitch' && error.status === 403) {
+        return 'Twitch разрешает создавать награды только для каналов со статусом Affiliate или Partner.';
+    }
+
+    if (platform === 'vk' && error.status === 403) {
+        return 'У токена VK Live не хватает прав для управления наградами. Переавторизуйте интеграцию VK Live.';
+    }
+
+    return 'Не удалось получить доступ к наградам платформы. Попробуйте снова чуть позже.';
+};
+
 const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
     const [redemptions, setRedemptions] = useState<RewardDemand[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [processing, setProcessing] = useState<Set<string>>(new Set());
     const [rewardsMap, setRewardsMap] = useState<Map<string, PlatformReward>>(new Map());
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -210,8 +256,9 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
     const loadRedemptions = useCallback(async (): Promise<void> => {
         try {
             setLoading(true);
+            setLoadError(null);
             if (platform === 'vk') {
-                const rewardsData = await pointsApi.getRewards('vk') as RewardsResponse;
+                const rewardsData = (await pointsApi.getRewards('vk')) as RewardsResponse;
                 const map = new Map<string, PlatformReward>();
                 if (rewardsData.rewards) {
                     rewardsData.rewards.forEach((reward: PlatformReward) => {
@@ -220,7 +267,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                 }
                 setRewardsMap(map);
 
-                const data = await pointsApi.getVKDemands() as DemandsResponse;
+                const data = (await pointsApi.getVKDemands()) as DemandsResponse;
 
                 let demands: RewardDemand[] = [];
                 if (Array.isArray(data.demands)) {
@@ -247,7 +294,12 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             }
         } catch (err) {
             logger.error('Error loading redemptions:', err);
-            toast.error('Не удалось загрузить награды');
+            const message =
+                err instanceof Error && err.message
+                    ? err.message
+                    : 'Не удалось загрузить очередь наград. Попробуйте снова чуть позже.';
+            setLoadError(message);
+            toast.error(message);
             setRedemptions([]);
         } finally {
             setLoading(false);
@@ -259,12 +311,12 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
     }, [loadRedemptions]);
 
     const handleAccept = async (redemptionId: string): Promise<void> => {
-        setProcessing(prev => new Set(prev).add(redemptionId));
+        setProcessing((prev) => new Set(prev).add(redemptionId));
         try {
             await pointsApi.processVKDemands('accept', [redemptionId]);
             toast.success('Награда принята');
-            setRedemptions(prev => prev.filter(d => d.id !== redemptionId));
-            setSelectedItems(prev => {
+            setRedemptions((prev) => prev.filter((d) => d.id !== redemptionId));
+            setSelectedItems((prev) => {
                 const next = new Set(prev);
                 next.delete(redemptionId);
                 return next;
@@ -273,7 +325,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             logger.error('Error accepting redemption:', err);
             toast.error('Ошибка принятия награды');
         } finally {
-            setProcessing(prev => {
+            setProcessing((prev) => {
                 const next = new Set(prev);
                 next.delete(redemptionId);
                 return next;
@@ -282,12 +334,12 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
     };
 
     const handleReject = async (redemptionId: string): Promise<void> => {
-        setProcessing(prev => new Set(prev).add(redemptionId));
+        setProcessing((prev) => new Set(prev).add(redemptionId));
         try {
             await pointsApi.processVKDemands('reject', [redemptionId]);
             toast.success('Награда отклонена');
-            setRedemptions(prev => prev.filter(d => d.id !== redemptionId));
-            setSelectedItems(prev => {
+            setRedemptions((prev) => prev.filter((d) => d.id !== redemptionId));
+            setSelectedItems((prev) => {
                 const next = new Set(prev);
                 next.delete(redemptionId);
                 return next;
@@ -296,7 +348,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
             logger.error('Error rejecting redemption:', err);
             toast.error('Ошибка отклонения награды');
         } finally {
-            setProcessing(prev => {
+            setProcessing((prev) => {
                 const next = new Set(prev);
                 next.delete(redemptionId);
                 return next;
@@ -308,19 +360,19 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         if (selectedItems.size === 0) return;
 
         const ids = Array.from(selectedItems);
-        setProcessing(prev => new Set([...prev, ...ids]));
+        setProcessing((prev) => new Set([...prev, ...ids]));
         try {
             await pointsApi.processVKDemands('accept', ids);
             toast.success(`Принято наград: ${ids.length}`);
-            setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
+            setRedemptions((prev) => prev.filter((d) => !ids.includes(d.id)));
             setSelectedItems(new Set());
         } catch (err: unknown) {
             logger.error('Error bulk accepting:', err);
             toast.error('Ошибка принятия наград');
         } finally {
-            setProcessing(prev => {
+            setProcessing((prev) => {
                 const next = new Set(prev);
-                ids.forEach(id => next.delete(id));
+                ids.forEach((id) => next.delete(id));
                 return next;
             });
         }
@@ -330,19 +382,19 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
         if (selectedItems.size === 0) return;
 
         const ids = Array.from(selectedItems);
-        setProcessing(prev => new Set([...prev, ...ids]));
+        setProcessing((prev) => new Set([...prev, ...ids]));
         try {
             await pointsApi.processVKDemands('reject', ids);
             toast.success(`Отклонено наград: ${ids.length}`);
-            setRedemptions(prev => prev.filter(d => !ids.includes(d.id)));
+            setRedemptions((prev) => prev.filter((d) => !ids.includes(d.id)));
             setSelectedItems(new Set());
         } catch (err: unknown) {
             logger.error('Error bulk rejecting:', err);
             toast.error('Ошибка отклонения наград');
         } finally {
-            setProcessing(prev => {
+            setProcessing((prev) => {
                 const next = new Set(prev);
-                ids.forEach(id => next.delete(id));
+                ids.forEach((id) => next.delete(id));
                 return next;
             });
         }
@@ -376,10 +428,12 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                     <CardContent className="py-12 text-center">
                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
                         <p className="text-sm text-muted-foreground">
-                            Нет активных запросов
+                            {loadError ? 'Очередь наград сейчас недоступна' : 'Нет активных запросов'}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            Когда зрители активируют награды, они появятся здесь
+                            {loadError
+                                ? loadError
+                                : 'Когда зрители активируют награды, они появятся здесь'}
                         </p>
                     </CardContent>
                 </Card>
@@ -395,7 +449,10 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         <div className="flex items-center gap-3 flex-wrap">
                             <div className="flex items-center gap-2">
                                 <Label className="text-sm font-medium whitespace-nowrap">Фильтр:</Label>
-                                <Select value={filterType} onValueChange={(value) => setFilterType(value as 'all' | 'tts' | 'other')}>
+                                <Select
+                                    value={filterType}
+                                    onValueChange={(value) => setFilterType(value as 'all' | 'tts' | 'other')}
+                                >
                                     <SelectTrigger className={`w-[clamp(140px,25vw,200px)] ${CONTROL_TRIGGER_CLASS}`}>
                                         <SelectValue placeholder="Выберите фильтр" />
                                     </SelectTrigger>
@@ -412,22 +469,29 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                     <div className="h-6 w-px bg-border" />
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-muted-foreground whitespace-nowrap">
-                                            Найдено: <span className="font-semibold text-foreground">{filteredRedemptions.length}</span>
+                                            Найдено:{' '}
+                                            <span className="font-semibold text-foreground">
+                                                {filteredRedemptions.length}
+                                            </span>
                                         </span>
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             onClick={() => {
-                                                const allSelected = filteredRedemptions.every(d => selectedItems.has(d.id));
+                                                const allSelected = filteredRedemptions.every((d) =>
+                                                    selectedItems.has(d.id)
+                                                );
                                                 if (allSelected) {
                                                     setSelectedItems(new Set());
                                                 } else {
-                                                    setSelectedItems(new Set(filteredRedemptions.map(d => d.id)));
+                                                    setSelectedItems(new Set(filteredRedemptions.map((d) => d.id)));
                                                 }
                                             }}
                                             className="whitespace-nowrap"
                                         >
-                                            {filteredRedemptions.every(d => selectedItems.has(d.id)) ? 'Снять все' : 'Выбрать все'}
+                                            {filteredRedemptions.every((d) => selectedItems.has(d.id))
+                                                ? 'Снять все'
+                                                : 'Выбрать все'}
                                         </Button>
                                     </div>
                                 </>
@@ -437,13 +501,15 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         {selectedItems.size > 0 && (
                             <div className="flex items-center gap-2 flex-wrap">
                                 <div className="px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20">
-                                    <span className="text-sm font-medium text-primary">Выбрано: {selectedItems.size}</span>
+                                    <span className="text-sm font-medium text-primary">
+                                        Выбрано: {selectedItems.size}
+                                    </span>
                                 </div>
                                 <Button
                                     size="sm"
                                     variant="default"
                                     onClick={handleBulkAccept}
-                                    disabled={Array.from(selectedItems).some(id => processing.has(id))}
+                                    disabled={Array.from(selectedItems).some((id) => processing.has(id))}
                                     className="whitespace-nowrap bg-none bg-primary hover:bg-primary/90 shadow-none"
                                 >
                                     <CheckCircle2 className="w-4 h-4 mr-1.5" />
@@ -453,7 +519,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                     size="sm"
                                     variant="destructive"
                                     onClick={handleBulkReject}
-                                    disabled={Array.from(selectedItems).some(id => processing.has(id))}
+                                    disabled={Array.from(selectedItems).some((id) => processing.has(id))}
                                     className="whitespace-nowrap"
                                 >
                                     <XCircle className="w-4 h-4 mr-1.5" />
@@ -469,9 +535,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                 <Card className={SURFACE_CARD_CLASS}>
                     <CardContent className="py-12 text-center">
                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-                        <p className="text-sm text-muted-foreground">
-                            Нет запросов по выбранному фильтру
-                        </p>
+                        <p className="text-sm text-muted-foreground">Нет запросов по выбранному фильтру</p>
                     </CardContent>
                 </Card>
             ) : (
@@ -480,23 +544,35 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         const rewardData = rewardsMap.get(demand.reward?.id || '');
                         const rewardTitle = rewardData?.name || rewardData?.title || 'Неизвестная награда';
                         const rewardCost = rewardData?.price || rewardData?.cost || 0;
-                        const isTtsReward = rewardTitle.toLowerCase().includes('голос') || rewardTitle.toLowerCase().includes('tts') || rewardTitle.toLowerCase().includes('озвучка');
+                        const isTtsReward =
+                            rewardTitle.toLowerCase().includes('голос') ||
+                            rewardTitle.toLowerCase().includes('tts') ||
+                            rewardTitle.toLowerCase().includes('озвучка');
 
                         let message = '';
                         if (Array.isArray(demand.message_parts) && demand.message_parts.length > 0) {
-                            message = demand.message_parts.map(part => {
-                                if (typeof part === 'string') return part;
-                                if (typeof part === 'object' && part !== null) {
-                                    const p = part as { text?: { content: string }; mention?: { nick: string }; link?: { content: string }; smile?: { name: string }; content?: string };
-                                    if (p.text?.content) return p.text.content;
-                                    if (p.mention?.nick) return `@${p.mention.nick}`;
-                                    if (p.link?.content) return p.link.content;
-                                    if (p.smile?.name) return p.smile.name;
-                                    if (p.content) return p.content;
-                                    return JSON.stringify(part);
-                                }
-                                return String(part);
-                            }).join(' ').trim();
+                            message = demand.message_parts
+                                .map((part) => {
+                                    if (typeof part === 'string') return part;
+                                    if (typeof part === 'object' && part !== null) {
+                                        const p = part as {
+                                            text?: { content: string };
+                                            mention?: { nick: string };
+                                            link?: { content: string };
+                                            smile?: { name: string };
+                                            content?: string;
+                                        };
+                                        if (p.text?.content) return p.text.content;
+                                        if (p.mention?.nick) return `@${p.mention.nick}`;
+                                        if (p.link?.content) return p.link.content;
+                                        if (p.smile?.name) return p.smile.name;
+                                        if (p.content) return p.content;
+                                        return JSON.stringify(part);
+                                    }
+                                    return String(part);
+                                })
+                                .join(' ')
+                                .trim();
                         } else if (typeof demand.message === 'string') {
                             message = demand.message;
                         } else if (demand.message && typeof demand.message === 'object') {
@@ -507,14 +583,20 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                         const isSelected = selectedItems.has(demand.id);
                         const isProcessing = processing.has(demand.id);
                         const userName = demand.user?.nick || demand.user?.name || 'Пользователь';
-                        const timestamp = demand.created_at ? new Date(typeof demand.created_at === 'number' ? demand.created_at * 1000 : new Date(demand.created_at).getTime()).toLocaleString('ru-RU', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            second: '2-digit'
-                        }) : 'Неизвестно';
+                        const timestamp = demand.created_at
+                            ? new Date(
+                                  typeof demand.created_at === 'number'
+                                      ? demand.created_at * 1000
+                                      : new Date(demand.created_at).getTime()
+                              ).toLocaleString('ru-RU', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                              })
+                            : 'Неизвестно';
 
                         return (
                             <Card
@@ -528,7 +610,7 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                 type="checkbox"
                                                 checked={isSelected}
                                                 onChange={(e) => {
-                                                    setSelectedItems(prev => {
+                                                    setSelectedItems((prev) => {
                                                         const next = new Set(prev);
                                                         if (e.target.checked) {
                                                             next.add(demand.id);
@@ -552,19 +634,24 @@ const RedemptionQueue: React.FC<RedemptionQueueProps> = ({ platform }) => {
                                                                 {(userName[0] || 'U').toUpperCase()}
                                                             </span>
                                                         </div>
-                                                        <span className="font-semibold text-sm truncate">{userName}</span>
+                                                        <span className="font-semibold text-sm truncate">
+                                                            {userName}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center gap-2 mb-3 flex-wrap">
                                                 <Badge
-                                                    variant={isTtsReward ? "default" : "outline"}
+                                                    variant={isTtsReward ? 'default' : 'outline'}
                                                     className={`text-xs font-medium ${isTtsReward ? 'bg-purple-600/20 text-purple-300 border-purple-600/30' : 'bg-muted/50'}`}
                                                 >
                                                     {rewardTitle}
                                                 </Badge>
-                                                <Badge variant="secondary" className="text-xs font-mono bg-blue-600/20 text-blue-300 border-blue-600/30">
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="text-xs font-mono bg-blue-600/20 text-blue-300 border-blue-600/30"
+                                                >
                                                     {rewardCost} баллов
                                                 </Badge>
                                             </div>
@@ -657,7 +744,7 @@ const PointsManagementPage: React.FC = () => {
     const vkEnabled = integrations?.vk?.enabled || false;
 
     useEffect(() => {
-        setSelectedPlatform(prev => {
+        setSelectedPlatform((prev) => {
             if (prev === 'twitch' && twitchEnabled) return prev;
             if (prev === 'vk' && vkEnabled) return prev;
             if (vkEnabled) return 'vk';
@@ -671,64 +758,61 @@ const PointsManagementPage: React.FC = () => {
         window.localStorage.setItem('points_selected_platform', selectedPlatform);
     }, [selectedPlatform]);
 
-    const loadRewards = useCallback(async (platform: 'twitch' | 'vk', showLoader: boolean = true): Promise<void> => {
-        try {
-            if (showLoader) {
-                setLoading(true);
-            }
-            if (platform === 'twitch' && !twitchEnabled) {
+    const loadRewards = useCallback(
+        async (platform: 'twitch' | 'vk', showLoader: boolean = true): Promise<void> => {
+            try {
+                if (showLoader) {
+                    setLoading(true);
+                }
+                if (platform === 'twitch' && !twitchEnabled) {
+                    setRewards([]);
+                    setRewardCapability(
+                        disabledRewardCapability(platform, 'Подключите Twitch, чтобы создавать награды')
+                    );
+                    return;
+                }
+                if (platform === 'vk' && !vkEnabled) {
+                    setRewards([]);
+                    setRewardCapability(
+                        disabledRewardCapability(platform, 'Подключите VK Live, чтобы создавать награды')
+                    );
+                    return;
+                }
+                const data = (await pointsApi.getRewards(platform)) as RewardsResponse;
+
+                const sortedRewards = (data.rewards || []).sort((a: PlatformReward, b: PlatformReward) => {
+                    if (a.is_enabled === b.is_enabled) return 0;
+                    return a.is_enabled ? -1 : 1;
+                });
+
+                setRewards(sortedRewards);
+                setRewardCapability(data.capability ?? enabledRewardCapability(platform));
+            } catch (err) {
+                logger.error('Error loading rewards:', err);
+                const apiError = err as { message?: string; status?: number };
+                const capabilityReason = normalizeCapabilityReason(platform, apiError);
+
+                if (apiError.status === 404) {
+                    setRewardCapability(disabledRewardCapability(platform, capabilityReason));
+                } else {
+                    setRewardCapability(disabledRewardCapability(platform, capabilityReason));
+                    toast.error(capabilityReason, { duration: 5000 });
+                }
                 setRewards([]);
-                setRewardCapability(disabledRewardCapability(platform, 'Подключите Twitch, чтобы создавать награды'));
-                return;
+            } finally {
+                if (showLoader) {
+                    setLoading(false);
+                }
             }
-            if (platform === 'vk' && !vkEnabled) {
-                setRewards([]);
-                setRewardCapability(disabledRewardCapability(platform, 'Подключите VK Live, чтобы создавать награды'));
-                return;
-            }
-            const data = await pointsApi.getRewards(platform) as RewardsResponse;
-
-            const sortedRewards = (data.rewards || []).sort((a: PlatformReward, b: PlatformReward) => {
-                if (a.is_enabled === b.is_enabled) return 0;
-                return a.is_enabled ? -1 : 1;
-            });
-
-            setRewards(sortedRewards);
-            setRewardCapability(data.capability ?? enabledRewardCapability(platform));
-        } catch (err) {
-            logger.error('Error loading rewards:', err);
-            const apiError = err as { message?: string; status?: number };
-            const errorMessage = apiError.message || 'Неизвестная ошибка';
-
-            if (apiError.status === 404) {
-                setRewardCapability(disabledRewardCapability(platform, `Подключите ${platform === 'vk' ? 'VK Live' : 'Twitch'}, чтобы создавать награды`));
-            } else if (
-                platform === 'twitch' &&
-                (apiError.status === 403 || errorMessage.includes('партнёр или аффилейт') || errorMessage.includes('partner or affiliate'))
-            ) {
-                setRewardCapability(disabledRewardCapability(
-                    platform,
-                    'Для создания наград нужен Twitch Affiliate или Partner'
-                ));
-            } else {
-                setRewardCapability(disabledRewardCapability(platform, 'Создание наград временно недоступно'));
-                toast.error('Настройки не загружены. Попробуйте снова позднее', { duration: 5000 });
-            }
-            setRewards([]);
-        } finally {
-            if (showLoader) {
-                setLoading(false);
-            }
-        }
-    }, [twitchEnabled, vkEnabled]);
+        },
+        [twitchEnabled, vkEnabled]
+    );
 
     useEffect(() => {
         void loadRewards(selectedPlatform, true);
     }, [selectedPlatform, loadRewards]);
 
     const canCreateReward = rewardCapability.platform === selectedPlatform && rewardCapability.can_create;
-    const createDisabledReason = !canCreateReward ? rewardCapability.reason : null;
-
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -741,67 +825,62 @@ const PointsManagementPage: React.FC = () => {
     return (
         <div className="container mx-auto p-4 sm:p-6">
             <div className="flex flex-col gap-3 mb-6">
-                <div className="flex flex-col gap-3 border-b border-border pb-1 sm:flex-row sm:items-end sm:justify-between">
-                    <div className="flex min-w-0 overflow-x-auto">
+                <div className="relative flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-px bg-border" aria-hidden="true" />
+                    <div className="hide-scrollbar relative z-10 flex min-w-0 overflow-x-auto">
                         <button
                             onClick={() => setActiveTab('rewards')}
-                            className={`${TAB_BUTTON_BASE} ${activeTab === 'rewards'
-                                ? TAB_ACTIVE_CLASS
-                                : 'border-transparent text-muted-foreground hover:text-sky-300'
-                                }`}
+                            className={`${TAB_BUTTON_BASE} ${
+                                activeTab === 'rewards'
+                                    ? TAB_ACTIVE_CLASS
+                                    : 'hover:text-sky-300'
+                            }`}
                         >
                             Награды
                         </button>
                         <button
                             onClick={() => setActiveTab('queue')}
-                            className={`${TAB_BUTTON_BASE} ${activeTab === 'queue'
-                                ? TAB_ACTIVE_CLASS
-                                : 'border-transparent text-muted-foreground hover:text-sky-300'
-                                }`}
+                            className={`${TAB_BUTTON_BASE} ${
+                                activeTab === 'queue'
+                                    ? TAB_ACTIVE_CLASS
+                                    : 'hover:text-sky-300'
+                            }`}
                         >
                             Очередь запросов
                         </button>
                     </div>
 
                     {(twitchEnabled || vkEnabled) && (
-                        <div className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border/70 bg-background/35 p-1">
+                        <div className="hide-scrollbar relative z-10 inline-flex max-w-full items-center gap-3 overflow-x-auto">
                             {twitchEnabled && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
+                                <button
+                                    type="button"
                                     onClick={() => setSelectedPlatform('twitch')}
                                     className={cn(
-                                        'h-8 rounded-md border border-transparent gap-1.5 px-3 text-xs sm:text-sm',
+                                        PLATFORM_TAB_BASE,
                                         selectedPlatform === 'twitch'
-                                            ? 'text-white shadow-sm hover:text-white'
-                                            : 'text-muted-foreground hover:border-border hover:bg-background/60 hover:text-[#9146FF]'
+                                            ? 'text-[#9146FF] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-[#9146FF]'
+                                            : 'hover:text-[#9146FF]'
                                     )}
-                                    style={selectedPlatform === 'twitch'
-                                        ? { backgroundColor: PLATFORM_COLORS.TWITCH }
-                                        : undefined}
                                 >
                                     <TwitchIcon className="w-3.5 h-3.5" />
                                     Twitch
-                                </Button>
+                                </button>
                             )}
                             {vkEnabled && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
+                                <button
+                                    type="button"
                                     onClick={() => setSelectedPlatform('vk')}
                                     className={cn(
-                                        'h-8 rounded-md border border-transparent gap-1.5 px-3 text-xs sm:text-sm',
+                                        PLATFORM_TAB_BASE,
                                         selectedPlatform === 'vk'
-                                            ? 'text-white shadow-sm hover:text-white'
-                                            : 'text-muted-foreground hover:border-border hover:text-foreground hover:bg-background/60'
+                                            ? 'text-[#FF4444] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:rounded-full after:bg-[#FF4444]'
+                                            : 'hover:text-[#FF4444]'
                                     )}
-                                    style={selectedPlatform === 'vk'
-                                        ? { backgroundColor: PLATFORM_COLORS.VK_LIVE }
-                                        : undefined}
                                 >
                                     <VKIcon className="w-3.5 h-3.5" />
                                     VK Live
-                                </Button>
+                                </button>
                             )}
                         </div>
                     )}
@@ -824,8 +903,37 @@ const PointsManagementPage: React.FC = () => {
                                 <Plus className="w-4 h-4 mr-2" />
                                 Создать награду
                             </Button>
-                            {createDisabledReason && (
-                                <p className="text-xs text-muted-foreground">{createDisabledReason}</p>
+                            {rewardCapability.platform === selectedPlatform && rewardCapability.reason && (
+                                <Card className={SURFACE_CARD_CLASS}>
+                                    <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <Badge
+                                                    variant="outline"
+                                                    className={cn(
+                                                        'text-xs font-medium',
+                                                        getCapabilityBadgeTone(selectedPlatform, canCreateReward)
+                                                    )}
+                                                >
+                                                    {selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}
+                                                </Badge>
+                                                <span className="text-sm font-medium text-foreground">
+                                                    {canCreateReward ? 'Награды доступны' : 'Есть ограничение платформы'}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm leading-relaxed text-muted-foreground">
+                                                {rewardCapability.reason}
+                                            </p>
+                                        </div>
+                                        {rewardCapability.required_role && !canCreateReward && (
+                                            <Badge variant="secondary" className="self-start text-xs">
+                                                {rewardCapability.required_role === 'affiliate_or_partner'
+                                                    ? 'Нужен Affiliate или Partner'
+                                                    : 'Нужны права владельца канала'}
+                                            </Badge>
+                                        )}
+                                    </CardContent>
+                                </Card>
                             )}
                         </>
                     )}
@@ -838,8 +946,14 @@ const PointsManagementPage: React.FC = () => {
                                 <Card className={SURFACE_CARD_CLASS}>
                                     <CardContent className="py-12 text-center">
                                         <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-                                        <p className="text-sm text-muted-foreground font-medium">Нет наград</p>
-                                        <p className="text-xs text-muted-foreground mt-1">Создайте первую награду для зрителей!</p>
+                                        <p className="text-sm text-muted-foreground font-medium">
+                                            {canCreateReward ? 'Нет наград' : 'Награды сейчас недоступны'}
+                                        </p>
+                                        {rewardCapability.platform === selectedPlatform && rewardCapability.reason && (
+                                            <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+                                                {rewardCapability.reason}
+                                            </p>
+                                        )}
                                     </CardContent>
                                 </Card>
                             ) : (
@@ -870,9 +984,11 @@ const PointsManagementPage: React.FC = () => {
                 }}
                 reward={editingReward}
                 platform={selectedPlatform}
-                channelName={selectedPlatform === 'vk'
-                    ? (user?.vk_channel_name || user?.vk_username || integrations.vk?.username)
-                    : (user?.twitch_username || integrations.twitch?.username)}
+                channelName={
+                    selectedPlatform === 'vk'
+                        ? user?.vk_channel_name || user?.vk_username || integrations.vk?.username
+                        : user?.twitch_username || integrations.twitch?.username
+                }
                 onSuccess={() => {
                     setShowCreateDialog(false);
                     setEditingReward(null);

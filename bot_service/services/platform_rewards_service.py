@@ -14,6 +14,12 @@ from integrations.base import TokenInfo, IntegrationError, TokenExpiredError, Ra
 
 logger = logging.getLogger('bot_service')
 
+TWITCH_AFFILIATE_REQUIRED_MESSAGE = (
+    "Twitch разрешает создавать награды только для каналов со статусом Affiliate или Partner."
+)
+VK_REWARD_MANAGE_SCOPES = {"channel:points:rewards"}
+VK_REWARD_DEMANDS_SCOPES = {"channel:points:rewards:demands"}
+
 
 _platform_rewards_service_singleton: "PlatformRewardsService | None" = None
 
@@ -46,6 +52,49 @@ class PlatformRewardsService:
             scopes=token_model.scopes
         )
 
+    @staticmethod
+    def _normalize_scopes(raw_scopes) -> set[str]:
+        if isinstance(raw_scopes, list):
+            return {str(scope).strip() for scope in raw_scopes if str(scope).strip()}
+        if isinstance(raw_scopes, str):
+            normalized = raw_scopes.replace(",", " ")
+            return {scope.strip() for scope in normalized.split(" ") if scope.strip()}
+        return set()
+
+    @staticmethod
+    def _is_twitch_affiliate_requirement_error(message: str | None) -> bool:
+        if not message:
+            return False
+        lowered = message.lower()
+        return (
+            "affiliate" in lowered
+            or "partner" in lowered
+            or "channel points" in lowered
+            or "custom reward" in lowered
+        )
+
+    def _require_vk_scopes(self, token_model, required_scopes: set[str]):
+        granted_scopes = self._normalize_scopes(getattr(token_model, "scopes", None))
+        missing_scopes = sorted(required_scopes - granted_scopes)
+        if missing_scopes:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "У токена VK Live не хватает прав: "
+                    + ", ".join(missing_scopes)
+                    + ". Переавторизуйте интеграцию VK Live."
+                ),
+            )
+
+    def _get_vk_channel_name_or_raise(self, user_id: int, db) -> str:
+        channel_name = self.user_service.get_vk_channel_name(user_id, db)
+        if not channel_name:
+            raise HTTPException(
+                status_code=404,
+                detail="Не найден VK Live канал. Подключите интеграцию VK Live заново.",
+            )
+        return channel_name
+
     async def get_rewards(self, user_id: int, platform: str, db) -> List[Dict[str, Any]]:
         """Get rewards from platform."""
         token = self.user_service.get_user_token(user_id, platform.lower(), db)
@@ -68,7 +117,8 @@ class PlatformRewardsService:
             
             return await self._get_twitch_rewards(token.platform_user_id, token_info)
         elif platform.lower() == 'vk':
-            channel_name = self.user_service.get_vk_channel_name(user_id, db)
+            self._require_vk_scopes(token, VK_REWARD_MANAGE_SCOPES)
+            channel_name = self._get_vk_channel_name_or_raise(user_id, db)
             return await self._get_vk_rewards(channel_name, decrypted_token)
         else:
             raise HTTPException(status_code=400, detail="Unsupported platform")
@@ -142,7 +192,8 @@ class PlatformRewardsService:
                 self._handle_integration_error(e)
                 
         elif platform.lower() == 'vk':
-            channel_name = self.user_service.get_vk_channel_name(user_id, db)
+            self._require_vk_scopes(token, VK_REWARD_MANAGE_SCOPES)
+            channel_name = self._get_vk_channel_name_or_raise(user_id, db)
             vk_data = self._map_to_vk_create(reward_data)
             
             result = await vk_api.create_channel_reward(channel_name, decrypted_token, vk_data)
@@ -243,7 +294,8 @@ class PlatformRewardsService:
                 self._handle_integration_error(e)
 
         elif platform.lower() == 'vk':
-            channel_name = self.user_service.get_vk_channel_name(user_id, db)
+            self._require_vk_scopes(token, VK_REWARD_MANAGE_SCOPES)
+            channel_name = self._get_vk_channel_name_or_raise(user_id, db)
             vk_data = self._map_to_vk_create(reward_data)
             
             result = await vk_api.edit_channel_reward(channel_name, reward_id, decrypted_token, vk_data)
@@ -270,7 +322,8 @@ class PlatformRewardsService:
                 self._handle_integration_error(e)
                 
         elif platform.lower() == 'vk':
-            channel_name = self.user_service.get_vk_channel_name(user_id, db)
+            self._require_vk_scopes(token, VK_REWARD_MANAGE_SCOPES)
+            channel_name = self._get_vk_channel_name_or_raise(user_id, db)
             # Add logic for clearing demands if needed? The original code had complex logic for VK delete.
             # I should incorporate that logic here or simplified.
             # The original code had "FIX: VK API não permite..." with loop to reject demands.
@@ -305,7 +358,8 @@ class PlatformRewardsService:
                 self._handle_integration_error(e)
                 
         elif platform.lower() == 'vk':
-            channel_name = self.user_service.get_vk_channel_name(user_id, db)
+            self._require_vk_scopes(token, VK_REWARD_DEMANDS_SCOPES)
+            channel_name = self._get_vk_channel_name_or_raise(user_id, db)
             # VK redemptions are demands
             result = await vk_api.get_reward_demands(channel_name, decrypted_token)
             if result and isinstance(result, dict):
@@ -333,7 +387,8 @@ class PlatformRewardsService:
                 self._handle_integration_error(e)
                 
         elif platform.lower() == 'vk':
-            channel_name = self.user_service.get_vk_channel_name(user_id, db)
+            self._require_vk_scopes(token, VK_REWARD_DEMANDS_SCOPES)
+            channel_name = self._get_vk_channel_name_or_raise(user_id, db)
             demand_ids = [int(redemption_id)]
             if status.lower() == 'fulfilled':
                 return await vk_api.accept_reward_demands(channel_name, decrypted_token, demand_ids)
@@ -388,7 +443,8 @@ class PlatformRewardsService:
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
         
         if platform.lower() == 'vk':
-            channel_name = self.user_service.get_vk_channel_name(user_id, db)
+            self._require_vk_scopes(token, VK_REWARD_MANAGE_SCOPES)
+            channel_name = self._get_vk_channel_name_or_raise(user_id, db)
             if is_enabled:
                 return await vk_api.enable_channel_reward(channel_name, reward_id, decrypted_token)
             else:
@@ -406,8 +462,8 @@ class PlatformRewardsService:
         token = self.user_service.get_user_token(user_id, 'vk', db)
         if not token:
              raise HTTPException(status_code=404, detail="VK token not found")
-        
-        channel_name = self.user_service.get_vk_channel_name(user_id, db)
+        self._require_vk_scopes(token, VK_REWARD_DEMANDS_SCOPES)
+        channel_name = self._get_vk_channel_name_or_raise(user_id, db)
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
         
         result = await vk_api.get_reward_demands(channel_name, decrypted_token)
@@ -423,8 +479,8 @@ class PlatformRewardsService:
         token = self.user_service.get_user_token(user_id, 'vk', db)
         if not token:
              raise HTTPException(status_code=404, detail="VK token not found")
-             
-        channel_name = self.user_service.get_vk_channel_name(user_id, db)
+        self._require_vk_scopes(token, VK_REWARD_DEMANDS_SCOPES)
+        channel_name = self._get_vk_channel_name_or_raise(user_id, db)
         decrypted_token = self.user_service.decrypt_access_token(token.access_token)
         
         if action == 'accept':
@@ -436,16 +492,19 @@ class PlatformRewardsService:
 
     def _handle_integration_error(self, e: IntegrationError):
         """Map IntegrationError to HTTPException"""
+        error_message = getattr(e, "message", None) or str(e) or "Platform API request failed"
+        if self._is_twitch_affiliate_requirement_error(error_message):
+            raise HTTPException(status_code=403, detail=TWITCH_AFFILIATE_REQUIRED_MESSAGE)
         if isinstance(e, TokenExpiredError):
             raise HTTPException(status_code=401, detail="Token expired")
         elif isinstance(e, RateLimitError):
             raise HTTPException(status_code=429, detail="Rate limit exceeded")
         elif isinstance(e, AuthenticationError):
-            raise HTTPException(status_code=403, detail="Authentication failed")
+            raise HTTPException(status_code=403, detail=error_message)
         else:
             # Check status code in Base Exception
             if e.status_code:
-                raise HTTPException(status_code=e.status_code, detail="Integration request failed")
+                raise HTTPException(status_code=e.status_code, detail=error_message)
             raise HTTPException(status_code=500, detail="Platform API request failed")
 
 

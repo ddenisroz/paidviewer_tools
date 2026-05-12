@@ -3,6 +3,12 @@ services:
     image: redis:7-alpine
     container_name: tts_redis_local
     command: redis-server --requirepass ${REDIS_PASSWORD:-redis-dev-password}
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     ports: !override
       - "6379:6379"
     healthcheck:
@@ -14,6 +20,12 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: tts_postgres_local
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     environment: !override
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -28,6 +40,12 @@ services:
       context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_local
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     env_file:
       - path: ../../bot_service/.env
         required: false
@@ -56,6 +74,11 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev-password}@redis:6379/0
       ADMIN_USERS: ${ADMIN_USERS:-}
       VK_AUTH_BASE_URL: https://auth.live.vkvideo.ru/app/oauth2/authorize
+      TWITCH_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/twitch/callback
+      TWITCH_BOT_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/twitch/bot/callback
+      VK_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/vk/callback
+      VK_BOT_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/vk/bot/callback
+      DONATIONALERTS_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/donationalerts/callback
       CORS_ORIGINS: ${LOCAL_APP_ORIGIN:-http://localhost},http://localhost:3000,http://localhost:5173
       RATE_LIMIT_LOGIN: 60/minute
       SESSION_COOKIE_SECURE: "false"
@@ -70,6 +93,12 @@ services:
       context: ../../../tts-gateway
       dockerfile: Dockerfile
     container_name: tts_gateway_local
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     ports: !override
       - "8010:8010"
     environment: !override
@@ -81,6 +110,7 @@ services:
       TTS_GATEWAY_F5_API_KEY: ${F5_TTS_SERVICE_API_KEY:-f5-dev-key}
       TTS_GATEWAY_QWEN_URL: http://qwen_tts:8000
       TTS_GATEWAY_QWEN_API_KEY: ${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
+      TTS_GATEWAY_QWEN_URL_POLICY: passthrough
 
   tts_service:
     profiles: ["cloud-tts-real"]
@@ -88,6 +118,12 @@ services:
       context: ../../../f5-tts-service
       dockerfile: Dockerfile
     container_name: tts_tts_service_local
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     ports: !override
       - "8011:8011"
     environment: !override
@@ -105,9 +141,9 @@ services:
       HUGGINGFACE_TOKEN: ${HUGGINGFACE_TOKEN:-}
       HF_TOKEN: ${HUGGINGFACE_TOKEN:-}
       HF_HOME: /app/f5_tts_cache
+    gpus: all
     volumes: !override
       - tts_audio:/app/audio
-      - tts_logs:/app/logs
       - tts_cache:/app/f5_tts_cache
 
   qwen_tts:
@@ -116,6 +152,12 @@ services:
       context: ../../../nano-qwen3tts-vllm
       dockerfile: Dockerfile
     container_name: tts_qwen_service_local
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     ports: !override
       - "8012:8000"
     environment: !override
@@ -124,8 +166,13 @@ services:
       HF_HOME: /root/.cache/huggingface
       QWEN_VOICE_STORAGE_DIR: /app/runtime/qwen_voices
       QWEN_ALLOWED_MODELS: ${QWEN_ALLOWED_MODELS:-}
-      QWEN3_TTS_MODEL_PATH: ${QWEN3_TTS_MODEL_PATH:-}
+      QWEN3_TTS_MODEL_PATH: ${QWEN3_TTS_MODEL_PATH:-Qwen/Qwen3-TTS-12Hz-0.6B-Base}
       QWEN_TTS_ALLOWED_MODELS: ${QWEN_TTS_ALLOWED_MODELS:-}
+      QWEN_TTS_ENABLE_PREWARM: ${QWEN_TTS_ENABLE_PREWARM:-false}
+      QWEN_TTS_TOKENIZER_CUDAGRAPH_LENGTHS: ${QWEN_TTS_TOKENIZER_CUDAGRAPH_LENGTHS:-0}
+    volumes: !override
+      - qwen_hf_cache:/root/.cache/huggingface
+      - qwen_voice_storage:/app/runtime/qwen_voices
 
   frontend:
     build:
@@ -133,7 +180,15 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_LOCAL_TTS_AGENT_URL: http://localhost:46321
+        VITE_BOT_SERVICE_URL: http://localhost:8000
+        VITE_BOT_SERVICE_WS_URL: ws://localhost:8000
     container_name: tts_frontend_local
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+        compress: "true"
     ports: !override
       - "80:80"
     volumes: !override
@@ -149,11 +204,14 @@ volumes:
     driver: local
   tts_audio:
     driver: local
-  tts_logs:
-    driver: local
   tts_cache:
     driver: local
   qwen_hf_cache:
     driver: local
   qwen_voice_storage:
     driver: local
+
+networks:
+  default:
+    name: tts_network
+    driver: bridge

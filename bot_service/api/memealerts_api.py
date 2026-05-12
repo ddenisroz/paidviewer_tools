@@ -1,13 +1,13 @@
 """MemeAlerts API endpoints for grants, settings, and automation."""
 from typing import Literal, Optional
-from urllib.parse import quote, urlparse
+from urllib.parse import urlencode, urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from core.database import get_db
-from auth.auth import get_current_user, get_current_user_optional
 from core.config import settings
+from auth.auth import get_current_user, get_current_user_optional
 from repositories.user_token_repository import UserTokenRepository
 from services.memealerts_service import MemeAlertsService
 from core.token_encryption import encrypt_token, decrypt_token
@@ -20,6 +20,19 @@ router = APIRouter(prefix="/api/memealerts", tags=["memealerts"])
 
 MEMEALERTS_API_BASE = "https://memealerts.com/api"
 _MEMEALERTS_ALLOWED_AUTH_HOSTS = {"memealerts.com", "www.memealerts.com"}
+
+
+def _resolve_memealerts_callback_url() -> str:
+    base_candidates = [
+        str(getattr(settings, "frontend_url", "") or "").strip().rstrip("/"),
+        str(getattr(settings, "backend_url", "") or "").strip().rstrip("/"),
+    ]
+    for base_url in base_candidates:
+        if _is_safe_absolute_callback_url(base_url):
+            callback_url = f"{base_url}/memealerts/callback"
+            if _is_safe_absolute_callback_url(callback_url):
+                return callback_url
+    raise HTTPException(status_code=500, detail="Failed to resolve MemeAlerts callback URL")
 
 
 def _is_safe_absolute_callback_url(url: str) -> bool:
@@ -60,6 +73,19 @@ def decode_memealerts_token(token: str) -> dict:
     except jwt.PyJWTError:
         logger.exception("Failed to decode MemeAlerts token")
         raise ValueError("Invalid token format")
+
+
+def _extract_memealerts_streamer_id(decoded: dict, trusted_fallback: Optional[str] = None) -> Optional[str]:
+    """Pick the actual MemeAlerts streamer id from JWT claims."""
+    return (
+        decoded.get("streamer_id")
+        or decoded.get("streamerId")
+        or decoded.get("tid")
+        or decoded.get("user_id")
+        or decoded.get("sub")
+        or trusted_fallback
+        or decoded.get("id")
+    )
 
 
 class PlatformRewardSettingsPatch(BaseModel):
@@ -120,15 +146,7 @@ async def get_memealerts_status(
             try:
                 access_token = decrypt_token(token.access_token)
                 decoded = decode_memealerts_token(access_token) if access_token else {}
-                streamer_id = (
-                    decoded.get("id")
-                    or decoded.get("tid")
-                    or decoded.get("streamer_id")
-                    or decoded.get("streamerId")
-                    or decoded.get("user_id")
-                    or decoded.get("sub")
-                    or token.platform_user_id
-                )
+                streamer_id = _extract_memealerts_streamer_id(decoded, token.platform_user_id)
                 return {
                     "success": True, 
                     "connected": True,
@@ -160,29 +178,25 @@ async def get_memealerts_connect_url(
     user: dict = Depends(get_current_user),
 ):
     """
-    Build a single-click MemeAlerts OAuth URL.
-    Uses FRONTEND_URL as callback base to support public domain deployments.
+    Build the primary MemeAlerts OAuth URL with a same-origin callback page.
     """
     try:
-        frontend_base = (settings.frontend_url or "http://localhost:5173").rstrip("/")
-        if not _is_safe_absolute_callback_url(frontend_base):
-            logger.error("Unsafe FRONTEND_URL for MemeAlerts callback: %r", frontend_base)
-            raise HTTPException(status_code=503, detail="MemeAlerts integration is misconfigured")
-
-        callback_url = f"{frontend_base}/memealerts/callback"
+        _ = user
         provider = "twitch"
-        auth_url = (
-            f"https://memealerts.com/api/auth/{provider}"
-            f"?return_url={quote(callback_url, safe='')}"
-        )
-        if not _is_safe_memealerts_auth_url(auth_url):
+        callback_url = _resolve_memealerts_callback_url()
+        direct_auth_url = f"{MEMEALERTS_API_BASE}/auth/{provider}?{urlencode({'return_url': callback_url})}"
+        proxy_auth_url = f"/api/memealerts/proxy/api/auth/{provider}?{urlencode({'return_url': callback_url})}"
+        if not _is_safe_memealerts_auth_url(direct_auth_url):
             logger.error("Unsafe MemeAlerts auth URL generated")
             raise HTTPException(status_code=500, detail="Failed to generate secure auth URL")
         return {
             "success": True,
             "provider": provider,
+            "auth_url": direct_auth_url,
+            "direct_auth_url": direct_auth_url,
+            "proxy_auth_url": proxy_auth_url,
             "callback_url": callback_url,
-            "auth_url": auth_url,
+            "flow": "direct_popup_callback",
         }
     except HTTPException:
         raise
@@ -301,14 +315,7 @@ async def connect_memealerts(
         except ValueError:
             logger.warning("MemeAlerts token is not a decodable JWT; validation requires an existing streamer id")
 
-        claimed_streamer_id = (
-            decoded.get("id")
-            or decoded.get("tid")
-            or decoded.get("streamer_id")
-            or decoded.get("streamerId")
-            or decoded.get("user_id")
-            or decoded.get("sub")
-        )
+        claimed_streamer_id = _extract_memealerts_streamer_id(decoded)
         streamer_id = trusted_streamer_id or claimed_streamer_id
         token_scope = decoded.get("scope")
 

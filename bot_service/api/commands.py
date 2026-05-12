@@ -40,7 +40,7 @@ class CommandCreate(BaseModel):
     def sanitize_command_name(cls, value: str) -> str:
         if not value or not value.strip():
             raise ValueError("Command name cannot be empty")
-        return sanitize_input(value, max_length=20)
+        return sanitize_input(value.strip().lstrip("!"), max_length=50)
 
     @field_validator("response_text")
     @classmethod
@@ -51,6 +51,8 @@ class CommandCreate(BaseModel):
 class CommandUpdate(BaseModel):
     """Payload for updating a command."""
 
+    command_name: Optional[str] = None
+    alias: Optional[str] = None
     is_enabled: Optional[bool] = None
     platforms: Optional[str] = None
     allowed_roles: Optional[str] = None
@@ -64,6 +66,16 @@ class CommandUpdate(BaseModel):
         if value is not None:
             return sanitize_input(value, max_length=500)
         return value
+
+    @field_validator("command_name", "alias")
+    @classmethod
+    def sanitize_optional_trigger(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        cleaned = value.strip().lstrip("!")
+        if not cleaned:
+            return ""
+        return sanitize_input(cleaned, max_length=50)
 
 
 class CommandOverrideCreate(BaseModel):
@@ -212,8 +224,8 @@ async def create_command(
             db=db,
         )
         return result
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid command data")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Invalid command data")
     except HTTPException:
         raise
     except Exception:
@@ -243,7 +255,7 @@ async def update_command(
     except ValueError as exc:
         error_text = str(exc)
         status_code = 404 if _is_not_found_error(error_text) else 403 if _is_forbidden_error(error_text) else 400
-        raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
+        raise HTTPException(status_code=status_code, detail=error_text or _command_error_message(status_code))
     except HTTPException:
         raise
     except Exception:
@@ -276,7 +288,7 @@ async def create_command_override(
         return result
     except ValueError as exc:
         status_code = 404 if _is_not_found_error(str(exc)) else 400
-        raise HTTPException(status_code=status_code, detail=_command_error_message(status_code))
+        raise HTTPException(status_code=status_code, detail=str(exc) or _command_error_message(status_code))
     except HTTPException:
         raise
     except Exception:

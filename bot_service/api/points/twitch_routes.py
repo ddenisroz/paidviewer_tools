@@ -9,7 +9,6 @@ from core.database import get_db
 from services.platform_rewards_service import get_platform_rewards_service
 from auth.auth import get_current_user
 from core.security_modern import limiter
-# [Modified Import] Relative import or direct from api.points
 from api.points.routes import CreateRewardRequest
 
 logger = logging.getLogger('bot_service')
@@ -17,10 +16,16 @@ logger = logging.getLogger('bot_service')
 points_twitch_router = APIRouter(tags=["points_twitch"])
 
 TWITCH_REWARDS_REQUIRED_ROLE = "affiliate_or_partner"
-TWITCH_REWARDS_UNAVAILABLE_REASON = "Для создания наград нужен Twitch Affiliate или Partner"
+TWITCH_REWARDS_UNAVAILABLE_REASON = (
+    "Twitch разрешает создавать награды только для каналов со статусом Affiliate или Partner."
+)
 
 
-def _twitch_rewards_capability_response(can_create: bool, reason: str | None, rewards: list | None = None) -> JSONResponse:
+def _twitch_rewards_capability_response(
+    can_create: bool,
+    reason: str | None,
+    rewards: list | None = None,
+) -> JSONResponse:
     return JSONResponse(content={
         "success": True,
         "platform": "twitch",
@@ -42,20 +47,15 @@ async def get_twitch_rewards(
     """Get Twitch channel rewards."""
     try:
         rewards = await get_platform_rewards_service().get_rewards(user['id'], 'twitch', db)
-        
         return _twitch_rewards_capability_response(True, None, rewards)
-
     except HTTPException as exc:
         if exc.status_code == 403:
-            return _twitch_rewards_capability_response(
-                False,
-                TWITCH_REWARDS_UNAVAILABLE_REASON,
-                [],
-            )
+            return _twitch_rewards_capability_response(False, TWITCH_REWARDS_UNAVAILABLE_REASON, [])
         raise
     except Exception:
         logger.exception("[ERROR] [TWITCH REWARDS] Error")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @points_twitch_router.post("/rewards/twitch/create")
 @limiter.limit("10/minute")
@@ -70,7 +70,7 @@ async def create_twitch_reward(
         result = await get_platform_rewards_service().create_reward(
             user['id'], 'twitch', reward_data.dict(), db
         )
-        
+
         return {
             "success": True,
             "platform": "twitch",
@@ -82,6 +82,7 @@ async def create_twitch_reward(
     except Exception:
         logger.exception("Error creating Twitch reward")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @points_twitch_router.patch("/rewards/twitch/{reward_id}")
 async def update_twitch_reward(
@@ -108,6 +109,7 @@ async def update_twitch_reward(
         logger.exception("Error updating Twitch reward")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 @points_twitch_router.delete("/rewards/twitch/{reward_id}")
 async def delete_twitch_reward(
     reward_id: str,
@@ -130,6 +132,7 @@ async def delete_twitch_reward(
         logger.exception("Error deleting Twitch reward")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 @points_twitch_router.get("/platform/rewards")
 async def get_platform_rewards(
     platform: str,
@@ -151,6 +154,7 @@ async def get_platform_rewards(
     except Exception:
         logger.exception("Error getting platform rewards")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @points_twitch_router.post("/platform/rewards/create")
 async def create_platform_reward(
@@ -177,6 +181,7 @@ async def create_platform_reward(
         logger.exception("Error creating platform reward")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 @points_twitch_router.delete("/platform/rewards/{reward_id}")
 async def delete_platform_reward(
     platform: str,
@@ -198,6 +203,7 @@ async def delete_platform_reward(
     except Exception:
         logger.exception("Error deleting platform reward")
         raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @points_twitch_router.get("/platform/redemptions")
 async def get_platform_redemptions(
@@ -225,6 +231,7 @@ async def get_platform_redemptions(
         logger.exception("Error getting platform redemptions")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 @points_twitch_router.patch("/platform/redemptions/{redemption_id}")
 async def update_platform_redemption(
     platform: str,
@@ -241,8 +248,8 @@ async def update_platform_redemption(
         )
 
         if not success:
-              raise HTTPException(status_code=500, detail="Failed to update the status.")
-             
+            raise HTTPException(status_code=500, detail="Failed to update the status.")
+
         return {
             "success": True,
             "message": f"Status updated: {status}"

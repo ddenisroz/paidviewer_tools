@@ -11,6 +11,14 @@ class _RewardsAvailableService:
         return [{"id": "reward-1", "title": "Test reward", "cost": 100}]
 
 
+class _VkRewardsUnavailableService:
+    async def get_rewards(self, user_id, platform, db):
+        raise HTTPException(
+            status_code=403,
+            detail="У токена VK Live не хватает прав: channel:points:rewards. Переавторизуйте интеграцию VK Live.",
+        )
+
+
 def test_twitch_rewards_forbidden_returns_disabled_capability(authenticated_client, monkeypatch):
     monkeypatch.setattr(
         "api.points.twitch_routes.get_platform_rewards_service",
@@ -26,7 +34,7 @@ def test_twitch_rewards_forbidden_returns_disabled_capability(authenticated_clie
     assert data["rewards"] == []
     assert data["capability"] == {
         "can_create": False,
-        "reason": "Для создания наград нужен Twitch Affiliate или Partner",
+        "reason": "Twitch разрешает создавать награды только для каналов со статусом Affiliate или Partner.",
         "required_role": "affiliate_or_partner",
         "platform": "twitch",
     }
@@ -49,4 +57,25 @@ def test_twitch_rewards_available_returns_enabled_capability(authenticated_clien
         "reason": None,
         "required_role": "affiliate_or_partner",
         "platform": "twitch",
+    }
+
+
+def test_vk_rewards_forbidden_returns_disabled_capability(authenticated_client, monkeypatch):
+    monkeypatch.setattr(
+        "api.points.vk_routes.get_platform_rewards_service",
+        lambda: _VkRewardsUnavailableService(),
+    )
+
+    response = authenticated_client.get("/api/points/rewards/vk")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["platform"] == "vk"
+    assert data["rewards"] == []
+    assert data["capability"] == {
+        "can_create": False,
+        "reason": "У токена VK Live не хватает прав: channel:points:rewards. Переавторизуйте интеграцию VK Live.",
+        "required_role": "channel_owner",
+        "platform": "vk",
     }

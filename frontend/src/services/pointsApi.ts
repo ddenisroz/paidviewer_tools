@@ -1,101 +1,104 @@
-﻿import { API_BASE_URL } from '@/constants';
+import { apiClient } from '@/services/api/client';
+
+import type { AxiosError, AxiosResponse } from 'axios';
 
 type Platform = 'twitch' | 'vk';
 
 interface ApiError extends Error {
-  status?: number;
-  response?: Response;
+    status?: number;
+    response?: { status?: number };
 }
 
-async function handleJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
-  if (response.ok) {
-    return response.json() as Promise<T>;
-  }
-  let errorMessage = fallbackMessage;
-  try {
-    const errorData = await response.json() as { detail?: string; message?: string };
-    errorMessage = errorData?.detail || errorData?.message || fallbackMessage;
-  } catch {
+async function handleApiResponse<T>(request: Promise<AxiosResponse<T>>, fallbackMessage: string): Promise<T> {
     try {
-      const text = await response.text();
-      errorMessage = text || fallbackMessage;
-    } catch {
-      // ignore
+        const response = await request;
+        return response.data;
+    } catch (err) {
+        const axiosError = err as AxiosError<{ detail?: string | { message?: string }; message?: string } | string>;
+        const responseData = axiosError.response?.data;
+        let errorMessage = fallbackMessage;
+
+        if (typeof responseData === 'string' && responseData.trim()) {
+            errorMessage = responseData;
+        } else if (responseData && typeof responseData === 'object') {
+            const detail = responseData.detail;
+            if (typeof detail === 'string' && detail.trim()) {
+                errorMessage = detail;
+            } else if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+                errorMessage = detail.message;
+            } else {
+                errorMessage = responseData.message || fallbackMessage;
+            }
+        } else if (err instanceof Error && err.message) {
+            errorMessage = err.message;
+        }
+
+        if (
+            axiosError.response?.status === 403 &&
+            /partner|affiliate|channel.?points|broadcaster/i.test(errorMessage)
+        ) {
+            errorMessage =
+                'Twitch разрешает создавать награды только для каналов со статусом Affiliate или Partner. Это ограничение Twitch, приложение работает корректно.';
+        }
+
+        const error: ApiError = new Error(errorMessage);
+        error.status = axiosError.response?.status;
+        error.response = axiosError.response ? { status: axiosError.response.status } : undefined;
+        throw error;
     }
-  }
-  const error: ApiError = new Error(errorMessage);
-  error.status = response.status;
-  error.response = response;
-  throw error;
 }
 
 class PointsAPI {
-  async getRewards<T = unknown>(platform: Platform): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}`, {
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    return handleJsonResponse<T>(response, `Failed to load ${platform} rewards`);
-  }
+    async getRewards<T = unknown>(platform: Platform): Promise<T> {
+        return handleApiResponse<T>(
+            apiClient.get<T>(`/api/points/rewards/${platform}`),
+            `Failed to load ${platform} rewards`
+        );
+    }
 
-  async createReward<T = unknown>(platform: Platform, rewardData: Record<string, unknown>): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/create`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rewardData),
-    });
-    return handleJsonResponse<T>(response, 'Failed to create reward');
-  }
+    async createReward<T = unknown>(platform: Platform, rewardData: Record<string, unknown>): Promise<T> {
+        return handleApiResponse<T>(
+            apiClient.post<T>(`/api/points/rewards/${platform}/create`, rewardData),
+            'Failed to create reward'
+        );
+    }
 
-  async updateReward<T = unknown>(platform: Platform, rewardId: string, rewardData: Record<string, unknown>): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(rewardData),
-    });
-    return handleJsonResponse<T>(response, 'Failed to update reward');
-  }
+    async updateReward<T = unknown>(
+        platform: Platform,
+        rewardId: string,
+        rewardData: Record<string, unknown>
+    ): Promise<T> {
+        return handleApiResponse<T>(
+            apiClient.patch<T>(`/api/points/rewards/${platform}/${rewardId}`, rewardData),
+            'Failed to update reward'
+        );
+    }
 
-  async deleteReward<T = unknown>(platform: Platform, rewardId: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
-    return handleJsonResponse<T>(response, 'Failed to delete reward');
-  }
+    async deleteReward<T = unknown>(platform: Platform, rewardId: string): Promise<T> {
+        return handleApiResponse<T>(
+            apiClient.delete<T>(`/api/points/rewards/${platform}/${rewardId}`),
+            'Failed to delete reward'
+        );
+    }
 
-  async toggleReward<T = unknown>(platform: Platform, rewardId: string, isEnabled: boolean): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}/api/points/rewards/${platform}/${rewardId}/toggle`, {
-      method: 'PATCH',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_enabled: isEnabled }),
-    });
-    return handleJsonResponse<T>(response, 'Failed to toggle reward');
-  }
+    async toggleReward<T = unknown>(platform: Platform, rewardId: string, isEnabled: boolean): Promise<T> {
+        return handleApiResponse<T>(
+            apiClient.patch<T>(`/api/points/rewards/${platform}/${rewardId}/toggle`, { is_enabled: isEnabled }),
+            'Failed to toggle reward'
+        );
+    }
 
-  async getVKDemands<T = unknown>(): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/demands`, {
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    return handleJsonResponse<T>(response, 'Failed to load VK demands');
-  }
+    async getVKDemands<T = unknown>(): Promise<T> {
+        return handleApiResponse<T>(apiClient.get<T>('/api/points/rewards/vk/demands'), 'Failed to load VK demands');
+    }
 
-  async processVKDemands<T = unknown>(action: 'accept' | 'reject', demandIds: string[]): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}/api/points/rewards/vk/demands/process`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, demand_ids: demandIds }),
-    });
-    return handleJsonResponse<T>(response, 'Failed to process demands');
-  }
+    async processVKDemands<T = unknown>(action: 'accept' | 'reject', demandIds: string[]): Promise<T> {
+        return handleApiResponse<T>(
+            apiClient.post<T>('/api/points/rewards/vk/demands/process', { action, demand_ids: demandIds }),
+            'Failed to process demands'
+        );
+    }
 }
 
 export const pointsApi = new PointsAPI();
 export default pointsApi;
-
-

@@ -3,30 +3,74 @@
 import { useAuth } from '@/context/AuthContext';
 import { useChat } from '@/context/ChatContext';
 import MessageContent from '@/features/chat/components/MessageContent';
+import ColorInput from '@/features/chatbox/components/ColorInputPickerOnly';
+import {
+    extractSettingsFromResponse,
+    loadGoogleFont,
+    normalizeChatBoxSettings,
+} from '@/features/chatbox/utils/chatboxHelpers';
 import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
+import { chatboxService } from '@/services/api/services/chatboxService';
 import { twitchBadgesService } from '@/services/twitchBadges';
+import { Input } from '@/shared/components/ui/input';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { logger } from '@/shared/utils/prodLogger';
 
+import type { ChatBoxSettings } from '@/types/chatbox';
 import type { ChatMessage } from '@/types/chat';
 
-interface ChatSettings {
-    font_size: number;
-    font_family: string;
-    text_color: string;
-    background_color: string;
-    show_platform_icons: boolean;
-    show_badges: boolean;
-    max_messages: number;
-    show_7tv_emotes: boolean;
-    show_links: boolean;
-    auto_load_images: boolean;
-}
+type ChatWindowSettings = ChatBoxSettings & {
+    show_timestamps: boolean;
+};
 
 interface Emotes {
     channelEmotes: Map<string, unknown>;
     globalEmotes: Map<string, unknown>;
 }
+
+const CHAT_WINDOW_FONT_OPTIONS = [
+    'Inter',
+    'Roboto',
+    'Montserrat',
+    'Oswald',
+    'Ubuntu',
+    'Russo One',
+    'Rubik',
+    'Bebas Neue',
+    'JetBrains Mono',
+];
+
+const DEFAULT_CHAT_SETTINGS: ChatWindowSettings = {
+    ...normalizeChatBoxSettings({
+    font_size: 14,
+    font_family: 'Inter',
+    text_color: '#FFFFFF',
+    username_color: '#9147FF',
+    background_color: '#1A1A1A',
+    background_opacity: 1,
+    message_spacing: 2,
+    show_platform_icons: true,
+    show_badges: true,
+    max_messages: 50,
+    show_7tv_emotes: true,
+    show_links: true,
+    auto_load_images: true,
+    show_roles: false,
+    show_avatars: false,
+    font_weight: 'normal',
+    text_stroke_width: 0,
+    text_stroke_color: '#000000',
+    animation_type: 'fade',
+    animation_duration: 300,
+    message_fade_seconds: 60,
+    chat_direction: 'vertical',
+    chat_width: 100,
+    border_radius: 8,
+    widget_url: '',
+    version: 1,
+    }),
+    show_timestamps: false,
+};
 
 const normalizeVkAssetUrl = (url?: string): string => {
     if (!url) return '';
@@ -39,45 +83,86 @@ const ChatWindow: React.FC = () => {
     const { user, isAuthenticated } = useAuth();
     const { messages, isConnected } = useChat();
 
-    // [OK] Настройки чата - сохраняются в localStorage для UI-состояния
-    const [settings, setSettings] = useState<ChatSettings>(() => {
-        try {
-            const saved = localStorage.getItem('chatWindowSettings');
-            if (saved) {
-                return JSON.parse(saved);
-            }
-        } catch (e) {
-            logger.error('Failed to load chat window settings:', e);
-        }
-        return {
-            font_size: 14,
-            font_family: 'Inter, sans-serif',
-            text_color: '#FFFFFF',
-            background_color: '#1a1a1a',
-            show_platform_icons: true,
-            show_badges: true,
-            max_messages: 50,
-            show_7tv_emotes: true,
-            show_links: true,
-            auto_load_images: true
-        };
-    });
-
+    const [settings, setSettings] = useState<ChatWindowSettings>(DEFAULT_CHAT_SETTINGS);
     const [showSettings, setShowSettings] = useState<boolean>(false);
-
-    // Сохраняем настройки в localStorage при изменении
-    useEffect(() => {
-        try {
-            localStorage.setItem('chatWindowSettings', JSON.stringify(settings));
-        } catch (e) {
-            logger.error('Failed to save chat window settings:', e);
-        }
-    }, [settings]);
+    const [, setFontVersion] = useState(0);
+    const [fontStatus, setFontStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [badgesLoaded, setBadgesLoaded] = useState<boolean>(false);
     const [emotes, setEmotes] = useState<Emotes>({ channelEmotes: new Map(), globalEmotes: new Map() });
     const twitchUserId = (user?.integrations?.twitch as { platform_user_id?: string })?.platform_user_id;
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            return;
+        }
+
+        let active = true;
+        void chatboxService
+            .getSettings()
+            .then((response) => {
+                if (!active) {
+                    return;
+                }
+                const sharedSettings = normalizeChatBoxSettings(
+                    extractSettingsFromResponse(response as never) as Partial<ChatBoxSettings>
+                );
+                setSettings((prev) => ({ ...prev, ...sharedSettings }));
+            })
+            .catch((error) => {
+                logger.error('Failed to load shared chat settings:', error);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [isAuthenticated]);
+
+    useEffect(() => {
+        if (!settings.font_family) {
+            setFontStatus('idle');
+            return;
+        }
+
+        let active = true;
+        setFontStatus('loading');
+        loadGoogleFont(settings.font_family);
+        if (typeof document === 'undefined' || !('fonts' in document)) {
+            setFontStatus('ready');
+            setFontVersion((prev) => prev + 1);
+            return;
+        }
+
+        const primaryFont = settings.font_family.split(',')[0]?.trim() || settings.font_family;
+        Promise.allSettled([
+            document.fonts.load(`${settings.font_weight || 'normal'} ${settings.font_size}px "${primaryFont}"`),
+            document.fonts.ready,
+        ]).finally(() => {
+            if (active) {
+                setFontStatus('ready');
+                setFontVersion((prev) => prev + 1);
+            }
+        });
+
+        return () => {
+            active = false;
+        };
+    }, [settings.font_family, settings.font_size, settings.font_weight]);
+
+    const updateSettings = (patch: Partial<ChatWindowSettings>): void => {
+        setSettings((prev) => {
+            const next = {
+                ...prev,
+                ...normalizeChatBoxSettings({ ...prev, ...patch }),
+                ...patch,
+            };
+            void chatboxService.saveSettings(next as unknown as Record<string, unknown>).catch((error) => {
+                logger.error('Failed to save shared chat settings:', error);
+            });
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (!settings.show_badges) {
@@ -89,9 +174,10 @@ const ChatWindow: React.FC = () => {
             return;
         }
 
-        twitchBadgesService.loadGlobalBadges()
+        twitchBadgesService
+            .loadGlobalBadges()
             .then(() => setBadgesLoaded(true))
-            .catch(err => logger.error('Failed to load badges:', err));
+            .catch((err) => logger.error('Failed to load badges:', err));
     }, [badgesLoaded, settings.show_badges]);
 
     useEffect(() => {
@@ -102,8 +188,8 @@ const ChatWindow: React.FC = () => {
 
         if (user?.twitch_username) {
             getAllEmotesForChannel(user.twitch_username, twitchUserId)
-                .then(data => setEmotes(data))
-                .catch(err => logger.error('Failed to load 7TV emotes:', err));
+                .then((data) => setEmotes(data))
+                .catch((err) => logger.error('Failed to load 7TV emotes:', err));
         }
     }, [settings.show_7tv_emotes, user?.twitch_username, twitchUserId]);
 
@@ -139,50 +225,60 @@ const ChatWindow: React.FC = () => {
     }, [messages.length]);
 
     const displayMessages = messages.slice(-settings.max_messages);
+    const backgroundOpacity = typeof settings.background_opacity === 'number' ? settings.background_opacity : 1;
+    const messageSpacing = typeof settings.message_spacing === 'number' ? settings.message_spacing : 2;
+    const windowBackground =
+        backgroundOpacity >= 1
+            ? settings.background_color
+            : `${settings.background_color}${Math.round(backgroundOpacity * 255).toString(16).padStart(2, '0')}`;
 
     if (!isAuthenticated) {
         return (
-            <div style={{
-                width: '100vw',
-                height: '100vh',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                color: '#fff',
-                fontFamily: 'Inter, sans-serif',
-                gap: '16px'
-            }}>
+            <div
+                style={{
+                    width: '100vw',
+                    height: '100vh',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    color: '#fff',
+                    fontFamily: 'Inter, sans-serif',
+                    gap: '16px',
+                }}
+            >
                 <div style={{ fontSize: '48px' }}>[AUTH]</div>
                 <div style={{ fontSize: '18px' }}>Требуется авторизация</div>
-                <div style={{ fontSize: '14px', opacity: 0.7 }}>
-                    Пожалуйста, войдите в систему
-                </div>
+                <div style={{ fontSize: '14px', opacity: 0.7 }}>Пожалуйста, войдите в систему</div>
             </div>
         );
     }
 
     return (
-        <div style={{
-            width: '100vw',
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            backgroundColor: settings.background_color,
-            fontFamily: settings.font_family,
-            fontSize: `${settings.font_size}px`,
-            color: settings.text_color,
-            overflow: 'hidden'
-        }}>
-            <div style={{
-                padding: '10px 12px',
-                borderBottom: '1px solid #333',
+        <div
+            style={{
+                width: '100vw',
+                height: '100vh',
                 display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                backgroundColor: '#111'
-            }}>
+                flexDirection: 'column',
+                backgroundColor: windowBackground,
+                fontFamily: settings.font_family,
+                fontSize: `${settings.font_size}px`,
+                color: settings.text_color,
+                overflow: 'hidden',
+            }}
+        >
+            <div
+                style={{
+                    padding: '10px 12px',
+                    borderBottom: '1px solid #333',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#111',
+                }}
+            >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ fontSize: '24px' }}>[CHAT]</div>
                     <div>
@@ -206,26 +302,32 @@ const ChatWindow: React.FC = () => {
                             display: 'flex',
                             alignItems: 'center',
                             gap: '6px',
-                            transition: 'all 0.2s'
+                            transition: 'all 0.2s',
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#4a5568'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = showSettings ? '#4a5568' : 'transparent'}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = '#4a5568')}
+                        onMouseLeave={(e) =>
+                            (e.currentTarget.style.background = showSettings ? '#4a5568' : 'transparent')
+                        }
                     >
                         Настройки
                     </button>
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        fontSize: '12px',
-                        opacity: 0.7
-                    }}>
-                        <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            backgroundColor: isConnected ? '#00ff00' : '#ff0000'
-                        }} />
+                    <div
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            fontSize: '12px',
+                            opacity: 0.7,
+                        }}
+                    >
+                        <div
+                            style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                backgroundColor: isConnected ? '#00ff00' : '#ff0000',
+                            }}
+                        />
                         {isConnected ? 'Подключено' : 'Отключено'}
                     </div>
                 </div>
@@ -233,85 +335,99 @@ const ChatWindow: React.FC = () => {
 
             {/* Панель настроек */}
             {showSettings && (
-                <div style={{
-                    padding: '16px',
-                    borderBottom: '1px solid #333',
-                    backgroundColor: '#1a1a1a',
-                    maxHeight: '300px',
-                    overflowY: 'auto'
-                }}>
+                <div
+                    style={{
+                        padding: '16px',
+                        borderBottom: '1px solid #333',
+                        backgroundColor: '#1a1a1a',
+                        maxHeight: '300px',
+                        overflowY: 'auto',
+                    }}
+                >
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', fontSize: '13px' }}>
                         <div>
-                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Размер шрифта</label>
-                            <input
-                                type="number"
-                                value={settings.font_size}
-                                onChange={(e) => setSettings({ ...settings, font_size: parseInt(e.target.value) || 14 })}
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Шрифт</label>
+                            <select
+                                value={settings.font_family}
+                                onChange={(e) => updateSettings({ font_family: e.target.value })}
                                 style={{
                                     width: '100%',
                                     padding: '6px 8px',
                                     background: '#2d3748',
                                     border: '1px solid #4a5568',
                                     borderRadius: '4px',
-                                    color: '#fff'
+                                    color: '#fff',
                                 }}
-                                min="10"
-                                max="24"
-                            />
+                            >
+                                {CHAT_WINDOW_FONT_OPTIONS.map((font) => (
+                                    <option key={font} value={font}>
+                                        {font}
+                                    </option>
+                                ))}
+                            </select>
+                            <div style={{ marginTop: '6px', fontSize: '11px', opacity: 0.65 }}>
+                                {fontStatus === 'loading'
+                                    ? 'Подгружаем шрифт...'
+                                    : 'Шрифт синхронизирован с общими настройками чата'}
+                            </div>
                         </div>
 
                         <div>
-                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Макс. сообщений</label>
-                            <input
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>
+                                Макс. сообщений
+                            </label>
+                            <Input
                                 type="number"
                                 value={settings.max_messages}
-                                onChange={(e) => setSettings({ ...settings, max_messages: parseInt(e.target.value) || 50 })}
-                                style={{
-                                    width: '100%',
-                                    padding: '6px 8px',
-                                    background: '#2d3748',
-                                    border: '1px solid #4a5568',
-                                    borderRadius: '4px',
-                                    color: '#fff'
-                                }}
+                                onChange={(e) => updateSettings({ max_messages: parseInt(e.target.value, 10) || 50 })}
+                                className="border-slate-600 bg-slate-800 text-white"
                                 min="10"
                                 max="200"
                             />
                         </div>
 
                         <div>
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Размер шрифта</label>
+                            <Input
+                                type="number"
+                                value={settings.font_size}
+                                onChange={(e) => updateSettings({ font_size: parseInt(e.target.value, 10) || 14 })}
+                                className="border-slate-600 bg-slate-800 text-white"
+                                min="10"
+                                max="24"
+                            />
+                        </div>
+
+                        <div>
                             <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Цвет текста</label>
-                            <input
-                                type="color"
-                                value={settings.text_color}
-                                onChange={(e) => setSettings({ ...settings, text_color: e.target.value })}
-                                style={{
-                                    width: '100%',
-                                    height: '32px',
-                                    padding: '2px',
-                                    background: '#2d3748',
-                                    border: '1px solid #4a5568',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                }}
+                            <ColorInput
+                                value={settings.text_color || '#FFFFFF'}
+                                onChange={(value) => updateSettings({ text_color: value })}
                             />
                         </div>
 
                         <div>
                             <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>Цвет фона</label>
+                            <ColorInput
+                                value={settings.background_color || '#1A1A1A'}
+                                onChange={(value) => updateSettings({ background_color: value })}
+                                opacity={Math.round(backgroundOpacity * 100)}
+                                onOpacityChange={(value) => updateSettings({ background_opacity: value / 100 })}
+                            />
+                        </div>
+
+                        <div>
+                            <label style={{ display: 'block', marginBottom: '6px', opacity: 0.8 }}>
+                                Интервал сообщений: {messageSpacing}px
+                            </label>
                             <input
-                                type="color"
-                                value={settings.background_color}
-                                onChange={(e) => setSettings({ ...settings, background_color: e.target.value })}
-                                style={{
-                                    width: '100%',
-                                    height: '32px',
-                                    padding: '2px',
-                                    background: '#2d3748',
-                                    border: '1px solid #4a5568',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer'
-                                }}
+                                type="range"
+                                value={messageSpacing}
+                                onChange={(e) => updateSettings({ message_spacing: Number(e.target.value) })}
+                                min="0"
+                                max="16"
+                                step="1"
+                                style={{ width: '100%' }}
                             />
                         </div>
                     </div>
@@ -321,7 +437,7 @@ const ChatWindow: React.FC = () => {
                             <input
                                 type="checkbox"
                                 checked={settings.show_platform_icons}
-                                onChange={(e) => setSettings({ ...settings, show_platform_icons: e.target.checked })}
+                                onChange={(e) => updateSettings({ show_platform_icons: e.target.checked })}
                                 style={{ cursor: 'pointer' }}
                             />
                             <span style={{ fontSize: '13px' }}>Показывать иконки платформ</span>
@@ -331,7 +447,7 @@ const ChatWindow: React.FC = () => {
                             <input
                                 type="checkbox"
                                 checked={settings.show_badges}
-                                onChange={(e) => setSettings({ ...settings, show_badges: e.target.checked })}
+                                onChange={(e) => updateSettings({ show_badges: e.target.checked })}
                                 style={{ cursor: 'pointer' }}
                             />
                             <span style={{ fontSize: '13px' }}>Показывать значки</span>
@@ -340,8 +456,18 @@ const ChatWindow: React.FC = () => {
                         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
                             <input
                                 type="checkbox"
+                                checked={settings.show_timestamps ?? false}
+                                onChange={(e) => updateSettings({ show_timestamps: e.target.checked })}
+                                style={{ cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '13px' }}>Показывать время</span>
+                        </label>
+
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <input
+                                type="checkbox"
                                 checked={settings.show_7tv_emotes}
-                                onChange={(e) => setSettings({ ...settings, show_7tv_emotes: e.target.checked })}
+                                onChange={(e) => updateSettings({ show_7tv_emotes: e.target.checked })}
                                 style={{ cursor: 'pointer' }}
                             />
                             <span style={{ fontSize: '13px' }}>Показывать 7TV смайлики</span>
@@ -351,7 +477,7 @@ const ChatWindow: React.FC = () => {
                             <input
                                 type="checkbox"
                                 checked={settings.show_links}
-                                onChange={(e) => setSettings({ ...settings, show_links: e.target.checked })}
+                                onChange={(e) => updateSettings({ show_links: e.target.checked })}
                                 style={{ cursor: 'pointer' }}
                             />
                             <span style={{ fontSize: '13px' }}>Показывать ссылки</span>
@@ -361,7 +487,7 @@ const ChatWindow: React.FC = () => {
                             <input
                                 type="checkbox"
                                 checked={settings.auto_load_images}
-                                onChange={(e) => setSettings({ ...settings, auto_load_images: e.target.checked })}
+                                onChange={(e) => updateSettings({ auto_load_images: e.target.checked })}
                                 style={{ cursor: 'pointer' }}
                             />
                             <span style={{ fontSize: '13px' }}>Автоматически загружать картинки</span>
@@ -370,22 +496,26 @@ const ChatWindow: React.FC = () => {
                 </div>
             )}
 
-            <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                padding: '4px 8px',
-                display: 'flex',
-                flexDirection: 'column'
-            }}>
+            <div
+                style={{
+                    flex: 1,
+                    overflowY: 'auto',
+                    padding: '4px 8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                }}
+            >
                 {displayMessages.length === 0 ? (
-                    <div style={{
-                        flex: 1,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: 0.5,
-                        textAlign: 'center'
-                    }}>
+                    <div
+                        style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            opacity: 0.5,
+                            textAlign: 'center',
+                        }}
+                    >
                         <div>
                             <div style={{ fontSize: '48px', marginBottom: '16px' }}>[CHAT]</div>
                             <div>Ожидание сообщений...</div>
@@ -406,36 +536,39 @@ const ChatWindow: React.FC = () => {
                                 gap: '4px',
                                 lineHeight: 1,
                                 verticalAlign: 'text-bottom',
-                                marginRight: '6px'
+                                marginRight: '6px',
                             };
                             const showMeta = Boolean(
                                 settings.show_platform_icons ||
-                                (settings.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0)
+                                (settings.show_badges &&
+                                    msg.badges &&
+                                    Array.isArray(msg.badges) &&
+                                    msg.badges.length > 0)
                             );
 
                             return (
                                 <div
                                     key={msg.id || `${msg.platform}-${msg.timestamp}-${msg.author_name || msg.author}`}
                                     style={{
-                                        marginTop: index > 0 ? '2px' : '0',
+                                        marginTop: index > 0 ? `${messageSpacing}px` : '0',
                                         padding: '3px 6px',
                                         backgroundColor: 'rgba(255, 255, 255, 0.05)',
                                         borderRadius: '4px',
                                         wordBreak: 'break-word',
-                                        lineHeight: 1.35
+                                        lineHeight: 1.35,
                                     }}
                                 >
                                     {showMeta && (
                                         <span style={metaGroupStyle}>
-                                            {settings.show_platform_icons && (
-                                                msg.platform === 'twitch' ? (
+                                            {settings.show_platform_icons &&
+                                                (msg.platform === 'twitch' ? (
                                                     <TwitchIcon
                                                         style={{
                                                             color: '#9146FF',
                                                             width: `${iconSize}px`,
                                                             height: `${iconSize}px`,
                                                             display: 'inline-block',
-                                                            verticalAlign: 'text-bottom'
+                                                            verticalAlign: 'text-bottom',
                                                         }}
                                                     />
                                                 ) : (
@@ -445,73 +578,94 @@ const ChatWindow: React.FC = () => {
                                                             width: `${iconSize - 2}px`,
                                                             height: `${iconSize - 2}px`,
                                                             display: 'inline-block',
-                                                            verticalAlign: 'text-bottom'
+                                                            verticalAlign: 'text-bottom',
                                                         }}
                                                     />
-                                                )
-                                            )}
+                                                ))}
 
-                                            {settings.show_badges && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
-                                                <>
-                                                    {msg.badges.map((badge: string, idx: number) => {
-                                                        if (msg.platform === 'vk') {
-                                                            const badgeUrl = normalizeVkAssetUrl(badge);
+                                            {settings.show_badges &&
+                                                msg.badges &&
+                                                Array.isArray(msg.badges) &&
+                                                msg.badges.length > 0 && (
+                                                    <>
+                                                        {msg.badges.map((badge: string, idx: number) => {
+                                                            if (msg.platform === 'vk') {
+                                                                const badgeUrl = normalizeVkAssetUrl(badge);
+                                                                if (!badgeUrl) return null;
+                                                                return (
+                                                                    <img
+                                                                        key={idx}
+                                                                        src={badgeUrl}
+                                                                        alt="vk-badge"
+                                                                        title={badge}
+                                                                        style={{
+                                                                            width: `${badgeSize}px`,
+                                                                            height: `${badgeSize}px`,
+                                                                            objectFit: 'contain',
+                                                                            display: 'inline-block',
+                                                                            verticalAlign: 'text-bottom',
+                                                                        }}
+                                                                        onError={(e) => {
+                                                                            (
+                                                                                e.target as HTMLImageElement
+                                                                            ).style.display = 'none';
+                                                                        }}
+                                                                    />
+                                                                );
+                                                            }
+
+                                                            const [badgeId, version] = badge.split('/');
+                                                            const badgeUrl = twitchBadgesService.getBadgeUrl(
+                                                                badgeId,
+                                                                version,
+                                                                '1x'
+                                                            );
+
                                                             if (!badgeUrl) return null;
+
                                                             return (
                                                                 <img
                                                                     key={idx}
                                                                     src={badgeUrl}
-                                                                    alt="vk-badge"
+                                                                    alt={badgeId}
                                                                     title={badge}
                                                                     style={{
                                                                         width: `${badgeSize}px`,
                                                                         height: `${badgeSize}px`,
                                                                         objectFit: 'contain',
                                                                         display: 'inline-block',
-                                                                        verticalAlign: 'text-bottom'
+                                                                        verticalAlign: 'text-bottom',
                                                                     }}
                                                                     onError={(e) => {
-                                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                                        (e.target as HTMLImageElement).style.display =
+                                                                            'none';
                                                                     }}
                                                                 />
                                                             );
-                                                        }
-
-                                                        const [badgeId, version] = badge.split('/');
-                                                        const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
-
-                                                        if (!badgeUrl) return null;
-
-                                                        return (
-                                                            <img
-                                                                key={idx}
-                                                                src={badgeUrl}
-                                                                alt={badgeId}
-                                                                title={badge}
-                                                                style={{
-                                                                    width: `${badgeSize}px`,
-                                                                    height: `${badgeSize}px`,
-                                                                    objectFit: 'contain',
-                                                                    display: 'inline-block',
-                                                                    verticalAlign: 'text-bottom'
-                                                                }}
-                                                                onError={(e) => {
-                                                                    (e.target as HTMLImageElement).style.display = 'none';
-                                                                }}
-                                                            />
-                                                        );
-                                                    })}
-                                                </>
-                                            )}
-
+                                                        })}
+                                                    </>
+                                                )}
                                         </span>
                                     )}
 
-                                    <span style={{
-                                        color: msg.platform === 'twitch' ? '#9146FF' : '#FF4444',
-                                        fontWeight: '600',
-                                        marginRight: '4px'
-                                    }}>
+                                    {settings.show_timestamps && (
+                                        <span style={{ marginRight: '6px', color: 'rgba(255,255,255,0.45)' }}>
+                                            {msg.timestamp
+                                                ? new Date(msg.timestamp).toLocaleTimeString('ru-RU', {
+                                                      hour: '2-digit',
+                                                      minute: '2-digit',
+                                                  })
+                                                : ''}
+                                        </span>
+                                    )}
+
+                                    <span
+                                        style={{
+                                            color: msg.platform === 'twitch' ? '#9146FF' : '#FF4444',
+                                            fontWeight: '600',
+                                            marginRight: '4px',
+                                        }}
+                                    >
                                         {msg.author_name || msg.author}:
                                     </span>
 
@@ -533,15 +687,17 @@ const ChatWindow: React.FC = () => {
                 )}
             </div>
 
-            <div style={{
-                padding: '8px 12px',
-                borderTop: '1px solid #333',
-                backgroundColor: '#111',
-                fontSize: '11px',
-                opacity: 0.6,
-                textAlign: 'center'
-            }}>
-                    Это окно использует общее WebSocket соединение (Leader Election)
+            <div
+                style={{
+                    padding: '8px 12px',
+                    borderTop: '1px solid #333',
+                    backgroundColor: '#111',
+                    fontSize: '11px',
+                    opacity: 0.6,
+                    textAlign: 'center',
+                }}
+            >
+                Это окно использует общее WebSocket соединение (Leader Election)
             </div>
         </div>
     );

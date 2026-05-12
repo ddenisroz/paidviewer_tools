@@ -27,7 +27,7 @@ import {
     Terminal,
     Trash2,
     Users,
-    XCircle
+    XCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -46,24 +46,34 @@ import {
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Checkbox } from '@/shared/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/shared/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/shared/components/ui/dialog';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { PageLoader } from '@/shared/components/ui/loader';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Switch } from '@/shared/components/ui/switch';
-import { DASHBOARD_TABS_LIST_CLASS, DASHBOARD_TAB_TRIGGER_CLASS, Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import {
+    DASHBOARD_TAB_TRIGGER_CLASS,
+    DASHBOARD_TABS_LIST_CLASS,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from '@/shared/components/ui/tabs';
 import { Textarea } from '@/shared/components/ui/textarea';
-
-
 
 import PageWrapper from '../shared/components/PageWrapper';
 
 import type { Command as ChatCommand } from '@/features/drops/types';
-
-
 
 interface CreateForm {
     command_name: string;
@@ -82,6 +92,8 @@ interface CreateForm {
 }
 
 interface EditForm {
+    command_name: string;
+    alias: string;
     is_enabled: boolean;
     platforms: string;
     allowed_roles: string;
@@ -122,9 +134,10 @@ interface CommandCardProps {
     onDelete?: (commandId: number) => void;
 }
 
-const SURFACE_CARD_CLASS = 'border-border/70 bg-card/70 backdrop-blur-sm';
-const CONTROL_TRIGGER_CLASS = 'h-9 w-full border-sky-500/25 bg-transparent text-sky-100 shadow-none data-[state=open]:border-sky-500/55';
-const CONTROL_CONTENT_CLASS = 'border-border/70 bg-popover/95 backdrop-blur-sm';
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/85';
+const CONTROL_TRIGGER_CLASS =
+    'h-9 w-full border-sky-400/45 bg-[#0b0712] text-sky-100 shadow-[0_0_0_1px_rgba(14,165,233,0.12)] data-[state=open]:border-sky-400/75 data-[state=open]:bg-[#0b0712]';
+const CONTROL_CONTENT_CLASS = 'border-sky-400/40 bg-[#0b0712] shadow-2xl shadow-black/60 ring-1 ring-white/10';
 const TRIGGER_MODE_LABELS: Record<'command' | 'keyword' | 'timer', string> = {
     command: 'По !команде',
     keyword: 'По слову',
@@ -170,6 +183,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
     const antiSpamWindow = Number(commandSettings.anti_spam_window_seconds || 0);
     const conditionLiveOnly = Boolean(commandSettings.condition_live_only || false);
     const conditionMinStreak = Number(commandSettings.condition_min_streak_days || 0);
+    const safeAlias = toSafeText(command.alias, '');
 
     const getRoleIcon = (role: string | undefined): React.ReactNode => {
         if (!role || role.trim() === '') {
@@ -177,10 +191,10 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
         }
         // Map ChatCommand user_level to role display
         const roleMap: Record<string, string> = {
-            'everyone': 'all',
-            'subscriber': 'vip',
-            'moderator': 'moderator',
-            'broadcaster': 'broadcaster'
+            everyone: 'all',
+            subscriber: 'vip',
+            moderator: 'moderator',
+            broadcaster: 'broadcaster',
         };
         const mappedRole = roleMap[role] || role;
 
@@ -188,9 +202,9 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
             { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
             { value: 'moderator', label: 'Модераторы+', icon: <ShieldCheck className="h-3 w-3" /> },
-            { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> }
+            { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> },
         ];
-        const option = roleOptions.find(opt => opt.value === mappedRole);
+        const option = roleOptions.find((opt) => opt.value === mappedRole);
         return option ? option.icon : <Users className="h-3 w-3" />;
     };
 
@@ -200,10 +214,10 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
         }
         // Map ChatCommand user_level to role display
         const roleMap: Record<string, string> = {
-            'everyone': 'all',
-            'subscriber': 'vip',
-            'moderator': 'moderator',
-            'broadcaster': 'broadcaster'
+            everyone: 'all',
+            subscriber: 'vip',
+            moderator: 'moderator',
+            broadcaster: 'broadcaster',
         };
         const mappedRole = roleMap[role] || role;
 
@@ -211,51 +225,45 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
             { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
             { value: 'vip', label: 'VIP+', icon: <Star className="h-3 w-3" /> },
             { value: 'moderator', label: 'Модераторы+', icon: <ShieldCheck className="h-3 w-3" /> },
-            { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> }
+            { value: 'broadcaster', label: 'Владелец', icon: <Crown className="h-3 w-3" /> },
         ];
-        const option = roleOptions.find(opt => opt.value === mappedRole);
+        const option = roleOptions.find((opt) => opt.value === mappedRole);
         return option ? option.label : 'Неизвестная роль';
     };
 
-
-
     const getTagConfig = (tag: string): TagConfig => {
         const tagConfig: Record<string, TagConfig> = {
-            'Общее': { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+            Общее: { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
             'Медиа и интерактивность': { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
             'TTS ИИ озвучка': { icon: Mic, color: 'bg-green-500/10 text-green-600 border-green-500/20' },
             'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
             'Управление чатом': { icon: MessageSquare, color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20' },
-            'Memealerts': { icon: Coins, color: 'bg-pink-500/10 text-pink-500 border-pink-500/20' }
+            Memealerts: { icon: Coins, color: 'bg-pink-500/10 text-pink-500 border-pink-500/20' },
         };
         return tagConfig[tag] || { icon: Tag, color: 'bg-muted/60 text-muted-foreground border-border' };
     };
 
     return (
-        <Card className={`h-full ${SURFACE_CARD_CLASS}`}>
+        <Card className={`h-full min-w-0 ${SURFACE_CARD_CLASS}`}>
             <CardHeader className="pb-1">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Terminal className="h-3 w-3 text-primary" />
-                        <code className="text-sm font-bold font-mono bg-muted px-2 py-1 rounded text-foreground">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <Terminal className="h-3 w-3 shrink-0 text-primary" />
+                        <code className="min-w-0 truncate rounded bg-muted px-2 py-1 font-mono text-sm font-bold text-foreground">
                             !{safeCommandName}
                         </code>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                         <Switch
                             checked={command.enabled}
                             onCheckedChange={(checked) => onToggle(command.name, { is_enabled: checked }, command.id)}
                         />
-                        {type === 'custom' && (
-                            <Badge variant="outline">Кастомная</Badge>
-                        )}
+                        {type === 'custom' && <Badge variant="outline">Кастомная</Badge>}
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="space-y-3">
-                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                    {safeDescription}
-                </p>
+                <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{safeDescription}</p>
 
                 {showResponsePreview && (
                     <div className="p-2 bg-muted/30 rounded-md border-l-2 border-primary/20">
@@ -264,30 +272,51 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                     </div>
                 )}
 
-                <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                        <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+                        <div className="flex min-w-0 items-center gap-1">
                             {getRoleIcon(command.user_level || 'everyone')}
-                            <span>{getRoleLabel(command.user_level || 'everyone')}</span>
+                            <span className="truncate">{getRoleLabel(command.user_level || 'everyone')}</span>
                         </div>
                         <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             <span>{command.cooldown || 0}с</span>
                         </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex shrink-0 items-center gap-1.5">
                         {(command.platform === 'all' || command.platform === 'twitch') && (
-                            <Badge variant="outline" className="text-xs px-1.5 py-0 bg-purple-500/10 text-purple-600 border-purple-500/20">
-                                Twitch
+                            <Badge
+                                variant="outline"
+                                className="whitespace-nowrap px-1.5 py-0 text-[11px] bg-purple-500/10 text-purple-400 border-purple-500/20"
+                                title="Twitch"
+                            >
+                                TW
                             </Badge>
                         )}
                         {(command.platform === 'all' || command.platform === 'vk') && (
-                            <Badge variant="outline" className="text-xs px-1.5 py-0 bg-red-500/10 text-red-600 border-red-500/20">
+                            <Badge
+                                variant="outline"
+                                className="whitespace-nowrap px-1.5 py-0 text-[11px] bg-red-500/10 text-red-400 border-red-500/20"
+                                title="VK Live"
+                            >
                                 VK
                             </Badge>
                         )}
                     </div>
                 </div>
+
+                {safeAlias && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">
+                            alias
+                        </Badge>
+                        <span className="truncate">
+                            !{safeAlias}
+                            {' -> '}
+                            !{safeCommandName}
+                        </span>
+                    </div>
+                )}
 
                 {type === 'custom' && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -295,11 +324,11 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                             {TRIGGER_MODE_LABELS[triggerMode] || TRIGGER_MODE_LABELS.command}
                         </Badge>
                         {triggerMode === 'keyword' && triggerKeyword && (
-                            <span>Триггер: <span className="text-foreground">{triggerKeyword}</span></span>
+                            <span>
+                                Триггер: <span className="text-foreground">{triggerKeyword}</span>
+                            </span>
                         )}
-                        {triggerMode === 'timer' && (
-                            <span>{Math.max(15, timerInterval)}с</span>
-                        )}
+                        {triggerMode === 'timer' && <span>{Math.max(15, timerInterval)}с</span>}
                         <span>prio {Math.max(0, priority)}</span>
                         {antiSpamWindow > 0 && <span>анти-спам {antiSpamWindow}с</span>}
                         {conditionLiveOnly && <span>только онлайн</span>}
@@ -309,7 +338,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
 
                 {command.tags && Array.isArray(command.tags) && command.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
-                        {command.tags.map((tag, index) => {
+                        {command.tags.slice(0, 2).map((tag, index) => {
                             const safeTag = toSafeText(tag, 'Без категории');
                             const config = getTagConfig(safeTag);
                             const IconComponent = config.icon;
@@ -317,10 +346,10 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                                 <Badge
                                     key={`${tag}-${index}`}
                                     variant="outline"
-                                    className={`text-xs px-2 py-0.5 flex items-center gap-1 ${config.color}`}
+                                    className={`max-w-full px-2 py-0.5 text-xs flex items-center gap-1 ${config.color}`}
                                 >
                                     <IconComponent className="h-3 w-3" />
-                                    {safeTag}
+                                    <span className="truncate">{safeTag}</span>
                                 </Badge>
                             );
                         })}
@@ -328,12 +357,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
                 )}
 
                 <div className="flex gap-2 pt-2 border-t border-border/30">
-                    <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => onEdit(command)}
-                        className="flex-1 h-8 text-xs"
-                    >
+                    <Button variant="default" size="sm" onClick={() => onEdit(command)} className="flex-1 h-8 text-xs">
                         <Edit2 className="h-3 w-3 mr-1" />
                         Настроить
                     </Button>
@@ -361,20 +385,27 @@ const CommandsPage: React.FC = () => {
     const { integrations } = useIntegrations();
 
     // Все хуки должны быть вызваны до любых условных return
-    const { data: commandsData, isLoading: loading, isInitialLoading: initialLoading } = useCommands({
+    const {
+        data: commandsData,
+        isLoading: loading,
+        isInitialLoading: initialLoading,
+    } = useCommands({
         enabled: !!isAuthenticated && (integrations?.twitch?.enabled || integrations?.vk?.enabled),
     });
     const [historySearch, setHistorySearch] = useState<string>('');
     const [historyPlatform, setHistoryPlatform] = useState<string>('all');
     const [historyType, setHistoryType] = useState<string>('all');
-    const { data: commandHistory = [], isLoading: historyLoading } = useCommandsHistory({
-        search: historySearch || undefined,
-        platform: historyPlatform === 'all' ? undefined : historyPlatform,
-        command_type: historyType === 'all' ? undefined : historyType,
-        limit: 100,
-    }, {
-        enabled: !!isAuthenticated,
-    });
+    const { data: commandHistory = [], isLoading: historyLoading } = useCommandsHistory(
+        {
+            search: historySearch || undefined,
+            platform: historyPlatform === 'all' ? undefined : historyPlatform,
+            command_type: historyType === 'all' ? undefined : historyType,
+            limit: 100,
+        },
+        {
+            enabled: !!isAuthenticated,
+        }
+    );
 
     const createCommandMutation = useCreateCommand();
     const createOverrideMutation = useCreateCommandOverride();
@@ -410,6 +441,8 @@ const CommandsPage: React.FC = () => {
     });
 
     const [editForm, setEditForm] = useState<EditForm>({
+        command_name: '',
+        alias: '',
         is_enabled: true,
         platforms: 'twitch,vk',
         allowed_roles: 'all',
@@ -431,6 +464,16 @@ const CommandsPage: React.FC = () => {
     const customCommands = useMemo<ChatCommand[]>(() => {
         return commandsData?.custom_commands || [];
     }, [commandsData?.custom_commands]);
+    const editingPrimaryTag = useMemo(() => {
+        if (!editingCommand || !Array.isArray(editingCommand.tags) || editingCommand.tags.length === 0) {
+            return '';
+        }
+        const firstTag = editingCommand.tags[0];
+        return normalizeTag(typeof firstTag === 'string' ? firstTag : String(firstTag));
+    }, [editingCommand]);
+    const isStreamControlCommand =
+        editingPrimaryTag === 'Управление трансляцией' &&
+        (editingCommand?.name === 'title' || editingCommand?.name === 'game');
 
     // Все хуки должны быть вызваны до любых условных return (правило React Hooks)
     const basicTags = useMemo(() => {
@@ -438,10 +481,11 @@ const CommandsPage: React.FC = () => {
             if (!Array.isArray(cmd.tags)) {
                 return [];
             }
-            return cmd.tags.map(tag => normalizeTag(typeof tag === 'string' ? tag : String(tag)));
+            return cmd.tags.map((tag) => normalizeTag(typeof tag === 'string' ? tag : String(tag)));
         });
-        return [...new Set(normalizedTags)]
-            .sort((a, b) => a.localeCompare(b, 'ru', { sensitivity: 'base' })) as string[];
+        return [...new Set(normalizedTags)].sort((a, b) =>
+            a.localeCompare(b, 'ru', { sensitivity: 'base' })
+        ) as string[];
     }, [basicCommands]);
 
     if (!isAuthenticated) {
@@ -453,17 +497,13 @@ const CommandsPage: React.FC = () => {
                             <AlertCircle className="w-10 h-10 text-muted-foreground" />
                         </div>
                         <div className="space-y-2 max-w-md">
-                            <h3 className="text-xl font-semibold text-foreground">
-                                Требуется авторизация
-                            </h3>
+                            <h3 className="text-xl font-semibold text-foreground">Требуется авторизация</h3>
                             <p className="text-muted-foreground text-sm">
-                                Для использования управления командами необходимо войти в систему и подключить хотя бы одну платформу (Twitch или VK Live)
+                                Для использования управления командами необходимо войти в систему и подключить хотя бы
+                                одну платформу (Twitch или VK Live)
                             </p>
                         </div>
-                        <Button
-                            onClick={() => navigate('/login')}
-                            className="gap-2"
-                        >
+                        <Button onClick={() => navigate('/login')} className="gap-2">
                             <Settings className="w-4 h-4" />
                             Войти в систему
                         </Button>
@@ -477,22 +517,26 @@ const CommandsPage: React.FC = () => {
         { value: 'all', label: 'Все зрители', icon: <Users className="h-3 w-3" /> },
         { value: 'vip', label: 'VIP и выше', icon: <Star className="h-3 w-3" /> },
         { value: 'moderator', label: 'Модераторы и выше', icon: <ShieldCheck className="h-3 w-3" /> },
-        { value: 'broadcaster', label: 'Только владелец', icon: <Crown className="h-3 w-3" /> }
+        { value: 'broadcaster', label: 'Только владелец', icon: <Crown className="h-3 w-3" /> },
     ];
 
     const platformOptions: PlatformOption[] = [
-        { value: 'twitch,vk', label: 'Все платформы', enabled: !!(integrations?.twitch?.enabled && integrations?.vk?.enabled) },
+        {
+            value: 'twitch,vk',
+            label: 'Все платформы',
+            enabled: !!(integrations?.twitch?.enabled && integrations?.vk?.enabled),
+        },
         { value: 'twitch', label: 'Только Twitch', enabled: !!integrations?.twitch?.enabled },
-        { value: 'vk', label: 'Только VK Live', enabled: !!integrations?.vk?.enabled }
+        { value: 'vk', label: 'Только VK Live', enabled: !!integrations?.vk?.enabled },
     ];
 
     const tagConfig: Record<string, TagConfig> = {
-        'Общее': { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+        Общее: { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
         'Медиа и интерактивность': { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
         'TTS ИИ озвучка': { icon: Mic, color: 'bg-green-500/10 text-green-600 border-green-500/20' },
         'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
         'Управление чатом': { icon: MessageSquare, color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20' },
-        'Memealerts': { icon: Coins, color: 'bg-pink-500/10 text-pink-500 border-pink-500/20' }
+        Memealerts: { icon: Coins, color: 'bg-pink-500/10 text-pink-500 border-pink-500/20' },
     };
 
     const getTagConfig = (tag: string): TagConfig => {
@@ -503,24 +547,24 @@ const CommandsPage: React.FC = () => {
 
     const getPlatformLabel = (platforms: string): string => {
         if (platforms === 'twitch,vk' || platforms === 'all') return 'Все платформы';
-        return platformOptions.find(opt => opt.value === platforms)?.label || platforms;
+        return platformOptions.find((opt) => opt.value === platforms)?.label || platforms;
     };
 
     const getFilteredBasicCommands = (): ChatCommand[] => {
         return basicCommands.filter((command: ChatCommand) => {
-            const matchesSearch = command.name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
+            const matchesSearch =
+                command.name.toLowerCase().includes(basicSearchTerm.toLowerCase()) ||
                 command.description?.toLowerCase().includes(basicSearchTerm.toLowerCase());
 
             const normalizedCommandTags = Array.isArray(command.tags)
-                ? command.tags.map(tag => normalizeTag(typeof tag === 'string' ? tag : String(tag)))
+                ? command.tags.map((tag) => normalizeTag(typeof tag === 'string' ? tag : String(tag)))
                 : [];
-            const matchesTags = selectedBasicTags.length === 0 || selectedBasicTags.some(selectedTag =>
-                normalizedCommandTags.includes(selectedTag)
-            );
+            const matchesTags =
+                selectedBasicTags.length === 0 ||
+                selectedBasicTags.some((selectedTag) => normalizedCommandTags.includes(selectedTag));
 
-            const matchesPlatform = platformFilter === 'all' ||
-                command.platform === 'all' ||
-                command.platform === platformFilter;
+            const matchesPlatform =
+                platformFilter === 'all' || command.platform === 'all' || command.platform === platformFilter;
 
             return matchesSearch && matchesTags && matchesPlatform;
         });
@@ -528,23 +572,19 @@ const CommandsPage: React.FC = () => {
 
     const getFilteredCustomCommands = (): ChatCommand[] => {
         return customCommands.filter((command: ChatCommand) => {
-            const matchesSearch = command.name.toLowerCase().includes(customSearchTerm.toLowerCase()) ||
+            const matchesSearch =
+                command.name.toLowerCase().includes(customSearchTerm.toLowerCase()) ||
                 command.response?.toLowerCase().includes(customSearchTerm.toLowerCase());
 
-            const matchesPlatform = platformFilter === 'all' ||
-                command.platform === 'all' ||
-                command.platform === platformFilter;
+            const matchesPlatform =
+                platformFilter === 'all' || command.platform === 'all' || command.platform === platformFilter;
 
             return matchesSearch && matchesPlatform;
         });
     };
 
     const toggleTag = (tag: string): void => {
-        setSelectedBasicTags(prev =>
-            prev.includes(tag)
-                ? prev.filter(t => t !== tag)
-                : [...prev, tag]
-        );
+        setSelectedBasicTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
     };
 
     const clearAllFilters = (): void => {
@@ -562,12 +602,13 @@ const CommandsPage: React.FC = () => {
             extra_settings: {
                 trigger_mode: createForm.trigger_mode,
                 trigger_keyword: createForm.trigger_mode === 'keyword' ? createForm.trigger_keyword.trim() : '',
-                timer_interval_seconds: createForm.trigger_mode === 'timer' ? Math.max(15, createForm.timer_interval_seconds) : 300,
+                timer_interval_seconds:
+                    createForm.trigger_mode === 'timer' ? Math.max(15, createForm.timer_interval_seconds) : 300,
                 priority: Math.max(0, Math.min(100, createForm.priority)),
                 anti_spam_window_seconds: Math.max(0, Math.min(600, createForm.anti_spam_window_seconds)),
                 condition_live_only: createForm.condition_live_only,
                 condition_min_streak_days: Math.max(0, Math.min(365, createForm.condition_min_streak_days)),
-            }
+            },
         };
 
         createCommandMutation.mutate(commandData as unknown as Partial<ChatCommand>, {
@@ -588,7 +629,7 @@ const CommandsPage: React.FC = () => {
                     condition_live_only: false,
                     condition_min_streak_days: 0,
                 });
-            }
+            },
         });
     };
 
@@ -596,31 +637,37 @@ const CommandsPage: React.FC = () => {
         if (!commandId || !editingCommand) return;
 
         if (editingCommand.command_type === 'global') {
-            createOverrideMutation.mutate({
-                command_name: editingCommand.name,
-                is_enabled: editForm.is_enabled,
-                platforms: editForm.platforms,
-                allowed_roles: editForm.allowed_roles,
-                cooldown_seconds: editForm.cooldown_seconds,
-                alias: null,
-                extra_settings: {
-                    ...editForm.extra_settings,
-                    trigger_mode: editForm.trigger_mode,
-                    trigger_keyword: editForm.trigger_mode === 'keyword' ? editForm.trigger_keyword.trim() : '',
-                    timer_interval_seconds: editForm.trigger_mode === 'timer' ? Math.max(15, editForm.timer_interval_seconds) : 300,
-                    priority: Math.max(0, Math.min(100, editForm.priority)),
-                    anti_spam_window_seconds: Math.max(0, Math.min(600, editForm.anti_spam_window_seconds)),
-                    condition_live_only: editForm.condition_live_only,
-                    condition_min_streak_days: Math.max(0, Math.min(365, editForm.condition_min_streak_days)),
-                }
-            }, {
-                onSuccess: () => {
-                    setIsEditDialogOpen(false);
-                    setEditingCommand(null);
+            createOverrideMutation.mutate(
+                {
+                    command_name: editingCommand.name,
+                    is_enabled: editForm.is_enabled,
+                    platforms: editForm.platforms,
+                    allowed_roles: editForm.allowed_roles,
+                    cooldown_seconds: editForm.cooldown_seconds,
+                    alias: editForm.alias.trim() || null,
+                    extra_settings: {
+                        ...editForm.extra_settings,
+                        trigger_mode: editForm.trigger_mode,
+                        trigger_keyword: editForm.trigger_mode === 'keyword' ? editForm.trigger_keyword.trim() : '',
+                        timer_interval_seconds:
+                            editForm.trigger_mode === 'timer' ? Math.max(15, editForm.timer_interval_seconds) : 300,
+                        priority: Math.max(0, Math.min(100, editForm.priority)),
+                        anti_spam_window_seconds: Math.max(0, Math.min(600, editForm.anti_spam_window_seconds)),
+                        condition_live_only: editForm.condition_live_only,
+                        condition_min_streak_days: Math.max(0, Math.min(365, editForm.condition_min_streak_days)),
+                    },
                 },
-            });
+                {
+                    onSuccess: () => {
+                        setIsEditDialogOpen(false);
+                        setEditingCommand(null);
+                    },
+                }
+            );
         } else {
             const commandData = {
+                command_name: editForm.command_name,
+                alias: editForm.alias.trim() || null,
                 response_text: editForm.response_text,
                 platforms: editForm.platforms,
                 allowed_roles: editForm.allowed_roles,
@@ -630,20 +677,24 @@ const CommandsPage: React.FC = () => {
                     ...editForm.extra_settings,
                     trigger_mode: editForm.trigger_mode,
                     trigger_keyword: editForm.trigger_mode === 'keyword' ? editForm.trigger_keyword.trim() : '',
-                    timer_interval_seconds: editForm.trigger_mode === 'timer' ? Math.max(15, editForm.timer_interval_seconds) : 300,
+                    timer_interval_seconds:
+                        editForm.trigger_mode === 'timer' ? Math.max(15, editForm.timer_interval_seconds) : 300,
                     priority: Math.max(0, Math.min(100, editForm.priority)),
                     anti_spam_window_seconds: Math.max(0, Math.min(600, editForm.anti_spam_window_seconds)),
                     condition_live_only: editForm.condition_live_only,
                     condition_min_streak_days: Math.max(0, Math.min(365, editForm.condition_min_streak_days)),
-                }
+                },
             };
 
-            updateCommandMutation.mutate({ commandId, command: commandData as unknown as Partial<ChatCommand> }, {
-                onSuccess: () => {
-                    setIsEditDialogOpen(false);
-                    setEditingCommand(null);
+            updateCommandMutation.mutate(
+                { commandId, command: commandData as unknown as Partial<ChatCommand> },
+                {
+                    onSuccess: () => {
+                        setIsEditDialogOpen(false);
+                        setEditingCommand(null);
+                    },
                 }
-            });
+            );
         }
     };
 
@@ -671,7 +722,8 @@ const CommandsPage: React.FC = () => {
             broadcaster: 'broadcaster',
         };
         // Get extra_settings from command if available
-        const cmdExtraSettings = (command as unknown as { extra_settings?: Record<string, unknown> }).extra_settings || {};
+        const cmdExtraSettings =
+            (command as unknown as { extra_settings?: Record<string, unknown> }).extra_settings || {};
         const triggerMode = (cmdExtraSettings.trigger_mode as 'command' | 'keyword' | 'timer' | undefined) || 'command';
         const triggerKeyword = String(cmdExtraSettings.trigger_keyword || '');
         const timerInterval = Number(cmdExtraSettings.timer_interval_seconds || 300);
@@ -680,6 +732,8 @@ const CommandsPage: React.FC = () => {
         const conditionLiveOnly = Boolean(cmdExtraSettings.condition_live_only || false);
         const conditionMinStreakDays = Number(cmdExtraSettings.condition_min_streak_days || 0);
         setEditForm({
+            command_name: command.name || '',
+            alias: command.alias || '',
             is_enabled: command.enabled ?? true,
             platforms: platform === 'all' ? 'twitch,vk' : platform,
             allowed_roles: roleMap[user_level] || user_level,
@@ -692,12 +746,12 @@ const CommandsPage: React.FC = () => {
             priority: Number.isFinite(priority) ? Math.max(0, Math.min(100, priority)) : 0,
             anti_spam_window_seconds: Number.isFinite(antiSpamWindow) ? Math.max(0, Math.min(600, antiSpamWindow)) : 0,
             condition_live_only: conditionLiveOnly,
-            condition_min_streak_days: Number.isFinite(conditionMinStreakDays) ? Math.max(0, Math.min(365, conditionMinStreakDays)) : 0,
+            condition_min_streak_days: Number.isFinite(conditionMinStreakDays)
+                ? Math.max(0, Math.min(365, conditionMinStreakDays))
+                : 0,
         });
         setIsEditDialogOpen(true);
     };
-
-
 
     if (initialLoading && basicCommands.length === 0 && customCommands.length === 0) {
         return (
@@ -711,22 +765,13 @@ const CommandsPage: React.FC = () => {
         <PageWrapper>
             <Tabs defaultValue="basic" className="min-w-0 space-y-6">
                 <TabsList className={DASHBOARD_TABS_LIST_CLASS}>
-                    <TabsTrigger
-                        value="basic"
-                        className={DASHBOARD_TAB_TRIGGER_CLASS}
-                    >
+                    <TabsTrigger value="basic" className={DASHBOARD_TAB_TRIGGER_CLASS}>
                         Базовые команды
                     </TabsTrigger>
-                    <TabsTrigger
-                        value="custom"
-                        className={DASHBOARD_TAB_TRIGGER_CLASS}
-                    >
+                    <TabsTrigger value="custom" className={DASHBOARD_TAB_TRIGGER_CLASS}>
                         Кастомные команды
                     </TabsTrigger>
-                    <TabsTrigger
-                        value="history"
-                        className={DASHBOARD_TAB_TRIGGER_CLASS}
-                    >
+                    <TabsTrigger value="history" className={DASHBOARD_TAB_TRIGGER_CLASS}>
                         История
                     </TabsTrigger>
                 </TabsList>
@@ -743,13 +788,13 @@ const CommandsPage: React.FC = () => {
                                             placeholder="Поиск команд..."
                                             value={basicSearchTerm}
                                             onChange={(e) => setBasicSearchTerm(e.target.value)}
-                                            className="border-sky-500/25 bg-transparent pl-10 text-sky-100 placeholder:text-sky-200/50"
+                                            className="border-sky-500/25 bg-[#0b0712] pl-10 text-sky-100 placeholder:text-sky-200/50"
                                         />
                                     </div>
                                 </div>
-                                
+
                                 <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                                <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
+                                    <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                         <SelectValue placeholder="Все платформы" />
                                     </SelectTrigger>
                                     <SelectContent className={CONTROL_CONTENT_CLASS}>
@@ -780,7 +825,11 @@ const CommandsPage: React.FC = () => {
                                 <div className="relative">
                                     <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
                                         <PopoverTrigger asChild>
-                                            <Button variant="outline" size="sm" className="h-9 w-full justify-between border-sky-500/25 bg-transparent text-sky-100 hover:bg-sky-500/10">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-9 w-full justify-between border-sky-500/35 bg-[#0b0712] text-sky-100 hover:border-sky-400/55 hover:bg-sky-500/10"
+                                            >
                                                 <span className="inline-flex items-center gap-2">
                                                     <Filter className="h-4 w-4" />
                                                     Фильтр по тегам
@@ -792,15 +841,17 @@ const CommandsPage: React.FC = () => {
                                                     >
                                                         {selectedBasicTags.length}
                                                     </Badge>
-                                                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isFilterOpen ? 'rotate-180' : ''}`} />
+                                                    <ChevronDown
+                                                        className={`h-4 w-4 transition-transform duration-200 ${isFilterOpen ? 'rotate-180' : ''}`}
+                                                    />
                                                 </span>
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent
-                                            className="w-64 p-0 border-border/70 bg-popover/95 backdrop-blur-sm origin-top-left data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:duration-200 data-[state=closed]:duration-150 data-[state=open]:ease-out data-[state=closed]:ease-in"
+                                            className="w-[min(34rem,calc(100vw-2rem))] p-0 border-sky-400/45 bg-[#0b0712] shadow-2xl shadow-black/70 ring-1 ring-white/10"
                                             align="start"
                                         >
-                                            <div className="p-3 border-b">
+                                            <div className="p-3 border-b border-sky-500/20">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <h4 className="font-medium text-sm">Фильтр по тегам</h4>
                                                     {selectedBasicTags.length > 0 && (
@@ -818,33 +869,35 @@ const CommandsPage: React.FC = () => {
                                                     placeholder="Поиск тегов..."
                                                     value={tagSearchTerm}
                                                     onChange={(e) => setTagSearchTerm(e.target.value)}
-                                                    className="h-8 border-sky-500/25 bg-transparent text-xs text-sky-100 placeholder:text-sky-200/50"
+                                                    className="h-8 border-sky-500/25 bg-background/70 text-xs text-sky-100 placeholder:text-sky-200/50"
                                                 />
                                             </div>
-                                            <div className="max-h-64 overflow-y-auto">
+                                            <div className="flex flex-wrap content-start gap-2 p-3">
                                                 {basicTags.length > 0 ? (
                                                     basicTags
-                                                        .filter(tag => tag.toLowerCase().includes(tagSearchTerm.toLowerCase()))
-                                                        .map(tag => {
+                                                        .filter((tag) =>
+                                                            tag.toLowerCase().includes(tagSearchTerm.toLowerCase())
+                                                        )
+                                                        .map((tag) => {
                                                             const config = getTagConfig(tag);
                                                             const IconComponent = config.icon;
                                                             const isSelected = selectedBasicTags.includes(tag);
                                                             return (
-                                                                <div
+                                                                <button
+                                                                    type="button"
                                                                     key={tag}
-                                                                    className={`flex items-center space-x-3 p-2.5 hover:bg-muted/70 cursor-pointer rounded-md transition-colors ${isSelected ? 'bg-muted/50' : ''
-                                                                        }`}
+                                                                    className={`inline-flex min-h-8 max-w-full items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                                                                        isSelected
+                                                                            ? 'border-sky-400/60 bg-sky-500/15 text-sky-100'
+                                                                            : 'border-border/60 bg-background/55 text-muted-foreground hover:border-sky-400/35 hover:bg-sky-500/10 hover:text-foreground'
+                                                                    }`}
                                                                     onClick={() => toggleTag(tag)}
                                                                 >
-                                                                    <Checkbox
-                                                                        checked={isSelected}
-                                                                        onChange={() => toggleTag(tag)}
-                                                                    />
                                                                     <div className={`p-1.5 rounded-md ${config.color}`}>
                                                                         <IconComponent className="h-3.5 w-3.5" />
                                                                     </div>
-                                                                    <span className="text-sm flex-1 font-medium">{tag}</span>
-                                                                </div>
+                                                                    <span className="truncate">{tag}</span>
+                                                                </button>
                                                             );
                                                         })
                                                 ) : (
@@ -858,7 +911,7 @@ const CommandsPage: React.FC = () => {
                                 </div>
                             </div>
 
-                                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-3">
                                 {getFilteredBasicCommands().map((command: ChatCommand) => (
                                     <div key={command.id || command.name}>
                                         <CommandCard
@@ -904,10 +957,12 @@ const CommandsPage: React.FC = () => {
                                                 id="command_name"
                                                 placeholder="tg (без символа !)"
                                                 value={createForm.command_name}
-                                                onChange={(e) => setCreateForm(prev => ({
-                                                    ...prev,
-                                                    command_name: e.target.value.replace('!', '')
-                                                }))}
+                                                onChange={(e) =>
+                                                    setCreateForm((prev) => ({
+                                                        ...prev,
+                                                        command_name: e.target.value.replace('!', ''),
+                                                    }))
+                                                }
                                             />
                                         </div>
                                         <div>
@@ -916,10 +971,12 @@ const CommandsPage: React.FC = () => {
                                                 id="response_text"
                                                 placeholder="Подписывайтесь на мой Telegram канал: https://t.me/..."
                                                 value={createForm.response_text}
-                                                onChange={(e) => setCreateForm(prev => ({
-                                                    ...prev,
-                                                    response_text: e.target.value
-                                                }))}
+                                                onChange={(e) =>
+                                                    setCreateForm((prev) => ({
+                                                        ...prev,
+                                                        response_text: e.target.value,
+                                                    }))
+                                                }
                                             />
                                         </div>
                                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -927,20 +984,23 @@ const CommandsPage: React.FC = () => {
                                                 <Label>Платформы</Label>
                                                 <Select
                                                     value={createForm.platforms || 'twitch,vk'}
-                                                    onValueChange={(value) => setCreateForm(prev => ({
-                                                        ...prev,
-                                                        platforms: value
-                                                    }))}
+                                                    onValueChange={(value) =>
+                                                        setCreateForm((prev) => ({
+                                                            ...prev,
+                                                            platforms: value,
+                                                        }))
+                                                    }
                                                 >
                                                     <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                                         <SelectValue placeholder="Выберите платформы">
-                                                            {createForm.platforms === 'twitch,vk' || !createForm.platforms
+                                                            {createForm.platforms === 'twitch,vk' ||
+                                                            !createForm.platforms
                                                                 ? 'Все платформы'
                                                                 : getPlatformLabel(createForm.platforms)}
                                                         </SelectValue>
                                                     </SelectTrigger>
                                                     <SelectContent className={CONTROL_CONTENT_CLASS}>
-                                                        {platformsToShow.map(option => (
+                                                        {platformsToShow.map((option) => (
                                                             <SelectItem key={option.value} value={option.value}>
                                                                 {option.label}
                                                             </SelectItem>
@@ -952,18 +1012,22 @@ const CommandsPage: React.FC = () => {
                                                 <Label>Доступ</Label>
                                                 <Select
                                                     value={createForm.allowed_roles}
-                                                    onValueChange={(value) => setCreateForm(prev => ({
-                                                        ...prev,
-                                                        allowed_roles: value
-                                                    }))}
+                                                    onValueChange={(value) =>
+                                                        setCreateForm((prev) => ({
+                                                            ...prev,
+                                                            allowed_roles: value,
+                                                        }))
+                                                    }
                                                 >
                                                     <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                                         <SelectValue placeholder="Выберите доступ">
-                                                            {roleOptions.find(opt => opt.value === createForm.allowed_roles)?.label || 'Выберите доступ'}
+                                                            {roleOptions.find(
+                                                                (opt) => opt.value === createForm.allowed_roles
+                                                            )?.label || 'Выберите доступ'}
                                                         </SelectValue>
                                                     </SelectTrigger>
                                                     <SelectContent className={CONTROL_CONTENT_CLASS}>
-                                                        {roleOptions.map(option => (
+                                                        {roleOptions.map((option) => (
                                                             <SelectItem key={option.value} value={option.value}>
                                                                 {option.label}
                                                             </SelectItem>
@@ -979,10 +1043,12 @@ const CommandsPage: React.FC = () => {
                                                 type="number"
                                                 min="0"
                                                 value={createForm.cooldown_seconds}
-                                                onChange={(e) => setCreateForm(prev => ({
-                                                    ...prev,
-                                                    cooldown_seconds: parseInt(e.target.value) || 0
-                                                }))}
+                                                onChange={(e) =>
+                                                    setCreateForm((prev) => ({
+                                                        ...prev,
+                                                        cooldown_seconds: parseInt(e.target.value) || 0,
+                                                    }))
+                                                }
                                                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
@@ -991,10 +1057,12 @@ const CommandsPage: React.FC = () => {
                                                 <Label>Режим запуска</Label>
                                                 <Select
                                                     value={createForm.trigger_mode}
-                                                    onValueChange={(value) => setCreateForm(prev => ({
-                                                        ...prev,
-                                                        trigger_mode: value as 'command' | 'keyword' | 'timer'
-                                                    }))}
+                                                    onValueChange={(value) =>
+                                                        setCreateForm((prev) => ({
+                                                            ...prev,
+                                                            trigger_mode: value as 'command' | 'keyword' | 'timer',
+                                                        }))
+                                                    }
                                                 >
                                                     <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                                         <SelectValue />
@@ -1013,10 +1081,12 @@ const CommandsPage: React.FC = () => {
                                                         id="trigger_keyword"
                                                         placeholder="например: привет"
                                                         value={createForm.trigger_keyword}
-                                                        onChange={(e) => setCreateForm(prev => ({
-                                                            ...prev,
-                                                            trigger_keyword: e.target.value
-                                                        }))}
+                                                        onChange={(e) =>
+                                                            setCreateForm((prev) => ({
+                                                                ...prev,
+                                                                trigger_keyword: e.target.value,
+                                                            }))
+                                                        }
                                                     />
                                                 </div>
                                             )}
@@ -1028,10 +1098,15 @@ const CommandsPage: React.FC = () => {
                                                         type="number"
                                                         min="15"
                                                         value={createForm.timer_interval_seconds}
-                                                        onChange={(e) => setCreateForm(prev => ({
-                                                            ...prev,
-                                                            timer_interval_seconds: Math.max(15, parseInt(e.target.value, 10) || 15)
-                                                        }))}
+                                                        onChange={(e) =>
+                                                            setCreateForm((prev) => ({
+                                                                ...prev,
+                                                                timer_interval_seconds: Math.max(
+                                                                    15,
+                                                                    parseInt(e.target.value, 10) || 15
+                                                                ),
+                                                            }))
+                                                        }
                                                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     />
                                                 </div>
@@ -1045,10 +1120,15 @@ const CommandsPage: React.FC = () => {
                                                         min="0"
                                                         max="100"
                                                         value={createForm.priority}
-                                                        onChange={(e) => setCreateForm(prev => ({
-                                                            ...prev,
-                                                            priority: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0))
-                                                        }))}
+                                                        onChange={(e) =>
+                                                            setCreateForm((prev) => ({
+                                                                ...prev,
+                                                                priority: Math.max(
+                                                                    0,
+                                                                    Math.min(100, parseInt(e.target.value, 10) || 0)
+                                                                ),
+                                                            }))
+                                                        }
                                                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     />
                                                 </div>
@@ -1060,35 +1140,54 @@ const CommandsPage: React.FC = () => {
                                                         min="0"
                                                         max="600"
                                                         value={createForm.anti_spam_window_seconds}
-                                                        onChange={(e) => setCreateForm(prev => ({
-                                                            ...prev,
-                                                            anti_spam_window_seconds: Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0))
-                                                        }))}
+                                                        onChange={(e) =>
+                                                            setCreateForm((prev) => ({
+                                                                ...prev,
+                                                                anti_spam_window_seconds: Math.max(
+                                                                    0,
+                                                                    Math.min(600, parseInt(e.target.value, 10) || 0)
+                                                                ),
+                                                            }))
+                                                        }
                                                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     />
                                                 </div>
                                             </div>
                                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                                 <div className="flex items-center justify-between rounded-md border border-border/70 p-2">
-                                                    <Label htmlFor="condition_live_only" className="text-sm">Только когда стрим онлайн</Label>
+                                                    <Label htmlFor="condition_live_only" className="text-sm">
+                                                        Только когда стрим онлайн
+                                                    </Label>
                                                     <Switch
                                                         id="condition_live_only"
                                                         checked={createForm.condition_live_only}
-                                                        onCheckedChange={(checked) => setCreateForm(prev => ({ ...prev, condition_live_only: checked }))}
+                                                        onCheckedChange={(checked) =>
+                                                            setCreateForm((prev) => ({
+                                                                ...prev,
+                                                                condition_live_only: checked,
+                                                            }))
+                                                        }
                                                     />
                                                 </div>
                                                 <div>
-                                                    <Label htmlFor="condition_min_streak_days">Мин. стрик зрителя</Label>
+                                                    <Label htmlFor="condition_min_streak_days">
+                                                        Мин. стрик зрителя
+                                                    </Label>
                                                     <Input
                                                         id="condition_min_streak_days"
                                                         type="number"
                                                         min="0"
                                                         max="365"
                                                         value={createForm.condition_min_streak_days}
-                                                        onChange={(e) => setCreateForm(prev => ({
-                                                            ...prev,
-                                                            condition_min_streak_days: Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0))
-                                                        }))}
+                                                        onChange={(e) =>
+                                                            setCreateForm((prev) => ({
+                                                                ...prev,
+                                                                condition_min_streak_days: Math.max(
+                                                                    0,
+                                                                    Math.min(365, parseInt(e.target.value, 10) || 0)
+                                                                ),
+                                                            }))
+                                                        }
                                                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                                     />
                                                 </div>
@@ -1119,15 +1218,15 @@ const CommandsPage: React.FC = () => {
                                                     placeholder="Поиск кастомных команд..."
                                                     value={customSearchTerm}
                                                     onChange={(e) => setCustomSearchTerm(e.target.value)}
-                                                    className="border-sky-500/25 bg-transparent pl-10 text-sky-100 placeholder:text-sky-200/50"
+                                                    className="border-sky-500/25 bg-[#0b0712] pl-10 text-sky-100 placeholder:text-sky-200/50"
                                                 />
                                             </div>
                                         </div>
 
                                         <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                                        <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
-                                            <SelectValue placeholder="Все платформы" />
-                                        </SelectTrigger>
+                                            <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
+                                                <SelectValue placeholder="Все платформы" />
+                                            </SelectTrigger>
                                             <SelectContent className={CONTROL_CONTENT_CLASS}>
                                                 <SelectItem value="all">Все платформы</SelectItem>
                                                 <SelectItem value="twitch">
@@ -1197,7 +1296,7 @@ const CommandsPage: React.FC = () => {
                                         placeholder="Поиск по команде..."
                                         value={historySearch}
                                         onChange={(e) => setHistorySearch(e.target.value)}
-                                        className="border-sky-500/25 bg-transparent pl-10 text-sky-100 placeholder:text-sky-200/50"
+                                        className="border-sky-500/25 bg-[#0b0712] pl-10 text-sky-100 placeholder:text-sky-200/50"
                                     />
                                 </div>
                                 <Select value={historyPlatform} onValueChange={setHistoryPlatform}>
@@ -1229,14 +1328,25 @@ const CommandsPage: React.FC = () => {
                             ) : (
                                 <div className="space-y-2">
                                     {commandHistory.map((cmd) => (
-                                        <div key={`hist-${cmd.id}`} className="flex items-center justify-between rounded-md border border-border/70 bg-card/60 p-2.5">
+                                        <div
+                                            key={`hist-${cmd.id}`}
+                                            className="flex items-center justify-between rounded-md border border-border/70 bg-card/60 p-2.5"
+                                        >
                                             <div className="min-w-0">
-                                                <div className="font-mono text-sm text-foreground truncate">!{cmd.name}</div>
+                                                <div className="font-mono text-sm text-foreground truncate">
+                                                    !{cmd.name}
+                                                </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    Последний вызов: {cmd.last_used ? new Date(cmd.last_used).toLocaleString('ru-RU') : 'нет'}
+                                                    Последний вызов:{' '}
+                                                    {cmd.last_used
+                                                        ? new Date(cmd.last_used).toLocaleString('ru-RU')
+                                                        : 'нет'}
                                                 </div>
                                             </div>
-                                            <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-200">
+                                            <Badge
+                                                variant="outline"
+                                                className="border-sky-500/30 bg-sky-500/10 text-sky-200"
+                                            >
                                                 {cmd.usage_count || 0}
                                             </Badge>
                                         </div>
@@ -1251,22 +1361,95 @@ const CommandsPage: React.FC = () => {
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>
-                            !{editingCommand?.name}
-                        </DialogTitle>
+                        <DialogTitle>!{editingCommand?.name}</DialogTitle>
                     </DialogHeader>
                     {editingCommand && (
                         <div className="space-y-4">
+                            {editingPrimaryTag && (
+                                <div className="rounded-md border border-border/70 bg-card/60 px-3 py-2 text-sm">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-200">
+                                            {editingPrimaryTag}
+                                        </Badge>
+                                        {isStreamControlCommand && (
+                                            <span className="text-muted-foreground">
+                                                {editingCommand.name === 'title'
+                                                    ? 'Использование: !title Новое название стрима'
+                                                    : 'Использование: !game Just Chatting'}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div>
+                                    <Label htmlFor="edit_command_name">
+                                        {editingCommand.command_type === 'global' ? 'Основная команда' : 'Название команды'}
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">!</span>
+                                        <Input
+                                            id="edit_command_name"
+                                            value={
+                                                editingCommand.command_type === 'global'
+                                                    ? editingCommand.name
+                                                    : editForm.command_name
+                                            }
+                                            disabled={editingCommand.command_type === 'global'}
+                                            onChange={(e) =>
+                                                setEditForm((prev) => ({
+                                                    ...prev,
+                                                    command_name: e.target.value,
+                                                }))
+                                            }
+                                            placeholder="например, hello"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label htmlFor="edit_command_alias">
+                                        {editingCommand.command_type === 'global'
+                                            ? 'Alias для этой команды'
+                                            : 'Дополнительный alias'}
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">!</span>
+                                        <Input
+                                            id="edit_command_alias"
+                                            value={editForm.alias}
+                                            onChange={(e) =>
+                                                setEditForm((prev) => ({
+                                                    ...prev,
+                                                    alias: e.target.value,
+                                                }))
+                                            }
+                                            placeholder={
+                                                editingCommand.command_type === 'global'
+                                                    ? 'например, игра'
+                                                    : 'например, привет'
+                                            }
+                                        />
+                                    </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        {editingCommand.command_type === 'global'
+                                            ? 'Основное имя остаётся системным, а alias даёт вам короткий вызов этой команды.'
+                                            : 'Alias работает как второе имя для вашей кастомной команды.'}
+                                    </p>
+                                </div>
+                            </div>
+
                             {editingCommand.command_type === 'custom' && (
                                 <div>
                                     <Label htmlFor="edit_response">Ответ команды</Label>
                                     <Textarea
                                         id="edit_response"
                                         value={editForm.response_text}
-                                        onChange={(e) => setEditForm(prev => ({
-                                            ...prev,
-                                            response_text: e.target.value
-                                        }))}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                response_text: e.target.value,
+                                            }))
+                                        }
                                     />
                                 </div>
                             )}
@@ -1276,10 +1459,12 @@ const CommandsPage: React.FC = () => {
                                     <Label>Платформы</Label>
                                     <Select
                                         value={editForm.platforms || 'twitch,vk'}
-                                        onValueChange={(value) => setEditForm(prev => ({
-                                            ...prev,
-                                            platforms: value
-                                        }))}
+                                        onValueChange={(value) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                platforms: value,
+                                            }))
+                                        }
                                     >
                                         <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                             <SelectValue placeholder="Выберите платформы">
@@ -1289,7 +1474,7 @@ const CommandsPage: React.FC = () => {
                                             </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent className={CONTROL_CONTENT_CLASS}>
-                                            {platformsToShow.map(option => (
+                                            {platformsToShow.map((option) => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
                                                 </SelectItem>
@@ -1301,18 +1486,21 @@ const CommandsPage: React.FC = () => {
                                     <Label>Доступ</Label>
                                     <Select
                                         value={editForm.allowed_roles}
-                                        onValueChange={(value) => setEditForm(prev => ({
-                                            ...prev,
-                                            allowed_roles: value
-                                        }))}
+                                        onValueChange={(value) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                allowed_roles: value,
+                                            }))
+                                        }
                                     >
                                         <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                             <SelectValue placeholder="Выберите доступ">
-                                                {roleOptions.find(opt => opt.value === editForm.allowed_roles)?.label || 'Выберите доступ'}
+                                                {roleOptions.find((opt) => opt.value === editForm.allowed_roles)
+                                                    ?.label || 'Выберите доступ'}
                                             </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent className={CONTROL_CONTENT_CLASS}>
-                                            {roleOptions.map(option => (
+                                            {roleOptions.map((option) => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
                                                 </SelectItem>
@@ -1329,10 +1517,12 @@ const CommandsPage: React.FC = () => {
                                     type="number"
                                     min="0"
                                     value={editForm.cooldown_seconds}
-                                    onChange={(e) => setEditForm(prev => ({
-                                        ...prev,
-                                        cooldown_seconds: parseInt(e.target.value) || 0
-                                    }))}
+                                    onChange={(e) =>
+                                        setEditForm((prev) => ({
+                                            ...prev,
+                                            cooldown_seconds: parseInt(e.target.value) || 0,
+                                        }))
+                                    }
                                     className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                             </div>
@@ -1343,10 +1533,12 @@ const CommandsPage: React.FC = () => {
                                         <Label>Режим запуска</Label>
                                         <Select
                                             value={editForm.trigger_mode}
-                                            onValueChange={(value) => setEditForm(prev => ({
-                                                ...prev,
-                                                trigger_mode: value as 'command' | 'keyword' | 'timer'
-                                            }))}
+                                            onValueChange={(value) =>
+                                                setEditForm((prev) => ({
+                                                    ...prev,
+                                                    trigger_mode: value as 'command' | 'keyword' | 'timer',
+                                                }))
+                                            }
                                         >
                                             <SelectTrigger className={CONTROL_TRIGGER_CLASS}>
                                                 <SelectValue />
@@ -1364,10 +1556,12 @@ const CommandsPage: React.FC = () => {
                                             <Input
                                                 id="edit_trigger_keyword"
                                                 value={editForm.trigger_keyword}
-                                                onChange={(e) => setEditForm(prev => ({
-                                                    ...prev,
-                                                    trigger_keyword: e.target.value
-                                                }))}
+                                                onChange={(e) =>
+                                                    setEditForm((prev) => ({
+                                                        ...prev,
+                                                        trigger_keyword: e.target.value,
+                                                    }))
+                                                }
                                             />
                                         </div>
                                     )}
@@ -1379,10 +1573,15 @@ const CommandsPage: React.FC = () => {
                                                 type="number"
                                                 min="15"
                                                 value={editForm.timer_interval_seconds}
-                                                onChange={(e) => setEditForm(prev => ({
-                                                    ...prev,
-                                                    timer_interval_seconds: Math.max(15, parseInt(e.target.value, 10) || 15)
-                                                }))}
+                                                onChange={(e) =>
+                                                    setEditForm((prev) => ({
+                                                        ...prev,
+                                                        timer_interval_seconds: Math.max(
+                                                            15,
+                                                            parseInt(e.target.value, 10) || 15
+                                                        ),
+                                                    }))
+                                                }
                                                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
@@ -1396,10 +1595,15 @@ const CommandsPage: React.FC = () => {
                                                 min="0"
                                                 max="100"
                                                 value={editForm.priority}
-                                                onChange={(e) => setEditForm(prev => ({
-                                                    ...prev,
-                                                    priority: Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0))
-                                                }))}
+                                                onChange={(e) =>
+                                                    setEditForm((prev) => ({
+                                                        ...prev,
+                                                        priority: Math.max(
+                                                            0,
+                                                            Math.min(100, parseInt(e.target.value, 10) || 0)
+                                                        ),
+                                                    }))
+                                                }
                                                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
@@ -1411,21 +1615,30 @@ const CommandsPage: React.FC = () => {
                                                 min="0"
                                                 max="600"
                                                 value={editForm.anti_spam_window_seconds}
-                                                onChange={(e) => setEditForm(prev => ({
-                                                    ...prev,
-                                                    anti_spam_window_seconds: Math.max(0, Math.min(600, parseInt(e.target.value, 10) || 0))
-                                                }))}
+                                                onChange={(e) =>
+                                                    setEditForm((prev) => ({
+                                                        ...prev,
+                                                        anti_spam_window_seconds: Math.max(
+                                                            0,
+                                                            Math.min(600, parseInt(e.target.value, 10) || 0)
+                                                        ),
+                                                    }))
+                                                }
                                                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div className="flex items-center justify-between rounded-md border border-border/70 p-2">
-                                            <Label htmlFor="edit_condition_live_only" className="text-sm">Только когда стрим онлайн</Label>
+                                            <Label htmlFor="edit_condition_live_only" className="text-sm">
+                                                Только когда стрим онлайн
+                                            </Label>
                                             <Switch
                                                 id="edit_condition_live_only"
                                                 checked={editForm.condition_live_only}
-                                                onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, condition_live_only: checked }))}
+                                                onCheckedChange={(checked) =>
+                                                    setEditForm((prev) => ({ ...prev, condition_live_only: checked }))
+                                                }
                                             />
                                         </div>
                                         <div>
@@ -1436,10 +1649,15 @@ const CommandsPage: React.FC = () => {
                                                 min="0"
                                                 max="365"
                                                 value={editForm.condition_min_streak_days}
-                                                onChange={(e) => setEditForm(prev => ({
-                                                    ...prev,
-                                                    condition_min_streak_days: Math.max(0, Math.min(365, parseInt(e.target.value, 10) || 0))
-                                                }))}
+                                                onChange={(e) =>
+                                                    setEditForm((prev) => ({
+                                                        ...prev,
+                                                        condition_min_streak_days: Math.max(
+                                                            0,
+                                                            Math.min(365, parseInt(e.target.value, 10) || 0)
+                                                        ),
+                                                    }))
+                                                }
                                                 className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             />
                                         </div>
@@ -1450,7 +1668,9 @@ const CommandsPage: React.FC = () => {
                             {/* Настройки голосования для команды skip */}
                             {editingCommand.name === 'skip' && (
                                 <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800/50 mt-4">
-                                    <Label htmlFor="skip_votes" className="text-base font-medium">Голосов для скипа</Label>
+                                    <Label htmlFor="skip_votes" className="text-base font-medium">
+                                        Голосов для скипа
+                                    </Label>
                                     <p className="text-xs text-muted-foreground mb-3">
                                         1 = мгновенный скип (только модераторы), 2+ = голосование всех зрителей
                                     </p>
@@ -1460,13 +1680,15 @@ const CommandsPage: React.FC = () => {
                                         min="1"
                                         max="20"
                                         value={(editForm.extra_settings?.skip_votes_required as number) || 1}
-                                        onChange={(e) => setEditForm(prev => ({
-                                            ...prev,
-                                            extra_settings: {
-                                                ...prev.extra_settings,
-                                                skip_votes_required: parseInt(e.target.value) || 1
-                                            }
-                                        }))}
+                                        onChange={(e) =>
+                                            setEditForm((prev) => ({
+                                                ...prev,
+                                                extra_settings: {
+                                                    ...prev.extra_settings,
+                                                    skip_votes_required: parseInt(e.target.value) || 1,
+                                                },
+                                            }))
+                                        }
                                         className="w-24 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                     />
                                 </div>
@@ -1478,7 +1700,9 @@ const CommandsPage: React.FC = () => {
                             Отмена
                         </Button>
                         <Button
-                            onClick={() => handleUpdateCommand(editingCommand?.id ? Number(editingCommand.id) : undefined)}
+                            onClick={() =>
+                                handleUpdateCommand(editingCommand?.id ? Number(editingCommand.id) : undefined)
+                            }
                             className="h-9 shadow-none"
                         >
                             <Save className="h-4 w-4 mr-2" />
@@ -1492,5 +1716,3 @@ const CommandsPage: React.FC = () => {
 };
 
 export default CommandsPage;
-
-

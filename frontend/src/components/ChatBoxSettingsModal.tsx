@@ -10,7 +10,7 @@ import PreviewPanel from '@/features/chatbox/components/PreviewPanel';
 import {
     extractSettingsFromResponse,
     loadGoogleFont,
-    normalizeChatBoxSettings
+    normalizeChatBoxSettings,
 } from '@/features/chatbox/utils/chatboxHelpers';
 import { chatboxService } from '@/services/api/services/chatboxService';
 import { Button } from '@/shared/components/ui/button';
@@ -73,7 +73,7 @@ const DEFAULT_SETTINGS: ChatBoxSettings = {
     show_links: true,
     auto_load_images: true,
     widget_url: '',
-    version: 1
+    version: 1,
 };
 
 const PREVIEW_MESSAGES: PreviewMessage[] = [
@@ -85,7 +85,7 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
         time: '12:00',
         role: 'Viewer',
         badges: [],
-        avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=D'
+        avatar_url: 'https://placehold.co/40x40/1f2937/FFFFFF?text=D',
     },
     {
         id: 2,
@@ -96,19 +96,25 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
         role: 'VIP',
         badges: ['vip/1'],
         emotes: [
-            { id: '25', name: 'Kappa', url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0', start: 18, end: 22 }
+            {
+                id: '25',
+                name: 'Kappa',
+                url: 'https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/1.0',
+                start: 18,
+                end: 22,
+            },
         ],
-        avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=P'
+        avatar_url: 'https://placehold.co/40x40/4f46e5/FFFFFF?text=P',
     },
     {
         id: 3,
         platform: 'twitch',
         author: 'arolkish',
-        message: 'Ребят, а что выграло на ауке? https://example.com',
+        message: 'Ребят, что выиграло на ауке? https://example.com',
         time: '12:02',
         role: 'Moderator',
         badges: ['moderator/1'],
-        avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=A'
+        avatar_url: 'https://placehold.co/40x40/22c55e/FFFFFF?text=A',
     },
     {
         id: 4,
@@ -117,36 +123,40 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
         message: 'когда уже игры будут? :lasqaJoyge:',
         time: '12:03',
         role: '',
-        badges: ['https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731'],
+        badges: [
+            'https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731',
+        ],
         emotes: [
             {
                 id: 'e46b4fbd-901a-4f62-8924-da9eb4f094f8',
                 name: 'lasqaJoyge',
                 url: 'https://images.live.vkvideo.ru/smile/e46b4fbd-901a-4f62-8924-da9eb4f094f8/icon/size/large?change_time=1759944303',
                 start: 0,
-                end: 0
-            }
+                end: 0,
+            },
         ],
-        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=DK'
+        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=DK',
     },
     {
         id: 5,
         platform: 'vk',
-        author: 'Zavtra_Zaeb',
+        author: 'Zavtra_Zavod',
         message: 'Доброе утро :lasqaPoPivu:',
         time: '12:04',
         role: '',
-        badges: ['https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731'],
+        badges: [
+            'https://images.live.vkvideo.ru/badge/69b9405b-81ae-40b4-abdb-2d47cff10637/icon/size/large?change_time=1733399731',
+        ],
         emotes: [
             {
                 id: 'e46b4fbd-901a-4f62-8924-da9eb4f094f8',
                 name: 'lasqaPoPivu',
                 url: 'https://images.live.vkvideo.ru/smile/e46b4fbd-901a-4f62-8924-da9eb4f094f8/icon/size/large?change_time=1759944303',
                 start: 0,
-                end: 0
-            }
+                end: 0,
+            },
         ],
-        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=ZZ'
+        avatar_url: 'https://placehold.co/40x40/ef4444/FFFFFF?text=ZZ',
     },
     {
         id: 6,
@@ -156,14 +166,15 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
         time: '12:05',
         role: 'Viewer',
         badges: [],
-        avatar_url: 'https://placehold.co/40x40/475569/FFFFFF?text=P'
-    }
+        avatar_url: 'https://placehold.co/40x40/475569/FFFFFF?text=P',
+    },
 ];
 
 const SETTINGS_SECTION_CLASS = 'rounded-lg border border-border/60 bg-card/60 p-4 space-y-4';
 const SETTINGS_SECTION_TITLE_CLASS = 'text-[11px] uppercase tracking-wider text-muted-foreground';
 const SETTINGS_SELECT_TRIGGER_CLASS = 'h-9 bg-background/70 border-border/60 text-sm font-normal font-base';
-const BLUE_ACTIVE_CLASS = 'data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:border-sky-500/60';
+const BLUE_ACTIVE_CLASS =
+    'data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:border-sky-500/60';
 
 const FONT_OPTIONS = [
     'Inter',
@@ -177,14 +188,14 @@ const FONT_OPTIONS = [
     'Playfair Display',
     'Comfortaa',
     'Russo One',
-    'JetBrains Mono'
+    'JetBrains Mono',
 ];
 
 const FONT_WEIGHT_OPTIONS = [
     { value: 'normal', label: 'Обычный' },
     { value: '500', label: 'Средний' },
     { value: '600', label: 'Полужирный' },
-    { value: '700', label: 'Жирный' }
+    { value: '700', label: 'Жирный' },
 ];
 
 const ANIMATION_OPTIONS = [
@@ -193,12 +204,12 @@ const ANIMATION_OPTIONS = [
     { value: 'slide-left', label: 'Слайд справа' },
     { value: 'scale', label: 'Масштаб' },
     { value: 'bounce', label: 'Пружина' },
-    { value: 'none', label: 'Без анимации' }
+    { value: 'none', label: 'Без анимации' },
 ];
 
 const CHAT_DIRECTION_OPTIONS = [
     { value: 'vertical', label: 'Вертикально' },
-    { value: 'horizontal', label: 'Горизонтально' }
+    { value: 'horizontal', label: 'Горизонтально' },
 ];
 
 const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onClose, onSave }) => {
@@ -208,6 +219,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [fontStatus, setFontStatus] = useState<'idle' | 'loading' | 'ready'>('idle');
 
     useEffect(() => {
         if (isOpen) {
@@ -219,14 +231,40 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
             setInitialSettings(null);
             setLoading(false);
         }
-        return () => { document.body.style.overflow = ''; };
+        return () => {
+            document.body.style.overflow = '';
+        };
     }, [isOpen]);
 
     useEffect(() => {
-        if (settings?.font_family) {
-            loadGoogleFont(settings.font_family);
+        if (!settings?.font_family) {
+            setFontStatus('idle');
+            return undefined;
         }
-    }, [settings?.font_family]);
+
+        let active = true;
+        setFontStatus('loading');
+        loadGoogleFont(settings.font_family);
+
+        if (typeof document === 'undefined' || !('fonts' in document)) {
+            setFontStatus('ready');
+            return undefined;
+        }
+
+        const primaryFont = settings.font_family.split(',')[0]?.trim() || settings.font_family;
+        Promise.allSettled([
+            document.fonts.load(`${settings.font_weight || 'normal'} ${settings.font_size}px "${primaryFont}"`),
+            document.fonts.ready,
+        ]).finally(() => {
+            if (active) {
+                setFontStatus('ready');
+            }
+        });
+
+        return () => {
+            active = false;
+        };
+    }, [settings?.font_family, settings?.font_size, settings?.font_weight]);
 
     useEffect(() => {
         if (!isOpen) return undefined;
@@ -240,7 +278,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     const loadSettings = async () => {
         try {
             setLoading(true);
-            const response = await chatboxService.getSettings() as AxiosResponse<ApiResponse<ChatBoxSettings>>;
+            const response = (await chatboxService.getSettings()) as AxiosResponse<ApiResponse<ChatBoxSettings>>;
             const data = extractSettingsFromResponse(response);
             const normalized = normalizeChatBoxSettings(data);
             setSettings(normalized);
@@ -255,10 +293,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     const handleSave = async (regenerateToken = false) => {
         try {
             setSaving(true);
-            const response = await chatboxService.saveSettings(
+            const response = (await chatboxService.saveSettings(
                 { ...settings, version: settings.version || 1 },
                 regenerateToken
-            ) as AxiosResponse<ApiResponse<ChatBoxSettings>>;
+            )) as AxiosResponse<ApiResponse<ChatBoxSettings>>;
             const updatedSettings = extractSettingsFromResponse(response);
             const normalized = normalizeChatBoxSettings(updatedSettings);
             setSettings(normalized);
@@ -273,30 +311,34 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
         }
     };
 
-    const availableAnimationOptions = settings.chat_direction === 'horizontal'
-        ? [
-            { value: 'slide-left', label: 'Слайд справа' },
-            { value: 'none', label: 'Без анимации' }
-        ]
-        : ANIMATION_OPTIONS;
+    const availableAnimationOptions =
+        settings.chat_direction === 'horizontal'
+            ? [
+                  { value: 'slide-left', label: 'Слайд справа' },
+                  { value: 'none', label: 'Без анимации' },
+              ]
+            : ANIMATION_OPTIONS;
 
     const handleChange = (key: keyof ChatBoxSettings, value: string | number | boolean) => {
-        setSettings(prev => {
+        setSettings((prev) => {
             if (key === 'chat_direction') {
                 const nextDirection = String(value);
                 return {
                     ...prev,
                     chat_direction: nextDirection,
-                    animation_type: nextDirection === 'horizontal'
-                        ? (prev.animation_type === 'none' ? 'none' : 'slide-left')
-                        : prev.animation_type
+                    animation_type:
+                        nextDirection === 'horizontal'
+                            ? prev.animation_type === 'none'
+                                ? 'none'
+                                : 'slide-left'
+                            : prev.animation_type,
                 };
             }
 
             if (key === 'animation_type' && prev.chat_direction === 'horizontal') {
                 return {
                     ...prev,
-                    animation_type: value === 'none' ? 'none' : 'slide-left'
+                    animation_type: value === 'none' ? 'none' : 'slide-left',
                 };
             }
 
@@ -305,16 +347,14 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     };
 
     const resetToDefaults = () => {
-        setSettings(prev => ({
+        setSettings((prev) => ({
             ...DEFAULT_SETTINGS,
             widget_url: prev.widget_url,
-            version: prev.version || DEFAULT_SETTINGS.version
+            version: prev.version || DEFAULT_SETTINGS.version,
         }));
     };
 
-    const hasUnsavedChanges = initialSettings
-        ? JSON.stringify(settings) !== JSON.stringify(initialSettings)
-        : false;
+    const hasUnsavedChanges = initialSettings ? JSON.stringify(settings) !== JSON.stringify(initialSettings) : false;
 
     const copyToClipboard = () => {
         navigator.clipboard.writeText(settings.widget_url);
@@ -328,9 +368,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
     if (loading) {
         const loadingContent = (
             <>
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999]" />
+                <div className="fixed inset-0 bg-black/75 z-[9999]" />
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center">
-                <div className="bg-slate-900/95 p-8 rounded-lg shadow-2xl border border-slate-700/60">
+                    <div className="bg-slate-900/95 p-8 rounded-lg shadow-2xl border border-slate-700/60">
                         <div className="text-white">Загрузка...</div>
                     </div>
                 </div>
@@ -341,11 +381,11 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
     const modalContent = (
         <>
-            <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[9999]" onClick={onClose} />
+            <div className="fixed inset-0 bg-black/75 z-[9999]" onClick={onClose} />
 
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
                 <div
-                    className="bg-background/95 font-base rounded-xl max-w-5xl w-full h-[92vh] max-h-[92vh] overflow-hidden flex flex-col pointer-events-auto border border-border/60 shadow-2xl"
+                    className="bg-background/95 font-base rounded-lg max-w-5xl w-full h-[92vh] max-h-[92vh] overflow-hidden flex flex-col pointer-events-auto border border-border/60 shadow-2xl"
                     onClick={(e) => e.stopPropagation()}
                 >
                     {/* Header */}
@@ -358,7 +398,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                 </span>
                             )}
                         </div>
-                        <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-accent/60">
+                        <button
+                            onClick={onClose}
+                            className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-accent/60"
+                        >
                             <X className="w-5 h-5" />
                         </button>
                     </div>
@@ -371,7 +414,11 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                 <PreviewPanel
                                     settings={settings}
                                     previewMessages={PREVIEW_MESSAGES}
-                                    twitchChannelName={(user?.integrations?.twitch as { channel_name?: string })?.channel_name || user?.twitch_username || null}
+                                    twitchChannelName={
+                                        (user?.integrations?.twitch as { channel_name?: string })?.channel_name ||
+                                        user?.twitch_username ||
+                                        null
+                                    }
                                 />
                             </div>
 
@@ -409,19 +456,31 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         <div className="flex-1 min-w-0 min-h-0">
                             <Tabs defaultValue="appearance" className="h-full flex flex-col overflow-hidden min-h-0">
                                 <TabsList className="mb-4 grid grid-cols-3 gap-2 bg-transparent p-0 font-base">
-                                    <TabsTrigger value="appearance" className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}>
+                                    <TabsTrigger
+                                        value="appearance"
+                                        className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}
+                                    >
                                         <Palette className="w-3 h-3" /> Внешний вид
                                     </TabsTrigger>
-                                    <TabsTrigger value="animation" className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}>
+                                    <TabsTrigger
+                                        value="animation"
+                                        className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}
+                                    >
                                         <Sparkles className="w-3 h-3" /> Анимация
                                     </TabsTrigger>
-                                    <TabsTrigger value="display" className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}>
+                                    <TabsTrigger
+                                        value="display"
+                                        className={`text-xs gap-1.5 rounded-md border border-border/60 bg-transparent text-muted-foreground ${BLUE_ACTIVE_CLASS}`}
+                                    >
                                         <Settings2 className="w-3 h-3" /> Отображение
                                     </TabsTrigger>
                                 </TabsList>
 
                                 {/* Appearance Tab */}
-                                <TabsContent value="appearance" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
+                                <TabsContent
+                                    value="appearance"
+                                    className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0"
+                                >
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Типографика</div>
                                         <div className="grid gap-4 md:grid-cols-3">
@@ -435,13 +494,22 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent className="bg-card border-border/60 z-[11000] font-base">
-                                                        {FONT_OPTIONS.map(font => (
-                                                            <SelectItem key={font} value={font} style={{ fontFamily: font }}>
+                                                        {FONT_OPTIONS.map((font) => (
+                                                            <SelectItem
+                                                                key={font}
+                                                                value={font}
+                                                                style={{ fontFamily: font }}
+                                                            >
                                                                 {font}
                                                             </SelectItem>
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
+                                                <p className="text-[11px] text-muted-foreground">
+                                                    {fontStatus === 'loading'
+                                                        ? 'Подгружаем шрифт для предпросмотра...'
+                                                        : 'Шрифт применён в предпросмотре, оверлее и отдельном окне.'}
+                                                </p>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Размер</Label>
@@ -485,20 +553,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                 <ColorInput
                                                     value={settings.background_color || '#000000'}
                                                     onChange={(v) => handleChange('background_color', v)}
+                                                    opacity={Math.round(settings.background_opacity * 100)}
+                                                    onOpacityChange={(v) => handleChange('background_opacity', v / 100)}
                                                 />
-                                                <div className="space-y-1.5">
-                                                    <span className="text-[11px] text-muted-foreground">Непрозрачность</span>
-                                                    <SliderWithInput
-                                                        value={Math.round(settings.background_opacity * 100)}
-                                                        onChange={(v) => handleChange('background_opacity', v / 100)}
-                                                        min={0}
-                                                        max={100}
-                                                        step={5}
-                                                        unit="%"
-                                                        inputWidth={56}
-                                                        inputClassName="text-sm"
-                                                    />
-                                                </div>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Цвет текста</Label>
@@ -507,7 +564,9 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     onChange={(v) => handleChange('text_color', v)}
                                                 />
                                                 <div className="space-y-2">
-                                                    <Label className="text-xs text-muted-foreground">Цвет никнейма</Label>
+                                                    <Label className="text-xs text-muted-foreground">
+                                                        Цвет никнейма
+                                                    </Label>
                                                     <ColorInput
                                                         value={settings.username_color || '#9147FF'}
                                                         onChange={(v) => handleChange('username_color', v)}
@@ -556,7 +615,10 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                 </TabsContent>
 
                                 {/* Animation Tab */}
-                                <TabsContent value="animation" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
+                                <TabsContent
+                                    value="animation"
+                                    className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0"
+                                >
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Анимация</div>
                                         <div className="space-y-2">
@@ -569,7 +631,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-card border-border/60 z-[11000] font-base">
-                                                    {availableAnimationOptions.map(option => (
+                                                    {availableAnimationOptions.map((option) => (
                                                         <SelectItem key={option.value} value={option.value}>
                                                             {option.label}
                                                         </SelectItem>
@@ -610,33 +672,54 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                 </TabsContent>
 
                                 {/* Display Tab */}
-                                <TabsContent value="display" className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0">
+                                <TabsContent
+                                    value="display"
+                                    className="flex-1 overflow-y-auto space-y-5 mt-0 pr-2 min-h-0"
+                                >
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Отображение</div>
                                         <div className="grid gap-3 sm:grid-cols-2">
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Иконки платформ</Label>
-                                                <Switch checked={settings.show_platform_icons} onCheckedChange={(v) => handleChange('show_platform_icons', v)} />
+                                                <Switch
+                                                    checked={settings.show_platform_icons}
+                                                    onCheckedChange={(v) => handleChange('show_platform_icons', v)}
+                                                />
                                             </div>
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Значки (badges)</Label>
-                                                <Switch checked={settings.show_badges} onCheckedChange={(v) => handleChange('show_badges', v)} />
+                                                <Switch
+                                                    checked={settings.show_badges}
+                                                    onCheckedChange={(v) => handleChange('show_badges', v)}
+                                                />
                                             </div>
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">7TV Эмодзи</Label>
-                                                <Switch checked={settings.show_7tv_emotes} onCheckedChange={(v) => handleChange('show_7tv_emotes', v)} />
+                                                <Switch
+                                                    checked={settings.show_7tv_emotes}
+                                                    onCheckedChange={(v) => handleChange('show_7tv_emotes', v)}
+                                                />
                                             </div>
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Ссылки</Label>
-                                                <Switch checked={settings.show_links} onCheckedChange={(v) => handleChange('show_links', v)} />
+                                                <Switch
+                                                    checked={settings.show_links}
+                                                    onCheckedChange={(v) => handleChange('show_links', v)}
+                                                />
                                             </div>
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Аватарки</Label>
-                                                <Switch checked={settings.show_avatars ?? false} onCheckedChange={(v) => handleChange('show_avatars', v)} />
+                                                <Switch
+                                                    checked={settings.show_avatars ?? false}
+                                                    onCheckedChange={(v) => handleChange('show_avatars', v)}
+                                                />
                                             </div>
                                             <div className="flex items-center justify-between rounded-md border border-border/60 bg-background/70 px-3 py-2">
                                                 <Label className="text-sm text-foreground">Автозагрузка медиа</Label>
-                                                <Switch checked={settings.auto_load_images ?? true} onCheckedChange={(v) => handleChange('auto_load_images', v)} />
+                                                <Switch
+                                                    checked={settings.auto_load_images ?? true}
+                                                    onCheckedChange={(v) => handleChange('auto_load_images', v)}
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -659,22 +742,22 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Направление</Label>
-                                            <Select
-                                                value={settings.chat_direction}
-                                                onValueChange={(v) => handleChange('chat_direction', v)}
-                                            >
-                                                <SelectTrigger className={SETTINGS_SELECT_TRIGGER_CLASS}>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-card border-border/60 z-[11000] font-base">
-                                                    {CHAT_DIRECTION_OPTIONS.map(option => (
-                                                        <SelectItem key={option.value} value={option.value}>
-                                                            {option.label}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                                <Select
+                                                    value={settings.chat_direction}
+                                                    onValueChange={(v) => handleChange('chat_direction', v)}
+                                                >
+                                                    <SelectTrigger className={SETTINGS_SELECT_TRIGGER_CLASS}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="bg-card border-border/60 z-[11000] font-base">
+                                                        {CHAT_DIRECTION_OPTIONS.map((option) => (
+                                                            <SelectItem key={option.value} value={option.value}>
+                                                                {option.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
                                         </div>
 
                                         <div className="grid gap-4 md:grid-cols-2">
@@ -713,15 +796,27 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                     {/* Footer */}
                     <div className="border-t border-border/60 px-5 py-3 flex items-center justify-between gap-2 bg-card/60">
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" onClick={resetToDefaults} className="h-9 border-border/60 bg-background/70 text-foreground hover:bg-accent hover:text-foreground">
+                            <Button
+                                variant="outline"
+                                onClick={resetToDefaults}
+                                className="h-9 border-border/60 bg-background/70 text-foreground hover:bg-accent hover:text-foreground"
+                            >
                                 Сбросить
                             </Button>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Button variant="outline" onClick={onClose} className="h-9 border-border/60 bg-background/70 text-foreground hover:bg-accent hover:text-foreground">
+                            <Button
+                                variant="outline"
+                                onClick={onClose}
+                                className="h-9 border-border/60 bg-background/70 text-foreground hover:bg-accent hover:text-foreground"
+                            >
                                 Отмена
                             </Button>
-                            <Button onClick={() => handleSave(false)} disabled={saving} className="h-9 bg-none bg-primary hover:bg-primary/90">
+                            <Button
+                                onClick={() => handleSave(false)}
+                                disabled={saving}
+                                className="h-9 bg-none bg-primary hover:bg-primary/90"
+                            >
                                 {saving ? 'Сохранение...' : 'Сохранить'}
                             </Button>
                         </div>
@@ -735,8 +830,3 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 };
 
 export default ChatBoxSettingsModal;
-
-
-
-
-
