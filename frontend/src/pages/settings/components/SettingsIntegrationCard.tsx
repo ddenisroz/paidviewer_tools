@@ -32,7 +32,12 @@ const SettingsIntegrationCard: React.FC<SettingsIntegrationCardProps> = ({
                     <span className="truncate text-xs text-muted-foreground">{sublabel}</span>
                 </div>
             </div>
-            <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} className={accentClassName} />
+            <Switch
+                checked={checked}
+                disabled={disabled}
+                onCheckedChange={onCheckedChange}
+                className={accentClassName}
+            />
         </div>
     </Card>
 );

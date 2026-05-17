@@ -7,6 +7,7 @@ import httpx
 import logging
 from datetime import timedelta
 from typing import Optional, Dict, Any
+from urllib.parse import urlencode
 from fastapi import APIRouter, Request, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -85,14 +86,13 @@ async def vk_auth(request: Request):
     # Generate a CSRF protection state token.
     state = secrets.token_urlsafe(16)
 
-    auth_url = (
-        f"{VK_AUTH_BASE_URL}?"
-        f"client_id={VK_CLIENT_ID}&"
-        f"redirect_uri={VK_REDIRECT_URI}&"
-        f"response_type=code&"
-        f"scope={scopes}&"
-        f"state={state}"
-    )
+    auth_url = f"{VK_AUTH_BASE_URL}?" + urlencode({
+        "client_id": VK_CLIENT_ID,
+        "redirect_uri": VK_REDIRECT_URI,
+        "response_type": "code",
+        "scope": scopes,
+        "state": state,
+    })
 
     logger.info("VK Live auth URL generated")
 
@@ -125,14 +125,13 @@ async def login_vk(request: Request):
     # Generate a CSRF protection state token.
     state = secrets.token_urlsafe(16)
 
-    auth_url = (
-        f"{VK_AUTH_BASE_URL}?"
-        f"client_id={VK_CLIENT_ID}&"
-        f"redirect_uri={VK_REDIRECT_URI}&"
-        f"response_type=code&"
-        f"scope={scopes}&"
-        f"state={state}"
-    )
+    auth_url = f"{VK_AUTH_BASE_URL}?" + urlencode({
+        "client_id": VK_CLIENT_ID,
+        "redirect_uri": VK_REDIRECT_URI,
+        "response_type": "code",
+        "scope": scopes,
+        "state": state,
+    })
 
     logger.info("VK Live API login URL generated")
     from fastapi.responses import RedirectResponse
@@ -157,8 +156,9 @@ async def vk_callback(request: Request, db: Session = Depends(get_db), code: str
 
     # Handle explicit authorization cancellation from the provider.
     if error:
-        logger.warning(f"VK OAuth cancelled by user or failed: {error} - {error_description}")
-        return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.VK, "cancelled", is_linking))
+        error_code = oauth_handler.normalize_provider_error(error)
+        logger.warning("VK OAuth provider returned error=%s mapped_to=%s description=%s", error, error_code, error_description)
+        return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.VK, error_code, is_linking))
 
     # Ensure that the provider returned an authorization code.
     if not code:

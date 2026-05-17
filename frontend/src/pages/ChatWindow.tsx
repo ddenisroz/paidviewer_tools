@@ -3,21 +3,22 @@
 import { useAuth } from '@/context/AuthContext';
 import { useChat } from '@/context/ChatContext';
 import MessageContent from '@/features/chat/components/MessageContent';
+import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
 import ColorInput from '@/features/chatbox/components/ColorInputPickerOnly';
+import { CHATBOX_BRAND_FONT, CHATBOX_FONT_OPTIONS } from '@/features/chatbox/constants/fontOptions';
 import {
     extractSettingsFromResponse,
     loadGoogleFont,
     normalizeChatBoxSettings,
 } from '@/features/chatbox/utils/chatboxHelpers';
-import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
 import { chatboxService } from '@/services/api/services/chatboxService';
 import { twitchBadgesService } from '@/services/twitchBadges';
-import { Input } from '@/shared/components/ui/input';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { Input } from '@/shared/components/ui/input';
 import { logger } from '@/shared/utils/prodLogger';
 
-import type { ChatBoxSettings } from '@/types/chatbox';
 import type { ChatMessage } from '@/types/chat';
+import type { ChatBoxSettings } from '@/types/chatbox';
 
 type ChatWindowSettings = ChatBoxSettings & {
     show_timestamps: boolean;
@@ -28,22 +29,10 @@ interface Emotes {
     globalEmotes: Map<string, unknown>;
 }
 
-const CHAT_WINDOW_FONT_OPTIONS = [
-    'Inter',
-    'Roboto',
-    'Montserrat',
-    'Oswald',
-    'Ubuntu',
-    'Russo One',
-    'Rubik',
-    'Bebas Neue',
-    'JetBrains Mono',
-];
-
 const DEFAULT_CHAT_SETTINGS: ChatWindowSettings = {
     ...normalizeChatBoxSettings({
     font_size: 14,
-    font_family: 'Inter',
+    font_family: CHATBOX_BRAND_FONT,
     text_color: '#FFFFFF',
     username_color: '#9147FF',
     background_color: '#1A1A1A',
@@ -359,16 +348,23 @@ const ChatWindow: React.FC = () => {
                                     color: '#fff',
                                 }}
                             >
-                                {CHAT_WINDOW_FONT_OPTIONS.map((font) => (
+                                {CHATBOX_FONT_OPTIONS.map((font) => (
                                     <option key={font} value={font}>
                                         {font}
                                     </option>
                                 ))}
                             </select>
-                            <div style={{ marginTop: '6px', fontSize: '11px', opacity: 0.65 }}>
-                                {fontStatus === 'loading'
-                                    ? 'Подгружаем шрифт...'
-                                    : 'Шрифт синхронизирован с общими настройками чата'}
+                            <div style={{ alignItems: 'center', display: 'flex', gap: '6px', marginTop: '6px', fontSize: '11px', opacity: 0.65 }}>
+                                <span
+                                    style={{
+                                        background: fontStatus === 'loading' ? '#fbbf24' : '#34d399',
+                                        borderRadius: 999,
+                                        display: 'inline-block',
+                                        height: 6,
+                                        width: 6,
+                                    }}
+                                />
+                                {fontStatus === 'loading' ? 'Загрузка' : 'Применён'}
                             </div>
                         </div>
 

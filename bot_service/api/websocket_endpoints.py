@@ -10,7 +10,7 @@ import asyncio
 import logging
 from typing import List, Dict, Any, Optional
 
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, WebSocket, HTTPException
 
 from core.config import settings
 from core.database import ChatMessage, get_db
@@ -19,6 +19,8 @@ from core.session_manager import session_manager
 from services.memory_websocket_manager import get_memory_websocket_manager
 from repositories.chatbox_repository import ChatBoxRepository
 from repositories.user_repository import UserRepository
+from auth.auth import verify_jwt_token
+from services.youtube.obs_overlay import build_youtube_obs_state
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +123,18 @@ async def _send_chat_history(websocket: WebSocket, user_id: int) -> None:
 
 
 async def _resolve_authenticated_user_id(websocket: WebSocket) -> Optional[int]:
-    """Resolve authenticated user_id from session cookie for WebSocket handshake."""
+    """Resolve authenticated user_id from WebSocket token or session cookie."""
+    ws_token = (websocket.query_params.get("ws_token") or "").strip()
+    if ws_token:
+        try:
+            payload = verify_jwt_token(ws_token, expected_type="chat_ws")
+            raw_user_id = payload.get("user_id")
+            user_id = int(raw_user_id) if raw_user_id else 0
+            if user_id > 0:
+                return user_id
+        except Exception:
+            return None
+
     session_id = websocket.cookies.get("session_id")
     if not session_id:
         return None
@@ -140,6 +153,37 @@ async def _resolve_authenticated_user_id(websocket: WebSocket) -> Optional[int]:
         return None
 
     return user_id
+
+
+async def _resolve_dev_tts_player_user_id(websocket: WebSocket, path_user_id: int) -> Optional[int]:
+    """Local-only fallback for the dedicated TTS player during development."""
+    if not settings.is_development:
+        return None
+
+    client_role = (websocket.query_params.get("client_role") or "").strip().lower()
+    presence_only_raw = websocket.query_params.get("presence_only")
+    presence_only = str(presence_only_raw).strip().lower() in {"1", "true", "yes", "on"}
+    origin = (websocket.headers.get("origin") or "").strip().lower()
+
+    if client_role != "tts_player" or not presence_only:
+        return None
+
+    if origin and "localhost" not in origin and "127.0.0.1" not in origin:
+        return None
+
+    def _db_query() -> bool:
+        db = next(get_db())
+        try:
+            return UserRepository(db).get_by_id(path_user_id) is not None
+        finally:
+            db.close()
+
+    user_exists = await asyncio.to_thread(_db_query)
+    if not user_exists:
+        return None
+
+    logger.info("[WS] Development fallback accepted for TTS player user_id=%s", path_user_id)
+    return path_user_id
 
 
 async def _resolve_chatbox_token_user_id(token: str) -> Optional[int]:
@@ -270,6 +314,8 @@ async def websocket_chat(websocket: WebSocket, user_id: str):
 
     authenticated_user_id = await _resolve_authenticated_user_id(websocket)
     if not authenticated_user_id:
+        authenticated_user_id = await _resolve_dev_tts_player_user_id(websocket, user_id_int)
+    if not authenticated_user_id:
         logger.warning("[WS] Unauthorized connection attempt: missing/invalid session")
         await websocket.close(code=4401)
         return
@@ -317,6 +363,75 @@ async def websocket_chat_overlay(websocket: WebSocket, token: str):
         display_user_id=f"overlay:{user_id_int}",
         manage_tts_disconnect=False,
     )
+
+
+def _resolve_obs_token_user_id(token: str) -> Optional[int]:
+    try:
+        payload = verify_jwt_token(token, expected_type="obs")
+        user_id = payload.get("user_id")
+        return int(user_id) if user_id else None
+    except (HTTPException, TypeError, ValueError):
+        return None
+
+
+async def _load_youtube_obs_state(user_id: int) -> Dict[str, Any]:
+    def _db_query() -> Dict[str, Any]:
+        db = next(get_db())
+        try:
+            return build_youtube_obs_state(user_id, db)
+        finally:
+            db.close()
+
+    return await asyncio.to_thread(_db_query)
+
+
+@router.websocket("/ws/youtube-obs/{token}")
+async def websocket_youtube_obs(websocket: WebSocket, token: str):
+    """Public OBS websocket for YouTube overlay state."""
+    token_preview = (token or "")[:8]
+    user_id = _resolve_obs_token_user_id(token)
+    if not user_id:
+        logger.warning("[WS] Invalid YouTube OBS token %s..., closing", token_preview)
+        await websocket.close(code=4401)
+        return
+
+    conn_mgr = get_connection_manager()
+    await conn_mgr.connect_youtube_obs(websocket, token, user_id)
+
+    try:
+        await websocket.send_json(
+            {
+                "type": "youtube_obs_state",
+                "data": await _load_youtube_obs_state(user_id),
+            }
+        )
+
+        while True:
+            raw_message = await websocket.receive_text()
+            try:
+                message = json.loads(raw_message)
+            except json.JSONDecodeError:
+                continue
+
+            message_type = message.get("type")
+            if message_type == "ping":
+                await websocket.send_json({"type": "pong"})
+            elif message_type in {"refresh", "request_state"}:
+                await websocket.send_json(
+                    {
+                        "type": "youtube_obs_state",
+                        "data": await _load_youtube_obs_state(user_id),
+                    }
+                )
+
+    except Exception as exc:
+        exc_text = str(exc).lower()
+        if "1000" in exc_text or "1001" in exc_text or "disconnect" in exc_text or "closed" in exc_text:
+            logger.info("[WS] YouTube OBS disconnected cleanly: user=%s", user_id)
+        else:
+            logger.warning("[WS] YouTube OBS error for user %s: %s", user_id, exc)
+    finally:
+        await conn_mgr.disconnect_youtube_obs(token)
 
 
 async def _schedule_tts_disconnect(user_id: int) -> None:

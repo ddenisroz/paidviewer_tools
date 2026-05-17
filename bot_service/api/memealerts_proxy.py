@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Depends, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from starlette.requests import ClientDisconnect
 
@@ -29,6 +29,13 @@ router = APIRouter(prefix="/api/memealerts/proxy", tags=["memealerts-proxy"])
 MEMEALERTS_ORIGIN = "https://memealerts.com"
 MEMEALERTS_WWW_ORIGIN = "https://www.memealerts.com"
 PROXY_PREFIX = "/api/memealerts/proxy"
+_ALLOWED_EXTERNAL_AUTH_REDIRECT_HOSTS = {
+    "accounts.google.com",
+    "id.twitch.tv",
+    "oauth.vk.com",
+    "id.vk.com",
+    "login.vk.com",
+}
 
 _HOP_BY_HOP = frozenset(
     {
@@ -53,13 +60,108 @@ _INJECTED_SCRIPT = """
 <script data-ma-proxy="1">
 (function () {
   var handled = false;
+  var inFlight = false;
+  var lastAttemptKey = "";
 
-  function notifyOpener(type, payload) {
-    if (!window.opener) return;
+  function normalizePossibleStreamerId(value) {
+    if (value === null || value === undefined) return "";
+    var text = String(value).trim();
+    if (!text) return "";
+    if (/^[a-f0-9]{24}$/i.test(text)) return text;
+    if (/^\\d{1,32}$/.test(text)) return text;
+    return "";
+  }
+
+  function isAuthStorageKey(key) {
+    if (typeof key !== "string") return false;
+    return /(token|auth|jwt|session|login)/i.test(key);
+  }
+
+  function isProfileStorageKey(key) {
+    if (typeof key !== "string") return false;
+    return /(user|profile|account|streamer|channel|viewer|me)/i.test(key);
+  }
+
+  function extractStreamerIdFromObject(value, depth) {
+    if (!value || depth > 4) return "";
+
+    if (Array.isArray(value)) {
+      for (var idx = 0; idx < value.length && idx < 6; idx += 1) {
+        var nestedArrayId = extractStreamerIdFromObject(value[idx], depth + 1);
+        if (nestedArrayId) return nestedArrayId;
+      }
+      return "";
+    }
+
+    if (typeof value !== "object") return "";
+
+    var directKeys = [
+      "streamer_id",
+      "streamerId",
+      "tid",
+      "user_id",
+      "userId",
+      "channel_id",
+      "channelId",
+      "broadcaster_id",
+      "broadcasterId",
+    ];
+    for (var i = 0; i < directKeys.length; i += 1) {
+      var directValue = normalizePossibleStreamerId(value[directKeys[i]]);
+      if (directValue) return directValue;
+    }
+
+    var looksLikeProfile =
+      !!value.username ||
+      !!value.nickname ||
+      !!value.displayName ||
+      !!value.name ||
+      !!value.email ||
+      !!value.avatar ||
+      !!value.channel;
+    if (looksLikeProfile) {
+      var profileId = normalizePossibleStreamerId(value.id);
+      if (profileId) return profileId;
+    }
+
+    var nestedKeys = [
+      "user",
+      "profile",
+      "account",
+      "streamer",
+      "channel",
+      "viewer",
+      "me",
+      "auth",
+      "data",
+      "result",
+    ];
+    for (var j = 0; j < nestedKeys.length; j += 1) {
+      var nestedValue = extractStreamerIdFromObject(value[nestedKeys[j]], depth + 1);
+      if (nestedValue) return nestedValue;
+    }
+
+    return "";
+  }
+
+  function notifyClient(type, payload) {
     try {
       var data = payload || {};
       data.type = type;
-      window.opener.postMessage(data, window.location.origin);
+    } catch (e) {}
+
+    try {
+      if (window.opener) {
+        window.opener.postMessage(data, window.location.origin);
+      }
+    } catch (e) {}
+
+    try {
+      if ("BroadcastChannel" in window) {
+        var channel = new BroadcastChannel("memealerts-auth");
+        channel.postMessage(data);
+        channel.close();
+      }
     } catch (e) {}
   }
 
@@ -71,10 +173,20 @@ _INJECTED_SCRIPT = """
       params.get("auth_token") ||
       params.get("jwt") ||
       "";
+    var streamerId =
+      params.get("streamer_id") ||
+      params.get("streamerId") ||
+      params.get("tid") ||
+      params.get("user_id") ||
+      params.get("userId") ||
+      params.get("channel_id") ||
+      params.get("channelId") ||
+      "";
     if (!access) return {};
     return {
       access_token: access,
       refresh_token: params.get("refresh_token") || params.get("refreshToken") || undefined,
+      streamer_id: normalizePossibleStreamerId(streamerId) || undefined,
     };
   }
 
@@ -110,11 +222,14 @@ _INJECTED_SCRIPT = """
     return token.length >= 24;
   }
 
-  function extractFromUnknown(rawValue) {
+  function extractFromUnknown(rawValue, keyName) {
     if (typeof rawValue !== "string" || !rawValue) return {};
 
     var direct = rawValue.trim();
-    if (looksLikeToken(direct)) {
+    var authKey = isAuthStorageKey(keyName || "");
+    var profileKey = isProfileStorageKey(keyName || "");
+
+    if (authKey && looksLikeToken(direct)) {
       return { access_token: direct };
     }
 
@@ -131,7 +246,15 @@ _INJECTED_SCRIPT = """
           return {
             access_token: access,
             refresh_token: parsed.refresh_token || parsed.refreshToken || undefined,
+            streamer_id: extractStreamerIdFromObject(parsed, 0) || undefined,
           };
+        }
+
+        if (profileKey) {
+          var profileStreamerId = extractStreamerIdFromObject(parsed, 0);
+          if (profileStreamerId) {
+            return { streamer_id: profileStreamerId };
+          }
         }
       }
     } catch (e) {}
@@ -147,6 +270,18 @@ _INJECTED_SCRIPT = """
 
   function readStorageToken() {
     try {
+      var fallbackStreamerId = "";
+      for (var scanIdx = 0; scanIdx < localStorage.length; scanIdx += 1) {
+        var scanKey = localStorage.key(scanIdx);
+        if (!scanKey || !isProfileStorageKey(scanKey)) continue;
+        var scanValue = localStorage.getItem(scanKey);
+        var scanned = extractFromUnknown(scanValue || "", scanKey);
+        if (scanned.streamer_id) {
+          fallbackStreamerId = scanned.streamer_id;
+          break;
+        }
+      }
+
       var knownKeys = [
         "accessToken",
         "access_token",
@@ -159,7 +294,7 @@ _INJECTED_SCRIPT = """
       ];
       for (var i = 0; i < knownKeys.length; i += 1) {
         var directValue = localStorage.getItem(knownKeys[i]);
-        var extractedDirect = extractFromUnknown(directValue || "");
+        var extractedDirect = extractFromUnknown(directValue || "", knownKeys[i]);
         if (extractedDirect.access_token) {
           return {
             access_token: extractedDirect.access_token,
@@ -168,15 +303,18 @@ _INJECTED_SCRIPT = """
               localStorage.getItem("refreshToken") ||
               localStorage.getItem("refresh_token") ||
               undefined,
+            streamer_id: extractedDirect.streamer_id || fallbackStreamerId || undefined,
           };
         }
       }
 
+      var profileStreamerId = fallbackStreamerId;
       for (var idx = 0; idx < localStorage.length; idx += 1) {
         var key = localStorage.key(idx);
         if (!key) continue;
+        if (!isAuthStorageKey(key) && !isProfileStorageKey(key)) continue;
         var value = localStorage.getItem(key);
-        var extracted = extractFromUnknown(value || "");
+        var extracted = extractFromUnknown(value || "", key);
         if (extracted.access_token) {
           return {
             access_token: extracted.access_token,
@@ -185,7 +323,11 @@ _INJECTED_SCRIPT = """
               localStorage.getItem("refreshToken") ||
               localStorage.getItem("refresh_token") ||
               undefined,
+            streamer_id: extracted.streamer_id || profileStreamerId || undefined,
           };
+        }
+        if (!profileStreamerId && extracted.streamer_id) {
+          profileStreamerId = extracted.streamer_id;
         }
       }
       return {};
@@ -212,15 +354,36 @@ _INJECTED_SCRIPT = """
     } catch (e) {}
   }
 
+  function readCookie(name) {
+    try {
+      var parts = document.cookie ? document.cookie.split("; ") : [];
+      for (var i = 0; i < parts.length; i += 1) {
+        var item = parts[i];
+        var separator = item.indexOf("=");
+        var key = separator >= 0 ? item.slice(0, separator) : item;
+        if (decodeURIComponent(key) === name) {
+          return decodeURIComponent(separator >= 0 ? item.slice(separator + 1) : "");
+        }
+      }
+    } catch (e) {}
+    return "";
+  }
+
   async function persistToken(payload) {
     try {
+      var headers = { "Content-Type": "application/json" };
+      var csrfToken = readCookie("csrf_token");
+      if (csrfToken) {
+        headers["X-CSRF-Token"] = csrfToken;
+      }
       var response = await fetch("/api/memealerts/connect", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: headers,
         body: JSON.stringify({
           access_token: payload.access_token,
           refresh_token: payload.refresh_token,
+          streamer_id: payload.streamer_id,
         }),
       });
       var data = null;
@@ -231,32 +394,42 @@ _INJECTED_SCRIPT = """
       if (data && typeof data.success === "boolean") {
         ok = ok && data.success;
       }
-      return { ok: ok, status: response.status };
+      return {
+        ok: ok,
+        status: response.status,
+        detail: (data && (data.detail || data.error)) || "",
+      };
     } catch (e) {
-      return { ok: false, status: 0 };
+      return { ok: false, status: 0, detail: "" };
     }
   }
 
   async function processToken(payload, source) {
-    if (handled || !payload || !payload.access_token) return;
-    handled = true;
+    if (handled || inFlight || !payload || !payload.access_token) return;
+    var attemptKey = String(payload.access_token) + "|" + String(payload.streamer_id || "");
+    if (attemptKey === lastAttemptKey) return;
 
-    notifyOpener("memealerts_token", {
-      access_token: payload.access_token,
-      refresh_token: payload.refresh_token,
-    });
+    inFlight = true;
+    lastAttemptKey = attemptKey;
 
     var persistResult = await persistToken(payload);
-    notifyOpener("memealerts_proxy_result", {
+    notifyClient("memealerts_proxy_result", {
       ok: !!persistResult.ok,
       status: persistResult.status || 0,
+      detail: persistResult.detail || "",
       source: source || "unknown",
+      streamer_id: payload.streamer_id || undefined,
     });
 
-    cleanupStorage();
-    setTimeout(function () {
-      window.close();
-    }, persistResult.ok ? 350 : 900);
+    if (persistResult.ok) {
+      handled = true;
+      cleanupStorage();
+      setTimeout(function () {
+        window.close();
+      }, 350);
+    }
+
+    inFlight = false;
   }
 
   var tries = 0;
@@ -307,6 +480,13 @@ _PATH_FIX_SCRIPT = """
 """
 
 
+def _is_auth_proxy_path(path: str) -> bool:
+    normalized = (path or "").lstrip("/")
+    return normalized == "auth" or normalized == "api/auth" or normalized.startswith("auth/") or normalized.startswith(
+        "api/auth/"
+    )
+
+
 def _rewrite_set_cookie(value: str, request: Request) -> str:
     # Convert upstream cookies to current host scope so browser keeps them
     # for subsequent proxy requests (anti-bot/session cookies).
@@ -315,6 +495,38 @@ def _rewrite_set_cookie(value: str, request: Request) -> str:
         rewritten = re.sub(r";\s*Secure", "", rewritten, flags=re.IGNORECASE)
         rewritten = re.sub(r";\s*SameSite=None", "; SameSite=Lax", rewritten, flags=re.IGNORECASE)
     return rewritten
+
+
+def _get_origin(value: str | None) -> str | None:
+    if not value:
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _is_same_local_host(origin: str, request: Request) -> bool:
+    origin_host = (urlparse(origin).hostname or "").lower()
+    request_host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or request.url.netloc
+    ).split(":", 1)[0].lower()
+    return origin_host == request_host or origin_host in {"localhost", "127.0.0.1", "::1"}
+
+
+def _resolve_proxy_public_base(request: Request) -> str:
+    for header_name in ("referer", "origin"):
+        origin = _get_origin(request.headers.get(header_name))
+        if origin and _is_same_local_host(origin, request):
+            return origin.rstrip("/")
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+    if host and proto in {"http", "https"} and not any(ch in host for ch in "\r\n\t"):
+        return f"{proto}://{host}".rstrip("/")
+    return str(request.base_url).rstrip("/")
 
 
 def _normalize_query(path: str, query: list[tuple[str, str]] | None) -> list[tuple[str, str]] | None:
@@ -330,7 +542,7 @@ def _normalize_auth_query(
     if not query:
         query = []
 
-    if not path.startswith("api/auth/"):
+    if not (path.startswith("auth/") or path.startswith("api/auth/")):
         return query
 
     normalized: list[tuple[str, str]] = []
@@ -380,7 +592,7 @@ def _build_upstream_auth_fallback_query(
     path: str,
     query: list[tuple[str, str]] | None,
 ) -> list[tuple[str, str]] | None:
-    if not query or not path.startswith("api/auth/"):
+    if not query or not (path.startswith("auth/") or path.startswith("api/auth/")):
         return query
 
     normalized: list[tuple[str, str]] = []
@@ -398,13 +610,17 @@ def _build_upstream_auth_fallback_query(
     return normalized
 
 
+def _normalize_upstream_path(path: str) -> str:
+    return (path or "").lstrip("/")
+
+
 def _build_proxy_auth_fallback_query(
     path: str,
     query: list[tuple[str, str]] | None,
     *,
     proxy_return_url: str,
 ) -> list[tuple[str, str]] | None:
-    if not path.startswith("api/auth/"):
+    if not (path.startswith("auth/") or path.startswith("api/auth/")):
         return query
 
     normalized: list[tuple[str, str]] = []
@@ -423,8 +639,9 @@ def _build_proxy_auth_fallback_query(
 
 
 def _build_upstream_url(path: str) -> str:
-    if path:
-        return f"{MEMEALERTS_ORIGIN}/{path}"
+    normalized_path = _normalize_upstream_path(path)
+    if normalized_path:
+        return f"{MEMEALERTS_ORIGIN}/{normalized_path}"
     return f"{MEMEALERTS_ORIGIN}/"
 
 
@@ -439,7 +656,7 @@ async def _read_proxy_body_limited(request: Request, max_bytes: int) -> bytes:
     return bytes(data)
 
 
-def _rewrite_body(body: bytes, content_type: str, proxy_prefix: str) -> bytes:
+def _rewrite_body(body: bytes, content_type: str, proxy_prefix: str, *, path: str = "") -> bytes:
     if not content_type:
         return body
 
@@ -502,7 +719,7 @@ def _rewrite_body(body: bytes, content_type: str, proxy_prefix: str) -> bytes:
     while repeated_prefix in text:
         text = text.replace(repeated_prefix, proxy_prefix)
 
-    if is_html:
+    if is_html and not _is_auth_proxy_path(path):
         if 'data-ma-route-fix="1"' not in text:
             if "<head>" in text:
                 text = text.replace("<head>", f"<head>{_PATH_FIX_SCRIPT}", 1)
@@ -573,7 +790,13 @@ def _resolve_proxy_access_token(raw_stored_token: str | None) -> str | None:
     return None
 
 
-def _sanitize_redirect_location(location: str, proxy_prefix: str) -> str:
+def _sanitize_redirect_location(
+    location: str,
+    proxy_prefix: str,
+    *,
+    request: Request | None = None,
+    allow_external_auth_redirects: bool = False,
+) -> str:
     """Normalize upstream redirect targets to safe proxy-local locations."""
     if not location:
         return proxy_prefix
@@ -593,6 +816,8 @@ def _sanitize_redirect_location(location: str, proxy_prefix: str) -> str:
     if location.startswith(MEMEALERTS_WWW_ORIGIN):
         return location.replace(MEMEALERTS_WWW_ORIGIN, proxy_prefix)
     if location.startswith("/"):
+        if location.startswith("/memealerts/callback") or location.startswith(f"{proxy_prefix}/auth/redirect"):
+            return location
         return f"{proxy_prefix}{location}"
 
     parsed = urlparse(location)
@@ -605,6 +830,24 @@ def _sanitize_redirect_location(location: str, proxy_prefix: str) -> str:
     # Keep relative paths inside proxy.
     if not scheme and not parsed.netloc:
         return f"{proxy_prefix}/{location.lstrip('./')}"
+
+    request_host = (
+        (request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc).split(":", 1)[0]
+        .strip()
+        .lower()
+        if request is not None
+        else ""
+    )
+    redirect_host = (parsed.hostname or "").strip().lower()
+    if request_host and redirect_host in {request_host, "localhost", "127.0.0.1", "::1"}:
+        if parsed.path.startswith("/memealerts/callback") or parsed.path.startswith(f"{proxy_prefix}/auth/redirect"):
+            return location
+
+    if allow_external_auth_redirects and scheme == "https":
+        if redirect_host in _ALLOWED_EXTERNAL_AUTH_REDIRECT_HOSTS or any(
+            redirect_host.endswith(suffix) for suffix in (".google.com", ".twitch.tv", ".vk.com", ".vk.ru")
+        ):
+            return location
 
     # Allow only absolute redirects to upstream MemeAlerts hosts.
     if scheme in {"http", "https"} and parsed.netloc.lower() in {"memealerts.com", "www.memealerts.com"}:
@@ -633,6 +876,13 @@ async def proxy_path(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
+    canonical_path = _normalize_upstream_path(path)
+    if canonical_path != (path or "").lstrip("/"):
+        query_string = f"?{request.url.query}" if request.url.query else ""
+        return RedirectResponse(
+            url=f"{PROXY_PREFIX}/{canonical_path}{query_string}",
+            status_code=307,
+        )
     return await _proxy(request, path, user=user, db=db)
 
 
@@ -674,7 +924,7 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
     query = list(request.query_params.multi_items()) if request.query_params else None
     has_explicit_return_url = bool(request.query_params.get("return_url"))
     query = _normalize_query(path, query)
-    proxy_return_url = f"{str(request.base_url).rstrip('/')}{PROXY_PREFIX}/auth/redirect"
+    proxy_return_url = f"{_resolve_proxy_public_base(request)}{PROXY_PREFIX}/auth/redirect"
     query = _normalize_auth_query(path, query, proxy_return_url=proxy_return_url)
 
     try:
@@ -689,10 +939,7 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
             # Retry auth with proxy callback first, then with upstream callback.
             # This keeps automatic token handoff working when possible and falls
             # back to upstream redirect only as a last resort.
-            if (
-                path.startswith("api/auth/")
-                and upstream_resp.status_code >= 400
-            ):
+            if _is_auth_proxy_path(path) and upstream_resp.status_code >= 400:
                 retried_query = query
                 proxy_fallback_query = _build_proxy_auth_fallback_query(
                     path,
@@ -712,21 +959,6 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
                         params=proxy_fallback_query,
                     )
                     retried_query = proxy_fallback_query
-
-                if upstream_resp.status_code >= 400:
-                    upstream_fallback_query = _build_upstream_auth_fallback_query(path, retried_query)
-                    if upstream_fallback_query != retried_query:
-                        logger.warning(
-                            "[PROXY] Auth flow still rejected return_url, retrying with upstream return_url (explicit=%s)",
-                            has_explicit_return_url,
-                        )
-                        upstream_resp = await client.request(
-                            method=request.method,
-                            url=upstream_url,
-                            headers=fwd_headers,
-                            content=body if body else None,
-                            params=upstream_fallback_query,
-                        )
                 else:
                     logger.info(
                         "[PROXY] Auth flow accepted proxy return_url after fallback (explicit=%s)",
@@ -741,7 +973,12 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
 
     if upstream_resp.is_redirect:
         location = upstream_resp.headers.get("location", "")
-        location = _sanitize_redirect_location(location, proxy_prefix)
+        location = _sanitize_redirect_location(
+            location,
+            proxy_prefix,
+            request=request,
+            allow_external_auth_redirects=_is_auth_proxy_path(path),
+        )
 
         upstream_set_cookies = upstream_resp.headers.get_list("set-cookie")
         resp_headers = _filter_headers(upstream_resp.headers, is_response=True)
@@ -755,7 +992,7 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
         return response
 
     content_type = upstream_resp.headers.get("content-type", "")
-    resp_body = _rewrite_body(upstream_resp.content, content_type, proxy_prefix)
+    resp_body = _rewrite_body(upstream_resp.content, content_type, proxy_prefix, path=path)
 
     upstream_set_cookies = upstream_resp.headers.get_list("set-cookie")
     resp_headers = _filter_headers(upstream_resp.headers, is_response=True)

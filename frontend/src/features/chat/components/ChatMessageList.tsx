@@ -47,7 +47,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
     onContextMenuAction,
     onScroll,
     onScrollToBottom,
-    setMessagesContainerRef
+    setMessagesContainerRef,
 }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -61,9 +61,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                 <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                     <MessageSquare className="h-12 w-12 mb-3 opacity-50" />
                     <p className="text-sm">Нет сообщений</p>
-                    <p className="text-xs mt-1">
-                        {isConnected ? 'Ожидание сообщений...' : 'Ожидание подключения...'}
-                    </p>
+                    <p className="text-xs mt-1">{isConnected ? 'Ожидание сообщений...' : 'Ожидание подключения...'}</p>
                 </div>
             </div>
         );
@@ -85,10 +83,7 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                 message={msg}
                                 onSwipeAction={onContextMenuAction}
                             >
-                                <div
-                                    className="p-1"
-                                    onContextMenu={(e) => onContextMenu(e, msg)}
-                                >
+                                <div className="p-1" onContextMenu={(e) => onContextMenu(e, msg)}>
                                     <div className="text-sm leading-[1.35]">
                                         {msg.platform === 'twitch' ? (
                                             <TwitchIcon
@@ -101,87 +96,100 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                                 style={{ width: '16px', height: '16px' }}
                                             />
                                         )}
-
                                         <span className="text-xs text-muted-foreground mr-1.5 timestamp">
                                             {formatLocalMessageTime(msg.timestamp)}
                                         </span>
-
-                                        {msg.platform === 'twitch' && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
-                                            <>
-                                                {msg.badges.map((badge, idx) => {
-                                                    if (!badge || typeof badge !== 'string' || !badge.includes('/')) {
-                                                        logger.debug('Invalid badge format:', badge);
-                                                        return null;
-                                                    }
-
-                                                    const [badgeId, version] = badge.split('/');
-                                                    if (!badgeId || !version) {
-                                                        logger.debug('Badge missing id or version:', badge);
-                                                        return null;
-                                                    }
-
-                                                    const badgeUrl = twitchBadgesService.getBadgeUrl(badgeId, version, '1x');
-
-                                                    if (!badgeUrl) {
-                                                        if (badgesLoaded) {
+                                        {msg.platform === 'twitch' &&
+                                            msg.badges &&
+                                            Array.isArray(msg.badges) &&
+                                            msg.badges.length > 0 && (
+                                                <>
+                                                    {msg.badges.map((badge, idx) => {
+                                                        if (
+                                                            !badge ||
+                                                            typeof badge !== 'string' ||
+                                                            !badge.includes('/')
+                                                        ) {
+                                                            logger.debug('Invalid badge format:', badge);
                                                             return null;
-                                                        } else {
-                                                            return (
-                                                                <span
-                                                                    key={idx}
-                                                                    className="inline-block align-text-bottom mr-0.5 w-[16px] h-[16px] bg-gray-600 rounded"
-                                                                    title={badge}
-                                                                />
-                                                            );
                                                         }
-                                                    }
 
-                                                    return (
-                                                        <img
-                                                            key={idx}
-                                                            src={badgeUrl}
-                                                            alt={badgeId}
-                                                            title={badge}
-                                                            className="inline-block align-text-bottom mr-0.5 object-contain"
-                                                            style={{ width: '16px', height: '16px' }}
-                                                            onError={(e) => {
-                                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </>
-                                        )}
+                                                        const [badgeId, version] = badge.split('/');
+                                                        if (!badgeId || !version) {
+                                                            logger.debug('Badge missing id or version:', badge);
+                                                            return null;
+                                                        }
 
-                                        {msg.platform === 'vk' && msg.badges && Array.isArray(msg.badges) && msg.badges.length > 0 && (
-                                            <>
-                                                {msg.badges.map((badge, idx) => {
-                                                    if (!badge || typeof badge !== 'string') {
-                                                        return null;
-                                                    }
-                                                    return (
-                                                        <img
-                                                            key={idx}
-                                                            src={badge}
-                                                            alt="vk-badge"
-                                                            className="inline-block align-text-bottom mr-0.5 object-contain"
-                                                            style={{ width: '16px', height: '16px' }}
-                                                            onError={(e) => {
-                                                                (e.target as HTMLImageElement).style.display = 'none';
-                                                            }}
-                                                        />
-                                                    );
-                                                })}
-                                            </>
-                                        )}
+                                                        const badgeUrl = twitchBadgesService.getBadgeUrl(
+                                                            badgeId,
+                                                            version,
+                                                            '1x'
+                                                        );
 
+                                                        if (!badgeUrl) {
+                                                            if (badgesLoaded) {
+                                                                return null;
+                                                            } else {
+                                                                return (
+                                                                    <span
+                                                                        key={idx}
+                                                                        className="inline-block align-text-bottom mr-0.5 w-[16px] h-[16px] bg-gray-600 rounded"
+                                                                        title={badge}
+                                                                    />
+                                                                );
+                                                            }
+                                                        }
+
+                                                        return (
+                                                            <img
+                                                                key={idx}
+                                                                src={badgeUrl}
+                                                                alt={badgeId}
+                                                                title={badge}
+                                                                className="inline-block align-text-bottom mr-0.5 object-contain"
+                                                                style={{ width: '16px', height: '16px' }}
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display =
+                                                                        'none';
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
+                                        {msg.platform === 'vk' &&
+                                            msg.badges &&
+                                            Array.isArray(msg.badges) &&
+                                            msg.badges.length > 0 && (
+                                                <>
+                                                    {msg.badges.map((badge, idx) => {
+                                                        if (!badge || typeof badge !== 'string') {
+                                                            return null;
+                                                        }
+                                                        return (
+                                                            <img
+                                                                key={idx}
+                                                                src={badge}
+                                                                alt="vk-badge"
+                                                                className="inline-block align-text-bottom mr-0.5 object-contain"
+                                                                style={{ width: '16px', height: '16px' }}
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).style.display =
+                                                                        'none';
+                                                                }}
+                                                            />
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
                                         <span
-                                            className={`font-medium cursor-pointer hover:underline ${msg.platform === 'twitch'
+                                            className={`font-medium cursor-pointer hover:underline ${
+                                                msg.platform === 'twitch'
                                                     ? 'text-purple-400'
                                                     : msg.platform === 'vk'
-                                                        ? 'text-red-400'
-                                                        : ''
-                                                }`}
+                                                      ? 'text-red-400'
+                                                      : ''
+                                            }`}
                                             style={
                                                 msg.platform === 'twitch' || msg.platform === 'vk'
                                                     ? undefined
@@ -192,7 +200,6 @@ const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                         >
                                             {msg.author_name || msg.author || 'Unknown'}:
                                         </span>{' '}
-
                                         <span className="break-words">
                                             <MessageContent
                                                 message={msg.content || msg.message || 'Нет содержимого'}

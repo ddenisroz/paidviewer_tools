@@ -1,10 +1,8 @@
 ﻿import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 
-import { authLogger as logger } from '../shared/utils/prodLogger';
 import { useAuthStore } from '../store/useAuthStore';
 
 import type { User } from '@/types/user';
-
 
 interface AuthContextType {
     user: User | null;
@@ -25,15 +23,7 @@ interface AuthContextType {
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const {
-        user,
-        isAuthenticated,
-        isLoading,
-        checkAuth,
-        loginWithTwitch,
-        loginWithVk,
-        logout
-    } = useAuthStore();
+    const { user, isAuthenticated, isLoading, checkAuth, loginWithTwitch, loginWithVk, logout } = useAuthStore();
 
     // Track if we have performed the initial check
     const [initialCheckDone, setInitialCheckDone] = useState(false);
@@ -48,7 +38,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const initAuth = async () => {
             // Check for auth params in URL
             const currentUrl = new URL(window.location.href);
-            const hasAuthParams = currentUrl.searchParams.has('auth') ||
+            const hasAuthParams =
+                currentUrl.searchParams.has('auth') ||
                 currentUrl.searchParams.has('success') ||
                 currentUrl.searchParams.has('error');
 
@@ -87,20 +78,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     return (
-        <AuthContext.Provider value={{
-            user,
-            isAuthenticated,
-            isLoading,
-            isCheckingAuth,
-            integrationsNeedRefresh,
-            loginWithTwitch,
-            loginWithVk,
-            logout,
-            checkAuthStatus: checkAuth,
-            refreshAuthStatus,
-            markIntegrationsRefreshed,
-            isWhitelisted
-        }}>
+        <AuthContext.Provider
+            value={{
+                user,
+                isAuthenticated,
+                isLoading,
+                isCheckingAuth,
+                integrationsNeedRefresh,
+                loginWithTwitch,
+                loginWithVk,
+                logout,
+                checkAuthStatus: checkAuth,
+                refreshAuthStatus,
+                markIntegrationsRefreshed,
+                isWhitelisted,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );

@@ -139,7 +139,7 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
             if 'speed_preset' in settings_data:
                 settings.speed_preset = settings_data['speed_preset']
             if 'volume' in settings_data:
-                settings.volume = settings_data['volume']
+                settings.volume = max(0, min(100, int(settings_data['volume'])))
             settings.updated_at = utcnow_naive()
         else:
             settings = UserVoiceSettings(
@@ -149,7 +149,9 @@ class UserVoiceSettingsRepository(BaseRepository[UserVoiceSettings]):
                 tts_provider=tts_provider,
                 cfg_strength=settings_data.get('cfg_strength'),
                 speed_preset=settings_data.get('speed_preset'),
-                volume=settings_data.get('volume')
+                volume=max(0, min(100, int(settings_data['volume'])))
+                if settings_data.get('volume') is not None
+                else None,
             )
             self.db.add(settings)
         

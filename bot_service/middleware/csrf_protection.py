@@ -25,6 +25,10 @@ class CSRFProtectionMiddleware(BaseHTTPMiddleware):
             "/auth/vk",
             "/auth/twitch/callback",
             "/auth/vk/callback",
+            "/api/auth/dev-login",
+            # Third-party MemeAlerts SPA performs its own POST requests through our
+            # same-origin proxy while keeping our session cookie attached.
+            "/api/memealerts/proxy",
         ]
 
     async def dispatch(self, request: Request, call_next):

@@ -23,7 +23,9 @@
     min-height: 56px !important;
     align-items: center !important;
     font-family: inherit !important;
-    transition: transform 0.2s ease, opacity 0.2s ease !important;
+    transition:
+        transform 0.2s ease,
+        opacity 0.2s ease !important;
 }
 
 /* Prevent lifting effect on hover */
@@ -32,22 +34,22 @@
 }
 
 /* Consistent Even Borders for all types */
-[data-sonner-toast][data-type="success"] {
+[data-sonner-toast][data-type='success'] {
     border: 1px solid rgba(16, 185, 129, 0.5) !important;
     background-image: linear-gradient(to right, rgba(16, 185, 129, 0.05), transparent) !important;
 }
 
-[data-sonner-toast][data-type="error"] {
+[data-sonner-toast][data-type='error'] {
     border: 1px solid rgba(239, 110, 110, 0.5) !important;
     background-image: linear-gradient(to right, rgba(239, 68, 68, 0.05), transparent) !important;
 }
 
-[data-sonner-toast][data-type="warning"] {
+[data-sonner-toast][data-type='warning'] {
     border: 1px solid rgba(245, 158, 11, 0.6) !important;
     background-image: linear-gradient(to right, rgba(245, 158, 11, 0.05), transparent) !important;
 }
 
-[data-sonner-toast][data-type="info"] {
+[data-sonner-toast][data-type='info'] {
     border: 1px solid rgba(59, 130, 246, 0.5) !important;
     background-image: linear-gradient(to right, rgba(59, 130, 246, 0.05), transparent) !important;
 }

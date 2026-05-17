@@ -18,7 +18,7 @@ const AnimationSettings: React.FC<AnimationSettingsProps> = ({
     messageFadeSeconds,
     onAnimationTypeChange,
     onAnimationDurationChange,
-    onMessageFadeSecondsChange
+    onMessageFadeSecondsChange,
 }) => {
     return (
         <div className="space-y-6">

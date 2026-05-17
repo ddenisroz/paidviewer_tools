@@ -28,13 +28,7 @@ describe('FormBuilder', () => {
         ];
 
         it('renders text input field', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             expect(screen.getByLabelText('Имя пользователя')).toBeInTheDocument();
             expect(screen.getByPlaceholderText('Введите имя')).toBeInTheDocument();
@@ -43,12 +37,7 @@ describe('FormBuilder', () => {
         it('validates text input on submit', async () => {
             const user = userEvent.setup();
             render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                    defaultValues={{ username: '' }}
-                />
+                <FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} defaultValues={{ username: '' }} />
             );
 
             const submitButton = screen.getByRole('button', { name: 'Сохранить' });
@@ -63,12 +52,7 @@ describe('FormBuilder', () => {
         it('submits valid text input', async () => {
             const user = userEvent.setup();
             render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                    defaultValues={{ username: '' }}
-                />
+                <FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} defaultValues={{ username: '' }} />
             );
 
             const input = screen.getByLabelText('Имя пользователя');
@@ -99,13 +83,7 @@ describe('FormBuilder', () => {
         ];
 
         it('renders number input field', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             const input = screen.getByLabelText('Возраст');
             expect(input).toHaveAttribute('type', 'number');
@@ -128,13 +106,7 @@ describe('FormBuilder', () => {
         ];
 
         it('renders checkbox field', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             expect(screen.getByLabelText('Согласен с условиями')).toBeInTheDocument();
         });
@@ -142,12 +114,7 @@ describe('FormBuilder', () => {
         it('toggles checkbox value', async () => {
             const user = userEvent.setup();
             render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                    defaultValues={{ agree: false }}
-                />
+                <FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} defaultValues={{ agree: false }} />
             );
 
             const checkbox = screen.getByRole('checkbox');
@@ -176,13 +143,7 @@ describe('FormBuilder', () => {
         ];
 
         it('renders select field', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             expect(screen.getByText('Роль')).toBeInTheDocument();
         });
@@ -203,13 +164,7 @@ describe('FormBuilder', () => {
         ];
 
         it('renders textarea field', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             const textarea = screen.getByLabelText('Описание');
             expect(textarea.tagName).toBe('TEXTAREA');
@@ -231,26 +186,13 @@ describe('FormBuilder', () => {
         ];
 
         it('shows submit button with default label', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             expect(screen.getByRole('button', { name: 'Сохранить' })).toBeInTheDocument();
         });
 
         it('shows submit button with custom label', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                    submitLabel="Отправить"
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} submitLabel="Отправить" />);
 
             expect(screen.getByRole('button', { name: 'Отправить' })).toBeInTheDocument();
         });
@@ -288,14 +230,7 @@ describe('FormBuilder', () => {
         });
 
         it('disables form when loading', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                    loading
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} loading />);
 
             const input = screen.getByLabelText('Имя');
             const submitButton = screen.getByRole('button', { name: 'Сохранить' });
@@ -320,13 +255,7 @@ describe('FormBuilder', () => {
         ];
 
         it('shows field description', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             expect(screen.getByText('Введите ваш email адрес')).toBeInTheDocument();
         });
@@ -353,13 +282,7 @@ describe('FormBuilder', () => {
         ];
 
         it('does not render hidden fields', () => {
-            render(
-                <FormBuilder
-                    schema={schema}
-                    fields={fields}
-                    onSubmit={mockOnSubmit}
-                />
-            );
+            render(<FormBuilder schema={schema} fields={fields} onSubmit={mockOnSubmit} />);
 
             expect(screen.getByLabelText('Видимое поле')).toBeInTheDocument();
             expect(screen.queryByLabelText('Скрытое поле')).not.toBeInTheDocument();

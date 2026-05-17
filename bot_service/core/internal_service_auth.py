@@ -28,14 +28,13 @@ def _build_api_key_headers(api_key: str) -> Dict[str, str]:
 
 
 def _normalize_provider(provider: str) -> str:
-    candidate = (provider or "").strip().lower()
-    if candidate == "qwen":
-        return "qwen"
+    _ = provider
     return "f5"
 
 
 def _provider_api_key_setting_name(provider: str) -> str:
-    return "QWEN_TTS_SERVICE_API_KEY" if _normalize_provider(provider) == "qwen" else "F5_TTS_SERVICE_API_KEY"
+    _ = provider
+    return "F5_TTS_SERVICE_API_KEY"
 
 
 def _resolve_gateway_api_key(*, strict: bool) -> str:
@@ -51,14 +50,9 @@ def _resolve_gateway_api_key(*, strict: bool) -> str:
 
 def _resolve_provider_api_key(provider: str, *, strict: bool) -> tuple[str, str]:
     normalized_provider = _normalize_provider(provider)
-    if normalized_provider == "qwen":
-        api_key = _normalize_api_key(settings.qwen_tts_service_api_key)
-        if api_key:
-            return api_key, "provider"
-    else:
-        api_key = _normalize_api_key(settings.f5_tts_service_api_key)
-        if api_key:
-            return api_key, "provider"
+    api_key = _normalize_api_key(settings.f5_tts_service_api_key)
+    if api_key:
+        return api_key, "provider"
 
     api_key = _normalize_api_key(settings.tts_internal_api_key)
     if api_key:
@@ -70,15 +64,8 @@ def _resolve_provider_api_key(provider: str, *, strict: bool) -> tuple[str, str]
 
     if not api_key and strict:
         raise TTSAuthConfigError(
-            (
-                "QWEN_TTS_SERVICE_API_KEY is required for qwen upstream requests. "
-                "Fallbacks: TTS_INTERNAL_API_KEY, TTS_GATEWAY_API_KEY."
-            )
-            if normalized_provider == "qwen"
-            else (
-                "F5_TTS_SERVICE_API_KEY is required for f5 upstream requests. "
-                "Fallbacks: TTS_INTERNAL_API_KEY, TTS_GATEWAY_API_KEY."
-            )
+            "F5_TTS_SERVICE_API_KEY is required for f5 upstream requests. "
+            "Fallbacks: TTS_INTERNAL_API_KEY, TTS_GATEWAY_API_KEY."
         )
     return "", "missing"
 

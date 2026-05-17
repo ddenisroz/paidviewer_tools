@@ -25,7 +25,7 @@ const ImageLootboxTab: React.FC<ImageLootboxTabProps> = ({
     imageLootboxes,
     openingLootboxId,
     onLootboxOpen,
-    onOpenImageLootbox
+    onOpenImageLootbox,
 }) => {
     return (
         <div className="bg-gray-800 rounded-lg p-6">
@@ -35,7 +35,7 @@ const ImageLootboxTab: React.FC<ImageLootboxTabProps> = ({
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => imageLootboxes.forEach(lb => onLootboxOpen(lb.id))}
+                        onClick={() => imageLootboxes.forEach((lb) => onLootboxOpen(lb.id))}
                     >
                         <Gift className="w-4 h-4 mr-2" />
                         Открыть все
@@ -53,20 +53,20 @@ const ImageLootboxTab: React.FC<ImageLootboxTabProps> = ({
 
             <div className="mb-6">
                 <p className="text-gray-400 text-sm">
-                    Нажмите на лутбокс, чтобы увидеть анимацию открытия. Картинки будут сменяться, создавая эффект открытия.
+                    Нажмите на лутбокс, чтобы увидеть анимацию открытия. Картинки будут сменяться, создавая эффект
+                    открытия.
                 </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {imageLootboxes.map((lootbox) => {
-                    const lootboxForConfig = { ...lootbox, id: typeof lootbox.id === 'number' ? lootbox.id : undefined };
+                    const lootboxForConfig = {
+                        ...lootbox,
+                        id: typeof lootbox.id === 'number' ? lootbox.id : undefined,
+                    };
                     const config = createLootboxImageConfig(lootboxForConfig, 'grid');
                     return (
-                        <div
-                            key={lootbox.id}
-                            id={`image-lootbox-${lootbox.id}`}
-                            className="animate-lootbox-appear"
-                        >
+                        <div key={lootbox.id} id={`image-lootbox-${lootbox.id}`} className="animate-lootbox-appear">
                             <ImageLootbox
                                 images={config.images}
                                 title={config.title}
@@ -94,11 +94,11 @@ const ImageLootboxTab: React.FC<ImageLootboxTabProps> = ({
             </div>
 
             <div className="mt-8 p-4 bg-gray-700 rounded-lg">
-            <h4 className="text-sm font-semibold text-white mb-2">О системе анимации</h4>
+                <h4 className="text-sm font-semibold text-white mb-2">О системе анимации</h4>
                 <p className="text-sm text-gray-300">
-                    Система использует смену картинок для создания эффекта открытия лутбокса.
-                    Каждый лутбокс имеет набор картинок: закрытый → этапы открытия → открытый.
-                    Добавьте свои картинки в папку <code className="bg-gray-800 px-1 rounded">/src/images/lootboxes/</code>
+                    Система использует смену картинок для создания эффекта открытия лутбокса. Каждый лутбокс имеет набор
+                    картинок: закрытый → этапы открытия → открытый. Добавьте свои картинки в папку{' '}
+                    <code className="bg-gray-800 px-1 rounded">/src/images/lootboxes/</code>
                 </p>
             </div>
         </div>

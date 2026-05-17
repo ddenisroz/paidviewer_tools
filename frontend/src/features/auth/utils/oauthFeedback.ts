@@ -4,10 +4,14 @@ export const OAUTH_PLATFORM_LABELS: Record<string, string> = {
 };
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
-    cancelled: 'Авторизация отменена.',
+    access_denied:
+        'Вход не завершен: провайдер отклонил запрос или была нажата отмена. Нажмите вход еще раз и подтвердите доступ.',
+    cancelled: 'Вход не завершен. Нажмите кнопку входа еще раз и подтвердите доступ у провайдера.',
     integration_not_configured: 'Интеграция еще не настроена.',
     provider_unreachable: 'Сервис авторизации временно недоступен. Попробуйте еще раз через минуту.',
     provider_rejected: 'Провайдер не подтвердил авторизацию. Повторите попытку.',
+    redirect_mismatch:
+        'Callback URL не совпадает с настройками Twitch. Проверьте redirect URI в локальном конфиге и Twitch Developer Console.',
     invalid_state: 'Сессия авторизации устарела. Начните вход заново.',
     identity_conflict: 'Найдены конфликтующие данные аккаунта. Мы уже их вычищаем, попробуйте вход еще раз.',
     internal_error: 'Во время авторизации произошла внутренняя ошибка.',

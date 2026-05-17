@@ -1,13 +1,7 @@
 ﻿// src/components/chat/ChatControls.tsx
 import React from 'react';
 
-import {
-    Copy,
-    MessageCircle,
-    MessageSquare,
-    Settings,
-    Twitch
-} from 'lucide-react';
+import { Copy, MessageCircle, MessageSquare, Settings, Twitch } from 'lucide-react';
 
 import { VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
@@ -16,7 +10,6 @@ import { Label } from '@/shared/components/ui/label';
 import { Separator } from '@/shared/components/ui/separator';
 import { Switch } from '@/shared/components/ui/switch';
 import { toast } from '@/utils/toastManager';
-
 
 interface Integration {
     enabled?: boolean;
@@ -47,7 +40,7 @@ const ChatControls: React.FC<ChatControlsProps> = ({
     showObsSettings,
     setShowObsSettings,
     integrations,
-    generateObsUrl
+    generateObsUrl,
 }) => {
     const twitchEnabled = integrations.twitch?.enabled;
     const vkEnabled = integrations.vk?.enabled;
@@ -106,7 +99,6 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                             {vkEnabled ? `@${integrations.vk?.username}` : 'Не подключен'}
                         </span>
                     </div>
-
                 </div>
 
                 <Separator />
@@ -178,12 +170,14 @@ const ChatControls: React.FC<ChatControlsProps> = ({
                             Нажмите кнопку выше чтобы сгенерировать URL с текущими настройками
                         </div>
                         <div className="text-xs text-muted-foreground">
-                            <strong>Текущая фильтрация:</strong> {
-                                twitchChatEnabled && vkChatEnabled ? 'Объединенный чат (Twitch + VK Live)' :
-                                    twitchChatEnabled ? 'Только Twitch' :
-                                        vkChatEnabled ? 'Только VK Live' :
-                                            'Все платформы'
-                            }
+                            <strong>Текущая фильтрация:</strong>{' '}
+                            {twitchChatEnabled && vkChatEnabled
+                                ? 'Объединенный чат (Twitch + VK Live)'
+                                : twitchChatEnabled
+                                  ? 'Только Twitch'
+                                  : vkChatEnabled
+                                    ? 'Только VK Live'
+                                    : 'Все платформы'}
                         </div>
                     </div>
                 </div>

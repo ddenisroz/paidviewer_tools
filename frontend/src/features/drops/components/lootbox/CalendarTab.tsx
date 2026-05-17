@@ -18,13 +18,13 @@ interface CalendarTabProps {
 }
 
 const CalendarTab: React.FC<CalendarTabProps> = ({ gameFieldData, onDayClick }) => {
-    const activeDays = gameFieldData.filter(day => day.isActive).length;
-    const daysWithViewers = gameFieldData.filter(day => day.hasViewer).length;
-    const uniqueViewers = new Set(gameFieldData.filter(day => day.viewerName).map(day => day.viewerName)).size;
-    
+    const activeDays = gameFieldData.filter((day) => day.isActive).length;
+    const daysWithViewers = gameFieldData.filter((day) => day.hasViewer).length;
+    const uniqueViewers = new Set(gameFieldData.filter((day) => day.viewerName).map((day) => day.viewerName)).size;
+
     let maxStreak = 0;
     let currentStreak = 0;
-    gameFieldData.forEach(day => {
+    gameFieldData.forEach((day) => {
         if (day.isActive) {
             currentStreak++;
             maxStreak = Math.max(maxStreak, currentStreak);
@@ -55,25 +55,26 @@ const CalendarTab: React.FC<CalendarTabProps> = ({ gameFieldData, onDayClick }) 
                         key={dayData.day}
                         className={`
                             aspect-square flex flex-col items-center justify-center text-sm rounded-lg cursor-pointer transition-all duration-200 border-2
-                            ${dayData.hasViewer
-                                ? dayData.isActive
-                                    ? 'bg-green-600 text-white border-green-500 hover:bg-green-700'
-                                    : 'bg-blue-700 text-white border-blue-600 hover:bg-blue-800'
-                                : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-gray-600'
+                            ${
+                                dayData.hasViewer
+                                    ? dayData.isActive
+                                        ? 'bg-green-600 text-white border-green-500 hover:bg-green-700'
+                                        : 'bg-blue-700 text-white border-blue-600 hover:bg-blue-800'
+                                    : 'bg-gray-700 text-gray-400 border-gray-600 hover:bg-gray-600'
                             }
                         `}
-                        title={dayData.viewerName ? `День ${dayData.day}: ${dayData.viewerName}` : `День ${dayData.day}: Нет зрителей`}
+                        title={
+                            dayData.viewerName
+                                ? `День ${dayData.day}: ${dayData.viewerName}`
+                                : `День ${dayData.day}: Нет зрителей`
+                        }
                         onClick={() => onDayClick(dayData.day, dayData.viewerName)}
                     >
                         <div className="text-xs font-bold">{dayData.day}</div>
                         {dayData.viewerName && (
-                            <div className="text-xs truncate w-full text-center px-1">
-                                {dayData.viewerName}
-                            </div>
+                            <div className="text-xs truncate w-full text-center px-1">{dayData.viewerName}</div>
                         )}
-                        {dayData.hasViewer && dayData.isActive && (
-                            <Check className="w-3 h-3 mt-1" />
-                        )}
+                        {dayData.hasViewer && dayData.isActive && <Check className="w-3 h-3 mt-1" />}
                     </div>
                 ))}
             </div>

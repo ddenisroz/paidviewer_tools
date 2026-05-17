@@ -13,11 +13,12 @@ const AuthCallbackPage: React.FC = () => {
         const handleCallback = async (): Promise<void> => {
             try {
                 const currentUrl = new URL(window.location.href);
-                const hasAuthParams = currentUrl.searchParams.has('auth') || 
-                                      currentUrl.searchParams.has('success') || 
-                                      currentUrl.searchParams.has('error') ||
-                                      currentUrl.searchParams.has('auth_link');
-                
+                const hasAuthParams =
+                    currentUrl.searchParams.has('auth') ||
+                    currentUrl.searchParams.has('success') ||
+                    currentUrl.searchParams.has('error') ||
+                    currentUrl.searchParams.has('auth_link');
+
                 if (hasAuthParams) {
                     currentUrl.searchParams.delete('auth');
                     currentUrl.searchParams.delete('success');
@@ -25,11 +26,11 @@ const AuthCallbackPage: React.FC = () => {
                     currentUrl.searchParams.delete('auth_link');
                     window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search);
                 }
-                
+
                 await refreshAuthStatus(true);
                 navigate('/dashboard', { replace: true });
             } catch (error) {
-                logger.error("[ERROR] Ошибка при обновлении статуса аутентификации:", error);
+                logger.error('[ERROR] Ошибка при обновлении статуса аутентификации:', error);
                 navigate('/login', { replace: true });
             }
         };
@@ -41,4 +42,3 @@ const AuthCallbackPage: React.FC = () => {
 };
 
 export default AuthCallbackPage;
-

@@ -1131,6 +1131,36 @@ def test_memealerts_proxy_blocks_crlf_redirect_location():
     assert location == memealerts_proxy.PROXY_PREFIX
 
 
+def test_memealerts_proxy_allows_local_callback_redirect_for_auth():
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/api/memealerts/proxy/api/auth/google",
+        "headers": [(b"host", b"localhost")],
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+        "server": ("localhost", 80),
+        "scheme": "http",
+    }
+    request = Request(scope)
+    location = memealerts_proxy._sanitize_redirect_location(
+        "http://localhost/memealerts/callback?provider=google&accessToken=test-token",
+        memealerts_proxy.PROXY_PREFIX,
+        request=request,
+        allow_external_auth_redirects=True,
+    )
+    assert location.startswith("http://localhost/memealerts/callback")
+
+
+def test_memealerts_proxy_allows_provider_redirect_for_auth():
+    location = memealerts_proxy._sanitize_redirect_location(
+        "https://accounts.google.com/o/oauth2/v2/auth?client_id=test",
+        memealerts_proxy.PROXY_PREFIX,
+        allow_external_auth_redirects=True,
+    )
+    assert location.startswith("https://accounts.google.com/o/oauth2/v2/auth")
+
+
 def test_memealerts_proxy_postmessage_uses_same_origin_target():
     assert 'postMessage(data, window.location.origin)' in memealerts_proxy._INJECTED_SCRIPT
 
@@ -1290,12 +1320,83 @@ def test_memealerts_callback_url_rejects_javascript_scheme():
 
 
 @pytest.mark.asyncio
-async def test_memealerts_connect_url_returns_503_on_unsafe_frontend_url(monkeypatch):
+async def test_memealerts_connect_url_prefers_proxy_callback_flow(monkeypatch):
+    monkeypatch.setattr(memealerts_api.settings, "frontend_url", "https://app.local")
+    monkeypatch.setattr(memealerts_api.settings, "backend_url", "https://api.local")
+
+    result = await memealerts_api.get_memealerts_connect_url(user={"id": 1})
+
+    assert result["flow"] == "provider_popup_callback"
+    assert result["callback_url"] == "https://app.local/memealerts/callback?provider=twitch"
+    assert result["auth_url"].startswith("/api/memealerts/proxy/api/auth/twitch?")
+    assert "return_url=https%3A%2F%2Fapp.local%2Fmemealerts%2Fcallback%3Fprovider%3Dtwitch" in result["auth_url"]
+    assert result["direct_auth_url"].startswith("https://memealerts.com/api/auth/twitch?")
+    assert result["proxy_auth_url"].startswith("/api/memealerts/proxy/api/auth/twitch?")
+
+
+@pytest.mark.asyncio
+async def test_memealerts_connect_url_rejects_unsafe_callback_urls(monkeypatch):
     monkeypatch.setattr(memealerts_api.settings, "frontend_url", "javascript:alert(1)")
+    monkeypatch.setattr(memealerts_api.settings, "backend_url", "")
 
     with pytest.raises(HTTPException) as exc_info:
         await memealerts_api.get_memealerts_connect_url(user={"id": 1})
-    assert exc_info.value.status_code == 503
+
+    assert exc_info.value.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_memealerts_connect_accepts_streamer_id_hint_for_non_jwt(monkeypatch):
+    recorded: dict[str, object] = {}
+
+    class DummyTokenRepo:
+        def __init__(self, _db):
+            pass
+
+        def get_by_user_and_platform(self, _user_id, _platform):
+            return None
+
+        def upsert(self, **kwargs):
+            recorded["upsert"] = kwargs
+
+    class DummyService:
+        def __init__(self, _db):
+            pass
+
+        async def validate_access_token(self, access_token, streamer_id):
+            recorded["validate"] = {
+                "access_token": access_token,
+                "streamer_id": streamer_id,
+            }
+            return {"streamer_id": streamer_id}
+
+    def _raise_invalid_token(_token):
+        raise ValueError("Invalid token format")
+
+    monkeypatch.setattr(memealerts_api, "UserTokenRepository", DummyTokenRepo)
+    monkeypatch.setattr(memealerts_api, "MemeAlertsService", DummyService)
+    monkeypatch.setattr(memealerts_api, "decode_memealerts_token", _raise_invalid_token)
+    monkeypatch.setattr(memealerts_api, "encrypt_token", lambda value: f"enc::{value}" if value else None)
+
+    payload = memealerts_api.ConnectMemeAlertsRequest(
+        access_token="x" * 32,
+        refresh_token="y" * 24,
+        streamer_id="507f1f77bcf86cd799439011",
+    )
+
+    result = await memealerts_api.connect_memealerts(
+        token_data=payload,
+        user={"id": 7},
+        db=None,
+    )
+
+    assert result["connected"] is True
+    assert result["streamer_id"] == "507f1f77bcf86cd799439011"
+    assert recorded["validate"] == {
+        "access_token": "x" * 32,
+        "streamer_id": "507f1f77bcf86cd799439011",
+    }
+    assert recorded["upsert"]["platform_user_id"] == "507f1f77bcf86cd799439011"
 
 
 @pytest.mark.asyncio

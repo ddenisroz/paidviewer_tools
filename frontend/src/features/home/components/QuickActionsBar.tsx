@@ -6,7 +6,6 @@ import { DollarSign, Volume2, VolumeX, Zap } from 'lucide-react';
 import { useQuickActionsLogic } from '@/features/home/hooks/useQuickActionsLogic';
 import { Card } from '@/shared/components/ui/card';
 
-
 import ActionButton from './quickactions/ActionButton';
 import { useQuickActionsHandlers } from './quickactions/useQuickActionsHandlers';
 
@@ -31,14 +30,14 @@ const QuickActionsBar: React.FC<QuickActionsBarProps> = ({ embedded = false }) =
         rewardsData: logic.rewardsData,
         updateDropsConfigMutation: logic.updateDropsConfigMutation,
         queryClient: logic.queryClient,
-        integrations: logic.integrations
+        integrations: logic.integrations,
     });
 
     const handleTtsToggle = () => {
         if (!logic.isToggling) {
             logic.setIsToggling(true);
             logic.toggleTtsMutation.mutate(!logic.ttsState, {
-                onSettled: () => logic.setIsToggling(false)
+                onSettled: () => logic.setIsToggling(false),
             });
         }
     };
@@ -48,7 +47,13 @@ const QuickActionsBar: React.FC<QuickActionsBarProps> = ({ embedded = false }) =
     if (!logic.isAuthenticated) return null;
 
     const content = (
-        <div className={embedded ? "flex items-center justify-center gap-3 px-0 py-0" : "flex items-center justify-center gap-3 px-6 py-4"}>
+        <div
+            className={
+                embedded
+                    ? 'flex items-center justify-center gap-3 px-0 py-0'
+                    : 'flex items-center justify-center gap-3 px-6 py-4'
+            }
+        >
             <ActionButton
                 icon={logic.ttsState ? Volume2 : VolumeX}
                 label="TTS чата"
@@ -80,11 +85,7 @@ const QuickActionsBar: React.FC<QuickActionsBarProps> = ({ embedded = false }) =
         return content;
     }
 
-    return (
-        <Card className="card-glass transition-all duration-300">
-            {content}
-        </Card>
-    );
+    return <Card className="card-glass transition-all duration-300">{content}</Card>;
 };
 
 export default QuickActionsBar;

@@ -202,30 +202,30 @@ async def get_admin_voices(
         raise
     except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout) as error:
         logger.warning(
-            "TTS service unavailable (%s): %s. Returning empty voice list.",
+            "TTS service unavailable while listing admin voices (%s): %s.",
             upstream_url,
             error,
         )
-        return {
-            "success": True,
-            "voices": [],
-            "global_voices": [],
-            "user_voices": [],
-            "warning": f"TTS service is unavailable ({upstream_url})",
-            "tts_service_url": upstream_url,
-            "provider": resolved_provider,
-        }
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "tts_voice_upstream_unreachable",
+                "message": "TTS voice service is unavailable",
+                "provider": resolved_provider,
+                "upstream_url": upstream_url,
+            },
+        ) from error
     except Exception:
         logger.exception("Get admin voices error")
-        return {
-            "success": True,
-            "voices": [],
-            "global_voices": [],
-            "user_voices": [],
-            "warning": "TTS service connection error",
-            "tts_service_url": upstream_url,
-            "provider": resolved_provider,
-        }
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "tts_voice_admin_list_failed",
+                "message": "TTS service connection error",
+                "provider": resolved_provider,
+                "upstream_url": upstream_url,
+            },
+        )
 
 
 @router.post("/voices/upload")

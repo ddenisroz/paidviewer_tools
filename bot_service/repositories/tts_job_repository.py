@@ -98,14 +98,9 @@ class TTSJobRepository:
         return requeued
 
     def _provider_filter(self, worker: Worker):
-        provider_checks = []
-        if worker.supports_f5:
-            provider_checks.append(TTSJob.provider == "f5")
-        if worker.supports_qwen:
-            provider_checks.append(TTSJob.provider == "qwen")
-        if not provider_checks:
+        if not worker.supports_f5:
             return false()
-        return or_(*provider_checks)
+        return TTSJob.provider == "f5"
 
     def _ownership_filter(self, worker: Worker):
         owned_filter = and_(

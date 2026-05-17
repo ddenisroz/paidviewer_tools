@@ -1,58 +1,64 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 
 interface TypingAnimationProps extends React.HTMLAttributes<HTMLSpanElement> {
-  text: string;
-  speed?: number;
-  showCursor?: boolean;
-  cursorBlink?: boolean;
+    text: string;
+    speed?: number;
+    showCursor?: boolean;
+    cursorBlink?: boolean;
+    cursorChar?: string;
 }
 
-const TypingAnimation: React.FC<TypingAnimationProps> = ({ 
-  text, 
-  speed = 50, 
-  className, 
-  showCursor = true,
-  cursorBlink = true,
-  ...props 
+const TypingAnimation: React.FC<TypingAnimationProps> = ({
+    text,
+    speed = 50,
+    className,
+    showCursor = true,
+    cursorBlink = true,
+    cursorChar = '_',
+    ...props
 }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(0);
+    const [currentIndex, setCurrentIndex] = useState(0);
 
-  useEffect(() => {
-    if (currentIndex < text.length) {
-      const timeout = setTimeout(() => {
-        setDisplayedText(prev => prev + text[currentIndex]);
-        setCurrentIndex(prev => prev + 1);
-      }, speed);
+    useEffect(() => {
+        setCurrentIndex(0);
+    }, [text]);
 
-      return () => clearTimeout(timeout);
-    }
-  }, [currentIndex, text, speed]);
+    useEffect(() => {
+        if (currentIndex >= text.length) return;
 
-  return (
-    <span className={cn("relative inline-grid align-baseline", className)} {...props}>
-      <span className="invisible col-start-1 row-start-1 whitespace-pre" aria-hidden="true">
-        {text}
-        {showCursor ? '_' : ''}
-      </span>
-      <span className="col-start-1 row-start-1 flex whitespace-pre">
-        <span>{displayedText}</span>
-        {showCursor && (
-          <span
-            className={cn(
-              "text-green-400",
-              cursorBlink && "animate-pulse",
-            )}
-          >
-            _
-          </span>
-        )}
-      </span>
-    </span>
-  );
+        const timeout = window.setTimeout(() => {
+            setCurrentIndex((prev) => Math.min(prev + 1, text.length));
+        }, speed);
+
+        return () => window.clearTimeout(timeout);
+    }, [currentIndex, text, speed]);
+
+    const displayedText = text.slice(0, currentIndex);
+
+    return (
+        <span className={cn('inline-grid align-baseline', className)} aria-label={text} {...props}>
+            <span
+                className="invisible col-start-1 row-start-1 inline-flex items-baseline justify-self-start whitespace-pre"
+                aria-hidden="true"
+            >
+                <span>{text}</span>
+                {showCursor && <span className="typing-caret">{cursorChar}</span>}
+            </span>
+            <span className="col-start-1 row-start-1 inline-flex items-baseline justify-self-start whitespace-pre">
+                <span>{displayedText}</span>
+                {showCursor && (
+                    <span
+                        className={cn('typing-caret text-green-400', cursorBlink && 'typing-caret--blink')}
+                        aria-hidden="true"
+                    >
+                        {cursorChar}
+                    </span>
+                )}
+            </span>
+        </span>
+    );
 };
 
 export { TypingAnimation };
-

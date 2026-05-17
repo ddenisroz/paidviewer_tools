@@ -4,7 +4,7 @@ interface MemeAlertsLogoProps {
     className?: string;
 }
 
-export const MemeAlertsLogo: React.FC<MemeAlertsLogoProps> = ({ className = "h-8 w-auto" }) => (
+export const MemeAlertsLogo: React.FC<MemeAlertsLogoProps> = ({ className = 'h-8 w-auto' }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 92 51" className={className}>
         <path
             fill="#FFE600"

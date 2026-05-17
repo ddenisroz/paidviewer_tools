@@ -45,74 +45,81 @@ export const useChatActions = (_user?: User | null): UseChatActionsReturn => {
         } catch (error: unknown) {
             logger.error('Error loading blocked users:', error);
             const err = error as { response?: { data?: { detail?: string } }; message?: string };
-            const errorMessage = err.response?.data?.detail || err.message || 'Не удалось загрузить список заблокированных пользователей';
+            const errorMessage =
+                err.response?.data?.detail ||
+                err.message ||
+                'Не удалось загрузить список заблокированных пользователей';
             toast.error(`Ошибка загрузки: ${errorMessage}`);
         }
     }, []);
 
-    const handleContextMenuAction = useCallback(async (action: string, msg: ChatMessage, currentUser?: User | null): Promise<void> => {
-        const username = msg.author_name || msg.author;
-        const platform = msg.platform;
+    const handleContextMenuAction = useCallback(
+        async (action: string, msg: ChatMessage, currentUser?: User | null): Promise<void> => {
+            const username = msg.author_name || msg.author;
+            const platform = msg.platform;
 
-        let channelName = msg.channel || msg.channel_name;
-        if (!channelName) {
-            channelName = platform === 'twitch'
-                ? currentUser?.twitch_username
-                : (currentUser?.vk_channel_name || currentUser?.vk_username);
-        }
-
-        if (!channelName) {
-            logger.error('Channel name not found:', { platform, user: currentUser });
-            toast.error('Канал не найден');
-            return;
-        }
-
-        try {
-            switch (action) {
-                case 'block_tts':
-                case 'unblock_tts': {
-                    logger.log(`[CHAT MUTE] ${action} для ${username} (${platform})`);
-
-                    const response = await chatService.toggleMute({
-                        username,
-                        platform,
-                        channel_name: channelName
-                    });
-
-                    logger.log('[CHAT MUTE] Response:', response.data);
-                    const data = response.data.data || response.data;
-                    const dataWithAction = data as { action?: string };
-                    const resultAction = dataWithAction?.action;
-
-                    if (resultAction === 'muted') {
-                        setTtsBlockedUsers(prev => new Set(prev).add(`${platform}:${username.toLowerCase()}`));
-                        toast.success(`${username} заглушен в TTS`);
-                    } else {
-                        setTtsBlockedUsers(prev => {
-                            const newSet = new Set(prev);
-                            newSet.delete(`${platform}:${username.toLowerCase()}`);
-                            return newSet;
-                        });
-                        toast.success(`[VOLUME] ${username} разглушен в TTS`);
-                    }
-                    break;
-                }
-
-                default:
-                    logger.warn('Unknown action:', action);
-                    break;
+            let channelName = msg.channel || msg.channel_name;
+            if (!channelName) {
+                channelName =
+                    platform === 'twitch'
+                        ? currentUser?.twitch_username
+                        : currentUser?.vk_channel_name || currentUser?.vk_username;
             }
-        } catch (error: unknown) {
-            logger.error('Error executing moderation action:', error);
-            const err = error as { response?: { data?: { detail?: string } } };
-            toast.error(err.response?.data?.detail || 'Ошибка выполнения действия');
-        }
-    }, []);
+
+            if (!channelName) {
+                logger.error('Channel name not found:', { platform, user: currentUser });
+                toast.error('Канал не найден');
+                return;
+            }
+
+            try {
+                switch (action) {
+                    case 'block_tts':
+                    case 'unblock_tts': {
+                        logger.log(`[CHAT MUTE] ${action} для ${username} (${platform})`);
+
+                        const response = await chatService.toggleMute({
+                            username,
+                            platform,
+                            channel_name: channelName,
+                        });
+
+                        logger.log('[CHAT MUTE] Response:', response.data);
+                        const data = response.data.data || response.data;
+                        const dataWithAction = data as { action?: string };
+                        const resultAction = dataWithAction?.action;
+
+                        if (resultAction === 'muted') {
+                            setTtsBlockedUsers((prev) => new Set(prev).add(`${platform}:${username.toLowerCase()}`));
+                            toast.success(`${username} заглушен в TTS`);
+                        } else {
+                            setTtsBlockedUsers((prev) => {
+                                const newSet = new Set(prev);
+                                newSet.delete(`${platform}:${username.toLowerCase()}`);
+                                return newSet;
+                            });
+                            toast.success(`[VOLUME] ${username} разглушен в TTS`);
+                        }
+                        break;
+                    }
+
+                    default:
+                        logger.warn('Unknown action:', action);
+                        break;
+                }
+            } catch (error: unknown) {
+                logger.error('Error executing moderation action:', error);
+                const err = error as { response?: { data?: { detail?: string } } };
+                toast.error(err.response?.data?.detail || 'Ошибка выполнения действия');
+            }
+        },
+        []
+    );
 
     return {
         ttsBlockedUsers,
         setTtsBlockedUsers,
         handleContextMenuAction,
-        loadBlockedUsers
+        loadBlockedUsers,
     };
 };

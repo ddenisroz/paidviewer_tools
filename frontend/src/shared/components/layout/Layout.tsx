@@ -16,79 +16,79 @@ import { composeProviders } from '@/shared/utils/composeProviders';
 // Эти контексты нужны только внутри dashboard layout
 // TtsPlayerProvider теперь в main.tsx (нужен для ChatProvider)
 const LayoutProviders = composeProviders(
-  TtsProvider,
-  DataProvider,
-  PlayerProvider,
-  DonationAlertsProvider,
-  WidgetLayoutProvider
+    TtsProvider,
+    DataProvider,
+    PlayerProvider,
+    DonationAlertsProvider,
+    WidgetLayoutProvider
 );
 
 // Внутренний компонент для использования usePlayer
 const LayoutContent: React.FC = () => {
-  const { isVisible, isTheaterMode } = usePlayer();
-  const location = useLocation();
-  const { toggleTts } = useTts(); // Use TTS context
-  const currentPath = location.pathname;
-  const currentSearch = location.search;
-  const searchParams = new URLSearchParams(currentSearch);
-  const activeTab = searchParams.get('tab');
-  const isMediaYoutubeTab = currentPath.startsWith('/dashboard/media') && (!activeTab || activeTab === 'youtube');
-  const isOnYoutubePage = currentPath.startsWith('/dashboard/youtube') || isMediaYoutubeTab;
+    const { isVisible, isTheaterMode } = usePlayer();
+    const location = useLocation();
+    const { toggleTts } = useTts(); // Use TTS context
+    const currentPath = location.pathname;
+    const currentSearch = location.search;
+    const searchParams = new URLSearchParams(currentSearch);
+    const activeTab = searchParams.get('tab');
+    const isMediaYoutubeTab = currentPath.startsWith('/dashboard/media') && (!activeTab || activeTab === 'youtube');
+    const isOnYoutubePage = currentPath.startsWith('/dashboard/youtube') || isMediaYoutubeTab;
 
-  // Global Keyboard Shortcut for TTS (Shift+T)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Check for Shift+T, ignore if typing in inputs
-      if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
-        const target = e.target as HTMLElement;
-        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-          return;
-        }
+    // Global Keyboard Shortcut for TTS (Shift+T)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Check for Shift+T, ignore if typing in inputs
+            if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+                const target = e.target as HTMLElement;
+                if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+                    return;
+                }
 
-        e.preventDefault();
-        toggleTts();
-      }
-    };
+                e.preventDefault();
+                toggleTts();
+            }
+        };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleTts]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [toggleTts]);
 
-  // Показываем отступ снизу только если плеер виден и не на странице YouTube
-  const showPlayerPadding = isVisible && !isTheaterMode && !isOnYoutubePage;
+    // Показываем отступ снизу только если плеер виден и не на странице YouTube
+    const showPlayerPadding = isVisible && !isTheaterMode && !isOnYoutubePage;
 
-  return (
-    <div className="grid h-screen w-full grid-cols-[56px_1fr] md:grid-cols-[64px_1fr] xl:grid-cols-[280px_1fr] overflow-hidden">
-      <Sidebar />
-      <div className="flex flex-col h-full overflow-hidden">
-        <Header />
-        <main
-          className={`flex flex-1 flex-col gap-3 p-3 sm:p-4 xl:gap-6 xl:p-6 bg-background/95 relative transition-all duration-300 overflow-y-auto ${showPlayerPadding ? 'pb-24' : ''
-            }`}
-          style={{ scrollbarGutter: 'stable both-edges' }}
-        >
-          <div className="max-w-7xl w-full mx-auto flex-1">
-            <Outlet />
-          </div>
-        </main>
-      </div>
+    return (
+        <div className="grid h-screen w-full grid-cols-[56px_1fr] md:grid-cols-[64px_1fr] xl:grid-cols-[304px_1fr] overflow-hidden">
+            <Sidebar />
+            <div className="flex flex-col h-full overflow-hidden">
+                <Header />
+                <main
+                    className={`flex flex-1 flex-col gap-3 p-3 sm:p-4 xl:gap-6 xl:p-6 bg-background/95 relative transition-all duration-300 overflow-y-auto ${
+                        showPlayerPadding ? 'pb-24' : ''
+                    }`}
+                    style={{ scrollbarGutter: 'stable both-edges' }}
+                >
+                    <div className="max-w-7xl w-full mx-auto flex-1">
+                        <Outlet />
+                    </div>
+                </main>
+            </div>
 
-      {/* Уведомление о cookies рендерим один раз здесь */}
-      <CookieConsent />
+            {/* Уведомление о cookies рендерим один раз здесь */}
+            <CookieConsent />
 
-      {/* Глобальный YouTube плеер (мини-плеер/портал) */}
-      <GlobalPlayer />
-    </div>
-  );
+            {/* Глобальный YouTube плеер (мини-плеер/портал) */}
+            <GlobalPlayer />
+        </div>
+    );
 };
 
 const Layout: React.FC = () => {
-  return (
-    <LayoutProviders>
-      <LayoutContent />
-    </LayoutProviders>
-  );
+    return (
+        <LayoutProviders>
+            <LayoutContent />
+        </LayoutProviders>
+    );
 };
 
 export default Layout;
-

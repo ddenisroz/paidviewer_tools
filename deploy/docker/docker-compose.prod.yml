@@ -69,32 +69,6 @@ services:
       retries: 3
       start_period: 60s
 
-  qwen_tts:
-    image: ${QWEN_TTS_IMAGE:?QWEN_TTS_IMAGE must be pinned to a tested tag or digest}
-    container_name: tts_qwen_service_prod
-    profiles: ["cloud-tts-real"]
-    ports:
-      - "127.0.0.1:8002:8000"
-    environment:
-      - PORT=8000
-      - API_KEY=${QWEN_TTS_SERVICE_API_KEY:?QWEN_TTS_SERVICE_API_KEY is required}
-      - HF_HOME=/root/.cache/huggingface
-      - QWEN_VOICE_STORAGE_DIR=/app/runtime/qwen_voices
-      - QWEN_ALLOWED_MODELS=${QWEN_ALLOWED_MODELS:-}
-      - QWEN3_TTS_MODEL_PATH=${QWEN3_TTS_MODEL_PATH:-}
-      - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
-    volumes:
-      - qwen_hf_cache:/root/.cache/huggingface
-      - qwen_voice_storage:/app/runtime/qwen_voices
-    gpus: all
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
   tts_gateway:
     image: ${TTS_GATEWAY_IMAGE:?TTS_GATEWAY_IMAGE must be pinned to a tested tag or digest}
     container_name: tts_gateway_prod
@@ -108,8 +82,6 @@ services:
       - TTS_GATEWAY_REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       - TTS_GATEWAY_F5_URL=http://tts_service:8011
       - TTS_GATEWAY_F5_API_KEY=${F5_TTS_SERVICE_API_KEY:?F5_TTS_SERVICE_API_KEY is required}
-      - TTS_GATEWAY_QWEN_URL=http://qwen_tts:8000
-      - TTS_GATEWAY_QWEN_API_KEY=${QWEN_TTS_SERVICE_API_KEY:?QWEN_TTS_SERVICE_API_KEY is required}
     depends_on:
       redis:
         condition: service_healthy
@@ -148,12 +120,6 @@ services:
       - TTS_GATEWAY_API_KEY=${TTS_GATEWAY_API_KEY:?TTS_GATEWAY_API_KEY is required}
       - F5_TTS_SERVICE_URL=http://tts_service:8011
       - F5_TTS_SERVICE_API_KEY=${F5_TTS_SERVICE_API_KEY:?F5_TTS_SERVICE_API_KEY is required}
-      - QWEN_TTS_SERVICE_URL=${QWEN_TTS_SERVICE_URL:-http://qwen_tts:8000}
-      - QWEN_TTS_SERVICE_API_KEY=${QWEN_TTS_SERVICE_API_KEY:?QWEN_TTS_SERVICE_API_KEY is required}
-      - QWEN_VOICE_SERVICE_URL=${QWEN_VOICE_SERVICE_URL:-}
-      - QWEN_ALLOWED_MODELS=${QWEN_ALLOWED_MODELS:-}
-      - QWEN_CLOUD_ALLOWED_MODELS=${QWEN_CLOUD_ALLOWED_MODELS:-}
-      - QWEN_TTS_ALLOWED_MODELS=${QWEN_TTS_ALLOWED_MODELS:-}
 
       # Redis.
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
@@ -249,10 +215,6 @@ volumes:
   tts_backups:
     driver: local
   tts_cache:
-    driver: local
-  qwen_hf_cache:
-    driver: local
-  qwen_voice_storage:
     driver: local
   bot_cache:
     driver: local

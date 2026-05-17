@@ -3,8 +3,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { API_BASE_URL } from '@/constants';
 import MessageContent from '@/features/chat/components/MessageContent';
-import { loadGoogleFont } from '@/features/chatbox/utils/chatboxHelpers';
 import { getGlobalEmotes } from '@/features/chat/utils/emotes';
+import { CHATBOX_BRAND_FONT } from '@/features/chatbox/constants/fontOptions';
+import { loadGoogleFont } from '@/features/chatbox/utils/chatboxHelpers';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { VkRoleBadge } from '@/shared/components/RoleBadge';
@@ -73,30 +74,29 @@ const PREVIEW_7TV_FALLBACKS: EmoteData[] = [
         id: 'preview-7tv-justanotherday',
         name: 'JustAnotherDay',
         url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
-        animated: false
+        animated: false,
     },
     {
         id: 'preview-7tv-em',
         name: 'Em',
         url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
-        animated: false
+        animated: false,
     },
     {
         id: 'preview-7tv-based',
         name: 'Based',
         url: `${API_BASE_URL}/api/proxy/7tv/cdn.7tv.app/emote/01G7RPTSY00003P60HPZKBDE31/2x.webp`,
-        animated: false
-    }
+        animated: false,
+    },
 ];
 
 const PREVIEW_TWITCH_BADGE_FALLBACKS: Record<string, string> = {
     'broadcaster/1': 'https://static-cdn.jtvnw.net/badges/v1/5527c58c-fb7d-422d-b71b-f309dcb85cc1/1',
     'moderator/1': 'https://static-cdn.jtvnw.net/badges/v1/3267646d-33f0-4b17-b3df-f923a41db1d0/1',
-    'vip/1': 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/1'
+    'vip/1': 'https://static-cdn.jtvnw.net/badges/v1/b817aba4-fad8-49e2-b88a-7cc744dfa6ec/1',
 };
 
-const sanitizeFontFamily = (fontFamily: string): string =>
-    fontFamily.replace(/[^a-zA-Z0-9,\s-]/g, '').trim();
+const sanitizeFontFamily = (fontFamily: string): string => fontFamily.replace(/[^a-zA-Z0-9,\s-]/g, '').trim();
 
 const normalizeVkAssetUrl = (url?: string): string => {
     if (!url) return '';
@@ -137,14 +137,14 @@ const registerInlineEmote = (map: Map<string, EmoteData>, emote: EmoteData): voi
         trimmed,
         trimmed.toLowerCase(),
         `:${trimmed}:`,
-        `:${trimmed.toLowerCase()}:`
+        `:${trimmed.toLowerCase()}:`,
     ]);
     keys.forEach((key) => map.set(key, emote));
 };
 
 const toRenderedPreviewMessage = (message: PreviewMessage): RenderedPreviewMessage => ({
     ...message,
-    preview_key: `${message.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    preview_key: `${message.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
 });
 
 const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, twitchChannelName }) => {
@@ -158,15 +158,15 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
 
     const isHorizontal = settings.chat_direction === 'horizontal';
     const effectiveAnimationType = isHorizontal
-        ? (settings.animation_type === 'none' ? 'none' : 'slide-left')
+        ? settings.animation_type === 'none'
+            ? 'none'
+            : 'slide-left'
         : settings.animation_type;
     const chatWidth = Math.max(20, Math.min(100, settings.chat_width || 100));
     const resolvedFontFamily = useMemo(() => {
         const safeFontFamily = settings.font_family ? sanitizeFontFamily(settings.font_family) : '';
-        if (!safeFontFamily) return 'Inter, sans-serif';
-        return safeFontFamily.includes(',')
-            ? safeFontFamily
-            : `${safeFontFamily}, sans-serif`;
+        if (!safeFontFamily) return `${CHATBOX_BRAND_FONT}, sans-serif`;
+        return safeFontFamily.includes(',') ? safeFontFamily : `${safeFontFamily}, sans-serif`;
     }, [settings.font_family]);
     const previewLimit = useMemo(() => {
         if (isHorizontal) return Math.max(1, settings.max_messages);
@@ -337,20 +337,23 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
     useEffect(() => {
         if (previewMessages.length === 0) return undefined;
 
-        const interval = setInterval(() => {
-            const template = previewMessages[nextTemplateIndexRef.current % previewMessages.length];
-            nextTemplateIndexRef.current = (nextTemplateIndexRef.current + 1) % previewMessages.length;
+        const interval = setInterval(
+            () => {
+                const template = previewMessages[nextTemplateIndexRef.current % previewMessages.length];
+                nextTemplateIndexRef.current = (nextTemplateIndexRef.current + 1) % previewMessages.length;
 
-            const nextMessage = toRenderedPreviewMessage(template);
-            const limit = previewLimit;
+                const nextMessage = toRenderedPreviewMessage(template);
+                const limit = previewLimit;
 
-            setSimulatedMessages((prev) => [...prev, nextMessage].slice(-limit));
-            setLastAnimatedMessageKey(
-                effectiveAnimationType !== 'none' && settings.animation_duration > 0
-                    ? nextMessage.preview_key
-                    : null
-            );
-        }, Math.max(1800, settings.animation_duration + 600));
+                setSimulatedMessages((prev) => [...prev, nextMessage].slice(-limit));
+                setLastAnimatedMessageKey(
+                    effectiveAnimationType !== 'none' && settings.animation_duration > 0
+                        ? nextMessage.preview_key
+                        : null
+                );
+            },
+            Math.max(1800, settings.animation_duration + 600)
+        );
 
         return () => clearInterval(interval);
     }, [previewMessages, effectiveAnimationType, settings.animation_duration, previewLimit]);
@@ -380,6 +383,13 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                         60% { opacity: 1; transform: translateY(-6px) scale(1.02); }
                         100% { opacity: 1; transform: translateY(0) scale(1); }
                     }
+                    .chatbox-preview-scroll {
+                        scrollbar-width: none;
+                        -ms-overflow-style: none;
+                    }
+                    .chatbox-preview-scroll::-webkit-scrollbar {
+                        display: none;
+                    }
                 `}
             </style>
             <div
@@ -388,7 +398,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                     background: panelBackground,
                     fontFamily: resolvedFontFamily,
                     fontSize: `${settings.font_size}px`,
-                    fontWeight: settings.font_weight || 'normal'
+                    fontWeight: settings.font_weight || 'normal',
                 }}
             >
                 <div
@@ -397,7 +407,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                         display: 'flex',
                         alignItems: isHorizontal ? 'center' : 'stretch',
                         justifyContent: isHorizontal ? 'flex-start' : 'flex-end',
-                        height: '100%'
+                        height: '100%',
                     }}
                 >
                     <div
@@ -407,8 +417,8 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                             width: `${chatWidth}%`,
                             maxWidth: '100%',
                             height: '100%',
-                            paddingBottom: isHorizontal ? '8px' : '0',
-                            scrollbarWidth: isHorizontal ? 'thin' : undefined
+                            paddingBottom: 0,
+                            scrollbarWidth: 'none',
                         }}
                     >
                         <div
@@ -417,201 +427,237 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                 flexDirection: isHorizontal ? 'row' : 'column',
                                 alignItems: isHorizontal ? 'center' : 'stretch',
                                 gap: isHorizontal ? '8px' : `${settings.message_spacing}px`,
-                                width: isHorizontal ? 'max-content' : '100%'
+                                width: isHorizontal ? 'max-content' : '100%',
                             }}
                         >
                             {!isHorizontal && <div style={{ flexGrow: 1 }} />}
                             {simulatedMessages.map((msg) => {
-                            const animationName = getAnimationName(effectiveAnimationType);
-                            const shouldAnimate = effectiveAnimationType !== 'none'
-                                && settings.animation_duration > 0
-                                && animationName
-                                && msg.preview_key === lastAnimatedMessageKey;
-                            const platformIconSize = Math.max(12, Math.min(24, settings.font_size));
-                            const messageBackground = hexToRgba(settings.background_color || '#000000', settings.background_opacity);
-                            const metaGroupStyle: React.CSSProperties = {
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                lineHeight: 1,
-                                verticalAlign: 'text-bottom',
-                                marginRight: '6px'
-                            };
-                            const showMeta = Boolean(
-                                settings.show_platform_icons ||
-                                (settings.show_badges && msg.badges.length > 0) ||
-                                (settings.show_badges && msg.platform === 'vk' && (msg.vk_role_icon_url || msg.role))
-                            );
-                            const messageText = msg.message;
-                            const previewText = isHorizontal
-                                ? truncateWords(messageText, 6)
-                                : messageText;
-                            const vkInlineEmotes = new Map<string, EmoteData>();
-                            if (msg.platform === 'vk' && Array.isArray(msg.emotes)) {
-                                msg.emotes.forEach((emote) => {
-                                    if (!emote?.name || !emote?.url) return;
-                                    const mapped: EmoteData = {
-                                        id: String(emote.id || emote.name),
-                                        name: emote.name.replace(/^:+|:+$/g, ''),
-                                        url: normalizeVkAssetUrl(emote.url),
-                                        animated: false
-                                    };
-                                    registerInlineEmote(vkInlineEmotes, mapped);
-                                });
-                            }
-                            const messageGlobalEmotes = settings.show_7tv_emotes
-                                ? new Map<string, EmoteData>([...effectiveGlobalEmotes, ...vkInlineEmotes])
-                                : vkInlineEmotes;
-                            const displayMessage = (
-                                <MessageContent
-                                    message={previewText}
-                                    channelEmotes={settings.show_7tv_emotes ? new Map() : new Map()}
-                                    globalEmotes={messageGlobalEmotes}
-                                    twitchEmotes={msg.platform === 'twitch' ? msg.emotes : []}
-                                    showLinks={settings.show_links}
-                                    autoLoadImages={settings.auto_load_images ?? true}
-                                />
-                            );
-                            const baseMessageStyle: React.CSSProperties = {
-                                fontFamily: resolvedFontFamily,
-                                borderRadius: `${settings.border_radius ?? 8}px`,
-                                whiteSpace: isHorizontal ? 'nowrap' : 'normal',
-                                wordBreak: isHorizontal ? 'normal' : 'break-word',
-                                overflowWrap: 'anywhere',
-                                overflow: isHorizontal ? 'hidden' : 'visible',
-                                textOverflow: isHorizontal ? 'ellipsis' : 'clip',
-                                flexShrink: 0,
-                                minWidth: isHorizontal ? 'fit-content' : 'auto',
-                                maxWidth: isHorizontal ? '600px' : 'auto',
-                                padding: isHorizontal ? '6px 10px' : '4px 8px',
-                                backgroundColor: messageBackground,
-                                lineHeight: 1.3
-                            };
-                            const strokeStyle = settings.text_stroke_width > 0
-                                ? {
-                                    WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
-                                    paintOrder: 'stroke fill'
+                                const animationName = getAnimationName(effectiveAnimationType);
+                                const shouldAnimate =
+                                    effectiveAnimationType !== 'none' &&
+                                    settings.animation_duration > 0 &&
+                                    animationName &&
+                                    msg.preview_key === lastAnimatedMessageKey;
+                                const platformIconSize = Math.max(12, Math.min(24, settings.font_size));
+                                const messageBackground = hexToRgba(
+                                    settings.background_color || '#000000',
+                                    settings.background_opacity
+                                );
+                                const metaGroupStyle: React.CSSProperties = {
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    lineHeight: 1,
+                                    verticalAlign: 'text-bottom',
+                                    marginRight: '6px',
+                                };
+                                const showMeta = Boolean(
+                                    settings.show_platform_icons ||
+                                    (settings.show_badges && msg.badges.length > 0) ||
+                                    (settings.show_badges &&
+                                        msg.platform === 'vk' &&
+                                        (msg.vk_role_icon_url || msg.role))
+                                );
+                                const messageText = msg.message;
+                                const previewText = isHorizontal ? truncateWords(messageText, 6) : messageText;
+                                const vkInlineEmotes = new Map<string, EmoteData>();
+                                if (msg.platform === 'vk' && Array.isArray(msg.emotes)) {
+                                    msg.emotes.forEach((emote) => {
+                                        if (!emote?.name || !emote?.url) return;
+                                        const mapped: EmoteData = {
+                                            id: String(emote.id || emote.name),
+                                            name: emote.name.replace(/^:+|:+$/g, ''),
+                                            url: normalizeVkAssetUrl(emote.url),
+                                            animated: false,
+                                        };
+                                        registerInlineEmote(vkInlineEmotes, mapped);
+                                    });
                                 }
-                                : {};
+                                const messageGlobalEmotes = settings.show_7tv_emotes
+                                    ? new Map<string, EmoteData>([...effectiveGlobalEmotes, ...vkInlineEmotes])
+                                    : vkInlineEmotes;
+                                const displayMessage = (
+                                    <MessageContent
+                                        message={previewText}
+                                        channelEmotes={settings.show_7tv_emotes ? new Map() : new Map()}
+                                        globalEmotes={messageGlobalEmotes}
+                                        twitchEmotes={msg.platform === 'twitch' ? msg.emotes : []}
+                                        showLinks={settings.show_links}
+                                        autoLoadImages={settings.auto_load_images ?? true}
+                                    />
+                                );
+                                const baseMessageStyle: React.CSSProperties = {
+                                    fontFamily: resolvedFontFamily,
+                                    borderRadius: `${settings.border_radius ?? 8}px`,
+                                    whiteSpace: isHorizontal ? 'nowrap' : 'normal',
+                                    wordBreak: isHorizontal ? 'normal' : 'break-word',
+                                    overflowWrap: 'anywhere',
+                                    overflow: isHorizontal ? 'hidden' : 'visible',
+                                    textOverflow: isHorizontal ? 'ellipsis' : 'clip',
+                                    flexShrink: 0,
+                                    minWidth: isHorizontal ? 'fit-content' : 'auto',
+                                    maxWidth: isHorizontal ? '600px' : 'auto',
+                                    padding: isHorizontal ? '6px 10px' : '4px 8px',
+                                    backgroundColor: messageBackground,
+                                    lineHeight: 1.3,
+                                };
+                                const strokeStyle =
+                                    settings.text_stroke_width > 0
+                                        ? {
+                                              WebkitTextStroke: `${settings.text_stroke_width}px ${settings.text_stroke_color || '#000000'}`,
+                                              paintOrder: 'stroke fill',
+                                          }
+                                        : {};
 
-                            return (
-                                <div
-                                    key={msg.preview_key}
-                                    className="text-white"
-                                    style={{
-                                        ...baseMessageStyle,
-                                        ...strokeStyle,
-                                        animation: shouldAnimate ? `${animationName} ${settings.animation_duration}ms ease-out` : undefined,
-                                        color: settings.text_color || '#ffffff'
-                                    }}
-                                >
-                                    {showMeta && (
-                                        <span style={metaGroupStyle}>
-                                            {settings.show_platform_icons && (
-                                                msg.platform === 'twitch' ? (
-                                                    <TwitchIcon className="inline-block" style={{ width: `${platformIconSize}px`, height: `${platformIconSize}px`, verticalAlign: 'text-bottom', color: '#9146FF' }} />
-                                                ) : (
-                                                    <VKIcon className="inline-block" style={{ width: `${platformIconSize}px`, height: `${platformIconSize}px`, verticalAlign: 'text-bottom', color: '#FF4444' }} />
-                                                )
-                                            )}
-                                            {settings.show_badges && msg.badges.length > 0 && msg.platform === 'twitch' && (
-                                                <>
-                                                    {msg.badges.map((badge) => {
-                                                        const [badgeId, version] = badge.split('/');
-                                                        const cachedBadgeUrl = twitchBadgesService.getBadgeUrl(
-                                                            badgeId,
-                                                            version,
-                                                            '1x',
-                                                            twitchChannelName || null
-                                                        );
-                                                        const fallbackBadgeUrl = PREVIEW_TWITCH_BADGE_FALLBACKS[badge];
-                                                        const badgeUrl = cachedBadgeUrl || fallbackBadgeUrl;
-                                                        if (!badgeUrl) return null;
-
-                                                        const badgeSize = Math.max(14, Math.min(24, settings.font_size * 1.1));
-                                                        return (
-                                                            <img
-                                                                key={`${msg.id}-${badgeId}-${version}`}
-                                                                src={badgeUrl}
-                                                                alt={badgeId}
-                                                                title={badgeId}
-                                                                loading="lazy"
-                                                                style={{ width: `${badgeSize}px`, height: `${badgeSize}px`, verticalAlign: 'text-bottom' }}
-                                                                onError={(e) => {
-                                                                    (e.target as HTMLImageElement).style.display = 'none';
-                                                                }}
-                                                            />
-                                                        );
-                                                    })}
-                                                </>
-                                            )}
-                                            {settings.show_badges && msg.badges.length > 0 && msg.platform === 'vk' && (
-                                                <>
-                                                    {msg.badges.map((badge, idx) => (
-                                                        <img
-                                                            key={`${msg.id}-${idx}`}
-                                                            src={normalizeVkAssetUrl(badge)}
-                                                            alt="badge"
-                                                            loading="lazy"
+                                return (
+                                    <div
+                                        key={msg.preview_key}
+                                        className="text-white"
+                                        style={{
+                                            ...baseMessageStyle,
+                                            ...strokeStyle,
+                                            animation: shouldAnimate
+                                                ? `${animationName} ${settings.animation_duration}ms ease-out`
+                                                : undefined,
+                                            color: settings.text_color || '#ffffff',
+                                        }}
+                                    >
+                                        {showMeta && (
+                                            <span style={metaGroupStyle}>
+                                                {settings.show_platform_icons &&
+                                                    (msg.platform === 'twitch' ? (
+                                                        <TwitchIcon
+                                                            className="inline-block"
                                                             style={{
-                                                                width: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
-                                                                height: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
-                                                                verticalAlign: 'text-bottom'
+                                                                width: `${platformIconSize}px`,
+                                                                height: `${platformIconSize}px`,
+                                                                verticalAlign: 'text-bottom',
+                                                                color: '#9146FF',
                                                             }}
-                                                            onError={(e) => {
-                                                                const target = e.target as HTMLImageElement;
-                                                                if (!tryVkAssetFallback(target)) {
-                                                                    target.style.display = 'none';
-                                                                }
+                                                        />
+                                                    ) : (
+                                                        <VKIcon
+                                                            className="inline-block"
+                                                            style={{
+                                                                width: `${platformIconSize}px`,
+                                                                height: `${platformIconSize}px`,
+                                                                verticalAlign: 'text-bottom',
+                                                                color: '#FF4444',
                                                             }}
                                                         />
                                                     ))}
-                                                </>
-                                            )}
-                                            {settings.show_badges && msg.platform === 'vk' && msg.role && (
-                                                <VkRoleBadge
-                                                    role={msg.role}
-                                                    size={Math.max(12, Math.min(18, settings.font_size * 0.9))}
-                                                    style={{ lineHeight: 1, verticalAlign: 'text-bottom' }}
+                                                {settings.show_badges &&
+                                                    msg.badges.length > 0 &&
+                                                    msg.platform === 'twitch' && (
+                                                        <>
+                                                            {msg.badges.map((badge) => {
+                                                                const [badgeId, version] = badge.split('/');
+                                                                const cachedBadgeUrl = twitchBadgesService.getBadgeUrl(
+                                                                    badgeId,
+                                                                    version,
+                                                                    '1x',
+                                                                    twitchChannelName || null
+                                                                );
+                                                                const fallbackBadgeUrl =
+                                                                    PREVIEW_TWITCH_BADGE_FALLBACKS[badge];
+                                                                const badgeUrl = cachedBadgeUrl || fallbackBadgeUrl;
+                                                                if (!badgeUrl) return null;
+
+                                                                const badgeSize = Math.max(
+                                                                    14,
+                                                                    Math.min(24, settings.font_size * 1.1)
+                                                                );
+                                                                return (
+                                                                    <img
+                                                                        key={`${msg.id}-${badgeId}-${version}`}
+                                                                        src={badgeUrl}
+                                                                        alt={badgeId}
+                                                                        title={badgeId}
+                                                                        loading="lazy"
+                                                                        style={{
+                                                                            width: `${badgeSize}px`,
+                                                                            height: `${badgeSize}px`,
+                                                                            verticalAlign: 'text-bottom',
+                                                                        }}
+                                                                        onError={(e) => {
+                                                                            (
+                                                                                e.target as HTMLImageElement
+                                                                            ).style.display = 'none';
+                                                                        }}
+                                                                    />
+                                                                );
+                                                            })}
+                                                        </>
+                                                    )}
+                                                {settings.show_badges &&
+                                                    msg.badges.length > 0 &&
+                                                    msg.platform === 'vk' && (
+                                                        <>
+                                                            {msg.badges.map((badge, idx) => (
+                                                                <img
+                                                                    key={`${msg.id}-${idx}`}
+                                                                    src={normalizeVkAssetUrl(badge)}
+                                                                    alt="badge"
+                                                                    loading="lazy"
+                                                                    style={{
+                                                                        width: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
+                                                                        height: `${Math.max(14, Math.min(24, settings.font_size * 1.1))}px`,
+                                                                        verticalAlign: 'text-bottom',
+                                                                    }}
+                                                                    onError={(e) => {
+                                                                        const target = e.target as HTMLImageElement;
+                                                                        if (!tryVkAssetFallback(target)) {
+                                                                            target.style.display = 'none';
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </>
+                                                    )}
+                                                {settings.show_badges && msg.platform === 'vk' && msg.role && (
+                                                    <VkRoleBadge
+                                                        role={msg.role}
+                                                        size={Math.max(12, Math.min(18, settings.font_size * 0.9))}
+                                                        style={{ lineHeight: 1, verticalAlign: 'text-bottom' }}
+                                                    />
+                                                )}
+                                            </span>
+                                        )}
+                                        <span
+                                            style={{
+                                                fontFamily: resolvedFontFamily,
+                                                color:
+                                                    settings.username_color ||
+                                                    (msg.platform === 'twitch' ? '#9146FF' : '#FF4444'),
+                                                fontWeight: 600,
+                                            }}
+                                        >
+                                            {settings.show_avatars && msg.avatar_url && (
+                                                <img
+                                                    src={msg.avatar_url}
+                                                    alt={msg.author}
+                                                    loading="lazy"
+                                                    style={{
+                                                        width: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
+                                                        height: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
+                                                        borderRadius: '999px',
+                                                        display: 'inline-block',
+                                                        verticalAlign: 'text-bottom',
+                                                        marginRight: '6px',
+                                                    }}
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                    }}
                                                 />
                                             )}
-                                        </span>
-                                    )}
-                                    <span
-                                        style={{
-                                            fontFamily: resolvedFontFamily,
-                                            color: settings.username_color || (msg.platform === 'twitch' ? '#9146FF' : '#FF4444'),
-                                            fontWeight: 600
-                                        }}
-                                    >
-                                        {settings.show_avatars && msg.avatar_url && (
-                                            <img
-                                                src={msg.avatar_url}
-                                                alt={msg.author}
-                                                loading="lazy"
-                                                style={{
-                                                    width: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
-                                                    height: `${Math.max(14, Math.min(22, settings.font_size * 1.1))}px`,
-                                                    borderRadius: '999px',
-                                                    display: 'inline-block',
-                                                    verticalAlign: 'text-bottom',
-                                                    marginRight: '6px',
-                                                }}
-                                                onError={(e) => {
-                                                    (e.target as HTMLImageElement).style.display = 'none';
-                                                }}
-                                            />
+                                            {msg.author}:
+                                        </span>{' '}
+                                        {settings.show_roles && msg.role && (
+                                            <span className="text-[10px] text-muted-foreground mr-1">[{msg.role}]</span>
                                         )}
-                                        {msg.author}:
-                                    </span>{' '}
-                                    {settings.show_roles && msg.role && (
-                                        <span className="text-[10px] text-muted-foreground mr-1">
-                                            [{msg.role}]
-                                        </span>
-                                    )}
-                                    <span style={{ fontFamily: resolvedFontFamily }}>{displayMessage}</span>
-                                </div>
-                            );
+                                        <span style={{ fontFamily: resolvedFontFamily }}>{displayMessage}</span>
+                                    </div>
+                                );
                             })}
                         </div>
                     </div>

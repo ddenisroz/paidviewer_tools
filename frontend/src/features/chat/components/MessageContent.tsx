@@ -81,7 +81,11 @@ const isImageUrl = (url: string): boolean => {
     }
 };
 
-const removeUrls = (text: string): string => text.replace(URL_REGEX, '').replace(/\s{2,}/g, ' ').trim();
+const removeUrls = (text: string): string =>
+    text
+        .replace(URL_REGEX, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
 
 const TWITCH_TEXT_EMOTES: Record<string, { id: string; name: string }> = {
     ':)': { id: '1', name: 'Smile' },
@@ -113,12 +117,7 @@ ChatImage.displayName = 'ChatImage';
 
 // Компонент для ссылки
 const ChatLink: React.FC<{ href: string }> = memo(({ href }) => (
-    <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-cyan-400 underline hover:text-cyan-300"
-    >
+    <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline hover:text-cyan-300">
         {href}
     </a>
 ));
@@ -143,7 +142,9 @@ const processTwitchEmotes = (text: string, emotes: ChatEmote[]): string => {
 
         if (start < 0 || end > processedText.length) continue;
 
-        const rawUrl = normalizeInlineEmoteUrl(emote.url || `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`);
+        const rawUrl = normalizeInlineEmoteUrl(
+            emote.url || `https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/1.0`
+        );
         const emoteUrl = encodeURI(rawUrl);
         const emoteName = escapeHtmlAttr(emote.name || 'emote');
         const imgTag = `<img src="${emoteUrl}" alt="${emoteName}" class="${INLINE_EMOTE_CLASS}" title="${emoteName}" />`;
@@ -168,12 +169,7 @@ const processTwitchTextEmotes = (text: string): string => {
 };
 
 // Рендер части сообщения (текст, ссылка или картинка)
-const renderPart = (
-    part: string,
-    index: number,
-    showLinks: boolean,
-    autoLoadImages: boolean
-): React.ReactNode => {
+const renderPart = (part: string, index: number, showLinks: boolean, autoLoadImages: boolean): React.ReactNode => {
     // Проверяем, является ли часть URL
     if (URL_REGEX.test(part)) {
         URL_REGEX.lastIndex = 0; // Reset regex state
@@ -225,7 +221,7 @@ const renderMessageWithEmotes = (
                             display: 'inline-block',
                             verticalAlign: 'middle',
                             objectFit: 'contain',
-                            marginInline: '0.1em'
+                            marginInline: '0.1em',
                         }}
                         loading="lazy"
                         onError={(e) => {
@@ -266,7 +262,8 @@ const renderMessageWithEmotes = (
                 if (URL_REGEX.test(subPart)) {
                     URL_REGEX.lastIndex = 0;
                     if (!showLinks) return null;
-                    if (autoLoadImages && isImageUrl(subPart)) return <ChatImage key={`${index}-${subIndex}`} src={subPart} />;
+                    if (autoLoadImages && isImageUrl(subPart))
+                        return <ChatImage key={`${index}-${subIndex}`} src={subPart} />;
                     return <ChatLink key={`${index}-${subIndex}`} href={subPart} />;
                 }
                 return <span key={`${index}-${subIndex}`}>{subPart}</span>;
@@ -278,64 +275,59 @@ const renderMessageWithEmotes = (
     });
 };
 
-const MessageContent: React.FC<MessageContentProps> = memo(({
-    message,
-    channelEmotes,
-    globalEmotes,
-    twitchEmotes,
-    showLinks = true,
-    autoLoadImages = true
-}) => {
-    // Мемоизация обработки сообщения
-    const content = useMemo(() => {
-        if (!message) return null;
+const MessageContent: React.FC<MessageContentProps> = memo(
+    ({ message, channelEmotes, globalEmotes, twitchEmotes, showLinks = true, autoLoadImages = true }) => {
+        // Мемоизация обработки сообщения
+        const content = useMemo(() => {
+            if (!message) return null;
 
-        // 1. Сначала обрабатываем Twitch Native Emotes (заменяем диапазоны на img)
-        // Важно: делать это ПЕРЕД 7TV, так как они имеют приоритет и точные позиции
-        let processedWithTwitch = message;
-        if (twitchEmotes && twitchEmotes.length > 0) {
-            processedWithTwitch = processTwitchEmotes(message, twitchEmotes);
-        }
-        processedWithTwitch = processTwitchTextEmotes(processedWithTwitch);
+            // 1. Сначала обрабатываем Twitch Native Emotes (заменяем диапазоны на img)
+            // Важно: делать это ПЕРЕД 7TV, так как они имеют приоритет и точные позиции
+            let processedWithTwitch = message;
+            if (twitchEmotes && twitchEmotes.length > 0) {
+                processedWithTwitch = processTwitchEmotes(message, twitchEmotes);
+            }
+            processedWithTwitch = processTwitchTextEmotes(processedWithTwitch);
 
-        // 2. Затем обрабатываем 7TV эмоты (заменяем текст на img)
-        const withEmotes = processEmotes(
-            processedWithTwitch,
-            channelEmotes || new Map(),
-            globalEmotes || new Map()
-        );
+            // 2. Затем обрабатываем 7TV эмоты (заменяем текст на img)
+            const withEmotes = processEmotes(
+                processedWithTwitch,
+                channelEmotes || new Map(),
+                globalEmotes || new Map()
+            );
 
-        // Если есть эмодзи (img теги) - используем специальный рендерер
-        if (withEmotes.includes('<img')) {
+            // Если есть эмодзи (img теги) - используем специальный рендерер
+            if (withEmotes.includes('<img')) {
+                return (
+                    <span className="chat-message-content break-words">
+                        {renderMessageWithEmotes(withEmotes, showLinks, autoLoadImages)}
+                    </span>
+                );
+            }
+
+            // Обработка ссылок (FALLBACK для сообщений без эмодзи)
+            if (!showLinks) {
+                const processed = removeUrls(message);
+                return processed ? <span className="break-words">{processed}</span> : null;
+            }
+
+            // Разбиваем на части и рендерим
+            const parts = message.split(URL_REGEX);
             return (
                 <span className="chat-message-content break-words">
-                    {renderMessageWithEmotes(withEmotes, showLinks, autoLoadImages)}
+                    {parts.map((part, index) => (
+                        <span key={index} className="align-middle">
+                            {renderPart(part, index, showLinks, autoLoadImages)}
+                            {index < parts.length - 1 ? ' ' : ''}
+                        </span>
+                    ))}
                 </span>
             );
-        }
+        }, [message, channelEmotes, globalEmotes, twitchEmotes, showLinks, autoLoadImages]);
 
-        // Обработка ссылок (FALLBACK для сообщений без эмодзи)
-        if (!showLinks) {
-            const processed = removeUrls(message);
-            return processed ? <span className="break-words">{processed}</span> : null;
-        }
-
-        // Разбиваем на части и рендерим
-        const parts = message.split(URL_REGEX);
-        return (
-            <span className="chat-message-content break-words">
-                {parts.map((part, index) => (
-                    <span key={index} className="align-middle">
-                        {renderPart(part, index, showLinks, autoLoadImages)}
-                        {index < parts.length - 1 ? ' ' : ''}
-                    </span>
-                ))}
-            </span>
-        );
-    }, [message, channelEmotes, globalEmotes, twitchEmotes, showLinks, autoLoadImages]);
-
-    return content;
-});
+        return content;
+    }
+);
 
 MessageContent.displayName = 'MessageContent';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { ChevronDown, List, Pause, Play, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react';
+import { BarChart2, ChevronDown, List, Pause, Play, SkipForward, Trash2, Volume2, VolumeX, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/shared/components/ui/button';
@@ -43,15 +43,15 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
     onVolumeChange,
     onClearQueue,
     onClose,
-    variant = 'floating'
+    variant = 'floating',
 }) => {
     const isDocked = variant === 'sidebar';
     return (
         <div
             className={cn(
                 isDocked
-                    ? "w-full pointer-events-auto"
-                    : "fixed bottom-4 right-4 z-40 w-[min(420px,calc(100vw-2rem))] pointer-events-auto"
+                    ? 'w-full pointer-events-auto'
+                    : 'fixed bottom-4 right-4 z-40 w-[min(420px,calc(100vw-2rem))] pointer-events-auto'
             )}
         >
             <div className="relative">
@@ -79,19 +79,21 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                         {/* Info & Controls */}
                         <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    {isPlaying && (
+                                        <span
+                                            className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300"
+                                            title="Играет"
+                                        >
+                                            <BarChart2 className="h-3 w-3 animate-pulse" />
+                                        </span>
+                                    )}
                                     <h3
-                                        className="text-foreground font-medium text-sm leading-tight truncate"
+                                        className="truncate text-sm font-medium leading-tight text-foreground"
                                         title={displayVideo.title}
                                     >
                                         {displayVideo.title}
                                     </h3>
-                                    <p
-                                        className="text-muted-foreground text-xs truncate"
-                                        title={String(displayVideo.requester_name || displayVideo.user_id || 'Unknown')}
-                                    >
-                                        {displayVideo.requester_name || displayVideo.user_id || 'Unknown'}
-                                    </p>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     {queue.length > 0 && (
@@ -100,10 +102,10 @@ export const MiniPlayerUI: React.FC<MiniPlayerUIProps> = ({
                                             size="sm"
                                             onClick={onToggleQueue}
                                             className={cn(
-                                                "h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground",
-                                                showQueue && "bg-accent/80 text-foreground"
+                                                'h-8 w-8 rounded-full p-0 text-muted-foreground hover:bg-accent/80 hover:text-foreground',
+                                                showQueue && 'bg-accent/80 text-foreground'
                                             )}
-                                            title={showQueue ? "Скрыть очередь" : "Показать очередь"}
+                                            title={showQueue ? 'Скрыть очередь' : 'Показать очередь'}
                                         >
                                             <List className="w-4 h-4" />
                                         </Button>
@@ -145,7 +147,7 @@ interface QueuePanelProps {
 }
 
 const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onClose, onClearQueue, onSelectQueueItem }) => (
-    <div className="absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl bg-[#13060d] shadow-2xl shadow-black/50 ring-1 ring-white/5 animate-in slide-in-from-bottom-2 fade-in duration-200">
+    <div className="pv-static-anchor-in absolute bottom-full left-0 right-0 mb-2 overflow-hidden rounded-xl bg-[#13060d] shadow-2xl shadow-black/50 ring-1 ring-white/5">
         <div className="flex items-center justify-between border-b border-border/50 bg-[#13060d] px-4 py-3">
             <span className="text-xs font-medium text-white/70 uppercase tracking-wider">Очередь</span>
             <div className="flex items-center gap-1">
@@ -180,10 +182,10 @@ const QueuePanel: React.FC<QueuePanelProps> = ({ queue, onClose, onClearQueue, o
                     onClick={() => onSelectQueueItem?.(video)}
                 >
                     <span className="w-4 text-right text-[10px] font-mono text-muted-foreground/60">{index + 1}</span>
-                    <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-medium text-foreground">{video.title}</p>
-                        <p className="truncate text-[10px] text-muted-foreground">{video.requester_name || video.user_id || 'Unknown'}</p>
-                    </div>
+                    <p className="flex min-w-0 flex-1 items-center gap-2 text-xs font-medium text-foreground">
+                        {index === 0 && <BarChart2 className="h-3 w-3 shrink-0 animate-pulse text-emerald-300" />}
+                        <span className="truncate">{video.title}</span>
+                    </p>
                 </button>
             ))}
         </div>
@@ -197,20 +199,15 @@ interface ThumbnailSectionProps {
     onTogglePlayPause: () => void;
 }
 
-const ThumbnailSection: React.FC<ThumbnailSectionProps> = ({
-    thumbnail,
-    title,
-    isPlaying,
-    onTogglePlayPause
-}) => (
+const ThumbnailSection: React.FC<ThumbnailSectionProps> = ({ thumbnail, title, isPlaying, onTogglePlayPause }) => (
     <div className="group/thumb relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-slate-900/60 ring-1 ring-white/10 shadow-inner">
         {thumbnail ? (
             <img
                 src={thumbnail}
                 alt={title}
                 className={cn(
-                    "w-full h-full object-cover transition-transform duration-700",
-                    isPlaying ? "scale-110" : "scale-100 grayscale-[0.2]"
+                    'w-full h-full object-cover transition-transform duration-700',
+                    isPlaying ? 'scale-110' : 'scale-100 grayscale-[0.2]'
                 )}
             />
         ) : (
@@ -223,7 +220,11 @@ const ThumbnailSection: React.FC<ThumbnailSectionProps> = ({
             className="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/35 opacity-0 transition-opacity group-hover/thumb:opacity-100"
             onClick={onTogglePlayPause}
         >
-            {isPlaying ? <Pause className="w-6 h-6 text-white fill-current" /> : <Play className="w-6 h-6 text-white fill-current" />}
+            {isPlaying ? (
+                <Pause className="w-6 h-6 text-white fill-current" />
+            ) : (
+                <Play className="w-6 h-6 text-white fill-current" />
+            )}
         </div>
     </div>
 );
@@ -236,13 +237,7 @@ interface ControlsRowProps {
     onVolumeChange: (value: number[]) => void;
 }
 
-const ControlsRow: React.FC<ControlsRowProps> = ({
-    isMuted,
-    volume,
-    onNextVideo,
-    onToggleMute,
-    onVolumeChange
-}) => (
+const ControlsRow: React.FC<ControlsRowProps> = ({ isMuted, volume, onNextVideo, onToggleMute, onVolumeChange }) => (
     <div className="mt-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-1">
             <Button
@@ -262,7 +257,7 @@ const ControlsRow: React.FC<ControlsRowProps> = ({
                 size="sm"
                 onClick={onToggleMute}
                 className="h-7 w-7 p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                title={isMuted ? "Включить звук" : "Выключить звук"}
+                title={isMuted ? 'Включить звук' : 'Выключить звук'}
             >
                 {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </Button>
@@ -278,5 +273,3 @@ const ControlsRow: React.FC<ControlsRowProps> = ({
 );
 
 export default MiniPlayerUI;
-
-

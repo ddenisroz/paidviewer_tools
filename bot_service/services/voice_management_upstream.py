@@ -16,7 +16,6 @@ from services.tts.provider_utils import (
     get_voice_management_upstream_params,
     get_voice_management_upstream_url,
     normalize_provider,
-    qwen_voice_crud_not_available_detail,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,8 +43,6 @@ def provider_tts_api_base(provider: str = "f5") -> str:
     try:
         provider_url = get_voice_management_upstream_url(resolved_provider)
     except ProviderRoutingError as error:
-        if str(error) == "qwen_voice_crud_not_available":
-            raise HTTPException(status_code=501, detail=qwen_voice_crud_not_available_detail()) from error
         raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
     return f"{provider_url.rstrip('/')}/api/tts"
 
@@ -55,8 +52,6 @@ def provider_admin_api_base(provider: str = "f5") -> str:
     try:
         provider_url = get_voice_management_upstream_url(resolved_provider)
     except ProviderRoutingError as error:
-        if str(error) == "qwen_voice_crud_not_available":
-            raise HTTPException(status_code=501, detail=qwen_voice_crud_not_available_detail()) from error
         raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
     return f"{provider_url.rstrip('/')}/api/admin"
 
@@ -132,11 +127,25 @@ def raise_upstream_transport_error(
 ) -> None:
     if isinstance(error, httpx.TimeoutException):
         logger.warning("Voice upstream timeout during %s: %s", operation, error)
-        raise HTTPException(status_code=504, detail=timeout_detail) from error
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "code": "tts_voice_upstream_timeout",
+                "message": timeout_detail,
+                "operation": operation,
+            },
+        ) from error
 
     if isinstance(error, httpx.RequestError):
         logger.warning("Voice upstream connection error during %s: %s", operation, error)
-        raise HTTPException(status_code=503, detail=connect_detail) from error
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "tts_voice_upstream_unreachable",
+                "message": connect_detail,
+                "operation": operation,
+            },
+        ) from error
 
     logger.exception("Voice upstream unexpected failure during %s", operation)
     raise HTTPException(status_code=500, detail="Internal server error") from error
@@ -169,4 +178,3 @@ class VoiceManagementUpstreamClient:
                 timeout_detail=timeout_detail,
                 connect_detail=connect_detail,
             )
-

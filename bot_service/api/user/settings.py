@@ -42,10 +42,7 @@ class TTSSettingsUpdateRequest(BaseModel):
     engine: Optional[str] = None
     advanced_provider: Optional[str] = None
     f5_mode: Optional[str] = None
-    qwen_mode: Optional[str] = None
     voice: Optional[str] = None
-    qwen_voice: Optional[str] = None
-    qwen_model: Optional[str] = None
     listening_mode: Optional[str] = None
     use_local_tts: Optional[bool] = None
     enabled_platforms: Optional[list] = None
@@ -149,20 +146,17 @@ async def update_my_tts_settings(
         
         # Validate inputs
         if request.engine is not None:
-            valid_engines = ['gtts', 'f5tts', 'gcloud', 'qwen']
+            valid_engines = ['gtts', 'f5tts', 'gcloud']
             if request.engine not in valid_engines:
                 raise HTTPException(status_code=400, detail=f"Invalid engine. Must be one of: {valid_engines}")
 
         if request.advanced_provider is not None:
-            valid_providers = ['f5', 'gcloud', 'qwen']
+            valid_providers = ['f5', 'gcloud']
             if request.advanced_provider not in valid_providers:
                 raise HTTPException(status_code=400, detail=f"Invalid advanced_provider. Must be one of: {valid_providers}")
 
         if request.f5_mode is not None and request.f5_mode not in {'cloud', 'local'}:
             raise HTTPException(status_code=400, detail="Invalid f5_mode. Must be one of: cloud, local")
-
-        if request.qwen_mode is not None and request.qwen_mode not in {'cloud', 'local'}:
-            raise HTTPException(status_code=400, detail="Invalid qwen_mode. Must be one of: cloud, local")
 
         if request.listening_mode is not None:
             valid_modes = ['website', 'obs']
@@ -182,14 +176,8 @@ async def update_my_tts_settings(
             save_payload["advanced_provider"] = request.advanced_provider
         if request.f5_mode is not None:
             save_payload["f5_mode"] = request.f5_mode
-        if request.qwen_mode is not None:
-            save_payload["qwen_mode"] = request.qwen_mode
         if request.voice is not None:
             save_payload["voice"] = request.voice
-        if request.qwen_voice is not None:
-            save_payload["qwen_voice"] = request.qwen_voice
-        if request.qwen_model is not None:
-            save_payload["qwen_model"] = request.qwen_model
         if request.listening_mode is not None:
             save_payload["listening_mode"] = request.listening_mode
         if request.use_local_tts is not None:

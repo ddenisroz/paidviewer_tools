@@ -50,9 +50,12 @@ export const useLootboxData = (channelName: string) => {
             const [openingsRes] = await Promise.all([
                 lootboxService.getRecentOpenings(channelName, { limit: 5 }),
                 lootboxService.getProgression(channelName),
-                lootboxService.getLootboxes(channelName)
+                lootboxService.getLootboxes(channelName),
             ]);
-            const responseData = openingsRes.data as { data?: { openings?: LootboxOpening[] }; openings?: LootboxOpening[] };
+            const responseData = openingsRes.data as {
+                data?: { openings?: LootboxOpening[] };
+                openings?: LootboxOpening[];
+            };
             const openingsData = responseData.data || responseData;
             setRecentOpenings((openingsData?.openings || []) as LootboxOpening[]);
         } catch (error) {
@@ -72,6 +75,6 @@ export const useLootboxData = (channelName: string) => {
         isLoading,
         imageLootboxes,
         gameFieldData,
-        setGameFieldData
+        setGameFieldData,
     };
 };

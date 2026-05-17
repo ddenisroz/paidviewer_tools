@@ -2,20 +2,34 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-
-import VoiceDeleteDialog from '@/features/admin/components/VoiceDeleteDialog';
 import VoiceCollections from '@/features/admin/components/voice-management/VoiceCollections';
 import VoiceEditDialog from '@/features/admin/components/voice-management/VoiceEditDialog';
 import VoiceManagementHeader from '@/features/admin/components/voice-management/VoiceManagementHeader';
 import VoiceUploadDialog from '@/features/admin/components/voice-management/VoiceUploadDialog';
-import type { OwnerType, ProviderCapability, SpeedPreset, VoiceManagementUser, VoiceProvider } from '@/features/admin/types/voiceManagement';
+import VoiceDeleteDialog from '@/features/admin/components/VoiceDeleteDialog';
 import { extractApiErrorMessage, parseAdminVoicesResponse } from '@/features/admin/utils/voiceManagementUtils';
 import { ttsService } from '@/services/api/services';
-import { deleteVoice, getAdminVoices, getUsers, renameVoice, retranscribeVoice, testVoice, updateVoiceSettings, uploadVoice } from '@/services/unified-api';
+import {
+    deleteVoice,
+    getAdminVoices,
+    getUsers,
+    renameVoice,
+    retranscribeVoice,
+    testVoice,
+    updateVoiceSettings,
+    uploadVoice,
+} from '@/services/unified-api';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
 import { resolveAudioUrl } from '@/shared/utils/urlUtils';
 
+import type {
+    OwnerType,
+    ProviderCapability,
+    SpeedPreset,
+    VoiceManagementUser,
+    VoiceProvider,
+} from '@/features/admin/types/voiceManagement';
 import type { TtsVoice } from '@/types/tts';
 
 interface AudioResponse {
@@ -31,12 +45,13 @@ interface TranscribeResponse {
     };
 }
 
-
 const VoiceManagement: React.FC = () => {
     const { addToast } = useToast();
     const [loading, setLoading] = useState<boolean>(true);
     const [uploadDialogOpen, setUploadDialogOpen] = useState<boolean>(false);
-    const [testText, setTestText] = useState<string>("Привет, я бы хотел с тобой постримить, если честно, для меня бы это было честью. Постримить с таким великим стримером было бы реально круто.");
+    const [testText, setTestText] = useState<string>(
+        'Привет, я бы хотел с тобой постримить, если честно, для меня бы это было честью. Постримить с таким великим стримером было бы реально круто.'
+    );
     const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
 
     const [currentVoice, setCurrentVoice] = useState<TtsVoice | null>(null);
@@ -66,7 +81,6 @@ const VoiceManagement: React.FC = () => {
     const isUserClosingRef = useRef<boolean>(false);
     const previewAudioRef = useRef<HTMLAudioElement | null>(null);
     const queryClient = useQueryClient();
-
 
     const stopPreviewAudio = (): void => {
         const previewAudio = previewAudioRef.current;
@@ -100,13 +114,15 @@ const VoiceManagement: React.FC = () => {
 
     const selectedProviderCapabilities = providerCapabilities[voiceProvider];
     const isAdminVoiceAvailable = selectedProviderCapabilities?.voice_admin !== false;
-    const providerCapabilityMessage =
-        selectedProviderCapabilities?.voice_detail?.message
-        || (voiceProvider === 'qwen' ? 'Админское управление голосами Qwen недоступно в текущем окружении.' : null);
+    const providerCapabilityMessage = selectedProviderCapabilities?.voice_detail?.message || null;
     const providerCapabilityHint = selectedProviderCapabilities?.voice_detail?.hint;
 
     // React Query: загружаем голоса для админа
-    const { data: voicesData = [], isLoading: voicesLoading, error: voicesError } = useQuery<TtsVoice[]>({
+    const {
+        data: voicesData = [],
+        isLoading: voicesLoading,
+        error: voicesError,
+    } = useQuery<TtsVoice[]>({
         queryKey: ['admin-voices', voiceProvider, isAdminVoiceAvailable],
         queryFn: async (): Promise<TtsVoice[]> => {
             if (!isAdminVoiceAvailable) {
@@ -128,9 +144,17 @@ const VoiceManagement: React.FC = () => {
     useEffect(() => {
         if (voicesError) {
             logger.error('[ERROR] [ADMIN] Error loading voices:', voicesError);
-            const error = voicesError as { message?: string; code?: string; response?: { status?: number; data?: { detail?: string } } };
+            const error = voicesError as {
+                message?: string;
+                code?: string;
+                response?: { status?: number; data?: { detail?: string } };
+            };
 
-            if (error.message?.includes('connection') || error.message?.includes('timeout') || error.code === 'ECONNREFUSED') {
+            if (
+                error.message?.includes('connection') ||
+                error.message?.includes('timeout') ||
+                error.code === 'ECONNREFUSED'
+            ) {
                 setTtsServiceWarning(`Ошибка подключения к TTS сервису: ${error.message || 'Сервис недоступен'}`);
             } else if (error.response?.status === 500 && error.response?.data?.detail?.includes('connection')) {
                 setTtsServiceWarning(error.response.data.detail);
@@ -139,7 +163,11 @@ const VoiceManagement: React.FC = () => {
     }, [voicesError]);
 
     // React Query: загружаем пользователей
-    const { data: usersData = [], isLoading: usersLoadingQuery, error: usersError } = useQuery<VoiceManagementUser[]>({
+    const {
+        data: usersData = [],
+        isLoading: usersLoadingQuery,
+        error: usersError,
+    } = useQuery<VoiceManagementUser[]>({
         queryKey: ['admin-voice-users'],
         queryFn: async (): Promise<VoiceManagementUser[]> => {
             const response = await getUsers();
@@ -172,7 +200,11 @@ const VoiceManagement: React.FC = () => {
         if (usersError) {
             logger.error('Error loading users:', usersError);
             const error = usersError as { message?: string };
-            addToast({ type: 'error', title: 'Ошибка', message: `Не удалось загрузить пользователей: ${error.message || 'Неизвестная ошибка'}` });
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: `Не удалось загрузить пользователей: ${error.message || 'Неизвестная ошибка'}`,
+            });
         }
     }, [usersError, addToast]);
 
@@ -252,14 +284,14 @@ const VoiceManagement: React.FC = () => {
             addToast({
                 type: 'error',
                 title: 'Ошибка',
-                message: `Неподдерживаемый формат файла. Поддерживаемые форматы: ${supportedFormats.join(', ')}`
+                message: `Неподдерживаемый формат файла. Поддерживаемые форматы: ${supportedFormats.join(', ')}`,
             });
             event.target.value = '';
             return;
         }
 
         setUploadFile(file);
-        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
+        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
         setVoiceName(nameWithoutExt);
     };
 
@@ -268,7 +300,8 @@ const VoiceManagement: React.FC = () => {
             addToast({
                 type: 'warning',
                 title: 'Недоступно',
-                message: providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
+                message:
+                    providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
             });
             return;
         }
@@ -279,7 +312,11 @@ const VoiceManagement: React.FC = () => {
         }
 
         if (ownerId === 'user' && !selectedUserId) {
-            addToast({ type: 'error', title: 'Ошибка', message: 'Выберите пользователя для пользовательского голоса.' });
+            addToast({
+                type: 'error',
+                title: 'Ошибка',
+                message: 'Выберите пользователя для пользовательского голоса.',
+            });
             return;
         }
 
@@ -297,9 +334,10 @@ const VoiceManagement: React.FC = () => {
                 await uploadVoice(formData, voiceProvider);
             }
 
-            const message = ownerId === 'global'
-                ? `Голос "${voiceName.trim()}" успешно загружен в глобальные голоса.`
-                : `Голос "${voiceName.trim()}" успешно загружен для пользователя.`;
+            const message =
+                ownerId === 'global'
+                    ? `Голос "${voiceName.trim()}" успешно загружен в глобальные голоса.`
+                    : `Голос "${voiceName.trim()}" успешно загружен для пользователя.`;
             addToast({ type: 'success', title: 'Успех', message });
             setUploadDialogOpen(false);
             setUploadFile(null);
@@ -320,12 +358,13 @@ const VoiceManagement: React.FC = () => {
             addToast({
                 type: 'warning',
                 title: 'Недоступно',
-                message: providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
+                message:
+                    providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
             });
             return;
         }
 
-        const voiceToDelete = voices.find(v => v.id === voiceId);
+        const voiceToDelete = voices.find((v) => v.id === voiceId);
         if (!voiceToDelete) {
             return;
         }
@@ -360,9 +399,8 @@ const VoiceManagement: React.FC = () => {
         setEditDialogOpen(true);
     };
 
-
     const handleReferenceTextChange = (value: string): void => {
-        setCurrentVoice(prev => prev ? { ...prev, reference_text: value } : null);
+        setCurrentVoice((prev) => (prev ? { ...prev, reference_text: value } : null));
     };
 
     const handleRenameVoice = async (): Promise<void> => {
@@ -370,7 +408,8 @@ const VoiceManagement: React.FC = () => {
             addToast({
                 type: 'warning',
                 title: 'Недоступно',
-                message: providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
+                message:
+                    providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
             });
             return;
         }
@@ -385,13 +424,11 @@ const VoiceManagement: React.FC = () => {
         try {
             await renameVoice(currentVoice.id, newName, voiceProvider);
 
-            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
-                voice.id === currentVoice.id
-                    ? { ...voice, name: newName }
-                    : voice
-            ));
+            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) =>
+                prev.map((voice) => (voice.id === currentVoice.id ? { ...voice, name: newName } : voice))
+            );
 
-            setCurrentVoice(prev => prev ? { ...prev, name: newName } : null);
+            setCurrentVoice((prev) => (prev ? { ...prev, name: newName } : null));
             setOriginalVoiceName(newName);
 
             addToast({ type: 'success', title: 'Успех', message: 'Голос переименован успешно!' });
@@ -406,7 +443,8 @@ const VoiceManagement: React.FC = () => {
             addToast({
                 type: 'warning',
                 title: 'Недоступно',
-                message: providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
+                message:
+                    providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
             });
             return;
         }
@@ -416,18 +454,16 @@ const VoiceManagement: React.FC = () => {
             const settings = {
                 cfg_strength: testCfgStrength,
                 speed_preset: testSpeedPreset,
-                reference_text: currentVoice.reference_text
+                reference_text: currentVoice.reference_text,
             };
 
             await updateVoiceSettings(currentVoice.id, settings, voiceProvider);
 
-            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
-                voice.id === currentVoice.id
-                    ? { ...voice, ...settings }
-                    : voice
-            ));
+            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) =>
+                prev.map((voice) => (voice.id === currentVoice.id ? { ...voice, ...settings } : voice))
+            );
 
-            setCurrentVoice(prev => prev ? { ...prev, ...settings } : null);
+            setCurrentVoice((prev) => (prev ? { ...prev, ...settings } : null));
 
             isUserClosingRef.current = true;
             setEditDialogOpen(false);
@@ -438,13 +474,13 @@ const VoiceManagement: React.FC = () => {
         }
     };
 
-
     const handleTestVoice = async (): Promise<void> => {
         if (!isAdminVoiceAvailable) {
             addToast({
                 type: 'warning',
                 title: 'Недоступно',
-                message: providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
+                message:
+                    providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
             });
             return;
         }
@@ -459,10 +495,10 @@ const VoiceManagement: React.FC = () => {
                 voiceProvider,
                 voiceProvider === 'f5'
                     ? {
-                        cfg_strength: testCfgStrength,
-                        speed_preset: testSpeedPreset,
-                    }
-                    : undefined,
+                          cfg_strength: testCfgStrength,
+                          speed_preset: testSpeedPreset,
+                      }
+                    : undefined
             );
 
             const audioResponse = response as AudioResponse;
@@ -541,14 +577,13 @@ const VoiceManagement: React.FC = () => {
         }
     };
 
-
-
     const handleRetranscribeVoice = async (): Promise<void> => {
         if (!isAdminVoiceAvailable) {
             addToast({
                 type: 'warning',
                 title: 'Недоступно',
-                message: providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
+                message:
+                    providerCapabilityMessage || 'Админское управление голосами недоступно для выбранного провайдера.',
             });
             return;
         }
@@ -559,13 +594,17 @@ const VoiceManagement: React.FC = () => {
             const response = await retranscribeVoice(currentVoice.id, voiceProvider);
             const transcribeResponse = response as unknown as TranscribeResponse;
 
-            setCurrentVoice(prev => prev ? { ...prev, reference_text: transcribeResponse.data.reference_text } : null);
+            setCurrentVoice((prev) =>
+                prev ? { ...prev, reference_text: transcribeResponse.data.reference_text } : null
+            );
 
-            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) => prev.map(voice =>
-                voice.id === currentVoice.id
-                    ? { ...voice, reference_text: transcribeResponse.data.reference_text }
-                    : voice
-            ));
+            queryClient.setQueryData(['admin-voices', voiceProvider], (prev: TtsVoice[] = []) =>
+                prev.map((voice) =>
+                    voice.id === currentVoice.id
+                        ? { ...voice, reference_text: transcribeResponse.data.reference_text }
+                        : voice
+                )
+            );
 
             addToast({ type: 'success', title: 'Успех', message: 'Перетранскрипция завершена успешно!' });
         } catch (error) {
@@ -577,14 +616,16 @@ const VoiceManagement: React.FC = () => {
     };
 
     const parsedSelectedUserId = Number.parseInt(selectedUserFilter, 10);
-    const userVoices = voices.filter((voice) =>
-        voice.voice_type === 'user'
-        && (selectedUserFilter === 'all' || voice.owner_id === parsedSelectedUserId)
-        && (searchQuery === '' || voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    const userVoices = voices.filter(
+        (voice) =>
+            voice.voice_type === 'user' &&
+            (selectedUserFilter === 'all' || voice.owner_id === parsedSelectedUserId) &&
+            (searchQuery === '' || voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
-    const globalVoices = voices.filter((voice) =>
-        voice.voice_type === 'global'
-        && (searchQuery === '' || voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    const globalVoices = voices.filter(
+        (voice) =>
+            voice.voice_type === 'global' &&
+            (searchQuery === '' || voice.name.toLowerCase().includes(searchQuery.toLowerCase()))
     );
     const totalUserVoices = voices.filter((voice) => voice.voice_type === 'user').length;
     const totalGlobalVoices = voices.filter((voice) => voice.voice_type === 'global').length;
@@ -595,12 +636,12 @@ const VoiceManagement: React.FC = () => {
 
     const handleCfgStrengthChange = (value: number): void => {
         setTestCfgStrength(value);
-        setCurrentVoice(prev => prev ? { ...prev, cfg_strength: value } : null);
+        setCurrentVoice((prev) => (prev ? { ...prev, cfg_strength: value } : null));
     };
 
     const handleSpeedPresetChange = (preset: SpeedPreset): void => {
         setTestSpeedPreset(preset);
-        setCurrentVoice(prev => prev ? { ...prev, speed_preset: preset } : null);
+        setCurrentVoice((prev) => (prev ? { ...prev, speed_preset: preset } : null));
     };
 
     return (
@@ -690,4 +731,3 @@ const VoiceManagement: React.FC = () => {
 };
 
 export default VoiceManagement;
-

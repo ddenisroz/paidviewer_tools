@@ -11,8 +11,6 @@ from models.tts import TTSUserSettings
 from services.tts.provider_utils import (
     infer_provider_from_engine,
     normalize_provider_mode,
-    normalize_qwen_model_selection,
-    resolve_qwen_cloud_model_selection,
 )
 
 
@@ -63,17 +61,10 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
             settings.engine,
             advanced_provider=getattr(settings, "advanced_provider", None),
         )
-        if provider == "qwen":
-            use_local_tts = normalize_provider_mode(getattr(settings, "qwen_mode", "cloud")) == "local"
-        elif provider == "f5":
+        if provider == "f5":
             use_local_tts = normalize_provider_mode(getattr(settings, "f5_mode", "cloud")) == "local"
         else:
             use_local_tts = False
-
-        qwen_mode = getattr(settings, "qwen_mode", "cloud") or "cloud"
-        qwen_model = normalize_qwen_model_selection(getattr(settings, "qwen_model", None))
-        if normalize_provider_mode(qwen_mode) == "cloud":
-            qwen_model = resolve_qwen_cloud_model_selection(qwen_model)
 
         return {
             "enable_7tv": settings.enable_7tv,
@@ -85,11 +76,8 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
             "listening_mode": settings.listening_mode,
             "advanced_provider": getattr(settings, "advanced_provider", "f5") or "f5",
             "f5_mode": getattr(settings, "f5_mode", "cloud") or "cloud",
-            "qwen_mode": qwen_mode,
             "gcloud_voices": settings.gcloud_voices or [],
             "gcloud_mood": settings.gcloud_mood or "neutral",
-            "qwen_voice": getattr(settings, "qwen_voice", "default") or "default",
-            "qwen_model": qwen_model,
             "max_message_length": settings.max_message_length,
             "skip_commands": settings.skip_commands,
             "use_local_tts": use_local_tts,

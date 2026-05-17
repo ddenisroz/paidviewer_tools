@@ -10,72 +10,82 @@
 
 /* Neutral button hover states (no motion jump) */
 button:not(:disabled):hover,
-[role="button"]:not([aria-disabled="true"]):hover {
-  transform: none;
-  box-shadow: none;
-  transition: color 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out;
+[role='button']:not([aria-disabled='true']):hover {
+    transform: none;
+    box-shadow: none;
+    transition:
+        color 0.15s ease-out,
+        background-color 0.15s ease-out,
+        border-color 0.15s ease-out;
 }
 
 button:not(:disabled):active,
-[role="button"]:not([aria-disabled="true"]):active {
-  transform: none;
-  transition: color 0.1s ease-out, background-color 0.1s ease-out, border-color 0.1s ease-out;
+[role='button']:not([aria-disabled='true']):active {
+    transform: none;
+    transition:
+        color 0.1s ease-out,
+        background-color 0.1s ease-out,
+        border-color 0.1s ease-out;
 }
 
 /* Link hover states */
 a:hover {
-  opacity: 0.85;
-  transition: opacity 0.15s ease-out;
+    opacity: 0.85;
+    transition: opacity 0.15s ease-out;
 }
 
 /* Card hover states */
-[class*="Card"]:hover,
+[class*='Card']:hover,
 .card:hover {
-  box-shadow: none;
-  transform: none;
-  transition: border-color 0.2s ease-out, background-color 0.2s ease-out;
+    box-shadow: none;
+    transform: none;
+    transition:
+        border-color 0.2s ease-out,
+        background-color 0.2s ease-out;
 }
 
 /* Input hover states */
 input:not(:disabled):hover,
 textarea:not(:disabled):hover,
 select:not(:disabled):hover {
-  border-color: inherit;
-  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+    border-color: inherit;
+    transition:
+        border-color 0.15s ease-out,
+        background-color 0.15s ease-out;
 }
 
 /* Switch/Toggle hover states */
-[role="switch"]:not([aria-disabled="true"]):hover {
-  opacity: 0.9;
-  transition: opacity 0.15s ease-out;
+[role='switch']:not([aria-disabled='true']):hover {
+    opacity: 0.9;
+    transition: opacity 0.15s ease-out;
 }
 
 /* Icon button hover states */
-button[class*="icon"]:hover,
+button[class*='icon']:hover,
 button[aria-label]:hover {
-  background-color: hsl(var(--accent));
-  transition: background-color 0.15s ease-out;
+    background-color: hsl(var(--accent));
+    transition: background-color 0.15s ease-out;
 }
 
 /* Dropdown menu item hover */
-[role="menuitem"]:hover,
-[role="option"]:hover {
-  background-color: hsl(var(--accent));
-  transition: background-color 0.15s ease-out;
+[role='menuitem']:hover,
+[role='option']:hover {
+    background-color: hsl(var(--accent));
+    transition: background-color 0.15s ease-out;
 }
 
 /* Tab hover states */
-[role="tab"]:hover {
-  background-color: hsl(var(--accent) / 0.5);
-  transition: background-color 0.15s ease-out;
+[role='tab']:hover {
+    background-color: hsl(var(--accent) / 0.5);
+    transition: background-color 0.15s ease-out;
 }
 
 /* Checkbox and radio hover states */
-input[type="checkbox"]:not(:disabled):hover,
-input[type="radio"]:not(:disabled):hover {
-  cursor: pointer;
-  box-shadow: 0 0 0 4px hsl(var(--ring) / 0.1);
-  transition: box-shadow 0.15s ease-out;
+input[type='checkbox']:not(:disabled):hover,
+input[type='radio']:not(:disabled):hover {
+    cursor: pointer;
+    box-shadow: 0 0 0 4px hsl(var(--ring) / 0.1);
+    transition: box-shadow 0.15s ease-out;
 }
 
 /* ============================================
@@ -84,71 +94,71 @@ input[type="radio"]:not(:disabled):hover {
 
 /* Global focus ring for all interactive elements */
 *:focus-visible {
-  outline: none;
-  box-shadow: none;
-  transition: none;
+    outline: none;
+    box-shadow: none;
+    transition: none;
 }
 
 /* Enhanced focus for buttons */
 button:focus-visible,
-[role="button"]:focus-visible {
-  outline: none;
-  box-shadow: none;
-  transition: none;
+[role='button']:focus-visible {
+    outline: none;
+    box-shadow: none;
+    transition: none;
 }
 
 /* Focus for inputs */
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
-[role="combobox"]:focus-visible {
-  outline: none;
-  border-color: inherit;
-  box-shadow: none;
-  transition: none;
+[role='combobox']:focus-visible {
+    outline: none;
+    border-color: inherit;
+    box-shadow: none;
+    transition: none;
 }
 
 /* Focus for links */
 a:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 4px;
-  border-radius: 2px;
-  transition: outline 0.15s ease-out;
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 4px;
+    border-radius: 2px;
+    transition: outline 0.15s ease-out;
 }
 
 /* Focus for cards (when interactive) */
-[class*="Card"]:focus-visible,
+[class*='Card']:focus-visible,
 .card:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 4px;
-  transition: outline 0.15s ease-out;
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 4px;
+    transition: outline 0.15s ease-out;
 }
 
 /* Focus for switch/toggle */
-[role="switch"]:focus-visible {
-  outline: none;
-  box-shadow: none;
-  transition: none;
+[role='switch']:focus-visible {
+    outline: none;
+    box-shadow: none;
+    transition: none;
 }
 
 /* Focus for dropdown items */
-[role="menuitem"]:focus-visible,
-[role="option"]:focus-visible {
-  outline: none;
-  box-shadow: none;
-  transition: none;
+[role='menuitem']:focus-visible,
+[role='option']:focus-visible {
+    outline: none;
+    box-shadow: none;
+    transition: none;
 }
 
 /* Focus for tabs */
-[role="tab"]:focus-visible {
-  outline: none;
-  box-shadow: none;
-  transition: none;
+[role='tab']:focus-visible {
+    outline: none;
+    box-shadow: none;
+    transition: none;
 }
 
 /* Skip focus outline for mouse users */
 *:focus:not(:focus-visible) {
-  outline: none;
+    outline: none;
 }
 
 /* ============================================
@@ -157,123 +167,123 @@ a:focus-visible {
 
 /* Checkmark animation */
 @keyframes checkmark-draw {
-  0% {
-    stroke-dashoffset: 100;
-    opacity: 0;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    stroke-dashoffset: 0;
-    opacity: 1;
-  }
+    0% {
+        stroke-dashoffset: 100;
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        stroke-dashoffset: 0;
+        opacity: 1;
+    }
 }
 
 @keyframes checkmark-circle {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .checkmark-animation {
-  animation: checkmark-circle 0.3s ease-out;
+    animation: checkmark-circle 0.3s ease-out;
 }
 
 .checkmark-animation path {
-  stroke-dasharray: 100;
-  stroke-dashoffset: 100;
-  animation: checkmark-draw 0.4s ease-out 0.1s forwards;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: checkmark-draw 0.4s ease-out 0.1s forwards;
 }
 
 /* Success pulse animation */
 @keyframes success-pulse {
-  0% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .success-pulse {
-  animation: success-pulse 0.4s ease-out;
+    animation: success-pulse 0.4s ease-out;
 }
 
 /* Success ripple effect */
 @keyframes success-ripple {
-  0% {
-    transform: scale(0);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
+    0% {
+        transform: scale(0);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(2);
+        opacity: 0;
+    }
 }
 
 .success-ripple::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: hsl(142, 76%, 36%);
-  animation: success-ripple 0.6s ease-out;
-  pointer-events: none;
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: hsl(142, 76%, 36%);
+    animation: success-ripple 0.6s ease-out;
+    pointer-events: none;
 }
 
 /* Success fade-in */
 @keyframes success-fade-in {
-  0% {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
+    0% {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .success-fade-in {
-  animation: success-fade-in 0.3s ease-out;
+    animation: success-fade-in 0.3s ease-out;
 }
 
 /* Success bounce */
 @keyframes success-bounce {
-  0% {
-    transform: scale(0.3);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 1;
-  }
-  70% {
-    transform: scale(0.95);
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 1;
+    }
+    70% {
+        transform: scale(0.95);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 .success-bounce {
-  animation: success-bounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    animation: success-bounce 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 /* ============================================
@@ -282,51 +292,47 @@ a:focus-visible {
 
 /* Spinner animation */
 @keyframes spinner-rotate {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 .spinner {
-  animation: spinner-rotate 0.8s linear infinite;
+    animation: spinner-rotate 0.8s linear infinite;
 }
 
 /* Pulse loading */
 @keyframes pulse-loading {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .pulse-loading {
-  animation: pulse-loading 1.5s ease-in-out infinite;
+    animation: pulse-loading 1.5s ease-in-out infinite;
 }
 
 /* Skeleton shimmer */
 @keyframes skeleton-shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 .skeleton-shimmer {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--muted)) 0%,
-    hsl(var(--muted) / 0.5) 50%,
-    hsl(var(--muted)) 100%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+    background: linear-gradient(90deg, hsl(var(--muted)) 0%, hsl(var(--muted) / 0.5) 50%, hsl(var(--muted)) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }
 
 /* ============================================
@@ -335,64 +341,72 @@ a:focus-visible {
 
 /* Button press effect */
 @keyframes button-press {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(0.95);
-  }
-  100% {
-    transform: scale(1);
-  }
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(0.95);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
 .button-press {
-  animation: button-press 0.2s ease-out;
+    animation: button-press 0.2s ease-out;
 }
 
 /* Ripple effect on click */
 @keyframes ripple {
-  0% {
-    transform: scale(0);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(4);
-    opacity: 0;
-  }
+    0% {
+        transform: scale(0);
+        opacity: 0.6;
+    }
+    100% {
+        transform: scale(4);
+        opacity: 0;
+    }
 }
 
 .ripple-effect {
-  position: relative;
-  overflow: hidden;
+    position: relative;
+    overflow: hidden;
 }
 
 .ripple-effect::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.5);
-  width: 20px;
-  height: 20px;
-  animation: ripple 0.6s ease-out;
-  pointer-events: none;
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+    width: 20px;
+    height: 20px;
+    animation: ripple 0.6s ease-out;
+    pointer-events: none;
 }
 
 /* Shake animation for errors */
 @keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-4px);
-  }
-  20%, 40%, 60%, 80% {
-    transform: translateX(4px);
-  }
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translateX(-4px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translateX(4px);
+    }
 }
 
 .shake-animation {
-  animation: shake 0.4s ease-out;
+    animation: shake 0.4s ease-out;
 }
 
 /* ============================================
@@ -401,34 +415,34 @@ a:focus-visible {
 
 /* Toast slide-in animation */
 @keyframes toast-slide-in {
-  0% {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  100% {
-    transform: translateX(0);
-    opacity: 1;
-  }
+    0% {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    100% {
+        transform: translateX(0);
+        opacity: 1;
+    }
 }
 
 .toast-slide-in {
-  animation: toast-slide-in 0.3s ease-out;
+    animation: toast-slide-in 0.3s ease-out;
 }
 
 /* Toast slide-out animation */
 @keyframes toast-slide-out {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(100%);
-    opacity: 0;
-  }
+    0% {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateX(100%);
+        opacity: 0;
+    }
 }
 
 .toast-slide-out {
-  animation: toast-slide-out 0.2s ease-in;
+    animation: toast-slide-out 0.2s ease-in;
 }
 
 /* ============================================
@@ -437,39 +451,39 @@ a:focus-visible {
 
 /* Smooth transitions for all interactive elements */
 .interactive {
-  transition: all 0.15s ease-out;
+    transition: all 0.15s ease-out;
 }
 
 /* Disabled state */
 .disabled,
 [disabled],
-[aria-disabled="true"] {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
+[aria-disabled='true'] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
 }
 
 /* Loading state */
 .loading {
-  position: relative;
-  pointer-events: none;
-  opacity: 0.7;
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
 }
 
 .loading::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: hsl(var(--background) / 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: hsl(var(--background) / 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Active state */
 .active {
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
 }
 
 /* ============================================
@@ -478,34 +492,34 @@ a:focus-visible {
 
 /* Use GPU acceleration for animations */
 button,
-[role="button"],
+[role='button'],
 a,
 input,
 textarea,
 select,
-[class*="Card"],
+[class*='Card'],
 .card {
-  will-change: transform;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
 }
 
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
-  
-  button:hover,
-  [role="button"]:hover,
-  [class*="Card"]:hover,
-  .card:hover {
-    transform: none;
-  }
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    button:hover,
+    [role='button']:hover,
+    [class*='Card']:hover,
+    .card:hover {
+        transform: none;
+    }
 }
 
 /* ============================================
@@ -514,32 +528,32 @@ select,
 
 /* High contrast mode support */
 @media (prefers-contrast: high) {
-  *:focus-visible {
-    outline-width: 3px;
-    outline-offset: 3px;
-  }
-  
-  button:focus-visible,
-  [role="button"]:focus-visible {
-    outline-width: 3px;
-    box-shadow: 0 0 0 6px hsl(var(--ring) / 0.3);
-  }
+    *:focus-visible {
+        outline-width: 3px;
+        outline-offset: 3px;
+    }
+
+    button:focus-visible,
+    [role='button']:focus-visible {
+        outline-width: 3px;
+        box-shadow: 0 0 0 6px hsl(var(--ring) / 0.3);
+    }
 }
 
 /* Ensure minimum touch target size (44x44px) */
 button,
-[role="button"],
+[role='button'],
 a,
-input[type="checkbox"],
-input[type="radio"],
-[role="switch"] {
-  min-width: 44px;
-  min-height: 44px;
+input[type='checkbox'],
+input[type='radio'],
+[role='switch'] {
+    min-width: 44px;
+    min-height: 44px;
 }
 
 /* Exception for icon-only buttons */
-button[class*="icon"],
+button[class*='icon'],
 button[aria-label] {
-  min-width: 36px;
-  min-height: 36px;
+    min-width: 36px;
+    min-height: 36px;
 }

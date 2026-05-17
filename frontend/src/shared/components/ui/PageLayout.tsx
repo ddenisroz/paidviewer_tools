@@ -13,20 +13,20 @@ interface PageLayoutProps {
     skeleton?: ReactNode;
 }
 
-const PageLayout: React.FC<PageLayoutProps> = ({ 
-    children, 
+const PageLayout: React.FC<PageLayoutProps> = ({
+    children,
     className,
     title,
     description,
     loading = false,
-    skeleton = null 
+    skeleton = null,
 }) => {
     if (loading) {
         return (
-            <div className={cn("container mx-auto p-6 space-y-6", className)}>
+            <div className={cn('container mx-auto space-y-6 p-6', className)}>
                 {title && (
                     <div>
-                        <h1 className="text-3xl font-bold mb-6 text-foreground">{title}</h1>
+                        <h1 className="mb-6 text-3xl font-bold text-foreground">{title}</h1>
                         {description && <p className="text-muted-foreground">{description}</p>}
                     </div>
                 )}
@@ -36,10 +36,10 @@ const PageLayout: React.FC<PageLayoutProps> = ({
     }
 
     return (
-        <div className={cn("container mx-auto p-6 space-y-6", className)}>
+        <div className={cn('container mx-auto space-y-6 p-6', className)}>
             {title && (
                 <div>
-                    <h1 className="text-3xl font-bold mb-6 text-foreground">{title}</h1>
+                    <h1 className="mb-6 text-3xl font-bold text-foreground">{title}</h1>
                     {description && <p className="text-muted-foreground">{description}</p>}
                 </div>
             )}
@@ -49,4 +49,3 @@ const PageLayout: React.FC<PageLayoutProps> = ({
 };
 
 export default PageLayout;
-

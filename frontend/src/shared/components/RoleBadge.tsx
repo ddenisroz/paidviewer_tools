@@ -9,37 +9,40 @@ interface VkRoleBadgeProps {
     style?: React.CSSProperties;
 }
 
-const VK_ROLE_MAP: Record<string, { label: string; color: string; bg: string; Icon: React.FC<React.SVGProps<SVGSVGElement>> }> = {
+const VK_ROLE_MAP: Record<
+    string,
+    { label: string; color: string; bg: string; Icon: React.FC<React.SVGProps<SVGSVGElement>> }
+> = {
     broadcaster: {
         label: 'Streamer',
         color: '#F97316',
         bg: 'rgba(249, 115, 22, 0.18)',
-        Icon: Crown
+        Icon: Crown,
     },
     owner: {
         label: 'Streamer',
         color: '#F97316',
         bg: 'rgba(249, 115, 22, 0.18)',
-        Icon: Crown
+        Icon: Crown,
     },
     moderator: {
         label: 'Moderator',
         color: '#22C55E',
         bg: 'rgba(34, 197, 94, 0.18)',
-        Icon: ShieldCheck
+        Icon: ShieldCheck,
     },
     vip: {
         label: 'vip',
         color: '#FACC15',
         bg: 'rgba(250, 204, 21, 0.18)',
-        Icon: Star
+        Icon: Star,
     },
     subscriber: {
         label: 'Subscriber',
         color: '#60A5FA',
         bg: 'rgba(96, 165, 250, 0.18)',
-        Icon: User
-    }
+        Icon: User,
+    },
 };
 
 const VK_ROLE_ALIASES: Record<string, string> = {
@@ -73,7 +76,7 @@ export const VkRoleBadge: React.FC<VkRoleBadgeProps> = ({ role, size = 14, class
                     borderRadius: '6px',
                     backgroundColor: 'rgba(239, 68, 68, 0.2)',
                     color: '#F87171',
-                    ...style
+                    ...style,
                 }}
             >
                 <ShieldCheck style={{ width: `${size}px`, height: `${size}px` }} />
@@ -96,7 +99,7 @@ export const VkRoleBadge: React.FC<VkRoleBadgeProps> = ({ role, size = 14, class
                 borderRadius: '6px',
                 backgroundColor: config.bg,
                 color: config.color,
-                ...style
+                ...style,
             }}
         >
             <Icon style={{ width: `${size}px`, height: `${size}px` }} />

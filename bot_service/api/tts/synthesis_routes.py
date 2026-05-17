@@ -44,7 +44,8 @@ async def synthesize_text(
     try:
         data = await request.json()
         text = data.get("text")
-        voice = data.get("voice", "default_voice")
+        raw_voice = data.get("voice")
+        voice = str(raw_voice).strip() if raw_voice is not None else None
         # Optional params
         channel = data.get("channel")
         platform = data.get("platform", "twitch")

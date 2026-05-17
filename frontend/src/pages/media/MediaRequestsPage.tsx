@@ -24,11 +24,15 @@ const MediaRequestsPage: React.FC = () => {
         }
     };
 
+    const isYoutubeTab = activeTab === 'youtube' || !activeTab;
+
     return (
-        <PageWrapper title="Медиа запросы">
-            <div className="w-full">
-                {renderContent()}
-            </div>
+        <PageWrapper
+            title="Медиа запросы"
+            className={isYoutubeTab ? '!min-h-0 h-full py-0' : undefined}
+            contentClassName={isYoutubeTab ? 'h-full min-h-0 space-y-0' : undefined}
+        >
+            <div className={isYoutubeTab ? 'h-full min-h-0 w-full' : 'w-full'}>{renderContent()}</div>
         </PageWrapper>
     );
 };

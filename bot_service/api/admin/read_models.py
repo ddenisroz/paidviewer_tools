@@ -36,6 +36,7 @@ from services.worker_control.service import WorkerControlPlaneService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/admin", tags=["admin-read-models"])
+REQUIRED_TWITCH_CHAT_SCOPES = {"chat:read", "chat:edit"}
 
 
 def require_admin(user: dict) -> None:
@@ -135,12 +136,21 @@ async def _load_bot_token_status(platform: str, db: Session) -> dict[str, Any]:
     seconds_left = None
     if expires_at:
         seconds_left = max(0, int((expires_at - utcnow_naive()).total_seconds()))
+    scopes = bot_token.get("scopes") if isinstance(bot_token.get("scopes"), list) else []
+    missing_scopes = (
+        sorted(REQUIRED_TWITCH_CHAT_SCOPES - set(scopes))
+        if provider == "twitch"
+        else []
+    )
 
     return {
         "configured": True,
         "platform": provider,
         "bot_login": bot_token.get("bot_login"),
         "bot_user_id": bot_token.get("bot_user_id"),
+        "scopes": scopes,
+        "missing_scopes": missing_scopes,
+        "valid_for_chat": not missing_scopes,
         "expires_at": expires_at.isoformat() if expires_at else None,
         "seconds_left": seconds_left,
         "needs_refresh": bool(
@@ -203,7 +213,7 @@ async def _fetch_provider_health(provider: str) -> dict[str, Any]:
             "message": None if healthy else payload.get("message") or payload.get("detail"),
         }
     except Exception as error:
-        logger.exception("Provider health check failed for %s", normalized_provider)
+        logger.warning("Provider health check unavailable for %s: %s", normalized_provider, error)
         return {
             "provider": normalized_provider,
             "healthy": False,
@@ -212,7 +222,8 @@ async def _fetch_provider_health(provider: str) -> dict[str, Any]:
             "url": upstream_url,
             "via": "gateway" if use_gateway else "direct",
             "error_code": "provider_unreachable",
-            "message": str(error),
+            "message": "Сервис не отвечает. Запустите локальный TTS или проверьте адрес.",
+            "details": str(error),
         }
 
 
@@ -226,7 +237,7 @@ def _summarize_workers(workers: list[dict[str, Any]]) -> dict[str, Any]:
         "disabled": 0,
         "managed": 0,
         "self_hosted": 0,
-        "providers": {"f5": 0, "qwen": 0},
+        "providers": {"f5": 0},
     }
     for worker in workers:
         status = str(worker.get("status") or "offline").lower()
@@ -242,8 +253,6 @@ def _summarize_workers(workers: list[dict[str, Any]]) -> dict[str, Any]:
 
         if worker.get("supports_f5"):
             summary["providers"]["f5"] += 1
-        if worker.get("supports_qwen"):
-            summary["providers"]["qwen"] += 1
     return summary
 
 
@@ -262,8 +271,8 @@ def _build_alerts(
                 {
                     "id": f"tts-{provider}",
                     "severity": "high",
-                    "title": f"{provider.upper()} cloud unhealthy",
-                    "message": health.get("message") or "Healthcheck failed",
+                    "title": f"{provider.upper()} не отвечает",
+                    "message": health.get("message") or "Проверьте, что голосовой сервис запущен и доступен.",
                 }
             )
 
@@ -273,8 +282,17 @@ def _build_alerts(
                 {
                     "id": f"token-{platform}",
                     "severity": "medium",
-                    "title": f"{platform.upper()} bot token missing",
-                    "message": status.get("message") or "Bot token is not configured",
+                    "title": f"{platform.upper()} бот не авторизован",
+                    "message": "Нужна авторизация бота перед запуском чата.",
+                }
+            )
+        elif status.get("missing_scopes"):
+            alerts.append(
+                {
+                    "id": f"token-scopes-{platform}",
+                    "severity": "high",
+                    "title": f"{platform.upper()} бот без прав чата",
+                    "message": f"Нет прав: {', '.join(status['missing_scopes'])}. Переавторизуйте бота.",
                 }
             )
         elif status.get("needs_refresh"):
@@ -282,8 +300,8 @@ def _build_alerts(
                 {
                     "id": f"token-refresh-{platform}",
                     "severity": "medium",
-                    "title": f"{platform.upper()} bot token expires soon",
-                    "message": "Refresh is recommended before the next maintenance window",
+                    "title": f"{platform.upper()} токен скоро истечёт",
+                    "message": "Обновите токен перед следующим запуском.",
                 }
             )
 
@@ -292,8 +310,8 @@ def _build_alerts(
             {
                 "id": "workers-offline",
                 "severity": "medium",
-                "title": "Some TTS workers are offline",
-                "message": f"Offline workers: {workers_summary['offline']}",
+                "title": "Часть локальных TTS-программ offline",
+                "message": f"Не отвечают: {workers_summary['offline']}",
             }
         )
 
@@ -314,7 +332,6 @@ async def get_admin_overview(
     runtime_bots = _collect_bot_runtime()
     provider_health = {
         "f5": await _fetch_provider_health("f5"),
-        "qwen": await _fetch_provider_health("qwen"),
     }
     worker_service = WorkerControlPlaneService(db)
     workers = worker_service.list_workers_admin()
@@ -411,7 +428,6 @@ async def get_admin_tts(
     provider_capabilities = get_all_provider_capabilities()
     provider_health = {
         "f5": await _fetch_provider_health("f5"),
-        "qwen": await _fetch_provider_health("qwen"),
     }
 
     providers: dict[str, Any] = {}

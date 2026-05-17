@@ -93,6 +93,12 @@ async def broadcast_youtube_queue_update(user_id: int):
             "data": {}
         }
         await manager.send_to_user(user_id, message)
+        try:
+            from core.connection_manager import get_connection_manager
+
+            await get_connection_manager().send_youtube_obs_to_user(user_id, message)
+        except Exception:
+            logger.debug("YouTube OBS queue signal broadcast failed", exc_info=True)
         logger.debug(f"Broadcasted YouTube queue update for user {user_id}")
     except Exception as e:
         logger.error(f"Error broadcasting YouTube queue update: {e}")

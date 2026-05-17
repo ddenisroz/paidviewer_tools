@@ -220,6 +220,7 @@ class VkBotOAuthService:
                 'access_token': decrypt_token(bot_token.access_token),
                 'refresh_token': decrypt_token(bot_token.refresh_token) if bot_token.refresh_token else None,
                 'expires_at': bot_token.expires_at,
+                'scopes': bot_token.scopes if isinstance(bot_token.scopes, list) else [],
                 'bot_login': bot_token.bot_login,
                 'bot_user_id': bot_token.bot_user_id
             }

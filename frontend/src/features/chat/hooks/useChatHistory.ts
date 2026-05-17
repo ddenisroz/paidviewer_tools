@@ -38,7 +38,7 @@ export function useChatHistory({
     integrationsLoading,
     integrations,
     historyLoaded,
-    onHistoryLoaded
+    onHistoryLoaded,
 }: UseChatHistoryOptions): void {
     const loadingRef = useRef<boolean>(false);
     // Track if we've already attempted to load history this session
@@ -76,10 +76,10 @@ export function useChatHistory({
             // Use ref to check current value (not stale closure)
             while (elapsedTime < maxWaitTime && !historyLoadedRef.current) {
                 if (isConnected) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    await new Promise((resolve) => setTimeout(resolve, 500));
                     break;
                 }
-                await new Promise(resolve => setTimeout(resolve, checkInterval));
+                await new Promise((resolve) => setTimeout(resolve, checkInterval));
                 elapsedTime += checkInterval;
             }
 
@@ -95,14 +95,14 @@ export function useChatHistory({
             try {
                 logger.info('[CHAT] Loading chat history from API (WebSocket fallback)...');
                 const response = await chatService.getChatHistory({
-                    limit: parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10)
+                    limit: parseInt(import.meta.env.VITE_CHAT_MAX_MESSAGES || '200', 10),
                 });
 
                 const data = response.data as ApiResponse;
                 if (data.success && data.messages && data.messages.length > 0) {
                     const platformFilter: PlatformFilter = {
                         twitch: integrations?.twitch?.enabled ?? true,
-                        vk: integrations?.vk?.enabled ?? true
+                        vk: integrations?.vk?.enabled ?? true,
                     };
 
                     logger.info(`[CHAT] Loaded ${data.messages.length} messages from history (API fallback)`);
@@ -121,4 +121,3 @@ export function useChatHistory({
         // Removed onHistoryLoaded from deps - using ref instead to prevent re-triggers
     }, [enabled, isAuthenticated, integrationsLoading, isConnected, integrations, historyLoaded]);
 }
-

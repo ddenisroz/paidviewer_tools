@@ -1,7 +1,7 @@
 ﻿// src/context/ChatContext.tsx
 /**
  * Контекст чата - композиция хуков для управления чатом.
- * 
+ *
  * Рефакторинг: логика разделена на отдельные хуки:
  * - useChatMessages: управление сообщениями (reducer, localStorage)
  * - useChatWebSocket: обработка WebSocket сообщений
@@ -14,8 +14,8 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 
 import { useLocation } from 'react-router-dom';
 
-import { isAdminPath } from '@/features/admin/utils/adminRoutes';
 import { type BotStatusType, useBotConnection } from '@/features/admin/hooks/useBotConnection';
+import { isAdminPath } from '@/features/admin/utils/adminRoutes';
 import { useChatHistory } from '@/features/chat/hooks/useChatHistory';
 import { useChatMessages } from '@/features/chat/hooks/useChatMessages';
 import { useChatWebSocket } from '@/features/chat/hooks/useChatWebSocket';
@@ -23,10 +23,8 @@ import { useToast } from '@/shared/components/ui/toast';
 import { useAudioUnlock } from '@/shared/hooks/useAudioUnlock';
 import useSharedWebSocket from '@/shared/hooks/useSharedWebSocket';
 
-
 import { useAuth } from './AuthContext';
 import { useIntegrations } from './IntegrationsContext';
-
 
 // Import refactored hooks
 
@@ -43,7 +41,7 @@ interface ChatContextValue {
     sendMessage: (message: string, platforms?: string[]) => void;
     connectBotToChannels: (platforms?: string[]) => Promise<void>;
     disconnectBotFromChannels: () => Promise<void>;
-    getBotConnectionStatus: () => Promise<{ status: BotStatusType;[key: string]: unknown }>;
+    getBotConnectionStatus: () => Promise<{ status: BotStatusType; [key: string]: unknown }>;
     clearMessages: () => void;
     setMessages: (messages: ChatMessage[]) => void;
 }
@@ -69,9 +67,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     const { addToast: _addToast } = useToast();
     const location = useLocation();
 
-    const isBotStatusPage =
-        location.pathname.startsWith('/dashboard/chat-analysis') ||
-        isAdminPath(location.pathname);
+    const isBotStatusPage = location.pathname.startsWith('/dashboard/chat-analysis') || isAdminPath(location.pathname);
     const botStatusPollInterval = isBotStatusPage ? 30000 : 120000;
     const shouldLoadChatHistory = location.pathname.startsWith('/chat-window');
     const shouldUseSharedWebSocket =
@@ -95,21 +91,16 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         setMessages: setMessagesInternal,
         clearMessages,
         historyLoaded,
-        setHistoryLoaded
+        setHistoryLoaded,
     } = useChatMessages();
 
     // Bot connection hook
-    const {
-        botStatus,
-        setBotStatus,
-        connectBotToChannels,
-        disconnectBotFromChannels,
-        getBotConnectionStatus
-    } = useBotConnection({
-        isAuthenticated: !!isAuthenticated,
-        isCheckingAuth: isCheckingAuth ?? false,
-        pollingInterval: botStatusPollInterval
-    });
+    const { botStatus, setBotStatus, connectBotToChannels, disconnectBotFromChannels, getBotConnectionStatus } =
+        useBotConnection({
+            isAuthenticated: !!isAuthenticated,
+            isCheckingAuth: isCheckingAuth ?? false,
+            pollingInterval: botStatusPollInterval,
+        });
 
     // WebSocket message handler hook
     const { lastJsonMessage, handleWebSocketMessage } = useChatWebSocket({
@@ -120,7 +111,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             setHistoryLoaded(true);
         },
         onBotStatusChange: setBotStatus,
-        onError: setError
+        onError: setError,
     });
 
     // User ID for WebSocket
@@ -148,7 +139,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         onHistoryLoaded: (msgs, filter) => {
             setMessagesInternal(msgs, filter);
             setHistoryLoaded(true);
-        }
+        },
     });
 
     // Clear messages on logout
@@ -159,28 +150,34 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }, [isAuthenticated, clearMessages]);
 
     // Send message function
-    const sendMessage = useCallback((message: string, platforms: string[] = []): void => {
-        if (!isConnected) {
-            throw new Error('WebSocket not connected');
-        }
-        if (!message || !message.trim()) {
-            throw new Error('Message cannot be empty');
-        }
-        if (!platforms || platforms.length === 0) {
-            throw new Error('No platforms specified');
-        }
+    const sendMessage = useCallback(
+        (message: string, platforms: string[] = []): void => {
+            if (!isConnected) {
+                throw new Error('WebSocket not connected');
+            }
+            if (!message || !message.trim()) {
+                throw new Error('Message cannot be empty');
+            }
+            if (!platforms || platforms.length === 0) {
+                throw new Error('No platforms specified');
+            }
 
-        wsSendMessage({
-            type: 'send_message',
-            message: message.trim(),
-            platforms: platforms
-        });
-    }, [isConnected, wsSendMessage]);
+            wsSendMessage({
+                type: 'send_message',
+                message: message.trim(),
+                platforms: platforms,
+            });
+        },
+        [isConnected, wsSendMessage]
+    );
 
     // Public setMessages wrapper
-    const setMessages = useCallback((newMessages: ChatMessage[]): void => {
-        setMessagesInternal(newMessages);
-    }, [setMessagesInternal]);
+    const setMessages = useCallback(
+        (newMessages: ChatMessage[]): void => {
+            setMessagesInternal(newMessages);
+        },
+        [setMessagesInternal]
+    );
 
     // Context value
     const value = useMemo<ChatContextValue>(() => {
@@ -195,7 +192,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
             disconnectBotFromChannels,
             getBotConnectionStatus,
             clearMessages,
-            setMessages
+            setMessages,
         };
     }, [
         messages,
@@ -208,12 +205,8 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
         disconnectBotFromChannels,
         getBotConnectionStatus,
         clearMessages,
-        setMessages
+        setMessages,
     ]);
 
-    return (
-        <ChatContext.Provider value={value}>
-            {children}
-        </ChatContext.Provider>
-    );
+    return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

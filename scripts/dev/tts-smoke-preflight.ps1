@@ -159,13 +159,7 @@ switch ($Scenario) {
             'TTS_GATEWAY_URL',
             'TTS_GATEWAY_API_KEY',
             'F5_TTS_SERVICE_URL',
-            'F5_TTS_SERVICE_API_KEY',
-            'QWEN_TTS_SERVICE_URL'
-        ) -Results $results
-
-        Test-OptionalEnvKeys -Map $botEnv -Area 'cloud' -OptionalKeys @(
-            'QWEN_TTS_SERVICE_API_KEY',
-            'QWEN_VOICE_SERVICE_URL'
+            'F5_TTS_SERVICE_API_KEY'
         ) -Results $results
 
         Test-EnvKeys -Map $botEnv -Area 'self_host' -RequiredKeys @(
@@ -178,12 +172,7 @@ switch ($Scenario) {
             'TTS_GATEWAY_URL',
             'TTS_GATEWAY_API_KEY',
             'F5_TTS_SERVICE_URL',
-            'F5_TTS_SERVICE_API_KEY',
-            'QWEN_TTS_SERVICE_URL'
-        ) -Results $results
-
-        Test-OptionalEnvKeys -Map $botEnv -Area 'cloud' -OptionalKeys @(
-            'QWEN_TTS_SERVICE_API_KEY'
+            'F5_TTS_SERVICE_API_KEY'
         ) -Results $results
     }
     'self_host' {
@@ -205,7 +194,6 @@ switch ($Scenario) {
 if ($Scenario -in @('all', 'cloud')) {
     Add-Result $results 'WARN' 'external' 'Redis reachability for tts-gateway is not verified by this script'
     Add-Result $results 'WARN' 'external' 'F5 vendor/assets/weights are not verified by this script'
-    Add-Result $results 'WARN' 'external' 'Qwen Linux/WSL2 runtime readiness is not verified by this script'
 }
 
 if ($Scenario -in @('all', 'self_host')) {
@@ -213,13 +201,9 @@ if ($Scenario -in @('all', 'self_host')) {
     Add-Result $results 'WARN' 'self_host' 'Authenticated + whitelisted user state is not verified by this script'
 }
 
-if ($env:OS -like '*Windows*') {
-    Add-Result $results 'WARN' 'platform' 'Windows host detected; native Qwen runtime is expected to run in Linux or WSL2'
-}
-
 if (-not $SkipComposeChecks) {
-    Invoke-ComposeConfigCheck -ComposeFile (Join-Path $repoRoot 'deploy\docker\docker-compose.dev.yml') -Results $results
-    Invoke-ComposeConfigCheck -ComposeFile (Join-Path $repoRoot 'deploy\docker\docker-compose.bot.yml') -Results $results
+    Invoke-ComposeConfigCheck -ComposeFile (Join-Path $repoRoot 'deploy\docker\docker-compose.prod.yml') -Results $results
+    Invoke-ComposeConfigCheck -ComposeFile (Join-Path $repoRoot 'deploy\docker\docker-compose.local.yml') -Results $results
 }
 
 foreach ($result in $results) {

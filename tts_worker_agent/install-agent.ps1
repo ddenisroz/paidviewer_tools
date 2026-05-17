@@ -86,6 +86,9 @@ function Merge-ProvisioningIntoConfig {
 
     Update-PropertyIfPresent -Target $config -PropertyName "server_base_url" -Value ([string]$bundle.server_base_url)
     Update-PropertyIfPresent -Target $config -PropertyName "pairing_code" -Value ([string]$bundle.pairing_code)
+    if ($bundle.expires_at) {
+        Update-PropertyIfPresent -Target $config -PropertyName "pairing_expires_at" -Value ([string]$bundle.expires_at)
+    }
     if ($bundle.required_agent_version) {
         Update-PropertyIfPresent -Target $config -PropertyName "required_agent_version" -Value ([string]$bundle.required_agent_version)
     }
@@ -110,7 +113,7 @@ function Merge-ProvisioningIntoConfig {
         $config | Add-Member -NotePropertyName "providers" -NotePropertyValue ([pscustomobject]@{})
     }
 
-    foreach ($providerName in @("f5", "qwen")) {
+    foreach ($providerName in @("f5")) {
         $providerBundle = $bundle.providers.$providerName
         if ($null -eq $providerBundle) {
             continue

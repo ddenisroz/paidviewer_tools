@@ -127,6 +127,17 @@ class OAuthHandler:
         base_url = FRONTEND_REDIRECTS["settings"] if is_linking else FRONTEND_REDIRECTS["login"]
         return f"{base_url}?{urlencode({'auth_error': error_code, 'platform': platform})}"
 
+    def normalize_provider_error(self, error: Optional[str]) -> str:
+        """Map provider OAuth error codes to user-facing app error codes."""
+        normalized = (error or "").strip().lower()
+        if normalized in {"access_denied", "cancelled", "canceled", "user_denied", "consent_required"}:
+            return "access_denied"
+        if normalized in {"temporarily_unavailable", "server_error"}:
+            return "provider_unreachable"
+        if normalized in {"redirect_mismatch", "invalid_redirect_uri"}:
+            return "redirect_mismatch"
+        return "provider_rejected"
+
     def _get_monitored_channel(self, platform: str, user_data: OAuthUserData) -> str:
         """Resolve the monitored channel slug used for session correlation."""
         if platform == Platform.VK:

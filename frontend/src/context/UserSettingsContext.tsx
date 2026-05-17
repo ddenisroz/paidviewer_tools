@@ -2,7 +2,10 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 /* eslint-disable react-refresh/only-export-components */
-import { useSaveUserSettings, useUserSettings as useUserSettingsQuery } from '@/queries/userSettings/userSettingsQueries';
+import {
+    useSaveUserSettings,
+    useUserSettings as useUserSettingsQuery,
+} from '@/queries/userSettings/userSettingsQueries';
 import cacheManager, { CACHE_CONFIG } from '@/shared/utils/cacheManager';
 import Logger from '@/shared/utils/prodLogger';
 
@@ -88,7 +91,12 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isSaving, setIsSaving] = useState<boolean>(false);
 
-    const { data: settingsData, isLoading: isLoadingSettings, refetch: refetchSettings, error: settingsError } = useUserSettingsQuery({
+    const {
+        data: settingsData,
+        isLoading: isLoadingSettings,
+        refetch: refetchSettings,
+        error: settingsError,
+    } = useUserSettingsQuery({
         enabled: !!isAuthenticated,
         staleTime: 5 * 60 * 1000, // 5 minutes
         refetchOnWindowFocus: false,
@@ -130,16 +138,16 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     useEffect(() => {
         if (settingsError) {
             logger.error('[USER_SETTINGS] Error loading settings:', settingsError);
-            setSettings(null);
-            cacheManager.invalidate(CACHE_CONFIG.USER_SETTINGS);
+            const status = (settingsError as { response?: { status?: number } }).response?.status;
+            if (status === 401 || status === 403) {
+                setSettings(null);
+            }
         }
     }, [settingsError]);
 
     useEffect(() => {
         setIsLoading(isLoadingSettings);
     }, [isLoadingSettings]);
-
-
 
     const loadSettings = useCallback(async (): Promise<void> => {
         if (!isAuthenticated) {
@@ -166,12 +174,17 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
                     if ('data' in responseData && responseData.data) {
                         // It's an API Response
                         const innerData = responseData.data;
-                        if (innerData && typeof innerData === 'object' && 'settings' in innerData && innerData.settings) {
+                        if (
+                            innerData &&
+                            typeof innerData === 'object' &&
+                            'settings' in innerData &&
+                            innerData.settings
+                        ) {
                             // Backend now returns { success, message, updated_fields, settings: {...} }
                             savedSettings = innerData.settings as UserSettings;
                         } else if (innerData && typeof innerData === 'object' && 'settings' in innerData) {
                             // Handle edge case where settings might be directly inside data? Unlikely with new structure but safe.
-                            savedSettings = (innerData.settings as unknown) as UserSettings;
+                            savedSettings = innerData.settings as unknown as UserSettings;
                         } else {
                             savedSettings = innerData as UserSettings;
                         }
@@ -203,47 +216,59 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
         setIsSaving(saveSettingsMutation.isPending);
     }, [saveSettingsMutation.isPending]);
 
-    const saveSettings = useCallback(async (newSettings: Partial<UserSettings>): Promise<boolean> => {
-        if (!isAuthenticated) return false;
+    const saveSettings = useCallback(
+        async (newSettings: Partial<UserSettings>): Promise<boolean> => {
+            if (!isAuthenticated) return false;
 
-        return new Promise((resolve) => {
-            saveSettingsMutation.mutate(newSettings, {
-                onSuccess: () => resolve(true),
-                onError: () => resolve(false),
+            return new Promise((resolve) => {
+                saveSettingsMutation.mutate(newSettings, {
+                    onSuccess: () => resolve(true),
+                    onError: () => resolve(false),
+                });
             });
-        });
-    }, [isAuthenticated, saveSettingsMutation]);
+        },
+        [isAuthenticated, saveSettingsMutation]
+    );
 
-    const updateSetting = useCallback(async (key: keyof UserSettings, value: unknown): Promise<boolean> => {
-        // Optimistic update
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        setSettings(prev => prev ? { ...prev, [key]: value as any } : null);
+    const updateSetting = useCallback(
+        async (key: keyof UserSettings, value: unknown): Promise<boolean> => {
+            // Optimistic update
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            setSettings((prev) => (prev ? { ...prev, [key]: value as any } : null));
 
-        const success = await saveSettings({ [key]: value } as Partial<UserSettings>);
+            const success = await saveSettings({ [key]: value } as Partial<UserSettings>);
 
-        if (!success) {
-            // Revert on failure (reload from server)
-            loadSettings();
-        }
-        return success;
-    }, [saveSettings, loadSettings]);
+            if (!success) {
+                // Revert on failure (reload from server)
+                loadSettings();
+            }
+            return success;
+        },
+        [saveSettings, loadSettings]
+    );
 
-    const updateSettings = useCallback(async (settingsToUpdate: Partial<UserSettings>): Promise<boolean> => {
-        // Optimistic update
-        setSettings(prev => prev ? { ...prev, ...settingsToUpdate } : null);
+    const updateSettings = useCallback(
+        async (settingsToUpdate: Partial<UserSettings>): Promise<boolean> => {
+            // Optimistic update
+            setSettings((prev) => (prev ? { ...prev, ...settingsToUpdate } : null));
 
-        const success = await saveSettings(settingsToUpdate);
+            const success = await saveSettings(settingsToUpdate);
 
-        if (!success) {
-            // Revert on failure
-            loadSettings();
-        }
-        return success;
-    }, [saveSettings, loadSettings]);
+            if (!success) {
+                // Revert on failure
+                loadSettings();
+            }
+            return success;
+        },
+        [saveSettings, loadSettings]
+    );
 
-    const getSetting = useCallback(<T = unknown,>(key: keyof UserSettings, defaultValue: T | null = null): T | null => {
-        return (settings?.[key] as T) ?? defaultValue;
-    }, [settings]);
+    const getSetting = useCallback(
+        <T = unknown,>(key: keyof UserSettings, defaultValue: T | null = null): T | null => {
+            return (settings?.[key] as T) ?? defaultValue;
+        },
+        [settings]
+    );
 
     const getChatSettings = useCallback((): ChatSettings | null => {
         if (!settings) return null;
@@ -256,7 +281,7 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
             show_user_roles: settings.chat_show_user_roles ?? true,
             animation_duration: settings.chat_animation_duration ?? 500,
             animation_type: settings.chat_animation_type ?? 'slide',
-            message_fade_seconds: settings.chat_message_fade_seconds ?? 60
+            message_fade_seconds: settings.chat_message_fade_seconds ?? 60,
         };
     }, [settings]);
 
@@ -283,8 +308,8 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
                 moderator: settings.obs_moderator_color ?? '#00ff00',
                 vip: settings.obs_vip_color ?? '#ffd700',
                 subscriber: settings.obs_subscriber_color ?? '#ff6b6b',
-                normal: settings.obs_normal_color ?? '#ffffff'
-            }
+                normal: settings.obs_normal_color ?? '#ffffff',
+            },
         };
     }, [settings]);
 
@@ -292,15 +317,17 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
         if (settings) {
             return {
                 combine_titles: settings.combine_titles ?? false,
-                combine_categories: settings.combine_categories ?? false
+                combine_categories: settings.combine_categories ?? false,
             };
         }
 
-        const cachedSettings = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, { ignoreExpired: true }) as UserSettings | null;
+        const cachedSettings = cacheManager.get(CACHE_CONFIG.USER_SETTINGS, {
+            ignoreExpired: true,
+        }) as UserSettings | null;
         if (cachedSettings) {
             return {
                 combine_titles: cachedSettings.combine_titles ?? false,
-                combine_categories: cachedSettings.combine_categories ?? false
+                combine_categories: cachedSettings.combine_categories ?? false,
             };
         }
 
@@ -308,22 +335,15 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
     }, [settings]);
 
     useEffect(() => {
-        loadSettings();
-    }, [loadSettings]);
-
-    useEffect(() => {
-        const unsubscribe = cacheManager.subscribe(
-            CACHE_CONFIG.USER_SETTINGS.key,
-            (updatedData: unknown) => {
-                if (updatedData && typeof updatedData === 'object') {
-                    logger.debug('[USER_SETTINGS] Multi-tab update received');
-                    setSettings(updatedData as UserSettings);
-                } else {
-                    logger.debug('[USER_SETTINGS] Cache invalidated from another tab');
-                    loadSettings();
-                }
+        const unsubscribe = cacheManager.subscribe(CACHE_CONFIG.USER_SETTINGS.key, (updatedData: unknown) => {
+            if (updatedData && typeof updatedData === 'object') {
+                logger.debug('[USER_SETTINGS] Multi-tab update received');
+                setSettings(updatedData as UserSettings);
+            } else {
+                logger.debug('[USER_SETTINGS] Cache invalidated from another tab');
+                loadSettings();
             }
-        );
+        });
 
         return unsubscribe;
     }, [loadSettings]);
@@ -339,13 +359,8 @@ export const UserSettingsProvider: React.FC<UserSettingsProviderProps> = ({ chil
         getSetting,
         getChatSettings,
         getObsSettings,
-        getCombineSettings
+        getCombineSettings,
     };
 
-    return (
-        <UserSettingsContext.Provider value={value}>
-            {children}
-        </UserSettingsContext.Provider>
-    );
+    return <UserSettingsContext.Provider value={value}>{children}</UserSettingsContext.Provider>;
 };
-

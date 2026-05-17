@@ -45,6 +45,13 @@ class CommandService:
             return self._command_repo
         return CommandRepository(db)
 
+    @staticmethod
+    def _sanitize_command_trigger(value: str, *, field_name: str = "command") -> str:
+        trigger = sanitize_input((value or "").strip().lstrip("!").lower(), max_length=50, allow_special=False)
+        if not trigger:
+            raise ValueError(f"{field_name} cannot be empty")
+        return trigger
+
     # === Query Methods ===
 
     def find_command(
@@ -226,12 +233,13 @@ class CommandService:
                 "Delete unused commands before creating new ones."
             )
         
-        # Check if command exists
-        if repo.command_exists(command_name, user_id):
+        sanitized_name = self._sanitize_command_trigger(command_name, field_name="Command name")
+
+        # Check if command exists globally, as a user command, or as a user alias.
+        if repo.trigger_exists(sanitized_name, user_id):
             raise ValueError("A command with this name already exists")
         
         # Sanitize input
-        sanitized_name = sanitize_input(command_name, max_length=50, allow_special=False)
         sanitized_response = sanitize_input(response_text, max_length=1000, allow_special=False)
         
         # Create command
@@ -284,6 +292,25 @@ class CommandService:
 
         if command.user_id != user_id:
             raise ValueError("No permission to edit this command")
+
+        if "command_name" in update_data and update_data["command_name"] is not None:
+            if command.command_type != "custom":
+                raise ValueError("Only custom commands can be renamed. Use alias for global commands.")
+            new_name = self._sanitize_command_trigger(update_data["command_name"], field_name="Command name")
+            if new_name != command.command_name:
+                if repo.trigger_exists(new_name, user_id, exclude_command_id=command.id):
+                    raise ValueError("A command with this name already exists")
+                command.command_name = new_name
+
+        if "alias" in update_data:
+            raw_alias = update_data.get("alias")
+            if raw_alias is None or str(raw_alias).strip() == "":
+                command.alias = None
+            else:
+                new_alias = self._sanitize_command_trigger(str(raw_alias), field_name="Alias")
+                if repo.trigger_exists(new_alias, user_id, exclude_command_id=command.id):
+                    raise ValueError("Alias is already in use")
+                command.alias = new_alias
         
         # Update fields
         if "is_enabled" in update_data and update_data["is_enabled"] is not None:
@@ -326,6 +353,7 @@ class CommandService:
             ValueError: If validation fails
         """
         repo = self._get_repo(db)
+        command_name = self._sanitize_command_trigger(command_name, field_name="Command name")
         
         # Check global command exists
         global_command = repo.get_global_command_by_name(command_name)
@@ -347,7 +375,13 @@ class CommandService:
             if extra_settings is not None:
                 existing_override.extra_settings = extra_settings
             if alias is not None:
-                existing_override.alias = alias
+                if str(alias).strip():
+                    cleaned_alias = self._sanitize_command_trigger(alias, field_name="Alias")
+                    if repo.trigger_exists(cleaned_alias, user_id, exclude_command_id=existing_override.id):
+                        raise ValueError(f"Alias '{cleaned_alias}' is already in use")
+                    existing_override.alias = cleaned_alias
+                else:
+                    existing_override.alias = None
             
             db.commit()
             db.refresh(existing_override)
@@ -366,9 +400,11 @@ class CommandService:
                 }
             }
         
-        # Check alias not used
-        if alias and repo.alias_exists(alias, user_id):
-            raise ValueError(f"Alias '{alias}' is already in use")
+        cleaned_alias = None
+        if alias is not None and str(alias).strip():
+            cleaned_alias = self._sanitize_command_trigger(alias, field_name="Alias")
+            if repo.trigger_exists(cleaned_alias, user_id):
+                raise ValueError(f"Alias '{cleaned_alias}' is already in use")
         
         # Create override
         new_override = BotCommand(
@@ -377,7 +413,7 @@ class CommandService:
             command_name=command_name,
             command_type='override',
             parent_command_id=global_command.id,
-            alias=alias,
+            alias=cleaned_alias,
             response_text="",
             is_enabled=is_enabled,
             platforms=platforms if platforms else global_command.platforms,

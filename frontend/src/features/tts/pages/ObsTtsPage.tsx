@@ -33,7 +33,7 @@ const ObsTtsPage: React.FC = () => {
                     const message = JSON.parse(event.data) as { type: string; audio_url?: string; message?: string };
                     if (message.type === 'tts_synthesized' && message.audio_url) {
                         const audioUrl = resolveAudioUrl(message.audio_url);
-                        setAudioQueue(prevQueue => [...prevQueue, audioUrl]);
+                        setAudioQueue((prevQueue) => [...prevQueue, audioUrl]);
                     } else if (message.type === 'tts_error') {
                         setStatus(`Error: ${message.message || 'Unknown error'}`);
                     }
@@ -71,18 +71,18 @@ const ObsTtsPage: React.FC = () => {
             audio.oncanplaythrough = (): void => {
                 audio.play().catch(() => {
                     setIsPlaying(false);
-                    setAudioQueue(prevQueue => prevQueue.slice(1));
+                    setAudioQueue((prevQueue) => prevQueue.slice(1));
                 });
             };
 
             audio.onended = (): void => {
                 setIsPlaying(false);
-                setAudioQueue(prevQueue => prevQueue.slice(1));
+                setAudioQueue((prevQueue) => prevQueue.slice(1));
             };
 
             audio.onerror = (): void => {
                 setIsPlaying(false);
-                setAudioQueue(prevQueue => prevQueue.slice(1));
+                setAudioQueue((prevQueue) => prevQueue.slice(1));
             };
 
             audio.load();
@@ -90,18 +90,22 @@ const ObsTtsPage: React.FC = () => {
     }, [audioQueue, isPlaying]);
 
     return (
-        <div style={{
-            fontFamily: 'sans-serif',
-            color: 'white',
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            padding: '20px',
-            borderRadius: '10px',
-            position: 'absolute',
-            top: '10px',
-            left: '10px',
-        }}>
+        <div
+            style={{
+                fontFamily: 'sans-serif',
+                color: 'white',
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                padding: '20px',
+                borderRadius: '10px',
+                position: 'absolute',
+                top: '10px',
+                left: '10px',
+            }}
+        >
             <h1>OBS TTS Player</h1>
-            <p><strong>Status:</strong> {status}</p>
+            <p>
+                <strong>Status:</strong> {status}
+            </p>
             <p>This is a browser source for OBS. It will automatically play TTS audio from your chat when enabled.</p>
             <p>Queue length: {audioQueue.length}</p>
         </div>
@@ -109,5 +113,3 @@ const ObsTtsPage: React.FC = () => {
 };
 
 export default ObsTtsPage;
-
-

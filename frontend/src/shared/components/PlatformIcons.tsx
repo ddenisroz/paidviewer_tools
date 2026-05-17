@@ -12,8 +12,8 @@ interface IconProps {
 export const TwitchIcon: React.FC<IconProps> = (props) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        width={props.style?.width || props.width || "20"}
-        height={props.style?.height || props.height || "20"}
+        width={props.style?.width || props.width || '20'}
+        height={props.style?.height || props.height || '20'}
         viewBox="0 0 24 24"
         fill="currentColor"
         className={props.className}
@@ -27,22 +27,26 @@ export const TwitchIcon: React.FC<IconProps> = (props) => (
 export const VKIcon: React.FC<IconProps> = (props) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        width={props.style?.width || props.width || "20"}
-        height={props.style?.height || props.height || "20"}
+        width={props.style?.width || props.width || '20'}
+        height={props.style?.height || props.height || '20'}
         fill="currentColor"
         viewBox="2 2 20 20"
         className={props.className}
         style={props.style}
     >
-        <path fillRule="evenodd" d="M6 9.12c0-2.352 0-3.528.457-4.427a4.2 4.2 0 0 1 1.836-1.836C9.192 2.4 10.368 2.4 12.72 2.4h.624c2.89 0 4.334 0 5.438.563a5.16 5.16 0 0 1 2.256 2.255c.562 1.104.562 2.548.562 5.438v2.688c0 2.89 0 4.334-.562 5.438a5.16 5.16 0 0 1-2.256 2.256c-1.104.562-2.548.562-5.438.562h-.624c-2.352 0-3.528 0-4.427-.457a4.2 4.2 0 0 1-1.836-1.836C6 18.408 6 17.232 6 14.88V9.12Zm10.328 1.165c.947.566 1.42.848 1.58 1.214.14.32.14.684 0 1.002-.16.367-.633.649-1.58 1.214l-2.506 1.497c-.99.591-1.484.887-1.891.848a1.248 1.248 0 0 1-.89-.504C10.8 15.226 10.8 14.649 10.8 13.496v-2.992c0-1.152 0-1.728.242-2.059.19-.25.478-.41.89-.504.407-.039.9.257 1.89.848l2.506 1.496ZM4.2 9.457c0-2.892 0-4.336.563-5.44a5.16 5.16 0 0 1 .883-1.24 3.653 3.653 0 0 0-.428.185 5.16 5.16 0 0 0-2.256 2.255C2.4 6.322 2.4 7.766 2.4 10.656v2.688c0 2.89 0 4.334.563 5.438a5.16 5.16 0 0 0 2.255 2.256c.137.07.278.13.428.184a5.16 5.16 0 0 1-.883-1.24c-.563-1.104-.563-2.548-.563-5.438V9.457Z" clipRule="evenodd" />
+        <path
+            fillRule="evenodd"
+            d="M6 9.12c0-2.352 0-3.528.457-4.427a4.2 4.2 0 0 1 1.836-1.836C9.192 2.4 10.368 2.4 12.72 2.4h.624c2.89 0 4.334 0 5.438.563a5.16 5.16 0 0 1 2.256 2.255c.562 1.104.562 2.548.562 5.438v2.688c0 2.89 0 4.334-.562 5.438a5.16 5.16 0 0 1-2.256 2.256c-1.104.562-2.548.562-5.438.562h-.624c-2.352 0-3.528 0-4.427-.457a4.2 4.2 0 0 1-1.836-1.836C6 18.408 6 17.232 6 14.88V9.12Zm10.328 1.165c.947.566 1.42.848 1.58 1.214.14.32.14.684 0 1.002-.16.367-.633.649-1.58 1.214l-2.506 1.497c-.99.591-1.484.887-1.891.848a1.248 1.248 0 0 1-.89-.504C10.8 15.226 10.8 14.649 10.8 13.496v-2.992c0-1.152 0-1.728.242-2.059.19-.25.478-.41.89-.504.407-.039.9.257 1.89.848l2.506 1.496ZM4.2 9.457c0-2.892 0-4.336.563-5.44a5.16 5.16 0 0 1 .883-1.24 3.653 3.653 0 0 0-.428.185 5.16 5.16 0 0 0-2.256 2.255C2.4 6.322 2.4 7.766 2.4 10.656v2.688c0 2.89 0 4.334.563 5.438a5.16 5.16 0 0 0 2.255 2.256c.137.07.278.13.428.184a5.16 5.16 0 0 1-.883-1.24c-.563-1.104-.563-2.548-.563-5.438V9.457Z"
+            clipRule="evenodd"
+        />
     </svg>
 );
 
 // Официальная иконка DonationAlerts (восстановлена из SVG)
 export const DonationAlertsIcon: React.FC<IconProps> = (props) => (
     <svg
-        width={props.style?.width || props.width || "20"}
-        height={props.style?.height || props.height || "20"}
+        width={props.style?.width || props.width || '20'}
+        height={props.style?.height || props.height || '20'}
         viewBox="0 0 69 80"
         version="1.1"
         xmlns="http://www.w3.org/2000/svg"
@@ -72,5 +76,3 @@ export const DonationAlertsIcon: React.FC<IconProps> = (props) => (
         </g>
     </svg>
 );
-
-

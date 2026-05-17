@@ -23,9 +23,6 @@ from services.tts.google_cloud_tts import (
 from services.tts.provider_utils import (
     build_tts_mode_contract,
     ProviderRoutingError,
-    QWEN_BASE_MODEL,
-    QWEN_PROMPT_MODEL,
-    filter_qwen_cloud_models,
     get_provider_capabilities,
     get_synthesis_upstream_url,
     get_voice_management_upstream_params,
@@ -108,43 +105,11 @@ def _normalize_voice_provider(provider: str) -> str:
                 "message": "Google Cloud provider does not support voice CRUD in bot_service.",
             },
         )
-    return "qwen" if normalized_provider == "qwen" else "f5"
+    return "f5"
 
 
 def _voice_management_base_url(provider: str) -> str:
     return provider_admin_api_base(_normalize_voice_provider(provider)).removesuffix("/api/admin")
-
-
-def _qwen_models_headers(*, local_api_key: Optional[str] = None, local: bool = False) -> dict:
-    return build_tts_auth_headers(
-        provider="qwen",
-        upstream="local" if local else "voice",
-        local_api_key=local_api_key,
-        strict=False,
-    )
-
-
-async def _fetch_qwen_models_payload(*, endpoint_url: str, headers: dict) -> dict:
-    async with httpx.AsyncClient(timeout=3.0, **build_tts_httpx_client_kwargs()) as client:
-        response = await client.get(f"{endpoint_url.rstrip('/')}/api/models", headers=headers)
-    if response.status_code != 200:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "code": "qwen_models_upstream_error",
-                "message": f"Qwen models endpoint returned HTTP {response.status_code}.",
-            },
-        )
-    payload = response.json()
-    if not isinstance(payload, dict):
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "code": "qwen_models_invalid_payload",
-                "message": "Qwen models endpoint returned invalid payload.",
-            },
-        )
-    return payload
 
 
 async def _resolve_user_whitelist_state(*, user_id: int, db: Session) -> bool:
@@ -161,15 +126,12 @@ _CANONICAL_ENGINE_TYPES = {
     "gcloud",
     "f5_cloud",
     "f5_local",
-    "qwen_cloud",
-    "qwen_local",
 }
 
 _ENGINE_TYPE_ALIASES = {
     "cloud": "f5_cloud",
     "local": "f5_local",
     "f5": "f5_cloud",
-    "qwen": "qwen_cloud",
 }
 
 
@@ -227,20 +189,6 @@ def _engine_type_to_settings_payload(engine_type: str) -> dict:
             "f5_mode": "local",
             "use_local_tts": True,
         }
-    if engine_type == "qwen_cloud":
-        return {
-            "engine": "qwen",
-            "advanced_provider": "qwen",
-            "qwen_mode": "cloud",
-            "use_local_tts": False,
-        }
-    if engine_type == "qwen_local":
-        return {
-            "engine": "qwen",
-            "advanced_provider": "qwen",
-            "qwen_mode": "local",
-            "use_local_tts": True,
-        }
     raise ValueError(f"Unsupported engine_type: {engine_type}")
 
 # ============================================================================
@@ -253,7 +201,8 @@ async def get_tts_settings(
     service: TTSService = Depends(get_tts_service)
 ):
     """Get TTS settings for current user."""
-    return await service.get_tts_settings(user_id=user['id'])
+    settings_dict = await service.get_tts_settings(user_id=user['id'])
+    return settings_dict
 
 @router.post("/settings")
 async def update_tts_settings(
@@ -271,7 +220,6 @@ async def update_tts_settings(
         "engine": "engine",
         "advancedProvider": "advanced_provider",
         "f5Mode": "f5_mode",
-        "qwenMode": "qwen_mode",
         "voice": "voice",
         "listeningMode": "listening_mode",
         "maxMessageLength": "max_message_length",
@@ -281,8 +229,6 @@ async def update_tts_settings(
         "filterMentions": "filter_mentions",
         "gcloudVoices": "gcloud_voices",
         "gcloudMood": "gcloud_mood",
-        "qwenVoice": "qwen_voice",
-        "qwenModel": "qwen_model",
     }
 
     model_fields_set = getattr(settings_req, "model_fields_set", set())
@@ -305,6 +251,7 @@ async def update_tts_settings(
         if result.get("error") == "Version conflict":
              raise HTTPException(status_code=409, detail=result)
         raise HTTPException(status_code=500, detail="Internal server error")
+
     return result
 
 # ============================================================================
@@ -321,143 +268,6 @@ async def get_tts_status(
     if result.get('error'):
         raise HTTPException(status_code=404, detail="TTS status not found")
     return result
-
-
-@router.get("/qwen/models")
-async def get_qwen_models_catalog(
-    mode: str = "cloud",
-    user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    normalized_mode = "local" if str(mode or "").strip().lower() == "local" else "cloud"
-    is_whitelisted = await _resolve_user_whitelist_state(user_id=int(user["id"]), db=db)
-    provider_capabilities = get_provider_capabilities("qwen")
-
-    if normalized_mode == "local":
-        repo = LocalTTSRepository(db)
-        local_config = repo.get_by_user_id(int(user["id"]), provider="qwen")
-        if not local_config:
-            contract = build_tts_mode_contract(
-                "qwen",
-                "local",
-                available=False,
-                is_whitelisted=is_whitelisted,
-                degraded_reason="Self-hosted Qwen endpoint is not configured for this user yet.",
-                error_code="qwen_local_not_configured",
-                capabilities=provider_capabilities,
-                recommended_path="tts_worker_agent",
-            )
-            return {
-                "success": True,
-                "source": "local",
-                "configured": False,
-                "endpoint_url": None,
-                "models": [],
-                "detail": {
-                    "code": "qwen_local_not_configured",
-                    "message": "Self-hosted Qwen endpoint не настроен для этого пользователя.",
-                },
-                **contract,
-            }
-
-        endpoint_url = normalize_local_tts_endpoint_url(local_config.endpoint_url)
-        headers = _qwen_models_headers(local_api_key=local_config.api_key, local=True)
-    else:
-        endpoint_url = (settings.qwen_tts_service_url or "").strip().rstrip("/")
-        if not endpoint_url:
-            contract = build_tts_mode_contract(
-                "qwen",
-                "cloud",
-                available=False,
-                is_whitelisted=is_whitelisted,
-                degraded_reason="Managed Qwen cloud runtime is not configured.",
-                error_code="qwen_cloud_not_configured",
-                capabilities=provider_capabilities,
-            )
-            return {
-                "success": True,
-                "source": "managed",
-                "configured": False,
-                "endpoint_url": None,
-                "models": [],
-                "detail": {
-                    "code": "qwen_cloud_not_configured",
-                    "message": "Облачный Qwen worker не настроен.",
-                },
-                **contract,
-            }
-        headers = _qwen_models_headers()
-
-    try:
-        payload = await _fetch_qwen_models_payload(endpoint_url=endpoint_url, headers=headers)
-    except httpx.RequestError:
-        contract = build_tts_mode_contract(
-            "qwen",
-            normalized_mode,
-            available=False,
-            is_whitelisted=is_whitelisted,
-            degraded_reason="Qwen runtime is unreachable or still warming up.",
-            error_code="qwen_models_upstream_unreachable",
-            capabilities=provider_capabilities,
-            recommended_path="tts_worker_agent" if normalized_mode == "local" else None,
-        )
-        return {
-            "success": True,
-            "source": "local" if normalized_mode == "local" else "managed",
-            "configured": True,
-            "endpoint_url": endpoint_url,
-            "models": [],
-            "detail": {
-                "code": "qwen_models_upstream_unreachable",
-                "message": "Qwen worker недоступен или ещё прогревается. Список моделей runtime временно недоступен.",
-            },
-            **contract,
-        }
-
-    models = [
-        dict(model)
-        for model in (payload.get("models") if isinstance(payload.get("models"), list) else [])
-        if isinstance(model, dict) and str(model.get("id") or "").strip()
-    ]
-    filtering_payload = {
-        "enabled": False,
-        "tokens": [],
-        "families": [],
-        "exact_ids": [],
-        "filtered_count": 0,
-        "source": None,
-    }
-    if normalized_mode == "cloud":
-        filtered_payload = filter_qwen_cloud_models(models)
-        models = filtered_payload["models"]
-        filtering_payload = filtered_payload["filtering"]
-
-    current_model_raw = str(payload.get("current_model") or "").strip()
-    current_model = current_model_raw or None
-    contract = build_tts_mode_contract(
-        "qwen",
-        normalized_mode,
-        available=len(models) > 0,
-        is_whitelisted=is_whitelisted,
-        degraded_reason=None if len(models) > 0 else "Qwen runtime returned an empty model catalog.",
-        error_code=None if len(models) > 0 else "qwen_models_empty",
-        capabilities=provider_capabilities,
-        recommended_path="tts_worker_agent" if normalized_mode == "local" else None,
-    )
-    return {
-        "success": True,
-        "source": "local" if normalized_mode == "local" else "managed",
-        "configured": True,
-        "endpoint_url": endpoint_url,
-        "current_model": current_model,
-        "models": models,
-        "filtering": filtering_payload,
-        "product_defaults": {
-            "base_model": QWEN_BASE_MODEL,
-            "prompt_model": QWEN_PROMPT_MODEL,
-        },
-        **contract,
-    }
 
 
 @router.get("/health")
@@ -516,7 +326,7 @@ async def get_tts_upstream_health(
     local_api_key = None
     use_gateway = should_route_provider_via_gateway(normalized_provider)
 
-    if normalized_mode != "local" and normalized_provider in {"f5", "qwen"}:
+    if normalized_mode != "local" and normalized_provider == "f5":
         try:
             from services.worker_control.service import WorkerControlPlaneService
 
@@ -644,20 +454,6 @@ async def get_tts_upstream_health(
             else get_synthesis_upstream_url(normalized_provider).rstrip("/")
         )
     except ProviderRoutingError as error:
-        if str(error) == "qwen_gateway_required":
-            payload = build_tts_mode_contract(
-                "qwen",
-                normalized_mode,
-                available=False,
-                is_whitelisted=is_whitelisted,
-                degraded_reason="Qwen synthesis is available only via tts-gateway.",
-                error_code="qwen_gateway_required",
-                capabilities=provider_capabilities,
-            )
-            return _attach_detail({
-                "success": True,
-                **payload,
-            }, fallback_message="Configure TTS_GATEWAY_URL and TTS_GATEWAY_API_KEY.")
         raise HTTPException(status_code=400, detail={"code": str(error), "message": str(error)}) from error
 
     if not local_endpoint_url:
@@ -740,7 +536,6 @@ async def set_tts_engine(
     - gtts
     - gcloud
     - f5_cloud / f5_local
-    - qwen_cloud / qwen_local
 
     Backward-compatible aliases are accepted:
     - cloud -> f5_cloud

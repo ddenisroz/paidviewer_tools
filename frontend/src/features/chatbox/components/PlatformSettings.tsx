@@ -40,7 +40,7 @@ const PlatformSettings: React.FC<PlatformSettingsProps> = ({
     onMaxMessagesChange,
     onMessageSpacingChange,
     onChatDirectionChange,
-    onChatWidthChange
+    onChatWidthChange,
 }) => {
     return (
         <div className="space-y-6">
@@ -51,34 +51,22 @@ const PlatformSettings: React.FC<PlatformSettingsProps> = ({
                 <div className="grid gap-4">
                     <div className="flex items-center justify-between">
                         <Label className="text-foreground">Иконки платформ</Label>
-                        <Switch
-                            checked={showPlatformIcons}
-                            onCheckedChange={onShowPlatformIconsChange}
-                        />
+                        <Switch checked={showPlatformIcons} onCheckedChange={onShowPlatformIconsChange} />
                     </div>
 
                     <div className="flex items-center justify-between">
                         <Label className="text-foreground">Значки (badges)</Label>
-                        <Switch
-                            checked={showBadges}
-                            onCheckedChange={onShowBadgesChange}
-                        />
+                        <Switch checked={showBadges} onCheckedChange={onShowBadgesChange} />
                     </div>
 
                     <div className="flex items-center justify-between">
                         <Label className="text-foreground">7TV Эмодзи</Label>
-                        <Switch
-                            checked={show7tvEmotes}
-                            onCheckedChange={onShow7tvEmotesChange}
-                        />
+                        <Switch checked={show7tvEmotes} onCheckedChange={onShow7tvEmotesChange} />
                     </div>
 
                     <div className="flex items-center justify-between">
                         <Label className="text-foreground">Ссылки</Label>
-                        <Switch
-                            checked={showLinks}
-                            onCheckedChange={onShowLinksChange}
-                        />
+                        <Switch checked={showLinks} onCheckedChange={onShowLinksChange} />
                     </div>
                 </div>
             </div>

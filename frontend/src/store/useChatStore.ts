@@ -1,7 +1,7 @@
 // frontend/src/store/useChatStore.ts
 /**
  * Zustand store for chat state management.
- * 
+ *
  * Manages:
  * - Chat messages
  * - Connection status
@@ -49,19 +49,21 @@ export const useChatStore = create<ChatState>()(
         (set, _get) => ({
             ...initialState,
 
-            addMessage: (message) => set((state) => {
-                const newMessages = [...state.messages, message];
-                // Limit messages to prevent memory issues
-                if (newMessages.length > MAX_MESSAGES) {
-                    return { messages: newMessages.slice(-MAX_MESSAGES) };
-                }
-                return { messages: newMessages };
-            }),
+            addMessage: (message) =>
+                set((state) => {
+                    const newMessages = [...state.messages, message];
+                    // Limit messages to prevent memory issues
+                    if (newMessages.length > MAX_MESSAGES) {
+                        return { messages: newMessages.slice(-MAX_MESSAGES) };
+                    }
+                    return { messages: newMessages };
+                }),
 
-            setMessages: (messages) => set({
-                messages: messages.slice(-MAX_MESSAGES),
-                historyLoaded: true,
-            }),
+            setMessages: (messages) =>
+                set({
+                    messages: messages.slice(-MAX_MESSAGES),
+                    historyLoaded: true,
+                }),
 
             clearMessages: () => set({ messages: [], historyLoaded: false }),
 

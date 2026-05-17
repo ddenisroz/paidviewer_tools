@@ -90,20 +90,23 @@ async def initialize_twitch_bot(channels: Optional[List[str]] = None) -> bool:
         registry.twitch_bot = bot
         registry.twitch_task = task
 
-        logger.info("[TWITCH] Task created, waiting 5 seconds for connection...")
-        await asyncio.sleep(5)
+        logger.info("[TWITCH] Task created, waiting for ready signal...")
+        try:
+            await asyncio.wait_for(bot.ready_event.wait(), timeout=12)
+        except asyncio.TimeoutError:
+            logger.error("[ERROR] [TWITCH] Bot did not become ready within 12 seconds")
+            await registry.stop_twitch_bot()
+            return False
 
         if task.done():
             logger.error("[ERROR] [TWITCH] Bot task completed unexpectedly!")
             if task.exception():
                 logger.error(f"[ERROR] [TWITCH] Task exception: {task.exception()}")
+            registry.twitch_bot = None
+            registry.twitch_task = None
             return False
 
-        if hasattr(bot, "nick") and bot.nick:
-            logger.info(f"[OK] [TWITCH] Bot connected as: {bot.nick}")
-        else:
-            logger.warning("[WARN] [TWITCH] Bot nick not set yet, may still be connecting...")
-
+        logger.info(f"[OK] [TWITCH] Bot connected as: {bot.nick}")
         logger.info("[OK] Twitch bot started")
         return True
     except Exception as e:

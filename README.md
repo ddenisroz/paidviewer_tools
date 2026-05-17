@@ -20,7 +20,6 @@
 
 - [tts-gateway](/H:/Programming/raw_code/AI/Python/tts-gateway)
 - [f5-tts-service](/H:/Programming/raw_code/AI/Python/f5-tts-service)
-- [nano-qwen3tts-vllm](/H:/Programming/raw_code/AI/Python/nano-qwen3tts-vllm)
 
 ## Официальные TTS-режимы
 
@@ -51,7 +50,7 @@ cd H:\Programming\raw_code\AI\Python\paidviewer_tools
 
 ```powershell
 .\start-dev.ps1 -WithCloudTtsReal
-.\start-dev.ps1 -WithCloudTtsReal -Services bot_service qwen_tts
+.\start-dev.ps1 -WithCloudTtsReal -Services bot_service tts_service
 .\start-dev.ps1 -WithCloudTtsReal -Build -Services bot_service
 .\start-dev.ps1 -WithCloudTtsReal -Reset
 ```

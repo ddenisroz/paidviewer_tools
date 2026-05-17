@@ -1,6 +1,7 @@
 {
   "server_base_url": "http://127.0.0.1:8000",
   "pairing_code": "PASTE-FIRST-PAIRING-CODE-HERE",
+  "pairing_expires_at": "",
   "worker_token": "",
   "worker_key": "",
   "required_agent_version": "1.0.0",
@@ -13,11 +14,6 @@
     "f5": {
       "enabled": true,
       "endpoint_url": "http://127.0.0.1:8011",
-      "api_key": ""
-    },
-    "qwen": {
-      "enabled": true,
-      "endpoint_url": "http://127.0.0.1:8012",
       "api_key": ""
     }
   }

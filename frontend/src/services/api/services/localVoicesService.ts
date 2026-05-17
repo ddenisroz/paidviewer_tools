@@ -3,7 +3,7 @@ import { AxiosError } from 'axios';
 import apiClient from '@/services/api/client';
 import { logger } from '@/shared/utils/prodLogger';
 
-export type LocalTtsProvider = 'f5' | 'qwen';
+export type LocalTtsProvider = 'f5';
 
 export interface LocalVoice {
     id: number;
@@ -44,7 +44,9 @@ interface UpdateVoiceSettingsResponse {
 }
 
 const normalizeVoiceType = (voice: LocalVoice): 'base' | 'custom' => {
-    const candidate = String(voice.type || voice.voice_type || '').trim().toLowerCase();
+    const candidate = String(voice.type || voice.voice_type || '')
+        .trim()
+        .toLowerCase();
     return candidate === 'global' || candidate === 'base' ? 'base' : 'custom';
 };
 
@@ -92,11 +94,15 @@ export const localVoicesService = {
     async updateVoiceSettings(
         provider: LocalTtsProvider,
         voiceId: number,
-        settings: Record<string, unknown>,
+        settings: Record<string, unknown>
     ): Promise<LocalVoice | null> {
-        const response = await apiClient.put<UpdateVoiceSettingsResponse>(`/api/local-tts/voices/${voiceId}/settings`, settings, {
-            params: { provider },
-        });
+        const response = await apiClient.put<UpdateVoiceSettingsResponse>(
+            `/api/local-tts/voices/${voiceId}/settings`,
+            settings,
+            {
+                params: { provider },
+            }
+        );
         return response.data.voice ? normalizeVoice(response.data.voice) : null;
     },
 };

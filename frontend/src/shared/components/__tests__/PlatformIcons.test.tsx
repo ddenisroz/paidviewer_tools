@@ -103,7 +103,7 @@ describe('PlatformIcons', () => {
         it('both icons render as SVG elements', () => {
             const { container: twitchContainer } = render(<TwitchIcon />);
             const { container: vkContainer } = render(<VKIcon />);
-            
+
             expect(twitchContainer.querySelector('svg')).toBeInTheDocument();
             expect(vkContainer.querySelector('svg')).toBeInTheDocument();
         });
@@ -111,10 +111,10 @@ describe('PlatformIcons', () => {
         it('icons have different viewBox dimensions', () => {
             const { container: twitchContainer } = render(<TwitchIcon />);
             const { container: vkContainer } = render(<VKIcon />);
-            
+
             const twitchSvg = twitchContainer.querySelector('svg');
             const vkSvg = vkContainer.querySelector('svg');
-            
+
             expect(twitchSvg?.getAttribute('viewBox')).toBe('0 0 24 24');
             expect(vkSvg?.getAttribute('viewBox')).toBe('2 2 20 20');
         });

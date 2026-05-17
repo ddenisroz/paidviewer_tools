@@ -5,7 +5,6 @@ import { QueryClient, UseMutationResult } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import { useNavigate } from 'react-router-dom';
 
-
 import { queryKeys } from '@/queries/queryKeys';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
@@ -35,7 +34,12 @@ interface UseQuickActionsHandlersProps {
     setOptimisticStreakState: (value: { twitch?: boolean; vk?: boolean } | null) => void;
     dropsConfigData: DropsConfig | null | undefined;
     rewardsData: unknown[] | undefined;
-    updateDropsConfigMutation: UseMutationResult<ApiResponse<unknown>, AxiosError, Partial<DropsConfig>, { previousConfig?: DropsConfig }>;
+    updateDropsConfigMutation: UseMutationResult<
+        ApiResponse<unknown>,
+        AxiosError,
+        Partial<DropsConfig>,
+        { previousConfig?: DropsConfig }
+    >;
     queryClient: QueryClient;
     integrations: {
         twitch?: { enabled: boolean };
@@ -59,7 +63,7 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
         rewardsData,
         updateDropsConfigMutation,
         queryClient,
-        integrations
+        integrations,
     } = props;
 
     useEffect(() => {
@@ -87,14 +91,18 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
                         return { ...old, [dbPlatformKey]: streak_enabled };
                     });
 
-                    setTimeout(() => { isProcessing = false; }, 100);
+                    setTimeout(() => {
+                        isProcessing = false;
+                    }, 100);
                 } else if (donation_enabled !== undefined && source === 'useDropsConfig') {
                     isProcessing = true;
                     queryClient.setQueryData(queryKeys.drops.config(channelName), (old: DropsConfig | undefined) => {
                         if (!old) return old;
                         return { ...old, donation_enabled };
                     });
-                    setTimeout(() => { isProcessing = false; }, 100);
+                    setTimeout(() => {
+                        isProcessing = false;
+                    }, 100);
                 }
             }
         };
@@ -106,12 +114,14 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
     const handleStreakToggle = () => {
         if (isToggling || !channelName || updateDropsConfigMutation.isPending) return;
 
-        const currentTwitchStreakEnabled = optimisticStreakState?.twitch !== undefined
-            ? optimisticStreakState.twitch
-            : (dropsConfigData?.streak_enabled_twitch || false);
-        const currentVkStreakEnabled = optimisticStreakState?.vk !== undefined
-            ? optimisticStreakState.vk
-            : (dropsConfigData?.streak_enabled_vk || false);
+        const currentTwitchStreakEnabled =
+            optimisticStreakState?.twitch !== undefined
+                ? optimisticStreakState.twitch
+                : dropsConfigData?.streak_enabled_twitch || false;
+        const currentVkStreakEnabled =
+            optimisticStreakState?.vk !== undefined
+                ? optimisticStreakState.vk
+                : dropsConfigData?.streak_enabled_vk || false;
         const currentAnyStreakEnabled = currentTwitchStreakEnabled || currentVkStreakEnabled;
 
         const currentRewards = rewardsData || [];
@@ -120,7 +130,7 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
         if (!currentAnyStreakEnabled && !currentHasRewards) {
             toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"', {
                 description: 'Перейдите в Drops → Награды',
-                duration: 4000
+                duration: 4000,
             });
             return;
         }
@@ -132,7 +142,7 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
         const newVkState = integrations.vk?.enabled ? newState : currentVkStreakEnabled;
         const payload = {
             streak_enabled_twitch: newTwitchState,
-            streak_enabled_vk: newVkState
+            streak_enabled_vk: newVkState,
         };
 
         setOptimisticStreakState({ twitch: newTwitchState, vk: newVkState });
@@ -142,25 +152,41 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
                 toast.success(newState ? 'Стрик включен для всех платформ' : 'Стрик отключен для всех платформ');
 
                 if (integrations.twitch?.enabled) {
-                    window.dispatchEvent(new CustomEvent('drops-config-changed', {
-                        detail: { streak_enabled: newState, channel: channelName, platform: 'twitch', source: 'QuickActionsBar' }
-                    }));
+                    window.dispatchEvent(
+                        new CustomEvent('drops-config-changed', {
+                            detail: {
+                                streak_enabled: newState,
+                                channel: channelName,
+                                platform: 'twitch',
+                                source: 'QuickActionsBar',
+                            },
+                        })
+                    );
                 }
                 if (integrations.vk?.enabled) {
-                    window.dispatchEvent(new CustomEvent('drops-config-changed', {
-                        detail: { streak_enabled: newState, channel: channelName, platform: 'vk', source: 'QuickActionsBar' }
-                    }));
+                    window.dispatchEvent(
+                        new CustomEvent('drops-config-changed', {
+                            detail: {
+                                streak_enabled: newState,
+                                channel: channelName,
+                                platform: 'vk',
+                                source: 'QuickActionsBar',
+                            },
+                        })
+                    );
                 }
             },
             onError: (error) => {
                 logger.error('Error toggling streak:', error);
                 toast.error('Ошибка переключения стрика');
 
-                const previousConfig = queryClient.getQueryData(queryKeys.drops.config(channelName)) as DropsConfig | undefined;
+                const previousConfig = queryClient.getQueryData(queryKeys.drops.config(channelName)) as
+                    | DropsConfig
+                    | undefined;
                 if (previousConfig) {
                     setOptimisticStreakState({
                         twitch: previousConfig.streak_enabled_twitch || false,
-                        vk: previousConfig.streak_enabled_vk || false
+                        vk: previousConfig.streak_enabled_vk || false,
                     });
                 } else {
                     setOptimisticStreakState(null);
@@ -177,7 +203,7 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
         if (!isDonationAlertsConnected) {
             toast.info('Требуется подключение DonationAlerts', {
                 description: 'Перенаправление на страницу настроек...',
-                duration: 2000
+                duration: 2000,
             });
             setTimeout(() => navigate('/dashboard/settings'), 300);
             return;
@@ -186,7 +212,7 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
         if (!donationEnabledRaw && !hasRewards) {
             toast.error('Сначала настройте содержимое сундуков на вкладке "Награды"', {
                 description: 'Перейдите в Drops → Награды',
-                duration: 4000
+                duration: 4000,
             });
             return;
         }
@@ -194,23 +220,33 @@ export const useQuickActionsHandlers = (props: UseQuickActionsHandlersProps) => 
         setIsToggling(true);
 
         const newState = !donationEnabledRaw;
-        updateDropsConfigMutation.mutate({ donation_enabled: newState }, {
-            onSuccess: () => {
-                toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
-                window.dispatchEvent(new CustomEvent('drops-config-changed', {
-                    detail: { donation_enabled: newState, channel: channelName, platform, source: 'QuickActionsBar' }
-                }));
-            },
-            onError: (error) => {
-                logger.error('Error toggling donation:', error);
-                toast.error('Ошибка переключения донатов');
-            },
-            onSettled: () => setIsToggling(false),
-        });
+        updateDropsConfigMutation.mutate(
+            { donation_enabled: newState },
+            {
+                onSuccess: () => {
+                    toast.success(newState ? 'Донаты включены' : 'Донаты отключены');
+                    window.dispatchEvent(
+                        new CustomEvent('drops-config-changed', {
+                            detail: {
+                                donation_enabled: newState,
+                                channel: channelName,
+                                platform,
+                                source: 'QuickActionsBar',
+                            },
+                        })
+                    );
+                },
+                onError: (error) => {
+                    logger.error('Error toggling donation:', error);
+                    toast.error('Ошибка переключения донатов');
+                },
+                onSettled: () => setIsToggling(false),
+            }
+        );
     };
 
     return {
         handleStreakToggle,
-        handleDonationToggle
+        handleDonationToggle,
     };
 };

@@ -27,9 +27,7 @@ const LootboxHeader: React.FC<LootboxHeaderProps> = ({ selectedPlatform, onPlatf
                     <button
                         onClick={() => onPlatformChange('vk')}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                            selectedPlatform === 'vk'
-                                ? 'bg-blue-700 text-white'
-                                : 'text-gray-400 hover:text-white'
+                            selectedPlatform === 'vk' ? 'bg-blue-700 text-white' : 'text-gray-400 hover:text-white'
                         }`}
                     >
                         VK Live

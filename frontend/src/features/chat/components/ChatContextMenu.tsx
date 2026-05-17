@@ -1,10 +1,7 @@
 // src/features/chat/components/ChatContextMenu.tsx
 import React, { useEffect, useRef, useState } from 'react';
 
-import {
-    Volume2,
-    VolumeX
-} from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import ReactDOM from 'react-dom';
 
 import { logger } from '@/shared/utils/prodLogger';
@@ -26,7 +23,7 @@ const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
     message,
     onClose,
     onAction,
-    isTtsBlocked = false
+    isTtsBlocked = false,
 }) => {
     const menuRef = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState({ x, y });
@@ -61,7 +58,9 @@ const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
                 adjustedY = 10;
             }
 
-            logger.log(`[CONTEXT MENU] Position adjusted: original(${x}, ${y}) -> final(${adjustedX}, ${adjustedY}), size: ${menuRect.width}x${menuRect.height}`);
+            logger.log(
+                `[CONTEXT MENU] Position adjusted: original(${x}, ${y}) -> final(${adjustedX}, ${adjustedY}), size: ${menuRect.width}x${menuRect.height}`
+            );
             setPosition({ x: adjustedX, y: adjustedY });
         }
     }, [x, y]);
@@ -101,18 +100,19 @@ const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
     return ReactDOM.createPortal(
         <div
             ref={menuRef}
-            className="fixed bg-popover border border-border rounded-md shadow-2xl py-1 z-[99999] min-w-44 animate-in fade-in slide-in-from-top-2 duration-150 backdrop-blur-sm"
+            className="pv-static-anchor-in fixed min-w-44 rounded-md border border-border/70 bg-[#0b0712] py-1 shadow-2xl shadow-black/50 ring-1 ring-white/10 z-[99999]"
             style={{
                 left: `${position.x}px`,
                 top: `${position.y}px`,
-                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)',
             }}
         >
             {/* Заглушить/Разглушить TTS */}
             <button
                 onClick={() => handleAction(isTtsBlocked ? 'unblock_tts' : 'block_tts')}
-                className={`w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors font-medium ${isTtsBlocked ? 'text-green-500' : 'text-red-500'
-                    }`}
+                className={`w-full px-4 py-2 text-sm text-left hover:bg-accent flex items-center gap-2 transition-colors font-medium ${
+                    isTtsBlocked ? 'text-green-500' : 'text-red-500'
+                }`}
             >
                 {isTtsBlocked ? (
                     <>
@@ -132,4 +132,3 @@ const ChatContextMenu: React.FC<ChatContextMenuProps> = ({
 };
 
 export default ChatContextMenu;
-

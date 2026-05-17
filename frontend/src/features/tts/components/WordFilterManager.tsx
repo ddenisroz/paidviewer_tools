@@ -9,7 +9,6 @@ import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 
-
 import { useIntegrations } from '../../../context/IntegrationsContext';
 import { useAddFilteredWord, useDeleteFilteredWord, useFilteredWords } from '../../../queries/tts/ttsQueries';
 
@@ -28,7 +27,7 @@ const WordFilterManager: React.FC = React.memo(() => {
 
     // Используем useCallback для стабильной ссылки на функцию
     const toggleWordFilterExpanded = useCallback(() => {
-        setIsWordFilterExpanded(prev => !prev);
+        setIsWordFilterExpanded((prev) => !prev);
     }, []);
 
     const { integrations } = useIntegrations();
@@ -62,9 +61,9 @@ const WordFilterManager: React.FC = React.memo(() => {
 
     const wordsRaw = Array.isArray(wordsData)
         ? wordsData
-        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words
-            ?? (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words
-            ?? []);
+        : ((wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.filtered_words ??
+          (wordsData as { data?: { filtered_words?: unknown; words?: unknown } } | undefined)?.data?.words ??
+          []);
     const words: FilteredWord[] = (Array.isArray(wordsRaw) ? wordsRaw : []) as FilteredWord[];
     const isAdding = addWordMutation.isPending;
 
@@ -91,7 +90,7 @@ const WordFilterManager: React.FC = React.memo(() => {
         }
 
         addWordMutation.mutate({
-            word: newWord.trim()
+            word: newWord.trim(),
         });
     };
 
@@ -103,20 +102,28 @@ const WordFilterManager: React.FC = React.memo(() => {
     // Получение цвета для платформы
     const getPlatformColor = (platform: string): string => {
         switch (platform) {
-            case 'twitch': return 'bg-purple-600';
-            case 'vk': return 'bg-blue-600';
-            case 'all': return 'bg-gray-600';
-            default: return 'bg-gray-600';
+            case 'twitch':
+                return 'bg-purple-600';
+            case 'vk':
+                return 'bg-blue-600';
+            case 'all':
+                return 'bg-gray-600';
+            default:
+                return 'bg-gray-600';
         }
     };
 
     // Получение лейбла для платформы
     const _getPlatformLabel = (platform: string): string => {
         switch (platform) {
-            case 'twitch': return '[TW] Twitch';
-            case 'vk': return '[VK] VK Live';
-            case 'all': return '[WEB] Все платформы';
-            default: return platform;
+            case 'twitch':
+                return '[TW] Twitch';
+            case 'vk':
+                return '[VK] VK Live';
+            case 'all':
+                return '[WEB] Все платформы';
+            default:
+                return platform;
         }
     };
 
@@ -124,9 +131,8 @@ const WordFilterManager: React.FC = React.memo(() => {
     const hasPlatforms = availablePlatforms.length > 0;
 
     // Фильтруем слова по выбранной платформе
-    const filteredWords = selectedPlatform === 'all'
-        ? words
-        : words.filter(word => word.platform === selectedPlatform);
+    const filteredWords =
+        selectedPlatform === 'all' ? words : words.filter((word) => word.platform === selectedPlatform);
 
     if (!hasPlatforms) {
         return (
@@ -150,16 +156,11 @@ const WordFilterManager: React.FC = React.memo(() => {
         <Card>
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                        Фильтр слов
-                    </CardTitle>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleWordFilterExpanded}
-                        className="gap-2"
-                    >
-                        <ChevronDown className={`h-4 w-4 transition-transform ${isWordFilterExpanded ? 'rotate-180' : ''}`} />
+                    <CardTitle className="flex items-center gap-2">Фильтр слов</CardTitle>
+                    <Button variant="ghost" size="sm" onClick={toggleWordFilterExpanded} className="gap-2">
+                        <ChevronDown
+                            className={`h-4 w-4 transition-transform ${isWordFilterExpanded ? 'rotate-180' : ''}`}
+                        />
                     </Button>
                 </div>
             </CardHeader>
@@ -194,10 +195,7 @@ const WordFilterManager: React.FC = React.memo(() => {
                                     )}
                                 </SelectContent>
                             </Select>
-                            <Button
-                                onClick={addWord}
-                                disabled={isAdding || !newWord.trim()}
-                            >
+                            <Button onClick={addWord} disabled={isAdding || !newWord.trim()}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 Добавить
                             </Button>
@@ -214,13 +212,11 @@ const WordFilterManager: React.FC = React.memo(() => {
                         ) : (
                             <div className="flex flex-wrap gap-2">
                                 {filteredWords.map((word) => (
-                                    <Badge
-                                        key={word.id}
-                                        variant="secondary"
-                                        className="flex items-center gap-2"
-                                    >
+                                    <Badge key={word.id} variant="secondary" className="flex items-center gap-2">
                                         <span>{word.word}</span>
-                                        <span className={`px-2 py-0.5 rounded text-xs ${getPlatformColor(word.platform)} text-white`}>
+                                        <span
+                                            className={`px-2 py-0.5 rounded text-xs ${getPlatformColor(word.platform)} text-white`}
+                                        >
                                             {getPlatformIcon(word.platform)}
                                         </span>
                                         <Button
@@ -245,6 +241,3 @@ const WordFilterManager: React.FC = React.memo(() => {
 WordFilterManager.displayName = 'WordFilterManager';
 
 export default WordFilterManager;
-
-
-

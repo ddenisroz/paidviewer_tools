@@ -4,6 +4,7 @@ import httpx
 import logging
 from datetime import timedelta
 from typing import Optional, Dict, Any
+from urllib.parse import urlencode
 from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -62,7 +63,13 @@ async def login_twitch(request: Request):
         logger.info(f'Twitch OAuth requested with scopes: {scopes}')
         import secrets
         state = secrets.token_urlsafe(16)
-        auth_url = f'https://id.twitch.tv/oauth2/authorize?client_id={TWITCH_CLIENT_ID}&redirect_uri={TWITCH_REDIRECT_URI}&response_type=code&scope={scopes}&state={state}'
+        auth_url = 'https://id.twitch.tv/oauth2/authorize?' + urlencode({
+            'client_id': TWITCH_CLIENT_ID,
+            'redirect_uri': TWITCH_REDIRECT_URI,
+            'response_type': 'code',
+            'scope': scopes,
+            'state': state,
+        })
         logger.info('Twitch OAuth login URL generated')
         from fastapi.responses import RedirectResponse
         response = RedirectResponse(url=auth_url)
@@ -82,8 +89,9 @@ async def twitch_callback(request: Request, db: Session=Depends(get_db), code: s
     logger.info('Twitch callback received')
     is_linking = current_user is not None
     if error:
-        logger.warning(f'Twitch OAuth cancelled: {error} - {error_description}')
-        return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.TWITCH, 'cancelled', is_linking))
+        error_code = oauth_handler.normalize_provider_error(error)
+        logger.warning("Twitch OAuth provider returned error=%s mapped_to=%s description=%s", error, error_code, error_description)
+        return RedirectResponse(url=oauth_handler.get_error_redirect_url(Platform.TWITCH, error_code, is_linking))
     if not code:
         logger.error('No authorization code received from Twitch')
         raise HTTPException(status_code=400, detail='No authorization code received from Twitch')

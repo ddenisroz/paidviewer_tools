@@ -25,7 +25,6 @@ class TestConfigurationLoading:
             'BOT_SERVICE_HOST': '0.0.0.0',
             'BOT_SERVICE_PORT': '8000',
             'F5_TTS_SERVICE_URL': 'http://localhost:8001',
-            'QWEN_TTS_SERVICE_URL': 'http://localhost:8011',
             'FRONTEND_URL': 'http://localhost:5173',
             'SECRET_KEY': 'test-secret-key',
             'TOKEN_ENCRYPTION_KEY': 'test-encryption-key',
@@ -51,7 +50,6 @@ class TestConfigurationLoading:
             assert settings.bot_service_host == '0.0.0.0'
             assert settings.bot_service_port == 8000
             assert settings.f5_tts_service_url == 'http://localhost:8001'
-            assert settings.qwen_tts_service_url == 'http://localhost:8011'
             assert settings.frontend_url == 'http://localhost:5173'
             assert settings.secret_key == 'test-secret-key'
             assert settings.token_encryption_key == 'test-encryption-key'
@@ -194,7 +192,6 @@ class TestMigrationScript:
             'VK_CLIENT_ID',
             'VK_CLIENT_SECRET',
             'F5_TTS_SERVICE_URL',
-            'QWEN_TTS_SERVICE_URL',
             'FRONTEND_URL',
         ]
         
@@ -261,9 +258,8 @@ class TestDockerConfiguration:
     def test_docker_compose_files_exist(self):
         """Verify Docker Compose files exist"""
         required_compose_files = [
-            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.bot.yml',
-            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-advanced.yml',
-            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-simple.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.prod.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.local.yml',
         ]
         
         for compose_file in required_compose_files:
@@ -272,11 +268,22 @@ class TestDockerConfiguration:
     def test_docker_compose_syntax(self):
         """Test Docker Compose files have valid syntax"""
         import yaml
+
+        class _ComposeLoader(yaml.SafeLoader):
+            pass
+
+        def _construct_passthrough(loader, tag_suffix, node):
+            if isinstance(node, yaml.ScalarNode):
+                return loader.construct_scalar(node)
+            if isinstance(node, yaml.SequenceNode):
+                return loader.construct_sequence(node)
+            return loader.construct_mapping(node)
+
+        _ComposeLoader.add_multi_constructor("!", _construct_passthrough)
         
         compose_files = [
-            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.bot.yml',
-            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-advanced.yml',
-            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.tts-simple.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.prod.yml',
+            REPO_ROOT / 'deploy' / 'docker' / 'docker-compose.local.yml',
         ]
         
         for compose_file in compose_files:
@@ -285,7 +292,7 @@ class TestDockerConfiguration:
             
             try:
                 with open(compose_file, 'r') as f:
-                    yaml.safe_load(f)
+                    yaml.load(f, Loader=_ComposeLoader)
             except yaml.YAMLError as e:
                 pytest.fail(f"{compose_file} has invalid YAML syntax: {e}")
 

@@ -26,10 +26,7 @@ interface User {
 /**
  * Load badges for chat
  */
-export async function loadChatBadges(
-    integrations: Integrations,
-    user: User
-): Promise<void> {
+export async function loadChatBadges(integrations: Integrations, user: User): Promise<void> {
     await twitchBadgesService.loadGlobalBadges();
 
     if (integrations?.twitch?.enabled && user?.twitch_username) {
@@ -44,16 +41,12 @@ export async function loadChatBadges(
 /**
  * Fetch chat history for a platform
  */
-async function fetchPlatformHistory(
-    platform: 'twitch' | 'vk',
-    channel: string,
-    limit: number
-): Promise<ChatMessage[]> {
+async function fetchPlatformHistory(platform: 'twitch' | 'vk', channel: string, limit: number): Promise<ChatMessage[]> {
     try {
         const response = await chatService.getChatHistory({
             platform,
             channel,
-            limit
+            limit,
         });
 
         const data = response.data.data || response.data;
@@ -94,9 +87,7 @@ export async function loadCompleteChatHistory(
 
     // Sort by timestamp
     if (historyMessages.length > 0) {
-        historyMessages.sort((a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
+        historyMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     }
 
     return historyMessages;

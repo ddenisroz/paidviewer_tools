@@ -8,10 +8,10 @@ import { QueryKey, useQuery, UseQueryOptions } from '@tanstack/react-query';
 import { useDebounce } from 'use-debounce';
 
 interface UseDebouncedQueryOptions<TData, TError> extends Omit<UseQueryOptions<TData, TError>, 'queryKey' | 'queryFn'> {
-  queryKey: QueryKey;
-  queryFn: () => Promise<TData>;
-  debounceMs?: number;
-  searchTerm?: string;
+    queryKey: QueryKey;
+    queryFn: () => Promise<TData>;
+    debounceMs?: number;
+    searchTerm?: string;
 }
 
 /**
@@ -19,33 +19,33 @@ interface UseDebouncedQueryOptions<TData, TError> extends Omit<UseQueryOptions<T
  * Useful for search inputs and other user-triggered queries
  */
 export function useDebouncedQuery<TData = unknown, TError = unknown>({
-  queryKey,
-  queryFn,
-  debounceMs = 300,
-  searchTerm,
-  enabled = true,
-  ...options
-}: UseDebouncedQueryOptions<TData, TError>) {
-  const [debouncedSearchTerm] = useDebounce(searchTerm, debounceMs);
-  const [isDebouncing, setIsDebouncing] = useState(false);
-
-  useEffect(() => {
-    if (searchTerm !== debouncedSearchTerm) {
-      setIsDebouncing(true);
-    } else {
-      setIsDebouncing(false);
-    }
-  }, [searchTerm, debouncedSearchTerm]);
-
-  const query = useQuery<TData, TError>({
-    queryKey: [...queryKey, debouncedSearchTerm],
+    queryKey,
     queryFn,
-    enabled: enabled && !isDebouncing,
-    ...options,
-  });
+    debounceMs = 300,
+    searchTerm,
+    enabled = true,
+    ...options
+}: UseDebouncedQueryOptions<TData, TError>) {
+    const [debouncedSearchTerm] = useDebounce(searchTerm, debounceMs);
+    const [isDebouncing, setIsDebouncing] = useState(false);
 
-  return {
-    ...query,
-    isDebouncing,
-  };
+    useEffect(() => {
+        if (searchTerm !== debouncedSearchTerm) {
+            setIsDebouncing(true);
+        } else {
+            setIsDebouncing(false);
+        }
+    }, [searchTerm, debouncedSearchTerm]);
+
+    const query = useQuery<TData, TError>({
+        queryKey: [...queryKey, debouncedSearchTerm],
+        queryFn,
+        enabled: enabled && !isDebouncing,
+        ...options,
+    });
+
+    return {
+        ...query,
+        isDebouncing,
+    };
 }

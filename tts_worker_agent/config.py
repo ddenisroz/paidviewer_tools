@@ -10,6 +10,7 @@ import platform
 import shutil
 from ctypes import wintypes
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -136,6 +137,7 @@ class ProviderRuntimeConfig:
 class AgentConfig:
     server_base_url: str
     pairing_code: str = ""
+    pairing_expires_at: str = ""
     worker_token: str = ""
     worker_key: str = ""
     required_agent_version: str = ""
@@ -151,11 +153,11 @@ class AgentConfig:
         providers_raw = payload.get("providers") or {}
         providers = {
             "f5": ProviderRuntimeConfig.from_dict(providers_raw.get("f5")),
-            "qwen": ProviderRuntimeConfig.from_dict(providers_raw.get("qwen")),
         }
         return cls(
             server_base_url=str(payload.get("server_base_url") or "").strip().rstrip("/"),
             pairing_code=cls._normalize_pairing_code(_unprotect_secret(str(payload.get("pairing_code") or "").strip())),
+            pairing_expires_at=str(payload.get("pairing_expires_at") or payload.get("expires_at") or "").strip(),
             worker_token=_unprotect_secret(str(payload.get("worker_token") or "").strip()),
             worker_key=_unprotect_secret(str(payload.get("worker_key") or "").strip()),
             required_agent_version=str(payload.get("required_agent_version") or "").strip(),
@@ -178,6 +180,7 @@ class AgentConfig:
         return {
             "server_base_url": self.server_base_url,
             "pairing_code": _protect_secret(self.pairing_code),
+            "pairing_expires_at": self.pairing_expires_at,
             "worker_token": _protect_secret(self.worker_token),
             "worker_key": _protect_secret(self.worker_key),
             "required_agent_version": self.required_agent_version,
@@ -188,7 +191,6 @@ class AgentConfig:
             "wait_for_jobs": bool(self.wait_for_jobs),
             "providers": {
                 "f5": self.providers.get("f5", ProviderRuntimeConfig()).to_dict(),
-                "qwen": self.providers.get("qwen", ProviderRuntimeConfig()).to_dict(),
             },
         }
 
@@ -234,6 +236,33 @@ def load_provisioning_bundle(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _parse_datetime(value: str) -> datetime | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def is_timestamp_expired(value: str, *, now: datetime | None = None) -> bool:
+    expires_at = _parse_datetime(value)
+    if expires_at is None:
+        return False
+    current_time = now or datetime.now(timezone.utc)
+    return expires_at <= current_time
+
+
+def is_provisioning_bundle_expired(bundle_payload: dict[str, Any], *, now: datetime | None = None) -> bool:
+    return is_timestamp_expired(str(bundle_payload.get("expires_at") or "").strip(), now=now)
+
+
 def find_latest_provisioning_bundle(config_path: Path) -> Path | None:
     search_roots = [config_path.parent, Path.home() / "Downloads"]
     candidates: list[Path] = []
@@ -264,12 +293,15 @@ def apply_provisioning_bundle(
     bundle_pairing_code = AgentConfig._normalize_pairing_code(bundle_payload.get("pairing_code"))
     if not bundle_pairing_code:
         raise ValueError("Provisioning bundle does not contain pairing_code")
+    if is_provisioning_bundle_expired(bundle_payload):
+        raise ValueError("Provisioning bundle has expired")
 
     bundle_server_base_url = str(bundle_payload.get("server_base_url") or "").strip().rstrip("/")
     if bundle_server_base_url:
         config.server_base_url = bundle_server_base_url
 
     config.pairing_code = bundle_pairing_code
+    config.pairing_expires_at = str(bundle_payload.get("expires_at") or "").strip()
     config.required_agent_version = str(bundle_payload.get("required_agent_version") or config.required_agent_version or "").strip()
     config.recommended_agent_version = str(
         bundle_payload.get("recommended_agent_version") or config.recommended_agent_version or ""
@@ -283,7 +315,7 @@ def apply_provisioning_bundle(
     config.wait_for_jobs = bool(bundle_payload.get("wait_for_jobs", config.wait_for_jobs))
 
     providers_payload = bundle_payload.get("providers") or {}
-    for provider_name in ("f5", "qwen"):
+    for provider_name in ("f5",):
         provider_payload = providers_payload.get(provider_name)
         if not isinstance(provider_payload, dict):
             continue
@@ -321,6 +353,8 @@ def auto_apply_latest_provisioning_bundle(
         return config, None
 
     bundle_payload = load_provisioning_bundle(resolved_provisioning_path)
+    if is_provisioning_bundle_expired(bundle_payload):
+        return config, None
     updated_config = apply_provisioning_bundle(
         config,
         bundle_payload=bundle_payload,

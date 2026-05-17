@@ -116,7 +116,6 @@ class TestAllSystems:
         # Check provider-specific TTS variables
         required_vars = [
             'F5_TTS_SERVICE_URL',
-            'QWEN_TTS_SERVICE_URL',
         ]
         
         for var in required_vars:
@@ -131,8 +130,6 @@ class TestAllSystems:
         # Check TTS service URL is configurable
         assert hasattr(settings, 'f5_tts_service_url')
         assert settings.f5_tts_service_url is not None
-        assert hasattr(settings, 'qwen_tts_service_url')
-        assert settings.qwen_tts_service_url is not None
         
         print("[OK] TTS client uses configuration")
     
@@ -345,7 +342,7 @@ class TestAllSystems:
         env_files = [
             (PROJECT_ROOT / '.env.example', ['SECRET_KEY', 'DATABASE_URL', 'TWITCH_CLIENT_ID']),
             (PROJECT_ROOT / 'frontend/.env.example', ['VITE_BOT_SERVICE_URL', 'VITE_BOT_SERVICE_WS_URL']),
-            (PROJECT_ROOT / 'bot_service/.env.example', ['F5_TTS_SERVICE_URL', 'QWEN_TTS_SERVICE_URL']),
+            (PROJECT_ROOT / 'bot_service/.env.example', ['F5_TTS_SERVICE_URL']),
         ]
         
         for file_path, required_vars in env_files:

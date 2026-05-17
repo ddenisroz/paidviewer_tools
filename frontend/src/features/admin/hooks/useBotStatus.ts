@@ -37,7 +37,7 @@ export const useBotStatus = () => {
     // React Query v5: onError moved to useEffect
     useEffect(() => {
         if (botStatusQuery.error) {
-            logger.error("Failed to fetch bot status", botStatusQuery.error);
+            logger.error('Failed to fetch bot status', botStatusQuery.error);
         }
     }, [botStatusQuery.error]);
 
@@ -82,7 +82,6 @@ export const useBotStatus = () => {
         botEnabled,
         loading,
         handleBotToggle,
-        refetch
+        refetch,
     };
 };
-

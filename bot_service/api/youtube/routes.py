@@ -12,7 +12,8 @@ from repositories.command_repository import CommandRepository
 from services.youtube.youtube_service import YouTubeService
 from utils.enhanced_logger import log_request, log_response
 from core.connection_manager import get_connection_manager
-from auth.auth import get_current_user, get_current_user_optional
+from auth.auth import get_current_user, get_current_user_optional, verify_jwt_token
+from services.youtube.obs_overlay import build_youtube_obs_state
 logger = logging.getLogger('bot_service')
 youtube_router = APIRouter(prefix='/api/youtube', tags=['youtube'])
 
@@ -55,7 +56,15 @@ async def notify_queue_update(user_id: int, db: Session=None):
         connection_manager = get_connection_manager()
         queue_items = queue_service.get_user_queue(user_id=user_id, db=db)
         target_id = str(user_id)
-        await connection_manager.send_to_user(target_id, {'type': 'youtube_queue_update', 'queue': queue_items, 'timestamp': time.time()})
+        message = {'type': 'youtube_queue_update', 'queue': queue_items, 'timestamp': time.time()}
+        await connection_manager.send_to_user(target_id, message)
+        await connection_manager.send_youtube_obs_to_user(
+            user_id,
+            {
+                'type': 'youtube_obs_state',
+                'data': build_youtube_obs_state(user_id, db),
+            },
+        )
         logger.debug(f'[YOUTUBE] Sent youtube_queue_update to {target_id}')
     except HTTPException:
         raise
@@ -204,6 +213,22 @@ async def play_queue_item(queue_id: int, user: dict=Depends(get_current_user), d
         raise
     except Exception:
         logger.exception('Error moving queue item to top via API')
+        raise HTTPException(status_code=500, detail='Internal server error.')
+
+
+@youtube_router.get('/obs-state/{token}')
+async def get_youtube_obs_state(token: str, db: Session=Depends(get_db)):
+    """Get current YouTube OBS overlay state using an OBS token."""
+    try:
+        payload = verify_jwt_token(token, expected_type='obs')
+        user_id = payload.get('user_id')
+        if not user_id:
+            raise HTTPException(status_code=401, detail='Invalid OBS token.')
+        return build_youtube_obs_state(int(user_id), db)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception('Error getting YouTube OBS state')
         raise HTTPException(status_code=500, detail='Internal server error.')
 
 

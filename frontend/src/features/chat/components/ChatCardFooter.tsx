@@ -14,7 +14,7 @@ const ChatCardFooter: React.FC<ChatCardFooterProps> = ({
     twitchEnabled,
     vkEnabled,
     chatMessagesVisible,
-    isOnHomePage
+    isOnHomePage,
 }) => {
     if (!chatMessagesVisible && isOnHomePage) {
         return (

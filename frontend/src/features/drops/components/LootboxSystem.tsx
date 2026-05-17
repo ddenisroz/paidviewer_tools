@@ -6,12 +6,10 @@ import { animateLootboxOpening, createSparkleEffect } from '@/features/drops/uti
 import { CardSkeleton } from '@/shared/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 
-
 import CalendarTab from './lootbox/CalendarTab';
 import ImageLootboxTab from './lootbox/ImageLootboxTab';
 import LootboxHeader from './lootbox/LootboxHeader';
 import LootboxResultModal from './lootbox/LootboxResultModal';
-
 
 interface LootboxSystemProps {
     channelName: string;
@@ -41,7 +39,7 @@ const LootboxSystem: React.FC<LootboxSystemProps> = ({ channelName }) => {
 
     const openImageLootbox = (lootboxId: string | number) => {
         const element = document.getElementById(`image-lootbox-${lootboxId}`);
-        if (element) animateLootboxOpening(element, () => { });
+        if (element) animateLootboxOpening(element, () => {});
     };
 
     const handleDayClick = (dayNumber: number, currentViewerName: string | null) => {
@@ -50,11 +48,18 @@ const LootboxSystem: React.FC<LootboxSystemProps> = ({ channelName }) => {
             currentViewerName || ''
         );
         if (newViewerName !== null) {
-            setGameFieldData(prev => prev.map(day =>
-                day.day === dayNumber
-                    ? { ...day, viewerName: newViewerName.trim() || null, isActive: !!newViewerName.trim(), hasViewer: !!newViewerName.trim() }
-                    : day
-            ));
+            setGameFieldData((prev) =>
+                prev.map((day) =>
+                    day.day === dayNumber
+                        ? {
+                              ...day,
+                              viewerName: newViewerName.trim() || null,
+                              isActive: !!newViewerName.trim(),
+                              hasViewer: !!newViewerName.trim(),
+                          }
+                        : day
+                )
+            );
         }
     };
 
@@ -76,10 +81,7 @@ const LootboxSystem: React.FC<LootboxSystemProps> = ({ channelName }) => {
 
     return (
         <div className="space-y-8 p-6">
-            <LootboxHeader
-                selectedPlatform={selectedPlatform}
-                onPlatformChange={setSelectedPlatform}
-            />
+            <LootboxHeader selectedPlatform={selectedPlatform} onPlatformChange={setSelectedPlatform} />
 
             <Tabs defaultValue="image-lootboxes" className="w-full">
                 <TabsList className="grid w-full grid-cols-6">
@@ -101,10 +103,7 @@ const LootboxSystem: React.FC<LootboxSystemProps> = ({ channelName }) => {
                 </TabsContent>
 
                 <TabsContent value="calendar" className="space-y-6">
-                    <CalendarTab
-                        gameFieldData={gameFieldData}
-                        onDayClick={handleDayClick}
-                    />
+                    <CalendarTab gameFieldData={gameFieldData} onDayClick={handleDayClick} />
                 </TabsContent>
 
                 <TabsContent value="donation-lootboxes" className="space-y-6">

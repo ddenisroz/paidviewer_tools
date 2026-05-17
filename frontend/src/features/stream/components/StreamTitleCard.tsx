@@ -6,6 +6,7 @@ import { CheckCircle, Loader2, PenLine, Save } from 'lucide-react';
 import { useData } from '@/context/DataContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { useUserSettings } from '@/context/UserSettingsContext';
+import { useStreamTitleResetTimer } from '@/features/stream/hooks/useStreamTitleResetTimer';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -24,7 +25,6 @@ const StreamTitleCard: React.FC = () => {
     const lastSyncedTitleRef = useRef('');
     const skipNextSyncRef = useRef(false);
     const suppressSyncUntilRef = useRef(0);
-
 
     // Local state for immediate optimisic UI updates
     const [localCombine, setLocalCombine] = useState(combine_titles);
@@ -48,6 +48,18 @@ const StreamTitleCard: React.FC = () => {
     const normalizeTitle = (value?: string) => (value ?? '').trim();
     const saveButtonRef = useRef<HTMLButtonElement | null>(null);
     const suppressBlurRestoreRef = useRef(false);
+    const { clearTitleResetTimer, scheduleTitleReset } = useStreamTitleResetTimer({
+        initialData,
+        setCurrentData,
+        isLinked,
+        bothEnabled,
+        twitchEnabled,
+        vkEnabled,
+        syncInProgressRef,
+        lastSyncedTitleRef,
+        isEditingRef,
+        setIsUserDirty,
+    });
 
     useEffect(() => {
         if (Date.now() < suppressSyncUntilRef.current) {
@@ -63,15 +75,16 @@ const StreamTitleCard: React.FC = () => {
         const vkTitle = currentData.vk?.title || '';
         const masterTitle = twitchTitle || vkTitle;
         if (!masterTitle) return;
-        if (lastSyncedTitleRef.current === masterTitle && twitchTitle === masterTitle && vkTitle === masterTitle) return;
+        if (lastSyncedTitleRef.current === masterTitle && twitchTitle === masterTitle && vkTitle === masterTitle)
+            return;
 
         if (twitchTitle !== masterTitle || vkTitle !== masterTitle) {
             syncInProgressRef.current = true;
             lastSyncedTitleRef.current = masterTitle;
-            setCurrentData(prev => ({
+            setCurrentData((prev) => ({
                 ...prev,
                 twitch: { ...prev.twitch!, title: masterTitle },
-                vk: { ...prev.vk!, title: masterTitle }
+                vk: { ...prev.vk!, title: masterTitle },
             }));
             setTimeout(() => {
                 syncInProgressRef.current = false;
@@ -91,10 +104,10 @@ const StreamTitleCard: React.FC = () => {
             const masterTitle = currentData.twitch?.title || currentData.vk?.title || '';
             if (masterTitle) {
                 syncInProgressRef.current = true;
-                setCurrentData(prev => ({
+                setCurrentData((prev) => ({
                     ...prev,
                     twitch: { ...prev.twitch!, title: masterTitle },
-                    vk: { ...prev.vk!, title: masterTitle }
+                    vk: { ...prev.vk!, title: masterTitle },
                 }));
                 setTimeout(() => {
                     syncInProgressRef.current = false;
@@ -113,30 +126,31 @@ const StreamTitleCard: React.FC = () => {
     };
 
     const handleTitleChange = (platform: 'twitch' | 'vk', value: string) => {
+        clearTitleResetTimer();
         setIsUserDirty(true);
         isEditingRef.current = true;
         lastSyncedTitleRef.current = value;
         if (isLinked && bothEnabled) {
-            setCurrentData(prev => ({
+            setCurrentData((prev) => ({
                 ...prev,
                 twitch: { ...prev.twitch!, title: value },
-                vk: { ...prev.vk!, title: value }
+                vk: { ...prev.vk!, title: value },
             }));
             return;
         }
 
         if (platform === 'twitch') {
-            setCurrentData(prev => ({ ...prev, twitch: { ...prev.twitch!, title: value } }));
+            setCurrentData((prev) => ({ ...prev, twitch: { ...prev.twitch!, title: value } }));
             return;
         }
 
-        setCurrentData(prev => ({ ...prev, vk: { ...prev.vk!, title: value } }));
+        setCurrentData((prev) => ({ ...prev, vk: { ...prev.vk!, title: value } }));
     };
 
     const getTitleValue = (platform: 'twitch' | 'vk') =>
-        platform === 'twitch' ? (currentData.twitch?.title || '') : (currentData.vk?.title || '');
+        platform === 'twitch' ? currentData.twitch?.title || '' : currentData.vk?.title || '';
     const getInitialTitleValue = (platform: 'twitch' | 'vk') =>
-        platform === 'twitch' ? (initialData.twitch?.title || '') : (initialData.vk?.title || '');
+        platform === 'twitch' ? initialData.twitch?.title || '' : initialData.vk?.title || '';
     const hasPlatformChange = (platform: 'twitch' | 'vk') =>
         normalizeTitle(getTitleValue(platform)) !== normalizeTitle(getInitialTitleValue(platform));
 
@@ -149,10 +163,13 @@ const StreamTitleCard: React.FC = () => {
             if (isLinked) {
                 if (!isChanged) return;
                 const linkedTitle = currentData.twitch?.title ?? currentData.vk?.title ?? '';
-                success = await saveChanges({
-                    twitch: { title: linkedTitle },
-                    vk: { title: linkedTitle }
-                }, 'saveTitle');
+                success = await saveChanges(
+                    {
+                        twitch: { title: linkedTitle },
+                        vk: { title: linkedTitle },
+                    },
+                    'saveTitle'
+                );
             } else {
                 if (!hasPlatformChange(platform)) return;
                 const payload: Partial<Record<'twitch' | 'vk', { title: string }>> = {};
@@ -161,6 +178,7 @@ const StreamTitleCard: React.FC = () => {
             }
 
             if (success) {
+                clearTitleResetTimer();
                 setIsUserDirty(false);
                 isEditingRef.current = false;
                 suppressBlurRestoreRef.current = true;
@@ -202,19 +220,23 @@ const StreamTitleCard: React.FC = () => {
         if (nextFocused && saveButtonRef.current?.contains(nextFocused)) {
             return;
         }
+
+        if (isChanged && isUserDirty && !isSaving) {
+            scheduleTitleReset();
+        }
     };
 
     const handleInputFocus = (platform: 'twitch' | 'vk', e: React.FocusEvent<HTMLInputElement>) => {
+        clearTitleResetTimer();
         isEditingRef.current = true;
         lastSyncedTitleRef.current = getTitleValue(platform);
         e.target.select();
     };
 
     const isChanged = useMemo(() => {
-        const twitchChanged = twitchEnabled &&
-            normalizeTitle(initialData.twitch?.title) !== normalizeTitle(currentData.twitch?.title);
-        const vkChanged = vkEnabled &&
-            normalizeTitle(initialData.vk?.title) !== normalizeTitle(currentData.vk?.title);
+        const twitchChanged =
+            twitchEnabled && normalizeTitle(initialData.twitch?.title) !== normalizeTitle(currentData.twitch?.title);
+        const vkChanged = vkEnabled && normalizeTitle(initialData.vk?.title) !== normalizeTitle(currentData.vk?.title);
         return twitchChanged || vkChanged;
     }, [initialData, currentData, twitchEnabled, vkEnabled]);
 
@@ -230,20 +252,20 @@ const StreamTitleCard: React.FC = () => {
             const needsRestore = !currentTwitch && !currentVk && (initialTwitch || initialVk);
             if (needsRestore) {
                 const restoreValue = initialTwitch || initialVk;
-                setCurrentData(prev => ({
+                setCurrentData((prev) => ({
                     ...prev,
                     twitch: { ...prev.twitch!, title: restoreValue },
-                    vk: { ...prev.vk!, title: restoreValue }
+                    vk: { ...prev.vk!, title: restoreValue },
                 }));
             }
             return;
         }
 
         if (twitchEnabled && !currentTwitch && initialTwitch) {
-            setCurrentData(prev => ({ ...prev, twitch: { ...prev.twitch!, title: initialTwitch } }));
+            setCurrentData((prev) => ({ ...prev, twitch: { ...prev.twitch!, title: initialTwitch } }));
         }
         if (vkEnabled && !currentVk && initialVk) {
-            setCurrentData(prev => ({ ...prev, vk: { ...prev.vk!, title: initialVk } }));
+            setCurrentData((prev) => ({ ...prev, vk: { ...prev.vk!, title: initialVk } }));
         }
     }, [initialData, currentData, twitchEnabled, vkEnabled, isLinked, bothEnabled, setCurrentData]);
 
@@ -282,7 +304,9 @@ const StreamTitleCard: React.FC = () => {
                 {/* Twitch / Main Input */}
                 <div className="space-y-4 relative">
                     <div className="relative">
-                        <div className={`absolute left-3 top-1/2 z-20 flex -translate-y-1/2 items-center pointer-events-none ${isLinked && bothEnabled ? 'w-[3.75rem] gap-2' : 'w-6'}`}>
+                        <div
+                            className={`absolute left-3 top-1/2 z-20 flex -translate-y-1/2 items-center pointer-events-none ${isLinked && bothEnabled ? 'w-[3.75rem] gap-2' : 'w-6'}`}
+                        >
                             <TwitchIcon width={24} height={24} className="text-white/80 shrink-0" />
                             {isLinked && bothEnabled && (
                                 <VKIcon width={24} height={24} className="text-white/80 shrink-0" />
@@ -300,7 +324,13 @@ const StreamTitleCard: React.FC = () => {
                             autoCorrect="off"
                             autoCapitalize="off"
                             spellCheck={false}
-                            placeholder={isLinked ? "Общее название стрима..." : (twitchEnabled ? "Название на Twitch..." : "нет подключения")}
+                            placeholder={
+                                isLinked
+                                    ? 'Общее название стрима...'
+                                    : twitchEnabled
+                                      ? 'Название на Twitch...'
+                                      : 'нет подключения'
+                            }
                             className={`h-10 ${twitchInputPadding} pr-4 ${STREAM_FIELD_CLASS} ${!twitchEnabled && !isLinked ? 'bg-muted/40 cursor-not-allowed opacity-60' : ''}`}
                             disabled={!twitchEnabled && !isLinked}
                         />
@@ -328,7 +358,7 @@ const StreamTitleCard: React.FC = () => {
                                 autoCorrect="off"
                                 autoCapitalize="off"
                                 spellCheck={false}
-                                placeholder={vkEnabled ? "Название на VK Live..." : "нет подключения"}
+                                placeholder={vkEnabled ? 'Название на VK Live...' : 'нет подключения'}
                                 className={`h-10 ${vkInputPadding} pr-4 ${STREAM_FIELD_CLASS} ${!vkEnabled ? 'bg-muted/40 cursor-not-allowed opacity-60' : ''}`}
                                 disabled={!vkEnabled || !showVkField}
                             />

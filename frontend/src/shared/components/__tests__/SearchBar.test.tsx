@@ -14,35 +14,19 @@ describe('SearchBar', () => {
 
     describe('Basic functionality', () => {
         it('renders search input', () => {
-            render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                />
-            );
+            render(<SearchBar value="" onChange={mockOnChange} />);
 
             expect(screen.getByPlaceholderText('Поиск...')).toBeInTheDocument();
         });
 
         it('renders with custom placeholder', () => {
-            render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                    placeholder="Поиск пользователей..."
-                />
-            );
+            render(<SearchBar value="" onChange={mockOnChange} placeholder="Поиск пользователей..." />);
 
             expect(screen.getByPlaceholderText('Поиск пользователей...')).toBeInTheDocument();
         });
 
         it('displays current value', () => {
-            render(
-                <SearchBar
-                    value="test query"
-                    onChange={mockOnChange}
-                />
-            );
+            render(<SearchBar value="test query" onChange={mockOnChange} />);
 
             const input = screen.getByPlaceholderText('Поиск...') as HTMLInputElement;
             expect(input.value).toBe('test query');
@@ -50,12 +34,7 @@ describe('SearchBar', () => {
 
         it('calls onChange when typing', async () => {
             const user = userEvent.setup();
-            render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                />
-            );
+            render(<SearchBar value="" onChange={mockOnChange} />);
 
             const input = screen.getByPlaceholderText('Поиск...');
             await user.type(input, 'test');
@@ -64,12 +43,7 @@ describe('SearchBar', () => {
         });
 
         it('shows clear button when value is not empty', () => {
-            render(
-                <SearchBar
-                    value="test"
-                    onChange={mockOnChange}
-                />
-            );
+            render(<SearchBar value="test" onChange={mockOnChange} />);
 
             const clearButtons = screen.getAllByRole('button');
             expect(clearButtons.length).toBeGreaterThan(0);
@@ -77,16 +51,11 @@ describe('SearchBar', () => {
 
         it('clears value when clear button clicked', async () => {
             const user = userEvent.setup();
-            render(
-                <SearchBar
-                    value="test"
-                    onChange={mockOnChange}
-                />
-            );
+            render(<SearchBar value="test" onChange={mockOnChange} />);
 
             // Find the clear button (X icon)
             const buttons = screen.getAllByRole('button');
-            const clearButton = buttons.find(btn => btn.querySelector('svg'));
+            const clearButton = buttons.find((btn) => btn.querySelector('svg'));
 
             if (clearButton) {
                 await user.click(clearButton);
@@ -109,43 +78,21 @@ describe('SearchBar', () => {
         ];
 
         it('shows filter button when filters provided', () => {
-            render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                    filters={filters}
-                />
-            );
+            render(<SearchBar value="" onChange={mockOnChange} filters={filters} />);
 
             expect(screen.getByText('Фильтры')).toBeInTheDocument();
         });
 
         it('hides filter button when showFilterButton is false', () => {
-            render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                    filters={filters}
-                    showFilterButton={false}
-                />
-            );
+            render(<SearchBar value="" onChange={mockOnChange} filters={filters} showFilterButton={false} />);
 
             expect(screen.queryByText('Фильтры')).not.toBeInTheDocument();
         });
 
         it('displays active filters', () => {
-            const activeFilters = [
-                { key: 'status', value: 'active', label: 'Статус: Активный' },
-            ];
+            const activeFilters = [{ key: 'status', value: 'active', label: 'Статус: Активный' }];
 
-            render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                    filters={filters}
-                    activeFilters={activeFilters}
-                />
-            );
+            render(<SearchBar value="" onChange={mockOnChange} filters={filters} activeFilters={activeFilters} />);
 
             expect(screen.getByText('Активные фильтры:')).toBeInTheDocument();
             expect(screen.getByText('Статус: Активный')).toBeInTheDocument();
@@ -157,22 +104,13 @@ describe('SearchBar', () => {
                 { key: 'role', value: 'admin', label: 'Роль: Админ' },
             ];
 
-            render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                    filters={filters}
-                    activeFilters={activeFilters}
-                />
-            );
+            render(<SearchBar value="" onChange={mockOnChange} filters={filters} activeFilters={activeFilters} />);
 
             expect(screen.getByText('2')).toBeInTheDocument();
         });
 
         it('shows clear all button when filters are active', () => {
-            const activeFilters = [
-                { key: 'status', value: 'active', label: 'Статус: Активный' },
-            ];
+            const activeFilters = [{ key: 'status', value: 'active', label: 'Статус: Активный' }];
 
             render(
                 <SearchBar
@@ -189,9 +127,7 @@ describe('SearchBar', () => {
 
         it('calls onClearAll when clear all clicked', async () => {
             const user = userEvent.setup();
-            const activeFilters = [
-                { key: 'status', value: 'active', label: 'Статус: Активный' },
-            ];
+            const activeFilters = [{ key: 'status', value: 'active', label: 'Статус: Активный' }];
 
             render(
                 <SearchBar
@@ -210,13 +146,7 @@ describe('SearchBar', () => {
 
     describe('Styling', () => {
         it('applies custom className', () => {
-            const { container } = render(
-                <SearchBar
-                    value=""
-                    onChange={mockOnChange}
-                    className="custom-class"
-                />
-            );
+            const { container } = render(<SearchBar value="" onChange={mockOnChange} className="custom-class" />);
 
             expect(container.firstChild).toHaveClass('custom-class');
         });

@@ -1,4 +1,4 @@
-"""Backend-only worker control-plane routes for F5 and Qwen agents."""
+"""Backend-only worker control-plane routes for F5 agents."""
 
 from __future__ import annotations
 
@@ -88,7 +88,6 @@ class WorkerActivationRequest(BaseModel):
     pairing_code: str = Field(..., min_length=3, max_length=256)
     label: Optional[str] = Field(default=None, max_length=120)
     supports_f5: Optional[bool] = None
-    supports_qwen: Optional[bool] = None
     capabilities: dict[str, Any] = Field(default_factory=dict)
     runtime_metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -97,7 +96,6 @@ class WorkerPollRequest(BaseModel):
     max_jobs: int = Field(default=1, ge=1, le=10)
     wait_for_jobs: bool = True
     supports_f5: Optional[bool] = None
-    supports_qwen: Optional[bool] = None
     capabilities: dict[str, Any] = Field(default_factory=dict)
     runtime_metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -126,8 +124,6 @@ def _resolve_server_base_url(request: Request) -> str:
 
 
 def _resolve_default_provider_endpoint(provider: str) -> str:
-    if provider == "qwen":
-        return str(settings.worker_agent_default_qwen_endpoint_url or "").strip() or "http://127.0.0.1:8012"
     return str(settings.worker_agent_default_f5_endpoint_url or "").strip() or "http://127.0.0.1:8011"
 
 
@@ -137,13 +133,6 @@ def _build_provisioning_bundle(
     pairing_payload: dict[str, Any],
     trusted_origins: list[str],
 ) -> dict[str, Any]:
-    provider_hint = str(pairing_payload.get("provider_hint") or "").strip().lower() or "both"
-    enable_f5 = provider_hint in {"f5", "both"}
-    enable_qwen = provider_hint in {"qwen", "both"}
-    if not enable_f5 and not enable_qwen:
-        enable_f5 = True
-        enable_qwen = True
-
     label_hint = str(pairing_payload.get("label_hint") or "").strip() or "My TTS Worker"
 
     return {
@@ -163,13 +152,8 @@ def _build_provisioning_bundle(
         "wait_for_jobs": True,
         "providers": {
             "f5": {
-                "enabled": enable_f5,
+                "enabled": True,
                 "endpoint_url": _resolve_default_provider_endpoint("f5"),
-                "api_key": "",
-            },
-            "qwen": {
-                "enabled": enable_qwen,
-                "endpoint_url": _resolve_default_provider_endpoint("qwen"),
                 "api_key": "",
             },
         },
@@ -177,8 +161,8 @@ def _build_provisioning_bundle(
 
 
 def _build_provisioning_filename(provider_hint: Optional[str]) -> str:
-    normalized_provider = str(provider_hint or "").strip().lower() or "both"
-    provider_slug = normalized_provider if normalized_provider in {"f5", "qwen", "both"} else "both"
+    normalized_provider = str(provider_hint or "").strip().lower() or "f5"
+    provider_slug = normalized_provider if normalized_provider == "f5" else "f5"
     timestamp = int(time.time())
     return f"paidviewer-worker-provisioning-{provider_slug}-{timestamp}.json"
 
@@ -497,7 +481,6 @@ async def activate_worker_agent(
             pairing_code=request.pairing_code,
             label=request.label,
             supports_f5=request.supports_f5,
-            supports_qwen=request.supports_qwen,
             capabilities=request.capabilities,
             runtime_metadata=request.runtime_metadata,
         )
@@ -541,7 +524,6 @@ async def poll_worker_jobs(
                 worker=worker,
                 max_jobs=request.max_jobs,
                 supports_f5=request.supports_f5,
-                supports_qwen=request.supports_qwen,
                 capabilities=request.capabilities,
                 runtime_metadata=request.runtime_metadata,
             )

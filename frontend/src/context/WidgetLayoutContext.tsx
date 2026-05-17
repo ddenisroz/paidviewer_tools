@@ -12,7 +12,7 @@ const WidgetLayoutContext = createContext<WidgetLayoutContextType | undefined>(u
 export const WidgetLayoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isEditMode, setIsEditMode] = useState(false);
 
-    const toggleEditMode = () => setIsEditMode(prev => !prev);
+    const toggleEditMode = () => setIsEditMode((prev) => !prev);
     const setEditMode = (value: boolean) => setIsEditMode(value);
 
     return (

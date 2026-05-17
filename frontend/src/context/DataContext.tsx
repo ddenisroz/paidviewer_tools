@@ -5,7 +5,12 @@
 import { useLocation } from 'react-router-dom';
 
 import { expandQueryWithAliases, getCategoriesByAlias } from '@/constants/categoryAliases';
-import { useStreamHistory, useTwitchStreamInfo, useUpdateStream, useVkStreamInfo } from '@/queries/stream/streamQueries';
+import {
+    useStreamHistory,
+    useTwitchStreamInfo,
+    useUpdateStream,
+    useVkStreamInfo,
+} from '@/queries/stream/streamQueries';
 import { streamService } from '@/services/api/services/streamService';
 import { useToast } from '@/shared/components/ui/toast';
 import { logger } from '@/shared/utils/prodLogger';
@@ -17,11 +22,7 @@ import { useIntegrations } from './IntegrationsContext';
 import type { StreamCategory, StreamData, StreamHistory, UpdateStreamPayload } from '@/types/stream';
 
 function normalizeString(str: string): string {
-    return str
-        .toLowerCase()
-        .replace(/[-–—]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    return str.toLowerCase().replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function getCategoryInitials(categoryName: string): string {
@@ -54,11 +55,7 @@ function levenshteinDistance(a: string, b: string): number {
             if (b.charAt(i - 1) === a.charAt(j - 1)) {
                 matrix[i][j] = matrix[i - 1][j - 1];
             } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
-                );
+                matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j] + 1);
             }
         }
     }
@@ -83,25 +80,25 @@ function calculateRelevance(categoryName: string, query: string): number {
         if (categoryInitials.startsWith(queryNormalized)) return 0.9;
     }
 
-    const catWords = catNormalized.split(/\s+/).filter(w => w.length > 0);
-    const queryWords = queryNormalized.split(/\s+/).filter(w => w.length > 0);
+    const catWords = catNormalized.split(/\s+/).filter((w) => w.length > 0);
+    const queryWords = queryNormalized.split(/\s+/).filter((w) => w.length > 0);
 
     if (catWords.length > 0 && queryWords.length > 0 && catWords[0] === queryWords[0]) {
-        const allWordsPresent = queryWords.every(qw => catWords.some(cw => cw === qw || cw.startsWith(qw)));
+        const allWordsPresent = queryWords.every((qw) => catWords.some((cw) => cw === qw || cw.startsWith(qw)));
         if (allWordsPresent) return 2;
         return 3;
     }
 
-    const exactMatches = queryWords.filter(qw => catWords.some(cw => cw === qw)).length;
+    const exactMatches = queryWords.filter((qw) => catWords.some((cw) => cw === qw)).length;
     if (exactMatches === queryWords.length) {
         const wordsInOrder = queryWords.every((qw, idx) => {
-            const catIdx = catWords.findIndex(cw => cw === qw);
+            const catIdx = catWords.findIndex((cw) => cw === qw);
             return catIdx >= idx;
         });
         return wordsInOrder ? 4 : 5;
     }
 
-    const startsWithMatches = queryWords.filter(qw => catWords.some(cw => cw.startsWith(qw))).length;
+    const startsWithMatches = queryWords.filter((qw) => catWords.some((cw) => cw.startsWith(qw))).length;
     if (startsWithMatches === queryWords.length) {
         return 6;
     }
@@ -122,7 +119,7 @@ function calculateRelevance(categoryName: string, query: string): number {
         return 15 + (5 - startsWithMatches);
     }
 
-    const partialMatches = queryWords.filter(qw => catWords.some(cw => cw.includes(qw))).length;
+    const partialMatches = queryWords.filter((qw) => catWords.some((cw) => cw.includes(qw))).length;
     if (partialMatches > 0) {
         return 20 + (5 - partialMatches);
     }
@@ -143,17 +140,17 @@ function calculateRelevance(categoryName: string, query: string): number {
 
     const distance = levenshteinDistance(catNormalized, queryNormalized);
     const maxLength = Math.max(catNormalized.length, queryNormalized.length);
-    const similarity = 1 - (distance / maxLength);
+    const similarity = 1 - distance / maxLength;
 
     if (similarity > 0.8) {
         return 25 + Math.floor(distance);
     }
 
-    const wordFuzzyMatches = queryWords.filter(qw => {
-        return catWords.some(cw => {
+    const wordFuzzyMatches = queryWords.filter((qw) => {
+        return catWords.some((cw) => {
             const wordDist = levenshteinDistance(cw, qw);
             const wordMaxLen = Math.max(cw.length, qw.length);
-            const wordSim = 1 - (wordDist / wordMaxLen);
+            const wordSim = 1 - wordDist / wordMaxLen;
             return wordSim > 0.75;
         });
     }).length;
@@ -170,9 +167,7 @@ function calculateRelevance(categoryName: string, query: string): number {
 function sortCategoriesByRelevance(categories: StreamCategory[], query: string): StreamCategory[] {
     if (!query || query.trim() === '') return categories;
 
-    const aliasTargets = new Set(
-        getCategoriesByAlias(query).map((aliasName) => normalizeString(aliasName))
-    );
+    const aliasTargets = new Set(getCategoriesByAlias(query).map((aliasName) => normalizeString(aliasName)));
 
     return [...categories].sort((a, b) => {
         let scoreA = calculateRelevance(a.name, query);
@@ -232,16 +227,15 @@ function buildStreamCategory(
     fallbackName?: unknown,
     assets?: { box_art_url?: unknown; cover_url?: unknown }
 ): StreamCategory | null {
-    const categoryRecord = typeof rawCategory === 'object' && rawCategory !== null
-        ? rawCategory as Record<string, unknown>
-        : null;
+    const categoryRecord =
+        typeof rawCategory === 'object' && rawCategory !== null ? (rawCategory as Record<string, unknown>) : null;
 
     const resolvedId = categoryId ?? categoryRecord?.id ?? '';
     const resolvedName = String(
-        categoryRecord?.title
-        ?? categoryRecord?.name
-        ?? fallbackName
-        ?? (typeof rawCategory === 'string' ? rawCategory : '')
+        categoryRecord?.title ??
+            categoryRecord?.name ??
+            fallbackName ??
+            (typeof rawCategory === 'string' ? rawCategory : '')
     ).trim();
     const boxArtUrl = String(categoryRecord?.box_art_url ?? assets?.box_art_url ?? '').trim();
     const coverUrl = String(categoryRecord?.cover_url ?? assets?.cover_url ?? '').trim();
@@ -304,7 +298,10 @@ interface DataContextValue {
     setCurrentData: React.Dispatch<React.SetStateAction<StreamData>>;
     loading: LoadingState;
     status: StatusState;
-    saveChanges: (customPayload?: UpdateStreamPayload | null, statusType?: 'saveTitle' | 'saveCategory') => Promise<boolean>;
+    saveChanges: (
+        customPayload?: UpdateStreamPayload | null,
+        statusType?: 'saveTitle' | 'saveCategory'
+    ) => Promise<boolean>;
     categories: CategoriesState;
     searchCategories: (platform: 'twitch' | 'vk', query: string) => Promise<StreamCategory[]>;
     streamHistory: StreamHistory | null;
@@ -359,7 +356,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
     useEffect(() => {
         const cached = getQueryCache(['stream-data', user?.id]);
-        if (cached && ((cached as StreamData).twitch?.title || (cached as StreamData).twitch?.category || (cached as StreamData).vk?.title || (cached as StreamData).vk?.category)) {
+        if (
+            cached &&
+            ((cached as StreamData).twitch?.title ||
+                (cached as StreamData).twitch?.category ||
+                (cached as StreamData).vk?.title ||
+                (cached as StreamData).vk?.category)
+        ) {
             setInitialData(cached as StreamData);
             setCurrentData(cached as StreamData);
         }
@@ -391,7 +394,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         },
     });
 
-    const { data: historyData, isLoading: isLoadingHistory, refetch: _refetchHistory } = useStreamHistory({
+    const {
+        data: historyData,
+        isLoading: isLoadingHistory,
+        refetch: _refetchHistory,
+    } = useStreamHistory({
         enabled: !!isAuthenticated && isDashboardHome,
         refetchInterval: isDashboardHome ? 60000 : false,
         refetchIntervalInBackground: false,
@@ -400,7 +407,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     });
 
     useEffect(() => {
-        setLoading(prev => ({ ...prev, history: isLoadingHistory }));
+        setLoading((prev) => ({ ...prev, history: isLoadingHistory }));
     }, [isLoadingHistory]);
 
     // React Query v5: onSuccess moved to useEffect
@@ -411,9 +418,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
     }, [historyData]);
 
-
-
-    const { data: twitchData, isLoading: isLoadingTwitch, refetch: refetchTwitch } = useTwitchStreamInfo({
+    const {
+        data: twitchData,
+        isLoading: isLoadingTwitch,
+        refetch: refetchTwitch,
+    } = useTwitchStreamInfo({
         enabled: !!isAuthenticated && isDashboardHome && !!integrations.twitch?.enabled,
         refetchInterval: false,
         refetchIntervalInBackground: false,
@@ -421,7 +430,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         refetchOnWindowFocus: false,
     });
 
-    const { data: vkData, isLoading: isLoadingVk, refetch: refetchVk } = useVkStreamInfo({
+    const {
+        data: vkData,
+        isLoading: isLoadingVk,
+        refetch: refetchVk,
+    } = useVkStreamInfo({
         enabled: !!isAuthenticated && isDashboardHome && !!integrations.vk?.enabled,
         refetchInterval: false,
         refetchIntervalInBackground: false,
@@ -454,15 +467,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const vk = vkData.data as any;
             data.vk.title = vk.title || '';
-            data.vk.category = buildStreamCategory(
-                vk.category_id,
-                vk.category,
-                vk.category_name,
-                {
-                    box_art_url: vk.category?.box_art_url,
-                    cover_url: vk.category?.cover_url || vk.category_img_url,
-                }
-            );
+            data.vk.category = buildStreamCategory(vk.category_id, vk.category, vk.category_name, {
+                box_art_url: vk.category?.box_art_url,
+                cover_url: vk.category?.cover_url || vk.category_img_url,
+            });
         }
 
         return data;
@@ -470,14 +478,20 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
     const isLoadingStreamData = isLoadingTwitch || isLoadingVk;
     useEffect(() => {
-        setLoading(prev => ({ ...prev, streamData: isLoadingStreamData }));
+        setLoading((prev) => ({ ...prev, streamData: isLoadingStreamData }));
     }, [isLoadingStreamData]);
 
     // Track if it's the first load to allow initial population
     const [isFirstLoad, setIsFirstLoad] = useState(true);
 
     useEffect(() => {
-        if (combinedStreamData && (combinedStreamData.twitch.title || combinedStreamData.vk.title || combinedStreamData.twitch.category || combinedStreamData.vk.category)) {
+        if (
+            combinedStreamData &&
+            (combinedStreamData.twitch.title ||
+                combinedStreamData.vk.title ||
+                combinedStreamData.twitch.category ||
+                combinedStreamData.vk.category)
+        ) {
             const lastServerData = lastServerDataRef.current;
             if (lastServerData && areStreamDataEqual(lastServerData, combinedStreamData)) {
                 return;
@@ -488,7 +502,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             const latestCurrentData = currentDataRef.current;
             // Check if user has unsaved changes
             // We compare strict equality of objects/strings to ensure we don't overwrite if user is typing
-            // Note: This simple check assumes equality works. 
+            // Note: This simple check assumes equality works.
             // Better: Compare serialized or field-by-field if structure is complex.
             // For now, we assume if initialData matches currentData, it's pristine.
 
@@ -519,325 +533,362 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             setInitialData(combinedStreamData);
             setQueryCache(['stream-data', user?.id], combinedStreamData);
             if (!areStreamDataEqual(latestInitialData, combinedStreamData)) {
-                setRefreshTrigger(prev => prev + 1);
+                setRefreshTrigger((prev) => prev + 1);
             }
         }
     }, [combinedStreamData, user?.id, isFirstLoad]);
 
-    const loadStreamData = useCallback(async (force: boolean = false): Promise<void> => {
-        if (!isAuthenticated) {
-            return;
-        }
-        if (force) {
-            const promises: Promise<unknown>[] = [];
-            if (integrations.twitch?.enabled) promises.push(refetchTwitch());
-            if (integrations.vk?.enabled) promises.push(refetchVk());
-            await Promise.all(promises);
-        }
-    }, [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, refetchTwitch, refetchVk]);
-
-    const saveChanges = useCallback(async (
-        customPayload: UpdateStreamPayload | null = null,
-        statusType: 'saveTitle' | 'saveCategory' = 'saveTitle'
-    ): Promise<boolean> => {
-        setStatus(prev => ({ ...prev, [statusType]: 'loading' }));
-        let payload: UpdateStreamPayload | null = customPayload;
-        let changesFound = false;
-
-        if (!payload) {
-            payload = { twitch: {}, vk: {} };
-
-            if (integrations.twitch?.enabled) {
-                if (initialData.twitch.title !== currentData.twitch.title) {
-                    payload.twitch!.title = currentData.twitch.title;
-                    changesFound = true;
-                }
-                if (initialData.twitch.category?.id !== currentData.twitch.category?.id) {
-                    payload.twitch!.category_id = currentData.twitch.category?.id;
-                    changesFound = true;
-                }
+    const loadStreamData = useCallback(
+        async (force: boolean = false): Promise<void> => {
+            if (!isAuthenticated) {
+                return;
             }
+            if (force) {
+                const promises: Promise<unknown>[] = [];
+                if (integrations.twitch?.enabled) promises.push(refetchTwitch());
+                if (integrations.vk?.enabled) promises.push(refetchVk());
+                await Promise.all(promises);
+            }
+        },
+        [isAuthenticated, integrations.twitch?.enabled, integrations.vk?.enabled, refetchTwitch, refetchVk]
+    );
 
-            if (integrations.vk?.enabled) {
-                if (initialData.vk.title !== currentData.vk.title) {
-                    payload.vk!.title = currentData.vk.title;
-                    changesFound = true;
-                }
-                if (initialData.vk.category?.id !== currentData.vk.category?.id) {
-                    const vkCategoryPayload: { id: string; name: string; title: string; type: string; cover_url?: string } = {
-                        id: currentData.vk.category!.id,
-                        name: currentData.vk.category!.name,
-                        title: currentData.vk.category!.name,
-                        type: (currentData.vk.category as { type?: string }).type || "games",
-                        cover_url: (currentData.vk.category as { box_art_url?: string; cover_url?: string }).box_art_url || (currentData.vk.category as { cover_url?: string }).cover_url || ""
-                    };
+    const saveChanges = useCallback(
+        async (
+            customPayload: UpdateStreamPayload | null = null,
+            statusType: 'saveTitle' | 'saveCategory' = 'saveTitle'
+        ): Promise<boolean> => {
+            setStatus((prev) => ({ ...prev, [statusType]: 'loading' }));
+            let payload: UpdateStreamPayload | null = customPayload;
+            let changesFound = false;
 
-                    payload.vk!.category = vkCategoryPayload;
-                    payload.vk!.category_id = currentData.vk.category?.id;
-                    changesFound = true;
+            if (!payload) {
+                payload = { twitch: {}, vk: {} };
+
+                if (integrations.twitch?.enabled) {
+                    if (initialData.twitch.title !== currentData.twitch.title) {
+                        payload.twitch!.title = currentData.twitch.title;
+                        changesFound = true;
+                    }
+                    if (initialData.twitch.category?.id !== currentData.twitch.category?.id) {
+                        payload.twitch!.category_id = currentData.twitch.category?.id;
+                        changesFound = true;
+                    }
                 }
+
+                if (integrations.vk?.enabled) {
+                    if (initialData.vk.title !== currentData.vk.title) {
+                        payload.vk!.title = currentData.vk.title;
+                        changesFound = true;
+                    }
+                    if (initialData.vk.category?.id !== currentData.vk.category?.id) {
+                        const vkCategoryPayload: {
+                            id: string;
+                            name: string;
+                            title: string;
+                            type: string;
+                            cover_url?: string;
+                        } = {
+                            id: currentData.vk.category!.id,
+                            name: currentData.vk.category!.name,
+                            title: currentData.vk.category!.name,
+                            type: (currentData.vk.category as { type?: string }).type || 'games',
+                            cover_url:
+                                (currentData.vk.category as { box_art_url?: string; cover_url?: string }).box_art_url ||
+                                (currentData.vk.category as { cover_url?: string }).cover_url ||
+                                '',
+                        };
+
+                        payload.vk!.category = vkCategoryPayload;
+                        payload.vk!.category_id = currentData.vk.category?.id;
+                        changesFound = true;
+                    }
+                }
+
+                if (!changesFound) {
+                    setStatus((prev) => ({ ...prev, [statusType]: 'idle' }));
+                    addToast({ type: 'info', title: 'Информация', message: 'Нет изменений для сохранения.' });
+                    return false;
+                }
+            } else {
+                changesFound = Object.keys(payload).length > 0;
             }
 
             if (!changesFound) {
-                setStatus(prev => ({ ...prev, [statusType]: 'idle' }));
+                setStatus((prev) => ({ ...prev, [statusType]: 'idle' }));
                 addToast({ type: 'info', title: 'Информация', message: 'Нет изменений для сохранения.' });
                 return false;
             }
-        } else {
-            changesFound = Object.keys(payload).length > 0;
-        }
 
-        if (!changesFound) {
-            setStatus(prev => ({ ...prev, [statusType]: 'idle' }));
-            addToast({ type: 'info', title: 'Информация', message: 'Нет изменений для сохранения.' });
-            return false;
-        }
+            logger.log('[SEND] [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
 
-        logger.log('[SEND] [DataContext] Final payload before sending:', JSON.stringify(payload, null, 2));
-
-        try {
-            await updateStreamMutation.mutateAsync(payload as unknown as Record<string, unknown>);
-
-            const latest = currentDataRef.current;
-            const previousInitial = initialDataRef.current;
-            const nextInitial = cloneStreamData(previousInitial);
-            for (const platform of STREAM_PLATFORMS) {
-                applyPayloadFieldsForPlatform(nextInitial, latest, payload as UpdateStreamPayload, platform);
-            }
-
-            setStatus(prev => ({ ...prev, [statusType]: 'success' }));
-            setInitialData(nextInitial);
-            setQueryCache(['stream-data', user?.id], nextInitial);
-            setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
-            return true;
-        } catch (error: unknown) {
-            setStatus(prev => ({ ...prev, [statusType]: 'error' }));
-            logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
-
-            const errorResponse = error as {
-                response?: {
-                    status?: number;
-                    data?: {
-                        message?: unknown;
-                        detail?: unknown;
-                        updated_platforms?: unknown[];
-                        failed_platforms?: unknown[];
-                    };
-                };
-            };
-            const errorData = errorResponse.response?.data;
-            const detailObject =
-                errorData?.detail != null && typeof errorData.detail === 'object'
-                    ? (errorData.detail as Record<string, unknown>)
-                    : undefined;
-            const backendMessageRaw =
-                errorData?.message ??
-                detailObject?.message ??
-                errorData?.detail;
-            const backendMessage = typeof backendMessageRaw === 'string'
-                ? backendMessageRaw
-                : (backendMessageRaw != null && typeof backendMessageRaw === 'object'
-                    ? JSON.stringify(backendMessageRaw)
-                    : undefined);
-            const rawUpdatedPlatforms = Array.isArray(errorData?.updated_platforms)
-                ? errorData.updated_platforms
-                : (Array.isArray(detailObject?.updated_platforms)
-                    ? (detailObject.updated_platforms as unknown[])
-                    : []);
-            const rawFailedPlatforms = Array.isArray(errorData?.failed_platforms)
-                ? errorData.failed_platforms
-                : (Array.isArray(detailObject?.failed_platforms)
-                    ? (detailObject.failed_platforms as unknown[])
-                    : []);
-            const updatedPlatforms = rawUpdatedPlatforms.filter(isStreamPlatform);
-            const failedPlatforms = rawFailedPlatforms.filter(isStreamPlatform);
-            const hasPartialSuccess = updatedPlatforms.length > 0;
-
-            if (errorResponse.response?.status === 401) {
-                addToast({
-                    type: 'error',
-                    title: 'Токен истек',
-                    message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.'
-                });
-            } else {
-                addToast({
-                    type: 'error',
-                    title: 'Ошибка',
-                    message: backendMessage || 'Не удалось сохранить изменения. Данные откатываются...'
-                });
-            }
-
-            if (hasPartialSuccess) {
-                logger.log('[PARTIAL] [DATA CONTEXT] Applying partial stream update result', {
-                    updatedPlatforms,
-                    failedPlatforms,
-                });
+            try {
+                await updateStreamMutation.mutateAsync(payload as unknown as Record<string, unknown>);
 
                 const latest = currentDataRef.current;
                 const previousInitial = initialDataRef.current;
                 const nextInitial = cloneStreamData(previousInitial);
-                const nextCurrent = cloneStreamData(latest);
-
-                for (const platform of updatedPlatforms) {
+                for (const platform of STREAM_PLATFORMS) {
                     applyPayloadFieldsForPlatform(nextInitial, latest, payload as UpdateStreamPayload, platform);
                 }
 
-                for (const platform of failedPlatforms) {
-                    applyPayloadFieldsForPlatform(nextCurrent, previousInitial, payload as UpdateStreamPayload, platform);
-                }
-
+                setStatus((prev) => ({ ...prev, [statusType]: 'success' }));
                 setInitialData(nextInitial);
-                setCurrentData(nextCurrent);
                 setQueryCache(['stream-data', user?.id], nextInitial);
-            } else {
-                logger.log('[REFRESH] [DATA CONTEXT] Rolling back to server data...');
-                const rollbackSnapshot = initialDataRef.current;
-                setCurrentData(rollbackSnapshot);
-                setQueryCache(['stream-data', user?.id], rollbackSnapshot);
-            }
+                setTimeout(() => setStatus((prev) => ({ ...prev, [statusType]: 'idle' })), 3000);
+                return true;
+            } catch (error: unknown) {
+                setStatus((prev) => ({ ...prev, [statusType]: 'error' }));
+                logger.error('[ERROR] [DATA CONTEXT] Error saving changes:', error);
 
-            loadStreamData(true);
-            setTimeout(() => setStatus(prev => ({ ...prev, [statusType]: 'idle' })), 3000);
-            return false;
-        }
-    }, [initialData, currentData, integrations.twitch?.enabled, integrations.vk?.enabled, user?.id, loadStreamData, addToast, updateStreamMutation]);
+                const errorResponse = error as {
+                    response?: {
+                        status?: number;
+                        data?: {
+                            message?: unknown;
+                            detail?: unknown;
+                            updated_platforms?: unknown[];
+                            failed_platforms?: unknown[];
+                        };
+                    };
+                };
+                const errorData = errorResponse.response?.data;
+                const detailObject =
+                    errorData?.detail != null && typeof errorData.detail === 'object'
+                        ? (errorData.detail as Record<string, unknown>)
+                        : undefined;
+                const backendMessageRaw = errorData?.message ?? detailObject?.message ?? errorData?.detail;
+                const backendMessage =
+                    typeof backendMessageRaw === 'string'
+                        ? backendMessageRaw
+                        : backendMessageRaw != null && typeof backendMessageRaw === 'object'
+                          ? JSON.stringify(backendMessageRaw)
+                          : undefined;
+                const rawUpdatedPlatforms = Array.isArray(errorData?.updated_platforms)
+                    ? errorData.updated_platforms
+                    : Array.isArray(detailObject?.updated_platforms)
+                      ? (detailObject.updated_platforms as unknown[])
+                      : [];
+                const rawFailedPlatforms = Array.isArray(errorData?.failed_platforms)
+                    ? errorData.failed_platforms
+                    : Array.isArray(detailObject?.failed_platforms)
+                      ? (detailObject.failed_platforms as unknown[])
+                      : [];
+                const updatedPlatforms = rawUpdatedPlatforms.filter(isStreamPlatform);
+                const failedPlatforms = rawFailedPlatforms.filter(isStreamPlatform);
+                const hasPartialSuccess = updatedPlatforms.length > 0;
 
-    const searchCategories = useCallback(async (platform: 'twitch' | 'vk', query: string): Promise<StreamCategory[]> => {
-        logger.log('DataContext: Searching categories:', {
-            platform,
-            query,
-            enabled: integrations[platform]?.enabled,
-            isAuthenticated,
-            integrationsLoading
-        });
-
-        if (!isAuthenticated) {
-            logger.log('DataContext: User not authenticated, skipping search');
-            addToast({
-                type: 'error',
-                title: 'Требуется авторизация',
-                message: 'Пожалуйста, войдите в систему для поиска категорий.'
-            });
-            return [];
-        }
-
-        if (integrationsLoading) {
-            logger.log('DataContext: Integrations still loading, skipping search');
-            return [];
-        }
-
-        if (!integrations[platform]?.enabled) {
-            logger.log('DataContext: Platform not enabled, skipping search');
-            return [];
-        }
-
-        const cacheKey = ['stream-categories', platform, query.toLowerCase()];
-        const cachedCategories = getQueryCacheWithMaxAge<StreamCategory[]>(cacheKey, 10 * 60 * 1000);
-        if (cachedCategories && cachedCategories.length > 0) {
-            setCategories(prev => ({ ...prev, [platform]: cachedCategories }));
-            return cachedCategories;
-        }
-
-        setLoading(prev => ({ ...prev, categories: true }));
-        try {
-            const expandedQueries = expandQueryWithAliases(query);
-            logger.log('[DEBUG] DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
-
-            const requests = expandedQueries.map(async (searchQuery: string) => {
-                try {
-                    if (platform === 'twitch') {
-                        const response = await streamService.getTwitchCategories(searchQuery);
-                        return response.data;
-                    } else if (platform === 'vk') {
-                        const response = await streamService.getVkCategories(searchQuery);
-                        return response.data;
-                    }
-                    return { categories: [] };
-                } catch (err) {
-                    logger.warn(`Search failed for query "${searchQuery}":`, err);
-                    return { categories: [] };
-                }
-            });
-
-            const responses = await Promise.all(requests);
-            logger.log('[DEBUG] DataContext: All API responses received');
-
-            const allCategories = new Map<string, StreamCategory>();
-
-            for (const response of responses) {
-                let categoryData: StreamCategory[] = [];
-
-                // API returns {"categories": [...]} directly in response.data
-                // So response here is already the unwrapped data object
-                const responseObj = response as { categories?: StreamCategory[] };
-                if (responseObj.categories && Array.isArray(responseObj.categories)) {
-                    categoryData = responseObj.categories;
-                } else if (Array.isArray(response)) {
-                    categoryData = response as StreamCategory[];
+                if (errorResponse.response?.status === 401) {
+                    addToast({
+                        type: 'error',
+                        title: 'Токен истек',
+                        message: 'Пожалуйста, переавторизуйтесь в Twitch для продолжения работы.',
+                    });
+                } else {
+                    addToast({
+                        type: 'error',
+                        title: 'Ошибка',
+                        message: backendMessage || 'Не удалось сохранить изменения. Данные откатываются...',
+                    });
                 }
 
-                categoryData.forEach(cat => {
-                    if (cat.id && !allCategories.has(cat.id)) {
-                        allCategories.set(cat.id, cat);
+                if (hasPartialSuccess) {
+                    logger.log('[PARTIAL] [DATA CONTEXT] Applying partial stream update result', {
+                        updatedPlatforms,
+                        failedPlatforms,
+                    });
+
+                    const latest = currentDataRef.current;
+                    const previousInitial = initialDataRef.current;
+                    const nextInitial = cloneStreamData(previousInitial);
+                    const nextCurrent = cloneStreamData(latest);
+
+                    for (const platform of updatedPlatforms) {
+                        applyPayloadFieldsForPlatform(nextInitial, latest, payload as UpdateStreamPayload, platform);
                     }
-                });
+
+                    for (const platform of failedPlatforms) {
+                        applyPayloadFieldsForPlatform(
+                            nextCurrent,
+                            previousInitial,
+                            payload as UpdateStreamPayload,
+                            platform
+                        );
+                    }
+
+                    setInitialData(nextInitial);
+                    setCurrentData(nextCurrent);
+                    setQueryCache(['stream-data', user?.id], nextInitial);
+                } else {
+                    logger.log('[REFRESH] [DATA CONTEXT] Rolling back to server data...');
+                    const rollbackSnapshot = initialDataRef.current;
+                    setCurrentData(rollbackSnapshot);
+                    setQueryCache(['stream-data', user?.id], rollbackSnapshot);
+                }
+
+                loadStreamData(true);
+                setTimeout(() => setStatus((prev) => ({ ...prev, [statusType]: 'idle' })), 3000);
+                return false;
             }
+        },
+        [
+            initialData,
+            currentData,
+            integrations.twitch?.enabled,
+            integrations.vk?.enabled,
+            user?.id,
+            loadStreamData,
+            addToast,
+            updateStreamMutation,
+        ]
+    );
 
-            let mergedCategories = Array.from(allCategories.values());
-            mergedCategories = sortCategoriesByRelevance(mergedCategories, query);
-
-            logger.log('[TARGET] DataContext: Smart search complete:', {
+    const searchCategories = useCallback(
+        async (platform: 'twitch' | 'vk', query: string): Promise<StreamCategory[]> => {
+            logger.log('DataContext: Searching categories:', {
+                platform,
                 query,
-                totalFound: mergedCategories.length,
-                top3: mergedCategories.slice(0, 3).map(c => c.name)
+                enabled: integrations[platform]?.enabled,
+                isAuthenticated,
+                integrationsLoading,
             });
 
-            setCategories(prev => ({ ...prev, [platform]: mergedCategories }));
-            setQueryCache(cacheKey, mergedCategories);
-
-            return mergedCategories;
-        } catch (error: unknown) {
-            logger.error(`Error searching ${platform} categories:`, error);
-            const errorResponse = error as { response?: { status?: number }; message?: string };
-            if (errorResponse.response?.status === 401) {
-                logger.log('DataContext: Authentication required for category search');
+            if (!isAuthenticated) {
+                logger.log('DataContext: User not authenticated, skipping search');
                 addToast({
                     type: 'error',
                     title: 'Требуется авторизация',
-                    message: 'Пожалуйста, войдите в систему для поиска категорий.'
+                    message: 'Пожалуйста, войдите в систему для поиска категорий.',
                 });
-            } else {
-                logger.log('DataContext: Other error during search:', errorResponse.message);
-                addToast({
-                    type: 'error',
-                    title: 'Ошибка поиска',
-                    message: `Не удалось найти категории: ${errorResponse.message || 'Неизвестная ошибка'}`
-                });
+                return [];
             }
-            return [];
-        } finally {
-            setLoading(prev => ({ ...prev, categories: false }));
-        }
-    }, [integrations, addToast, isAuthenticated, integrationsLoading]);
 
-    const value = useMemo<DataContextValue>(() => ({
-        initialData,
-        currentData,
-        setCurrentData,
-        loading,
-        status,
-        saveChanges,
-        categories,
-        searchCategories,
-        streamHistory,
-        refreshTrigger
-    }), [
-        initialData, currentData, loading, status, saveChanges, categories, searchCategories, streamHistory, refreshTrigger
-    ]);
+            if (integrationsLoading) {
+                logger.log('DataContext: Integrations still loading, skipping search');
+                return [];
+            }
 
-    return (
-        <DataContext.Provider value={value}>
-            {children}
-        </DataContext.Provider>
+            if (!integrations[platform]?.enabled) {
+                logger.log('DataContext: Platform not enabled, skipping search');
+                return [];
+            }
+
+            const cacheKey = ['stream-categories', platform, query.toLowerCase()];
+            const cachedCategories = getQueryCacheWithMaxAge<StreamCategory[]>(cacheKey, 10 * 60 * 1000);
+            if (cachedCategories && cachedCategories.length > 0) {
+                setCategories((prev) => ({ ...prev, [platform]: cachedCategories }));
+                return cachedCategories;
+            }
+
+            setLoading((prev) => ({ ...prev, categories: true }));
+            try {
+                const expandedQueries = expandQueryWithAliases(query);
+                logger.log('[DEBUG] DataContext: Expanded queries:', { original: query, expanded: expandedQueries });
+
+                const requests = expandedQueries.map(async (searchQuery: string) => {
+                    try {
+                        if (platform === 'twitch') {
+                            const response = await streamService.getTwitchCategories(searchQuery);
+                            return response.data;
+                        } else if (platform === 'vk') {
+                            const response = await streamService.getVkCategories(searchQuery);
+                            return response.data;
+                        }
+                        return { categories: [] };
+                    } catch (err) {
+                        logger.warn(`Search failed for query "${searchQuery}":`, err);
+                        return { categories: [] };
+                    }
+                });
+
+                const responses = await Promise.all(requests);
+                logger.log('[DEBUG] DataContext: All API responses received');
+
+                const allCategories = new Map<string, StreamCategory>();
+
+                for (const response of responses) {
+                    let categoryData: StreamCategory[] = [];
+
+                    // API returns {"categories": [...]} directly in response.data
+                    // So response here is already the unwrapped data object
+                    const responseObj = response as { categories?: StreamCategory[] };
+                    if (responseObj.categories && Array.isArray(responseObj.categories)) {
+                        categoryData = responseObj.categories;
+                    } else if (Array.isArray(response)) {
+                        categoryData = response as StreamCategory[];
+                    }
+
+                    categoryData.forEach((cat) => {
+                        if (cat.id && !allCategories.has(cat.id)) {
+                            allCategories.set(cat.id, cat);
+                        }
+                    });
+                }
+
+                let mergedCategories = Array.from(allCategories.values());
+                mergedCategories = sortCategoriesByRelevance(mergedCategories, query);
+
+                logger.log('[TARGET] DataContext: Smart search complete:', {
+                    query,
+                    totalFound: mergedCategories.length,
+                    top3: mergedCategories.slice(0, 3).map((c) => c.name),
+                });
+
+                setCategories((prev) => ({ ...prev, [platform]: mergedCategories }));
+                setQueryCache(cacheKey, mergedCategories);
+
+                return mergedCategories;
+            } catch (error: unknown) {
+                logger.error(`Error searching ${platform} categories:`, error);
+                const errorResponse = error as { response?: { status?: number }; message?: string };
+                if (errorResponse.response?.status === 401) {
+                    logger.log('DataContext: Authentication required for category search');
+                    addToast({
+                        type: 'error',
+                        title: 'Требуется авторизация',
+                        message: 'Пожалуйста, войдите в систему для поиска категорий.',
+                    });
+                } else {
+                    logger.log('DataContext: Other error during search:', errorResponse.message);
+                    addToast({
+                        type: 'error',
+                        title: 'Ошибка поиска',
+                        message: `Не удалось найти категории: ${errorResponse.message || 'Неизвестная ошибка'}`,
+                    });
+                }
+                return [];
+            } finally {
+                setLoading((prev) => ({ ...prev, categories: false }));
+            }
+        },
+        [integrations, addToast, isAuthenticated, integrationsLoading]
     );
+
+    const value = useMemo<DataContextValue>(
+        () => ({
+            initialData,
+            currentData,
+            setCurrentData,
+            loading,
+            status,
+            saveChanges,
+            categories,
+            searchCategories,
+            streamHistory,
+            refreshTrigger,
+        }),
+        [
+            initialData,
+            currentData,
+            loading,
+            status,
+            saveChanges,
+            categories,
+            searchCategories,
+            streamHistory,
+            refreshTrigger,
+        ]
+    );
+
+    return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 };

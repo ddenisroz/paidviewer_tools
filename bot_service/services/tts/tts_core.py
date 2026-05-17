@@ -56,7 +56,6 @@ class TtsSettingsRequest(BaseModel):
     engine: str = Field('gtts')
     advancedProvider: Optional[str] = Field(None)
     f5Mode: Optional[str] = Field(None)
-    qwenMode: Optional[str] = Field(None)
     voice: str = Field('default_voice')
     listeningMode: str = Field('website')
     maxMessageLength: int = Field(500, ge=50, le=2000)
@@ -66,15 +65,13 @@ class TtsSettingsRequest(BaseModel):
     filterMentions: bool = Field(False)
     gcloudVoices: Optional[List[str]] = None
     gcloudMood: Optional[str] = None
-    qwenVoice: Optional[str] = None
-    qwenModel: Optional[str] = None
     version: int = Field(1, ge=1)
 
     @field_validator('engine')
     @classmethod
     def validate_engine(cls, v):
-        if v not in ['gtts', 'f5tts', 'gcloud', 'qwen']:
-            raise ValueError('engine must be either "gtts", "f5tts", "gcloud", or "qwen"')
+        if v not in ['gtts', 'f5tts', 'gcloud']:
+            raise ValueError('engine must be either "gtts", "f5tts", or "gcloud"')
         return v
 
     @field_validator('advancedProvider')
@@ -83,11 +80,11 @@ class TtsSettingsRequest(BaseModel):
         if v is None:
             return v
         normalized = str(v).strip().lower()
-        if normalized not in {'f5', 'gcloud', 'qwen'}:
-            raise ValueError('advancedProvider must be one of: f5, gcloud, qwen')
+        if normalized not in {'f5', 'gcloud'}:
+            raise ValueError('advancedProvider must be one of: f5, gcloud')
         return normalized
 
-    @field_validator('f5Mode', 'qwenMode')
+    @field_validator('f5Mode')
     @classmethod
     def validate_provider_mode(cls, v):
         if v is None:
@@ -186,8 +183,8 @@ class LocalTTSConfigRequest(BaseModel):
     @classmethod
     def validate_provider(cls, v):
         normalized = str(v).strip().lower()
-        if normalized not in {'f5', 'qwen'}:
-            raise ValueError('provider must be either "f5" or "qwen"')
+        if normalized != 'f5':
+            raise ValueError('provider must be "f5"')
         return normalized
 
     @field_validator('endpoint_url')
@@ -318,96 +315,15 @@ async def check_local_tts_health(
         )
 
         async with httpx.AsyncClient(timeout=5.0) as client:
-            if normalized_provider == "qwen":
-                compatibility_note = (
-                    "This endpoint is treated as a user's self-hosted Qwen endpoint. "
-                    "The official cloud path remains bot_service -> tts-gateway -> qwen runtime. "
-                    "The self-hosted path still uses a compatibility flow via /api/prepare -> /api/stream/{id}, "
-                    "but the worker now exposes health, model catalog and user voice CRUD endpoints."
-                )
-                last_error = "Connection check failed"
-                for probe_endpoint in probe_endpoints:
-                    for health_path in ("/health/ready", "/health/live", "/health"):
-                        try:
-                            health_probe = await client.get(f"{probe_endpoint}{health_path}", headers=headers)
-                            if health_probe.status_code == 200:
-                                health_payload = health_probe.json()
-                                result = {
-                                    "healthy": True,
-                                    "status": health_payload.get("status", "healthy"),
-                                    "compatibility_mode": "qwen_prepare_stream",
-                                    "warning": compatibility_note,
-                                    "version": health_payload.get("version"),
-                                    "ready": health_payload.get("ready"),
-                                    "phase": health_payload.get("phase"),
-                                    "percent": health_payload.get("percent"),
-                                    "message": health_payload.get("message"),
-                                    "current_model": health_payload.get("current_model"),
-                                    "target_model": health_payload.get("target_model"),
-                                    "endpoint_url": endpoint,
-                                    "probed_endpoint_url": probe_endpoint,
-                                }
-                                if fetch_status:
-                                    result["status_data"] = None
-                                return result
-                            last_error = f"HTTP {health_probe.status_code}"
-                        except httpx.TimeoutException:
-                            last_error = "Timeout: service is not responding"
-                        except httpx.RequestError as error:
-                            last_error = str(error) or "Could not connect"
-
-                    try:
-                        prepare_probe = await client.get(f"{probe_endpoint}/api/prepare", headers=headers)
-                        if prepare_probe.status_code in {405, 422}:
-                            result = {
-                                "healthy": True,
-                                "status": "healthy",
-                                "compatibility_mode": "qwen_prepare_stream",
-                                "warning": compatibility_note,
-                                "endpoint_url": endpoint,
-                                "probed_endpoint_url": probe_endpoint,
-                            }
-                            if fetch_status:
-                                try:
-                                    status_probe = await client.get(f"{probe_endpoint}/api/status/__healthcheck__", headers=headers)
-                                    result["status_data"] = status_probe.json() if status_probe.status_code == 200 else None
-                                except Exception:
-                                    result["status_data"] = None
-                            return result
-                        last_error = f"HTTP {prepare_probe.status_code}"
-                    except httpx.TimeoutException:
-                        last_error = "Timeout: service is not responding"
-                    except httpx.RequestError as error:
-                        last_error = str(error) or "Could not connect"
-
-                    try:
-                        root_response = await client.get(f"{probe_endpoint}/", headers=headers)
-                        if root_response.status_code == 200:
-                            result = {
-                                "healthy": True,
-                                "status": "healthy",
-                                "compatibility_mode": "qwen_prepare_stream",
-                                "warning": compatibility_note,
-                                "endpoint_url": endpoint,
-                                "probed_endpoint_url": probe_endpoint,
-                            }
-                            if fetch_status:
-                                result["status_data"] = None
-                            return result
-                        last_error = f"HTTP {root_response.status_code}"
-                    except httpx.TimeoutException:
-                        last_error = "Timeout: service is not responding"
-                    except httpx.RequestError as error:
-                        last_error = str(error) or "Could not connect"
-
-                return {"healthy": False, "error": last_error}
-
             last_error = "Connection check failed"
             for probe_endpoint in probe_endpoints:
                 try:
-                    response = await client.get(f"{probe_endpoint}/health", headers=headers)
+                    for health_path in ("/health", "/health/ready", "/api/health"):
+                        response = await client.get(f"{probe_endpoint}{health_path}", headers=headers)
+                        if response.status_code != 200:
+                            last_error = f"HTTP {response.status_code}"
+                            continue
 
-                    if response.status_code == 200:
                         data = response.json()
                         result = {
                             "healthy": True,
@@ -430,7 +346,6 @@ async def check_local_tts_health(
                             except Exception:
                                 result["status_data"] = None
                         return result
-                    last_error = f"HTTP {response.status_code}"
                 except httpx.TimeoutException:
                     last_error = "Timeout: service is not responding"
                 except httpx.RequestError as error:

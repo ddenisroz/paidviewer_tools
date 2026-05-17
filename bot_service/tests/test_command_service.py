@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
+import pytest
+
+from core.database import BotCommand
+from repositories.command_repository import CommandRepository
 from services.command_cooldown_store import CommandCooldownStore
 from services.command_service import CommandService
 
@@ -67,3 +71,78 @@ def test_command_cooldown_store_memory_fallback_expires_entries(monkeypatch):
     now = now + timedelta(seconds=11)
 
     assert service.check_cooldown(command, "viewer_2") is True
+
+
+def test_update_custom_command_renames_trigger(db, test_user):
+    cmd = BotCommand(
+        command_name="oldname",
+        command_type="custom",
+        user_id=test_user.id,
+        response_text="Hello",
+        is_enabled=True,
+        platforms="all",
+    )
+    db.add(cmd)
+    db.commit()
+
+    CommandService().update_command(cmd.id, test_user.id, {"command_name": "!newname"}, db)
+
+    db.refresh(cmd)
+    assert cmd.command_name == "newname"
+
+
+def test_create_global_override_alias_is_resolved(db, test_user):
+    global_cmd = BotCommand(
+        command_name="title",
+        command_type="global",
+        user_id=None,
+        response_text="Set title",
+        is_enabled=True,
+        platforms="all",
+    )
+    db.add(global_cmd)
+    db.commit()
+
+    result = CommandService().create_command_override(
+        user_id=test_user.id,
+        command_name="title",
+        alias="streamtitle",
+        db=db,
+    )
+
+    assert result["data"]["alias"] == "streamtitle"
+    found = CommandRepository(db).find_command("streamtitle", test_user.id, "twitch")
+    assert found is not None
+    assert found.command_name == "title"
+
+
+def test_global_override_alias_cannot_shadow_global_command(db, test_user):
+    db.add_all(
+        [
+            BotCommand(
+                command_name="title",
+                command_type="global",
+                user_id=None,
+                response_text="Set title",
+                is_enabled=True,
+                platforms="all",
+            ),
+            BotCommand(
+                command_name="game",
+                command_type="global",
+                user_id=None,
+                response_text="Set game",
+                is_enabled=True,
+                platforms="all",
+            ),
+        ]
+    )
+    db.commit()
+
+    with pytest.raises(ValueError, match="already in use"):
+        CommandService().create_command_override(
+            user_id=test_user.id,
+            command_name="title",
+            alias="game",
+            db=db,
+        )

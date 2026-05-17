@@ -24,7 +24,9 @@ const TtsQuickSettings: React.FC = () => {
 
         try {
             if (!audioContextRef.current) {
-                const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+                const AudioContextClass =
+                    window.AudioContext ||
+                    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
                 if (AudioContextClass) {
                     audioContextRef.current = new AudioContextClass();
                 }
@@ -79,9 +81,7 @@ const TtsQuickSettings: React.FC = () => {
                     ) : (
                         <VolumeX className="w-4 h-4 text-muted-foreground" />
                     )}
-                    <span className="text-sm font-medium">
-                        Озвучка чата
-                    </span>
+                    <span className="text-sm font-medium">Озвучка чата</span>
                 </div>
 
                 {/* Main Toggle */}
@@ -92,18 +92,11 @@ const TtsQuickSettings: React.FC = () => {
                         onCheckedChange={handleToggleTts}
                         disabled={isToggling}
                     />
-                    <span className="text-xs text-muted-foreground">
-                        {ttsEnabled ? 'ВКЛ' : 'ВЫКЛ'}
-                    </span>
+                    <span className="text-xs text-muted-foreground">{ttsEnabled ? 'ВКЛ' : 'ВЫКЛ'}</span>
                 </div>
 
                 {/* Кнопка настроек */}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/dashboard/tts')}
-                    className="h-8 px-2"
-                >
+                <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/tts')} className="h-8 px-2">
                     <Settings className="w-4 h-4" />
                 </Button>
             </div>

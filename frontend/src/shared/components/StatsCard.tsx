@@ -1,6 +1,6 @@
 /**
  * StatsCard - Универсальная карточка статистики
- * 
+ *
  * Используется в:
  * - Admin Dashboard
  * - Analytics Page
@@ -59,9 +59,9 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 
     const getTrendIcon = () => {
         if (!trend) return null;
-        
+
         const direction = trend.direction || (trend.value > 0 ? 'up' : trend.value < 0 ? 'down' : 'neutral');
-        
+
         switch (direction) {
             case 'up':
                 return <TrendingUp className="h-3 w-3" />;
@@ -74,9 +74,9 @@ export const StatsCard: React.FC<StatsCardProps> = ({
 
     const getTrendColor = () => {
         if (!trend) return '';
-        
+
         const direction = trend.direction || (trend.value > 0 ? 'up' : trend.value < 0 ? 'down' : 'neutral');
-        
+
         switch (direction) {
             case 'up':
                 return 'text-green-400';
@@ -88,7 +88,7 @@ export const StatsCard: React.FC<StatsCardProps> = ({
     };
 
     return (
-        <Card 
+        <Card
             className={cn(
                 'hover:shadow-lg transition-all duration-200',
                 onClick && 'cursor-pointer hover:border-primary',
@@ -97,29 +97,19 @@ export const StatsCard: React.FC<StatsCardProps> = ({
             onClick={onClick}
         >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {title}
-                </CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
                 {Icon && <Icon className={cn('h-4 w-4', color)} />}
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{value}</div>
-                
-                {description && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                        {description}
-                    </p>
-                )}
-                
+
+                {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+
                 {trend && (
-                    <div className={cn(
-                        'flex items-center gap-1 text-xs mt-2',
-                        getTrendColor()
-                    )}>
+                    <div className={cn('flex items-center gap-1 text-xs mt-2', getTrendColor())}>
                         {getTrendIcon()}
                         <span>
-                            {Math.abs(trend.value)}%
-                            {trend.label && ` ${trend.label}`}
+                            {Math.abs(trend.value)}%{trend.label && ` ${trend.label}`}
                         </span>
                     </div>
                 )}
@@ -136,12 +126,7 @@ export interface StatsGridProps {
     className?: string;
 }
 
-export const StatsGrid: React.FC<StatsGridProps> = ({
-    stats,
-    columns = 4,
-    loading = false,
-    className,
-}) => {
+export const StatsGrid: React.FC<StatsGridProps> = ({ stats, columns = 4, loading = false, className }) => {
     const gridCols = {
         1: 'grid-cols-1',
         2: 'grid-cols-1 md:grid-cols-2',
@@ -151,20 +136,9 @@ export const StatsGrid: React.FC<StatsGridProps> = ({
 
     return (
         <div className={cn('grid gap-4', gridCols[columns], className)}>
-            {loading ? (
-                Array.from({ length: columns }).map((_, i) => (
-                    <StatsCard
-                        key={i}
-                        title=""
-                        value=""
-                        loading
-                    />
-                ))
-            ) : (
-                stats.map((stat, i) => (
-                    <StatsCard key={i} {...stat} />
-                ))
-            )}
+            {loading
+                ? Array.from({ length: columns }).map((_, i) => <StatsCard key={i} title="" value="" loading />)
+                : stats.map((stat, i) => <StatsCard key={i} {...stat} />)}
         </div>
     );
 };

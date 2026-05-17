@@ -32,6 +32,7 @@ class TTSTask:
     completed_at: Optional[float] = None
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class MemoryTTSQueue:
     """
@@ -168,7 +169,8 @@ class MemoryTTSQueue:
             platform=platform,
             priority=priority,
             status=TaskStatus.PENDING,
-            created_at=time.time()
+            created_at=time.time(),
+            metadata=dict(metadata or {}),
         )
 
         # Attach metadata to the task if present.

@@ -63,9 +63,7 @@ class WorkerControlPlaneService:
         normalized = str(provider or "").strip().lower()
         if not normalized:
             return None
-        allowed = {"f5", "qwen"}
-        if allow_both:
-            allowed.add("both")
+        allowed = {"f5"}
         if normalized not in allowed:
             allowed_list = ", ".join(sorted(allowed))
             raise WorkerValidationError(f"provider must be one of: {allowed_list}")
@@ -100,10 +98,9 @@ class WorkerControlPlaneService:
         self,
         *,
         supports_f5: Optional[bool],
-        supports_qwen: Optional[bool],
         capabilities: Optional[dict[str, Any]],
         provider_hint: Optional[str] = None,
-    ) -> tuple[bool, bool]:
+    ) -> bool:
         capabilities = capabilities or {}
         providers = {
             str(item).strip().lower()
@@ -111,20 +108,15 @@ class WorkerControlPlaneService:
             if str(item).strip()
         }
         derived_f5 = supports_f5 if supports_f5 is not None else ("f5" in providers)
-        derived_qwen = supports_qwen if supports_qwen is not None else ("qwen" in providers)
 
-        if not derived_f5 and not derived_qwen:
-            raise WorkerValidationError("worker must support at least one provider: f5 or qwen")
+        if not derived_f5:
+            raise WorkerValidationError("worker must support F5")
 
-        hinted_provider = self._normalize_provider(provider_hint, allow_both=True)
+        hinted_provider = self._normalize_provider(provider_hint)
         if hinted_provider == "f5" and not derived_f5:
             raise WorkerValidationError("pairing token requires F5 support")
-        if hinted_provider == "qwen" and not derived_qwen:
-            raise WorkerValidationError("pairing token requires Qwen support")
-        if hinted_provider == "both" and not (derived_f5 and derived_qwen):
-            raise WorkerValidationError("pairing token requires both F5 and Qwen support")
 
-        return bool(derived_f5), bool(derived_qwen)
+        return bool(derived_f5)
 
     def _stale_before(self):
         return utcnow_naive() - timedelta(seconds=settings.worker_stale_after_seconds)
@@ -160,19 +152,13 @@ class WorkerControlPlaneService:
 
     @staticmethod
     def _worker_supports_provider(worker: Worker, provider: str) -> bool:
-        normalized_provider = str(provider or "").strip().lower()
-        if normalized_provider == "qwen":
-            return bool(worker.supports_qwen)
+        _ = provider
         return bool(worker.supports_f5)
 
     @staticmethod
     def _serialize_worker(worker: Worker, *, effective_status: Optional[str] = None) -> dict[str, Any]:
         status_value = effective_status or worker.status or "offline"
-        supported_providers = []
-        if worker.supports_f5:
-            supported_providers.append("f5")
-        if worker.supports_qwen:
-            supported_providers.append("qwen")
+        supported_providers = ["f5"] if worker.supports_f5 else []
 
         return {
             "id": worker.id,
@@ -183,7 +169,6 @@ class WorkerControlPlaneService:
             "is_managed": bool(worker.is_managed),
             "status": status_value,
             "supports_f5": bool(worker.supports_f5),
-            "supports_qwen": bool(worker.supports_qwen),
             "providers": supported_providers,
             "capabilities": dict(worker.capabilities or {}),
             "runtime_metadata": dict(worker.runtime_metadata or {}),
@@ -228,7 +213,6 @@ class WorkerControlPlaneService:
         capabilities: Optional[dict[str, Any]] = None,
         runtime_metadata: Optional[dict[str, Any]] = None,
         supports_f5: Optional[bool] = None,
-        supports_qwen: Optional[bool] = None,
         last_error: Optional[str] = None,
     ) -> Worker:
         worker.last_seen_at = utcnow_naive()
@@ -239,8 +223,6 @@ class WorkerControlPlaneService:
             worker.runtime_metadata = dict(runtime_metadata)
         if supports_f5 is not None:
             worker.supports_f5 = bool(supports_f5)
-        if supports_qwen is not None:
-            worker.supports_qwen = bool(supports_qwen)
         if last_error is not None:
             worker.last_error = last_error.strip() or None
         self.db.add(worker)
@@ -256,7 +238,7 @@ class WorkerControlPlaneService:
         provider_hint: Optional[str],
         is_managed: bool,
     ) -> dict[str, Any]:
-        normalized_provider_hint = self._normalize_provider(provider_hint, allow_both=True)
+        normalized_provider_hint = self._normalize_provider(provider_hint)
         resolved_owner_user_id = self._require_user_exists(owner_user_id)
         if not is_managed and resolved_owner_user_id is None:
             raise WorkerValidationError("owner_user_id is required for self-hosted pairing tokens")
@@ -291,7 +273,6 @@ class WorkerControlPlaneService:
         pairing_code: str,
         label: Optional[str],
         supports_f5: Optional[bool],
-        supports_qwen: Optional[bool],
         capabilities: Optional[dict[str, Any]],
         runtime_metadata: Optional[dict[str, Any]],
     ) -> dict[str, Any]:
@@ -305,9 +286,8 @@ class WorkerControlPlaneService:
         if token.expires_at < now:
             raise WorkerValidationError("pairing code has expired")
 
-        resolved_supports_f5, resolved_supports_qwen = self._derive_provider_support(
+        resolved_supports_f5 = self._derive_provider_support(
             supports_f5=supports_f5,
-            supports_qwen=supports_qwen,
             capabilities=capabilities,
             provider_hint=token.provider_hint,
         )
@@ -319,7 +299,6 @@ class WorkerControlPlaneService:
             label=str(label or token.label_hint or "TTS Worker").strip() or "TTS Worker",
             auth_token_hash=hash_secret(auth_token),
             supports_f5=resolved_supports_f5,
-            supports_qwen=resolved_supports_qwen,
             capabilities=dict(capabilities or {}),
             runtime_metadata=dict(runtime_metadata or {}),
             status="online",
@@ -527,8 +506,6 @@ class WorkerControlPlaneService:
                 raise WorkerPermissionError("target worker does not belong to this user")
             if normalized_provider == "f5" and not worker.supports_f5:
                 raise WorkerValidationError("target worker does not support F5")
-            if normalized_provider == "qwen" and not worker.supports_qwen:
-                raise WorkerValidationError("target worker does not support Qwen")
             target_worker_id = worker.id
 
         job = TTSJob(
@@ -653,15 +630,13 @@ class WorkerControlPlaneService:
         worker: Worker,
         max_jobs: int,
         supports_f5: Optional[bool],
-        supports_qwen: Optional[bool],
         capabilities: Optional[dict[str, Any]],
         runtime_metadata: Optional[dict[str, Any]],
     ) -> dict[str, Any]:
         worker = self._reload_worker(worker)
 
-        resolved_supports_f5, resolved_supports_qwen = self._derive_provider_support(
+        resolved_supports_f5 = self._derive_provider_support(
             supports_f5=supports_f5 if supports_f5 is not None else worker.supports_f5,
-            supports_qwen=supports_qwen if supports_qwen is not None else worker.supports_qwen,
             capabilities=capabilities if capabilities is not None else dict(worker.capabilities or {}),
             provider_hint=None,
         )
@@ -679,7 +654,6 @@ class WorkerControlPlaneService:
             capabilities=capabilities if capabilities is not None else dict(worker.capabilities or {}),
             runtime_metadata=runtime_metadata if runtime_metadata is not None else dict(worker.runtime_metadata or {}),
             supports_f5=resolved_supports_f5,
-            supports_qwen=resolved_supports_qwen,
             last_error="",
         )
         return {

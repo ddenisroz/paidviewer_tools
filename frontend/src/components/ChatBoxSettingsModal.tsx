@@ -7,6 +7,7 @@ import ReactDOM from 'react-dom';
 import { useAuth } from '@/context/AuthContext';
 import ColorInput from '@/features/chatbox/components/ColorInputPickerOnly';
 import PreviewPanel from '@/features/chatbox/components/PreviewPanel';
+import { CHATBOX_BRAND_FONT, CHATBOX_FONT_OPTIONS } from '@/features/chatbox/constants/fontOptions';
 import {
     extractSettingsFromResponse,
     loadGoogleFont,
@@ -48,7 +49,7 @@ interface PreviewMessage {
 }
 
 const DEFAULT_SETTINGS: ChatBoxSettings = {
-    font_family: 'Inter',
+    font_family: CHATBOX_BRAND_FONT,
     font_size: 16,
     font_weight: 'normal',
     text_color: '#FFFFFF',
@@ -170,26 +171,11 @@ const PREVIEW_MESSAGES: PreviewMessage[] = [
     },
 ];
 
-const SETTINGS_SECTION_CLASS = 'rounded-lg border border-border/60 bg-card/60 p-4 space-y-4';
+const SETTINGS_SECTION_CLASS = 'rounded-lg border border-border/60 bg-card/60 p-3.5 space-y-3.5';
 const SETTINGS_SECTION_TITLE_CLASS = 'text-[11px] uppercase tracking-wider text-muted-foreground';
 const SETTINGS_SELECT_TRIGGER_CLASS = 'h-9 bg-background/70 border-border/60 text-sm font-normal font-base';
 const BLUE_ACTIVE_CLASS =
     'data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:border-sky-500/60';
-
-const FONT_OPTIONS = [
-    'Inter',
-    'IBM Plex Sans',
-    'Fira Sans',
-    'Montserrat',
-    'Rubik',
-    'Oswald',
-    'Merriweather',
-    'PT Serif',
-    'Playfair Display',
-    'Comfortaa',
-    'Russo One',
-    'JetBrains Mono',
-];
 
 const FONT_WEIGHT_OPTIONS = [
     { value: 'normal', label: 'Обычный' },
@@ -494,7 +480,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                         <SelectValue />
                                                     </SelectTrigger>
                                                     <SelectContent className="bg-card border-border/60 z-[11000] font-base">
-                                                        {FONT_OPTIONS.map((font) => (
+                                                        {CHATBOX_FONT_OPTIONS.map((font) => (
                                                             <SelectItem
                                                                 key={font}
                                                                 value={font}
@@ -505,11 +491,16 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
-                                                <p className="text-[11px] text-muted-foreground">
-                                                    {fontStatus === 'loading'
-                                                        ? 'Подгружаем шрифт для предпросмотра...'
-                                                        : 'Шрифт применён в предпросмотре, оверлее и отдельном окне.'}
-                                                </p>
+                                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                                    <span
+                                                        className={`h-1.5 w-1.5 rounded-full ${
+                                                            fontStatus === 'loading'
+                                                                ? 'bg-amber-300'
+                                                                : 'bg-emerald-300'
+                                                        }`}
+                                                    />
+                                                    {fontStatus === 'loading' ? 'Загрузка' : 'Применён'}
+                                                </div>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Размер</Label>
@@ -547,7 +538,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
 
                                     <div className={SETTINGS_SECTION_CLASS}>
                                         <div className={SETTINGS_SECTION_TITLE_CLASS}>Цвета</div>
-                                        <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="grid gap-3 md:grid-cols-3">
                                             <div className="space-y-2">
                                                 <Label className="text-xs text-muted-foreground">Цвет фона</Label>
                                                 <ColorInput
@@ -563,25 +554,25 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                                                     value={settings.text_color || '#FFFFFF'}
                                                     onChange={(v) => handleChange('text_color', v)}
                                                 />
-                                                <div className="space-y-2">
-                                                    <Label className="text-xs text-muted-foreground">
-                                                        Цвет никнейма
-                                                    </Label>
-                                                    <ColorInput
-                                                        value={settings.username_color || '#9147FF'}
-                                                        onChange={(v) => handleChange('username_color', v)}
-                                                    />
-                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Цвет никнейма</Label>
+                                                <ColorInput
+                                                    value={settings.username_color || '#9147FF'}
+                                                    onChange={(v) => handleChange('username_color', v)}
+                                                />
                                             </div>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-xs text-muted-foreground">Обводка текста</Label>
-                                            <ColorInput
-                                                value={settings.text_stroke_color || '#000000'}
-                                                onChange={(v) => handleChange('text_stroke_color', v)}
-                                            />
-                                            <div className="space-y-1.5">
-                                                <span className="text-[11px] text-muted-foreground">Толщина</span>
+                                        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_220px]">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Обводка текста</Label>
+                                                <ColorInput
+                                                    value={settings.text_stroke_color || '#000000'}
+                                                    onChange={(v) => handleChange('text_stroke_color', v)}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs text-muted-foreground">Толщина</Label>
                                                 <SliderWithInput
                                                     value={settings.text_stroke_width}
                                                     onChange={(v) => handleChange('text_stroke_width', v)}

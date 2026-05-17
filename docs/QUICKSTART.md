@@ -10,7 +10,6 @@
 - `frontend`
 - `tts-gateway`
 - `f5-tts-service`
-- `nano-qwen3tts-vllm`
 - `tts_worker_agent` при проверке `self_host`
 
 ## Требования
@@ -19,18 +18,16 @@
 - Node.js `20+`
 - Docker Desktop + Docker Compose
 - PostgreSQL и Redis, если запускаешь не через docker compose
-- Linux/WSL2 для штатного запуска `nano-qwen3tts-vllm`
 
 ## Репозитории
 
 - основной продукт: [paidviewer_tools](/H:/Programming/raw_code/AI/Python/paidviewer_tools)
 - cloud gateway: [tts-gateway](/H:/Programming/raw_code/AI/Python/tts-gateway)
 - F5 runtime: [f5-tts-service](/H:/Programming/raw_code/AI/Python/f5-tts-service)
-- Qwen runtime: [nano-qwen3tts-vllm](/H:/Programming/raw_code/AI/Python/nano-qwen3tts-vllm)
 
 ## Рекомендуемый путь: лёгкий Docker-контур
 
-Это основной локальный сценарий для dashboard-разработки. Он не собирает и не запускает тяжёлые F5/Qwen runtimes.
+Это основной локальный сценарий для dashboard-разработки. Он не собирает и не запускает тяжёлый F5 runtime.
 
 ### 1. Подготовь основной репозиторий
 Для основного Docker-сценария локальная установка Python-зависимостей и `npm install` не нужны.
@@ -65,8 +62,6 @@ Copy-Item frontend/.env.example frontend/.env
 - `TTS_GATEWAY_API_KEY`
 - `F5_TTS_SERVICE_URL`
 - `F5_TTS_SERVICE_API_KEY`
-- `QWEN_TTS_SERVICE_URL`
-- `QWEN_TTS_SERVICE_API_KEY`
 
 ### 3. Подними локальный core-контур
 
@@ -96,7 +91,7 @@ Gateway-only профиль нужен для проверки UI и маршр�
 .\start-dev.ps1 -WithCloudTtsFake
 ```
 
-Полный TTS-профиль собирает и запускает тяжёлые F5/Qwen runtimes. Используй его только для TTS smoke или разработки TTS:
+Полный TTS-профиль собирает и запускает тяжёлый F5 runtime. Используй его только для TTS smoke или разработки TTS:
 
 ```powershell
 .\start-dev.ps1 -WithCloudTtsReal
@@ -106,8 +101,8 @@ Gateway-only профиль нужен для проверки UI и маршр�
 
 ```powershell
 .\start-dev.ps1 -WithCloudTtsReal -Services bot_service
-.\start-dev.ps1 -WithCloudTtsReal -Services qwen_tts
-.\start-dev.ps1 -WithCloudTtsReal -Build -Services qwen_tts
+.\start-dev.ps1 -WithCloudTtsReal -Services tts_service
+.\start-dev.ps1 -WithCloudTtsReal -Build -Services tts_service
 ```
 
 Полный жёсткий перезапуск нужен только когда действительно надо пересобрать всё или очистить старые контейнеры:
@@ -121,7 +116,6 @@ Gateway-only профиль нужен для проверки UI и маршр�
 
 - `tts-gateway` на `8010`
 - `f5-tts-service` на `8011`
-- `qwen_tts` на `8012` через Docker
 
 ### 5. Зафиксируй локальный origin для OAuth
 
@@ -148,10 +142,8 @@ Gateway-only профиль нужен для проверки UI и маршр�
 - `http://localhost`
 - `http://localhost:8000/health`
 - `http://localhost:8000/api/tts/health?provider=f5` только если включён TTS-профиль
-- `http://localhost:8000/api/tts/health?provider=qwen` только если включён TTS-профиль
 - `http://localhost:8010/health/ready` для `-WithCloudTtsFake` или `-WithCloudTtsReal`
 - `http://localhost:8011/health/ready` только для `-WithCloudTtsReal`
-- `http://localhost:8012/health/ready` только для `-WithCloudTtsReal`
 
 Официальный локальный путь теперь только `start-dev.ps1`, который использует `docker-compose.prod.yml + docker-compose.local.yml`.
 
@@ -171,7 +163,6 @@ paidviewer_tools/logs/docker/
 - `logs/docker/redis.log`
 - `logs/docker/tts_gateway.log`
 - `logs/docker/tts_service.log`
-- `logs/docker/qwen_tts.log`
 
 Это основной локальный путь для диагностики из IDE. Внутренние Docker log-файлы вручную читать не нужно.
 
@@ -242,9 +233,8 @@ python -m venv .venv
 1. Открой UI и войди в систему
 2. Проверь `/api/tts/health` и `/api/tts/status`
 3. Прогони один `cloud F5` synth
-4. Прогони один `cloud Qwen` synth
-5. Если нужен self-host smoke, подними `tts_worker_agent` и прогони `self_host F5` и `self_host Qwen`
-6. Проверь YouTube queue, drops и VK bot status
+4. Если нужен self-host smoke, подними `tts_worker_agent` и прогони `self_host F5`
+5. Проверь YouTube queue, drops и VK bot status
 
 ## Перед релизом
 

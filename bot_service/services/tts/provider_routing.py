@@ -10,7 +10,7 @@ def resolve_requested_provider(
     resolved_engine: str,
     settings_dict: dict[str, Any],
 ) -> str:
-    if resolved_engine in {"f5tts", "qwen"}:
+    if resolved_engine == "f5tts":
         return infer_provider_from_engine(
             resolved_engine,
             advanced_provider=settings_dict.get("advanced_provider"),
@@ -25,7 +25,8 @@ def resolve_advanced_provider_mode(
     provider: str,
     settings_dict: dict[str, Any],
 ) -> tuple[str, bool]:
-    provider_mode_key = "qwen_mode" if provider == "qwen" else "f5_mode"
+    _ = provider
+    provider_mode_key = "f5_mode"
     preferred_mode = normalize_provider_mode(settings_dict.get(provider_mode_key))
     has_explicit_provider_mode = (
         provider_mode_key in settings_dict and settings_dict.get(provider_mode_key) is not None
@@ -35,4 +36,3 @@ def resolve_advanced_provider_mode(
     if bool(settings_dict.get("use_local_tts", False)):
         return "local", False
     return preferred_mode, False
-

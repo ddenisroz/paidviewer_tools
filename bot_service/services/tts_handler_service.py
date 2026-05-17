@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import time
@@ -23,8 +24,6 @@ from services.memory_websocket_manager import get_memory_websocket_manager
 from services.tts.provider_utils import (
     infer_provider_from_engine,
     normalize_provider_mode,
-    normalize_qwen_model_selection,
-    resolve_qwen_cloud_model_selection,
 )
 
 # API (for specific legacy checks if needed)
@@ -58,6 +57,7 @@ class TTSHandlerService:
         self._fallback_dedupe_ttl_sec = 2.0
         self._recent_message_ids: dict[tuple[str, str], float] = {}
         self._recent_fallback_keys: dict[tuple[str, str, str, str], float] = {}
+        self._user_request_locks: dict[int, asyncio.Lock] = {}
 
     async def process_message_for_tts(
         self,
@@ -128,27 +128,33 @@ class TTSHandlerService:
                 
                 text_for_tts = filter_result["filtered_text"]
 
-                # 5. Determine TTS Engine & Volume
-                engine_config = self._determine_engine_and_volume(
-                    db, user_data, connection_manager, channel_identifier, platform
-                )
+                request_lock = self._get_user_request_lock(user_data["user_id"])
+                async with request_lock:
+                    sink_result = self._check_active_tts_sink(user_data, connection_manager, platform)
+                    if sink_result:
+                        return sink_result
 
-                # 6. Execute TTS Request
-                return await self._execute_tts_request(
-                    tts_api, 
-                    connection_manager, 
-                    channel_identifier, 
-                    text_for_tts, 
-                    username, 
-                    user_data, 
-                    engine_config,
-                    platform,
-                    db,
-                    reward_id,
-                    original_text=text,
-                    source_message_id=source_message_id,
-                    trace_id=trace_id,
-                )
+                    # 5. Determine TTS Engine & Volume
+                    engine_config = self._determine_engine_and_volume(
+                        db, user_data, connection_manager, channel_identifier, platform
+                    )
+
+                    # 6. Execute TTS Request
+                    return await self._execute_tts_request(
+                        tts_api,
+                        connection_manager,
+                        channel_identifier,
+                        text_for_tts,
+                        username,
+                        user_data,
+                        engine_config,
+                        platform,
+                        db,
+                        reward_id,
+                        original_text=text,
+                        source_message_id=source_message_id,
+                        trace_id=trace_id,
+                    )
 
             finally:
                 db.close()
@@ -204,6 +210,13 @@ class TTSHandlerService:
         previous_ts = self._recent_fallback_keys.get(fallback_key)
         self._recent_fallback_keys[fallback_key] = current_ts
         return previous_ts is not None and (current_ts - previous_ts) < self._fallback_dedupe_ttl_sec
+
+    def _get_user_request_lock(self, user_id: int) -> asyncio.Lock:
+        lock = self._user_request_locks.get(user_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._user_request_locks[user_id] = lock
+        return lock
 
     def _check_initial_conditions(self, text, username, channel_identifier, platform, connection_manager, skip_if_command):
         # Skip commands
@@ -347,11 +360,10 @@ class TTSHandlerService:
             advanced_provider=getattr(tts_settings, "advanced_provider", None),
         )
         f5_mode = normalize_provider_mode(getattr(tts_settings, "f5_mode", "cloud"))
-        qwen_mode = normalize_provider_mode(getattr(tts_settings, "qwen_mode", "cloud"))
-        use_ai_tts = (engine in {'f5tts', 'qwen'})
-        use_basic_tts = True
+        use_ai_tts = engine in {'f5tts'}
+        use_basic_tts = not use_ai_tts
 
-        preferred_mode = qwen_mode if advanced_provider == "qwen" else f5_mode
+        preferred_mode = f5_mode
 
         # Check Local Endpoint
         local_tts_repo = LocalTTSRepository(db)
@@ -364,9 +376,10 @@ class TTSHandlerService:
             if not is_user_whitelisted_cached(user_data["user"], db):
                 logger.warning(
                     f"[WARN] [{platform.upper()} TTS] User {user_id} not in whitelist for {advanced_provider}, "
-                    "falling back to gTTS"
+                    "advanced TTS disabled for this message"
                 )
                 use_ai_tts = False
+                use_basic_tts = True
 
         if has_local_endpoint:
             logger.info(
@@ -381,16 +394,28 @@ class TTSHandlerService:
         
         final_volume = base_volume_level
         voice_settings_dict = {}
+        selected_voice = str(tts_settings.voice or "").strip()
 
         # Voice Specific Settings
-        if use_ai_tts and tts_settings.voice:
+        if use_ai_tts:
              voice_settings_repo = UserVoiceSettingsRepository(db)
-             user_voice_config = voice_settings_repo.get_by_voice_name(
-                 user_id,
-                 tts_settings.voice,
-                 tts_provider=advanced_provider,
-             )
-             
+             explicit_voice = selected_voice.lower() not in {"", "default", "default_voice"}
+             user_voice_config = None
+             if explicit_voice:
+                 user_voice_config = voice_settings_repo.get_by_voice_name(
+                     user_id,
+                     selected_voice,
+                     tts_provider=advanced_provider,
+                 )
+             else:
+                 configured_voices = [
+                     item for item in voice_settings_repo.get_by_user_id(user_id, tts_provider=advanced_provider)
+                     if item.voice_name
+                 ]
+                 if len(configured_voices) == 1:
+                     user_voice_config = configured_voices[0]
+                     selected_voice = user_voice_config.voice_name
+
              if user_voice_config:
                  if user_voice_config.cfg_strength is not None:
                      voice_settings_dict["cfg_strength"] = user_voice_config.cfg_strength
@@ -403,10 +428,10 @@ class TTSHandlerService:
             "engine": engine,
             "advanced_provider": advanced_provider,
             "f5_mode": f5_mode,
-            "qwen_mode": qwen_mode,
             "use_ai_tts": use_ai_tts,
             "use_basic_tts": use_basic_tts,
             "volume": final_volume,
+            "voice": selected_voice,
             "voice_settings": voice_settings_dict
         }
 
@@ -430,25 +455,17 @@ class TTSHandlerService:
         tts_settings = user_data["tts_settings"]
         resolved_trace_id = trace_id or get_correlation_id()
         
-        qwen_mode = getattr(tts_settings, "qwen_mode", engine_config.get("qwen_mode", "cloud"))
-        qwen_model = normalize_qwen_model_selection(getattr(tts_settings, "qwen_model", None))
-        if normalize_provider_mode(qwen_mode) == "cloud":
-            qwen_model = resolve_qwen_cloud_model_selection(qwen_model)
-
         tts_settings_dict = {
             "enable7TV": tts_settings.enable_7tv,
             "enableTwitch": tts_settings.enable_twitch,
             "enableProfanity": tts_settings.enable_lexicon_filter,
             "maxLength": tts_settings.max_message_length,
             "skipCommands": tts_settings.skip_commands,
-            "voice": tts_settings.voice,
+            "voice": engine_config.get("voice") or tts_settings.voice,
             "advanced_provider": getattr(tts_settings, "advanced_provider", engine_config.get("advanced_provider", "f5")),
             "f5_mode": getattr(tts_settings, "f5_mode", engine_config.get("f5_mode", "cloud")),
-            "qwen_mode": qwen_mode,
             "gcloud_voices": getattr(tts_settings, "gcloud_voices", []) or [],
             "gcloud_mood": getattr(tts_settings, "gcloud_mood", "neutral") or "neutral",
-            "qwen_voice": getattr(tts_settings, "qwen_voice", "default") or "default",
-            "qwen_model": qwen_model,
             "trace_id": resolved_trace_id,
             "source_message_id": source_message_id,
             "source_platform": platform,
@@ -489,6 +506,25 @@ class TTSHandlerService:
         result["source_message_id"] = source_message_id
         result["spoken_text"] = text
         result["original_text"] = original_text
+
+        if (
+            result.get("success")
+            and engine_config["use_ai_tts"]
+            and result.get("actual_provider") == "gtts"
+            and result.get("requested_provider") == "f5"
+        ):
+            logger.warning(
+                "[TRACE] [%s TTS] trace_id=%s source_message_id=%s suppressed_gtts_fallback requested_provider=%s fallback_reason=%s",
+                platform.upper(),
+                resolved_trace_id,
+                source_message_id or "-",
+                result.get("requested_provider"),
+                result.get("fallback_reason"),
+            )
+            return {
+                "error": result.get("fallback_reason")
+                or f"{result.get('requested_provider')} fallback to gtts suppressed"
+            }
 
         if result.get("success"):
             # Log successful TTS request for analysis
@@ -576,11 +612,13 @@ class TTSHandlerService:
     def _validate_channel_points_mode(self, tts_user_settings, platform, reward_id) -> bool:
         logger.info(f"[REWARD] [{platform.upper()} TTS] Channel Points mode enabled")
         tts_reward_ids = tts_user_settings.tts_reward_ids or {}
-        if platform not in tts_reward_ids:
-            logger.warning(f"[ERROR] [{platform.upper()} TTS] No TTS reward configured")
-            return False
-        
-        expected_reward_id = tts_reward_ids[platform]
+        expected_reward_id = str(tts_reward_ids.get(platform) or "").strip()
+        if not expected_reward_id:
+            logger.warning(
+                f"[WARN] [{platform.upper()} TTS] Channel Points mode has no configured reward, falling back to all messages"
+            )
+            return True
+
         if not reward_id:
              logger.warning(f"[ERROR] [{platform.upper()} TTS] Message not from reward redemption")
              return False

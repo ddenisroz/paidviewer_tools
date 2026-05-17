@@ -17,7 +17,6 @@ interface UseGlobalPlayerOptions {
     nextVideo: () => Promise<void>;
 }
 
- 
 export function useGlobalPlayer({
     displayVideo,
     currentVideo,
@@ -28,7 +27,7 @@ export function useGlobalPlayer({
     handlePlayerReady,
     handlePlayerStateChange,
     handlePlayerError,
-    nextVideo
+    nextVideo,
 }: UseGlobalPlayerOptions) {
     const playerRef = useRef<ReactPlayerInstance>(null);
     const playerWrapperRef = useRef<YouTubePlayer | null>(null);
@@ -40,90 +39,93 @@ export function useGlobalPlayer({
     }, []);
 
     // Create player wrapper that matches YouTubePlayer interface
-    const createPlayerWrapper = useCallback((): YouTubePlayer => ({
-        pauseVideo: () => {
-            const internal = getInternalPlayer();
-            if (internal?.pauseVideo) {
-                internal.pauseVideo();
-                return;
-            }
-            internal?.pause?.();
-        },
-        playVideo: () => {
-            const internal = getInternalPlayer();
-            if (internal?.playVideo) {
-                internal.playVideo();
-                return;
-            }
-            internal?.play?.();
-        },
-        setVolume: (vol: number) => {
-            const internal = getInternalPlayer();
-            if (internal?.setVolume) {
-                internal.setVolume(vol);
-                return;
-            }
-            if (typeof internal?.volume === 'number') {
-                internal.volume = Math.max(0, Math.min(1, vol / 100));
-            }
-        },
-        getVolume: () => {
-            const internal = getInternalPlayer();
-            if (internal?.getVolume) {
-                return internal.getVolume();
-            }
-            if (typeof internal?.volume === 'number') {
-                return Math.round(internal.volume * 100);
-            }
-            return 0;
-        },
-        mute: () => {
-            const internal = getInternalPlayer();
-            if (internal?.mute) {
-                internal.mute();
-                return;
-            }
-            if (typeof internal?.muted === 'boolean') {
-                internal.muted = true;
-            }
-        },
-        unMute: () => {
-            const internal = getInternalPlayer();
-            if (internal?.unMute) {
-                internal.unMute();
-                return;
-            }
-            if (typeof internal?.muted === 'boolean') {
-                internal.muted = false;
-            }
-        },
-        getCurrentTime: () => {
-            const internal = getInternalPlayer();
-            if (internal?.getCurrentTime) {
-                return internal.getCurrentTime();
-            }
-            return typeof internal?.currentTime === 'number' ? internal.currentTime : 0;
-        },
-        getDuration: () => {
-            const internal = getInternalPlayer();
-            if (internal?.getDuration) {
-                return internal.getDuration();
-            }
-            return typeof internal?.duration === 'number' ? internal.duration : 0;
-        },
-        loadVideoById: (videoId: string, startSeconds?: number) => {
-            const internal = getInternalPlayer();
-            if (internal?.loadVideoById) {
-                internal.loadVideoById(videoId, startSeconds);
-            }
-        },
-        cueVideoById: (videoId: string, startSeconds?: number) => {
-            const internal = getInternalPlayer();
-            if (internal?.cueVideoById) {
-                internal.cueVideoById(videoId, startSeconds);
-            }
-        }
-    }), [getInternalPlayer]);
+    const createPlayerWrapper = useCallback(
+        (): YouTubePlayer => ({
+            pauseVideo: () => {
+                const internal = getInternalPlayer();
+                if (internal?.pauseVideo) {
+                    internal.pauseVideo();
+                    return;
+                }
+                internal?.pause?.();
+            },
+            playVideo: () => {
+                const internal = getInternalPlayer();
+                if (internal?.playVideo) {
+                    internal.playVideo();
+                    return;
+                }
+                internal?.play?.();
+            },
+            setVolume: (vol: number) => {
+                const internal = getInternalPlayer();
+                if (internal?.setVolume) {
+                    internal.setVolume(vol);
+                    return;
+                }
+                if (typeof internal?.volume === 'number') {
+                    internal.volume = Math.max(0, Math.min(1, vol / 100));
+                }
+            },
+            getVolume: () => {
+                const internal = getInternalPlayer();
+                if (internal?.getVolume) {
+                    return internal.getVolume();
+                }
+                if (typeof internal?.volume === 'number') {
+                    return Math.round(internal.volume * 100);
+                }
+                return 0;
+            },
+            mute: () => {
+                const internal = getInternalPlayer();
+                if (internal?.mute) {
+                    internal.mute();
+                    return;
+                }
+                if (typeof internal?.muted === 'boolean') {
+                    internal.muted = true;
+                }
+            },
+            unMute: () => {
+                const internal = getInternalPlayer();
+                if (internal?.unMute) {
+                    internal.unMute();
+                    return;
+                }
+                if (typeof internal?.muted === 'boolean') {
+                    internal.muted = false;
+                }
+            },
+            getCurrentTime: () => {
+                const internal = getInternalPlayer();
+                if (internal?.getCurrentTime) {
+                    return internal.getCurrentTime();
+                }
+                return typeof internal?.currentTime === 'number' ? internal.currentTime : 0;
+            },
+            getDuration: () => {
+                const internal = getInternalPlayer();
+                if (internal?.getDuration) {
+                    return internal.getDuration();
+                }
+                return typeof internal?.duration === 'number' ? internal.duration : 0;
+            },
+            loadVideoById: (videoId: string, startSeconds?: number) => {
+                const internal = getInternalPlayer();
+                if (internal?.loadVideoById) {
+                    internal.loadVideoById(videoId, startSeconds);
+                }
+            },
+            cueVideoById: (videoId: string, startSeconds?: number) => {
+                const internal = getInternalPlayer();
+                if (internal?.cueVideoById) {
+                    internal.cueVideoById(videoId, startSeconds);
+                }
+            },
+        }),
+        [getInternalPlayer]
+    );
 
     // Sync playback time with server
     const syncPlaybackTime = useCallback(() => {
@@ -131,9 +133,7 @@ export function useGlobalPlayer({
 
         try {
             const playedAtDate = new Date(
-                currentVideo.played_at.endsWith('Z')
-                    ? currentVideo.played_at
-                    : `${currentVideo.played_at}Z`
+                currentVideo.played_at.endsWith('Z') ? currentVideo.played_at : `${currentVideo.played_at}Z`
             );
             const now = new Date();
             const diffSeconds = (now.getTime() - playedAtDate.getTime()) / 1000;
@@ -148,7 +148,7 @@ export function useGlobalPlayer({
                 playerRef.current.seekTo?.(diffSeconds, 'seconds');
             }
         } catch (e) {
-            logger.error("Error syncing time", e);
+            logger.error('Error syncing time', e);
         }
     }, [currentVideo?.played_at]);
 
@@ -181,10 +181,13 @@ export function useGlobalPlayer({
     }, [displayVideo?.id, displayVideo?.video_id, nextVideo]);
 
     // Handle errors
-    const handleError = useCallback((error: unknown) => {
-        logger.error('[ReactPlayer] Error:', error);
-        handlePlayerError({ data: error });
-    }, [handlePlayerError]);
+    const handleError = useCallback(
+        (error: unknown) => {
+            logger.error('[ReactPlayer] Error:', error);
+            handlePlayerError({ data: error });
+        },
+        [handlePlayerError]
+    );
 
     // Handle play state
     const handlePlay = useCallback(() => {
@@ -206,6 +209,6 @@ export function useGlobalPlayer({
         handleEnded,
         handleError,
         handlePlay,
-        handlePause
+        handlePause,
     };
 }

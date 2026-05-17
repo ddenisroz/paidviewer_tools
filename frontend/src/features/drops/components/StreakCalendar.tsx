@@ -24,7 +24,7 @@ const QUALITY_CONFIGS: QualityConfig[] = [
     { id: 'common', label: 'Обычный', color: '#6B7280', image: CommonClosed },
     { id: 'rare', label: 'Редкий', color: '#3B82F6', image: RareClosed },
     { id: 'epic', label: 'Эпический', color: '#8B5CF6', image: EpicClosed },
-    { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed }
+    { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed },
 ];
 
 interface StreakCalendarFormData {
@@ -65,7 +65,10 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                     const value = formData[fieldName][0];
 
                     return (
-                        <div key={quality.id} className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm">
+                        <div
+                            key={quality.id}
+                            className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm"
+                        >
                             <div className="flex items-center justify-between gap-3">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <img
@@ -74,7 +77,9 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                         className="w-8 h-8 object-contain flex-shrink-0"
                                     />
                                     <div className="min-w-0">
-                                        <Label className="text-sm font-semibold leading-none whitespace-nowrap">{quality.label}</Label>
+                                        <Label className="text-sm font-semibold leading-none whitespace-nowrap">
+                                            {quality.label}
+                                        </Label>
                                         <p className="text-xs text-muted-foreground">После {value} стримов</p>
                                     </div>
                                 </div>

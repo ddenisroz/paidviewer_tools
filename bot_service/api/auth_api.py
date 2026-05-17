@@ -3,6 +3,7 @@
 Authentication API endpoints.
 Clean Architecture: uses UserRepository for data access.
 """
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 import logging
@@ -10,11 +11,14 @@ import logging
 from core.database import get_db
 from core.security_modern import limiter
 from core.session_manager import session_manager
+from core.cookie_config import get_session_cookie_settings
+from core.config import settings
 
 from core.auth_handlers import auth_handlers
-from auth.auth import get_current_user
+from auth.auth import create_jwt_token, get_current_user
 from repositories.user_repository import UserRepository
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +27,12 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Reserved usernames
 RESERVED_NAMES = {'admin', 'root', 'system', 'bot', 'moderator', 'mod'}
+
+
+class DevLoginRequest(BaseModel):
+    """Temporary local-development login payload."""
+
+    nickname: str = Field(..., min_length=2, max_length=50)
 
 
 @router.get("/me")
@@ -67,6 +77,77 @@ async def logout(
 ):
     """Logout current user."""
     return await auth_handlers.logout(current_user, db)
+
+
+@router.post("/dev-login")
+async def dev_login(
+    payload: DevLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Temporary local-development login by existing nickname."""
+    if not settings.is_development:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    nickname = payload.nickname.strip()
+    if not nickname:
+        raise HTTPException(status_code=400, detail="Введите никнейм")
+
+    repo = UserRepository(db)
+    user = (
+        repo.get_by_twitch_username(nickname)
+        or repo.get_by_vk_username(nickname)
+        or repo.get_by_vk_channel_name(nickname)
+    )
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь с таким ником не найден")
+
+    if not getattr(user, "is_active", True):
+        raise HTTPException(status_code=403, detail="Пользователь отключён")
+
+    if getattr(user, "is_blocked", False):
+        blocked_reason = getattr(user, "blocked_reason", None) or "Пользователь заблокирован"
+        raise HTTPException(status_code=403, detail=blocked_reason)
+
+    device_info = {
+        "platform": "dev-login",
+        "login_method": "dev_login",
+        "nickname_lookup": nickname,
+        "ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+    }
+    session_id = session_manager.create_session(user.id, device_info=device_info)
+
+    response = JSONResponse(
+        {
+            "success": True,
+            "authenticated": True,
+            "user": {
+                "id": user.id,
+                "twitch_username": user.twitch_username,
+                "vk_username": user.vk_username,
+                "vk_channel_name": user.vk_channel_name,
+                "is_admin": bool(user.role == "admin" or user.is_admin),
+            },
+        }
+    )
+    response.set_cookie(**get_session_cookie_settings(session_id))
+    return response
+
+
+@router.get("/ws-token")
+async def get_websocket_token(current_user: dict = Depends(get_current_user)):
+    """Return a short-purpose websocket auth token for dashboard/chat clients."""
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    return {
+        "success": True,
+        "token": create_jwt_token(int(user_id), token_type="chat_ws"),
+        "user_id": int(user_id),
+    }
 
 
 @router.get("/status")

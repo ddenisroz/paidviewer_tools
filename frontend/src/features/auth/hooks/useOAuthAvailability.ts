@@ -16,9 +16,10 @@ const EMPTY_OAUTH_AVAILABILITY: OAuthAvailability = {
 const getOAuthAvailability = (
     payload: ApiResponse<PlatformConfigResponse> | PlatformConfigResponse
 ): OAuthAvailability => {
-    const platforms = (payload as PlatformConfigResponse).platforms
-        || (payload as ApiResponse<PlatformConfigResponse>).data?.platforms
-        || [];
+    const platforms =
+        (payload as PlatformConfigResponse).platforms ||
+        (payload as ApiResponse<PlatformConfigResponse>).data?.platforms ||
+        [];
 
     return {
         twitch: platforms.some((platform) => platform.name === 'twitch' && platform.supportsOAuth),

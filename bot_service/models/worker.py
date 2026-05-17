@@ -27,7 +27,6 @@ class Worker(Base):
     label = Column(String, nullable=False, default="TTS Worker")
     auth_token_hash = Column(String, nullable=False, unique=True, index=True)
     supports_f5 = Column(Boolean, nullable=False, default=False, index=True)
-    supports_qwen = Column(Boolean, nullable=False, default=False, index=True)
     capabilities = Column(JsonType, nullable=False, default=dict)
     runtime_metadata = Column(JsonType, nullable=False, default=dict)
     status = Column(String, nullable=False, default="offline", index=True)

@@ -1,114 +1,163 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥚</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Paidviewer_tools</title>
-    
-    <!-- Preconnect to external domains (early connection) -->
-    
-    <!-- DNS prefetch для API -->
-    
-    <!-- CRITICAL: Font loading with swap for optimal performance -->
-    <!-- display=swap shows fallback immediately, swaps to custom font when loaded -->
-    <!-- Inter font stylesheet -->
-    <!-- Special fonts for page headers - угловатые шрифты -->
-    
-    <!-- Resource hints для ускорения загрузки -->
-    
-    <!-- Fallback: if stylesheet fails, we already have inline CSS with system fonts -->
-    
-    <!-- Critical CSS inline to prevent FOUT -->
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      
-      html {
-        height: 100%;
-        overflow-y: auto;
-      }
-      
-      body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        overflow-x: hidden;
-        /* Use Inter font immediately - with font-display: fallback it will use system font until Inter loads quickly */
-        /* This prevents layout shift - same font-family declaration from start, no visible swap */
-        font-family: 'Geist Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
-        font-size: 14px;
-        line-height: 1.5;
-        font-weight: 400;
-        background-color: hsl(260, 30%, 8%);
-        color: hsl(270, 20%, 95%);
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-        /* Show content immediately - fonts will load in background */
-        visibility: visible;
-        opacity: 1;
-        /* Force font rendering consistency - prevent layout shift */
-        font-feature-settings: 'cv11', 'ss01';
-        font-variant-numeric: tabular-nums;
-      }
-      
-      /* Fonts are preloaded, body is always visible */
-      /* Class fonts-loaded is added immediately in main.tsx */
-      
-      /* Base font sizes to prevent FOUT - using rem units for consistency */
-      /* These sizes match exactly with Tailwind defaults */
-      .text-xs { font-size: 0.75rem !important; line-height: 1rem !important; }
-      .text-sm { font-size: 0.875rem !important; line-height: 1.25rem !important; }
-      .text-base { font-size: 1rem !important; line-height: 1.5rem !important; }
-      .text-lg { font-size: 1.125rem !important; line-height: 1.75rem !important; }
-      .text-xl { font-size: 1.25rem !important; line-height: 1.75rem !important; }
-      .text-2xl { font-size: 1.5rem !important; line-height: 2rem !important; }
-      .text-3xl { font-size: 1.875rem !important; line-height: 2.25rem !important; }
-      
-      /* Ensure all text elements use consistent sizing and font-family */
-      /* Apply font-family to prevent layout shift during font swap */
-      p, span, div, button, input, textarea, label, a, h1, h2, h3, h4, h5, h6 {
-        font-family: 'Geist Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
-        font-size: inherit;
-        line-height: inherit;
-      }
-      
-      /* Prevent layout shift */
-      #root {
-        min-height: 100vh;
-        width: 100%;
-        /* Root is visible immediately - React mounts normally */
-        opacity: 1;
-        visibility: visible;
-      }
-      
-      /* Hide scrollbar initially */
-      ::-webkit-scrollbar {
-        width: 0px;
-        background: transparent;
-      }
-      
-      html {
-        scrollbar-width: none;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="root">
-      <!-- Minimal loading state - removed on mount -->
-      <style>
-        #root:empty::before {
-          content: '';
-          display: block;
-          width: 100%;
-          height: 100vh;
-          background-color: hsl(260, 30%, 8%);
-        }
-      </style>
-    </div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    <head>
+        <meta charset="UTF-8" />
+        <link
+            rel="icon"
+            href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥚</text></svg>"
+        />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Paidviewer_tools</title>
+
+        <!-- Preconnect to external domains (early connection) -->
+
+        <!-- DNS prefetch для API -->
+
+        <!-- CRITICAL: Font loading with swap for optimal performance -->
+        <!-- display=swap shows fallback immediately, swaps to custom font when loaded -->
+        <!-- Inter font stylesheet -->
+        <!-- Special fonts for page headers - угловатые шрифты -->
+
+        <!-- Resource hints для ускорения загрузки -->
+
+        <!-- Fallback: if stylesheet fails, we already have inline CSS with system fonts -->
+
+        <!-- Critical CSS inline to prevent FOUT -->
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            html {
+                height: 100%;
+                overflow-y: auto;
+            }
+
+            body {
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                overflow-x: hidden;
+                font-family:
+                    'Tektur',
+                    'Geist Sans',
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    'Segoe UI',
+                    'Roboto',
+                    sans-serif !important;
+                font-size: 14px;
+                line-height: 1.5;
+                font-weight: 400;
+                background-color: hsl(260, 30%, 8%);
+                color: hsl(270, 20%, 95%);
+                -webkit-font-smoothing: antialiased;
+                -moz-osx-font-smoothing: grayscale;
+                visibility: hidden;
+                opacity: 0;
+                font-feature-settings: 'cv11', 'ss01';
+                font-variant-numeric: tabular-nums;
+                transition: opacity 120ms ease-out;
+            }
+
+            body.app-ready {
+                visibility: visible;
+                opacity: 1;
+            }
+
+            /* Base font sizes to prevent FOUT - using rem units for consistency */
+            /* These sizes match exactly with Tailwind defaults */
+            .text-xs {
+                font-size: 0.75rem !important;
+                line-height: 1rem !important;
+            }
+            .text-sm {
+                font-size: 0.875rem !important;
+                line-height: 1.25rem !important;
+            }
+            .text-base {
+                font-size: 1rem !important;
+                line-height: 1.5rem !important;
+            }
+            .text-lg {
+                font-size: 1.125rem !important;
+                line-height: 1.75rem !important;
+            }
+            .text-xl {
+                font-size: 1.25rem !important;
+                line-height: 1.75rem !important;
+            }
+            .text-2xl {
+                font-size: 1.5rem !important;
+                line-height: 2rem !important;
+            }
+            .text-3xl {
+                font-size: 1.875rem !important;
+                line-height: 2.25rem !important;
+            }
+
+            /* Ensure all text elements use consistent sizing and font-family */
+            /* Apply font-family to prevent layout shift during font swap */
+            p,
+            span,
+            div,
+            button,
+            input,
+            textarea,
+            label,
+            a,
+            h1,
+            h2,
+            h3,
+            h4,
+            h5,
+            h6 {
+                font-family:
+                    'Tektur',
+                    'Geist Sans',
+                    system-ui,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    'Segoe UI',
+                    'Roboto',
+                    sans-serif !important;
+                font-size: inherit;
+                line-height: inherit;
+            }
+
+            /* Prevent layout shift */
+            #root {
+                min-height: 100vh;
+                width: 100%;
+            }
+
+            /* Hide scrollbar initially */
+            ::-webkit-scrollbar {
+                width: 0px;
+                background: transparent;
+            }
+
+            html {
+                scrollbar-width: none;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="root">
+            <!-- Minimal loading state - stays visible until app fonts are ready -->
+            <style>
+                #root:empty::before {
+                    content: '';
+                    display: block;
+                    width: 100%;
+                    height: 100vh;
+                    background-color: hsl(260, 30%, 8%);
+                }
+            </style>
+        </div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
 </html>

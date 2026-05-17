@@ -15,12 +15,12 @@ import type { AxiosError } from 'axios';
  * Получить список администраторов
  */
 export const useAdminList = (options?: Omit<UseQueryOptions<ApiResponse, AxiosError>, 'queryKey' | 'queryFn'>) => {
-  return useQuery({
-    queryKey: queryKeys.admin.list(),
-    queryFn: () => unwrapResponse(adminService.getAdminList()),
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    retry: 1,
-    ...options,
-  });
+    return useQuery({
+        queryKey: queryKeys.admin.list(),
+        queryFn: () => unwrapResponse(adminService.getAdminList()),
+        staleTime: 5 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+        retry: 1,
+        ...options,
+    });
 };

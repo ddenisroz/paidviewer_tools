@@ -3,8 +3,9 @@
 import { useSearchParams } from 'react-router-dom';
 
 import MessageContent from '@/features/chat/components/MessageContent';
-import { loadGoogleFont, normalizeChatBoxSettings } from '@/features/chatbox/utils/chatboxHelpers';
 import { getAllEmotesForChannel } from '@/features/chat/utils/emotes';
+import { CHATBOX_BRAND_FONT } from '@/features/chatbox/constants/fontOptions';
+import { loadGoogleFont, normalizeChatBoxSettings } from '@/features/chatbox/utils/chatboxHelpers';
 import { chatboxService } from '@/services/api/services/chatboxService';
 import { twitchBadgesService } from '@/services/twitchBadges';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
@@ -375,7 +376,7 @@ const ChatOverlay: React.FC = () => {
             ? safeFontFamily.includes(',')
                 ? safeFontFamily
                 : `${safeFontFamily}, sans-serif`
-            : 'Inter, sans-serif';
+            : `${CHATBOX_BRAND_FONT}, sans-serif`;
 
         return {
             width: `${settings?.chat_width || 100}vw`,
@@ -396,22 +397,11 @@ const ChatOverlay: React.FC = () => {
         const style = document.createElement('style');
         style.textContent = `
             .horizontal-chat-scroll::-webkit-scrollbar {
-                height: 8px;
-            }
-            .horizontal-chat-scroll::-webkit-scrollbar-track {
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 4px;
-            }
-            .horizontal-chat-scroll::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.3);
-                border-radius: 4px;
-            }
-            .horizontal-chat-scroll::-webkit-scrollbar-thumb:hover {
-                background: rgba(255, 255, 255, 0.5);
+                display: none;
             }
             .horizontal-chat-scroll {
-                scrollbar-width: thin;
-                scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+                scrollbar-width: none;
+                -ms-overflow-style: none;
             }
         `;
         document.head.appendChild(style);
@@ -807,7 +797,7 @@ const ChatOverlay: React.FC = () => {
                     justifyContent: 'center',
                     background: 'transparent',
                     color: '#fff',
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: `${CHATBOX_BRAND_FONT}, sans-serif`,
                     gap: '16px',
                 }}
             >
@@ -828,7 +818,7 @@ const ChatOverlay: React.FC = () => {
                     justifyContent: 'center',
                     background: 'transparent',
                     color: '#fff',
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: `${CHATBOX_BRAND_FONT}, sans-serif`,
                     padding: '20px',
                     textAlign: 'center',
                     gap: '16px',
@@ -862,7 +852,7 @@ const ChatOverlay: React.FC = () => {
                     justifyContent: 'center',
                     background: 'transparent',
                     color: '#fff',
-                    fontFamily: 'Inter, sans-serif',
+                    fontFamily: `${CHATBOX_BRAND_FONT}, sans-serif`,
                     padding: '20px',
                     textAlign: 'center',
                     gap: '16px',
@@ -997,7 +987,7 @@ const ChatOverlay: React.FC = () => {
                             overflowY: settings.chat_direction === 'horizontal' ? 'hidden' : 'auto',
                             alignItems: settings.chat_direction === 'horizontal' ? 'center' : 'stretch',
                             gap: settings.chat_direction === 'horizontal' ? '8px' : '0',
-                            paddingBottom: settings.chat_direction === 'horizontal' ? '8px' : '0',
+                            paddingBottom: '0',
                         }}
                     >
                         {settings.chat_direction !== 'horizontal' && <div style={{ flexGrow: 1 }} />}

@@ -19,7 +19,9 @@ const SettingsAccessCard: React.FC<SettingsAccessCardProps> = ({ onLogin }) => (
                 </div>
                 <div className="max-w-md space-y-2">
                     <h3 className="text-xl font-semibold text-foreground">Требуется авторизация</h3>
-                    <p className="text-sm text-muted-foreground">Для доступа к настройкам необходимо войти в систему.</p>
+                    <p className="text-sm text-muted-foreground">
+                        Для доступа к настройкам необходимо войти в систему.
+                    </p>
                 </div>
                 <Button onClick={onLogin} className="gap-2">
                     <Settings className="h-4 w-4" />

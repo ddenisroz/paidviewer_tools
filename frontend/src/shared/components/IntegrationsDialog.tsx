@@ -7,13 +7,19 @@ import { useNavigate } from 'react-router-dom';
 import { useDonationAlerts } from '@/context/DonationAlertsContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
-import { Badge } from "@/shared/components/ui/badge";
-import { Button } from "@/shared/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/shared/components/ui/dialog";
-import { Switch } from "@/shared/components/ui/switch";
+import { Badge } from '@/shared/components/ui/badge';
+import { Button } from '@/shared/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/shared/components/ui/dialog';
+import { Switch } from '@/shared/components/ui/switch';
 import { logger } from '@/shared/utils/prodLogger';
 import { toast } from '@/utils/toastManager';
-
 
 interface IntegrationsDialogProps {
     open: boolean;
@@ -22,8 +28,15 @@ interface IntegrationsDialogProps {
 
 const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenChange }) => {
     const navigate = useNavigate();
-    const { integrations, platformRelease, isLoading, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
-    const { isConnected: daConnected, isLoading: daLoading, error: daError, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
+    const { integrations, platformRelease, isLoading, updateTwitchIntegration, updateVkIntegration } =
+        useIntegrations();
+    const {
+        isConnected: daConnected,
+        isLoading: daLoading,
+        error: daError,
+        connect: daConnect,
+        disconnect: daDisconnect,
+    } = useDonationAlerts();
     // Проверяем, есть ли хотя бы одна основная платформа
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
 
@@ -66,7 +79,6 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
         await daDisconnect();
     };
 
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent
@@ -79,16 +91,9 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                     <div className="flex items-center justify-between">
                         <div>
                             <DialogTitle>Интеграции</DialogTitle>
-                            <DialogDescription>
-                                Управление подключениями к платформам
-                            </DialogDescription>
+                            <DialogDescription>Управление подключениями к платформам</DialogDescription>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => onOpenChange(false)}
-                            className="h-6 w-6"
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="h-6 w-6">
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
@@ -116,7 +121,10 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                                 <div className="flex items-center gap-2">
                                     <p className="font-semibold">VK Live</p>
                                     {platformRelease.vk.badgeLabel ? (
-                                        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+                                        <Badge
+                                            variant="outline"
+                                            className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                                        >
                                             {platformRelease.vk.badgeLabel}
                                         </Badge>
                                     ) : null}
@@ -130,9 +138,7 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                             />
                         </div>
                         {platformRelease.vk.helperText ? (
-                            <p className="pl-7 text-xs text-muted-foreground">
-                                {platformRelease.vk.helperText}
-                            </p>
+                            <p className="pl-7 text-xs text-muted-foreground">{platformRelease.vk.helperText}</p>
                         ) : null}
                     </div>
 
@@ -165,7 +171,9 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                                 <Switch
                                     variant="donation"
                                     checked={daConnected}
-                                    onCheckedChange={daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect}
+                                    onCheckedChange={
+                                        daConnected ? handleDonationAlertsDisconnect : handleDonationAlertsConnect
+                                    }
                                     disabled={daLoading || !hasMainIntegration}
                                 />
                             </div>
@@ -182,9 +190,7 @@ const IntegrationsDialog: React.FC<IntegrationsDialogProps> = ({ open, onOpenCha
                         {daError && (
                             <div className="flex items-center space-x-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
                                 <WarningCircle className="w-4 h-4 text-red-600" />
-                                <p className="text-sm text-red-700 dark:text-red-300">
-                                    {daError}
-                                </p>
+                                <p className="text-sm text-red-700 dark:text-red-300">{daError}</p>
                             </div>
                         )}
                     </div>

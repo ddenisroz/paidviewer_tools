@@ -18,21 +18,14 @@ interface Integrations {
 /**
  * Check if platform is enabled
  */
-export function isPlatformEnabled(
-    integrations: Integrations,
-    platform: 'twitch' | 'vk' | 'donationalerts'
-): boolean {
+export function isPlatformEnabled(integrations: Integrations, platform: 'twitch' | 'vk' | 'donationalerts'): boolean {
     return integrations?.[platform]?.enabled || false;
 }
 
 /**
  * Check if chat is enabled for platform on home page
  */
-export function isChatEnabled(
-    integrations: Integrations,
-    platform: 'twitch' | 'vk',
-    isOnHomePage: boolean
-): boolean {
+export function isChatEnabled(integrations: Integrations, platform: 'twitch' | 'vk', isOnHomePage: boolean): boolean {
     if (!isOnHomePage) return false;
     return isPlatformEnabled(integrations, platform);
 }
@@ -68,23 +61,15 @@ export function getChannelName(
 /**
  * Check if drops are enabled
  */
-export function areDropsEnabled(
-    integrations: Integrations
-): boolean {
-    return (
-        isPlatformEnabled(integrations, 'twitch') ||
-        isPlatformEnabled(integrations, 'vk')
-    );
+export function areDropsEnabled(integrations: Integrations): boolean {
+    return isPlatformEnabled(integrations, 'twitch') || isPlatformEnabled(integrations, 'vk');
 }
 
 /**
  * Check if any integrations are enabled
  */
 export function hasAnyIntegrations(integrations: Integrations): boolean {
-    return (
-        isPlatformEnabled(integrations, 'twitch') ||
-        isPlatformEnabled(integrations, 'vk')
-    );
+    return isPlatformEnabled(integrations, 'twitch') || isPlatformEnabled(integrations, 'vk');
 }
 
 /**
@@ -97,8 +82,5 @@ export function didIntegrationsEnable(
     const twitchEnabled = isPlatformEnabled(integrations, 'twitch');
     const vkEnabled = isPlatformEnabled(integrations, 'vk');
 
-    return (
-        (twitchEnabled && !prevIntegrations.twitch) ||
-        (vkEnabled && !prevIntegrations.vk)
-    );
+    return (twitchEnabled && !prevIntegrations.twitch) || (vkEnabled && !prevIntegrations.vk);
 }

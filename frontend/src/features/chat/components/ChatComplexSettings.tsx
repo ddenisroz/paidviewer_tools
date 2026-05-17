@@ -20,15 +20,13 @@ export const ChatComplexSettings: React.FC<ChatComplexSettingsProps> = ({
     onToggleImages,
     chatMessagesVisible,
     onToggleChatVisibility,
-    onOpenOBSSettings
+    onOpenOBSSettings,
 }) => {
     return (
         <div className="space-y-4 w-72">
             <div className="space-y-2">
                 <h4 className="font-medium leading-none text-foreground">Настройки чата</h4>
-                <p className="text-xs text-muted-foreground">
-                    Управление отображением элементов чата
-                </p>
+                <p className="text-xs text-muted-foreground">Управление отображением элементов чата</p>
             </div>
 
             <Separator className="bg-border" />
@@ -38,30 +36,30 @@ export const ChatComplexSettings: React.FC<ChatComplexSettingsProps> = ({
                 <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                         <Label className="text-sm text-foreground flex items-center gap-2">
-                            {chatMessagesVisible ? <Eye className="w-4 h-4 text-green-400" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
+                            {chatMessagesVisible ? (
+                                <Eye className="w-4 h-4 text-green-400" />
+                            ) : (
+                                <EyeOff className="w-4 h-4 text-muted-foreground" />
+                            )}
                             Сообщения
                         </Label>
                         <p className="text-xs text-muted-foreground">Показывать сообщения чата</p>
                     </div>
-                    <Switch
-                        checked={chatMessagesVisible}
-                        onCheckedChange={onToggleChatVisibility}
-                    />
+                    <Switch checked={chatMessagesVisible} onCheckedChange={onToggleChatVisibility} />
                 </div>
 
                 {/* Images Toggle */}
                 <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                         <Label className="text-sm text-foreground flex items-center gap-2">
-                            <ImageIcon className={`w-4 h-4 ${showImages ? 'text-blue-400' : 'text-muted-foreground'}`} />
+                            <ImageIcon
+                                className={`w-4 h-4 ${showImages ? 'text-blue-400' : 'text-muted-foreground'}`}
+                            />
                             Картинки и ссылки
                         </Label>
                         <p className="text-xs text-muted-foreground">Отображать медиа в чате</p>
                     </div>
-                    <Switch
-                        checked={showImages}
-                        onCheckedChange={onToggleImages}
-                    />
+                    <Switch checked={showImages} onCheckedChange={onToggleImages} />
                 </div>
             </div>
 

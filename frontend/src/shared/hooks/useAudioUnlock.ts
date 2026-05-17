@@ -19,7 +19,10 @@ export const useAudioUnlock = (options: UseAudioUnlockOptions = {}) => {
 
         try {
             if (!audioContext.current) {
-                audioContext.current = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+                audioContext.current = new (
+                    window.AudioContext ||
+                    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+                )();
             }
 
             if (audioContext.current.state === 'suspended') {
@@ -46,17 +49,17 @@ export const useAudioUnlock = (options: UseAudioUnlockOptions = {}) => {
         const handleInteraction = () => {
             unlock();
             // Remove listeners after first interaction
-            events.forEach(event => {
+            events.forEach((event) => {
                 document.removeEventListener(event, handleInteraction);
             });
         };
 
-        events.forEach(event => {
+        events.forEach((event) => {
             document.addEventListener(event, handleInteraction, { once: true });
         });
 
         return () => {
-            events.forEach(event => {
+            events.forEach((event) => {
                 document.removeEventListener(event, handleInteraction);
             });
         };

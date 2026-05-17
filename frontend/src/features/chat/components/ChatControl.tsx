@@ -10,13 +10,17 @@ const ChatControl: React.FC = () => {
     const {
         isConnected: isChatConnected,
         connectBotToChannels: connectChat,
-        disconnectBotFromChannels: disconnectChat
+        disconnectBotFromChannels: disconnectChat,
     } = useChat();
 
     // Pause/resume functionality not implemented in current context
     const isChatPaused = false;
-    const pauseChat = () => { /* Pause not implemented */ };
-    const resumeChat = () => { /* Resume not implemented */ };
+    const pauseChat = () => {
+        /* Pause not implemented */
+    };
+    const resumeChat = () => {
+        /* Resume not implemented */
+    };
 
     // Убираем требование авторизации для чата
     // if (!isAuthenticated) {
@@ -37,33 +41,28 @@ const ChatControl: React.FC = () => {
             <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                        <div className={`w-3 h-3 rounded-full ${isChatConnected
-                                ? (isChatPaused ? 'bg-yellow-500' : 'bg-green-500')
-                                : 'bg-red-500'
-                            }`} />
+                        <div
+                            className={`w-3 h-3 rounded-full ${
+                                isChatConnected ? (isChatPaused ? 'bg-yellow-500' : 'bg-green-500') : 'bg-red-500'
+                            }`}
+                        />
                         <div>
                             <p className="text-sm font-medium">
-                                {isChatConnected
-                                    ? (isChatPaused ? 'Чат на паузе' : 'Чат подключен')
-                                    : 'Чат отключен'
-                                }
+                                {isChatConnected ? (isChatPaused ? 'Чат на паузе' : 'Чат подключен') : 'Чат отключен'}
                             </p>
                             <p className="text-xs text-muted-foreground">
                                 {isChatConnected
-                                    ? (isChatPaused ? 'Сообщения не загружаются' : 'Получаем сообщения в реальном времени')
-                                    : 'Нажмите для подключения'
-                                }
+                                    ? isChatPaused
+                                        ? 'Сообщения не загружаются'
+                                        : 'Получаем сообщения в реальном времени'
+                                    : 'Нажмите для подключения'}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex items-center space-x-2">
                         {!isChatConnected ? (
-                            <Button
-                                onClick={() => connectChat()}
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700"
-                            >
+                            <Button onClick={() => connectChat()} size="sm" className="bg-green-600 hover:bg-green-700">
                                 <Wifi className="h-4 w-4 mr-2" />
                                 Подключиться
                             </Button>
@@ -109,4 +108,3 @@ const ChatControl: React.FC = () => {
 };
 
 export default ChatControl;
-

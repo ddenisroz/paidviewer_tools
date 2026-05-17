@@ -9,6 +9,7 @@ from auth.oauth_handler import OAuthUserData, oauth_handler
 from constants import Platform
 from core.database import User, UserToken
 from services.stream_info_service import StreamInfoService
+from services.bot_token_validator import bot_token_validator
 
 
 def test_twitch_callback_redirects_on_provider_network_error(client, monkeypatch):
@@ -43,6 +44,48 @@ def test_twitch_callback_redirects_on_provider_network_error(client, monkeypatch
     assert parsed.path.endswith("/login")
     assert query["auth_error"] == ["provider_unreachable"]
     assert query["platform"] == ["twitch"]
+
+
+def test_twitch_callback_preserves_provider_access_denied(client):
+    response = client.get(
+        "/auth/twitch/callback?error=access_denied&error_description=user_cancelled",
+        follow_redirects=False,
+    )
+
+    parsed = urlparse(response.headers["location"])
+    query = parse_qs(parsed.query)
+    assert response.status_code == 307
+    assert parsed.path.endswith("/login")
+    assert query["auth_error"] == ["access_denied"]
+    assert query["platform"] == ["twitch"]
+
+
+def test_twitch_callback_reports_redirect_mismatch(client):
+    response = client.get(
+        "/auth/twitch/callback?error=redirect_mismatch&error_description=redirect_uri_mismatch",
+        follow_redirects=False,
+    )
+
+    parsed = urlparse(response.headers["location"])
+    query = parse_qs(parsed.query)
+    assert response.status_code == 307
+    assert parsed.path.endswith("/login")
+    assert query["auth_error"] == ["redirect_mismatch"]
+    assert query["platform"] == ["twitch"]
+
+
+def test_vk_callback_preserves_provider_access_denied(client):
+    response = client.get(
+        "/auth/vk/callback?error=access_denied&error_description=user_cancelled",
+        follow_redirects=False,
+    )
+
+    parsed = urlparse(response.headers["location"])
+    query = parse_qs(parsed.query)
+    assert response.status_code == 307
+    assert parsed.path.endswith("/login")
+    assert query["auth_error"] == ["access_denied"]
+    assert query["platform"] == ["vk"]
 
 
 def test_twitch_callback_redirects_when_oauth_handler_fails(client, monkeypatch):
@@ -178,6 +221,50 @@ def test_vk_callback_accepts_user_info_without_request_level_verify(client, monk
 
     assert response.status_code == 307
     assert response.headers["location"] == "http://localhost/dashboard"
+
+
+@pytest.mark.asyncio
+async def test_twitch_bot_validator_rejects_user_token_without_chat_scopes(monkeypatch):
+    from services import bot_token_validator as validator_module
+
+    async def get_user_token():
+        return {"access_token": "user-token", "bot_login": "yourchy"}
+
+    class ValidateClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, **kwargs):
+            return httpx.Response(
+                200,
+                json={
+                    "user_id": "75969278",
+                    "login": "yourchy",
+                    "expires_in": 3600,
+                    "scopes": [
+                        "user:read:email",
+                        "channel:manage:broadcast",
+                        "channel:manage:redemptions",
+                    ],
+                },
+                request=httpx.Request("GET", url),
+            )
+
+    monkeypatch.setattr(
+        validator_module.twitch_bot_oauth_service,
+        "get_bot_token",
+        get_user_token,
+    )
+    monkeypatch.setattr(validator_module.httpx, "AsyncClient", lambda *args, **kwargs: ValidateClient())
+
+    result = await bot_token_validator.validate_twitch_bot_token()
+
+    assert result["valid"] is False
+    assert result["error"] == "Twitch bot token is missing required chat scopes"
+    assert result["missing_scopes"] == ["chat:edit", "chat:read"]
 
 
 def test_logout_preserves_platform_tokens(authenticated_client, db_session, test_user):
@@ -329,3 +416,15 @@ def test_stream_info_service_normalizes_vk_category_without_real_id(db_session):
         "name": "Just Chatting",
         "title": "Just Chatting",
     }
+
+
+def test_memealerts_streamer_id_prefers_tid_claim():
+    from api.memealerts_api import _extract_memealerts_streamer_id
+
+    assert _extract_memealerts_streamer_id({"id": "token-record-id", "tid": "streamer-id"}) == "streamer-id"
+
+
+def test_memealerts_streamer_id_uses_trusted_fallback_before_id():
+    from api.memealerts_api import _extract_memealerts_streamer_id
+
+    assert _extract_memealerts_streamer_id({"id": "token-record-id"}, "trusted-streamer-id") == "trusted-streamer-id"

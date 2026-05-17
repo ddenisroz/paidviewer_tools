@@ -13,24 +13,26 @@ from typing import Any
 from requests import HTTPError
 
 try:
-    from .adapters import F5Adapter, QwenAdapter
+    from .adapters import F5Adapter
     from .client import ControlPlaneClient
     from .config import (
         AgentConfig,
         DEFAULT_CONFIG_PATH,
         auto_apply_latest_provisioning_bundle,
+        is_timestamp_expired,
         load_config,
         save_config,
     )
     from .local_api import AgentRuntimeState, LocalAgentApiServer
     from .version import AGENT_VERSION, is_version_compatible
 except ImportError:  # pragma: no cover - direct script execution fallback
-    from adapters import F5Adapter, QwenAdapter
+    from adapters import F5Adapter
     from client import ControlPlaneClient
     from config import (
         AgentConfig,
         DEFAULT_CONFIG_PATH,
         auto_apply_latest_provisioning_bundle,
+        is_timestamp_expired,
         load_config,
         save_config,
     )
@@ -56,10 +58,6 @@ def build_adapters(config: AgentConfig):
     f5_cfg = config.providers.get("f5")
     if f5_cfg and f5_cfg.enabled and f5_cfg.endpoint_url:
         adapters["f5"] = F5Adapter(endpoint_url=f5_cfg.endpoint_url, api_key=f5_cfg.api_key)
-
-    qwen_cfg = config.providers.get("qwen")
-    if qwen_cfg and qwen_cfg.enabled and qwen_cfg.endpoint_url:
-        adapters["qwen"] = QwenAdapter(endpoint_url=qwen_cfg.endpoint_url, api_key=qwen_cfg.api_key)
 
     return adapters
 
@@ -102,7 +100,6 @@ def activate_if_needed_v2(
         pairing_code=config.pairing_code,
         label=config.label,
         supports_f5="f5" in adapters,
-        supports_qwen="qwen" in adapters,
         capabilities=build_capabilities(config),
         runtime_metadata=build_runtime_metadata(),
     )
@@ -112,6 +109,15 @@ def activate_if_needed_v2(
     config.pairing_code = ""
     save_config(config, config_path)
     LOGGER.info("Worker activated successfully worker_key=%s", config.worker_key or "-")
+    return config
+
+
+def clear_expired_pairing_if_needed(config: AgentConfig, config_path: Path) -> AgentConfig:
+    if not config.worker_token and config.pairing_code and is_timestamp_expired(config.pairing_expires_at):
+        config.pairing_code = ""
+        config.pairing_expires_at = ""
+        save_config(config, config_path)
+        LOGGER.warning("Pairing code expired. Download a fresh pairing bundle from Local TTS.")
     return config
 
 
@@ -162,6 +168,14 @@ def run_agent_v2(config_path: Path, *, provisioning_path: Path | None = None) ->
                     provisioning_path = None
 
             config = runtime_state.get_config_snapshot()
+            previous_pairing_code = config.pairing_code
+            previous_pairing_expires_at = config.pairing_expires_at
+            config = clear_expired_pairing_if_needed(config, config_path)
+            if (
+                config.pairing_code != previous_pairing_code
+                or config.pairing_expires_at != previous_pairing_expires_at
+            ):
+                runtime_state.update_config(config)
             adapters = build_adapters(config)
             if not adapters:
                 raise RuntimeError("No provider adapters are enabled")
@@ -202,7 +216,6 @@ def run_agent_v2(config_path: Path, *, provisioning_path: Path | None = None) ->
                     max_jobs=config.max_jobs_per_poll,
                     wait_for_jobs=config.wait_for_jobs,
                     supports_f5="f5" in adapters,
-                    supports_qwen="qwen" in adapters,
                     capabilities=build_capabilities(config),
                     runtime_metadata=build_runtime_metadata(),
                 )

@@ -1,6 +1,6 @@
 /**
  * SearchBar - Универсальный компонент поиска с фильтрами
- * 
+ *
  * Используется в:
  * - User Management
  * - Voice Management
@@ -105,11 +105,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                 <div className="flex flex-wrap gap-2 items-center">
                     <span className="text-sm text-muted-foreground">Активные фильтры:</span>
                     {activeFilters.map((filter) => (
-                        <Badge
-                            key={filter.key}
-                            variant="secondary"
-                            className="gap-1 pr-1"
-                        >
+                        <Badge key={filter.key} variant="secondary" className="gap-1 pr-1">
                             <span className="text-xs">{filter.label}</span>
                             <Button
                                 variant="ghost"
@@ -122,12 +118,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                         </Badge>
                     ))}
                     {onClearAll && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={onClearAll}
-                            className="h-6 text-xs"
-                        >
+                        <Button variant="ghost" size="sm" onClick={onClearAll} className="h-6 text-xs">
                             Очистить все
                         </Button>
                     )}
@@ -142,7 +133,7 @@ export const SearchBar: React.FC<SearchBarProps> = ({
                             <label className="text-sm font-medium">{filter.label}</label>
                             {filter.type === 'select' && filter.options && (
                                 <Select
-                                    value={activeFilters.find(f => f.key === filter.key)?.value || ''}
+                                    value={activeFilters.find((f) => f.key === filter.key)?.value || ''}
                                     onValueChange={(value) => onFilterChange?.(filter.key, value)}
                                 >
                                     <SelectTrigger>

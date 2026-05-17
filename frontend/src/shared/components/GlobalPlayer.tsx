@@ -17,7 +17,7 @@ import type { DisplayVideo } from './player';
 
 /**
  * GlobalPlayer - Orchestrates YouTube playback across the application.
- * 
+ *
  * Architecture:
  * - useGlobalPlayer hook: player wrapper, event handlers, time sync
  * - MiniPlayerUI: floating mini-player UI for non-YouTube pages
@@ -45,7 +45,7 @@ const GlobalPlayer: React.FC = () => {
         handlePlayerReady,
         handlePlayerStateChange,
         handlePlayerError,
-        playerContainerRef
+        playerContainerRef,
     } = usePlayer();
 
     const [showQueue, setShowQueue] = useState(false);
@@ -96,14 +96,7 @@ const GlobalPlayer: React.FC = () => {
         : queue;
 
     // Player hook
-    const {
-        playerRef,
-        handleReady,
-        handleEnded,
-        handleError,
-        handlePlay,
-        handlePause
-    } = useGlobalPlayer({
+    const { playerRef, handleReady, handleEnded, handleError, handlePlay, handlePause } = useGlobalPlayer({
         displayVideo,
         currentVideo: currentVideo as DisplayVideo | null,
         isPlaying,
@@ -113,7 +106,7 @@ const GlobalPlayer: React.FC = () => {
         handlePlayerReady,
         handlePlayerStateChange,
         handlePlayerError,
-        nextVideo
+        nextVideo,
     });
 
     // Volume change handler
@@ -161,7 +154,9 @@ const GlobalPlayer: React.FC = () => {
         }
     }, [showMiniUI, showQueue]);
 
-    const youtubeUrl = displayVideo ? (displayVideo.url || `https://www.youtube.com/watch?v=${displayVideo.video_id}`) : '';
+    const youtubeUrl = displayVideo
+        ? displayVideo.url || `https://www.youtube.com/watch?v=${displayVideo.video_id}`
+        : '';
 
     // React-Player component (cast to any for library compatibility - same as original)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -199,11 +194,10 @@ const GlobalPlayer: React.FC = () => {
                         iv_load_policy: 3,
                         cc_load_policy: 0,
                         hl: 'ru',
-                        origin: window.location.origin
-                    }
+                        origin: window.location.origin,
+                    },
                 }}
             />
-            
         </div>
     ) : null;
 
@@ -239,7 +233,7 @@ const GlobalPlayer: React.FC = () => {
             playerRoot.style.left = `${rect.left}px`;
             playerRoot.style.width = `${rect.width}px`;
             playerRoot.style.height = `${rect.height}px`;
-            playerRoot.style.borderRadius = isTheaterMode ? '0px' : (computed.borderRadius || '0px');
+            playerRoot.style.borderRadius = isTheaterMode ? '0px' : computed.borderRadius || '0px';
             playerRoot.style.overflow = 'hidden';
             playerRoot.style.pointerEvents = 'auto';
             playerRoot.style.zIndex = isTheaterMode ? '10000' : '40';
@@ -280,29 +274,30 @@ const GlobalPlayer: React.FC = () => {
             {playerRoot && reactPlayerComponent && createPortal(reactPlayerComponent, playerRoot)}
 
             {/* Mini player UI */}
-            {showMiniUI && (miniPlayerContainer
-                ? createPortal(
-                    <MiniPlayerUI
-                        displayVideo={activeDisplayVideo}
-                        displayThumbnail={displayThumbnail}
-                        isPlaying={isPlaying}
-                        isMuted={isMuted}
-                        volume={volume}
-                        queue={upcomingQueue as DisplayVideo[]}
-                        showQueue={showQueue}
-                        onToggleQueue={() => setShowQueue(!showQueue)}
-                        onSelectQueueItem={handleQueueSelect}
-                        onTogglePlayPause={togglePlayPause}
-                        onNextVideo={nextVideo}
-                        onToggleMute={toggleMute}
-                        onVolumeChange={handleVolumeChange}
-                        onClearQueue={handleClearQueue}
-                        onClose={handleMiniClose}
-                        variant="sidebar"
-                    />,
-                    miniPlayerContainer
-                )
-                : (
+            {showMiniUI &&
+                (miniPlayerContainer ? (
+                    createPortal(
+                        <MiniPlayerUI
+                            displayVideo={activeDisplayVideo}
+                            displayThumbnail={displayThumbnail}
+                            isPlaying={isPlaying}
+                            isMuted={isMuted}
+                            volume={volume}
+                            queue={upcomingQueue as DisplayVideo[]}
+                            showQueue={showQueue}
+                            onToggleQueue={() => setShowQueue(!showQueue)}
+                            onSelectQueueItem={handleQueueSelect}
+                            onTogglePlayPause={togglePlayPause}
+                            onNextVideo={nextVideo}
+                            onToggleMute={toggleMute}
+                            onVolumeChange={handleVolumeChange}
+                            onClearQueue={handleClearQueue}
+                            onClose={handleMiniClose}
+                            variant="sidebar"
+                        />,
+                        miniPlayerContainer
+                    )
+                ) : (
                     <MiniPlayerUI
                         displayVideo={activeDisplayVideo}
                         displayThumbnail={displayThumbnail}
@@ -321,8 +316,7 @@ const GlobalPlayer: React.FC = () => {
                         onClose={handleMiniClose}
                         variant="floating"
                     />
-                )
-            )}
+                ))}
 
             {/* Minimized player button - positioned at bottom of sidebar */}
             {showMinimizedButton && (

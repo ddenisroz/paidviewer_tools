@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from core.background_tasks import background_tasks
 from core.config import settings
 from core.connection_manager import get_connection_manager
-from core.database import BotCommand, get_db, init_db
+from core.database import get_db, init_db
 from services.memory_websocket_manager import get_memory_websocket_manager
 from services.tts.memory_tts_queue import get_memory_tts_queue
 
@@ -32,32 +32,15 @@ async def _startup_database() -> None:
 
 
 async def _startup_commands() -> None:
-    """Ensure global bot commands exist for core features such as `!sr`."""
+    """Idempotently refresh the full global command catalog on every startup."""
 
-    db = next(get_db())
     try:
-        has_global = db.query(BotCommand).filter(BotCommand.command_type == "global", BotCommand.user_id.is_(None)).first()
-        has_memegrant = db.query(BotCommand).filter(
-            BotCommand.command_type == "global",
-            BotCommand.user_id.is_(None),
-            BotCommand.command_name == "memegrant",
-        ).first()
-        has_givema = db.query(BotCommand).filter(
-            BotCommand.command_type == "global",
-            BotCommand.user_id.is_(None),
-            BotCommand.command_name == "givema",
-        ).first()
-        if not has_global or not has_memegrant or not has_givema:
-            logger.info("[STARTUP] Seeding or refreshing global bot commands")
-            from init_global_commands import init_global_commands
+        logger.info("[STARTUP] Seeding or refreshing global bot commands")
+        from init_global_commands import init_global_commands
 
-            init_global_commands()
-        else:
-            logger.info("[STARTUP] Global bot commands already exist")
+        init_global_commands()
     except Exception as exc:
         logger.error("Failed to seed global commands: %s", exc)
-    finally:
-        db.close()
 
 
 async def _startup_services() -> None:

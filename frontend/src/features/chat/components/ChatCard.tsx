@@ -11,22 +11,18 @@ import {
     autoScrollIfAtBottom,
     isUserAtBottom,
     scrollToBottom,
-    scrollToBottomInitial
+    scrollToBottomInitial,
 } from '@/features/chat/utils/scrollHelpers';
 import QuickActionsBar from '@/features/home/components/QuickActionsBar';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
-import {
-    isChatEnabled
-} from '@/shared/utils/platformHelpers';
+import { isChatEnabled } from '@/shared/utils/platformHelpers';
 
 import ChatCardFooter from './ChatCardFooter';
 import ChatCardHeader from './ChatCardHeader';
 import ChatContextMenu from './ChatContextMenu';
 import ChatMessageList from './ChatMessageList';
 
-
 import type { ChatMessage } from '@/types/chat';
-
 
 interface Integrations {
     twitch?: {
@@ -74,17 +70,12 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true, 
     const { messages: chatMessages, isConnected, setMessages } = useChat();
 
     // Use custom hooks for platform management and actions
-    const {
-        twitchChatVisible,
-        vkChatVisible,
-        handleTwitchToggle,
-        handleVkToggle
-    } = useChatPlatforms(user?.id);
+    const { twitchChatVisible, vkChatVisible, handleTwitchToggle, handleVkToggle } = useChatPlatforms(user?.id);
 
     const {
         ttsBlockedUsers,
         handleContextMenuAction: handleContextMenuActionFromHook,
-        loadBlockedUsers
+        loadBlockedUsers,
     } = useChatActions(user);
 
     // UI state
@@ -222,20 +213,23 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true, 
         setContextMenu({
             x: e.clientX + 2,
             y: e.clientY + 2,
-            message: msg
+            message: msg,
         });
     };
 
-    const handleContextMenuAction = React.useCallback(async (action: string, msg: ChatMessage): Promise<void> => {
-        await handleContextMenuActionFromHook(action, msg, user);
-    }, [handleContextMenuActionFromHook, user]);
+    const handleContextMenuAction = React.useCallback(
+        async (action: string, msg: ChatMessage): Promise<void> => {
+            await handleContextMenuActionFromHook(action, msg, user);
+        },
+        [handleContextMenuActionFromHook, user]
+    );
 
     // Open chat window
     const handleOpenChatWindow = (): void => {
         const width = 600;
         const height = 800;
-        const left = (window.screen.width / 2) - (width / 2);
-        const top = (window.screen.height / 2) - (height / 2);
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
         window.open(
             '/chat-window',
             'ChatWindow',
@@ -245,10 +239,12 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true, 
 
     // Export functions for separate chat window
     useEffect(() => {
-        (window as { handleChatContextMenuAction?: typeof handleContextMenuAction }).handleChatContextMenuAction = handleContextMenuAction;
+        (window as { handleChatContextMenuAction?: typeof handleContextMenuAction }).handleChatContextMenuAction =
+            handleContextMenuAction;
 
         return () => {
-            delete (window as { handleChatContextMenuAction?: typeof handleContextMenuAction }).handleChatContextMenuAction;
+            delete (window as { handleChatContextMenuAction?: typeof handleContextMenuAction })
+                .handleChatContextMenuAction;
         };
     }, [handleContextMenuAction]);
 
@@ -302,7 +298,9 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true, 
                         message={contextMenu.message}
                         onClose={() => setContextMenu(null)}
                         onAction={handleContextMenuAction}
-                        isTtsBlocked={ttsBlockedUsers.has(`${contextMenu.message.platform}:${(contextMenu.message.author_name || contextMenu.message.author || '').toLowerCase()}`)}
+                        isTtsBlocked={ttsBlockedUsers.has(
+                            `${contextMenu.message.platform}:${(contextMenu.message.author_name || contextMenu.message.author || '').toLowerCase()}`
+                        )}
                     />
                 )}
             </CardContent>
@@ -316,7 +314,7 @@ const ChatCard: React.FC<ChatCardProps> = ({ integrations, isOnHomePage = true, 
             <ChatBoxSettingsModal
                 isOpen={showChatBoxModal}
                 onClose={() => setShowChatBoxModal(false)}
-                onSave={() => { }}
+                onSave={() => {}}
             />
         </Card>
     );

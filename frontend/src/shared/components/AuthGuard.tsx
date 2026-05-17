@@ -26,4 +26,3 @@ const AuthGuard: React.FC = () => {
 };
 
 export default AuthGuard;
-

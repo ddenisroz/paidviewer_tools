@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     frontend_url: str = Field(default="http://localhost:5173", description="Frontend URL")
     tts_gateway_url: str = Field(
         default="",
-        description="Optional unified TTS gateway URL for provider routing (f5/qwen)",
+        description="Optional unified TTS gateway URL for provider routing (F5)",
     )
     tts_gateway_api_key: Optional[str] = Field(
         default=None,
@@ -67,41 +67,6 @@ class Settings(BaseSettings):
     f5_tts_service_api_key: Optional[str] = Field(
         default=None,
         description="Strict API key for bot_service -> f5-tts-service requests",
-    )
-    qwen_tts_service_url: str = Field(
-        default="http://localhost:8012",
-        description="Qwen TTS service URL",
-    )
-    qwen_tts_service_api_key: Optional[str] = Field(
-        default=None,
-        description="Strict API key for bot_service -> qwen upstream requests",
-    )
-    qwen_voice_service_url: str = Field(
-        default="",
-        description="Optional dedicated Qwen voice-management API URL; when empty bot_service falls back to qwen_tts_service_url",
-    )
-    qwen_voice_preview_timeout_seconds: float = Field(
-        default=60.0,
-        description=(
-            "Timeout in seconds for Qwen voice preview/test calls before bot_service returns "
-            "a readable warmup/model-loading error"
-        ),
-    )
-    qwen_cloud_allowed_models: str = Field(
-        default=os.getenv(
-            "QWEN_CLOUD_ALLOWED_MODELS",
-            os.getenv(
-                "QWEN_ALLOWED_MODELS",
-                os.getenv(
-                    "QWEN_TTS_ALLOWED_MODELS",
-                    "Qwen/Qwen3-TTS-12Hz-0.6B-Base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-                ),
-            ),
-        ),
-        description=(
-            "Backend allowlist for managed Qwen runtime models "
-            "(comma-separated family aliases and/or exact model ids)"
-        ),
     )
     f5_tts_storage_root: Optional[str] = Field(
         default=None,
@@ -156,7 +121,7 @@ class Settings(BaseSettings):
         description="Legacy alias for CORS_ORIGINS (comma-separated)",
     )
     local_tts_allowed_hosts: str = Field(
-        default="localhost,127.0.0.1,::1,host.docker.internal,f5_tts,tts_service,qwen_tts,qwen_service",
+        default="localhost,127.0.0.1,::1,host.docker.internal,f5_tts,tts_service",
         description="Allowed hostnames/IPs for user-defined local TTS endpoint URLs (comma-separated)",
     )
     local_tts_allowed_cidrs: str = Field(
@@ -178,10 +143,6 @@ class Settings(BaseSettings):
     worker_agent_default_f5_endpoint_url: str = Field(
         default="http://127.0.0.1:8011",
         description="Default local F5 runtime URL suggested in worker-agent provisioning bundles",
-    )
-    worker_agent_default_qwen_endpoint_url: str = Field(
-        default="http://127.0.0.1:8012",
-        description="Default local Qwen runtime URL suggested in worker-agent provisioning bundles",
     )
     worker_pairing_token_ttl_minutes: int = Field(
         default=15,
@@ -209,7 +170,7 @@ class Settings(BaseSettings):
     )
     worker_control_managed_enabled: bool = Field(
         default=True,
-        description="Allow bot_service to route managed F5/Qwen requests through worker-agent jobs",
+        description="Allow bot_service to route managed F5 requests through worker-agent jobs",
     )
     worker_result_timeout_seconds: int = Field(
         default=90,

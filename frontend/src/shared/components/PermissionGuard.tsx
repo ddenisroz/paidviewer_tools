@@ -11,12 +11,12 @@ interface PermissionGuardProps {
     fallback?: ReactNode;
 }
 
-const PermissionGuard: React.FC<PermissionGuardProps> = ({ 
-    children, 
-    requireAuth = false, 
-    requirePlatformToken = false, 
+const PermissionGuard: React.FC<PermissionGuardProps> = ({
+    children,
+    requireAuth = false,
+    requirePlatformToken = false,
     requireAdmin = false,
-    fallback = null 
+    fallback = null,
 }) => {
     const { isAuthenticated, user } = useAuth();
     const isAdmin = user?.role === 'admin' || user?.is_admin === true;
@@ -40,4 +40,3 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({
 };
 
 export default PermissionGuard;
-

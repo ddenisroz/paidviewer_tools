@@ -14,80 +14,79 @@ import type { AxiosResponse } from 'axios';
  * Integrations Service
  */
 export const integrationsService = {
-  /**
-   * Отключить Twitch интеграцию
-   * @returns Promise с ответом API
-   */
-  async disconnectTwitch(): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/integrations/twitch/disconnect');
-  },
+    /**
+     * Отключить Twitch интеграцию
+     * @returns Promise с ответом API
+     */
+    async disconnectTwitch(): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.post('/api/integrations/twitch/disconnect');
+    },
 
-  /**
-   * Отключить VK интеграцию
-   * @returns Promise с ответом API
-   */
-  async disconnectVk(): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/integrations/vk/disconnect');
-  },
+    /**
+     * Отключить VK интеграцию
+     * @returns Promise с ответом API
+     */
+    async disconnectVk(): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.post('/api/integrations/vk/disconnect');
+    },
 
-  /**
-   * Подключить Twitch интеграцию (редирект)
-   */
-  connectTwitch(): void {
-    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/twitch/login');
-    if (!safeUrl) {
-      logger.error('Blocked unsafe Twitch integration redirect URL', { API_BASE_URL });
-      return;
-    }
-    window.location.href = safeUrl;
-  },
+    /**
+     * Подключить Twitch интеграцию (редирект)
+     */
+    connectTwitch(): void {
+        const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/twitch/login');
+        if (!safeUrl) {
+            logger.error('Blocked unsafe Twitch integration redirect URL', { API_BASE_URL });
+            return;
+        }
+        window.location.href = safeUrl;
+    },
 
-  /**
-   * Подключить VK интеграцию (редирект)
-   */
-  connectVk(): void {
-    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/vk/login');
-    if (!safeUrl) {
-      logger.error('Blocked unsafe VK integration redirect URL', { API_BASE_URL });
-      return;
-    }
-    window.location.href = safeUrl;
-  },
+    /**
+     * Подключить VK интеграцию (редирект)
+     */
+    connectVk(): void {
+        const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/vk/login');
+        if (!safeUrl) {
+            logger.error('Blocked unsafe VK integration redirect URL', { API_BASE_URL });
+            return;
+        }
+        window.location.href = safeUrl;
+    },
 
-  /**
-   * Подключить DonationAlerts (редирект)
-   */
-  connectDonationAlertsRedirect(): void {
-    const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/donationalerts/login');
-    if (!safeUrl) {
-      logger.error('Blocked unsafe DonationAlerts integration redirect URL', { API_BASE_URL });
-      return;
-    }
-    window.location.href = safeUrl;
-  },
+    /**
+     * Подключить DonationAlerts (редирект)
+     */
+    connectDonationAlertsRedirect(): void {
+        const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/donationalerts/login');
+        if (!safeUrl) {
+            logger.error('Blocked unsafe DonationAlerts integration redirect URL', { API_BASE_URL });
+            return;
+        }
+        window.location.href = safeUrl;
+    },
 
-  /**
-   * Получить список интеграций
-   * @returns Promise с ответом API
-   */
-  async getIntegrations(): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.get('/api/integrations');
-  },
+    /**
+     * Получить список интеграций
+     * @returns Promise с ответом API
+     */
+    async getIntegrations(): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.get('/api/integrations');
+    },
 
-  /**
-   * Отключить интеграцию DonationAlerts
-   * @returns Promise с ответом API
-   */
-  async disconnectDonationAlerts(): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/integrations/donationalerts/disconnect');
-  },
+    /**
+     * Отключить интеграцию DonationAlerts
+     * @returns Promise с ответом API
+     */
+    async disconnectDonationAlerts(): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.post('/api/donationalerts/disconnect');
+    },
 
-  /**
-   * Подключить DonationAlerts (получить URL для подключения)
-   * @returns Promise с ответом API
-   */
-  async connectDonationAlerts(): Promise<AxiosResponse<ApiResponse>> {
-    return apiClient.post('/api/donationalerts/connect');
-  },
+    /**
+     * Подключить DonationAlerts (получить URL для подключения)
+     * @returns Promise с ответом API
+     */
+    async connectDonationAlerts(): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.post('/api/donationalerts/connect');
+    },
 };
-

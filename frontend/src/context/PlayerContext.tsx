@@ -1,6 +1,5 @@
 ﻿import React, { createContext, ReactNode, useCallback, useContext, useEffect, useReducer, useRef } from 'react';
 
-
 import { useLocation } from 'react-router-dom';
 import { useInterval } from 'react-use';
 
@@ -13,7 +12,6 @@ import { useAuth } from './AuthContext';
 import { useChat } from './ChatContext';
 
 import type { YoutubeQueue, YoutubeVideo } from '@/types/youtube';
-
 
 declare global {
     interface Window {
@@ -72,14 +70,14 @@ type PlayerAction =
     | { type: 'SET_QUEUE'; payload: YoutubeVideo[] }
     | { type: 'SET_PLAYER_REF'; payload: YouTubePlayer | null }
     | {
-        type: 'LOAD_QUEUE';
-        payload: {
-            queue: YoutubeVideo[];
-            current_video: YoutubeVideo | null;
-            is_playing?: boolean;
-            skip_votes?: { current: number; required: number; video_id?: number | string | null } | null;
-        };
-    }
+          type: 'LOAD_QUEUE';
+          payload: {
+              queue: YoutubeVideo[];
+              current_video: YoutubeVideo | null;
+              is_playing?: boolean;
+              skip_votes?: { current: number; required: number; video_id?: number | string | null } | null;
+          };
+      }
     | { type: 'NEXT_VIDEO'; payload: { current_video: YoutubeVideo | null } }
     | { type: 'TOGGLE_PLAY_PAUSE' }
     | { type: 'CLOSE_PLAYER' }
@@ -101,7 +99,7 @@ const initialState: PlayerState = {
     skipVotes: null,
     playerRef: null,
     isLoading: false,
-    error: null
+    error: null,
 };
 
 const MINI_PLAYER_MINIMIZED_STORAGE_KEY = 'yt_player_minimized';
@@ -116,11 +114,10 @@ const initializePlayerState = (baseState: PlayerState): PlayerState => {
     const isMinimized = window.localStorage.getItem(MINI_PLAYER_MINIMIZED_STORAGE_KEY) === '1';
     return {
         ...baseState,
-        isMinimized
+        isMinimized,
     };
 };
 
- 
 const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState => {
     switch (action.type) {
         case 'SET_LOADING':
@@ -132,7 +129,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
                 ...state,
                 currentVideo: action.payload,
                 isVisible: !!action.payload,
-                error: null
+                error: null,
             };
         case 'SET_PLAYING':
             return { ...state, isPlaying: action.payload };
@@ -166,7 +163,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
             const hasQueue = queue.length > 0 || !!currentVideo;
             const rawIsPlaying = (action.payload as { is_playing?: boolean }).is_playing ?? false;
             const userStarted = typeof window !== 'undefined' && window.ytUserStarted === true;
-            const isPlaying = state.userPaused ? false : (state.isPlaying || (Boolean(rawIsPlaying) && userStarted));
+            const isPlaying = state.userPaused ? false : state.isPlaying || (Boolean(rawIsPlaying) && userStarted);
             const skipVotes = action.payload.skip_votes ?? null;
             return {
                 ...state,
@@ -176,7 +173,7 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
                 skipVotes,
                 isVisible: hasQueue,
                 isLoading: false,
-                error: null
+                error: null,
             };
         }
         case 'NEXT_VIDEO': {
@@ -186,38 +183,37 @@ const playerReducer = (state: PlayerState, action: PlayerAction): PlayerState =>
                 currentVideo: action.payload.current_video,
                 userPaused: false,
                 isPlaying: hasNextVideo,
-                isVisible: hasNextVideo
+                isVisible: hasNextVideo,
             };
         }
         case 'TOGGLE_PLAY_PAUSE':
             return {
                 ...state,
                 isPlaying: !state.isPlaying,
-                isVisible: !state.isPlaying ? true : state.isVisible
+                isVisible: !state.isPlaying ? true : state.isVisible,
             };
         case 'CLOSE_PLAYER':
             return {
                 ...state,
                 isVisible: false,
                 isPlaying: false,
-                isMinimized: false
+                isMinimized: false,
             };
         case 'MINIMIZE_PLAYER':
             return {
                 ...state,
                 isMinimized: true,
-                isPlaying: false
+                isPlaying: false,
             };
         case 'MAXIMIZE_PLAYER':
             return {
                 ...state,
-                isMinimized: false
+                isMinimized: false,
             };
         default:
             return state;
     }
 };
-
 
 interface PlayerContextValue extends PlayerState {
     loadQueue: (force?: boolean) => Promise<void>;
@@ -247,7 +243,6 @@ interface PlayerProviderProps {
     children: ReactNode;
 }
 
- 
 export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const [state, dispatch] = useReducer(playerReducer, initialState, initializePlayerState);
     const lastUpdateTimeRef = useRef<number>(0);
@@ -267,9 +262,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
     const isMediaYoutubeTab = currentPath.startsWith('/dashboard/media') && (!activeTab || activeTab === 'youtube');
     const isOnYoutubePage = currentPath.startsWith('/dashboard/youtube') || isMediaYoutubeTab;
     const shouldPollQueue = isOnYoutubePage || state.isPlaying;
-    const queueRefetchInterval = shouldPollQueue
-        ? (isChatConnected ? 30000 : 15000)
-        : (state.isVisible ? 60000 : 120000);
+    const queueRefetchInterval = shouldPollQueue ? (isChatConnected ? 30000 : 15000) : state.isVisible ? 60000 : 120000;
 
     const broadcastPlaybackSync = useCallback((command: PlaybackSyncCommand): void => {
         if (typeof window === 'undefined') {
@@ -278,7 +271,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         try {
             window.localStorage.setItem(
                 YOUTUBE_PLAYBACK_SYNC_STORAGE_KEY,
-                JSON.stringify({ command, timestamp: Date.now() }),
+                JSON.stringify({ command, timestamp: Date.now() })
             );
         } catch (error) {
             logger.debug('[YouTube] Failed to broadcast playback sync', error);
@@ -315,10 +308,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
 
         try {
-            window.localStorage.setItem(
-                MINI_PLAYER_MINIMIZED_STORAGE_KEY,
-                state.isMinimized ? '1' : '0'
-            );
+            window.localStorage.setItem(MINI_PLAYER_MINIMIZED_STORAGE_KEY, state.isMinimized ? '1' : '0');
         } catch (error) {
             logger.debug('[YouTube] Failed to persist mini-player minimized state', error);
         }
@@ -340,7 +330,12 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         }
     }, [state.playerRef, state.volume, state.isMuted]);
 
-    const { data: queueData, isLoading: isLoadingQueue, refetch: refetchQueue, error: _queueError } = useYoutubeQueue({
+    const {
+        data: queueData,
+        isLoading: isLoadingQueue,
+        refetch: refetchQueue,
+        error: _queueError,
+    } = useYoutubeQueue({
         enabled: !!isAuthenticated,
         refetchInterval: queueRefetchInterval,
         refetchIntervalInBackground: false,
@@ -367,15 +362,15 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             const skipVotes = (queue as YoutubeQueue & { skip_votes?: PlayerState['skipVotes'] }).skip_votes ?? null;
             const hasVideo = Boolean(normalizedCurrent || normalizedQueue.length > 0);
             const userStarted = typeof window !== 'undefined' && window.ytUserStarted === true;
-            const nextIsPlaying = hasVideo ? (state.isPlaying || (rawIsPlaying && userStarted)) : false;
+            const nextIsPlaying = hasVideo ? state.isPlaying || (rawIsPlaying && userStarted) : false;
             dispatch({
                 type: 'LOAD_QUEUE',
                 payload: {
                     queue: normalizedQueue,
                     current_video: normalizedCurrent,
                     is_playing: nextIsPlaying,
-                    skip_votes: skipVotes
-                }
+                    skip_votes: skipVotes,
+                },
             });
             dispatch({ type: 'SET_LOADING', payload: false });
         }
@@ -390,7 +385,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             }
             dispatch({
                 type: 'SET_ERROR',
-                payload: 'Ошибка загрузки очереди'
+                payload: 'Ошибка загрузки очереди',
             });
             dispatch({ type: 'SET_LOADING', payload: false });
         }
@@ -400,12 +395,15 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         dispatch({ type: 'SET_LOADING', payload: isLoadingQueue });
     }, [isLoadingQueue]);
 
-    const loadQueue = useCallback(async (_force: boolean = false): Promise<void> => {
-        if (!isAuthenticated) {
-            return;
-        }
-        await refetchQueue();
-    }, [isAuthenticated, refetchQueue]);
+    const loadQueue = useCallback(
+        async (_force: boolean = false): Promise<void> => {
+            if (!isAuthenticated) {
+                return;
+            }
+            await refetchQueue();
+        },
+        [isAuthenticated, refetchQueue]
+    );
 
     useEffect(() => {
         if (typeof window === 'undefined') {
@@ -495,7 +493,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 const nextCurrentVideo = data.current_video ?? data.data?.current_video ?? null;
                 dispatch({
                     type: 'NEXT_VIDEO',
-                    payload: { current_video: nextCurrentVideo }
+                    payload: { current_video: nextCurrentVideo },
                 });
                 void refetchQueue();
             } else {
@@ -506,7 +504,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
             logger.error('Error skipping to next video:', error);
             dispatch({
                 type: 'SET_ERROR',
-                payload: 'Не удалось перейти к следующему видео'
+                payload: 'Не удалось перейти к следующему видео',
             });
         },
     });
@@ -577,9 +575,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
 
     const toggleMute = (): void => {
         if (state.isMuted) {
-            const restoredVolume = state.volume > 0
-                ? state.volume
-                : Math.max(1, Math.min(100, Math.round(lastNonZeroVolumeRef.current || 50)));
+            const restoredVolume =
+                state.volume > 0
+                    ? state.volume
+                    : Math.max(1, Math.min(100, Math.round(lastNonZeroVolumeRef.current || 50)));
             dispatch({ type: 'SET_VOLUME', payload: restoredVolume });
             dispatch({ type: 'SET_MUTED', payload: false });
             if (state.playerRef) {
@@ -791,9 +790,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         dispatch({ type: 'MAXIMIZE_PLAYER' });
     };
 
-    const playerSyncInterval = !isAuthenticated
-        ? null
-        : (isOnYoutubePage ? 250 : (state.isPlaying ? 1000 : 2000));
+    const playerSyncInterval = !isAuthenticated ? null : isOnYoutubePage ? 250 : state.isPlaying ? 1000 : 2000;
 
     useInterval(() => {
         if (isAuthenticated) {
@@ -830,7 +827,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                     if (data.video) {
                         dispatch({
                             type: 'SET_CURRENT_VIDEO',
-                            payload: data.video
+                            payload: data.video,
                         });
                         dispatch({ type: 'SET_PLAYING', payload: true });
                     }
@@ -841,7 +838,7 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
                 case 'theater_mode_changed':
                     dispatch({
                         type: 'SET_THEATER_MODE',
-                        payload: data.isTheaterMode
+                        payload: data.isTheaterMode,
                     });
                     break;
                 default:
@@ -879,14 +876,10 @@ export const PlayerProvider: React.FC<PlayerProviderProps> = ({ children }) => {
         setIsTheaterMode,
         markPlaybackStarted,
         playerContainerRef,
-        setPlayerContainer
+        setPlayerContainer,
     };
 
-    return (
-        <PlayerContext.Provider value={value}>
-            {children}
-        </PlayerContext.Provider>
-    );
+    return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
 };
 
 // eslint-disable-next-line react-refresh/only-export-components

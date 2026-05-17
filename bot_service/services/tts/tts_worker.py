@@ -14,6 +14,7 @@ from services.tts.memory_tts_queue import get_memory_tts_queue, TTSTask, TaskSta
 from services.tts.tts_manager import get_tts_manager
 from core.database import SessionLocal
 from core.connection_manager import get_connection_manager
+from services.notification_service import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,7 @@ class TTSWorker:
                     user_id=task.user_id,
                     volume_level=volume,
                     use_ai_tts=use_ai,
-                    use_basic_tts=True,
+                    use_basic_tts=not use_ai,
                     connection_manager=self.connection_manager,
                     db_session=db,
                     tts_settings=tts_settings,
@@ -115,6 +116,7 @@ class TTSWorker:
                 
                 if result.get("success"):
                     await get_memory_tts_queue().complete_task(task.task_id, result)
+                    await self._broadcast_completed_task(task, result)
                 else:
                     await get_memory_tts_queue().fail_task(task.task_id, result.get("error", "Unknown error"))
                     
@@ -125,6 +127,39 @@ class TTSWorker:
             logger.exception("Failed to process task %s", task.task_id)
             logger.error(traceback.format_exc())
             await get_memory_tts_queue().fail_task(task.task_id, str(e))
+
+    async def _broadcast_completed_task(self, task: TTSTask, result: dict) -> None:
+        """Deliver synthesized queued audio to the active TTS sink."""
+        metadata = task.metadata or {}
+        source_message_id = (
+            metadata.get("source_message_id")
+            or getattr(task, "meta_source_message_id", None)
+        )
+        trace_id = metadata.get("trace_id") or getattr(task, "meta_trace_id", None)
+        try:
+            await notification_service.broadcast_tts_audio(
+                audio_data={
+                    "audio_url": result.get("audio_url"),
+                    "voice": result.get("voice", task.voice or "unknown"),
+                    "volume": result.get("volume", getattr(task, "meta_volume", 50.0)),
+                    "tts_type": result.get("tts_type", "unknown"),
+                    "duration": result.get("duration", 0),
+                    "text": task.text,
+                    "spoken_text": result.get("spoken_text") or task.text,
+                    "original_text": metadata.get("original_text") or task.text,
+                    "username": getattr(task, "meta_author", None) or metadata.get("author") or "System",
+                    "trace_id": trace_id,
+                    "source_message_id": source_message_id,
+                    "requested_provider": result.get("requested_provider"),
+                    "actual_provider": result.get("actual_provider"),
+                    "fallback_used": bool(result.get("fallback_used")),
+                    "fallback_reason": result.get("fallback_reason"),
+                },
+                channel_name=task.channel,
+                platform=task.platform,
+            )
+        except Exception:
+            logger.exception("Failed to broadcast completed TTS task %s", task.task_id)
 
 # Global instance
 tts_worker = TTSWorker()

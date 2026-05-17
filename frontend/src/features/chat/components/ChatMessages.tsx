@@ -48,7 +48,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     ttsBlockedUsers,
     setTtsBlockedUsers,
     emotes,
-    handleContextMenuAction
+    handleContextMenuAction,
 }) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -59,13 +59,13 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             messagesEndRef.current.scrollIntoView({
                 behavior: 'smooth',
                 block: 'nearest',
-                inline: 'nearest'
+                inline: 'nearest',
             });
         }
     }, [messages]);
 
     // Фильтрация сообщений по платформам
-    const filteredMessages = messages.filter(msg => {
+    const filteredMessages = messages.filter((msg) => {
         if (combinedChat) {
             return true; // Показываем все сообщения в объединенном чате
         }
@@ -86,7 +86,7 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
         setContextMenu({
             x: e.clientX,
             y: e.clientY,
-            message: message
+            message: message,
         });
     };
 
@@ -97,10 +97,10 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
             const username = message.username || message.author || '';
             switch (action) {
                 case 'block_tts':
-                    setTtsBlockedUsers(prev => new Set([...prev, username]));
+                    setTtsBlockedUsers((prev) => new Set([...prev, username]));
                     break;
                 case 'unblock_tts':
-                    setTtsBlockedUsers(prev => {
+                    setTtsBlockedUsers((prev) => {
                         const newSet = new Set(prev);
                         newSet.delete(username);
                         return newSet;
@@ -127,9 +127,17 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
     const getPlatformBadge = (platform: string) => {
         switch (platform) {
             case 'twitch':
-                return <Badge variant="outline" className="text-purple-400 border-purple-500">Twitch</Badge>;
+                return (
+                    <Badge variant="outline" className="text-purple-400 border-purple-500">
+                        Twitch
+                    </Badge>
+                );
             case 'vk':
-                return <Badge variant="outline" className="text-rose-400 border-rose-500">VK Live</Badge>;
+                return (
+                    <Badge variant="outline" className="text-rose-400 border-rose-500">
+                        VK Live
+                    </Badge>
+                );
             default:
                 return null;
         }
@@ -162,34 +170,38 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                                 className="flex items-start gap-2 p-2 rounded hover:bg-gray-800 transition-colors cursor-context-menu"
                                 onContextMenu={(e) => handleContextMenuClick(e, message)}
                             >
-                                <div className="flex-shrink-0 mt-1">
-                                    {getPlatformIcon(message.platform)}
-                                </div>
+                                <div className="flex-shrink-0 mt-1">{getPlatformIcon(message.platform)}</div>
 
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         {/* Render Twitch badges if present */}
-                                        {message.badges && message.badges.length > 0 && message.platform === 'twitch' && (
-                                            <span className="flex items-center gap-0.5">
-                                                {message.badges.map((badge, idx) => {
-                                                    const [badgeId, version] = badge.split('/');
-                                                    // Try to get URL from global cache (badges should be preloaded)
-                                                    const url = twitchBadgesService.getBadgeUrl(badgeId, version || '1', '1x');
-                                                    if (url) {
-                                                        return (
-                                                            <img
-                                                                key={`${badgeId}-${idx}`}
-                                                                src={url}
-                                                                alt={badgeId}
-                                                                title={badgeId}
-                                                                className="h-4 w-4 inline-block object-contain align-text-bottom"
-                                                            />
+                                        {message.badges &&
+                                            message.badges.length > 0 &&
+                                            message.platform === 'twitch' && (
+                                                <span className="flex items-center gap-0.5">
+                                                    {message.badges.map((badge, idx) => {
+                                                        const [badgeId, version] = badge.split('/');
+                                                        // Try to get URL from global cache (badges should be preloaded)
+                                                        const url = twitchBadgesService.getBadgeUrl(
+                                                            badgeId,
+                                                            version || '1',
+                                                            '1x'
                                                         );
-                                                    }
-                                                    return null;
-                                                })}
-                                            </span>
-                                        )}
+                                                        if (url) {
+                                                            return (
+                                                                <img
+                                                                    key={`${badgeId}-${idx}`}
+                                                                    src={url}
+                                                                    alt={badgeId}
+                                                                    title={badgeId}
+                                                                    className="h-4 w-4 inline-block object-contain align-text-bottom"
+                                                                />
+                                                            );
+                                                        }
+                                                        return null;
+                                                    })}
+                                                </span>
+                                            )}
                                         {message.badges && message.badges.length > 0 && message.platform === 'vk' && (
                                             <span className="flex items-center gap-0.5">
                                                 {message.badges.map((badge, idx) => {
@@ -248,7 +260,10 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
                     message={contextMenu.message}
                     onAction={handleContextMenuActionLocal}
                     onClose={() => setContextMenu(null)}
-                    isTtsBlocked={ttsBlockedUsers && ttsBlockedUsers.has(contextMenu.message?.username || contextMenu.message?.author || '')}
+                    isTtsBlocked={
+                        ttsBlockedUsers &&
+                        ttsBlockedUsers.has(contextMenu.message?.username || contextMenu.message?.author || '')
+                    }
                 />
             )}
         </Card>
@@ -256,4 +271,3 @@ const ChatMessages: React.FC<ChatMessagesProps> = ({
 };
 
 export default ChatMessages;
-

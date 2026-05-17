@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-import { Pause, Play, SkipForward, Square, Volume2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { SkipForward, Square, Volume2 } from 'lucide-react';
 
 import { STORAGE_KEYS } from '@/constants';
 import { useTtsPlayer } from '@/context/TtsPlayerContext';
@@ -17,25 +16,23 @@ const getStoredListeningMode = (): ListeningMode => {
     return window.localStorage.getItem(STORAGE_KEYS.TTS_LISTENING_MODE) === 'obs' ? 'obs' : 'website';
 };
 
-const formatMessage = (text: string, maxLength: number = 180): string => {
+const formatMessage = (text: string, maxLength = 150): string => {
     if (text.length <= maxLength) return text;
     return `${text.slice(0, maxLength)}...`;
 };
+
+const formatQueuedAt = (date: Date): string =>
+    date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 const TtsPlayerPage: React.FC = () => {
     const {
         queue,
         currentItem,
-        isPlaying,
-        isPaused,
         isPrimaryPlayerTab,
         isAudioUnlocked,
         clearQueue,
         skipCurrent,
-        playFromQueue,
-        togglePause,
-        requestPrimaryPlayerTab,
-        unlockAudio
+        unlockAudio,
     } = useTtsPlayer();
 
     const { data: audioSettingsResponse } = useTtsAudioSettings();
@@ -53,14 +50,12 @@ const TtsPlayerPage: React.FC = () => {
 
     useEffect(() => {
         const handleModeChange = (event: CustomEvent<{ mode?: string }>) => {
-            const mode = event.detail?.mode === 'obs' ? 'obs' : 'website';
-            setListeningMode(mode);
+            setListeningMode(event.detail?.mode === 'obs' ? 'obs' : 'website');
         };
 
         const handleStorageChange = (event: StorageEvent) => {
             if (event.key !== STORAGE_KEYS.TTS_LISTENING_MODE) return;
-            const mode = event.newValue === 'obs' ? 'obs' : 'website';
-            setListeningMode(mode);
+            setListeningMode(event.newValue === 'obs' ? 'obs' : 'website');
         };
 
         window.addEventListener('tts-listening-mode-changed', handleModeChange as EventListener);
@@ -82,7 +77,6 @@ const TtsPlayerPage: React.FC = () => {
 
     const handleVolumeChange = (value: number): void => {
         setWebsiteVolume(value);
-
         if (volumeDebounceRef.current) {
             clearTimeout(volumeDebounceRef.current);
         }
@@ -92,157 +86,139 @@ const TtsPlayerPage: React.FC = () => {
         }, 250);
     };
 
-    const queueCountLabel = useMemo(() => {
-        if (!currentItem && queue.length === 0) return 'Empty';
-        if (queue.length === 0) return 'No queue';
-        return `${queue.length} queued`;
-    }, [currentItem, queue.length]);
-
-    const canControlPlayback = Boolean(currentItem) && listeningMode === 'website' && isPrimaryPlayerTab;
+    const hasItems = Boolean(currentItem) || queue.length > 0;
+    const canControlPlayback = listeningMode === 'website' && isPrimaryPlayerTab && hasItems;
     const showUnlockOverlay = listeningMode === 'website' && !isAudioUnlocked;
 
     return (
-        <div className="relative min-h-screen bg-background p-4 sm:p-6">
-            {showUnlockOverlay && (
-                <div
-                    className="fixed inset-0 z-[70] flex items-center justify-center bg-background/88 backdrop-blur-sm"
-                    onPointerDown={() => void unlockAudio()}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            void unlockAudio();
-                        }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Активировать звук TTS плеера"
+        <div className="min-h-screen bg-background p-4 sm:p-6">
+            {showUnlockOverlay ? (
+                <button
+                    type="button"
+                    className="fixed inset-0 z-[70] flex items-center justify-center bg-background/95"
+                    onClick={() => void unlockAudio()}
                 >
-                    <div className="mx-4 w-full max-w-md rounded-xl border border-border/80 bg-card/95 p-5 text-center shadow-xl">
-                        <p className="text-base font-semibold text-foreground">Активируйте звук</p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            Нажмите в любом месте, чтобы разрешить воспроизведение TTS в браузере.
-                        </p>
-                    </div>
-                </div>
-            )}
-            <div className="mx-auto w-full max-w-5xl">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:items-start">
-                    <Card className="card-glass lg:col-span-2 lg:min-h-[520px]">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-base sm:text-lg">TTS Player</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4 lg:space-y-5">
-                            {listeningMode === 'obs' && (
-                                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                                    OBS mode is active. Switch mode in <Link to="/dashboard/tts" className="underline">TTS settings</Link>.
-                                </div>
-                            )}
+                    <span className="rounded-xl border border-border/70 bg-card px-5 py-3 text-sm font-bold text-foreground">
+                        Включить звук
+                    </span>
+                </button>
+            ) : null}
 
-                            {listeningMode === 'website' && !isPrimaryPlayerTab && (
-                                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                                    Another TTS Player tab is active.
-                                    <button
-                                        type="button"
-                                        onClick={requestPrimaryPlayerTab}
-                                        className="ml-2 underline"
-                                    >
-                                        Take control
-                                    </button>
-                                </div>
-                            )}
+            <main className="mx-auto grid w-full max-w-5xl gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+                <Card className="card-glass border-border/70">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base">TTS Player</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                className="h-12 rounded-xl"
+                                onClick={clearQueue}
+                                disabled={!hasItems}
+                            >
+                                <Square className="mr-2 h-4 w-4" />
+                                Стоп
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="h-12 rounded-xl"
+                                onClick={skipCurrent}
+                                disabled={!canControlPlayback}
+                            >
+                                <SkipForward className="mr-2 h-4 w-4" />
+                                Скип
+                            </Button>
+                        </div>
 
-                            <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-                                <p className="text-xs text-muted-foreground">{queueCountLabel}</p>
-                                <p className="mt-1 break-words text-sm text-foreground">
-                                    {currentItem ? formatMessage(currentItem.text) : 'Waiting for messages...'}
-                                </p>
-                                {currentItem && (
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {currentItem.username || 'System'}{currentItem.platform ? ` - ${currentItem.platform}` : ''}
-                                    </p>
-                                )}
+                        <div className="rounded-xl border border-border/70 bg-background/35 p-4">
+                            <div className="mb-3 flex items-center justify-between gap-3">
+                                <span className="inline-flex items-center gap-2 text-sm font-bold text-foreground">
+                                    <Volume2 className="h-4 w-4 text-emerald-300" />
+                                    Громкость
+                                </span>
+                                <span className="text-sm font-bold text-foreground">{websiteVolume}%</span>
                             </div>
+                            <Slider
+                                value={[websiteVolume]}
+                                min={0}
+                                max={100}
+                                step={1}
+                                onValueChange={(values) => handleVolumeChange(values[0])}
+                                disabled={listeningMode !== 'website'}
+                            />
+                        </div>
+                    </CardContent>
+                </Card>
 
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={togglePause}
-                                    disabled={!canControlPlayback}
-                                    className="w-full"
-                                >
-                                    {isPaused || !isPlaying ? <Play className="mr-1 h-4 w-4" /> : <Pause className="mr-1 h-4 w-4" />}
-                                    {isPaused || !isPlaying ? 'Play' : 'Pause'}
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    onClick={skipCurrent}
-                                    disabled={!canControlPlayback}
-                                    className="w-full"
-                                >
-                                    <SkipForward className="mr-1 h-4 w-4" />
-                                    Skip
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={clearQueue}
-                                    disabled={!currentItem && queue.length === 0}
-                                    className="w-full"
-                                >
-                                    <Square className="mr-1 h-4 w-4" />
-                                    Stop
-                                </Button>
+                <Card className="card-glass min-h-[520px] border-border/70">
+                    <CardHeader className="border-b border-white/5 pb-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <CardTitle className="text-base">Очередь на озвучку</CardTitle>
+                            <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-bold text-foreground">
+                                {(currentItem ? 1 : 0) + queue.length}
+                            </span>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-4">
+                        {!hasItems ? (
+                            <div className="flex h-[410px] items-center justify-center rounded-xl border border-dashed border-border/70">
+                                <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/45" />
                             </div>
-
-                            <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-                                <div className="mb-2 flex items-center justify-between">
-                                    <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                                        <Volume2 className="h-3.5 w-3.5" />
-                                        Browser volume
-                                    </span>
-                                    <span className="text-xs font-semibold text-foreground">{websiteVolume}%</span>
-                                </div>
-                                <Slider
-                                    value={[websiteVolume]}
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    onValueChange={(values) => handleVolumeChange(values[0])}
-                                    disabled={listeningMode !== 'website'}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="card-glass lg:col-span-1 lg:min-h-[520px]">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm">Queue ({queue.length})</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2 lg:max-h-[440px] lg:overflow-y-auto lg:pr-1">
-                            {queue.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">Queue is empty</p>
-                            ) : (
-                                queue.map((item, index) => (
-                                    <button
-                                        key={item.id}
-                                        type="button"
-                                        onClick={() => playFromQueue(index)}
-                                        disabled={!isPrimaryPlayerTab}
-                                        className="w-full rounded-md border border-border/60 bg-muted/10 px-3 py-2 text-left transition-colors hover:bg-muted/30"
-                                    >
-                                        <p className="break-words text-sm text-foreground">{formatMessage(item.text, 120)}</p>
-                                        <p className="mt-1 text-[11px] text-muted-foreground">
-                                            {item.username || 'System'}{item.platform ? ` - ${item.platform}` : ''}
+                        ) : (
+                            <div className="space-y-2">
+                                {currentItem ? (
+                                    <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-3">
+                                        <div className="mb-2 flex items-center justify-between gap-3">
+                                            <span className="text-xs font-bold uppercase tracking-wide text-emerald-200">
+                                                Играет
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {formatQueuedAt(currentItem.timestamp)}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm font-bold text-foreground">
+                                            {formatMessage(currentItem.text)}
                                         </p>
-                                    </button>
-                                ))
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {[currentItem.username, currentItem.platform].filter(Boolean).join(' / ')}
+                                        </p>
+                                    </div>
+                                ) : null}
+
+                                {queue.map((item) => {
+                                    const isGenerated = Boolean(item.audioUrl);
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className="rounded-xl border border-border/70 bg-background/35 px-4 py-3"
+                                        >
+                                            <div className="mb-2 flex items-center justify-between gap-3">
+                                                <span
+                                                    className={`text-xs font-bold uppercase tracking-wide ${
+                                                        isGenerated ? 'text-sky-200' : 'text-amber-200'
+                                                    }`}
+                                                >
+                                                    {isGenerated ? 'Готово' : 'Генерация'}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {formatQueuedAt(item.timestamp)}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm font-bold text-foreground">{formatMessage(item.text)}</p>
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                {[item.username, item.platform].filter(Boolean).join(' / ')}
+                                            </p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </main>
         </div>
     );
 };

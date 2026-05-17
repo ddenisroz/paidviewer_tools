@@ -10,6 +10,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+Set-Location -LiteralPath $PSScriptRoot
 
 function Invoke-NativeOrThrow {
     param(
@@ -185,7 +186,7 @@ function Wait-ForServicesReady {
     while ((Get-Date) -lt $deadline) {
         $statuses = @(Get-ServiceReadinessStatus -ComposeArgs $ComposeArgs -ServiceNames $ServiceNames)
         $pending = @($statuses | Where-Object { $_.status -notin @("running", "healthy") })
-        $failed = @($statuses | Where-Object { $_.status -in @("exited", "dead", "unhealthy", "missing") })
+        $failed = @($statuses | Where-Object { $_.status -in @("exited", "dead", "missing") })
 
         if ($failed.Count -gt 0) {
             $failedText = ($failed | ForEach-Object { "$($_.service)=$($_.status)" }) -join ", "
@@ -249,7 +250,39 @@ if (-not (Test-Path "bot_service/.env")) {
 
 Stop-ExistingLogWatchers
 
-$selectedServices = @($Services | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+$selectedServices = @(
+    $Services |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { $_ -split "," } |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+)
+
+if ($WithCloudTtsReal -and $selectedServices.Count -gt 0) {
+    $selectedSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($serviceName in $selectedServices) {
+        [void]$selectedSet.Add($serviceName)
+    }
+
+    $cloudTtsBackends = @("tts_gateway", "tts_service")
+    $needsCloudBackends = $selectedSet.Contains("bot_service") -or $selectedSet.Contains("tts_gateway")
+
+    if ($needsCloudBackends) {
+        $autoAdded = New-Object System.Collections.Generic.List[string]
+        foreach ($backendService in $cloudTtsBackends) {
+            if (-not $selectedSet.Contains($backendService)) {
+                [void]$selectedSet.Add($backendService)
+                $autoAdded.Add($backendService)
+            }
+        }
+
+        if ($autoAdded.Count -gt 0) {
+            Write-Host "[INFO] Auto-including cloud TTS services for selected backend startup: $($autoAdded -join ', ')" -ForegroundColor Cyan
+        }
+
+        $selectedServices = @($selectedSet)
+    }
+}
 
 try {
     Invoke-NativeOrThrow -FilePath "docker" -ArgumentList @("version") -FailureMessage "Docker is not available."
@@ -279,7 +312,7 @@ if ($Build) {
     Write-Host "[START] Starting containers without forced rebuild..." -ForegroundColor Yellow
 }
 
-$upArgs = @("compose") + $composeArgs + @("up", "-d")
+$upArgs = @("compose") + $composeArgs + @("up", "-d", "--remove-orphans")
 if ($Build) {
     $upArgs += "--build"
 }
@@ -324,11 +357,10 @@ Write-Host "[LOG] Mirrored service logs: $((Get-LogMirrorRoot))" -ForegroundColo
 
 if ($WithCloudTtsFake) {
     Write-Host "[TTS] Gateway: http://localhost:8010" -ForegroundColor Cyan
-    Write-Host "[INFO] Fake/light TTS profile does not start F5 or Qwen model runtimes." -ForegroundColor Yellow
+    Write-Host "[INFO] Fake/light TTS profile does not start the heavy F5 runtime." -ForegroundColor Yellow
 } elseif ($WithCloudTtsReal) {
     Write-Host "[TTS] Gateway: http://localhost:8010" -ForegroundColor Cyan
     Write-Host "[TTS] F5 runtime: http://localhost:8011" -ForegroundColor Cyan
-    Write-Host "[TTS] Qwen runtime: http://localhost:8012" -ForegroundColor Cyan
 } else {
     Write-Host "[INFO] Started core profile only. Re-run with -WithCloudTtsFake or -WithCloudTtsReal to include TTS." -ForegroundColor Yellow
 }

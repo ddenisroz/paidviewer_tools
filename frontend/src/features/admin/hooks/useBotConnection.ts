@@ -44,7 +44,7 @@ interface UseBotConnectionReturn {
     setBotStatus: (status: BotStatusType) => void;
     connectBotToChannels: (platforms?: string[]) => Promise<void>;
     disconnectBotFromChannels: () => Promise<void>;
-    getBotConnectionStatus: () => Promise<{ status: BotStatusType;[key: string]: unknown }>;
+    getBotConnectionStatus: () => Promise<{ status: BotStatusType; [key: string]: unknown }>;
 }
 
 const getPayload = (response: unknown): BotStatusPayload => {
@@ -75,14 +75,14 @@ const getBotMessage = (payload: BotStatusPayload): string => {
         bot_not_ready: 'Бот пока не готов к работе с чатом.',
     };
 
-    return problem ? messages[problem] ?? messages.bot_not_ready : messages.bot_not_ready;
+    return problem ? (messages[problem] ?? messages.bot_not_ready) : messages.bot_not_ready;
 };
 
 export function useBotConnection({
     isAuthenticated,
     isCheckingAuth = false,
     pollingInterval,
-    pollingEnabled
+    pollingEnabled,
 }: UseBotConnectionOptions): UseBotConnectionReturn {
     const { addToast } = useToast();
     const [botStatus, setBotStatus] = useState<BotStatusType>('disconnected');
@@ -90,7 +90,11 @@ export function useBotConnection({
     const shouldPoll = pollingEnabled ?? true;
     const resolvedInterval = shouldPoll ? (pollingInterval ?? 30000) : false;
 
-    const { data: botStatusData, error: botStatusError, refetch: refetchBotStatus } = useBotStatus({
+    const {
+        data: botStatusData,
+        error: botStatusError,
+        refetch: refetchBotStatus,
+    } = useBotStatus({
         enabled: !!isAuthenticated,
         refetchInterval: resolvedInterval,
         refetchIntervalInBackground: false,
@@ -139,7 +143,7 @@ export function useBotConnection({
             addToast({
                 type: 'error',
                 title: 'Ошибка подключения',
-                message: 'Не удалось подключить бота к каналам'
+                message: 'Не удалось подключить бота к каналам',
             });
         },
     });
@@ -152,7 +156,7 @@ export function useBotConnection({
                 addToast({
                     type: 'success',
                     title: 'Бот отключен',
-                    message: payload.message ?? 'Бот отключен от каналов'
+                    message: payload.message ?? 'Бот отключен от каналов',
                 });
             }
         },
@@ -161,22 +165,25 @@ export function useBotConnection({
             addToast({
                 type: 'error',
                 title: 'Ошибка отключения',
-                message: 'Не удалось отключить бота от каналов'
+                message: 'Не удалось отключить бота от каналов',
             });
         },
     });
 
-    const connectBotToChannels = useCallback(async (_platforms: string[] = []): Promise<void> => {
-        if (!isAuthenticated) return;
-        connectBotMutation.mutate();
-    }, [isAuthenticated, connectBotMutation]);
+    const connectBotToChannels = useCallback(
+        async (_platforms: string[] = []): Promise<void> => {
+            if (!isAuthenticated) return;
+            connectBotMutation.mutate();
+        },
+        [isAuthenticated, connectBotMutation]
+    );
 
     const disconnectBotFromChannels = useCallback(async (): Promise<void> => {
         if (!isAuthenticated) return;
         disconnectBotMutation.mutate();
     }, [isAuthenticated, disconnectBotMutation]);
 
-    const getBotConnectionStatus = useCallback(async (): Promise<{ status: BotStatusType;[key: string]: unknown }> => {
+    const getBotConnectionStatus = useCallback(async (): Promise<{ status: BotStatusType; [key: string]: unknown }> => {
         if (!isAuthenticated) return { status: 'disconnected' };
 
         const result = await refetchBotStatus();
@@ -198,7 +205,7 @@ export function useBotConnection({
         setBotStatus,
         connectBotToChannels,
         disconnectBotFromChannels,
-        getBotConnectionStatus
+        getBotConnectionStatus,
     };
 }
 

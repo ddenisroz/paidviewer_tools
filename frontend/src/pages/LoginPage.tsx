@@ -9,25 +9,37 @@ import LoginOAuthButtons from '@/features/auth/components/LoginOAuthButtons';
 import { type OAuthPlatform, useOAuthAvailability } from '@/features/auth/hooks/useOAuthAvailability';
 import { getOAuthErrorMessage } from '@/features/auth/utils/oauthFeedback';
 import CookieConsent from '@/shared/components/CookieConsent';
+import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/shared/components/ui/card';
+import { Input } from '@/shared/components/ui/input';
+import { TypingAnimation } from '@/shared/components/ui/typing-animation';
 import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
+import { authService } from '@/services/api/services/authService';
 
-const LOGIN_FEATURES = ['TTS озвучка', 'Медиа запросы', 'Анализ чата'];
+const LOGIN_TITLE = 'Paidviewer Tools';
+const LOGIN_TITLE_TYPING_SPEED_MS = 38;
+const LOGIN_FEATURES = ['ИИ TTS озвучка', 'Анализ чата', 'Управление трансляцией'];
+const LOGIN_FEATURE_VISIBLE_MS = 2200;
+const LOGIN_FEATURE_FADE_MS = 450;
+const LOGIN_FEATURE_RESERVE_TEXT = 'Управление трансляцией';
 
 const LoginPage: React.FC = () => {
-    const { isAuthenticated, isCheckingAuth } = useAuth();
+    const { isAuthenticated, isCheckingAuth, refreshAuthStatus } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const [title, setTitle] = useState<string>('');
-    const [isTyping, setIsTyping] = useState<boolean>(true);
-    const [subtitleText, setSubtitleText] = useState<string>('');
-    const [subtitleVisible, setSubtitleVisible] = useState<boolean>(false);
-    const [currentFeatureIndex, setCurrentFeatureIndex] = useState<number>(0);
     const oauthAvailability = useOAuthAvailability();
-    const fullTitle = 'Paidviewer_tools';
+    const [isTitleTypingFinished, setIsTitleTypingFinished] = useState(false);
+    const [subtitleText, setSubtitleText] = useState('');
+    const [subtitleVisible, setSubtitleVisible] = useState(false);
+    const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
+    const [devNickname, setDevNickname] = useState('yourchy');
+    const [devLoginError, setDevLoginError] = useState('');
+    const [isDevLoginLoading, setIsDevLoginLoading] = useState(false);
     const searchParams = new URLSearchParams(location.search);
     const authErrorMessage = getOAuthErrorMessage(searchParams.get('platform'), searchParams.get('auth_error'));
+    const hostname = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : '';
+    const showDevLogin = ['localhost', '127.0.0.1'].includes(hostname);
 
     useEffect(() => {
         if (!isCheckingAuth && isAuthenticated) {
@@ -36,34 +48,36 @@ const LoginPage: React.FC = () => {
     }, [isAuthenticated, isCheckingAuth, navigate]);
 
     useEffect(() => {
-        if (isTyping && title.length < fullTitle.length) {
-            const timeoutId = setTimeout(() => {
-                setTitle(fullTitle.slice(0, title.length + 1));
-            }, 60);
-            return () => clearTimeout(timeoutId);
-        } else {
-            setIsTyping(false);
-        }
-    }, [title, isTyping]);
+        const timeoutId = window.setTimeout(
+            () => {
+                setIsTitleTypingFinished(true);
+            },
+            LOGIN_TITLE.length * LOGIN_TITLE_TYPING_SPEED_MS + 250
+        );
+
+        return () => window.clearTimeout(timeoutId);
+    }, []);
 
     useEffect(() => {
-        if (!isTyping) {
-            const showFeature = () => {
-                setSubtitleText(LOGIN_FEATURES[currentFeatureIndex]);
-                setSubtitleVisible(true);
+        if (!isTitleTypingFinished) return;
 
-                setTimeout(() => {
-                    setSubtitleVisible(false);
-                    setTimeout(() => {
-                        setCurrentFeatureIndex((prev) => (prev + 1) % LOGIN_FEATURES.length);
-                    }, 500); // Time to fade out
-                }, 2500); // Time to show text
-            };
+        const activeFeature = LOGIN_FEATURES[currentFeatureIndex];
+        setSubtitleText(activeFeature);
+        setSubtitleVisible(true);
 
-            const timeoutId = setTimeout(showFeature, 500);
-            return () => clearTimeout(timeoutId);
-        }
-    }, [isTyping, currentFeatureIndex]);
+        const hideTimeoutId = window.setTimeout(() => {
+            setSubtitleVisible(false);
+        }, LOGIN_FEATURE_VISIBLE_MS);
+
+        const nextFeatureTimeoutId = window.setTimeout(() => {
+            setCurrentFeatureIndex((prev) => (prev + 1) % LOGIN_FEATURES.length);
+        }, LOGIN_FEATURE_VISIBLE_MS + LOGIN_FEATURE_FADE_MS);
+
+        return () => {
+            window.clearTimeout(hideTimeoutId);
+            window.clearTimeout(nextFeatureTimeoutId);
+        };
+    }, [currentFeatureIndex, isTitleTypingFinished]);
 
     const handleLogin = (platform: OAuthPlatform): void => {
         if (!oauthAvailability?.[platform]) {
@@ -79,6 +93,31 @@ const LoginPage: React.FC = () => {
             return;
         }
         window.location.href = authUrl;
+    };
+
+    const handleDevLogin = async (): Promise<void> => {
+        const nickname = devNickname.trim();
+        if (!nickname) {
+            setDevLoginError('Введите никнейм для входа');
+            return;
+        }
+
+        setIsDevLoginLoading(true);
+        setDevLoginError('');
+
+        try {
+            await authService.devLogin(nickname);
+            await refreshAuthStatus(true);
+            navigate('/dashboard', { replace: true });
+        } catch (error: unknown) {
+            const detail =
+                typeof error === 'object' && error !== null && 'response' in error
+                    ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                    : undefined;
+            setDevLoginError(detail || 'Не удалось выполнить быстрый вход');
+        } finally {
+            setIsDevLoginLoading(false);
+        }
     };
 
     // Delay showing the spinner to avoid flickering on fast connections
@@ -121,15 +160,25 @@ const LoginPage: React.FC = () => {
 
     return (
         <div className="login-page-bg min-h-screen flex items-center justify-center text-white font-sans p-4 relative">
-
             <Card className="login-card w-full max-w-[28rem] shadow-2xl">
                 <CardHeader className="text-center pt-10 pb-4">
-                    <h1 className="brand-wordmark select-none mb-3 h-10 whitespace-nowrap text-[1.7rem] leading-none text-green-400 sm:text-[2.1rem]">
-                        {title}
-                        {isTyping ? <span className="blinking-cursor" aria-hidden="true">|</span> : null}
+                    <h1 className="brand-wordmark select-none mb-2 flex h-10 items-center justify-center whitespace-nowrap text-[1.7rem] leading-none text-emerald-300 [font-variant-ligatures:none] sm:text-[2.05rem]">
+                        <TypingAnimation
+                            text={LOGIN_TITLE}
+                            speed={LOGIN_TITLE_TYPING_SPEED_MS}
+                            cursorChar="|"
+                            className="justify-self-center"
+                        />
                     </h1>
-                    <div className="relative h-6 w-full">
-                        <p className={`text-slate-400 text-sm absolute inset-0 flex items-center justify-center subtitle-fade ${subtitleVisible ? 'opacity-100' : 'opacity-0'}`}>
+                    <div className="relative h-6 w-full overflow-hidden">
+                        <p className="invisible flex items-center justify-center text-sm" aria-hidden="true">
+                            {LOGIN_FEATURE_RESERVE_TEXT}
+                        </p>
+                        <p
+                            className={`subtitle-fade absolute inset-0 flex items-center justify-center text-sm text-slate-400 ${
+                                subtitleVisible ? 'opacity-100' : 'opacity-0'
+                            }`}
+                        >
                             {subtitleText}
                         </p>
                     </div>
@@ -141,6 +190,45 @@ const LoginPage: React.FC = () => {
                         </div>
                     )}
                     <LoginOAuthButtons availability={oauthAvailability} onLogin={handleLogin} />
+                    {showDevLogin && (
+                        <div className="space-y-3 rounded-lg border border-border/70 bg-black/20 px-4 py-4">
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium text-slate-100">Быстрый локальный вход</p>
+                                <p className="text-xs text-slate-400">
+                                    Только для тестирования на локальной машине. Введите существующий ник, например
+                                    yourchy.
+                                </p>
+                            </div>
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                                <Input
+                                    value={devNickname}
+                                    onChange={(event) => setDevNickname(event.target.value)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                            event.preventDefault();
+                                            void handleDevLogin();
+                                        }
+                                    }}
+                                    placeholder="yourchy"
+                                    autoComplete="username"
+                                    className="h-10 border-border/70 bg-background/80"
+                                />
+                                <Button
+                                    type="button"
+                                    onClick={() => void handleDevLogin()}
+                                    disabled={isDevLoginLoading || !devNickname.trim()}
+                                    className="h-10 px-4"
+                                >
+                                    {isDevLoginLoading ? 'Вход...' : 'Войти'}
+                                </Button>
+                            </div>
+                            {devLoginError && (
+                                <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                                    {devLoginError}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

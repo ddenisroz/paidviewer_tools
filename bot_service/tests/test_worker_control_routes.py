@@ -2,19 +2,18 @@ import base64
 from datetime import timedelta
 
 from core.datetime_utils import utcnow_naive
-from models import TTSJob, Worker, WorkerPairingToken
+from models import TTSJob, WorkerPairingToken
 
 
-def _activate_worker(client, pairing_code: str, *, supports_f5: bool, supports_qwen: bool, label: str = "Test Worker"):
+def _activate_worker(client, pairing_code: str, *, supports_f5: bool = True, label: str = "Test Worker"):
     response = client.post(
         "/api/worker-agent/activate",
         json={
             "pairing_code": pairing_code,
             "label": label,
             "supports_f5": supports_f5,
-            "supports_qwen": supports_qwen,
             "capabilities": {
-                "providers": [provider for provider, enabled in (("f5", supports_f5), ("qwen", supports_qwen)) if enabled],
+                "providers": [provider for provider, enabled in (("f5", supports_f5),) if enabled],
                 "runtime": "pytest",
                 "agent_version": "1.0.0",
             },
@@ -25,7 +24,7 @@ def _activate_worker(client, pairing_code: str, *, supports_f5: bool, supports_q
     return response.json()
 
 
-def _poll_worker(client, auth_token: str, *, supports_f5: bool, supports_qwen: bool, wait_for_jobs: bool = False):
+def _poll_worker(client, auth_token: str, *, supports_f5: bool = True, wait_for_jobs: bool = False):
     response = client.post(
         "/api/worker-agent/poll",
         headers={"Authorization": f"Bearer {auth_token}"},
@@ -33,9 +32,8 @@ def _poll_worker(client, auth_token: str, *, supports_f5: bool, supports_qwen: b
             "max_jobs": 1,
             "wait_for_jobs": wait_for_jobs,
             "supports_f5": supports_f5,
-            "supports_qwen": supports_qwen,
             "capabilities": {
-                "providers": [provider for provider, enabled in (("f5", supports_f5), ("qwen", supports_qwen)) if enabled],
+                "providers": [provider for provider, enabled in (("f5", supports_f5),) if enabled],
                 "agent_version": "1.0.0",
             },
             "runtime_metadata": {"hostname": "pytest-host", "agent_version": "1.0.0"},
@@ -48,18 +46,12 @@ def _poll_worker(client, auth_token: str, *, supports_f5: bool, supports_qwen: b
 def test_worker_pair_activate_and_complete_job(authenticated_client, db, test_user):
     token_response = authenticated_client.post(
         "/api/tts/workers/pairing-tokens",
-        json={"label_hint": "My PC", "provider_hint": "both"},
+        json={"label_hint": "My PC", "provider_hint": "f5"},
     )
     assert token_response.status_code == 200, token_response.text
     pairing_code = token_response.json()["pairing_code"]
 
-    activation = _activate_worker(
-        authenticated_client,
-        pairing_code,
-        supports_f5=True,
-        supports_qwen=True,
-        label="Home PC",
-    )
+    activation = _activate_worker(authenticated_client, pairing_code, label="Home PC")
     auth_token = activation["auth_token"]
     worker_key = activation["worker"]["worker_key"]
 
@@ -85,7 +77,7 @@ def test_worker_pair_activate_and_complete_job(authenticated_client, db, test_us
     assert job_response.status_code == 200, job_response.text
     job_id = job_response.json()["job"]["id"]
 
-    poll_payload = _poll_worker(authenticated_client, auth_token, supports_f5=True, supports_qwen=True)
+    poll_payload = _poll_worker(authenticated_client, auth_token)
     jobs = poll_payload["jobs"]
     assert len(jobs) == 1
     assert jobs[0]["id"] == job_id
@@ -118,22 +110,21 @@ def test_worker_pair_activate_and_complete_job(authenticated_client, db, test_us
 def test_user_can_create_provisioning_bundle(authenticated_client):
     response = authenticated_client.post(
         "/api/tts/workers/provisioning",
-        json={"label_hint": "Studio PC", "provider_hint": "qwen"},
+        json={"label_hint": "Studio PC", "provider_hint": "f5"},
     )
     assert response.status_code == 200, response.text
 
     payload = response.json()
     bundle = payload["provisioning_bundle"]
 
-    assert payload["download_filename"].startswith("paidviewer-worker-provisioning-qwen-")
+    assert payload["download_filename"].startswith("paidviewer-worker-provisioning-f5-")
     assert bundle["kind"] == "paidviewer_worker_provisioning"
     assert bundle["server_base_url"] == "http://testserver"
     assert bundle["pairing_code"]
     assert "http://localhost:5173" in bundle["trusted_origins"]
     assert bundle["label"] == "Studio PC"
-    assert bundle["providers"]["f5"]["enabled"] is False
-    assert bundle["providers"]["qwen"]["enabled"] is True
-    assert bundle["providers"]["qwen"]["endpoint_url"] == "http://127.0.0.1:8012"
+    assert bundle["providers"]["f5"]["enabled"] is True
+    assert bundle["providers"]["f5"]["endpoint_url"] == "http://127.0.0.1:8011"
     assert bundle["required_agent_version"]
     assert payload["worker_agent_contract"]["recommended_path"] == "tts_worker_agent"
 
@@ -153,7 +144,6 @@ def test_worker_activation_rejects_outdated_agent_version(authenticated_client, 
             "pairing_code": token_response.json()["pairing_code"],
             "label": "Old Worker",
             "supports_f5": True,
-            "supports_qwen": False,
             "capabilities": {"providers": ["f5"], "agent_version": "1.0.0"},
             "runtime_metadata": {"hostname": "pytest-host", "agent_version": "1.0.0"},
         },
@@ -170,12 +160,7 @@ def test_worker_poll_requeues_expired_jobs(authenticated_client, db):
         "/api/tts/workers/pairing-tokens",
         json={"provider_hint": "f5"},
     ).json()["pairing_code"]
-    activation = _activate_worker(
-        authenticated_client,
-        pairing_code,
-        supports_f5=True,
-        supports_qwen=False,
-    )
+    activation = _activate_worker(authenticated_client, pairing_code)
     auth_token = activation["auth_token"]
 
     job_response = authenticated_client.post(
@@ -185,7 +170,7 @@ def test_worker_poll_requeues_expired_jobs(authenticated_client, db):
     assert job_response.status_code == 200, job_response.text
     job_id = job_response.json()["job"]["id"]
 
-    first_poll = _poll_worker(authenticated_client, auth_token, supports_f5=True, supports_qwen=False)
+    first_poll = _poll_worker(authenticated_client, auth_token)
     assert len(first_poll["jobs"]) == 1
     assert first_poll["jobs"][0]["attempt_count"] == 1
 
@@ -195,33 +180,25 @@ def test_worker_poll_requeues_expired_jobs(authenticated_client, db):
     db.add(job_row)
     db.commit()
 
-    second_poll = _poll_worker(authenticated_client, auth_token, supports_f5=True, supports_qwen=False)
+    second_poll = _poll_worker(authenticated_client, auth_token)
     assert len(second_poll["jobs"]) == 1
     assert second_poll["jobs"][0]["id"] == job_id
     assert second_poll["jobs"][0]["attempt_count"] == 2
 
 
-def test_provider_specific_worker_only_claims_supported_jobs(authenticated_client):
+def test_provider_specific_worker_rejects_unknown_provider_jobs(authenticated_client):
     pairing_code = authenticated_client.post(
         "/api/tts/workers/pairing-tokens",
         json={"provider_hint": "f5"},
     ).json()["pairing_code"]
-    activation = _activate_worker(
-        authenticated_client,
-        pairing_code,
-        supports_f5=True,
-        supports_qwen=False,
-    )
+    activation = _activate_worker(authenticated_client, pairing_code)
     auth_token = activation["auth_token"]
 
-    qwen_job = authenticated_client.post(
+    invalid_job = authenticated_client.post(
         "/api/tts/workers/jobs",
-        json={"provider": "qwen", "text": "qwen only job"},
+        json={"provider": "unsupported", "text": "unsupported job"},
     )
-    assert qwen_job.status_code == 200, qwen_job.text
-
-    empty_poll = _poll_worker(authenticated_client, auth_token, supports_f5=True, supports_qwen=False)
-    assert empty_poll["jobs"] == []
+    assert invalid_job.status_code == 400, invalid_job.text
 
     f5_job = authenticated_client.post(
         "/api/tts/workers/jobs",
@@ -230,7 +207,7 @@ def test_provider_specific_worker_only_claims_supported_jobs(authenticated_clien
     assert f5_job.status_code == 200, f5_job.text
     f5_job_id = f5_job.json()["job"]["id"]
 
-    poll_payload = _poll_worker(authenticated_client, auth_token, supports_f5=True, supports_qwen=False)
+    poll_payload = _poll_worker(authenticated_client, auth_token)
     assert len(poll_payload["jobs"]) == 1
     assert poll_payload["jobs"][0]["id"] == f5_job_id
     assert poll_payload["jobs"][0]["provider"] == "f5"
@@ -239,7 +216,7 @@ def test_provider_specific_worker_only_claims_supported_jobs(authenticated_clien
 def test_admin_can_issue_managed_pairing_and_managed_job(admin_client):
     pairing_response = admin_client.post(
         "/api/tts/admin/workers/pairing-tokens",
-        json={"label_hint": "Managed Qwen", "provider_hint": "qwen", "is_managed": True},
+        json={"label_hint": "Managed F5", "provider_hint": "f5", "is_managed": True},
     )
     assert pairing_response.status_code == 200, pairing_response.text
     pairing_payload = pairing_response.json()
@@ -248,23 +225,22 @@ def test_admin_can_issue_managed_pairing_and_managed_job(admin_client):
     activation = _activate_worker(
         admin_client,
         pairing_payload["pairing_code"],
-        supports_f5=False,
-        supports_qwen=True,
-        label="Managed Qwen Worker",
+        supports_f5=True,
+        label="Managed F5 Worker",
     )
     auth_token = activation["auth_token"]
 
     job_response = admin_client.post(
         "/api/tts/admin/workers/jobs",
-        json={"provider": "qwen", "text": "managed qwen job"},
+        json={"provider": "f5", "text": "managed f5 job"},
     )
     assert job_response.status_code == 200, job_response.text
     job_id = job_response.json()["job"]["id"]
 
-    poll_payload = _poll_worker(admin_client, auth_token, supports_f5=False, supports_qwen=True)
+    poll_payload = _poll_worker(admin_client, auth_token)
     assert len(poll_payload["jobs"]) == 1
     assert poll_payload["jobs"][0]["id"] == job_id
-    assert poll_payload["jobs"][0]["provider"] == "qwen"
+    assert poll_payload["jobs"][0]["provider"] == "f5"
 
     workers_response = admin_client.get("/api/tts/admin/workers")
     assert workers_response.status_code == 200, workers_response.text

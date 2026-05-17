@@ -29,8 +29,6 @@ from services.tts.provider_utils import (
     infer_provider_from_engine,
     normalize_provider,
     normalize_provider_mode,
-    normalize_qwen_model_selection,
-    resolve_qwen_cloud_model_selection,
     resolve_provider_mode_for_settings,
 )
 
@@ -72,7 +70,7 @@ class TTSService:
     @staticmethod
     def _resolve_connection_manager_tts_type(engine: Optional[str]) -> str:
         normalized_engine = str(engine or "").strip().lower()
-        return "ai" if normalized_engine in {"f5tts", "qwen", "gcloud"} else "basic"
+        return "ai" if normalized_engine in {"f5tts", "gcloud"} else "basic"
 
     def _sync_connection_manager_tts_channels(self, *, user_id: int, engine: Optional[str]) -> None:
         user = self.user_repo.get_by_id(user_id)
@@ -184,11 +182,22 @@ class TTSService:
 
     # === Synthesis Management ===
 
+    @staticmethod
+    def _normalize_explicit_voice_override(voice: str | None) -> str:
+        requested_voice = str(voice or "").strip()
+        if not requested_voice:
+            return ""
+
+        normalized = requested_voice.lower()
+        if normalized in {"default", "default_voice"}:
+            return ""
+        return requested_voice
+
     async def synthesize(
         self,
         text: str,
         user: Dict[str, Any],
-        voice: str = "default_voice",
+        voice: str | None = None,
         channel: str = None,
         platform: str = "twitch",
         priority: int = 1
@@ -254,31 +263,68 @@ class TTSService:
                 settings_dict.get("engine"),
                 advanced_provider=settings_dict.get("advanced_provider"),
             )
-            requested_voice = str(voice or "").strip()
+            requested_voice = self._normalize_explicit_voice_override(voice)
             if requested_voice:
                 settings_dict["voice"] = requested_voice
-                if resolved_provider == "qwen":
-                    settings_dict["qwen_voice"] = requested_voice
             
-            # Add to Queue
-            # Add to Queue
-            task_id = await get_memory_tts_queue().add_task(
-                user_id=int(user_id),
-                text=text,
-                voice=voice,
-                channel=channel,
-                platform=platform,
-                priority=priority,
-                metadata={
-                    "requested_at": time.time(),
-                    "volume": audio_settings.website_volume,
-                    "author": user.get('username', 'Unknown'),
-                    "settings": settings_dict,
-                    "word_filter": filtered_words,
-                    "blocked_users": blocked_usernames,
-                    "use_ai": True # Default to trying AI
-                }
-            )
+            queue_metadata = {
+                "requested_at": time.time(),
+                "volume": audio_settings.website_volume,
+                "author": user.get('username', 'Unknown'),
+                "settings": settings_dict,
+                "word_filter": filtered_words,
+                "blocked_users": blocked_usernames,
+                "use_ai": True,
+                "trace_id": settings_dict.get("trace_id"),
+                "source_message_id": settings_dict.get("source_message_id"),
+                "original_text": text,
+            }
+
+            try:
+                task_id = await get_memory_tts_queue().add_task(
+                    user_id=int(user_id),
+                    text=text,
+                    voice=requested_voice or None,
+                    channel=channel,
+                    platform=platform,
+                    priority=priority,
+                    metadata=queue_metadata,
+                )
+            except RuntimeError as error:
+                error_message = str(error)
+                direct_preview_allowed = (
+                    "disabled for user" in error_message.lower()
+                    or "no active connections" in error_message.lower()
+                )
+                if not direct_preview_allowed:
+                    raise
+
+                from services.tts.tts_manager import get_tts_manager
+
+                logger.info(
+                    "Queue is unavailable for user %s; running direct preview synthesis instead: %s",
+                    user_id,
+                    error_message,
+                )
+                direct_result = await get_tts_manager().synthesize_tts(
+                    channel_name=channel,
+                    text=text,
+                    author=queue_metadata["author"],
+                    user_id=int(user_id),
+                    volume_level=audio_settings.website_volume,
+                    use_ai_tts=True,
+                    use_basic_tts=False,
+                    connection_manager=get_connection_manager(),
+                    db_session=self.db,
+                    tts_settings=settings_dict,
+                    word_filter=filtered_words,
+                    blocked_users=blocked_usernames,
+                    engine=str(settings_dict.get("engine") or "").strip() or None,
+                )
+                if direct_result.get("success"):
+                    await advanced_rate_limiter.add_tts_request(rate_limit_id, len(text))
+                    direct_result["message"] = "TTS preview ready"
+                return direct_result
 
             # Record Usage
             await advanced_rate_limiter.add_tts_request(rate_limit_id, len(text))
@@ -362,7 +408,6 @@ class TTSService:
     def _normalize_settings_payload(settings, payload: Dict[str, Any]) -> Dict[str, Any]:
         normalized = dict(payload)
         has_explicit_f5_mode = "f5_mode" in normalized
-        has_explicit_qwen_mode = "qwen_mode" in normalized
 
         current_engine = getattr(settings, "engine", "gtts")
         current_provider = infer_provider_from_engine(
@@ -370,10 +415,6 @@ class TTSService:
             advanced_provider=getattr(settings, "advanced_provider", None),
         )
         current_f5_mode = normalize_provider_mode(getattr(settings, "f5_mode", "cloud"))
-        current_qwen_mode = normalize_provider_mode(getattr(settings, "qwen_mode", "cloud"))
-
-        if "qwen_model" in normalized:
-            normalized["qwen_model"] = normalize_qwen_model_selection(normalized.get("qwen_model"))
 
         engine = str(normalized.get("engine") or current_engine or "gtts").strip().lower()
         provider = normalize_provider(normalized.get("advanced_provider") or current_provider)
@@ -381,16 +422,15 @@ class TTSService:
         if "advanced_provider" in normalized and "engine" not in normalized:
             if provider == "gcloud":
                 engine = "gcloud"
-            elif provider == "qwen":
-                engine = "qwen"
             else:
                 engine = "f5tts"
 
         if engine == "gcloud":
             provider = "gcloud"
-        elif engine == "qwen":
-            provider = "qwen"
         elif engine == "f5tts":
+            provider = "f5"
+        elif engine not in {"gtts", "gcloud", "f5tts"}:
+            engine = "f5tts"
             provider = "f5"
 
         normalized["engine"] = engine
@@ -401,30 +441,16 @@ class TTSService:
         else:
             normalized["f5_mode"] = current_f5_mode
 
-        if "qwen_mode" in normalized:
-            normalized["qwen_mode"] = normalize_provider_mode(normalized.get("qwen_mode"))
-        else:
-            normalized["qwen_mode"] = current_qwen_mode
-
         explicit_use_local = normalized.get("use_local_tts")
         if explicit_use_local is not None:
             use_local_tts = bool(explicit_use_local)
-            if provider == "qwen" and not has_explicit_qwen_mode:
-                normalized["qwen_mode"] = "local" if use_local_tts else "cloud"
-            elif provider == "f5" and not has_explicit_f5_mode:
+            if provider == "f5" and not has_explicit_f5_mode:
                 normalized["f5_mode"] = "local" if use_local_tts else "cloud"
 
-        if provider == "qwen":
-            normalized["use_local_tts"] = normalize_provider_mode(normalized.get("qwen_mode")) == "local"
-        elif provider == "f5":
+        if provider == "f5":
             normalized["use_local_tts"] = normalize_provider_mode(normalized.get("f5_mode")) == "local"
         else:
             normalized["use_local_tts"] = False
-
-        if provider == "qwen" and normalize_provider_mode(normalized.get("qwen_mode")) == "cloud":
-            normalized["qwen_model"] = resolve_qwen_cloud_model_selection(
-                normalized.get("qwen_model") or getattr(settings, "qwen_model", None)
-            )
 
         if engine in {"gtts", "gcloud"}:
             normalized["use_local_tts"] = False
@@ -497,20 +523,19 @@ class TTSService:
             engine,
             advanced_provider=getattr(tts_settings_row, "advanced_provider", None),
         )
+        if provider not in {"f5", "gcloud"}:
+            provider = "f5"
+            engine = "f5tts"
         f5_mode = normalize_provider_mode(getattr(tts_settings_row, "f5_mode", "cloud"))
-        qwen_mode = normalize_provider_mode(getattr(tts_settings_row, "qwen_mode", "cloud"))
         _, resolved_mode = resolve_provider_mode_for_settings(
             engine=engine,
             use_local_tts=bool(getattr(tts_settings_row, "use_local_tts", False)),
             advanced_provider=getattr(tts_settings_row, "advanced_provider", None),
             f5_mode=f5_mode,
-            qwen_mode=qwen_mode,
         )
 
         if engine == 'f5tts':
             engine_type = f'f5_{resolved_mode}'
-        elif engine == 'qwen':
-            engine_type = f'qwen_{resolved_mode}'
         elif engine == 'gcloud':
             engine_type = 'gcloud'
         else:
@@ -520,20 +545,15 @@ class TTSService:
 
         has_local_setup = False
         has_local_setup_f5 = False
-        has_local_setup_qwen = False
         has_local_endpoint_f5 = False
-        has_local_endpoint_qwen = False
         has_worker_setup = False
         has_worker_setup_f5 = False
-        has_worker_setup_qwen = False
         is_whitelisted = False
 
         try:
             local_repo = LocalTTSRepository(self.db)
             local_f5 = local_repo.get_active(user_id=user_id, provider="f5")
             has_local_endpoint_f5 = bool(local_f5 and local_f5.is_healthy)
-            local_qwen = local_repo.get_active(user_id=user_id, provider="qwen")
-            has_local_endpoint_qwen = bool(local_qwen and local_qwen.is_healthy)
 
             from services.worker_control.service import WorkerControlPlaneService
 
@@ -546,18 +566,9 @@ class TTSService:
                     managed_only=False,
                 )
             )
-            has_worker_setup_qwen = bool(
-                settings.worker_control_self_host_enabled
-                and worker_service.get_preferred_worker(
-                    provider="qwen",
-                    owner_user_id=user_id,
-                    managed_only=False,
-                )
-            )
             has_local_setup_f5 = has_local_endpoint_f5 or has_worker_setup_f5
-            has_local_setup_qwen = has_local_endpoint_qwen or has_worker_setup_qwen
-            has_worker_setup = has_worker_setup_qwen if provider == "qwen" else has_worker_setup_f5
-            has_local_setup = has_local_setup_qwen if provider == "qwen" else has_local_setup_f5
+            has_worker_setup = has_worker_setup_f5
+            has_local_setup = has_local_setup_f5
         except Exception:
             logger.exception("Failed to resolve local TTS status for user %s", user_id)
 
@@ -588,25 +599,6 @@ class TTSService:
                     recommended_path="tts_worker_agent",
                 ),
             },
-            "qwen": {
-                "cloud": build_tts_mode_contract(
-                    "qwen",
-                    "cloud",
-                    available=True,
-                    is_whitelisted=is_whitelisted,
-                    capabilities=provider_capabilities["qwen"],
-                ),
-                "self_host": build_tts_mode_contract(
-                    "qwen",
-                    "local",
-                    available=has_local_setup_qwen,
-                    is_whitelisted=is_whitelisted,
-                    degraded_reason=None if has_local_setup_qwen else "Self-host is not configured for Qwen yet.",
-                    error_code=None if has_local_setup_qwen else "self_host_not_configured",
-                    capabilities=provider_capabilities["qwen"],
-                    recommended_path="tts_worker_agent",
-                ),
-            },
             "gcloud": {
                 "cloud": build_tts_mode_contract(
                     "gcloud",
@@ -629,13 +621,7 @@ class TTSService:
         }
 
         active_contract = provider_matrix[provider]["self_host" if resolved_mode == "local" else "cloud"]
-        if provider == "qwen":
-            active_self_host_path = (
-                "tts_worker_agent"
-                if has_worker_setup_qwen
-                else ("raw_endpoint_compat" if has_local_endpoint_qwen else None)
-            )
-        elif provider == "f5":
+        if provider == "f5":
             active_self_host_path = (
                 "tts_worker_agent"
                 if has_worker_setup_f5
@@ -653,15 +639,11 @@ class TTSService:
             "mode": resolved_mode,
             "advanced_provider": provider,
             "f5_mode": f5_mode,
-            "qwen_mode": qwen_mode,
             "has_local_setup": has_local_setup,
             "has_local_setup_f5": has_local_setup_f5,
-            "has_local_setup_qwen": has_local_setup_qwen,
             "has_local_endpoint_f5": has_local_endpoint_f5,
-            "has_local_endpoint_qwen": has_local_endpoint_qwen,
             "has_worker_setup": has_worker_setup,
             "has_worker_setup_f5": has_worker_setup_f5,
-            "has_worker_setup_qwen": has_worker_setup_qwen,
             "is_whitelisted": is_whitelisted,
             "official_modes": ["cloud", "self_host"],
             "official_mode": active_contract["official_mode"],

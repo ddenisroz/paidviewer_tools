@@ -18,9 +18,9 @@ interface TtsSettingsProps {
 
 const TtsSettings: React.FC<TtsSettingsProps> = ({ ttsSettings, setTtsSettings }) => {
     const handleToggle = (field: keyof TtsSettingsState) => {
-        setTtsSettings(prev => ({
+        setTtsSettings((prev) => ({
             ...prev,
-            [field]: !prev[field]
+            [field]: !prev[field],
         }));
     };
 
@@ -81,4 +81,3 @@ const TtsSettings: React.FC<TtsSettingsProps> = ({ ttsSettings, setTtsSettings }
 };
 
 export default TtsSettings;
-

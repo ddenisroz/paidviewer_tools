@@ -16,595 +16,433 @@ import { Switch } from '@/shared/components/ui/switch';
 import { useAutoSave } from '@/shared/hooks/useAutoSave';
 import { toast } from '@/utils/toastManager';
 
-
 import MythycClosed from '../../../images/lootboxes/mythyc/mythyc_closed.png';
 
 import DonationGrid from './DonationGrid';
 import DonationHistory from './DonationHistory';
 
-
 import type { DropsConfig } from '@/types/drops';
 
 interface DonationSettingsProps {
-  user: Record<string, unknown>;
-  channelName: string;
-  hasRewards?: boolean;
+    user: Record<string, unknown>;
+    channelName: string;
+    hasRewards?: boolean;
 }
 
 interface DonationSettingsFormData {
-  donation_enabled: boolean;
-  donation_amount_common: number[];
-  donation_amount_rare: number[];
-  donation_amount_epic: number[];
-  donation_amount_legendary: number[];
-  mythical_enabled: boolean;
-  mythical_min_interval_hours: number[];
-  mythical_max_interval_hours: number[];
-  mythical_window_duration_minutes: number[];
-  mythical_donation_amount: number[];
+    donation_enabled: boolean;
+    donation_amount_common: number[];
+    donation_amount_rare: number[];
+    donation_amount_epic: number[];
+    donation_amount_legendary: number[];
+    mythical_enabled: boolean;
+    mythical_min_interval_hours: number[];
+    mythical_max_interval_hours: number[];
+    mythical_window_duration_minutes: number[];
+    mythical_donation_amount: number[];
 }
 
-const SURFACE_CARD_CLASS = 'card-glass border-border/70 bg-card/75 backdrop-blur-sm shadow-sm shadow-black/10';
+type DonationGridShape = {
+    donation_amount_common: number[];
+    donation_amount_rare: number[];
+    donation_amount_epic: number[];
+    donation_amount_legendary: number[];
+    [key: string]: number[];
+};
+
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm shadow-black/10';
+const PRESET_BUTTON_CLASS =
+    'h-7 rounded-md border-border/70 bg-card/70 px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground';
+const ACTIVE_PRESET_BUTTON_CLASS =
+    'h-7 rounded-md border-emerald-400/40 bg-emerald-500/15 px-2 text-xs text-emerald-200';
 const MYTHICAL_MIN_INTERVAL_PRESETS = [1, 3, 6, 12, 24];
 const MYTHICAL_MAX_INTERVAL_PRESETS = [6, 12, 24, 48, 72];
 const MYTHICAL_WINDOW_PRESETS = [5, 10, 15, 30, 60];
 const MYTHICAL_DONATION_PRESETS = [500, 1000, 2000, 5000, 10000];
 
+const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
+const hasDonationAlertsConnection = (enabled?: boolean, contextConnected?: boolean): boolean =>
+    Boolean(enabled || contextConnected);
+const getActiveDropsPlatform = (integrations: ReturnType<typeof useIntegrations>['integrations']): 'twitch' | 'vk' =>
+    integrations?.vk?.enabled && !integrations?.twitch?.enabled ? 'vk' : 'twitch';
+
 const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, hasRewards = false }) => {
-  const navigate = useNavigate();
-  const { integrations } = useIntegrations();
-  const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
-  const donationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
-  const platform = integrations?.twitch?.enabled ? 'twitch' : (integrations?.vk?.enabled ? 'vk' : 'twitch');
+    const navigate = useNavigate();
+    const { integrations } = useIntegrations();
+    const { isConnected: daConnected, connect: daConnect } = useDonationAlerts();
+    const donationAlertsConnected = hasDonationAlertsConnection(integrations?.donationalerts?.enabled, daConnected);
+    const platform = getActiveDropsPlatform(integrations);
+    const { config, isLoading, isInitialLoad, setIsInitialLoad, saveMutation } = useDropsConfig(channelName);
 
-  const { config, isLoading, isInitialLoad, setIsInitialLoad, saveMutation } = useDropsConfig(channelName);
+    const [formData, setFormData] = useState<DonationSettingsFormData>({
+        donation_enabled: false,
+        donation_amount_common: [DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
+        donation_amount_rare: [DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
+        donation_amount_epic: [DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
+        donation_amount_legendary: [DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY],
+        mythical_enabled: false,
+        mythical_min_interval_hours: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS],
+        mythical_max_interval_hours: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS],
+        mythical_window_duration_minutes: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES],
+        mythical_donation_amount: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT],
+    });
 
-  const [formData, setFormData] = useState<DonationSettingsFormData>({
-    donation_enabled: false,
-    donation_amount_common: [DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
-    donation_amount_rare: [DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
-    donation_amount_epic: [DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
-    donation_amount_legendary: [DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY],
-    mythical_enabled: false,
-    mythical_min_interval_hours: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS],
-    mythical_max_interval_hours: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS],
-    mythical_window_duration_minutes: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES],
-    mythical_donation_amount: [DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT]
-  });
+    const initialFormData = useMemo<DonationSettingsFormData | null>(() => {
+        if (!config) return null;
+        const typedConfig = config as DropsConfig;
+        const enabledByDa = donationAlertsConnected;
 
-  // Отслеживаем предыдущее состояние подключения DonationAlerts для автоматического включения donation drops
-  const [wasDonationAlertsConnected, setWasDonationAlertsConnected] = useState(donationalertsConnected);
-
-  useEffect(() => {
-    const handleDropsConfigChange = (event: CustomEvent) => {
-      const { donation_enabled, channel } = event.detail;
-      if (channel === channelName && donation_enabled !== undefined) {
-        setFormData(prev => ({ ...prev, donation_enabled }));
-      }
-    };
-
-    window.addEventListener('drops-config-changed', handleDropsConfigChange as EventListener);
-    return () => window.removeEventListener('drops-config-changed', handleDropsConfigChange as EventListener);
-  }, [channelName]);
-
-  const initialFormData = useMemo(() => {
-    if (!config) return null;
-
-    // Type assertion after null check
-    const typedConfig = config as DropsConfig;
-
-    // Проверяем интеграцию DonationAlerts при загрузке (используем актуальное значение)
-    const currentDonationalertsConnected = integrations?.donationalerts?.enabled || daConnected || false;
-    const donationEnabledFromServer = typedConfig.donation_enabled ?? false;
-    // Если интеграция не подключена, принудительно ставим false
-    const donationEnabled = currentDonationalertsConnected ? donationEnabledFromServer : false;
-
-    // Mythical Drops are available only with DonationAlerts integration
-    // Мифический drops работает на основе донатов, поэтому требует подключения DonationAlerts
-    const mythicalEnabledFromServer = typedConfig.mythical_enabled ?? false;
-    const mythicalEnabled = currentDonationalertsConnected ? mythicalEnabledFromServer : false;
-
-    return {
-      donation_enabled: donationEnabled,
-      donation_amount_common: [typedConfig.donation_amount_common ?? DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
-      donation_amount_rare: [typedConfig.donation_amount_rare ?? DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
-      donation_amount_epic: [typedConfig.donation_amount_epic ?? DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
-      donation_amount_legendary: [typedConfig.donation_amount_legendary ?? DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY],
-      mythical_enabled: mythicalEnabled,
-      mythical_min_interval_hours: [typedConfig.mythical_min_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS],
-      mythical_max_interval_hours: [typedConfig.mythical_max_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS],
-      mythical_window_duration_minutes: [typedConfig.mythical_window_duration_minutes ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES],
-      mythical_donation_amount: [typedConfig.mythical_donation_amount ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT]
-    };
-  }, [config, integrations, daConnected]);
-
-  useEffect(() => {
-    if (initialFormData && isInitialLoad) {
-      setFormData(initialFormData);
-      setIsInitialLoad(false);
-    }
-  }, [initialFormData, isInitialLoad, setIsInitialLoad]);
-
-  // FIX: use functional updates and remove formData from dependencies
-  // чтобы избежать бесконечного цикла. Проверяем текущие значения через ref или функциональное обновление.
-  useEffect(() => {
-    if (!donationalertsConnected) {
-      // Отключаем donation и mythical drops если DonationAlerts отключен
-      // Functional update keeps latest values without extending dependencies
-      setFormData(prev => {
-        // ✅ Проверяем текущие значения и обновляем только если они true
-        if (prev.donation_enabled || prev.mythical_enabled) {
-          return {
-            ...prev,
-            donation_enabled: false,
-            mythical_enabled: false
-          };
-        }
-        return prev; // Не изменяем состояние если значения уже false
-      });
-    }
-  }, [donationalertsConnected]); // ✅ Убираем formData из зависимостей для предотвращения бесконечного цикла
-
-  const mythicalEnabledDisplay = formData.mythical_enabled;
-  const donationEnabledDisplay = donationalertsConnected ? formData.donation_enabled : false;
-  const mythicalDonationMax = Math.max(
-    DROPS_CONSTANTS.MYTHICAL.MAX_DONATION_AMOUNT,
-    Math.ceil(formData.mythical_donation_amount[0] / 100) * 100
-  );
-  const mythicalIntervalMax = DROPS_CONSTANTS.MYTHICAL.MAX_INTERVAL_HOURS;
-  const mythicalWindowMax = DROPS_CONSTANTS.MYTHICAL.MAX_WINDOW_DURATION_MINUTES;
-
-  const setMythicalMinInterval = (value: number) => {
-    const clamped = Math.max(1, Math.min(mythicalIntervalMax, value));
-    setFormData((prev) => ({ ...prev, mythical_min_interval_hours: [clamped] }));
-  };
-
-  const setMythicalMaxInterval = (value: number) => {
-    const clamped = Math.max(1, Math.min(mythicalIntervalMax, value));
-    setFormData((prev) => ({ ...prev, mythical_max_interval_hours: [clamped] }));
-  };
-
-  const setMythicalWindowDuration = (value: number) => {
-    const clamped = Math.max(1, Math.min(mythicalWindowMax, value));
-    setFormData((prev) => ({ ...prev, mythical_window_duration_minutes: [clamped] }));
-  };
-
-  const setMythicalDonationAmount = (value: number) => {
-    const clamped = Math.max(500, Math.min(mythicalDonationMax, value));
-    setFormData((prev) => ({ ...prev, mythical_donation_amount: [clamped] }));
-  };
-
-  const validateMythical = (payload: Partial<DropsConfig>): string | null => {
-    if (payload.mythical_enabled) {
-      const minInterval = payload.mythical_min_interval_hours ?? formData.mythical_min_interval_hours[0];
-      const maxInterval = payload.mythical_max_interval_hours ?? formData.mythical_max_interval_hours[0];
-      if (minInterval >= maxInterval) {
-        return 'Минимальный интервал должен быть меньше максимального';
-      }
-    }
-    return null;
-  };
-
-  const { autoSave } = useAutoSave(
-    (payload: Partial<DropsConfig>) => saveMutation.mutate(payload),
-    1000,
-    validateMythical
-  );
-
-  const createPayload = (): Partial<DropsConfig> => ({
-    donation_enabled: formData.donation_enabled,
-    donation_amount_common: formData.donation_amount_common[0],
-    donation_amount_rare: formData.donation_amount_rare[0],
-    donation_amount_epic: formData.donation_amount_epic[0],
-    donation_amount_legendary: formData.donation_amount_legendary[0],
-    mythical_enabled: formData.mythical_enabled,
-    mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
-    mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
-    mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
-    mythical_donation_amount: formData.mythical_donation_amount[0]
-  });
-
-  useEffect(() => {
-    // Если DonationAlerts только что подключился (был false, стал true)
-    if (donationalertsConnected && !wasDonationAlertsConnected && !formData.donation_enabled) {
-      // Автоматически включаем donation drops после подключения
-      setFormData(prev => ({ ...prev, donation_enabled: true }));
-      // Сохраняем автоматически через небольшую задержку, чтобы дать время обновиться состоянию
-      setTimeout(() => {
-        const payload = {
-          donation_enabled: true,
-          donation_amount_common: formData.donation_amount_common[0],
-          donation_amount_rare: formData.donation_amount_rare[0],
-          donation_amount_epic: formData.donation_amount_epic[0],
-          donation_amount_legendary: formData.donation_amount_legendary[0],
-          mythical_enabled: formData.mythical_enabled,
-          mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
-          mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
-          mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
-          mythical_donation_amount: formData.mythical_donation_amount[0]
+        return {
+            donation_enabled: enabledByDa ? Boolean(typedConfig.donation_enabled) : false,
+            donation_amount_common: [typedConfig.donation_amount_common ?? DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
+            donation_amount_rare: [typedConfig.donation_amount_rare ?? DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
+            donation_amount_epic: [typedConfig.donation_amount_epic ?? DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
+            donation_amount_legendary: [
+                typedConfig.donation_amount_legendary ?? DROPS_CONSTANTS.DONATION.DEFAULT_LEGENDARY,
+            ],
+            mythical_enabled: enabledByDa ? Boolean(typedConfig.mythical_enabled) : false,
+            mythical_min_interval_hours: [
+                typedConfig.mythical_min_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MIN_INTERVAL_HOURS,
+            ],
+            mythical_max_interval_hours: [
+                typedConfig.mythical_max_interval_hours ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_MAX_INTERVAL_HOURS,
+            ],
+            mythical_window_duration_minutes: [
+                typedConfig.mythical_window_duration_minutes ??
+                    DROPS_CONSTANTS.MYTHICAL.DEFAULT_WINDOW_DURATION_MINUTES,
+            ],
+            mythical_donation_amount: [
+                typedConfig.mythical_donation_amount ?? DROPS_CONSTANTS.MYTHICAL.DEFAULT_DONATION_AMOUNT,
+            ],
         };
-        autoSave(payload);
-      }, 1000);
-    }
-    setWasDonationAlertsConnected(donationalertsConnected);
-  }, [donationalertsConnected, wasDonationAlertsConnected, formData, autoSave]);
+    }, [config, donationAlertsConnected]);
 
-  useEffect(() => {
-    const handleDonationAlertsConnected = (event: CustomEvent) => {
-      if (event.detail?.success) {
-        // Событие подключения - обновляем состояние для триггера автоматического включения
-        // Основная логика в useEffect выше
-      }
+    useEffect(() => {
+        if (initialFormData && isInitialLoad) {
+            setFormData(initialFormData);
+            setIsInitialLoad(false);
+        }
+    }, [initialFormData, isInitialLoad, setIsInitialLoad]);
+
+    useEffect(() => {
+        if (!donationAlertsConnected) {
+            setFormData((prev) => ({ ...prev, donation_enabled: false, mythical_enabled: false }));
+        }
+    }, [donationAlertsConnected]);
+
+    const validateMythical = (payload: Partial<DropsConfig>): string | null => {
+        if (!payload.mythical_enabled) return null;
+        const minInterval = payload.mythical_min_interval_hours ?? formData.mythical_min_interval_hours[0];
+        const maxInterval = payload.mythical_max_interval_hours ?? formData.mythical_max_interval_hours[0];
+        if (minInterval >= maxInterval) {
+            return 'Минимальный интервал должен быть меньше максимального';
+        }
+        return null;
     };
 
-    window.addEventListener('donationalerts_connected', handleDonationAlertsConnected as EventListener);
-    return () => window.removeEventListener('donationalerts_connected', handleDonationAlertsConnected as EventListener);
-  }, []);
-
-  useEffect(() => {
-    if (!isInitialLoad && config) {
-      autoSave({
-        donation_amount_common: formData.donation_amount_common[0],
-        donation_amount_rare: formData.donation_amount_rare[0],
-        donation_amount_epic: formData.donation_amount_epic[0],
-        donation_amount_legendary: formData.donation_amount_legendary[0],
-        mythical_min_interval_hours: formData.mythical_min_interval_hours[0],
-        mythical_max_interval_hours: formData.mythical_max_interval_hours[0],
-        mythical_window_duration_minutes: formData.mythical_window_duration_minutes[0],
-        mythical_donation_amount: formData.mythical_donation_amount[0]
-      });
-    }
-  }, [
-    formData.donation_amount_common,
-    formData.donation_amount_rare,
-    formData.donation_amount_epic,
-    formData.donation_amount_legendary,
-    formData.mythical_min_interval_hours,
-    formData.mythical_max_interval_hours,
-    formData.mythical_window_duration_minutes,
-    formData.mythical_donation_amount,
-    isInitialLoad,
-    config,
-    autoSave
-  ]);
-
-  if (isLoading || isInitialLoad || !config) {
-    return (
-      <Card className={SURFACE_CARD_CLASS}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        </CardContent>
-      </Card>
+    const { autoSave } = useAutoSave(
+        (payload: Partial<DropsConfig>) => saveMutation.mutate(payload),
+        1000,
+        validateMythical
     );
-  }
 
-  return (
-    <div className="space-y-4">
-      {/* Предупреждение если нет наград */}
-      {!hasRewards && (
-        <Card className="border-amber-500/35 bg-amber-500/10 backdrop-blur-sm shadow-sm shadow-black/20">
-          <CardContent className="p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-400/40 flex-shrink-0">
-                  <AlertTriangle className="h-4 w-4 text-amber-300" />
-                </div>
-                <p className="text-sm text-amber-100/90 break-words">
-                  Сначала добавьте награды на вкладке <strong className="text-amber-50">"Награды"</strong>.
-                </p>
-              </div>
-              <Button
-                onClick={() => navigate('/dashboard/drops?tab=rewards')}
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs flex-shrink-0 border-amber-300/40 bg-amber-500/10 text-amber-100 hover:bg-amber-500/20"
-              >
-                <Package className="w-3.5 h-3.5 mr-1.5" />
-                Настроить награды
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+    const createPayload = (next = formData): Partial<DropsConfig> => ({
+        donation_enabled: next.donation_enabled,
+        donation_amount_common: next.donation_amount_common[0],
+        donation_amount_rare: next.donation_amount_rare[0],
+        donation_amount_epic: next.donation_amount_epic[0],
+        donation_amount_legendary: next.donation_amount_legendary[0],
+        mythical_enabled: next.mythical_enabled,
+        mythical_min_interval_hours: next.mythical_min_interval_hours[0],
+        mythical_max_interval_hours: next.mythical_max_interval_hours[0],
+        mythical_window_duration_minutes: next.mythical_window_duration_minutes[0],
+        mythical_donation_amount: next.mythical_donation_amount[0],
+    });
 
-      {/* Настройки донатов - компактно */}
-      <Card className={SURFACE_CARD_CLASS}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Платные вознаграждения</CardTitle>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium">Включить donation drops</Label>
-              <div title={!donationalertsConnected ? "Нажмите чтобы подключить DonationAlerts" : ""}>
-                <Switch
-                  checked={donationEnabledDisplay}
-                  onCheckedChange={async (checked) => {
-                    if (checked) {
-                      // Проверяем интеграцию с DonationAlerts
-                      if (!donationalertsConnected) {
-                        // Автоматически включаем интеграцию DonationAlerts
-                        toast.info('Подключаем интеграцию DonationAlerts...', {
-                          description: 'Вы будете перенаправлены на страницу авторизации'
-                        });
-                        const connected = await daConnect();
+    const saveNext = (next: DonationSettingsFormData, patch?: Partial<DropsConfig>): void => {
+        setFormData(next);
+        autoSave({ ...createPayload(next), ...patch });
+    };
 
-                        if (!connected) {
-                          toast.error('Не удалось подключить интеграцию DonationAlerts');
-                          return;
-                        }
+    const openDonationAlertsSetup = async (): Promise<void> => {
+        toast.info('Открываю подключение DonationAlerts...', {
+            description: 'После авторизации вернитесь на эту вкладку, drops включатся автоматически.',
+        });
+        const redirected = await daConnect();
+        if (!redirected) {
+            navigate('/dashboard/settings?focus=donationalerts');
+        }
+    };
 
-                        // Если подключение успешно, daConnect() перенаправит на OAuth
-                        // После возврата с OAuth интеграция будет подключена
-                        return;
-                      }
-                    }
-                    setFormData({ ...formData, donation_enabled: checked });
-                    autoSave({ ...createPayload(), donation_enabled: checked });
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <DonationGrid
-            formData={formData as unknown as { donation_amount_common: number[]; donation_amount_rare: number[]; donation_amount_epic: number[]; donation_amount_legendary: number[];[key: string]: number[] }}
-            setFormData={setFormData as unknown as React.Dispatch<React.SetStateAction<{ donation_amount_common: number[]; donation_amount_rare: number[]; donation_amount_epic: number[]; donation_amount_legendary: number[];[key: string]: number[] }>>}
-          />
-        </CardContent>
-      </Card>
+    const handleDonationToggle = async (checked: boolean): Promise<void> => {
+        if (checked && !donationAlertsConnected) {
+            await openDonationAlertsSetup();
+            return;
+        }
+        const next = { ...formData, donation_enabled: checked };
+        saveNext(next, { donation_enabled: checked });
+    };
 
-      {/* Instruction and color legend */}
-      {donationEnabledDisplay && (
-        <Card className={SURFACE_CARD_CLASS}>
-          <CardContent className="pt-4 pb-4 space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-emerald-500/10 flex-shrink-0">
-                <Sparkles className="w-4 h-4 text-emerald-300" />
-              </div>
-              <div className="flex-1 space-y-2 text-sm">
-                <p className="text-muted-foreground break-words">
-                  Пороги выпадения по донатам:
-                </p>
+    const handleMythicalToggle = async (checked: boolean): Promise<void> => {
+        if (checked && !donationAlertsConnected) {
+            await openDonationAlertsSetup();
+            return;
+        }
+        const next = { ...formData, mythical_enabled: checked };
+        saveNext(next, { mythical_enabled: checked });
+    };
 
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_common[0]}₽</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_rare[0]}₽</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_epic[0]}₽</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                    <span className="text-muted-foreground">от {formData.donation_amount_legendary[0]}₽</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+    const setMythicalField = (
+        key:
+            | 'mythical_min_interval_hours'
+            | 'mythical_max_interval_hours'
+            | 'mythical_window_duration_minutes'
+            | 'mythical_donation_amount',
+        value: number,
+        min: number,
+        max: number
+    ): void => {
+        const next = { ...formData, [key]: [clamp(value, min, max)] };
+        saveNext(next);
+    };
 
-      {/* Мифический lootbox - компактно */}
-      <Card className={`${SURFACE_CARD_CLASS} border-emerald-500/30`}>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between min-h-[48px]">
-            <CardTitle className="text-lg flex items-center gap-2 text-emerald-300">
-              <img src={MythycClosed} alt="Мифический" className="w-10 h-10 flex-shrink-0" />
-              <Sparkles className="w-5 h-5 flex-shrink-0" />
-              <span>Мифический drops</span>
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Label className="text-sm font-medium text-emerald-200">Включить mythical drops</Label>
-              <div title="Мифический drops работает на основе донатов. Активация происходит только когда стрим онлайн.">
-                <Switch
-                  checked={mythicalEnabledDisplay}
-                  onCheckedChange={async (checked) => {
-                    if (checked) {
-                      // Проверяем интеграцию с DonationAlerts
-                      if (!donationalertsConnected) {
-                        // Автоматически включаем интеграцию DonationAlerts
-                        toast.info('Подключаем интеграцию DonationAlerts...', {
-                          description: 'Вы будете перенаправлены на страницу авторизации'
-                        });
-                        const connected = await daConnect();
+    const mythicalDonationMax = Math.max(
+        DROPS_CONSTANTS.MYTHICAL.MAX_DONATION_AMOUNT,
+        Math.ceil(formData.mythical_donation_amount[0] / 100) * 100
+    );
+    const mythicalIntervalMax = DROPS_CONSTANTS.MYTHICAL.MAX_INTERVAL_HOURS;
+    const mythicalWindowMax = DROPS_CONSTANTS.MYTHICAL.MAX_WINDOW_DURATION_MINUTES;
 
-                        if (!connected) {
-                          toast.error('Не удалось подключить интеграцию DonationAlerts');
-                          return;
-                        }
+    if (isLoading || isInitialLoad || !config) {
+        return (
+            <Card className={SURFACE_CARD_CLASS}>
+                <CardContent className="flex justify-center p-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </CardContent>
+            </Card>
+        );
+    }
 
-                        // Если подключение успешно, daConnect() перенаправит на OAuth
-                        // После возврата с OAuth интеграция будет подключена
-                        return;
-                      }
-                    }
-                    setFormData({ ...formData, mythical_enabled: checked });
-                    autoSave({ ...createPayload(), mythical_enabled: checked });
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </CardHeader>
-        {mythicalEnabledDisplay && (
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs">Мин. интервал (ч)</Label>
-                <div className="flex items-center gap-2">
-                  <Slider
-                    value={formData.mythical_min_interval_hours}
-                    onValueChange={(value) => setMythicalMinInterval(value[0])}
-                    min={1}
-                    max={mythicalIntervalMax}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    min="1"
-                    max={String(mythicalIntervalMax)}
-                    value={formData.mythical_min_interval_hours[0]}
-                    onChange={(e) => setMythicalMinInterval(parseInt(e.target.value, 10) || 1)}
-                    className="w-16 text-center"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {MYTHICAL_MIN_INTERVAL_PRESETS.filter((preset) => preset <= mythicalIntervalMax).map((preset) => (
-                    <Button
-                      key={`mythical-min-${preset}`}
-                      type="button"
-                      variant={formData.mythical_min_interval_hours[0] === preset ? 'secondary' : 'outline'}
-                      size="sm"
-                      className={`h-7 px-2 text-xs ${
-                        formData.mythical_min_interval_hours[0] === preset
-                          ? 'bg-accent text-foreground border-border/70'
-                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
-                      }`}
-                      onClick={() => setMythicalMinInterval(preset)}
-                    >
-                      {preset}ч
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Макс. интервал (ч)</Label>
-                <div className="flex items-center gap-2">
-                  <Slider
-                    value={formData.mythical_max_interval_hours}
-                    onValueChange={(value) => setMythicalMaxInterval(value[0])}
-                    min={1}
-                    max={mythicalIntervalMax}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    min="1"
-                    max={String(mythicalIntervalMax)}
-                    value={formData.mythical_max_interval_hours[0]}
-                    onChange={(e) => setMythicalMaxInterval(parseInt(e.target.value, 10) || 1)}
-                    className="w-16 text-center"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {MYTHICAL_MAX_INTERVAL_PRESETS.filter((preset) => preset <= mythicalIntervalMax).map((preset) => (
-                    <Button
-                      key={`mythical-max-${preset}`}
-                      type="button"
-                      variant={formData.mythical_max_interval_hours[0] === preset ? 'secondary' : 'outline'}
-                      size="sm"
-                      className={`h-7 px-2 text-xs ${
-                        formData.mythical_max_interval_hours[0] === preset
-                          ? 'bg-accent text-foreground border-border/70'
-                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
-                      }`}
-                      onClick={() => setMythicalMaxInterval(preset)}
-                    >
-                      {preset}ч
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Длительность окна (м)</Label>
-                <div className="flex items-center gap-2">
-                  <Slider
-                    value={formData.mythical_window_duration_minutes}
-                    onValueChange={(value) => setMythicalWindowDuration(value[0])}
-                    min={1}
-                    max={mythicalWindowMax}
-                    step={1}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    min="1"
-                    max={String(mythicalWindowMax)}
-                    value={formData.mythical_window_duration_minutes[0]}
-                    onChange={(e) => setMythicalWindowDuration(parseInt(e.target.value, 10) || 1)}
-                    className="w-16 text-center"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {MYTHICAL_WINDOW_PRESETS.filter((preset) => preset <= mythicalWindowMax).map((preset) => (
-                    <Button
-                      key={`mythical-window-${preset}`}
-                      type="button"
-                      variant={formData.mythical_window_duration_minutes[0] === preset ? 'secondary' : 'outline'}
-                      size="sm"
-                      className={`h-7 px-2 text-xs ${
-                        formData.mythical_window_duration_minutes[0] === preset
-                          ? 'bg-accent text-foreground border-border/70'
-                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
-                      }`}
-                      onClick={() => setMythicalWindowDuration(preset)}
-                    >
-                      {preset}м
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs">Мин. сумма (₽)</Label>
-                <div className="flex items-center gap-2">
-                  <Slider
-                    value={formData.mythical_donation_amount}
-                    onValueChange={(value) => setMythicalDonationAmount(value[0])}
-                    min={500}
-                    max={mythicalDonationMax}
-                    step={100}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    min="500"
-                    max={String(mythicalDonationMax)}
-                    step="1"
-                    value={formData.mythical_donation_amount[0]}
-                    onChange={(e) => setMythicalDonationAmount(parseInt(e.target.value, 10) || 500)}
-                    className="w-20 text-center"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {MYTHICAL_DONATION_PRESETS.filter((preset) => preset <= mythicalDonationMax).map((preset) => (
-                    <Button
-                      key={`mythical-donation-${preset}`}
-                      type="button"
-                      variant={formData.mythical_donation_amount[0] === preset ? 'secondary' : 'outline'}
-                      size="sm"
-                      className={`h-7 px-2 text-xs ${
-                        formData.mythical_donation_amount[0] === preset
-                          ? 'bg-accent text-foreground border-border/70'
-                          : 'border-border/70 bg-card/70 text-muted-foreground hover:bg-accent'
-                      }`}
-                      onClick={() => setMythicalDonationAmount(preset)}
-                    >
-                      {preset}₽
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        )}
-      </Card>
+    return (
+        <div className="space-y-4">
+            {!hasRewards && (
+                <Card className="border-amber-500/35 bg-amber-500/10 shadow-sm shadow-black/20">
+                    <CardContent className="p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
+                                <div className="flex-shrink-0 rounded-lg border border-amber-400/40 bg-amber-500/15 p-2">
+                                    <AlertTriangle className="h-4 w-4 text-amber-300" />
+                                </div>
+                                <p className="text-sm text-amber-100/90">
+                                    Сначала добавьте награды на вкладке{' '}
+                                    <strong className="text-amber-50">"Награды"</strong>.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={() => navigate('/dashboard/drops?tab=rewards')}
+                                variant="outline"
+                                size="sm"
+                                className="h-8 flex-shrink-0 border-amber-300/40 bg-amber-500/10 text-xs text-amber-100 hover:bg-amber-500/20"
+                            >
+                                <Package className="mr-1.5 h-3.5 w-3.5" />
+                                Настроить награды
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
-      {/* Donation history */}
-      <DonationHistory user={user} platform={platform} channelName={channelName} />
+            <Card className={SURFACE_CARD_CLASS}>
+                <CardHeader className="pb-3">
+                    <div className="flex min-h-10 items-center justify-between gap-3">
+                        <CardTitle className="text-lg">Платные вознаграждения</CardTitle>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium">Включить donation drops</Label>
+                            <Switch
+                                variant="donation"
+                                checked={donationAlertsConnected ? formData.donation_enabled : false}
+                                onCheckedChange={(checked) => void handleDonationToggle(checked)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <DonationGrid
+                        formData={formData as unknown as DonationGridShape}
+                        setFormData={setFormData as unknown as React.Dispatch<React.SetStateAction<DonationGridShape>>}
+                        onChange={(next) => autoSave(createPayload(next as unknown as DonationSettingsFormData))}
+                    />
+                </CardContent>
+            </Card>
 
-      {/* ✅ Убрали кнопку "Сохранить" - автосохранение работает автоматически */}
-    </div>
-  );
+            {donationAlertsConnected && formData.donation_enabled && (
+                <Card className={SURFACE_CARD_CLASS}>
+                    <CardContent className="space-y-3 py-4">
+                        <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 rounded-lg bg-emerald-500/10 p-2">
+                                <Sparkles className="h-4 w-4 text-emerald-300" />
+                            </div>
+                            <div className="space-y-2 text-sm">
+                                <p className="text-muted-foreground">Пороги выпадения по донатам:</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <span className="text-xs text-muted-foreground">
+                                        Обычный от {formData.donation_amount_common[0]} ₽
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Редкий от {formData.donation_amount_rare[0]} ₽
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Эпический от {formData.donation_amount_epic[0]} ₽
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Легендарный от {formData.donation_amount_legendary[0]} ₽
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            <Card className={`${SURFACE_CARD_CLASS} border-emerald-500/30`}>
+                <CardHeader className="pb-3">
+                    <div className="flex min-h-12 items-center justify-between gap-3">
+                        <CardTitle className="flex items-center gap-2 text-lg text-emerald-300">
+                            <img src={MythycClosed} alt="Мифический" className="h-10 w-10 flex-shrink-0" />
+                            <span>Мифический drops</span>
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                            <Label className="text-sm font-medium text-emerald-200">Включить Мифический drops</Label>
+                            <Switch
+                                variant="donation"
+                                checked={donationAlertsConnected ? formData.mythical_enabled : false}
+                                onCheckedChange={(checked) => void handleMythicalToggle(checked)}
+                            />
+                        </div>
+                    </div>
+                </CardHeader>
+
+                {formData.mythical_enabled && (
+                    <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <MythicalControl
+                                label="Мин. интервал"
+                                unit="ч"
+                                value={formData.mythical_min_interval_hours[0]}
+                                min={1}
+                                max={mythicalIntervalMax}
+                                sliderStep={1}
+                                presets={MYTHICAL_MIN_INTERVAL_PRESETS}
+                                onChange={(value) =>
+                                    setMythicalField('mythical_min_interval_hours', value, 1, mythicalIntervalMax)
+                                }
+                            />
+                            <MythicalControl
+                                label="Макс. интервал"
+                                unit="ч"
+                                value={formData.mythical_max_interval_hours[0]}
+                                min={1}
+                                max={mythicalIntervalMax}
+                                sliderStep={1}
+                                presets={MYTHICAL_MAX_INTERVAL_PRESETS}
+                                onChange={(value) =>
+                                    setMythicalField('mythical_max_interval_hours', value, 1, mythicalIntervalMax)
+                                }
+                            />
+                            <MythicalControl
+                                label="Длительность окна"
+                                unit="м"
+                                value={formData.mythical_window_duration_minutes[0]}
+                                min={1}
+                                max={mythicalWindowMax}
+                                sliderStep={1}
+                                presets={MYTHICAL_WINDOW_PRESETS}
+                                onChange={(value) =>
+                                    setMythicalField('mythical_window_duration_minutes', value, 1, mythicalWindowMax)
+                                }
+                            />
+                            <MythicalControl
+                                label="Мин. донат"
+                                unit="₽"
+                                value={formData.mythical_donation_amount[0]}
+                                min={500}
+                                max={mythicalDonationMax}
+                                sliderStep={100}
+                                presets={MYTHICAL_DONATION_PRESETS}
+                                onChange={(value) =>
+                                    setMythicalField('mythical_donation_amount', value, 500, mythicalDonationMax)
+                                }
+                            />
+                        </div>
+                    </CardContent>
+                )}
+            </Card>
+
+            <DonationHistory user={user} platform={platform} channelName={channelName} />
+        </div>
+    );
 };
+
+interface MythicalControlProps {
+    label: string;
+    unit: string;
+    value: number;
+    min: number;
+    max: number;
+    sliderStep: number;
+    presets: number[];
+    onChange: (value: number) => void;
+}
+
+const MythicalControl: React.FC<MythicalControlProps> = ({
+    label,
+    unit,
+    value,
+    min,
+    max,
+    sliderStep,
+    presets,
+    onChange,
+}) => (
+    <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <div className="flex items-center gap-2">
+            <Slider
+                value={[value]}
+                onValueChange={(next) => onChange(next[0])}
+                min={min}
+                max={max}
+                step={sliderStep}
+                className="flex-1"
+            />
+            <Input
+                type="number"
+                min={String(min)}
+                max={String(max)}
+                step="1"
+                value={value}
+                onChange={(event) => onChange(Number(event.target.value) || min)}
+                className="h-9 w-20 border-border/70 bg-card/70 text-center"
+            />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+            {presets
+                .filter((preset) => preset <= max)
+                .map((preset) => (
+                    <Button
+                        key={`${label}-${preset}`}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={value === preset ? ACTIVE_PRESET_BUTTON_CLASS : PRESET_BUTTON_CLASS}
+                        onClick={() => onChange(preset)}
+                    >
+                        {preset}
+                        {unit}
+                    </Button>
+                ))}
+        </div>
+    </div>
+);
 
 export default DonationSettings;

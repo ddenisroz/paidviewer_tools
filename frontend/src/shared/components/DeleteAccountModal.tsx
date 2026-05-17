@@ -43,21 +43,16 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75">
             <div className="bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 border border-gray-700">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-700">
                     <div className="flex items-center gap-3">
                         <AlertTriangle className="h-6 w-6 text-red-500" />
-                        <h2 className="text-xl font-bold text-white">
-                            Удаление аккаунта
-                        </h2>
+                        <h2 className="text-xl font-bold text-white">Удаление аккаунта</h2>
                     </div>
                     {!isDeleting && (
-                        <button
-                            onClick={handleClose}
-                            className="text-gray-400 hover:text-white transition-colors"
-                        >
+                        <button onClick={handleClose} className="text-gray-400 hover:text-white transition-colors">
                             <X className="h-5 w-5" />
                         </button>
                     )}
@@ -66,12 +61,8 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
                 {/* Content */}
                 <div className="p-6 space-y-4">
                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-                        <p className="text-red-400 font-semibold mb-2">
-                            [WARN] Это действие необратимо!
-                        </p>
-                        <p className="text-gray-300 text-sm">
-                            Будут удалены:
-                        </p>
+                        <p className="text-red-400 font-semibold mb-2">[WARN] Это действие необратимо!</p>
+                        <p className="text-gray-300 text-sm">Будут удалены:</p>
                         <ul className="list-disc list-inside text-gray-400 text-sm mt-2 space-y-1">
                             <li>Все подключенные интеграции (Twitch, VK Live)</li>
                             <li>Все настройки TTS и чата</li>
@@ -83,7 +74,9 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                            Введите <span className="font-mono bg-gray-700 px-1.5 py-0.5 rounded text-red-400">Delete</span> для подтверждения:
+                            Введите{' '}
+                            <span className="font-mono bg-gray-700 px-1.5 py-0.5 rounded text-red-400">Delete</span> для
+                            подтверждения:
                         </label>
                         <Input
                             type="text"
@@ -99,11 +92,7 @@ const DeleteAccountModal: React.FC<DeleteAccountModalProps> = ({ isOpen, onClose
 
                 {/* Footer */}
                 <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-700">
-                    <Button
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={isDeleting}
-                    >
+                    <Button variant="outline" onClick={handleClose} disabled={isDeleting}>
                         Отмена
                     </Button>
                     <Button

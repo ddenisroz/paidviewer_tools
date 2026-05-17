@@ -7,8 +7,8 @@ import { toast } from 'sonner';
 import {
     type LocalTtsProvider,
     type LocalVoice,
+    localVoicesService,
     type UploadVoiceData,
-    localVoicesService
 } from '@/services/api/services/localVoicesService';
 import { logger } from '@/shared/utils/prodLogger';
 
@@ -65,7 +65,11 @@ export const useDeleteVoiceMutation = (provider: LocalTtsProvider) => {
 export const useUpdateVoiceSettingsMutation = (provider: LocalTtsProvider) => {
     const queryClient = useQueryClient();
 
-    return useMutation<LocalVoice | null, AxiosError<{ detail?: string }>, { voiceId: number; settings: Record<string, unknown> }>({
+    return useMutation<
+        LocalVoice | null,
+        AxiosError<{ detail?: string }>,
+        { voiceId: number; settings: Record<string, unknown> }
+    >({
         mutationFn: ({ voiceId, settings }) => localVoicesService.updateVoiceSettings(provider, voiceId, settings),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: localVoicesKeys.list(provider) });

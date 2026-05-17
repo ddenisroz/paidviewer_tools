@@ -22,11 +22,11 @@ const ActionButton: React.FC<ActionButtonProps> = ({ icon: Icon, label, isActive
         >
             <Icon className="w-4 h-4 flex-shrink-0" />
             <span className="whitespace-nowrap">{label}</span>
-            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                isActive 
-                    ? 'bg-emerald-500/15 text-emerald-300' 
-                    : 'bg-muted/60 text-muted-foreground'
-            }`}>
+            <span
+                className={`text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${
+                    isActive ? 'bg-emerald-500/15 text-emerald-300' : 'bg-muted/60 text-muted-foreground'
+                }`}
+            >
                 {isActive ? 'ON' : 'OFF'}
             </span>
         </button>

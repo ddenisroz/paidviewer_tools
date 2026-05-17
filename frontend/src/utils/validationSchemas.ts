@@ -20,35 +20,19 @@ export const commandNameSchema = z
     .regex(/^[a-zA-Z0-9_]+$/, 'Только буквы, цифры и подчеркивание');
 
 // Command response validation
-export const commandResponseSchema = z
-    .string()
-    .min(1, 'Ответ команды обязателен')
-    .max(500, 'Максимум 500 символов');
+export const commandResponseSchema = z.string().min(1, 'Ответ команды обязателен').max(500, 'Максимум 500 символов');
 
 // Reward title validation
-export const rewardTitleSchema = z
-    .string()
-    .min(1, 'Название награды обязательно')
-    .max(45, 'Максимум 45 символов');
+export const rewardTitleSchema = z.string().min(1, 'Название награды обязательно').max(45, 'Максимум 45 символов');
 
 // Reward cost validation
-export const rewardCostSchema = z
-    .number()
-    .int('Должно быть целым числом')
-    .min(1, 'Минимум 1')
-    .max(10000000, 'Максимум 10,000,000');
+export const rewardCostSchema = z.number().int('Должно быть целым числом').min(1, 'Минимум 1').max(10000000, 'Максимум 10,000,000');
 
 // URL validation
-export const urlSchema = z
-    .string()
-    .url('Неверный формат URL')
-    .optional()
-    .or(z.literal(''));
+export const urlSchema = z.string().url('Неверный формат URL').optional().or(z.literal(''));
 
 // Color validation (hex)
-export const hexColorSchema = z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, 'Формат: #RRGGBB');
+export const hexColorSchema = z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Формат: #RRGGBB');
 
 // Command form schema
 export const commandFormSchema = z.object({

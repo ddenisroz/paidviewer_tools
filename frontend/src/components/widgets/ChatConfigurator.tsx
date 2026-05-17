@@ -12,7 +12,6 @@ import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 
-
 interface WidgetConfig {
     width: number;
     height: number;
@@ -73,34 +72,34 @@ const ChatConfigurator: React.FC = () => {
         platforms: {
             twitch: true,
             vk: true,
-            combined: true
+            combined: true,
         },
         platformFilter: 'combined', // 'twitch', 'vk', 'combined'
         colors: {
             moderator: '#00ff00',
             vip: '#ff6b6b',
             subscriber: '#4ecdc4',
-            normal: '#ffffff'
-        }
+            normal: '#ffffff',
+        },
     });
 
     const [previewUrl, setPreviewUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
     const updateConfig = (key: keyof WidgetConfig, value: unknown) => {
-        setConfig(prev => ({
+        setConfig((prev) => ({
             ...prev,
-            [key]: value
+            [key]: value,
         }));
     };
 
     const updateNestedConfig = (parent: 'platforms' | 'colors', key: string, value: unknown) => {
-        setConfig(prev => ({
+        setConfig((prev) => ({
             ...prev,
             [parent]: {
                 ...prev[parent],
-                [key]: value
-            }
+                [key]: value,
+            },
         }));
     };
 
@@ -163,7 +162,7 @@ const ChatConfigurator: React.FC = () => {
                                     <TabsTrigger value="messages">Сообщения</TabsTrigger>
                                     <TabsTrigger value="colors">Цвета</TabsTrigger>
                                 </TabsList>
-                                
+
                                 <TabsContent value="appearance" className="space-y-4">
                                     <div className="space-y-5">
                                         <div>
@@ -171,8 +170,12 @@ const ChatConfigurator: React.FC = () => {
                                             <div className="space-y-4">
                                                 <div className="space-y-2">
                                                     <div className="flex items-center justify-between">
-                                                        <Label htmlFor="width" className="text-sm">Ширина</Label>
-                                                        <span className="text-sm text-muted-foreground font-mono">{config.width}px</span>
+                                                        <Label htmlFor="width" className="text-sm">
+                                                            Ширина
+                                                        </Label>
+                                                        <span className="text-sm text-muted-foreground font-mono">
+                                                            {config.width}px
+                                                        </span>
                                                     </div>
                                                     <Slider
                                                         id="width"
@@ -187,11 +190,15 @@ const ChatConfigurator: React.FC = () => {
                                                         <span>1200</span>
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="space-y-2">
                                                     <div className="flex items-center justify-between">
-                                                        <Label htmlFor="height" className="text-sm">Высота</Label>
-                                                        <span className="text-sm text-muted-foreground font-mono">{config.height}px</span>
+                                                        <Label htmlFor="height" className="text-sm">
+                                                            Высота
+                                                        </Label>
+                                                        <span className="text-sm text-muted-foreground font-mono">
+                                                            {config.height}px
+                                                        </span>
                                                     </div>
                                                     <Slider
                                                         id="height"
@@ -209,7 +216,7 @@ const ChatConfigurator: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <Label htmlFor="backgroundColor">Цвет фона</Label>
                                         <Input
@@ -220,11 +227,15 @@ const ChatConfigurator: React.FC = () => {
                                             placeholder="rgba(0, 0, 0, 0.8)"
                                         />
                                     </div>
-                                    
+
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <Label htmlFor="borderRadius" className="text-sm">Скругление углов</Label>
-                                            <span className="text-sm text-muted-foreground font-mono">{config.borderRadius}px</span>
+                                            <Label htmlFor="borderRadius" className="text-sm">
+                                                Скругление углов
+                                            </Label>
+                                            <span className="text-sm text-muted-foreground font-mono">
+                                                {config.borderRadius}px
+                                            </span>
                                         </div>
                                         <Slider
                                             id="borderRadius"
@@ -239,10 +250,13 @@ const ChatConfigurator: React.FC = () => {
                                             <span>20</span>
                                         </div>
                                     </div>
-                                    
+
                                     <div>
                                         <Label htmlFor="fontFamily">Шрифт</Label>
-                                        <Select value={config.fontFamily} onValueChange={(value) => updateConfig('fontFamily', value)}>
+                                        <Select
+                                            value={config.fontFamily}
+                                            onValueChange={(value) => updateConfig('fontFamily', value)}
+                                        >
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -255,11 +269,15 @@ const ChatConfigurator: React.FC = () => {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    
+
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <Label htmlFor="fontSize" className="text-sm">Размер шрифта</Label>
-                                            <span className="text-sm text-muted-foreground font-mono">{config.fontSize}px</span>
+                                            <Label htmlFor="fontSize" className="text-sm">
+                                                Размер шрифта
+                                            </Label>
+                                            <span className="text-sm text-muted-foreground font-mono">
+                                                {config.fontSize}px
+                                            </span>
                                         </div>
                                         <Slider
                                             id="fontSize"
@@ -275,74 +293,90 @@ const ChatConfigurator: React.FC = () => {
                                         </div>
                                     </div>
                                 </TabsContent>
-                                
-                                        <TabsContent value="messages" className="space-y-4">
-                                            <div>
-                                                <div className="flex items-center justify-between">
-                                                    <Label htmlFor="maxMessages" className="text-sm">Максимум сообщений</Label>
-                                                    <span className="text-sm text-muted-foreground font-mono">{config.maxMessages}</span>
-                                                </div>
-                                                <Slider
-                                                    id="maxMessages"
-                                                    value={[config.maxMessages]}
-                                                    onValueChange={([value]) => updateConfig('maxMessages', value)}
-                                                    min={10}
-                                                    max={100}
-                                                    step={5}
+
+                                <TabsContent value="messages" className="space-y-4">
+                                    <div>
+                                        <div className="flex items-center justify-between">
+                                            <Label htmlFor="maxMessages" className="text-sm">
+                                                Максимум сообщений
+                                            </Label>
+                                            <span className="text-sm text-muted-foreground font-mono">
+                                                {config.maxMessages}
+                                            </span>
+                                        </div>
+                                        <Slider
+                                            id="maxMessages"
+                                            value={[config.maxMessages]}
+                                            onValueChange={([value]) => updateConfig('maxMessages', value)}
+                                            min={10}
+                                            max={100}
+                                            step={5}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground/60">
+                                            <span>10</span>
+                                            <span>100</span>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <Label>Платформы чата</Label>
+                                        <div className="space-y-2 mt-2">
+                                            <div className="flex items-center space-x-2">
+                                                <Switch
+                                                    id="platform-twitch"
+                                                    checked={config.platforms.twitch}
+                                                    onCheckedChange={(checked) =>
+                                                        updateNestedConfig('platforms', 'twitch', checked)
+                                                    }
                                                 />
-                                                <div className="flex justify-between text-xs text-muted-foreground/60">
-                                                    <span>10</span>
-                                                    <span>100</span>
-                                                </div>
+                                                <Label htmlFor="platform-twitch">Twitch</Label>
                                             </div>
-                                            
-                                            <div>
-                                                <Label>Платформы чата</Label>
-                                                <div className="space-y-2 mt-2">
-                                                    <div className="flex items-center space-x-2">
-                                                        <Switch
-                                                            id="platform-twitch"
-                                                            checked={config.platforms.twitch}
-                                                            onCheckedChange={(checked) => updateNestedConfig('platforms', 'twitch', checked)}
-                                                        />
-                                                        <Label htmlFor="platform-twitch">Twitch</Label>
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <Switch
-                                                            id="platform-vk"
-                                                            checked={config.platforms.vk}
-                                                            onCheckedChange={(checked) => updateNestedConfig('platforms', 'vk', checked)}
-                                                        />
-                                                        <Label htmlFor="platform-vk">VK Live</Label>
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                        <Switch
-                                                            id="platform-combined"
-                                                            checked={config.platforms.combined}
-                                                            onCheckedChange={(checked) => updateNestedConfig('platforms', 'combined', checked)}
-                                                        />
-                                                        <Label htmlFor="platform-combined">Объединенный</Label>
-                                                    </div>
-                                                </div>
+                                            <div className="flex items-center space-x-2">
+                                                <Switch
+                                                    id="platform-vk"
+                                                    checked={config.platforms.vk}
+                                                    onCheckedChange={(checked) =>
+                                                        updateNestedConfig('platforms', 'vk', checked)
+                                                    }
+                                                />
+                                                <Label htmlFor="platform-vk">VK Live</Label>
                                             </div>
-                                            
-                                            <div>
-                                                <Label htmlFor="platformFilter">Фильтр платформ</Label>
-                                                <Select value={config.platformFilter} onValueChange={(value) => updateConfig('platformFilter', value)}>
-                                                    <SelectTrigger>
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="twitch">Только Twitch</SelectItem>
-                                                        <SelectItem value="vk">Только VK Live</SelectItem>
-                                                        <SelectItem value="combined">Объединенный</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                            <div className="flex items-center space-x-2">
+                                                <Switch
+                                                    id="platform-combined"
+                                                    checked={config.platforms.combined}
+                                                    onCheckedChange={(checked) =>
+                                                        updateNestedConfig('platforms', 'combined', checked)
+                                                    }
+                                                />
+                                                <Label htmlFor="platform-combined">Объединенный</Label>
                                             </div>
-                                    
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <Label htmlFor="platformFilter">Фильтр платформ</Label>
+                                        <Select
+                                            value={config.platformFilter}
+                                            onValueChange={(value) => updateConfig('platformFilter', value)}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="twitch">Только Twitch</SelectItem>
+                                                <SelectItem value="vk">Только VK Live</SelectItem>
+                                                <SelectItem value="combined">Объединенный</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
                                     <div>
                                         <Label htmlFor="animationType">Тип анимации</Label>
-                                        <Select value={config.animationType} onValueChange={(value) => updateConfig('animationType', value)}>
+                                        <Select
+                                            value={config.animationType}
+                                            onValueChange={(value) => updateConfig('animationType', value)}
+                                        >
                                             <SelectTrigger>
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -353,11 +387,15 @@ const ChatConfigurator: React.FC = () => {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    
+
                                     <div>
                                         <div className="flex items-center justify-between">
-                                            <Label htmlFor="animationDuration" className="text-sm">Скорость анимации</Label>
-                                            <span className="text-sm text-muted-foreground font-mono">{config.animationDuration.toFixed(1)}с</span>
+                                            <Label htmlFor="animationDuration" className="text-sm">
+                                                Скорость анимации
+                                            </Label>
+                                            <span className="text-sm text-muted-foreground font-mono">
+                                                {config.animationDuration.toFixed(1)}с
+                                            </span>
                                         </div>
                                         <Slider
                                             id="animationDuration"
@@ -372,7 +410,7 @@ const ChatConfigurator: React.FC = () => {
                                             <span>2.0</span>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="flex items-center space-x-2">
                                         <Switch
                                             id="showTimestamps"
@@ -381,7 +419,7 @@ const ChatConfigurator: React.FC = () => {
                                         />
                                         <Label htmlFor="showTimestamps">Показывать время</Label>
                                     </div>
-                                    
+
                                     <div className="flex items-center space-x-2">
                                         <Switch
                                             id="showUserRoles"
@@ -391,7 +429,7 @@ const ChatConfigurator: React.FC = () => {
                                         <Label htmlFor="showUserRoles">Показывать роли</Label>
                                     </div>
                                 </TabsContent>
-                                
+
                                 <TabsContent value="colors" className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
@@ -399,7 +437,9 @@ const ChatConfigurator: React.FC = () => {
                                             <Input
                                                 type="color"
                                                 value={config.colors.moderator}
-                                                onChange={(e) => updateNestedConfig('colors', 'moderator', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateNestedConfig('colors', 'moderator', e.target.value)
+                                                }
                                                 className="w-full h-10"
                                             />
                                         </div>
@@ -417,7 +457,9 @@ const ChatConfigurator: React.FC = () => {
                                             <Input
                                                 type="color"
                                                 value={config.colors.subscriber}
-                                                onChange={(e) => updateNestedConfig('colors', 'subscriber', e.target.value)}
+                                                onChange={(e) =>
+                                                    updateNestedConfig('colors', 'subscriber', e.target.value)
+                                                }
                                                 className="w-full h-10"
                                             />
                                         </div>
@@ -435,7 +477,7 @@ const ChatConfigurator: React.FC = () => {
                             </Tabs>
                         </CardContent>
                     </Card>
-                    
+
                     <div className="flex space-x-2">
                         <Button onClick={saveConfig} disabled={isLoading}>
                             {isLoading ? 'Сохранение...' : 'Сохранить'}
@@ -446,16 +488,10 @@ const ChatConfigurator: React.FC = () => {
                         <Button onClick={() => document.getElementById('import')?.click()} variant="outline">
                             Импорт
                         </Button>
-                        <input
-                            id="import"
-                            type="file"
-                            accept=".json"
-                            onChange={importConfig}
-                            className="hidden"
-                        />
+                        <input id="import" type="file" accept=".json" onChange={importConfig} className="hidden" />
                     </div>
                 </div>
-                
+
                 {/* Предварительный просмотр */}
                 <div>
                     <Card>
@@ -478,17 +514,28 @@ const ChatConfigurator: React.FC = () => {
                             )}
                         </CardContent>
                     </Card>
-                    
+
                     <Card className="mt-4">
                         <CardHeader>
                             <CardTitle>Инструкция для OBS</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2 text-sm">
-                                <p>1. Добавьте <strong>Browser Source</strong> в OBS</p>
-                                <p>2. URL: <code className="bg-gray-100 px-1 rounded">{previewUrl || 'URL появится после сохранения'}</code></p>
-                                <p>3. Ширина: <code className="bg-gray-100 px-1 rounded">{config.width}px</code></p>
-                                <p>4. Высота: <code className="bg-gray-100 px-1 rounded">{config.height}px</code></p>
+                                <p>
+                                    1. Добавьте <strong>Browser Source</strong> в OBS
+                                </p>
+                                <p>
+                                    2. URL:{' '}
+                                    <code className="bg-gray-100 px-1 rounded">
+                                        {previewUrl || 'URL появится после сохранения'}
+                                    </code>
+                                </p>
+                                <p>
+                                    3. Ширина: <code className="bg-gray-100 px-1 rounded">{config.width}px</code>
+                                </p>
+                                <p>
+                                    4. Высота: <code className="bg-gray-100 px-1 rounded">{config.height}px</code>
+                                </p>
                                 <p>5. Включите "Shutdown source when not visible"</p>
                             </div>
                         </CardContent>
@@ -500,4 +547,3 @@ const ChatConfigurator: React.FC = () => {
 };
 
 export default ChatConfigurator;
-

@@ -81,6 +81,8 @@ class AgentRuntimeState:
             return None
         if "version_mismatch" in normalized:
             return "version_mismatch"
+        if "expired" in normalized:
+            return "pairing_expired"
         if "auth" in normalized:
             return "auth_failed"
         if "provider" in normalized and "configured" in normalized:
@@ -111,6 +113,7 @@ class AgentRuntimeState:
             "paired": bool(config.worker_token),
             "worker_key": config.worker_key or None,
             "awaiting_pairing": not bool(config.worker_token),
+            "pairing_expires_at": config.pairing_expires_at or None,
             "label": config.label,
             "last_error": self.last_error,
             "error_code": self._error_code_from_message(self.last_error),

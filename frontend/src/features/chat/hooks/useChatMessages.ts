@@ -32,11 +32,12 @@ const messagesReducer = (state: ChatMessage[], action: MessagesAction): ChatMess
 
     switch (action.type) {
         case 'ADD_MESSAGE': {
-            const isDuplicate = state.some(msg =>
-                msg.id === action.payload.id ||
-                (msg.timestamp === action.payload.timestamp &&
-                    msg.author === action.payload.author &&
-                    (msg.content === action.payload.content || msg.message === action.payload.message))
+            const isDuplicate = state.some(
+                (msg) =>
+                    msg.id === action.payload.id ||
+                    (msg.timestamp === action.payload.timestamp &&
+                        msg.author === action.payload.author &&
+                        (msg.content === action.payload.content || msg.message === action.payload.message))
             );
 
             if (isDuplicate) {
@@ -116,7 +117,7 @@ export function useChatMessages(): UseChatMessagesReturn {
             const payload: ChatMessagesStoragePayload = {
                 version: 1,
                 savedAt: Date.now(),
-                messages: messages.slice(-getMaxMessages())
+                messages: messages.slice(-getMaxMessages()),
             };
             localStorage.setItem(CHAT_MESSAGES_STORAGE_KEY, JSON.stringify(payload));
         } catch (error) {
@@ -124,13 +125,10 @@ export function useChatMessages(): UseChatMessagesReturn {
         }
     }, [messages]);
 
-    const filterByPlatform = useCallback((
-        msgs: ChatMessage[],
-        filter?: PlatformFilter
-    ): ChatMessage[] => {
+    const filterByPlatform = useCallback((msgs: ChatMessage[], filter?: PlatformFilter): ChatMessage[] => {
         if (!filter) return msgs;
 
-        return msgs.filter(msg => {
+        return msgs.filter((msg) => {
             if (msg.platform === 'twitch' && filter.twitch === false) return false;
             if (msg.platform === 'vk' && filter.vk === false) return false;
             return true;
@@ -146,13 +144,16 @@ export function useChatMessages(): UseChatMessagesReturn {
         dispatch({ type: 'ADD_MESSAGE', payload: message });
     }, []);
 
-    const setMessages = useCallback((newMessages: ChatMessage[], platformFilter?: PlatformFilter) => {
-        const filtered = filterByPlatform(newMessages, platformFilter);
-        if (filtered.length > 0) {
-            dispatch({ type: 'SET_MESSAGES', payload: filtered });
-            historyLoadedRef.current = true;
-        }
-    }, [filterByPlatform]);
+    const setMessages = useCallback(
+        (newMessages: ChatMessage[], platformFilter?: PlatformFilter) => {
+            const filtered = filterByPlatform(newMessages, platformFilter);
+            if (filtered.length > 0) {
+                dispatch({ type: 'SET_MESSAGES', payload: filtered });
+                historyLoadedRef.current = true;
+            }
+        },
+        [filterByPlatform]
+    );
 
     const clearMessages = useCallback(() => {
         dispatch({ type: 'CLEAR_MESSAGES' });
@@ -169,7 +170,7 @@ export function useChatMessages(): UseChatMessagesReturn {
         setMessages,
         clearMessages,
         historyLoaded: historyLoadedRef.current,
-        setHistoryLoaded
+        setHistoryLoaded,
     };
 }
 

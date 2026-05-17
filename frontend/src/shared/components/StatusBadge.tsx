@@ -1,14 +1,7 @@
 // src/shared/components/StatusBadge.tsx
 import React from 'react';
 
-import { 
-    AlertCircle, 
-    CheckCircle, 
-    Clock, 
-    Loader2, 
-    LucideIcon,
-    XCircle
-} from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Loader2, LucideIcon, XCircle } from 'lucide-react';
 
 import { Badge } from '@/shared/components/ui/badge';
 
@@ -26,11 +19,11 @@ interface StatusConfig {
     text: string;
 }
 
-const StatusBadge: React.FC<StatusBadgeProps> = ({ 
-    status, 
+const StatusBadge: React.FC<StatusBadgeProps> = ({
+    status,
     variant: _variant = 'default',
     showIcon = true,
-    className = '' 
+    className = '',
 }) => {
     const getStatusConfig = (status?: string): StatusConfig => {
         switch (status?.toLowerCase()) {
@@ -43,9 +36,9 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
                     variant: 'default',
                     className: 'bg-green-600/20 text-green-300 border-green-500',
                     icon: CheckCircle,
-                    text: 'Активен'
+                    text: 'Активен',
                 };
-            
+
             case 'inactive':
             case 'disabled':
             case 'offline':
@@ -55,9 +48,9 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
                     variant: 'destructive',
                     className: 'bg-red-600/20 text-red-300 border-red-500',
                     icon: XCircle,
-                    text: 'Неактивен'
+                    text: 'Неактивен',
                 };
-            
+
             case 'pending':
             case 'loading':
             case 'processing':
@@ -65,33 +58,33 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
                     variant: 'secondary',
                     className: 'bg-yellow-600/20 text-yellow-300 border-yellow-500',
                     icon: Loader2,
-                    text: 'Обработка'
+                    text: 'Обработка',
                 };
-            
+
             case 'warning':
             case 'caution':
                 return {
                     variant: 'outline',
                     className: 'bg-yellow-600/20 text-yellow-300 border-yellow-500',
                     icon: AlertCircle,
-                    text: 'Предупреждение'
+                    text: 'Предупреждение',
                 };
-            
+
             case 'waiting':
             case 'queued':
                 return {
                     variant: 'outline',
                     className: 'bg-blue-600/20 text-blue-300 border-blue-500',
                     icon: Clock,
-                    text: 'Ожидание'
+                    text: 'Ожидание',
                 };
-            
+
             default:
                 return {
                     variant: 'outline',
                     className: 'bg-gray-600/20 text-gray-300 border-gray-500',
                     icon: null,
-                    text: status || 'Неизвестно'
+                    text: status || 'Неизвестно',
                 };
         }
     };
@@ -100,17 +93,11 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({
     const IconComponent = config.icon;
 
     return (
-        <Badge 
-            variant={config.variant}
-            className={`${config.className} ${className}`}
-        >
-            {showIcon && IconComponent && (
-                <IconComponent className="h-3 w-3 mr-1" />
-            )}
+        <Badge variant={config.variant} className={`${config.className} ${className}`}>
+            {showIcon && IconComponent && <IconComponent className="h-3 w-3 mr-1" />}
             {config.text}
         </Badge>
     );
 };
 
 export default StatusBadge;
-

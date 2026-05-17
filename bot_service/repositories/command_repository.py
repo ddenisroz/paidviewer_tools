@@ -122,20 +122,7 @@ class CommandRepository(BaseRepository[BotCommand]):
                     return None
                 return override_cmd
 
-        # 3. Global
-        global_cmd = self.db.query(BotCommand).filter(
-            and_(
-                BotCommand.command_type == 'global',
-                BotCommand.user_id.is_(None),
-                BotCommand.command_name == command_name,
-                BotCommand.is_enabled == True
-            )
-        ).first()
-        
-        if global_cmd and self._check_platform(global_cmd, platform):
-            return global_cmd
-
-        # 4. Alias lookup
+        # 3. Alias lookup for user overrides
         alias_cmd = self.db.query(BotCommand).filter(
             and_(
                 BotCommand.command_type == 'override',
@@ -147,6 +134,19 @@ class CommandRepository(BaseRepository[BotCommand]):
         
         if alias_cmd and self._check_platform(alias_cmd, platform):
             return alias_cmd
+
+        # 4. Global
+        global_cmd = self.db.query(BotCommand).filter(
+            and_(
+                BotCommand.command_type == 'global',
+                BotCommand.user_id.is_(None),
+                BotCommand.command_name == command_name,
+                BotCommand.is_enabled == True
+            )
+        ).first()
+        
+        if global_cmd and self._check_platform(global_cmd, platform):
+            return global_cmd
 
         return None
 
@@ -176,6 +176,32 @@ class CommandRepository(BaseRepository[BotCommand]):
                 BotCommand.alias == alias
             )
         ).first() is not None
+
+    def trigger_exists(self, trigger: str, user_id: int, exclude_command_id: Optional[int] = None) -> bool:
+        """Check whether a command trigger or alias is already reserved for this user."""
+        cleaned_trigger = (trigger or "").strip().lower()
+        if not cleaned_trigger:
+            return False
+
+        query = self.db.query(BotCommand).filter(
+            or_(
+                and_(
+                    BotCommand.command_type == 'global',
+                    BotCommand.user_id.is_(None),
+                    BotCommand.command_name == cleaned_trigger,
+                ),
+                and_(
+                    BotCommand.user_id == user_id,
+                    or_(
+                        BotCommand.command_name == cleaned_trigger,
+                        BotCommand.alias == cleaned_trigger,
+                    ),
+                ),
+            )
+        )
+        if exclude_command_id is not None:
+            query = query.filter(BotCommand.id != exclude_command_id)
+        return query.first() is not None
 
     def get_global_command_by_name(self, command_name: str) -> Optional[BotCommand]:
         """Get global command by name."""

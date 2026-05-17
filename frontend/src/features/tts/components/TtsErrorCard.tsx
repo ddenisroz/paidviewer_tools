@@ -12,17 +12,9 @@ const TtsErrorCard: React.FC<TtsErrorCardProps> = ({ title, description, suggest
             <div className="flex items-start gap-3">
                 <div className="w-5 h-5 bg-red-500 rounded-full flex-shrink-0 mt-0.5"></div>
                 <div className="flex-1">
-                    <h2 className="text-lg font-semibold text-red-400 mb-2">
-                        {title}
-                    </h2>
-                    <p className="text-red-300 mb-3">
-                        {description}
-                    </p>
-                    {suggestion && (
-                        <p className="text-slate-400 text-sm mb-4">
-                            {suggestion}
-                        </p>
-                    )}
+                    <h2 className="text-lg font-semibold text-red-400 mb-2">{title}</h2>
+                    <p className="text-red-300 mb-3">{description}</p>
+                    {suggestion && <p className="text-slate-400 text-sm mb-4">{suggestion}</p>}
                 </div>
             </div>
         </div>
@@ -30,4 +22,3 @@ const TtsErrorCard: React.FC<TtsErrorCardProps> = ({ title, description, suggest
 };
 
 export default TtsErrorCard;
-

@@ -33,19 +33,24 @@ interface ToastProviderProps {
 }
 
 export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
-
     const addToast = useCallback((options: Omit<ToastOptions, 'id'>) => {
         const { type = 'info', message, title, duration } = options;
 
         // Map to sonner
-        const toastFn = type === 'error' ? toast.error :
-            type === 'success' ? toast.success :
-                type === 'warning' ? toast.warning :
-                    type === 'info' ? toast.info : toast;
+        const toastFn =
+            type === 'error'
+                ? toast.error
+                : type === 'success'
+                  ? toast.success
+                  : type === 'warning'
+                    ? toast.warning
+                    : type === 'info'
+                      ? toast.info
+                      : toast;
 
         // Sonner signature: toast(message, data)
-        // If we have a title, we usually make it the main text and message the description, 
-        // OR we can just join them. 
+        // If we have a title, we usually make it the main text and message the description,
+        // OR we can just join them.
         // Best practice for sonner: `toast.success('Title', { description: 'Message' })`
 
         const toastId = toastFn(title || message, {
@@ -77,4 +82,3 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
         </ToastContext.Provider>
     );
 };
-

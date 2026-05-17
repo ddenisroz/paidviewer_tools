@@ -7,7 +7,7 @@ const SCROLL_THRESHOLD = 150;
  */
 export function isUserAtBottom(container: HTMLElement | null): boolean {
     if (!container) return true;
-    
+
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     return distanceFromBottom < SCROLL_THRESHOLD;
 }
@@ -17,7 +17,7 @@ export function isUserAtBottom(container: HTMLElement | null): boolean {
  */
 export function scrollToBottom(container: HTMLElement | null): void {
     if (!container) return;
-    
+
     container.scrollTop = container.scrollHeight;
     requestAnimationFrame(() => {
         if (container) {
@@ -31,7 +31,7 @@ export function scrollToBottom(container: HTMLElement | null): void {
  */
 export function scrollToBottomInitial(container: HTMLElement | null): void {
     if (!container) return;
-    
+
     requestAnimationFrame(() => {
         if (container) {
             container.scrollTop = container.scrollHeight;
@@ -47,12 +47,9 @@ export function scrollToBottomInitial(container: HTMLElement | null): void {
 /**
  * Auto-scroll if user is at bottom
  */
-export function autoScrollIfAtBottom(
-    container: HTMLElement | null,
-    wasAtBottom: boolean
-): void {
+export function autoScrollIfAtBottom(container: HTMLElement | null, wasAtBottom: boolean): void {
     if (!container || !wasAtBottom) return;
-    
+
     requestAnimationFrame(() => {
         scrollToBottom(container);
     });

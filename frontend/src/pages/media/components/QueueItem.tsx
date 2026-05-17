@@ -30,16 +30,12 @@ const QueueItem: React.FC<QueueItemProps> = ({
     onBan,
     onSkip,
     isPlaying = false,
-    isDraggable = true
+    isDraggable = true,
 }) => {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: video.id, disabled: !isDraggable });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id: video.id,
+        disabled: !isDraggable,
+    });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -53,10 +49,8 @@ const QueueItem: React.FC<QueueItemProps> = ({
 
     const isRowClickable = Boolean(onPlay && !isPlaying);
     const gridClasses = compact
-        ? "grid grid-cols-[28px_minmax(0,1fr)_minmax(0,0.8fr)_72px]"
-        : "grid grid-cols-[28px_minmax(0,1fr)_64px_72px] md:grid-cols-[28px_minmax(0,1fr)_120px_64px_72px]";
-
-    const requesterLabel = video.requester_name || video.user_id || '\u0410\u0432\u0442\u043e\u0437\u0430\u043f\u0443\u0441\u043a';
+        ? 'grid grid-cols-[28px_minmax(0,1fr)_72px]'
+        : 'grid grid-cols-[28px_minmax(0,1fr)_64px_72px]';
 
     const handleRowClick = (): void => {
         if (isRowClickable) {
@@ -79,10 +73,10 @@ const QueueItem: React.FC<QueueItemProps> = ({
             ref={setNodeRef}
             style={style}
             className={cn(
-                "group items-center gap-3 px-3 py-2 hover:bg-accent/50 transition-colors border-b border-border/30 last:border-0",
+                'group items-center gap-3 px-3 py-2 hover:bg-accent/50 transition-colors border-b border-border/30 last:border-0',
                 gridClasses,
-                isRowClickable && "cursor-pointer",
-                isPlaying && "bg-primary/10 border-l-2 border-l-primary"
+                isRowClickable && 'cursor-pointer',
+                isPlaying && 'bg-primary/10 border-l-2 border-l-primary'
             )}
             onClick={handleRowClick}
             onKeyDown={handleRowKeyDown}
@@ -101,27 +95,24 @@ const QueueItem: React.FC<QueueItemProps> = ({
                     </div>
                 ) : null}
 
-                <span className={cn(
-                    "text-xs font-medium tabular-nums",
-                    isDraggable && !compact && "group-hover:hidden"
-                )}>
+                <span
+                    className={cn('text-xs font-medium tabular-nums', isDraggable && !compact && 'group-hover:hidden')}
+                >
                     {isPlaying ? <BarChart2 className="w-4 h-4 text-primary animate-pulse" /> : index + 1}
                 </span>
-
             </div>
 
             {compact ? (
                 <>
                     <div className="min-w-0 flex items-center">
-                        <span className={cn(
-                            "text-sm font-medium truncate",
-                            isPlaying ? "text-primary" : "text-foreground"
-                        )}>
+                        <span
+                            className={cn(
+                                'text-sm font-medium truncate',
+                                isPlaying ? 'text-primary' : 'text-foreground'
+                            )}
+                        >
                             {video.title}
                         </span>
-                    </div>
-                    <div className="min-w-0 flex items-center justify-center text-xs text-muted-foreground truncate text-center">
-                        {requesterLabel}
                     </div>
                 </>
             ) : (
@@ -137,27 +128,22 @@ const QueueItem: React.FC<QueueItemProps> = ({
                             />
                         </div>
                         <div className="flex flex-col min-w-0">
-                            <span className={cn(
-                                "font-medium text-sm truncate pr-4",
-                                isPlaying ? "text-primary" : "text-foreground"
-                            )}>
+                            <span
+                                className={cn(
+                                    'font-medium text-sm truncate pr-4',
+                                    isPlaying ? 'text-primary' : 'text-foreground'
+                                )}
+                            >
                                 {video.title}
                             </span>
                             <span className="text-xs text-muted-foreground truncate">
-                                {video.channel_name || "YouTube"}
+                                {video.channel_name || 'YouTube'}
                             </span>
                         </div>
                     </div>
 
-                    {/* Requester */}
-                    <div className="hidden md:flex w-full items-center justify-center text-xs text-muted-foreground truncate text-center">
-                        {requesterLabel}
-                    </div>
-
                     {/* Duration */}
-                    <div className="flex w-full justify-center text-xs font-mono text-muted-foreground">
-                        {duration}
-                    </div>
+                    <div className="flex w-full justify-center text-xs font-mono text-muted-foreground">{duration}</div>
                 </>
             )}
 
@@ -179,7 +165,9 @@ const QueueItem: React.FC<QueueItemProps> = ({
                                 <SkipForward className="w-3.5 h-3.5" />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{'\u041f\u0440\u043e\u043f\u0443\u0441\u0442\u0438\u0442\u044c'}</TooltipContent>
+                        <TooltipContent>
+                            {'\u041f\u0440\u043e\u043f\u0443\u0441\u0442\u0438\u0442\u044c'}
+                        </TooltipContent>
                     </Tooltip>
                 )}
 
@@ -199,7 +187,9 @@ const QueueItem: React.FC<QueueItemProps> = ({
                                 <Ban className="w-3.5 h-3.5" />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent>{'\u0417\u0430\u0431\u0430\u043d\u0438\u0442\u044c \u0432\u0438\u0434\u0435\u043e'}</TooltipContent>
+                        <TooltipContent>
+                            {'\u0417\u0430\u0431\u0430\u043d\u0438\u0442\u044c \u0432\u0438\u0434\u0435\u043e'}
+                        </TooltipContent>
                     </Tooltip>
                 )}
 

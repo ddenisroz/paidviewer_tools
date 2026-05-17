@@ -15,7 +15,7 @@ If behavior changes, keep the active product docs in `docs/` in sync.
 - `deploy/`: Docker compose files and deploy assets.
 - `docs/`: active product and operator docs.
 - `scripts/`: project tooling.
-- `scripts/dev/`: one-off diagnostics and helper scripts.
+- `scripts/dev/`: targeted smoke and support checks that still matter operationally.
 - `logs/`: local runtime logs when enabled.
 
 ## Active Product Model
@@ -132,7 +132,7 @@ If behavior changes, keep the active product docs in `docs/` in sync.
 - TTS/YouTube autoplay must not resume automatically after full page reload.
 - YouTube queue bans set queue items to `status='banned'`.
 - VK chat badges are passed as image URLs.
-- Qwen model availability must reflect the actual runtime/model policy.
+- F5 runtime availability must reflect the actual deployment and readiness policy.
 - If provider voice CRUD upstreams are unreachable, backend routes should return readable `503` behavior instead of pretending everything is empty and healthy.
 
 ## Admin UI Notes
@@ -158,9 +158,7 @@ If behavior changes, keep the active product docs in `docs/` in sync.
 Before making large changes, read:
 
 1. `docs/README.md`
-2. `docs/PROJECT_CONTEXT.md`
-3. `docs/QUICKSTART.md`
-4. `docs/architecture/TTS_ARCHITECTURE.md`
+2. `docs/QUICKSTART.md`
 
 If the task is operational or release-oriented, also read:
 

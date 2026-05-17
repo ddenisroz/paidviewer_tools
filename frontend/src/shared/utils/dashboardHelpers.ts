@@ -26,7 +26,10 @@ export interface DashboardStats {
 
 export { StatsCardProps as StatCard };
 
-export function createStatsCards(stats: DashboardStats | undefined, _navigate: (path: string) => void): StatsCardProps[] {
+export function createStatsCards(
+    stats: DashboardStats | undefined,
+    _navigate: (path: string) => void
+): StatsCardProps[] {
     if (!stats) return [];
 
     return [
@@ -34,32 +37,32 @@ export function createStatsCards(stats: DashboardStats | undefined, _navigate: (
             title: 'Пользователи',
             value: stats.total_users || 0,
             icon: Users,
-            color: 'text-blue-400'
+            color: 'text-blue-400',
         },
         {
             title: 'Активные',
             value: stats.active_users || 0,
             icon: Activity,
-            color: 'text-green-400'
+            color: 'text-green-400',
         },
         {
             title: 'Сообщения',
             value: stats.total_messages || 0,
             icon: MessageCircle,
-            color: 'text-purple-400'
+            color: 'text-purple-400',
         },
         {
             title: 'TTS запросы',
             value: stats.tts_requests || 0,
             icon: Mic,
-            color: 'text-orange-400'
+            color: 'text-orange-400',
         },
     ];
 }
 
 export function calculateStoragePercent(stats: DashboardStats | undefined): number {
     if (!stats?.system?.storage_total_gb) return 0;
-    return (stats.system.storage_used_gb || 0) / stats.system.storage_total_gb * 100;
+    return ((stats.system.storage_used_gb || 0) / stats.system.storage_total_gb) * 100;
 }
 
 export function getStorageColorClass(percent: number): string {

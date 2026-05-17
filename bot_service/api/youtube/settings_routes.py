@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from auth.auth import get_current_user
 from core.database import get_db
 from repositories.tts_settings_repository import TTSSettingsRepository
+from core.connection_manager import get_connection_manager
+from services.youtube.obs_overlay import build_youtube_obs_state
 from services.youtube.reward_settings import (
     apply_youtube_settings_update,
     build_youtube_settings_response,
@@ -25,6 +27,7 @@ class YouTubeSettingsResponse(BaseModel):
     """Response model for YouTube settings."""
 
     playback_mode: Literal['browser', 'obs'] = Field(default='browser', description='Playback mode')
+    obs_overlay_mode: Literal['video', 'track'] = Field(default='track', description='OBS overlay display mode')
     volume_level: int = Field(default=100, ge=0, le=100, description='Volume level (0-100)')
     requests_command_enabled: bool = Field(default=True, description='Allow !sr command')
 
@@ -44,6 +47,7 @@ class YouTubeSettingsUpdate(BaseModel):
     """Request model for updating YouTube settings."""
 
     playback_mode: Optional[Literal['browser', 'obs']] = Field(None, description='Playback mode')
+    obs_overlay_mode: Optional[Literal['video', 'track']] = Field(None, description='OBS overlay display mode')
     volume_level: Optional[int] = Field(None, ge=0, le=100, description='Volume level (0-100)')
     requests_command_enabled: Optional[bool] = Field(None, description='Allow !sr command')
 
@@ -107,6 +111,13 @@ async def save_youtube_settings(
         )
 
         repo.update_settings(tts_settings, {'youtube_settings': youtube_settings})
+        await get_connection_manager().send_youtube_obs_to_user(
+            user_id,
+            {
+                "type": "youtube_obs_state",
+                "data": build_youtube_obs_state(user_id, db),
+            },
+        )
         logger.info("YouTube settings saved for user %s", user_id)
         return YouTubeSettingsResponse(**build_youtube_settings_response(youtube_settings))
 

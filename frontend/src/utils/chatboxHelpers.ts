@@ -27,15 +27,7 @@ export const defaultChatBoxSettings: ChatBoxSettings = {
     platform: 'all',
 };
 
-export const fontFamilies = [
-    'Inter',
-    'Roboto',
-    'Open Sans',
-    'Montserrat',
-    'Poppins',
-    'Ubuntu',
-    'Fira Code',
-];
+export const fontFamilies = ['Inter', 'Roboto', 'Open Sans', 'Montserrat', 'Poppins', 'Ubuntu', 'Fira Code'];
 
 export const animationTypes = [
     { value: 'none', label: 'Нет' },

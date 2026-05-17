@@ -24,6 +24,9 @@ from services.twitch_bot_oauth_service import twitch_bot_oauth_service
 logger = logging.getLogger(__name__)
 
 
+REQUIRED_TWITCH_CHAT_SCOPES = {"chat:read", "chat:edit"}
+
+
 class BotTokenValidator:
     """Validation helpers for Twitch/VK bot OAuth tokens."""
 
@@ -90,6 +93,25 @@ class BotTokenValidator:
 
             if response.status_code == 200:
                 data = response.json()
+                scopes = set(data.get("scopes", []))
+                missing_chat_scopes = sorted(REQUIRED_TWITCH_CHAT_SCOPES - scopes)
+                if missing_chat_scopes:
+                    self.twitch_token_valid = False
+                    logger.error(
+                        "[ERROR] [BOT TOKEN] Twitch token is valid OAuth, but missing chat bot scopes: %s",
+                        ", ".join(missing_chat_scopes),
+                    )
+                    return {
+                        "valid": False,
+                        "error": "Twitch bot token is missing required chat scopes",
+                        "missing_scopes": missing_chat_scopes,
+                        "scopes": sorted(scopes),
+                        "instructions": (
+                            "Re-authorize the dedicated Twitch bot via /auth/twitch/bot/login "
+                            "or /api/admin/bot/twitch/login-link"
+                        ),
+                    }
+
                 self.twitch_token_valid = True
                 self.last_twitch_check = utcnow_naive()
 
@@ -109,7 +131,7 @@ class BotTokenValidator:
                     "user_id": data.get("user_id"),
                     "login": data.get("login"),
                     "expires_in": data.get("expires_in"),
-                    "scopes": data.get("scopes", []),
+                    "scopes": sorted(scopes),
                 }
 
             if response.status_code == 401:

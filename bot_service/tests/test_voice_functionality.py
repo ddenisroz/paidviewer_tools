@@ -4,8 +4,8 @@ The suite intentionally uses shared fixtures from tests/conftest.py and
 avoids standalone DB engines/files.
 """
 
-import pytest
 import httpx
+import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -40,12 +40,7 @@ class TestVoiceRouteGuards:
 class TestVoiceRoutesAuthenticated:
     """Authenticated behavior for user/admin routes."""
 
-    def test_enabled_voices_upstream_401_is_mapped_to_503(
-        self,
-        authenticated_client: TestClient,
-        test_user,
-        monkeypatch,
-    ):
+    def test_enabled_voices_upstream_401_is_mapped_to_503(self, authenticated_client: TestClient, test_user, monkeypatch):
         class _FakeResponse:
             status_code = 401
             text = '{"detail":"Unauthorized"}'
@@ -85,12 +80,7 @@ class TestVoiceRoutesAuthenticated:
             ("admin_get_global_voices", {"provider": "f5"}),
         ],
     )
-    async def test_voice_management_list_endpoints_map_upstream_401_to_503(
-        self,
-        monkeypatch,
-        method_name: str,
-        call_kwargs: dict,
-    ):
+    async def test_voice_management_list_endpoints_map_upstream_401_to_503(self, monkeypatch, method_name: str, call_kwargs: dict):
         class _FakeResponse:
             status_code = 401
             text = '{"detail":"Unauthorized"}'
@@ -135,23 +125,22 @@ class TestVoiceRoutesAuthenticated:
             await getattr(service, method_name)(**call_kwargs)
 
         assert exc_info.value.status_code == 503
-        assert exc_info.value.detail == "TTS service authorization failed"
+        detail = exc_info.value.detail
+        if isinstance(detail, dict):
+            assert detail["message"] == "TTS service authorization failed"
+        else:
+            assert detail == "TTS service authorization failed"
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         ("method_name", "call_kwargs"),
         [
-            ("get_global_voices", {"provider": "qwen"}),
-            ("get_user_custom_voices", {"user_id": 1, "provider": "qwen"}),
-            ("admin_get_global_voices", {"provider": "qwen"}),
+            ("get_global_voices", {"provider": "f5"}),
+            ("get_user_custom_voices", {"user_id": 1, "provider": "f5"}),
+            ("admin_get_global_voices", {"provider": "f5"}),
         ],
     )
-    async def test_voice_management_list_endpoints_map_upstream_connect_error_to_503(
-        self,
-        monkeypatch,
-        method_name: str,
-        call_kwargs: dict,
-    ):
+    async def test_voice_management_list_endpoints_map_upstream_connect_error_to_503(self, monkeypatch, method_name: str, call_kwargs: dict):
         class _FakeAsyncClient:
             def __init__(self, *args, **kwargs):
                 pass
@@ -169,18 +158,18 @@ class TestVoiceRoutesAuthenticated:
         monkeypatch.setattr(
             VoiceManagementService,
             "_provider_tts_api_base",
-            lambda self, provider="qwen": "http://voice-upstream/api/tts",
+            lambda self, provider="f5": "http://voice-upstream/api/tts",
         )
         monkeypatch.setattr(
             VoiceManagementService,
             "_provider_admin_api_base",
-            lambda self, provider="qwen": "http://voice-upstream/api/admin",
+            lambda self, provider="f5": "http://voice-upstream/api/admin",
         )
-        monkeypatch.setattr(VoiceManagementService, "_tts_auth_headers", lambda self, provider="qwen": {})
+        monkeypatch.setattr(VoiceManagementService, "_tts_auth_headers", lambda self, provider="f5": {})
         monkeypatch.setattr(
             VoiceManagementService,
             "_provider_request_params",
-            lambda self, provider="qwen", extra=None: extra or {},
+            lambda self, provider="f5", extra=None: extra or {},
         )
 
         service = VoiceManagementService(object())
@@ -189,60 +178,43 @@ class TestVoiceRoutesAuthenticated:
             await getattr(service, method_name)(**call_kwargs)
 
         assert exc_info.value.status_code == 503
-        assert exc_info.value.detail == "Failed to reach TTS voice service"
+        detail = exc_info.value.detail
+        assert isinstance(detail, dict)
+        assert detail["message"] == "Failed to reach TTS voice service"
+        assert detail["code"] == "tts_voice_upstream_unreachable"
 
-    @pytest.mark.parametrize("provider", ["f5", "qwen"])
-    def test_get_global_voices_authenticated(
-        self, authenticated_client: TestClient, provider: str
-    ):
-        response = authenticated_client.get(f"/api/voices/global?provider={provider}")
-        # Qwen CRUD is disabled unless QWEN_VOICE_SERVICE_URL is configured.
+    def test_get_global_voices_authenticated(self, authenticated_client: TestClient):
+        response = authenticated_client.get("/api/voices/global?provider=f5")
         assert response.status_code in (200, 500, 501, 503)
 
-    @pytest.mark.parametrize("provider", ["f5", "qwen"])
-    def test_get_custom_voices_authenticated(
-        self, authenticated_client: TestClient, provider: str
-    ):
-        response = authenticated_client.get(
-            f"/api/voices/user/custom?provider={provider}"
-        )
+    def test_get_custom_voices_authenticated(self, authenticated_client: TestClient):
+        response = authenticated_client.get("/api/voices/user/custom?provider=f5")
         assert response.status_code in (200, 500, 501, 503)
 
-    @pytest.mark.parametrize("provider", ["f5", "qwen"])
-    def test_update_user_voice_settings_authenticated(
-        self, authenticated_client: TestClient, provider: str
-    ):
+    def test_update_user_voice_settings_authenticated(self, authenticated_client: TestClient):
         response = authenticated_client.put(
-            f"/api/voices/user/settings/1?provider={provider}",
+            "/api/voices/user/settings/1?provider=f5",
             json={"cfg_strength": 2.5, "speed_preset": "normal", "volume": 70},
         )
-        # 404 is valid when voice does not exist in provider service.
         assert response.status_code in (200, 404, 500, 501, 503)
 
-    @pytest.mark.parametrize("provider", ["f5", "qwen"])
-    def test_admin_global_routes_authenticated(
-        self, admin_client: TestClient, provider: str
-    ):
-        list_response = admin_client.get(
-            f"/api/voices/admin/global?provider={provider}"
-        )
+    def test_admin_global_routes_authenticated(self, admin_client: TestClient):
+        list_response = admin_client.get("/api/voices/admin/global?provider=f5")
         assert list_response.status_code in (200, 500, 501, 503)
 
         update_response = admin_client.put(
-            f"/api/voices/admin/global/1?provider={provider}",
+            "/api/voices/admin/global/1?provider=f5",
             json={"cfg_strength": 3.0},
         )
         assert update_response.status_code in (200, 404, 500, 501, 503)
 
         rename_response = admin_client.put(
-            f"/api/voices/admin/global/1/rename?provider={provider}",
+            "/api/voices/admin/global/1/rename?provider=f5",
             json={"new_name": "new_voice_name"},
         )
         assert rename_response.status_code in (200, 404, 500, 501, 503)
 
-        delete_response = admin_client.delete(
-            f"/api/voices/admin/global/1?provider={provider}"
-        )
+        delete_response = admin_client.delete("/api/voices/admin/global/1?provider=f5")
         assert delete_response.status_code in (200, 404, 500, 501, 503)
 
     def test_provider_capabilities_endpoint(self, authenticated_client: TestClient):
@@ -251,10 +223,9 @@ class TestVoiceRoutesAuthenticated:
         payload = response.json()
         assert payload.get("success") is True
         providers = payload.get("providers") or {}
-        assert "f5" in providers
-        assert "qwen" in providers
+        assert set(providers.keys()) == {"f5", "gcloud"}
         assert providers["f5"]["official_self_host_path"] == "tts_worker_agent"
-        assert providers["qwen"]["supports_streaming"] is True
+        assert providers["gcloud"]["official_cloud_path"] == "internal"
 
 
 class TestVoiceInputValidation:

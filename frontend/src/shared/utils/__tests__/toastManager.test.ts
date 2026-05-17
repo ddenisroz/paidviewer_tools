@@ -108,51 +108,39 @@ describe('ToastManager', () => {
     describe('Grouping similar toasts', () => {
         it('groups identical messages', () => {
             vi.clearAllMocks();
-            
+
             toast.success('File uploaded');
             expect(sonnerToast.success).toHaveBeenCalledTimes(1);
-            expect(sonnerToast.success).toHaveBeenLastCalledWith(
-                'File uploaded',
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenLastCalledWith('File uploaded', expect.any(Object));
 
             // Second call within grouping window
             toast.success('File uploaded');
             expect(sonnerToast.success).toHaveBeenCalledTimes(2);
-            expect(sonnerToast.success).toHaveBeenLastCalledWith(
-                'File uploaded (2)',
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenLastCalledWith('File uploaded (2)', expect.any(Object));
 
             // Third call
             toast.success('File uploaded');
             expect(sonnerToast.success).toHaveBeenCalledTimes(3);
-            expect(sonnerToast.success).toHaveBeenLastCalledWith(
-                'File uploaded (3)',
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenLastCalledWith('File uploaded (3)', expect.any(Object));
         });
 
         it('normalizes messages for grouping', () => {
             vi.clearAllMocks();
-            
+
             toast.success('User 123 created');
             toast.success('User 456 created');
-            
+
             // Should group because numbers are normalized
             expect(sonnerToast.success).toHaveBeenCalledTimes(2);
-            expect(sonnerToast.success).toHaveBeenLastCalledWith(
-                'User 456 created (2)',
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenLastCalledWith('User 456 created (2)', expect.any(Object));
         });
 
         it('does not group different message types', () => {
             vi.clearAllMocks();
-            
+
             toast.success('Test message');
             toast.error('Test message');
-            
+
             // Should not group because types are different
             expect(sonnerToast.success).toHaveBeenCalledTimes(1);
             expect(sonnerToast.error).toHaveBeenCalledTimes(1);
@@ -175,58 +163,43 @@ describe('ToastManager', () => {
     describe('Message normalization', () => {
         it('removes quotes for grouping', () => {
             vi.clearAllMocks();
-            
+
             toast.success('"File" uploaded');
             toast.success("'File' uploaded");
-            
+
             // Should group because quotes are removed
             expect(sonnerToast.success).toHaveBeenCalledTimes(2);
-            expect(sonnerToast.success).toHaveBeenLastCalledWith(
-                "'File' uploaded (2)",
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenLastCalledWith("'File' uploaded (2)", expect.any(Object));
         });
 
         it('is case insensitive for grouping', () => {
             vi.clearAllMocks();
-            
+
             toast.success('Test Message');
             toast.success('test message');
-            
+
             // Should group because case is normalized
             expect(sonnerToast.success).toHaveBeenCalledTimes(2);
-            expect(sonnerToast.success).toHaveBeenLastCalledWith(
-                'test message (2)',
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenLastCalledWith('test message (2)', expect.any(Object));
         });
     });
 
     describe('Edge cases', () => {
         it('handles empty messages', () => {
             toast.success('');
-            expect(sonnerToast.success).toHaveBeenCalledWith(
-                '',
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenCalledWith('', expect.any(Object));
         });
 
         it('handles very long messages', () => {
             const longMessage = 'A'.repeat(1000);
             toast.success(longMessage);
-            expect(sonnerToast.success).toHaveBeenCalledWith(
-                longMessage,
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenCalledWith(longMessage, expect.any(Object));
         });
 
         it('handles special characters', () => {
             const specialMessage = '!@#$%^&*()_+-=[]{}|;:,.<>?';
             toast.success(specialMessage);
-            expect(sonnerToast.success).toHaveBeenCalledWith(
-                specialMessage,
-                expect.any(Object)
-            );
+            expect(sonnerToast.success).toHaveBeenCalledWith(specialMessage, expect.any(Object));
         });
     });
 });

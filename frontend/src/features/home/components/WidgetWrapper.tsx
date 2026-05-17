@@ -16,16 +16,12 @@ interface WidgetWrapperProps {
 const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ id, title, children, className }) => {
     const { isEditMode, widgets, draftWidgets } = useLayoutStore();
     const activeWidgets = isEditMode && draftWidgets ? draftWidgets : widgets;
-    const widgetState = activeWidgets.find(w => w.id === id);
+    const widgetState = activeWidgets.find((w) => w.id === id);
 
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id, disabled: !isEditMode });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id,
+        disabled: !isEditMode,
+    });
 
     const style = {
         // Используем только translate без scale/skew чтобы избежать деформации
@@ -44,10 +40,10 @@ const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ id, title, children, clas
             ref={setNodeRef}
             style={style}
             className={cn(
-                "relative",
+                'relative',
                 className,
-                isEditMode && "p-4 border-2 border-dashed border-white/20 rounded-xl bg-black/20",
-                isDragging && "opacity-90 shadow-xl z-50"
+                isEditMode && 'p-4 border-2 border-dashed border-white/20 rounded-xl bg-black/20',
+                isDragging && 'opacity-90 shadow-xl z-50'
             )}
         >
             {isEditMode && (
@@ -65,10 +61,12 @@ const WidgetWrapper: React.FC<WidgetWrapperProps> = ({ id, title, children, clas
                 </div>
             )}
 
-            <div className={cn(
-                "transition-all duration-300",
-                isEditMode && !widgetState.isVisible && "opacity-40 grayscale blur-[1px] pointer-events-none"
-            )}>
+            <div
+                className={cn(
+                    'transition-all duration-300',
+                    isEditMode && !widgetState.isVisible && 'opacity-40 grayscale blur-[1px] pointer-events-none'
+                )}
+            >
                 {children}
             </div>
         </div>

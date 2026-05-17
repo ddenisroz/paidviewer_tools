@@ -9,28 +9,27 @@
 import React, { ComponentType, ReactNode } from 'react';
 
 interface ProviderProps {
-  children: ReactNode;
+    children: ReactNode;
 }
 
 export const composeProviders = (...providers: ComponentType<ProviderProps>[]): React.FC<ProviderProps> => {
-  return ({ children }) => {
-    return providers.reduceRight((acc, Provider) => {
-      return <Provider>{acc}</Provider>;
-    }, children as React.ReactElement);
-  };
+    return ({ children }) => {
+        return providers.reduceRight((acc, Provider) => {
+            return <Provider>{acc}</Provider>;
+        }, children as React.ReactElement);
+    };
 };
 
 /**
  * Пример использования:
- * 
+ *
  * const AppProviders = composeProviders(
  *   ToastProvider,
  *   AuthProvider,
  *   IntegrationsProvider
  * );
- * 
+ *
  * <AppProviders>
  *   <App />
  * </AppProviders>
  */
-

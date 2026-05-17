@@ -33,11 +33,24 @@ export const useQuickActionsLogic = () => {
     const [optimisticStreakState, setOptimisticStreakState] = useState<OptimisticStreakState | null>(null);
 
     const channelName = useMemo(() => {
-        return integrations.twitch?.username || integrations.vk?.username || user?.twitch_username || user?.vk_username || user?.username || '';
-    }, [integrations.twitch?.username, integrations.vk?.username, user?.twitch_username, user?.vk_username, user?.username]);
+        return (
+            integrations.twitch?.username ||
+            integrations.vk?.username ||
+            user?.twitch_username ||
+            user?.vk_username ||
+            user?.username ||
+            ''
+        );
+    }, [
+        integrations.twitch?.username,
+        integrations.vk?.username,
+        user?.twitch_username,
+        user?.vk_username,
+        user?.username,
+    ]);
 
     const platform = useMemo(() => {
-        return integrations.twitch?.enabled ? 'twitch' : (integrations.vk?.enabled ? 'vk' : 'twitch');
+        return integrations.twitch?.enabled ? 'twitch' : integrations.vk?.enabled ? 'vk' : 'twitch';
     }, [integrations.twitch?.enabled, integrations.vk?.enabled]);
 
     const isDropsEnabled = useMemo(() => {
@@ -51,7 +64,6 @@ export const useQuickActionsLogic = () => {
     useEffect(() => {
         setOptimisticStreakState(null);
     }, [channelName]);
-
 
     const { data: ttsStatusResponse } = useTtsStatus(null, {
         enabled: !!isAuthenticated,
@@ -93,7 +105,6 @@ export const useQuickActionsLogic = () => {
         }
     }, [ttsStatusResponse]);
 
-
     // Sync TTS state when changed from other components (e.g., Shift+T shortcut)
     useEffect(() => {
         const handleExternalTtsChange = (e: Event) => {
@@ -120,21 +131,21 @@ export const useQuickActionsLogic = () => {
 
             // Also update React Query cache directly to inform other components (like TtsContext)
             queryClient.setQueryData(correctKey, (old: unknown) => {
-                const previous = (old && typeof old === 'object')
-                    ? old as { data?: Record<string, unknown> }
-                    : {};
+                const previous = old && typeof old === 'object' ? (old as { data?: Record<string, unknown> }) : {};
 
                 return {
                     ...previous,
                     success: true,
-                    data: { ...(previous.data || {}), enabled }
+                    data: { ...(previous.data || {}), enabled },
                 };
             });
 
             queryClient.invalidateQueries({ queryKey: queryKeys.tts.status() });
-            window.dispatchEvent(new CustomEvent('tts-status-changed', {
-                detail: { enabled }
-            }));
+            window.dispatchEvent(
+                new CustomEvent('tts-status-changed', {
+                    detail: { enabled },
+                })
+            );
         },
         onError: () => {
             // Revert optimistic update on error
@@ -199,22 +210,26 @@ export const useQuickActionsLogic = () => {
         },
     });
 
-    const twitchStreakEnabled = optimisticStreakState?.twitch !== undefined
-        ? optimisticStreakState.twitch
-        : (dropsConfigData?.streak_enabled_twitch || false);
-    const vkStreakEnabled = optimisticStreakState?.vk !== undefined
-        ? optimisticStreakState.vk
-        : (dropsConfigData?.streak_enabled_vk || false);
+    const twitchStreakEnabled =
+        optimisticStreakState?.twitch !== undefined
+            ? optimisticStreakState.twitch
+            : dropsConfigData?.streak_enabled_twitch || false;
+    const vkStreakEnabled =
+        optimisticStreakState?.vk !== undefined
+            ? optimisticStreakState.vk
+            : dropsConfigData?.streak_enabled_vk || false;
     const streakEnabled = twitchStreakEnabled || vkStreakEnabled;
 
     useEffect(() => {
         if (optimisticStreakState && dropsConfigData) {
-            const twitchMatches = optimisticStreakState.twitch !== undefined
-                ? optimisticStreakState.twitch === (dropsConfigData.streak_enabled_twitch || false)
-                : true;
-            const vkMatches = optimisticStreakState.vk !== undefined
-                ? optimisticStreakState.vk === (dropsConfigData.streak_enabled_vk || false)
-                : true;
+            const twitchMatches =
+                optimisticStreakState.twitch !== undefined
+                    ? optimisticStreakState.twitch === (dropsConfigData.streak_enabled_twitch || false)
+                    : true;
+            const vkMatches =
+                optimisticStreakState.vk !== undefined
+                    ? optimisticStreakState.vk === (dropsConfigData.streak_enabled_vk || false)
+                    : true;
 
             if (twitchMatches && vkMatches) {
                 setOptimisticStreakState(null);
@@ -246,6 +261,6 @@ export const useQuickActionsLogic = () => {
         dropsConfigData,
         rewardsData,
         queryClient,
-        integrations
+        integrations,
     };
 };

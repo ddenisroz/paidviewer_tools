@@ -1,6 +1,6 @@
 import React, { useLayoutEffect, useState } from 'react';
 
-import { Loader2, Tag } from 'lucide-react';
+import { SpinnerGap, TagSimple } from '@phosphor-icons/react';
 import ReactDOM from 'react-dom';
 
 import { logger } from '@/shared/utils/prodLogger';
@@ -24,9 +24,11 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
     search,
     onSelect,
     results,
-    inputRef
+    inputRef,
 }) => {
-    const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(null);
+    const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight: number } | null>(
+        null
+    );
 
     useLayoutEffect(() => {
         if (!isOpen || !inputRef) {
@@ -43,9 +45,7 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
             const openUpward = spaceBelow < 220 && spaceAbove > spaceBelow;
             const availableHeight = openUpward ? spaceAbove : spaceBelow;
             const maxHeight = Math.max(120, Math.min(320, availableHeight));
-            const top = openUpward
-                ? Math.max(8, rect.top - maxHeight - 4)
-                : rect.bottom + 4;
+            const top = openUpward ? Math.max(8, rect.top - maxHeight - 4) : rect.bottom + 4;
 
             setPosition({
                 top,
@@ -70,7 +70,7 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
     const dropdownContent = (
         <div
             data-category-dropdown="true"
-            className="fixed z-[9999] overflow-y-auto overscroll-contain rounded-md border border-border/80 bg-popover/98 shadow-2xl ring-1 ring-border/50 backdrop-blur-md"
+            className="fixed z-[9999] overflow-y-auto overscroll-contain rounded-md border border-sky-500/35 bg-[#0b0712] shadow-2xl shadow-black/60 ring-1 ring-white/10"
             style={{
                 top: `${position.top}px`,
                 left: `${position.left}px`,
@@ -79,30 +79,30 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
             }}
         >
             {!search.trim() ? (
-                <div className="px-3 py-3 text-sm text-muted-foreground">
-                    Начните вводить категорию.
-                </div>
+                <div className="px-3 py-3 text-sm text-muted-foreground">Начните вводить категорию.</div>
             ) : isLoading ? (
                 <div className="flex items-center gap-2 px-3 py-3 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <SpinnerGap className="h-4 w-4 animate-spin" weight="bold" />
                     Ищем категории...
                 </div>
             ) : results.length === 0 ? (
-                <div className="px-3 py-3 text-sm text-muted-foreground">
-                    Ничего не найдено.
-                </div>
+                <div className="px-3 py-3 text-sm text-muted-foreground">Ничего не найдено.</div>
             ) : (
                 results.map((cat) => (
                     <div
                         key={`${cat.id || cat.name}`}
                         className="flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors duration-200 hover:bg-muted/80"
                         onClick={() => {
-                            logger.log('[CATEGORY DROPDOWN] Category clicked:', { platform, category: cat.name, id: cat.id });
+                            logger.log('[CATEGORY DROPDOWN] Category clicked:', {
+                                platform,
+                                category: cat.name,
+                                id: cat.id,
+                            });
                             onSelect(platform, cat);
                         }}
                     >
                         <div className="flex-shrink-0">
-                            {(cat.box_art_url || cat.cover_url) ? (
+                            {cat.box_art_url || cat.cover_url ? (
                                 <img
                                     src={cat.box_art_url?.replace('{width}x{height}', '40x56') || cat.cover_url}
                                     alt={cat.name}
@@ -115,7 +115,8 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
                                         img.remove();
 
                                         const fallback = document.createElement('div');
-                                        fallback.className = 'flex h-10 w-8 items-center justify-center rounded border border-border/50 bg-muted/50';
+                                        fallback.className =
+                                            'flex h-10 w-8 items-center justify-center rounded border border-border/50 bg-muted/50';
 
                                         const icon = document.createElement('span');
                                         icon.className = 'text-xs text-muted-foreground';
@@ -127,7 +128,7 @@ export const StreamCategoryDropdown: React.FC<StreamCategoryDropdownProps> = ({
                                 />
                             ) : (
                                 <div className="flex h-10 w-8 items-center justify-center rounded border border-white/10 bg-muted/50">
-                                    <Tag className="h-4 w-4 text-muted-foreground" />
+                                    <TagSimple className="h-4 w-4 text-muted-foreground" weight="duotone" />
                                 </div>
                             )}
                         </div>

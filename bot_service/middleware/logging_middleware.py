@@ -145,6 +145,7 @@ class PerformanceLoggingMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp, slow_threshold_ms: float = 1000):
         super().__init__(app)
         self.slow_threshold_ms = slow_threshold_ms
+        self.long_poll_paths = ("/api/worker-agent/poll",)
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         start_time = time.time()
@@ -154,7 +155,7 @@ class PerformanceLoggingMiddleware(BaseHTTPMiddleware):
         duration_ms = (time.time() - start_time) * 1000
         
         # Log slow requests
-        if duration_ms > self.slow_threshold_ms:
+        if duration_ms > self.slow_threshold_ms and request.url.path not in self.long_poll_paths:
             logger.warning(
                 "slow_request",
                 method=request.method,

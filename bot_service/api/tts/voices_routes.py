@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import mimetypes
 import uuid
 from pathlib import Path
@@ -29,19 +29,11 @@ from services.voice_management_upstream import (
 )
 from services.tts.provider_utils import (
     get_all_provider_capabilities,
-    get_qwen_model_family,
     normalize_provider,
-    normalize_qwen_model_selection,
-    QWEN_BASE_MODEL,
 )
 logger = logging.getLogger('bot_service')
 voices_router = APIRouter(prefix='/api/voices', tags=['voices'])
 user_voices_router = APIRouter(prefix='/api/user/voices', tags=['user_voices'])
-
-QWEN_VOICE_PREVIEW_TIMEOUT_SECONDS = max(
-    30.0,
-    float(getattr(settings, "qwen_voice_preview_timeout_seconds", 60.0)),
-)
 
 class VoiceSchema(BaseModel):
     id: int
@@ -79,7 +71,7 @@ def _normalize_voice_provider(provider: Optional[str]) -> str:
                 'message': 'Google Cloud voice management is not supported via bot_service.',
             },
         )
-    return 'qwen' if normalized == 'qwen' else 'f5'
+    return 'f5'
 
 def _provider_base_url(provider: str) -> str:
     return provider_tts_api_base(_normalize_voice_provider(provider)).removesuffix('/api/tts')
@@ -185,8 +177,7 @@ async def check_whitelist_status(user: dict=Depends(get_current_user), db: Sessi
         if not db_user:
             return {'is_whitelisted': False, 'can_manage_voices': False}
         local_f5_endpoint = local_repo.get_active(user_id=user['id'], provider='f5')
-        local_qwen_endpoint = local_repo.get_active(user_id=user['id'], provider='qwen')
-        has_local_setup = bool(local_f5_endpoint and local_f5_endpoint.is_healthy or (local_qwen_endpoint and local_qwen_endpoint.is_healthy))
+        has_local_setup = bool(local_f5_endpoint and local_f5_endpoint.is_healthy)
         if has_local_setup:
             logger.info('[LOCAL] User %s has local TTS setup, allowing voice management', user['id'])
             return {'is_whitelisted': True, 'can_manage_voices': True, 'has_local_setup': True}
@@ -422,15 +413,7 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
             upstream_data['cfg_strength'] = str(payload['cfg_strength'])
         if payload.get('speed_preset') is not None:
             upstream_data['speed_preset'] = str(payload['speed_preset'])
-        if resolved_provider == 'qwen':
-            settings_repo = TTSSettingsRepository(service.db)
-            user_settings = settings_repo.get_or_create(owner_id or actor_id)
-            requested_model = normalize_qwen_model_selection(getattr(user_settings, 'qwen_model', None))
-            # Stored qwen voices are reference-audio clones, so preview must always use a Base model.
-            if get_qwen_model_family(requested_model) != 'base':
-                requested_model = QWEN_BASE_MODEL
-            upstream_data['model'] = requested_model
-        preview_timeout = QWEN_VOICE_PREVIEW_TIMEOUT_SECONDS if resolved_provider == 'qwen' else 30.0
+        preview_timeout = 30.0
         upstream_base_url = _provider_base_url(resolved_provider)
         async with httpx.AsyncClient(timeout=preview_timeout, **build_tts_httpx_client_kwargs()) as client:
             response = await client.post(
@@ -447,7 +430,22 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
                     payload=preview_payload,
                     upstream_base_url=upstream_base_url,
                 )
-            return preview_payload
+            if isinstance(preview_payload, dict):
+                preview_error = str(
+                    preview_payload.get('error')
+                    or preview_payload.get('detail')
+                    or preview_payload.get('message')
+                    or ''
+                ).strip()
+                if preview_error:
+                    raise HTTPException(
+                        status_code=503,
+                        detail=preview_error,
+                    )
+            raise HTTPException(
+                status_code=502,
+                detail='Provider preview completed without audio output.',
+            )
         detail = 'Failed to synthesize the test voice.'
         try:
             detail = response.json().get('detail', detail)
@@ -459,16 +457,6 @@ async def test_voice(voice_id: int, payload: dict=Body(default={}), current_user
             default_detail=detail,
         )
     except httpx.TimeoutException as error:
-        if resolved_provider == 'qwen':
-            logger.warning(
-                'Qwen voice preview timed out while waiting for worker warmup timeout=%ss error=%s',
-                preview_timeout,
-                error,
-            )
-            raise HTTPException(
-                status_code=504,
-                detail='Qwen worker is still loading the selected model. Try the preview again in a few seconds.',
-            ) from error
         logger.warning('Voice preview timed out provider=%s error=%s', resolved_provider, error)
         raise HTTPException(status_code=504, detail='Voice preview timed out. Try again.') from error
     except HTTPException:

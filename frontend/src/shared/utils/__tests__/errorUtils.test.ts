@@ -421,12 +421,12 @@ describe('errorUtils', () => {
                         const message = getErrorMessage(error);
                         const code = getErrorCode(error);
                         const details = getErrorDetails(error);
-                        
+
                         return (
                             message === error.response.data.message &&
                             code === error.response.data.error_code &&
-                            (error.response.data.details === undefined 
-                                ? details === undefined 
+                            (error.response.data.details === undefined
+                                ? details === undefined
                                 : details === error.response.data.details)
                         );
                     }),

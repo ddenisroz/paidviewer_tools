@@ -12,122 +12,72 @@ from services.tts import provider_utils
         ("google_cloud", "gcloud"),
         ("google-cloud", "gcloud"),
         ("google", "gcloud"),
-        ("qwen", "qwen"),
-        ("qwen3", "qwen"),
-        ("qwen-3", "qwen"),
-        ("qwen3tts", "qwen"),
         ("unknown", "f5"),
         ("", "f5"),
+        (None, "f5"),
     ],
 )
-def test_normalize_provider(raw: str, expected: str):
+def test_normalize_provider(raw, expected):
     assert provider_utils.normalize_provider(raw) == expected
-
-
-@pytest.mark.parametrize(
-    ("raw_model", "expected"),
-    [
-        (None, provider_utils.QWEN_BASE_MODEL),
-        ("", provider_utils.QWEN_BASE_MODEL),
-        ("default", provider_utils.QWEN_BASE_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-0.6B-Base", provider_utils.QWEN_BASE_06_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-1.7B-Base", provider_utils.QWEN_BASE_17_MODEL),
-        ("base", provider_utils.QWEN_BASE_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_06_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice", provider_utils.QWEN_CUSTOMVOICE_17_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign", provider_utils.QWEN_VOICEDESIGN_MODEL),
-        ("0.6 base", provider_utils.QWEN_BASE_06_MODEL),
-        ("0.6 customvoice", provider_utils.QWEN_CUSTOMVOICE_06_MODEL),
-        ("customvoice", provider_utils.QWEN_CUSTOMVOICE_MODEL),
-        ("voicedesign", provider_utils.QWEN_VOICEDESIGN_MODEL),
-        ("Qwen/Qwen3-TTS-12Hz-9.9B-Base", "Qwen/Qwen3-TTS-12Hz-9.9B-Base"),
-    ],
-)
-def test_normalize_qwen_model_selection(raw_model: str | None, expected: str):
-    assert provider_utils.normalize_qwen_model_selection(raw_model) == expected
-
-
-def test_get_qwen_model_catalog_returns_all_exact_qwen_product_options():
-    catalog = provider_utils.get_qwen_model_catalog()
-    assert [item["label"] for item in catalog] == [
-        "0.6 Base",
-        "1.7 Base",
-        "0.6 CustomVoice",
-        "1.7 VoiceDesign",
-        "1.7 CustomVoice",
-    ]
-    assert catalog[0]["supports_voice_cloning"] is True
-    assert catalog[3]["requires_prompt"] is True
-    assert catalog[4]["requires_prompt"] is False
 
 
 @pytest.mark.parametrize(
     ("engine", "advanced_provider", "expected"),
     [
         ("f5tts", None, "f5"),
-        ("qwen", None, "qwen"),
         ("gcloud", None, "gcloud"),
-        ("", "qwen", "qwen"),
         ("", "gcloud", "gcloud"),
+        ("", "f5", "f5"),
         ("unknown", None, "f5"),
     ],
 )
-def test_infer_provider_from_engine(engine: str, advanced_provider: str | None, expected: str):
+def test_infer_provider_from_engine(engine, advanced_provider, expected):
     assert provider_utils.infer_provider_from_engine(engine, advanced_provider=advanced_provider) == expected
 
 
 @pytest.mark.parametrize(
-    ("mode", "expected"),
+    ("mode", "expected", "public_expected"),
     [
-        ("local", "local"),
-        ("cloud", "cloud"),
-        ("", "cloud"),
-        ("unexpected", "cloud"),
-        (None, "cloud"),
+        ("local", "local", "self_host"),
+        ("self_host", "local", "self_host"),
+        ("self-host", "local", "self_host"),
+        ("cloud", "cloud", "cloud"),
+        ("", "cloud", "cloud"),
+        ("unexpected", "cloud", "cloud"),
+        (None, "cloud", "cloud"),
     ],
 )
-def test_normalize_provider_mode(mode: str | None, expected: str):
+def test_normalize_provider_mode_and_public_mode(mode, expected, public_expected):
     assert provider_utils.normalize_provider_mode(mode) == expected
+    assert provider_utils.to_public_provider_mode(mode) == public_expected
 
 
-def test_normalize_provider_mode_accepts_self_host_alias():
-    assert provider_utils.normalize_provider_mode("self_host") == "local"
-    assert provider_utils.to_public_provider_mode("self_host") == "self_host"
+def test_get_official_mode_path_matches_provider_modes():
+    assert provider_utils.get_official_mode_path("f5", "cloud") == "tts-gateway"
+    assert provider_utils.get_official_mode_path("f5", "self_host") == "tts_worker_agent"
+    assert provider_utils.get_official_mode_path("gcloud", "cloud") == "internal"
+    assert provider_utils.get_official_mode_path("gcloud", "self_host") is None
 
 
-def test_resolve_provider_mode_for_settings_prefers_explicit_provider_mode_over_legacy_flag():
+def test_resolve_provider_mode_for_settings_prefers_explicit_f5_mode_over_use_local_flag():
     provider, mode = provider_utils.resolve_provider_mode_for_settings(
         engine="f5tts",
         use_local_tts=True,
         advanced_provider="f5",
         f5_mode="cloud",
-        qwen_mode="cloud",
     )
     assert provider == "f5"
     assert mode == "cloud"
 
 
-def test_resolve_provider_mode_for_settings_uses_qwen_mode():
+def test_resolve_provider_mode_for_settings_uses_legacy_use_local_only_when_f5_mode_missing():
     provider, mode = provider_utils.resolve_provider_mode_for_settings(
-        engine="qwen",
-        use_local_tts=False,
-        advanced_provider="qwen",
-        f5_mode="local",
-        qwen_mode="cloud",
-    )
-    assert provider == "qwen"
-    assert mode == "cloud"
-
-
-def test_resolve_provider_mode_for_settings_uses_legacy_use_local_only_when_provider_mode_missing():
-    provider, mode = provider_utils.resolve_provider_mode_for_settings(
-        engine="qwen",
+        engine="f5tts",
         use_local_tts=True,
-        advanced_provider="qwen",
-        f5_mode="cloud",
-        qwen_mode=None,
+        advanced_provider="f5",
+        f5_mode=None,
     )
-    assert provider == "qwen"
+    assert provider == "f5"
     assert mode == "local"
 
 
@@ -137,212 +87,28 @@ def test_resolve_provider_mode_for_settings_gcloud_is_always_cloud():
         use_local_tts=True,
         advanced_provider="gcloud",
         f5_mode="local",
-        qwen_mode="local",
     )
     assert provider == "gcloud"
     assert mode == "cloud"
 
 
-def test_get_qwen_cloud_allowed_models_parses_family_aliases_and_exact_ids(monkeypatch):
-    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
-    monkeypatch.setattr(
-        provider_utils.settings,
-        "qwen_cloud_allowed_models",
-        "base, voice_design, Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-    )
-
-    result = provider_utils.get_qwen_cloud_allowed_models()
-
-    assert result["enabled"] is True
-    assert result["families"] == ["base", "voice_design"]
-    assert result["exact_ids"] == ["Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice"]
-    assert result["source"] == "settings"
-
-
-def test_get_qwen_cloud_allowed_models_prefers_shared_alias_env(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "qwen_cloud_allowed_models", "")
-    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
-    monkeypatch.setenv("QWEN_ALLOWED_MODELS", "base")
-
-    result = provider_utils.get_qwen_cloud_allowed_models()
-
-    assert result["enabled"] is True
-    assert result["families"] == ["base"]
-    assert result["source"] == "QWEN_ALLOWED_MODELS"
-
-
-def test_filter_qwen_cloud_models_filters_runtime_catalog(monkeypatch):
-    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
-    monkeypatch.setattr(
-        provider_utils.settings,
-        "qwen_cloud_allowed_models",
-        "base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-    )
-
-    result = provider_utils.filter_qwen_cloud_models(
-        [
-            {"id": provider_utils.QWEN_BASE_06_MODEL, "family": "base"},
-            {"id": provider_utils.QWEN_CUSTOMVOICE_06_MODEL, "family": "custom_voice"},
-            {"id": provider_utils.QWEN_VOICEDESIGN_MODEL, "family": "voice_design"},
-        ]
-    )
-
-    assert [item["id"] for item in result["models"]] == [
-        provider_utils.QWEN_BASE_06_MODEL,
-        provider_utils.QWEN_CUSTOMVOICE_06_MODEL,
-    ]
-    assert result["filtering"]["enabled"] is True
-    assert result["filtering"]["filtered_count"] == 1
-    assert result["filtering"]["source"] == "settings"
-
-
-def test_resolve_qwen_cloud_model_selection_downgrades_1_7_base_to_0_6_base(monkeypatch):
-    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
-    monkeypatch.setattr(
-        provider_utils.settings,
-        "qwen_cloud_allowed_models",
-        "Qwen/Qwen3-TTS-12Hz-0.6B-Base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-    )
-
-    resolved = provider_utils.resolve_qwen_cloud_model_selection(provider_utils.QWEN_BASE_17_MODEL)
-
-    assert resolved == provider_utils.QWEN_BASE_06_MODEL
-
-
-def test_resolve_qwen_cloud_model_selection_keeps_supported_0_6_customvoice(monkeypatch):
-    monkeypatch.delenv("QWEN_CLOUD_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_ALLOWED_MODELS", raising=False)
-    monkeypatch.delenv("QWEN_TTS_ALLOWED_MODELS", raising=False)
-    monkeypatch.setattr(
-        provider_utils.settings,
-        "qwen_cloud_allowed_models",
-        "Qwen/Qwen3-TTS-12Hz-0.6B-Base,Qwen/Qwen3-TTS-12Hz-0.6B-CustomVoice",
-    )
-
-    resolved = provider_utils.resolve_qwen_cloud_model_selection(provider_utils.QWEN_CUSTOMVOICE_06_MODEL)
-
-    assert resolved == provider_utils.QWEN_CUSTOMVOICE_06_MODEL
-
-
-def test_get_provider_service_url_prefers_qwen_url(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8011")
-    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8001")
-
-    assert provider_utils.get_provider_service_url("qwen") == "http://qwen:8011"
-    assert provider_utils.get_provider_service_url("f5") == "http://f5:8001"
-
-
-def test_get_provider_service_url_fallbacks(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "")
-    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "")
-
-    assert provider_utils.get_provider_service_url("qwen") == "http://localhost:8011"
-    assert provider_utils.get_provider_service_url("unknown") == "http://localhost:8011"
-
-
-def test_get_provider_upstream_url_prefers_gateway_for_advanced_providers(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010/")
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8011")
-    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8001")
-
-    assert provider_utils.get_provider_upstream_url("f5") == "http://gateway:8010"
-    assert provider_utils.get_provider_upstream_url("qwen") == "http://gateway:8010"
-
-
-def test_get_provider_upstream_url_falls_back_to_provider_service_without_gateway(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "")
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8011")
-    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8001")
-
-    assert provider_utils.get_provider_upstream_url("f5") == "http://f5:8001"
-    with pytest.raises(provider_utils.ProviderRoutingError, match="qwen_gateway_required"):
-        provider_utils.get_provider_upstream_url("qwen")
-
-
-def test_get_provider_upstream_params_includes_provider_only_for_gateway(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
-    assert provider_utils.get_provider_upstream_params("f5") == {"provider": "f5"}
-    assert provider_utils.get_provider_upstream_params("qwen", {"user_id": 42}) == {"user_id": 42, "provider": "qwen"}
-
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "")
-    assert provider_utils.get_provider_upstream_params("f5") == {}
-    assert provider_utils.get_provider_upstream_params("qwen", {"user_id": 42}) == {"user_id": 42}
-
-
-def test_voice_management_url_qwen_requires_qwen_voice_service(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "")
-    with pytest.raises(provider_utils.ProviderRoutingError, match="qwen_voice_crud_not_available"):
-        provider_utils.get_voice_management_upstream_url("qwen")
-
-
-def test_voice_management_url_qwen_uses_qwen_voice_service(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "http://qwen-voices:8020/")
-    assert provider_utils.get_voice_management_upstream_url("qwen") == "http://qwen-voices:8020"
-
-
-def test_voice_management_url_qwen_falls_back_to_qwen_tts_service(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8012/")
-    assert provider_utils.get_voice_management_upstream_url("qwen") == "http://qwen:8012"
-
-
-def test_provider_capabilities_qwen_defaults_to_no_voice_crud(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
-    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "")
-    capabilities = provider_utils.get_provider_capabilities("qwen")
-    assert capabilities["provider"] == "qwen"
-    assert capabilities["synthesis_available"] is True
-    assert capabilities["synthesis_requires_gateway"] is True
-    assert capabilities["voice_crud"] is False
-
-
-def test_provider_capabilities_qwen_enables_voice_crud_with_voice_url(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
-    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "http://qwen-voices:8020")
-    capabilities = provider_utils.get_provider_capabilities("qwen")
-    assert capabilities["voice_crud"] is True
-    assert capabilities["voice_admin"] is True
-
-
-def test_provider_capabilities_qwen_enables_voice_crud_with_qwen_tts_url(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
-    monkeypatch.setattr(provider_utils.settings, "qwen_voice_service_url", "")
-    monkeypatch.setattr(provider_utils.settings, "qwen_tts_service_url", "http://qwen:8012")
-    capabilities = provider_utils.get_provider_capabilities("qwen")
-    assert capabilities["voice_crud"] is True
-    assert capabilities["voice_admin"] is True
-
-
-def test_provider_capabilities_expose_mode_first_flags(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
-    capabilities = provider_utils.get_provider_capabilities("f5")
-    assert capabilities["official_modes"] == ["cloud", "self_host"]
-    assert capabilities["official_cloud_path"] == "tts-gateway"
-    assert capabilities["official_self_host_path"] == "tts_worker_agent"
-    assert capabilities["supports_voice_clone"] is True
-
-
 def test_resolve_cloud_slot_policy_honors_whitelist_mode(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "tts_cloud_slot_mode", "whitelist")
-    denied = provider_utils.resolve_cloud_slot_policy("qwen", is_whitelisted=False)
-    allowed = provider_utils.resolve_cloud_slot_policy("qwen", is_whitelisted=True)
+
+    denied = provider_utils.resolve_cloud_slot_policy("f5", is_whitelisted=False)
+    allowed = provider_utils.resolve_cloud_slot_policy("f5", is_whitelisted=True)
+    internal = provider_utils.resolve_cloud_slot_policy("gcloud", is_whitelisted=False)
 
     assert denied["slot_allowed"] is False
     assert denied["error_code"] == "cloud_slot_required"
     assert allowed["slot_allowed"] is True
+    assert internal["policy"] == "internal"
+    assert internal["slot_allowed"] is True
 
 
 def test_build_tts_mode_contract_prefers_self_host_when_cloud_slot_denied(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "tts_cloud_slot_mode", "whitelist")
+
     payload = provider_utils.build_tts_mode_contract(
         "f5",
         "cloud",
@@ -350,6 +116,7 @@ def test_build_tts_mode_contract_prefers_self_host_when_cloud_slot_denied(monkey
         is_whitelisted=False,
     )
 
+    assert payload["provider"] == "f5"
     assert payload["official_mode"] == "cloud"
     assert payload["slot_allowed"] is False
     assert payload["available"] is False
@@ -357,36 +124,95 @@ def test_build_tts_mode_contract_prefers_self_host_when_cloud_slot_denied(monkey
     assert payload["error_code"] == "cloud_slot_required"
 
 
+def test_get_provider_service_url_returns_f5_url(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8011")
+    assert provider_utils.get_provider_service_url("f5") == "http://f5:8011"
+
+
+def test_get_provider_service_url_falls_back_to_localhost(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "")
+    assert provider_utils.get_provider_service_url("f5") == "http://localhost:8011"
+
+
+def test_get_provider_service_url_rejects_gcloud():
+    with pytest.raises(provider_utils.ProviderRoutingError, match="gcloud_synthesis_is_internal"):
+        provider_utils.get_provider_service_url("gcloud")
+
+
+def test_get_provider_upstream_url_prefers_gateway_for_f5(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010/")
+    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8011")
+
+    assert provider_utils.get_provider_upstream_url("f5") == "http://gateway:8010"
+
+
+def test_get_provider_upstream_url_falls_back_to_direct_f5(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "")
+    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8011")
+
+    assert provider_utils.get_provider_upstream_url("f5") == "http://f5:8011"
+
+
+def test_get_provider_upstream_url_rejects_gcloud():
+    with pytest.raises(provider_utils.ProviderRoutingError, match="gcloud_synthesis_is_internal"):
+        provider_utils.get_provider_upstream_url("gcloud")
+
+
+def test_get_provider_upstream_params_includes_provider_only_for_gateway(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
+    assert provider_utils.get_provider_upstream_params("f5") == {"provider": "f5"}
+    assert provider_utils.get_provider_upstream_params("f5", {"user_id": 42}) == {"user_id": 42, "provider": "f5"}
+
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "")
+    assert provider_utils.get_provider_upstream_params("f5") == {}
+    assert provider_utils.get_provider_upstream_params("f5", {"user_id": 42}) == {"user_id": 42}
+
+
+def test_voice_management_upstream_matches_f5_service(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8011/")
+    assert provider_utils.get_voice_management_upstream_url("f5") == "http://f5:8011"
+    assert provider_utils.get_voice_management_upstream_params("f5", {"user_id": 7}) == {"user_id": 7}
+
+
+def test_voice_management_upstream_rejects_gcloud():
+    with pytest.raises(provider_utils.ProviderRoutingError, match="gcloud_voice_management_not_supported"):
+        provider_utils.get_voice_management_upstream_url("gcloud")
+
+
+def test_provider_capabilities_expose_f5_and_gcloud_contracts(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "http://gateway:8010")
+    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8011")
+
+    f5_capabilities = provider_utils.get_provider_capabilities("f5")
+    gcloud_capabilities = provider_utils.get_provider_capabilities("gcloud")
+
+    assert f5_capabilities["provider"] == "f5"
+    assert f5_capabilities["voice_crud"] is True
+    assert f5_capabilities["official_self_host_path"] == "tts_worker_agent"
+    assert f5_capabilities["synthesis_via"] == "gateway"
+
+    assert gcloud_capabilities["provider"] == "gcloud"
+    assert gcloud_capabilities["voice_crud"] is False
+    assert gcloud_capabilities["official_cloud_path"] == "internal"
+    assert gcloud_capabilities["official_self_host_path"] is None
+
+
+def test_get_all_provider_capabilities_contains_supported_providers(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "tts_gateway_url", "")
+    monkeypatch.setattr(provider_utils.settings, "f5_tts_service_url", "http://f5:8011")
+
+    payload = provider_utils.get_all_provider_capabilities()
+
+    assert set(payload.keys()) == {"f5", "gcloud"}
+    assert payload["f5"]["provider"] == "f5"
+    assert payload["gcloud"]["provider"] == "gcloud"
+
+
 def test_normalize_local_tts_endpoint_url_accepts_allowed_host(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost")
     monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")
 
     assert provider_utils.normalize_local_tts_endpoint_url("http://localhost:8001/") == "http://localhost:8001"
-
-
-def test_get_local_tts_probe_endpoints_adds_docker_fallbacks_for_loopback(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost,host.docker.internal,tts_service,qwen_tts")
-    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")
-
-    assert provider_utils.get_local_tts_probe_endpoints("http://localhost:8011", "f5") == [
-        "http://localhost:8011",
-        "http://host.docker.internal:8011",
-        "http://tts_service:8011",
-    ]
-    assert provider_utils.get_local_tts_probe_endpoints("http://127.0.0.1:8012", "qwen") == [
-        "http://127.0.0.1:8012",
-        "http://host.docker.internal:8012",
-        "http://qwen_tts:8012",
-    ]
-
-
-def test_get_local_tts_probe_endpoints_keeps_non_loopback_singleton(monkeypatch):
-    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "tts_service,host.docker.internal")
-    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "")
-
-    assert provider_utils.get_local_tts_probe_endpoints("http://tts_service:8011", "f5") == [
-        "http://tts_service:8011",
-    ]
 
 
 def test_normalize_local_tts_endpoint_url_rejects_path(monkeypatch):
@@ -410,3 +236,23 @@ def test_normalize_local_tts_endpoint_url_allows_host_from_cidr(monkeypatch):
     monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "10.0.0.0/8")
 
     assert provider_utils.normalize_local_tts_endpoint_url("http://10.5.6.7:8011") == "http://10.5.6.7:8011"
+
+
+def test_get_local_tts_probe_endpoints_adds_docker_fallbacks_for_loopback(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "localhost,host.docker.internal,tts_service")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "127.0.0.0/8")
+
+    assert provider_utils.get_local_tts_probe_endpoints("http://localhost:8011", "f5") == [
+        "http://localhost:8011",
+        "http://host.docker.internal:8011",
+        "http://tts_service:8011",
+    ]
+
+
+def test_get_local_tts_probe_endpoints_keeps_non_loopback_singleton(monkeypatch):
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_hosts", "tts_service,host.docker.internal")
+    monkeypatch.setattr(provider_utils.settings, "local_tts_allowed_cidrs", "")
+
+    assert provider_utils.get_local_tts_probe_endpoints("http://tts_service:8011", "f5") == [
+        "http://tts_service:8011",
+    ]

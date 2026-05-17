@@ -118,14 +118,7 @@ async def materialize_provider_audio(
             raise RuntimeError(
                 f"Provider audio fetch failed provider={provider} status={audio_response.status} body={body[:200]}"
             )
-        if provider == "qwen":
-            chunks = bytearray()
-            async for chunk in audio_response.content.iter_chunked(65536):
-                if chunk:
-                    chunks.extend(chunk)
-            audio_bytes = bytes(chunks)
-        else:
-            audio_bytes = await audio_response.read()
+        audio_bytes = await audio_response.read()
         if not audio_bytes:
             raise RuntimeError(f"Provider audio fetch returned empty payload provider={provider}")
         return await persist_audio_bytes_fn(

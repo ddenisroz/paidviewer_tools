@@ -23,7 +23,7 @@ const ColorSettings: React.FC<ColorSettingsProps> = ({
     onBackgroundColorChange,
     onBackgroundOpacityChange,
     onTextStrokeColorChange,
-    onBorderRadiusChange
+    onBorderRadiusChange,
 }) => {
     return (
         <div className="space-y-6">

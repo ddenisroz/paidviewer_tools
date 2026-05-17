@@ -3,6 +3,7 @@ services:
     image: redis:7-alpine
     container_name: tts_redis_local
     command: redis-server --requirepass ${REDIS_PASSWORD:-redis-dev-password}
+    restart: unless-stopped
     logging:
       driver: local
       options:
@@ -20,6 +21,7 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: tts_postgres_local
+    restart: unless-stopped
     logging:
       driver: local
       options:
@@ -40,6 +42,7 @@ services:
       context: ../../bot_service
       dockerfile: Dockerfile.prod
     container_name: tts_bot_service_local
+    restart: unless-stopped
     logging:
       driver: local
       options:
@@ -65,12 +68,6 @@ services:
       TTS_GATEWAY_API_KEY: ${TTS_GATEWAY_API_KEY:-gateway-dev-key}
       F5_TTS_SERVICE_URL: ${F5_TTS_SERVICE_URL:-http://tts_service:8011}
       F5_TTS_SERVICE_API_KEY: ${F5_TTS_SERVICE_API_KEY:-f5-dev-key}
-      QWEN_TTS_SERVICE_URL: ${QWEN_TTS_SERVICE_URL:-http://qwen_tts:8000}
-      QWEN_TTS_SERVICE_API_KEY: ${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
-      QWEN_VOICE_SERVICE_URL: ${QWEN_VOICE_SERVICE_URL:-}
-      QWEN_ALLOWED_MODELS: ${QWEN_ALLOWED_MODELS:-}
-      QWEN_CLOUD_ALLOWED_MODELS: ${QWEN_CLOUD_ALLOWED_MODELS:-}
-      QWEN_TTS_ALLOWED_MODELS: ${QWEN_TTS_ALLOWED_MODELS:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev-password}@redis:6379/0
       ADMIN_USERS: ${ADMIN_USERS:-}
       VK_AUTH_BASE_URL: https://auth.live.vkvideo.ru/app/oauth2/authorize
@@ -93,6 +90,7 @@ services:
       context: ../../../tts-gateway
       dockerfile: Dockerfile
     container_name: tts_gateway_local
+    restart: unless-stopped
     logging:
       driver: local
       options:
@@ -103,14 +101,13 @@ services:
       - "8010:8010"
     environment: !override
       TTS_GATEWAY_PORT: 8010
-      TTS_GATEWAY_PUBLIC_BASE_URL: http://tts_gateway:8010
+      TTS_GATEWAY_PUBLIC_BASE_URL: http://localhost:8010
       TTS_GATEWAY_API_KEYS: ${TTS_GATEWAY_API_KEY:-gateway-dev-key}
       TTS_GATEWAY_REDIS_URL: redis://:${REDIS_PASSWORD:-redis-dev-password}@redis:6379/0
+      TTS_GATEWAY_RESULT_TIMEOUT_SEC: ${TTS_GATEWAY_RESULT_TIMEOUT_SEC:-180}
+      TTS_GATEWAY_REQUEST_TIMEOUT_SEC: ${TTS_GATEWAY_REQUEST_TIMEOUT_SEC:-60}
       TTS_GATEWAY_F5_URL: http://tts_service:8011
       TTS_GATEWAY_F5_API_KEY: ${F5_TTS_SERVICE_API_KEY:-f5-dev-key}
-      TTS_GATEWAY_QWEN_URL: http://qwen_tts:8000
-      TTS_GATEWAY_QWEN_API_KEY: ${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
-      TTS_GATEWAY_QWEN_URL_POLICY: passthrough
 
   tts_service:
     profiles: ["cloud-tts-real"]
@@ -118,6 +115,7 @@ services:
       context: ../../../f5-tts-service
       dockerfile: Dockerfile
     container_name: tts_tts_service_local
+    restart: unless-stopped
     logging:
       driver: local
       options:
@@ -133,10 +131,10 @@ services:
       F5_TTS_DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-app_data}
       F5_TTS_DATABASE_ECHO: "false"
       F5_TTS_BASE_DIR: /app
-      F5_TTS_ENGINE_MODE: ${F5_TTS_ENGINE_MODE:-fake}
-      F5_TTS_ENABLE_PREWARM: ${F5_TTS_ENABLE_PREWARM:-false}
-      F5_TTS_RUACCENT_ENABLED: ${F5_TTS_RUACCENT_ENABLED:-false}
-      F5_TTS_TRANSCRIBER_ENABLED: ${F5_TTS_TRANSCRIBER_ENABLED:-false}
+      F5_TTS_ENGINE_MODE: ${F5_TTS_ENGINE_MODE:-real}
+      F5_TTS_ENABLE_PREWARM: ${F5_TTS_ENABLE_PREWARM:-true}
+      F5_TTS_RUACCENT_ENABLED: ${F5_TTS_RUACCENT_ENABLED:-true}
+      F5_TTS_TRANSCRIBER_ENABLED: ${F5_TTS_TRANSCRIBER_ENABLED:-true}
       F5_TTS_MAX_INPUT_TEXT_LENGTH: "2000"
       HUGGINGFACE_TOKEN: ${HUGGINGFACE_TOKEN:-}
       HF_TOKEN: ${HUGGINGFACE_TOKEN:-}
@@ -145,34 +143,6 @@ services:
     volumes: !override
       - tts_audio:/app/audio
       - tts_cache:/app/f5_tts_cache
-
-  qwen_tts:
-    profiles: ["cloud-tts-real"]
-    build:
-      context: ../../../nano-qwen3tts-vllm
-      dockerfile: Dockerfile
-    container_name: tts_qwen_service_local
-    logging:
-      driver: local
-      options:
-        max-size: "10m"
-        max-file: "5"
-        compress: "true"
-    ports: !override
-      - "8012:8000"
-    environment: !override
-      PORT: 8000
-      API_KEY: ${QWEN_TTS_SERVICE_API_KEY:-qwen-dev-key}
-      HF_HOME: /root/.cache/huggingface
-      QWEN_VOICE_STORAGE_DIR: /app/runtime/qwen_voices
-      QWEN_ALLOWED_MODELS: ${QWEN_ALLOWED_MODELS:-}
-      QWEN3_TTS_MODEL_PATH: ${QWEN3_TTS_MODEL_PATH:-Qwen/Qwen3-TTS-12Hz-0.6B-Base}
-      QWEN_TTS_ALLOWED_MODELS: ${QWEN_TTS_ALLOWED_MODELS:-}
-      QWEN_TTS_ENABLE_PREWARM: ${QWEN_TTS_ENABLE_PREWARM:-false}
-      QWEN_TTS_TOKENIZER_CUDAGRAPH_LENGTHS: ${QWEN_TTS_TOKENIZER_CUDAGRAPH_LENGTHS:-0}
-    volumes: !override
-      - qwen_hf_cache:/root/.cache/huggingface
-      - qwen_voice_storage:/app/runtime/qwen_voices
 
   frontend:
     build:
@@ -183,6 +153,7 @@ services:
         VITE_BOT_SERVICE_URL: http://localhost:8000
         VITE_BOT_SERVICE_WS_URL: ws://localhost:8000
     container_name: tts_frontend_local
+    restart: unless-stopped
     logging:
       driver: local
       options:
@@ -205,10 +176,6 @@ volumes:
   tts_audio:
     driver: local
   tts_cache:
-    driver: local
-  qwen_hf_cache:
-    driver: local
-  qwen_voice_storage:
     driver: local
 
 networks:

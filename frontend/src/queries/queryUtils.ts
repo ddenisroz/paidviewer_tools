@@ -7,5 +7,5 @@
  * Converts Promise<AxiosResponse<T>> to Promise<T>
  */
 export const unwrapResponse = <T>(promise: Promise<{ data: T }>): Promise<T> => {
-  return promise.then(response => response.data);
+    return promise.then((response) => response.data);
 };

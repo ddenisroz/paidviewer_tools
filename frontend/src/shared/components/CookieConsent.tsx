@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
+import { createPortal } from 'react-dom';
+
 const COOKIE_STORAGE_KEY = 'AcceptCookies';
-const COOKIE_MESSAGE = 'Cookies нужны для входа, сохранения сессии и ваших настроек.';
 
 const CookieConsent: React.FC = () => {
     const [isVisible, setIsVisible] = useState(false);
@@ -22,28 +23,24 @@ const CookieConsent: React.FC = () => {
         return null;
     }
 
-    return (
-        <div className="fixed bottom-4 right-4 z-50 w-[calc(100%-2rem)] max-w-xs">
-            <div className="relative rounded-lg border border-border/70 bg-popover/95 p-3 shadow-2xl backdrop-blur-sm">
-                <div className="absolute -right-2 -top-5">
-                    <div className="flex items-center justify-center rounded-full border border-amber-500/30 bg-amber-500/20 px-2 py-1">
-                        <span className="text-[10px] font-bold tracking-wider text-amber-400">Cookies</span>
-                    </div>
-                </div>
-
-                <div className="pr-2 pt-1">
-                    <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-                        {COOKIE_MESSAGE}
+    return createPortal(
+        <div className="pointer-events-none fixed bottom-4 right-4 z-[10010] w-[min(23rem,calc(100vw-2rem))]">
+            <div className="pv-static-anchor-in pointer-events-auto flex items-center gap-3 rounded-lg border border-border/80 bg-[#0b0712] p-3 shadow-2xl shadow-black/55 ring-1 ring-white/10">
+                <div className="min-w-0 flex-1">
+                    <p className="brand-wordmark text-[11px] font-semibold uppercase text-amber-300">Cookies</p>
+                    <p className="text-xs leading-snug text-muted-foreground">
+                        Необходимы и используются для хранения и валидации активной сессии.
                     </p>
-                    <button
-                        onClick={handleAccept}
-                        className="w-full rounded-lg bg-blue-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blue-800"
-                    >
-                        Принять
-                    </button>
                 </div>
+                <button
+                    onClick={handleAccept}
+                    className="h-8 shrink-0 rounded-md border border-blue-600 bg-blue-700 px-3 text-xs font-semibold text-white transition-colors hover:border-blue-500 hover:bg-blue-800"
+                >
+                    Принять
+                </button>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

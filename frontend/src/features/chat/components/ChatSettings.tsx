@@ -33,7 +33,7 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
     setShowObsSettings,
     obsSettings,
     setObsSettings,
-    generateObsUrl
+    generateObsUrl,
 }) => {
     if (!showObsSettings) {
         return null;
@@ -67,10 +67,12 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                             <input
                                 type="number"
                                 value={obsSettings.width}
-                                onChange={(e) => setObsSettings(prev => ({
-                                    ...prev,
-                                    width: parseInt(e.target.value) || 400
-                                }))}
+                                onChange={(e) =>
+                                    setObsSettings((prev) => ({
+                                        ...prev,
+                                        width: parseInt(e.target.value) || 400,
+                                    }))
+                                }
                                 className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white"
                                 min="200"
                                 max="1920"
@@ -81,10 +83,12 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                             <input
                                 type="number"
                                 value={obsSettings.height}
-                                onChange={(e) => setObsSettings(prev => ({
-                                    ...prev,
-                                    height: parseInt(e.target.value) || 600
-                                }))}
+                                onChange={(e) =>
+                                    setObsSettings((prev) => ({
+                                        ...prev,
+                                        height: parseInt(e.target.value) || 600,
+                                    }))
+                                }
                                 className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white"
                                 min="200"
                                 max="1080"
@@ -104,10 +108,12 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                             <Label>Font Family</Label>
                             <select
                                 value={obsSettings.fontFamily}
-                                onChange={(e) => setObsSettings(prev => ({
-                                    ...prev,
-                                    fontFamily: e.target.value
-                                }))}
+                                onChange={(e) =>
+                                    setObsSettings((prev) => ({
+                                        ...prev,
+                                        fontFamily: e.target.value,
+                                    }))
+                                }
                                 className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-800 text-white"
                             >
                                 <option value="Arial">Arial</option>
@@ -129,10 +135,12 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                                 min="10"
                                 max="48"
                                 value={obsSettings.fontSize}
-                                onChange={(e) => setObsSettings(prev => ({
-                                    ...prev,
-                                    fontSize: parseInt(e.target.value)
-                                }))}
+                                onChange={(e) =>
+                                    setObsSettings((prev) => ({
+                                        ...prev,
+                                        fontSize: parseInt(e.target.value),
+                                    }))
+                                }
                                 className="w-full"
                             />
                         </div>
@@ -144,10 +152,12 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                             <input
                                 type="color"
                                 value={obsSettings.backgroundColor}
-                                onChange={(e) => setObsSettings(prev => ({
-                                    ...prev,
-                                    backgroundColor: e.target.value
-                                }))}
+                                onChange={(e) =>
+                                    setObsSettings((prev) => ({
+                                        ...prev,
+                                        backgroundColor: e.target.value,
+                                    }))
+                                }
                                 className="w-full h-10 border border-gray-600 rounded-md bg-gray-800"
                             />
                         </div>
@@ -156,10 +166,12 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                             <input
                                 type="color"
                                 value={obsSettings.textColor}
-                                onChange={(e) => setObsSettings(prev => ({
-                                    ...prev,
-                                    textColor: e.target.value
-                                }))}
+                                onChange={(e) =>
+                                    setObsSettings((prev) => ({
+                                        ...prev,
+                                        textColor: e.target.value,
+                                    }))
+                                }
                                 className="w-full h-10 border border-gray-600 rounded-md bg-gray-800"
                             />
                         </div>
@@ -177,9 +189,7 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
                         <div className="flex items-center gap-2 mb-2">
                             <MessageCircle className="h-4 w-4 text-blue-500" />
                             <span className="font-medium text-sm">Chat</span>
-                            <span className="text-xs text-muted-foreground">
-                                (includes all platforms)
-                            </span>
+                            <span className="text-xs text-muted-foreground">(includes all platforms)</span>
                         </div>
                         <div className="flex gap-2">
                             <Button
@@ -205,4 +215,3 @@ const ChatSettings: React.FC<ChatSettingsProps> = ({
 };
 
 export default ChatSettings;
-

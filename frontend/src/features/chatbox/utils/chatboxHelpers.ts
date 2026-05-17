@@ -1,5 +1,7 @@
 // src/utils/chatboxHelpers.ts
 
+import { CHATBOX_BRAND_FONT, isBundledChatFont } from '../constants/fontOptions';
+
 import type { ApiResponse } from '@/types/api';
 import type { ChatBoxSettings } from '@/types/chatbox';
 import type { AxiosResponse } from 'axios';
@@ -35,10 +37,10 @@ const clampNumber = (value: number, min: number, max: number): number => {
 };
 
 const normalizeFontFamily = (value: string | undefined): string => {
-    if (!value) return 'Inter';
+    if (!value) return CHATBOX_BRAND_FONT;
     const first = value.split(',')[0]?.trim();
-    if (!first) return 'Inter';
-    return first.replace(/^['"]|['"]$/g, '') || 'Inter';
+    if (!first) return CHATBOX_BRAND_FONT;
+    return first.replace(/^['"]|['"]$/g, '') || CHATBOX_BRAND_FONT;
 };
 
 export function normalizeChatBoxSettings(data: Partial<ChatBoxSettings>): ChatBoxSettings {
@@ -77,16 +79,14 @@ export function normalizeChatBoxSettings(data: Partial<ChatBoxSettings>): ChatBo
         show_links: data.show_links ?? true,
         auto_load_images: data.auto_load_images ?? true,
         widget_url: data.widget_url || '',
-        version: data.version || 1
+        version: data.version || 1,
     };
 }
 
 /**
  * Extract settings data from API response
  */
-export function extractSettingsFromResponse(
-    response: AxiosResponse<ApiResponse<ChatBoxSettings>>
-): ChatBoxSettings {
+export function extractSettingsFromResponse(response: AxiosResponse<ApiResponse<ChatBoxSettings>>): ChatBoxSettings {
     const responseData = response.data;
     // Handle nested data structure: response.data.data or response.data
     if (responseData.data) {
@@ -101,7 +101,7 @@ export function extractSettingsFromResponse(
  */
 export function loadGoogleFont(fontFamily: string): void {
     const normalizedFont = normalizeFontFamily(fontFamily);
-    if (!normalizedFont || document.getElementById(`font-${normalizedFont}`)) {
+    if (!normalizedFont || isBundledChatFont(normalizedFont) || document.getElementById(`font-${normalizedFont}`)) {
         return;
     }
 

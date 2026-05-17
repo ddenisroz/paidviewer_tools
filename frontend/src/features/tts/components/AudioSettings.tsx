@@ -22,7 +22,7 @@ const AudioSettings: React.FC<AudioSettingsProps> = ({
     audioSettings,
     setAudioSettings,
     listeningMode,
-    onSaveSettings
+    onSaveSettings,
 }) => {
     const [localVolume, setLocalVolume] = useState(audioSettings.websiteVolume);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -31,19 +31,22 @@ const AudioSettings: React.FC<AudioSettingsProps> = ({
         setLocalVolume(audioSettings.websiteVolume);
     }, [audioSettings.websiteVolume]);
 
-    const handleVolumeChange = useCallback((value: number) => {
-        setLocalVolume(value);
-        const newSettings = { ...audioSettings, websiteVolume: value };
-        setAudioSettings(newSettings);
-        if (onSaveSettings) {
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
+    const handleVolumeChange = useCallback(
+        (value: number) => {
+            setLocalVolume(value);
+            const newSettings = { ...audioSettings, websiteVolume: value };
+            setAudioSettings(newSettings);
+            if (onSaveSettings) {
+                if (timeoutRef.current) {
+                    clearTimeout(timeoutRef.current);
+                }
+                timeoutRef.current = setTimeout(() => {
+                    onSaveSettings(newSettings);
+                }, 500);
             }
-            timeoutRef.current = setTimeout(() => {
-                onSaveSettings(newSettings);
-            }, 500);
-        }
-    }, [audioSettings, setAudioSettings, onSaveSettings]);
+        },
+        [audioSettings, setAudioSettings, onSaveSettings]
+    );
 
     // Cleanup timeout on unmount
     useEffect(() => {
@@ -89,5 +92,3 @@ const AudioSettings: React.FC<AudioSettingsProps> = ({
 };
 
 export default AudioSettings;
-
-

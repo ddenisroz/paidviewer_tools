@@ -40,11 +40,8 @@ class TTSUserSettings(Base):
     listening_mode = Column(String, nullable=False, default="website")
     advanced_provider = Column(String, nullable=False, default="f5")
     f5_mode = Column(String, nullable=False, default="cloud")
-    qwen_mode = Column(String, nullable=False, default="cloud")
     gcloud_voices = Column(JSON, nullable=False, default=list)
     gcloud_mood = Column(String, nullable=False, default="neutral")
-    qwen_voice = Column(String, nullable=False, default="default")
-    qwen_model = Column(String, nullable=True)
 
     # Enabled platforms for playback.
     enabled_platforms = Column(JSON, nullable=False, default=lambda: ["twitch", "vk"])

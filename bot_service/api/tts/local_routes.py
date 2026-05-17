@@ -43,9 +43,9 @@ class LocalErrorDetail(dict[str, Any]):
 
 def _normalize_local_provider(provider: str) -> str:
     normalized = (provider or "").strip().lower()
-    if normalized not in {"f5", "qwen"}:
-        raise HTTPException(status_code=400, detail='provider must be either "f5" or "qwen"')
-    return normalized
+    if normalized != "f5":
+        raise HTTPException(status_code=400, detail='provider must be "f5"')
+    return "f5"
 
 
 def _redact_api_key(api_key: Optional[str]) -> Optional[str]:
@@ -58,31 +58,6 @@ def _redact_api_key(api_key: Optional[str]) -> Optional[str]:
 
 def _provider_contract(provider: str) -> dict:
     capabilities = get_provider_capabilities(provider)
-    if provider == "qwen":
-        return {
-            "upstream_parity_ready": False,
-            "requires_compatibility_adapter": True,
-            "managed_topology": "gateway_managed",
-            "project_hosted_direct_supported": True,
-            "supports_native_strict_api_key": False,
-            "supports_native_health_endpoint": True,
-            "supports_native_status_endpoint": False,
-            "supports_local_voice_management": True,
-            "official_modes": capabilities.get("official_modes", ["cloud", "self_host"]),
-            "official_cloud_path": capabilities.get("official_cloud_path", "tts-gateway"),
-            "official_self_host_path": capabilities.get("official_self_host_path", "tts_worker_agent"),
-            "legacy_raw_endpoint_supported": capabilities.get("legacy_raw_endpoint_supported", True),
-            "warning": (
-                "This screen configures a user-owned self-host Qwen runtime. "
-                "The official managed path stays cloud-first through "
-                "bot_service -> tts-gateway -> qwen runtime. "
-                "Self-host Qwen runtimes expose model catalog and user voice CRUD, "
-                "while synthesis currently uses the compatibility adapter over "
-                "/api/prepare -> /api/stream/{id}. Health endpoints are available; "
-                "native status parity is still partial."
-            ),
-        }
-
     return {
         "upstream_parity_ready": True,
         "requires_compatibility_adapter": False,
@@ -98,15 +73,6 @@ def _provider_contract(provider: str) -> dict:
         "legacy_raw_endpoint_supported": capabilities.get("legacy_raw_endpoint_supported", True),
         "warning": None,
     }
-
-
-def _qwen_local_contract_detail() -> str:
-    return (
-        "This endpoint is treated as a user-owned self-hosted Qwen endpoint. "
-        "The official cloud path remains bot_service -> tts-gateway -> qwen runtime. "
-        "This repository still uses a compatibility adapter for synthesis, but the worker now exposes "
-        "/health/live, /health/ready, /api/models and user voice CRUD endpoints. Native status/auth parity remains partial."
-    )
 
 
 def _require_authenticated_user_id(user: Optional[dict]) -> int:
@@ -156,15 +122,11 @@ def _require_local_voice_runtime(
 
 def _is_provider_local_mode(db: Session, user_id: int, provider: str) -> bool:
     settings = TTSSettingsRepository(db).get_or_create(user_id=user_id)
-    if provider == "qwen":
-        return normalize_provider_mode(getattr(settings, "qwen_mode", "cloud")) == "local"
     return normalize_provider_mode(getattr(settings, "f5_mode", "cloud")) == "local"
 
 
 def _provider_mode_payload(provider: str, use_local: bool) -> dict[str, str]:
     target_mode = "local" if use_local else "cloud"
-    if provider == "qwen":
-        return {"qwen_mode": target_mode}
     return {"f5_mode": target_mode}
 
 
@@ -205,6 +167,35 @@ async def _fetch_f5_local_voices(
         if isinstance(data, list):
             return data
         return list(data.get("voices") or [])
+
+
+def _extract_voice_items(payload: Any, *, voice_type: str | None = None) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        voices = payload
+    elif isinstance(payload, dict):
+        voices = payload.get("voices") or payload.get("data") or []
+    else:
+        voices = []
+
+    result: list[dict[str, Any]] = []
+    for item in voices:
+        if not isinstance(item, dict):
+            continue
+        normalized = dict(item)
+        if voice_type and not normalized.get("type") and not normalized.get("voice_type"):
+            normalized["type"] = voice_type
+        result.append(normalized)
+    return result
+
+
+async def _fetch_local_voices(
+    *,
+    provider: str,
+    endpoint: str,
+    headers: dict[str, str],
+    user_id: int,
+) -> list[dict[str, Any]]:
+    return await _fetch_f5_local_voices(endpoint=endpoint, headers=headers, user_id=user_id)
 
 
 # ============================================================================
@@ -396,11 +387,7 @@ async def toggle_local_tts(
                     repo.disable_local(config)
                 raise HTTPException(
                     status_code=503,
-                    detail=(
-                        _qwen_local_contract_detail()
-                        if resolved_provider == "qwen"
-                        else "Local TTS is unavailable. Check your connection."
-                    ),
+                    detail="Local TTS is unavailable. Check your connection.",
                 )
 
         service = TTSService(db)
@@ -457,16 +444,6 @@ async def test_local_tts_connection(
         )
         if not health_result.get("healthy", False):
             error_detail = str(health_result.get("error") or "").strip()
-            if resolved_provider == "qwen":
-                raise HTTPException(
-                    status_code=502,
-                    detail=_local_error_detail(
-                        provider=resolved_provider,
-                        code="local_runtime_unreachable",
-                        message=_qwen_local_contract_detail(),
-                        provider_contract=provider_contract,
-                    ),
-                )
             if error_detail.startswith("Timeout:"):
                 raise HTTPException(
                     status_code=504,
@@ -505,9 +482,6 @@ async def test_local_tts_connection(
         warnings = []
         status_data = health_result.get("status_data")
 
-        if resolved_provider == "qwen":
-            warnings.append(provider_contract["warning"])
-
         contract = build_tts_mode_contract(
             resolved_provider,
             "local",
@@ -518,11 +492,7 @@ async def test_local_tts_connection(
 
         return {
             "success": True,
-            "message": (
-                "Self-hosted Qwen endpoint is reachable via compatibility path"
-                if resolved_provider == "qwen"
-                else "Connection successful"
-            ),
+            "message": "Connection successful",
             "provider_contract": provider_contract,
             "warnings": warnings,
             "health_data": health_data,
@@ -599,7 +569,12 @@ async def list_local_tts_voices(
     )
 
     try:
-        voices = await _fetch_f5_local_voices(endpoint=endpoint, headers=headers, user_id=user_id)
+        voices = await _fetch_local_voices(
+            provider=resolved_provider,
+            endpoint=endpoint,
+            headers=headers,
+            user_id=user_id,
+        )
         return {
             "success": True,
             "provider": resolved_provider,
@@ -773,7 +748,8 @@ async def sync_global_voices_to_local(
         )
 
         try:
-            local_voices = await _fetch_f5_local_voices(
+            local_voices = await _fetch_local_voices(
+                provider=resolved_provider,
                 endpoint=endpoint,
                 headers=headers,
                 user_id=user_id,

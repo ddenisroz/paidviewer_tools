@@ -96,6 +96,23 @@ export const resolveAudioUrl = (audioUrl: string, apiBaseUrl?: string): string =
         return normalized;
     }
     if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+        try {
+            const parsed = new URL(normalized);
+            const dockerHostPorts: Record<string, string> = {
+                tts_gateway: '8010',
+                'tts-gateway': '8010',
+                tts_service: '8011',
+                'tts-service': '8011',
+            };
+            const hostPort = dockerHostPorts[parsed.hostname];
+            if (hostPort) {
+                const browserUrl = new URL(getBrowserOrigin() || 'http://localhost');
+                browserUrl.port = hostPort;
+                return `${browserUrl.origin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+            }
+        } catch {
+            return normalized;
+        }
         return normalized;
     }
     const apiUrl = (apiBaseUrl || getApiBaseUrl()).replace(/\/+$/, '');

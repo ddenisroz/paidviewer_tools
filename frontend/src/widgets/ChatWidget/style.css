@@ -7,23 +7,23 @@
     --border-radius: 8px;
     --border-color: #333;
     --border-width: 2px;
-    
+
     /* Стили сообщений */
     --message-bg: rgba(255, 255, 255, 0.1);
     --message-border-radius: 4px;
     --message-margin: 4px;
     --message-padding: 8px;
-    
+
     /* Шрифты */
     --font-family: 'Arial', sans-serif;
     --font-size: 14px;
     --font-weight: normal;
     --text-color: #ffffff;
-    
+
     /* Анимации */
     --animation-duration: 0.3s;
     --animation-type: slide-in;
-    
+
     /* Цвета по ролям */
     --moderator-color: #00ff00;
     --vip-color: #ff6b6b;

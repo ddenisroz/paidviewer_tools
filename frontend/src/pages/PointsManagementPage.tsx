@@ -210,16 +210,6 @@ const enabledRewardCapability = (platform: 'twitch' | 'vk'): RewardCapability =>
     reason: null,
 });
 
-const getCapabilityBadgeTone = (platform: 'twitch' | 'vk', canCreate: boolean): string => {
-    if (canCreate) {
-        return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
-    }
-
-    return platform === 'twitch'
-        ? 'border-[#9146FF]/30 bg-[#9146FF]/10 text-[#c9a9ff]'
-        : 'border-[#FF4444]/30 bg-[#FF4444]/10 text-[#ffb4b4]';
-};
-
 const normalizeCapabilityReason = (platform: 'twitch' | 'vk', error: { message?: string; status?: number }): string => {
     const message = error.message?.trim();
 
@@ -903,38 +893,6 @@ const PointsManagementPage: React.FC = () => {
                                 <Plus className="w-4 h-4 mr-2" />
                                 Создать награду
                             </Button>
-                            {rewardCapability.platform === selectedPlatform && rewardCapability.reason && (
-                                <Card className={SURFACE_CARD_CLASS}>
-                                    <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={cn(
-                                                        'text-xs font-medium',
-                                                        getCapabilityBadgeTone(selectedPlatform, canCreateReward)
-                                                    )}
-                                                >
-                                                    {selectedPlatform === 'twitch' ? 'Twitch' : 'VK Live'}
-                                                </Badge>
-                                                <span className="text-sm font-medium text-foreground">
-                                                    {canCreateReward ? 'Награды доступны' : 'Есть ограничение платформы'}
-                                                </span>
-                                            </div>
-                                            <p className="text-sm leading-relaxed text-muted-foreground">
-                                                {rewardCapability.reason}
-                                            </p>
-                                        </div>
-                                        {rewardCapability.required_role && !canCreateReward && (
-                                            <Badge variant="secondary" className="self-start text-xs">
-                                                {rewardCapability.required_role === 'affiliate_or_partner'
-                                                    ? 'Нужен Affiliate или Partner'
-                                                    : 'Нужны права владельца канала'}
-                                            </Badge>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
                         </>
                     )}
                 </div>
@@ -944,15 +902,19 @@ const PointsManagementPage: React.FC = () => {
                         <div>
                             {rewards.length === 0 ? (
                                 <Card className={SURFACE_CARD_CLASS}>
-                                    <CardContent className="py-12 text-center">
-                                        <Gift className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-30" />
-                                        <p className="text-sm text-muted-foreground font-medium">
-                                            {canCreateReward ? 'Нет наград' : 'Награды сейчас недоступны'}
-                                        </p>
-                                        {rewardCapability.platform === selectedPlatform && rewardCapability.reason && (
-                                            <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                                                {rewardCapability.reason}
-                                            </p>
+                                    <CardContent className="grid min-h-52 place-items-center py-10">
+                                        {canCreateReward ? (
+                                            <Button
+                                                onClick={() => setShowCreateDialog(true)}
+                                                size="sm"
+                                                variant="outline"
+                                                className="gap-2"
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                                Первая награда
+                                            </Button>
+                                        ) : (
+                                            <Gift className="h-12 w-12 text-muted-foreground/30" strokeWidth={1.5} />
                                         )}
                                     </CardContent>
                                 </Card>

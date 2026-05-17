@@ -4,7 +4,6 @@
 import { ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
-
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { authService } from '@/services/api/services/authService';
@@ -24,19 +23,22 @@ const Header: React.FC = () => {
     const [integrationsOpen, setIntegrationsOpen] = useState(false);
 
     // Заголовки страниц
-    const pageTitles = useMemo(() => ({
-        '/dashboard/tts/voices': 'Управление голосами',
-        '/dashboard/tts/local': 'Локальный TTS',
-        '/dashboard/tts': 'TTS ИИ озвучка',
-        '/dashboard/youtube': 'YouTube заказы',
-        '/dashboard/drops': 'Drops система',
-        '/dashboard/commands': 'Команды',
-        '/dashboard/points': 'Баллы канала',
-        '/dashboard/settings': 'Настройки',
-        '/dashboard/chat-analysis': 'Аналитика чата',
-        '/dashboard/admin': '',
-        '/dashboard': '',
-    }), []);
+    const pageTitles = useMemo(
+        () => ({
+            '/dashboard/tts/voices': 'Управление голосами',
+            '/dashboard/tts/local': 'Локальный TTS',
+            '/dashboard/tts': 'TTS ИИ озвучка',
+            '/dashboard/youtube': 'YouTube заказы',
+            '/dashboard/drops': 'Drops система',
+            '/dashboard/commands': 'Команды',
+            '/dashboard/points': 'Баллы канала',
+            '/dashboard/settings': 'Настройки',
+            '/dashboard/chat-analysis': 'Аналитика чата',
+            '/dashboard/admin': '',
+            '/dashboard': '',
+        }),
+        []
+    );
 
     const pageTitle = useMemo(() => {
         const currentPath = location.pathname.replace(/\/$/, '') || '/';
@@ -76,7 +78,6 @@ const Header: React.FC = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [integrationsOpen]);
 
-
     const handleIntegrationToggle = async (platform: string) => {
         try {
             if (platform === 'twitch') {
@@ -102,7 +103,11 @@ const Header: React.FC = () => {
                 } else {
                     try {
                         const response = await integrationsService.connectDonationAlerts();
-                        const responseData = response.data as { data?: { success?: boolean; auth_url?: string }; success?: boolean; auth_url?: string };
+                        const responseData = response.data as {
+                            data?: { success?: boolean; auth_url?: string };
+                            success?: boolean;
+                            auth_url?: string;
+                        };
                         const data = responseData.data || responseData;
                         if (data.success && data.auth_url) {
                             const safeUrl = getSafeNavigationUrl(data.auth_url);
@@ -131,10 +136,7 @@ const Header: React.FC = () => {
         <header className="grid h-14 grid-cols-[1fr_auto_1fr] items-center gap-2 bg-transparent px-3 sm:gap-4 sm:px-6 lg:h-16">
             <div className="col-start-2 min-w-0 justify-self-center">
                 {pageTitle && (
-                    <h1
-                        className="truncate text-center text-xl font-extrabold text-cyan-300 sm:text-2xl"
-                        style={{ fontFamily: 'var(--font-family-brand)' }}
-                    >
+                    <h1 className="app-heading-page truncate text-center text-xl text-cyan-200 sm:text-2xl">
                         {pageTitle}
                     </h1>
                 )}
@@ -150,13 +152,13 @@ const Header: React.FC = () => {
                         >
                             <Settings className="h-4 w-4" />
                             <span className="hidden sm:inline">Интеграции</span>
-                            <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${integrationsOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown
+                                className={`h-4 w-4 transition-transform duration-200 ${integrationsOpen ? 'rotate-180' : ''}`}
+                            />
                         </Button>
 
                         {integrationsOpen && (
-                            <div
-                                className="absolute right-0 top-12 z-50 w-64 rounded-md border border-border/60 bg-card shadow-md backdrop-blur-sm"
-                            >
+                            <div className="absolute right-0 top-12 z-50 w-64 rounded-md border border-border/60 bg-[#0b0712] shadow-md ring-1 ring-white/10">
                                 <div className="p-4 space-y-3">
                                     <h3 className="text-sm font-semibold text-muted-foreground">Интеграции</h3>
 
@@ -167,13 +169,15 @@ const Header: React.FC = () => {
                                         </div>
                                         <button
                                             onClick={() => handleIntegrationToggle('twitch')}
-                                            className={`w-12 h-6 rounded-full transition-colors ${integrations?.twitch?.enabled
-                                                ? 'bg-[#9146FF]'
-                                                : 'bg-slate-600'
-                                                }`}
+                                            className={`w-12 h-6 rounded-full transition-colors ${
+                                                integrations?.twitch?.enabled ? 'bg-[#9146FF]' : 'bg-slate-600'
+                                            }`}
                                         >
-                                            <div className={`w-5 h-5 bg-white rounded-full transition-transform ${integrations?.twitch?.enabled ? 'translate-x-6' : 'translate-x-0.5'
-                                                }`} />
+                                            <div
+                                                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                                    integrations?.twitch?.enabled ? 'translate-x-6' : 'translate-x-0.5'
+                                                }`}
+                                            />
                                         </button>
                                     </div>
 
@@ -183,7 +187,10 @@ const Header: React.FC = () => {
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm">VK Live</span>
                                                 {platformRelease.vk.badgeLabel ? (
-                                                    <Badge variant="outline" className="h-5 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-300">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="h-5 border-amber-500/40 bg-amber-500/10 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-300"
+                                                    >
                                                         {platformRelease.vk.badgeLabel}
                                                     </Badge>
                                                 ) : null}
@@ -191,13 +198,15 @@ const Header: React.FC = () => {
                                         </div>
                                         <button
                                             onClick={() => handleIntegrationToggle('vk')}
-                                            className={`w-12 h-6 rounded-full transition-colors ${integrations?.vk?.enabled
-                                                ? 'bg-[#FF4444]'
-                                                : 'bg-slate-600'
-                                                }`}
+                                            className={`w-12 h-6 rounded-full transition-colors ${
+                                                integrations?.vk?.enabled ? 'bg-[#FF4444]' : 'bg-slate-600'
+                                            }`}
                                         >
-                                            <div className={`w-5 h-5 bg-white rounded-full transition-transform ${integrations?.vk?.enabled ? 'translate-x-6' : 'translate-x-0.5'
-                                                }`} />
+                                            <div
+                                                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                                    integrations?.vk?.enabled ? 'translate-x-6' : 'translate-x-0.5'
+                                                }`}
+                                            />
                                         </button>
                                     </div>
 
@@ -208,13 +217,17 @@ const Header: React.FC = () => {
                                         </div>
                                         <button
                                             onClick={() => handleIntegrationToggle('donationalerts')}
-                                            className={`w-12 h-6 rounded-full transition-colors ${integrations?.donationalerts?.enabled
-                                                ? 'bg-orange-500'
-                                                : 'bg-slate-600'
-                                                }`}
+                                            className={`w-12 h-6 rounded-full transition-colors ${
+                                                integrations?.donationalerts?.enabled ? 'bg-orange-500' : 'bg-slate-600'
+                                            }`}
                                         >
-                                            <div className={`w-5 h-5 bg-white rounded-full transition-transform ${integrations?.donationalerts?.enabled ? 'translate-x-6' : 'translate-x-0.5'
-                                                }`} />
+                                            <div
+                                                className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                                                    integrations?.donationalerts?.enabled
+                                                        ? 'translate-x-6'
+                                                        : 'translate-x-0.5'
+                                                }`}
+                                            />
                                         </button>
                                     </div>
                                 </div>
@@ -222,7 +235,6 @@ const Header: React.FC = () => {
                         )}
                     </div>
                 )}
-
 
                 {user && (
                     <Button

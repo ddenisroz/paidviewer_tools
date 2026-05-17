@@ -132,7 +132,7 @@ class VoiceManagementService:
     async def get_voice_info(self, voice_id: int, provider: str = "f5") -> Optional[Dict[str, Any]]:
         """Get information about a specific voice."""
         normalized_provider = self._ensure_voice_management_provider(provider)
-        request_timeout = 30.0 if normalized_provider == "qwen" else 10.0
+        request_timeout = 10.0
         try:
             async with httpx.AsyncClient(timeout=request_timeout, **build_tts_httpx_client_kwargs()) as client:
                 response = await client.get(
@@ -157,11 +157,6 @@ class VoiceManagementService:
                 voice_id,
                 request_timeout,
             )
-            if normalized_provider == "qwen":
-                raise HTTPException(
-                    status_code=504,
-                    detail="Qwen voice service is busy warming up. Try the preview again in a few seconds.",
-                ) from error
             raise HTTPException(status_code=504, detail="Voice service timed out") from error
         except httpx.RequestError as error:
             logger.warning(
@@ -499,7 +494,7 @@ class VoiceManagementService:
     ) -> Dict[str, Any]:
         """Upload a global voice in selected provider service."""
         normalized_provider = self._ensure_voice_management_provider(provider)
-        request_timeout = 240.0 if normalized_provider == "qwen" else 60.0
+        request_timeout = 60.0
         files = {"file": (filename, content, content_type)}
         data: Dict[str, str] = {}
         if name:
@@ -535,11 +530,6 @@ class VoiceManagementService:
                 normalized_provider,
                 request_timeout,
             )
-            if normalized_provider == "qwen":
-                raise HTTPException(
-                    status_code=504,
-                    detail="Qwen is still processing the uploaded sample. Refresh the voice list in a minute and try again.",
-                ) from error
             raise HTTPException(status_code=504, detail="Voice upload timed out") from error
         except HTTPException:
             raise

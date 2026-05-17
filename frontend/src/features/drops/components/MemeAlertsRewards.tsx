@@ -1,24 +1,15 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 
-import {
-    ArrowsClockwise,
-    CheckCircle,
-    CurrencyCircleDollar,
-    Gift,
-    HandCoins,
-    LinkSimple,
-    SpinnerGap,
-    XCircle,
-} from '@phosphor-icons/react';
+import { CheckCircle2, Gift, HandCoins, Loader2, RefreshCw, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
-import { AutomationCard, ConnectionNote } from '@/features/drops/components/MemeAlertsAutomationCard';
+import { AutomationCard } from '@/features/drops/components/MemeAlertsAutomationCard';
 import { parseMemeAlertsTokenPayload } from '@/features/drops/utils/memealertsToken';
 import { cn } from '@/lib/utils';
 import apiClient from '@/services/api/client';
-import { MemeAlertsLogo } from '@/shared/components/icons/MemeAlertsLogoV2';
+import { MemeAlertsMark } from '@/shared/components/icons/FeatureMarks';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
@@ -35,6 +26,8 @@ import type { AxiosError } from 'axios';
 const MEMEALERTS_API_BASE = '/api/memealerts';
 const POPUP_STATUS_POLL_MS = 2_000;
 const POPUP_STATUS_TIMEOUT_MS = 120_000;
+type MemeAlertsAuthProvider = 'twitch' | 'google' | 'vk';
+type PopupAuthState = 'idle' | 'redirecting' | 'sign_in' | 'saving' | 'success' | 'error';
 
 type MemeAlertsHistoryItem = {
     id?: string | number;
@@ -92,6 +85,27 @@ const DEFAULT_AUTOMATION_SETTINGS: MemeAlertsAutomationSettings = {
 const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm shadow-black/10';
 const FIELD_CLASS = 'h-9 border-border/70 bg-card/70 text-foreground placeholder:text-muted-foreground';
 const MUTED_PANEL_CLASS = 'rounded-lg border border-border/70 bg-background/45';
+const PROVIDER_LABELS: Record<MemeAlertsAuthProvider, string> = {
+    twitch: 'Twitch',
+    google: 'Google',
+    vk: 'VK',
+};
+const POPUP_STATE_LABELS: Record<PopupAuthState, string> = {
+    idle: 'Ожидание',
+    redirecting: 'Переход',
+    sign_in: 'Вход',
+    saving: 'Сохранение',
+    success: 'Готово',
+    error: 'Ошибка',
+};
+const POPUP_STATE_CLASS: Record<PopupAuthState, string> = {
+    idle: 'border-border/70 bg-card/70 text-muted-foreground',
+    redirecting: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
+    sign_in: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-200',
+    saving: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+    success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+    error: 'border-red-500/30 bg-red-500/10 text-red-200',
+};
 const REWARD_SWITCH_VARIANT = {
     twitch: 'twitch',
     vk: 'vk',
@@ -106,8 +120,10 @@ export const MemeAlertsRewards: React.FC = () => {
 
     const [statusLoading, setStatusLoading] = useState(true);
     const [isConnected, setIsConnected] = useState(false);
-    const [connectionNote, setConnectionNote] = useState<string | null>(null);
+    const [, setConnectionNote] = useState<string | null>(null);
     const [connecting, setConnecting] = useState(false);
+    const [activeProvider, setActiveProvider] = useState<MemeAlertsAuthProvider | null>(null);
+    const [popupState, setPopupState] = useState<PopupAuthState>('idle');
     const [grantTarget, setGrantTarget] = useState('');
     const [grantValue, setGrantValue] = useState<number>(10);
     const [granting, setGranting] = useState(false);
@@ -140,6 +156,7 @@ export const MemeAlertsRewards: React.FC = () => {
     const detachedPopupPollingRef = React.useRef(false);
     const statusPollingRef = React.useRef(false);
     const manualTokenInputRef = React.useRef<HTMLInputElement | null>(null);
+    const lastPopupErrorToastRef = React.useRef<string | null>(null);
 
     const stopPopupWatcher = useCallback((clearPopup = true) => {
         if (popupWatcherRef.current !== null) {
@@ -152,6 +169,27 @@ export const MemeAlertsRewards: React.FC = () => {
             popupRef.current = null;
         }
     }, []);
+
+    const finishConnectFlow = useCallback(
+        (nextState: PopupAuthState, note?: string | null) => {
+            setPopupState(nextState);
+            if (note !== undefined) {
+                setConnectionNote(note);
+            }
+            if (nextState === 'error' && note) {
+                if (lastPopupErrorToastRef.current !== note) {
+                    toast.error(note);
+                    lastPopupErrorToastRef.current = note;
+                }
+            } else if (nextState === 'success' || nextState === 'idle') {
+                lastPopupErrorToastRef.current = null;
+            }
+            if (nextState === 'success' || nextState === 'error' || nextState === 'idle') {
+                setConnecting(false);
+            }
+        },
+        []
+    );
 
     const checkStatus = useCallback(async (): Promise<boolean> => {
         try {
@@ -178,8 +216,8 @@ export const MemeAlertsRewards: React.FC = () => {
         popupWatcherRef.current = window.setInterval(() => {
             if (Date.now() - popupWatcherStartedAtRef.current > POPUP_STATUS_TIMEOUT_MS) {
                 stopPopupWatcher();
-                setConnecting(false);
-                setConnectionNote(
+                finishConnectFlow(
+                    'error',
                     'MemeAlerts не вернул подтверждение. Повторите вход или вставьте полную ссылку вручную.'
                 );
                 return;
@@ -194,39 +232,42 @@ export const MemeAlertsRewards: React.FC = () => {
                             popupRef.current.close();
                         }
                         stopPopupWatcher();
-                        setConnecting(false);
+                        finishConnectFlow('success', null);
                         return;
                     }
 
                     const popup = popupRef.current;
                     if (!detachedPopupPollingRef.current && (!popup || popup.closed)) {
                         stopPopupWatcher();
-                        setConnecting(false);
+                        finishConnectFlow('idle');
                     }
                 })
                 .finally(() => {
                     statusPollingRef.current = false;
                 });
         }, POPUP_STATUS_POLL_MS);
-    }, [checkStatus, stopPopupWatcher]);
+    }, [checkStatus, finishConnectFlow, stopPopupWatcher]);
 
     const handleProxyAuthResult = useCallback(
-        async (data: { ok?: boolean; status?: number; source?: string }) => {
+        async (data: { ok?: boolean; status?: number; source?: string; detail?: string }) => {
             const connected = data.ok ? await checkStatus() : false;
             if (connected) {
                 if (popupRef.current && !popupRef.current.closed) {
                     popupRef.current.close();
                 }
                 stopPopupWatcher();
-                setConnecting(false);
+                finishConnectFlow('success', null);
                 toast.success('MemeAlerts подключен');
             } else if (data.ok === false) {
-                setConnectionNote('MemeAlerts не подтвердил токен. Повторите подключение.');
-                stopPopupWatcher(false);
-                setConnecting(false);
+                const note = data.detail || 'MemeAlerts не подтвердил токен. Повторите подключение.';
+                const popupStillOpen = !!popupRef.current && !popupRef.current.closed;
+                finishConnectFlow('error', note);
+                if (!popupStillOpen) {
+                    stopPopupWatcher(false);
+                }
             }
         },
-        [checkStatus, stopPopupWatcher]
+        [checkStatus, finishConnectFlow, stopPopupWatcher]
     );
 
     useEffect(() => {
@@ -337,23 +378,24 @@ export const MemeAlertsRewards: React.FC = () => {
         selectedRewardPlatform,
     ]);
 
-    const saveTokenToBackend = useCallback(async (accessToken: string, refreshToken?: string) => {
+    const saveTokenToBackend = useCallback(async (accessToken: string, refreshToken?: string, streamerId?: string) => {
         try {
             const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/connect`, {
                 access_token: accessToken,
                 refresh_token: refreshToken,
+                streamer_id: streamerId,
             });
 
             if (data.success && data.connected) {
                 setIsConnected(true);
-                setConnectionNote(null);
+                finishConnectFlow('success', null);
                 toast.success('MemeAlerts подключен!', {
                     description: 'Теперь вы можете выдавать мемкоины',
                 });
                 return true;
             } else {
                 const message = data.detail || data.error || 'MemeAlerts не подтвердил токен';
-                setConnectionNote(message);
+                finishConnectFlow('error', message);
                 toast.error(message, {
                     description: 'Токен не сохранен',
                 });
@@ -364,13 +406,13 @@ export const MemeAlertsRewards: React.FC = () => {
             const backendMessage = axiosError.response?.data?.detail || axiosError.response?.data?.error;
             const message =
                 axiosError.response?.status === 400
-                    ? 'Токен MemeAlerts не подходит. Повторите вход и вставьте полную ссылку после авторизации.'
+                    ? backendMessage || 'Токен MemeAlerts пока не готов. Завершите вход в окне авторизации и повторите попытку.'
                     : backendMessage || 'Ошибка сети при сохранении токена';
-            setConnectionNote(message);
+            finishConnectFlow('error', message);
             toast.error(message);
             return false;
         }
-    }, []);
+    }, [finishConnectFlow]);
 
     // Listen for postMessage from the proxy popup with the extracted token.
     useEffect(() => {
@@ -382,29 +424,44 @@ export const MemeAlertsRewards: React.FC = () => {
             // Accept both old format and new typed format from the proxy script.
             const data = event.data as {
                 type?: string;
+                state?: PopupAuthState;
+                provider?: MemeAlertsAuthProvider;
                 access_token?: string;
                 refresh_token?: string;
+                streamer_id?: string;
                 ok?: boolean;
                 status?: number;
                 source?: string;
+                detail?: string;
             };
 
+            if (data.type === 'memealerts_auth_state' && data.state) {
+                if (data.provider) {
+                    setActiveProvider(data.provider);
+                }
+                finishConnectFlow(
+                    data.state,
+                    data.state === 'error' ? data.detail || null : data.state === 'success' ? null : undefined
+                );
+                return;
+            }
+
             if (data.type === 'memealerts_token' && data.access_token) {
+                setPopupState('saving');
                 setConnecting(true);
-                const success = await saveTokenToBackend(data.access_token, data.refresh_token);
+                const success = await saveTokenToBackend(data.access_token, data.refresh_token, data.streamer_id);
                 if (success && popupRef.current && !popupRef.current.closed) {
                     popupRef.current.close();
                 }
                 stopPopupWatcher();
-                setConnecting(false);
             } else if (data.access_token && !data.type) {
                 // Legacy format - keep backward compatibility.
-                const success = await saveTokenToBackend(data.access_token, data.refresh_token);
+                setPopupState('saving');
+                const success = await saveTokenToBackend(data.access_token, data.refresh_token, data.streamer_id);
                 if (success && popupRef.current && !popupRef.current.closed) {
                     popupRef.current.close();
                 }
                 stopPopupWatcher();
-                setConnecting(false);
             } else if (data.type === 'memealerts_proxy_result') {
                 await handleProxyAuthResult(data);
             }
@@ -415,15 +472,48 @@ export const MemeAlertsRewards: React.FC = () => {
             window.removeEventListener('message', handleMessage);
             stopPopupWatcher();
         };
-    }, [handleProxyAuthResult, saveTokenToBackend, stopPopupWatcher]);
+    }, [finishConnectFlow, handleProxyAuthResult, saveTokenToBackend, stopPopupWatcher]);
 
     useEffect(() => {
         if (!('BroadcastChannel' in window)) return undefined;
 
         const channel = new BroadcastChannel('memealerts-auth');
         channel.onmessage = (event) => {
-            const data = event?.data as { type?: string; ok?: boolean; status?: number; source?: string } | undefined;
-            if (data?.type === 'memealerts_proxy_result') {
+            const data = event?.data as
+                | {
+                      type?: string;
+                      state?: PopupAuthState;
+                      provider?: MemeAlertsAuthProvider;
+                      ok?: boolean;
+                      status?: number;
+                      source?: string;
+                      access_token?: string;
+                      refresh_token?: string;
+                      streamer_id?: string;
+                      detail?: string;
+                  }
+                | undefined;
+            if (data?.type === 'memealerts_auth_state' && data.state) {
+                if (data.provider) {
+                    setActiveProvider(data.provider);
+                }
+                finishConnectFlow(
+                    data.state,
+                    data.state === 'error' ? data.detail || null : data.state === 'success' ? null : undefined
+                );
+                return;
+            }
+
+            if (data?.type === 'memealerts_token' && data.access_token) {
+                setPopupState('saving');
+                setConnecting(true);
+                void saveTokenToBackend(data.access_token, data.refresh_token, data.streamer_id).then((success) => {
+                    if (success && popupRef.current && !popupRef.current.closed) {
+                        popupRef.current.close();
+                    }
+                    stopPopupWatcher();
+                });
+            } else if (data?.type === 'memealerts_proxy_result') {
                 void handleProxyAuthResult(data);
             }
         };
@@ -431,7 +521,7 @@ export const MemeAlertsRewards: React.FC = () => {
         return () => {
             channel.close();
         };
-    }, [handleProxyAuthResult]);
+    }, [finishConnectFlow, handleProxyAuthResult, saveTokenToBackend, stopPopupWatcher]);
 
     useEffect(() => {
         if (isConnected) {
@@ -455,62 +545,46 @@ export const MemeAlertsRewards: React.FC = () => {
         setRewardCoinsAmount(platformSettings.coins_amount || 10);
     }, [automationSettings.points_reward, selectedRewardPlatform]);
 
-    const handleConnect = useCallback(async () => {
-        const popupFeatures = 'width=500,height=700,scrollbars=yes,resizable=yes';
-        const popup = window.open('', 'memealerts-auth', popupFeatures);
+    const handleConnect = useCallback((provider: MemeAlertsAuthProvider) => {
+        setConnecting(true);
+        setActiveProvider(provider);
+        finishConnectFlow('redirecting', null);
+        stopPopupWatcher();
 
-        try {
-            setConnecting(true);
-            setConnectionNote(null);
-
-            if (popup) {
-                popupRef.current = popup;
-                try {
-                    popup.document.title = 'MemeAlerts';
-                    popup.document.body.innerHTML = `
-                        <div style="margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#140f1e;color:#f4f0ff;font:16px system-ui,sans-serif;">
-                            Подключаем MemeAlerts...
-                        </div>
-                    `;
-                } catch {
-                    // Ignore popup document access issues before navigation.
-                }
-            }
-
-            const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/connect-url`);
-            if (!data?.success || !data?.auth_url) {
-                throw new Error(data?.error || 'Не удалось получить ссылку подключения');
-            }
-
-            const safeUrl = getSafeNavigationUrl(data.auth_url);
-            if (!safeUrl) {
-                throw new Error('Небезопасный URL авторизации');
-            }
-
-            if (!popup) {
-                toast.info('Открываем MemeAlerts в этой вкладке', {
-                    description: 'Браузер заблокировал всплывающее окно, поэтому продолжаем подключение без popup',
-                });
-                window.location.href = safeUrl;
-                return;
-            }
-
-            popup.location.href = safeUrl;
-            popup.focus();
-            startPopupWatcher();
-            toast.info('Окно авторизации открыто', {
-                description: 'Если статус не обновится, используйте ручную ссылку',
-            });
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'Ошибка запуска авторизации';
-            if (popup && !popup.closed) {
-                popup.close();
-            }
-            toast.error(message);
-            stopPopupWatcher();
-            setConnecting(false);
+        const redirectUrl = getSafeNavigationUrl(
+            `/api/memealerts/connect-redirect?provider=${encodeURIComponent(provider)}`
+        );
+        if (!redirectUrl) {
+            toast.error('Не удалось открыть MemeAlerts');
+            finishConnectFlow('error', 'Не удалось открыть окно авторизации MemeAlerts.');
+            return;
         }
-    }, [startPopupWatcher, stopPopupWatcher]);
+
+        const popupWidth = 540;
+        const popupHeight = 760;
+        const left = window.screenX + Math.max(0, Math.round((window.outerWidth - popupWidth) / 2));
+        const top = window.screenY + Math.max(0, Math.round((window.outerHeight - popupHeight) / 2));
+        const features = [
+            `width=${popupWidth}`,
+            `height=${popupHeight}`,
+            `left=${left}`,
+            `top=${top}`,
+            'resizable=yes',
+            'scrollbars=yes',
+        ].join(',');
+
+        const popup = window.open('', 'memealerts-auth', features);
+        if (popup) {
+            popupRef.current = popup;
+            startPopupWatcher();
+            popup.location.href = redirectUrl;
+            popup.focus();
+            return;
+        }
+
+        startPopupWatcher(true);
+        window.location.assign(redirectUrl);
+    }, [finishConnectFlow, startPopupWatcher, stopPopupWatcher]);
 
     const handleDisconnect = async () => {
         try {
@@ -518,6 +592,9 @@ export const MemeAlertsRewards: React.FC = () => {
             const { data } = await apiClient.post(`${MEMEALERTS_API_BASE}/disconnect`);
             if (data.success) {
                 setIsConnected(false);
+                setPopupState('idle');
+                setActiveProvider(null);
+                setConnectionNote(null);
                 setAutomationSettings(DEFAULT_AUTOMATION_SETTINGS);
                 toast.success('MemeAlerts отключен');
             }
@@ -543,7 +620,7 @@ export const MemeAlertsRewards: React.FC = () => {
 
         try {
             setManualSubmitLoading(true);
-            const success = await saveTokenToBackend(parsed.accessToken, parsed.refreshToken);
+            const success = await saveTokenToBackend(parsed.accessToken, parsed.refreshToken, parsed.streamerId);
             if (success) {
                 setManualAuthUrl('');
                 if (popupRef.current && !popupRef.current.closed) {
@@ -634,11 +711,12 @@ export const MemeAlertsRewards: React.FC = () => {
         selectedRewardPlatform === 'twitch' ? !!integrations?.twitch?.enabled : !!integrations?.vk?.enabled;
     const selectedPlatformName = selectedRewardPlatform === 'twitch' ? 'Twitch' : 'VK Live';
     const rewardIdLabel = currentRewardSettings.reward_id || 'награда ещё не создана';
+    const activeProviderLabel = activeProvider ? PROVIDER_LABELS[activeProvider] : 'MemeAlerts';
 
     if (statusLoading) {
         return (
             <div className="flex justify-center p-8">
-                <SpinnerGap className="h-6 w-6 animate-spin" />
+                <Loader2 className="h-6 w-6 animate-spin" />
             </div>
         );
     }
@@ -647,7 +725,7 @@ export const MemeAlertsRewards: React.FC = () => {
         <div className="mx-auto w-full max-w-6xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card/70 px-3 py-2">
                 <div className="flex min-w-0 items-center gap-3">
-                    <MemeAlertsLogo className="h-9 w-auto shrink-0" />
+                    <MemeAlertsMark className="h-9 w-9 text-lg" />
                     <div className="min-w-0">
                         <p className="font-brand text-sm font-bold tracking-wide text-foreground">MemeAlerts</p>
                     </div>
@@ -657,9 +735,9 @@ export const MemeAlertsRewards: React.FC = () => {
                         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${isConnected ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}
                     >
                         {isConnected ? (
-                            <CheckCircle className="h-3.5 w-3.5" weight="fill" />
+                            <CheckCircle2 className="h-3.5 w-3.5" />
                         ) : (
-                            <XCircle className="h-3.5 w-3.5" weight="fill" />
+                            <XCircle className="h-3.5 w-3.5" />
                         )}
                         {isConnected ? 'Токен активен' : 'Токен не подключен'}
                     </div>
@@ -671,7 +749,7 @@ export const MemeAlertsRewards: React.FC = () => {
                             disabled={connecting}
                             className="h-8 border-border/70 bg-card/70 hover:bg-accent"
                         >
-                            {connecting && <SpinnerGap className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                            {connecting && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
                             Отключить
                         </Button>
                     )}
@@ -681,29 +759,36 @@ export const MemeAlertsRewards: React.FC = () => {
             {!isConnected ? (
                 <Card className={SURFACE_CARD_CLASS}>
                     <CardContent className="space-y-3 p-4">
-                        <ConnectionNote note={connectionNote} />
-
                         <Button
-                            onClick={handleConnect}
+                            type="button"
+                            onClick={() => handleConnect('twitch')}
                             disabled={connecting}
-                            className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
+                            className="h-11 w-full rounded-lg bg-blue-700 text-sm font-bold text-white hover:bg-blue-800 sm:w-auto sm:px-5"
                         >
-                            {connecting ? (
-                                <>
-                                    <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />
-                                    Ожидание авторизации
-                                </>
-                            ) : (
-                                <>
-                                    <LinkSimple className="mr-2 h-4 w-4" weight="bold" />
-                                    Подключить MemeAlerts
-                                </>
-                            )}
+                            {connecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Подключить MemeAlerts
                         </Button>
+
+                        {(connecting || popupState !== 'idle') && popupState !== 'error' && (
+                            <div
+                                className={cn(
+                                    'flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs',
+                                    POPUP_STATE_CLASS[popupState]
+                                )}
+                            >
+                                {popupState !== 'success' ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                )}
+                                <span className="font-medium">{activeProviderLabel}</span>
+                                <span>{POPUP_STATE_LABELS[popupState]}</span>
+                            </div>
+                        )}
 
                         <details className={cn(MUTED_PANEL_CLASS, 'p-3')}>
                             <summary className="cursor-pointer list-none text-xs font-medium text-muted-foreground">
-                                Ручная ссылка
+                                Резервный ввод
                             </summary>
                             <div className="mt-3 space-y-2">
                                 <div className="flex items-center gap-2">
@@ -725,7 +810,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                     disabled={manualSubmitLoading || !manualAuthUrl.trim()}
                                     className="h-8 w-full border-border/70 bg-card/70 hover:bg-accent"
                                 >
-                                    {manualSubmitLoading && <SpinnerGap className="mr-2 h-3.5 w-3.5 animate-spin" />}
+                                    {manualSubmitLoading && <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />}
                                     Применить
                                 </Button>
                             </div>
@@ -758,7 +843,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                     disabled={granting}
                                     className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
                                 >
-                                    {granting && <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />}
+                                    {granting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Выдать
                                 </Button>
                             </AutomationCard>
@@ -860,13 +945,13 @@ export const MemeAlertsRewards: React.FC = () => {
                                     disabled={rewardCreating || settingsLoading || !selectedPlatformConnected}
                                     className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
                                 >
-                                    {rewardCreating && <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />}
+                                    {rewardCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Создать или обновить
                                 </Button>
                             </AutomationCard>
 
                             <AutomationCard
-                                icon={CurrencyCircleDollar}
+                                icon={MemeAlertsMark}
                                 title="Кэшбек за донаты"
                                 disabled={!donationAlertsConnected}
                             >
@@ -959,7 +1044,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                     }
                                     className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
                                 >
-                                    {settingsSaving && <SpinnerGap className="mr-2 h-4 w-4 animate-spin" />}
+                                    {settingsSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     Сохранить
                                 </Button>
                             </AutomationCard>
@@ -977,7 +1062,7 @@ export const MemeAlertsRewards: React.FC = () => {
                                     disabled={historyLoading}
                                     className="h-8 border-border/70 bg-card/70 hover:bg-accent"
                                 >
-                                    <ArrowsClockwise
+                                    <RefreshCw
                                         className={`mr-2 h-3.5 w-3.5 ${historyLoading ? 'animate-spin' : ''}`}
                                     />
                                     Обновить

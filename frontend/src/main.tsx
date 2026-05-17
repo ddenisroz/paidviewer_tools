@@ -1,38 +1,45 @@
 /* eslint-disable import/order */
-import React from 'react'
+import React from 'react';
 
-import { QueryClientProvider } from '@tanstack/react-query'
-import ReactDOM from 'react-dom/client'
-import { BrowserRouter, useLocation } from 'react-router-dom'
+import { QueryClientProvider } from '@tanstack/react-query';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter, useLocation } from 'react-router-dom';
 
-import { ToastProvider } from '@/shared/components/ui/toast'
-import '@fontsource/geist-sans/400.css'
-import '@fontsource/geist-sans/500.css'
-import '@fontsource/geist-sans/600.css'
-import '@fontsource/geist-sans/700.css'
-import '@fontsource/rajdhani/500.css'
-import '@fontsource/rajdhani/600.css'
-import '@fontsource/rajdhani/700.css'
-import App from './App'
-import './App.css'
-import './styles/design-system.css'
-import './styles/toast-overrides.css'
+import { ToastProvider } from '@/shared/components/ui/toast';
+import '@fontsource/chakra-petch/500.css';
+import '@fontsource/chakra-petch/600.css';
+import '@fontsource/chakra-petch/700.css';
+import '@fontsource/geist-sans/400.css';
+import '@fontsource/geist-sans/500.css';
+import '@fontsource/geist-sans/600.css';
+import '@fontsource/geist-sans/700.css';
+import '@fontsource/rajdhani/500.css';
+import '@fontsource/rajdhani/600.css';
+import '@fontsource/rajdhani/700.css';
+import '@fontsource/tektur/400.css';
+import '@fontsource/tektur/500.css';
+import '@fontsource/tektur/600.css';
+import '@fontsource/tektur/700.css';
+import App from './App';
+import './App.css';
+import './styles/design-system.css';
+import './styles/toast-overrides.css';
 
 // Initialize Sentry before React
 
 // Lazy load non-critical providers для ускорения начальной загрузки
-import { AuthProvider } from './context/AuthContext'
-import { ChatProvider } from './context/ChatContext'
-import { IntegrationsProvider } from './context/IntegrationsContext'
-import { TtsPlayerProvider } from './context/TtsPlayerContext'
-import { UserSettingsProvider } from './context/UserSettingsContext'
-import { queryClient } from './lib/queryClient'
-import { initSentry } from './lib/sentry'
-import { composeProviders } from './shared/utils/composeProviders'
-import { cleanupQueryCache } from './shared/utils/queryPersist'
+import { AuthProvider } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
+import { IntegrationsProvider } from './context/IntegrationsContext';
+import { TtsPlayerProvider } from './context/TtsPlayerContext';
+import { UserSettingsProvider } from './context/UserSettingsContext';
+import { queryClient } from './lib/queryClient';
+import { initSentry } from './lib/sentry';
+import { composeProviders } from './shared/utils/composeProviders';
+import { cleanupQueryCache } from './shared/utils/queryPersist';
 
-initSentry()
-cleanupQueryCache()
+initSentry();
+cleanupQueryCache();
 
 // [TARGET] Core провайдеры - только самые критичные для начального рендера
 // Toast - обязательно сразу (для уведомлений)
@@ -40,81 +47,84 @@ cleanupQueryCache()
 // TtsPlayerProvider - нужен для ChatProvider
 // Остальные - загружаются после первого рендера если нужно
 const CoreProviders = composeProviders(
-  ToastProvider,
-  AuthProvider,
-  IntegrationsProvider,
-  TtsPlayerProvider,
-  ChatProvider,
-  UserSettingsProvider
+    ToastProvider,
+    AuthProvider,
+    IntegrationsProvider,
+    TtsPlayerProvider,
+    ChatProvider,
+    UserSettingsProvider
 );
 
 // Компонент-обёртка для условного рендера контекстов
 interface ConditionalContextWrapperProps {
-  children: React.ReactNode;
+    children: React.ReactNode;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components
 const ConditionalContextWrapper: React.FC<ConditionalContextWrapperProps> = ({ children }) => {
-  const location = useLocation();
+    const location = useLocation();
 
-  // Для overlay страниц (OBS виджеты) нужен только Toast
-  const isOverlayRoute =
-    location.pathname.startsWith('/chat-overlay') ||
-    location.pathname.startsWith('/tts-obs') ||
-    location.pathname.startsWith('/youtube-obs') ||
-    location.pathname.startsWith('/drops-widget');
+    // Для overlay страниц (OBS виджеты) нужен только Toast
+    const isOverlayRoute =
+        location.pathname.startsWith('/chat-overlay') ||
+        location.pathname.startsWith('/tts-obs') ||
+        location.pathname.startsWith('/youtube-obs') ||
+        location.pathname.startsWith('/drops-widget');
 
-  if (isOverlayRoute) {
-    return <ToastProvider>{children}</ToastProvider>;
-  }
+    if (isOverlayRoute) {
+        return <ToastProvider>{children}</ToastProvider>;
+    }
 
-  // Для основного приложения - только Core провайдеры
-  // Остальные (TtsHealth, Player, DonationAlerts, etc.) теперь локальные
-  // и находятся в Layout.jsx или на конкретных страницах
-  return <CoreProviders>{children}</CoreProviders>;
+    // Для основного приложения - только Core провайдеры
+    // Остальные (TtsHealth, Player, DonationAlerts, etc.) теперь локальные
+    // и находятся в Layout.jsx или на конкретных страницах
+    return <CoreProviders>{children}</CoreProviders>;
 };
 
 // Убираем класс "загрузка" после монтирования
 const rootElement = document.getElementById('root');
 if (!rootElement) {
-  throw new Error('Root element not found');
+    throw new Error('Root element not found');
 }
 
 const root = ReactDOM.createRoot(rootElement);
 
-root.render(
-  // StrictMode отключен: создает двойные WebSocket подключения в dev режиме
-  // <React.StrictMode>
-  <QueryClientProvider client={queryClient}>
-    <BrowserRouter>
-      <ConditionalContextWrapper>
-        <App />
-      </ConditionalContextWrapper>
-    </BrowserRouter>
-  </QueryClientProvider>
-  // </React.StrictMode>
-);
-
-// Font loading detection - prevent FOUT (Flash of Unstyled Text)
-(function () {
-  // Mark fonts as loaded immediately to prevent hiding content
-  // With font-display: fallback, content is always visible with system font
-  document.body.classList.add('fonts-loaded', 'loaded');
-
-  // Force font load check to prevent layout shift
-  if (document.fonts && document.fonts.check) {
-    // Check if the bundled primary font is loaded, if not it will use fallback seamlessly
-    const fontLoaded = document.fonts.check('1em Geist Sans');
-    if (!fontLoaded && document.fonts.ready) {
-      document.fonts.ready.then(() => {
-        // Font loaded, ensure no layout shift
-        document.body.classList.add('fonts-ready');
-      });
-    } else {
-      document.body.classList.add('fonts-ready');
+const waitForAppFonts = async (): Promise<void> => {
+    if (!document.fonts) {
+        return;
     }
-  } else {
-    document.body.classList.add('fonts-ready');
-  }
-})();
 
+    const fontTasks = [
+        document.fonts.load('400 1em "Tektur"'),
+        document.fonts.load('700 1em "Tektur"'),
+        document.fonts.ready,
+    ];
+
+    await Promise.race([
+        Promise.all(fontTasks).then(() => undefined),
+        new Promise<void>((resolve) => window.setTimeout(resolve, 2200)),
+    ]);
+};
+
+const bootstrap = async () => {
+    await waitForAppFonts();
+
+    root.render(
+        // StrictMode отключен: создает двойные WebSocket подключения в dev режиме
+        // <React.StrictMode>
+        <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+                <ConditionalContextWrapper>
+                    <App />
+                </ConditionalContextWrapper>
+            </BrowserRouter>
+        </QueryClientProvider>
+        // </React.StrictMode>
+    );
+
+    requestAnimationFrame(() => {
+        document.body.classList.add('app-ready');
+    });
+};
+
+void bootstrap();

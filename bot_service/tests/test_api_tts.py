@@ -85,11 +85,9 @@ class TestTTSAPI:
 
     def test_tts_health_check(self, authenticated_client):
         f5_response = authenticated_client.get("/api/tts/health", params={"provider": "f5"})
-        qwen_response = authenticated_client.get("/api/tts/health", params={"provider": "qwen"})
         gcloud_response = authenticated_client.get("/api/tts/health", params={"provider": "gcloud"})
 
         assert f5_response.status_code in [200, 500]
-        assert qwen_response.status_code in [200, 500]
         assert gcloud_response.status_code in [200, 500]
         if f5_response.status_code == 200:
             payload = f5_response.json()

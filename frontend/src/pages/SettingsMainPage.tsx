@@ -21,9 +21,8 @@ function buildSettingsAuthMessages(searchParams: URLSearchParams): {
 } {
     return {
         authErrorMessage: getOAuthErrorMessage(searchParams.get('platform'), searchParams.get('auth_error')),
-        authSuccessMessage: searchParams.get('success') === '1'
-            ? getOAuthLinkSuccessMessage(searchParams.get('auth_link'))
-            : null,
+        authSuccessMessage:
+            searchParams.get('success') === '1' ? getOAuthLinkSuccessMessage(searchParams.get('auth_link')) : null,
     };
 }
 
@@ -40,7 +39,7 @@ function redirectToPlatformAuth(platform: 'twitch' | 'vk'): void {
 function createPlatformToggleHandler(
     platform: 'twitch' | 'vk',
     isEnabled: boolean | undefined,
-    updateIntegration: (checked: boolean, onClose?: (() => void) | null) => Promise<void> | void,
+    updateIntegration: (checked: boolean, onClose?: (() => void) | null) => Promise<void> | void
 ): (checked: boolean) => void {
     return (checked: boolean) => {
         if (checked && !isEnabled) {
@@ -57,7 +56,12 @@ const SettingsMainPage: React.FC = () => {
     const location = useLocation();
     const { user, isAuthenticated } = useAuth();
     const { integrations, updateTwitchIntegration, updateVkIntegration } = useIntegrations();
-    const { isConnected: daConnected, isLoading: daLoading, connect: daConnect, disconnect: daDisconnect } = useDonationAlerts();
+    const {
+        isConnected: daConnected,
+        isLoading: daLoading,
+        connect: daConnect,
+        disconnect: daDisconnect,
+    } = useDonationAlerts();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const searchParams = new URLSearchParams(location.search);
@@ -65,7 +69,11 @@ const SettingsMainPage: React.FC = () => {
     const hasMainIntegration = integrations.twitch?.enabled || integrations.vk?.enabled;
     const twitchLabel = integrations.twitch?.username || user?.twitch_username || 'Не подключено';
     const vkLabel = integrations.vk?.username || user?.vk_channel_name || user?.vk_username || 'Не подключено';
-    const handleTwitchToggle = createPlatformToggleHandler('twitch', integrations.twitch?.enabled, updateTwitchIntegration);
+    const handleTwitchToggle = createPlatformToggleHandler(
+        'twitch',
+        integrations.twitch?.enabled,
+        updateTwitchIntegration
+    );
     const handleVkToggle = createPlatformToggleHandler('vk', integrations.vk?.enabled, updateVkIntegration);
 
     const handleDonationAlertsToggle = async (checked: boolean): Promise<void> => {

@@ -38,99 +38,109 @@ interface DonationGridFormData {
 interface DonationGridProps {
     formData: DonationGridFormData;
     setFormData: React.Dispatch<React.SetStateAction<DonationGridFormData>>;
+    onChange?: (next: DonationGridFormData) => void;
 }
 
-const CARD_CLASS = 'flex min-h-[132px] flex-col justify-between rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm';
+const CARD_CLASS =
+    'flex min-h-[132px] flex-col justify-between rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm';
 
-const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData }) => {
-  const getMaxAmount = (quality: string): number => {
-    return quality === 'legendary'
-      ? DROPS_CONSTANTS.DONATION.MAX_AMOUNT_LEGENDARY
-      : DROPS_CONSTANTS.DONATION.MAX_AMOUNT_OTHER;
-  };
+const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData, onChange }) => {
+    const getMaxAmount = (quality: string): number => {
+        return quality === 'legendary'
+            ? DROPS_CONSTANTS.DONATION.MAX_AMOUNT_LEGENDARY
+            : DROPS_CONSTANTS.DONATION.MAX_AMOUNT_OTHER;
+    };
 
-  const handleAmountChange = (quality: string, delta: number) => {
-    const fieldName = `donation_amount_${quality}`;
-    const currentValue = formData[fieldName][0];
-    const maxValue = getMaxAmount(quality);
-    const newValue = Math.max(0, Math.min(maxValue, currentValue + delta));
-    setFormData({ ...formData, [fieldName]: [newValue] });
-  };
+    const handleAmountChange = (quality: string, delta: number) => {
+        const fieldName = `donation_amount_${quality}`;
+        const currentValue = formData[fieldName][0];
+        const maxValue = getMaxAmount(quality);
+        const newValue = Math.max(0, Math.min(maxValue, currentValue + delta));
+        const next = { ...formData, [fieldName]: [newValue] };
+        setFormData(next);
+        onChange?.(next);
+    };
 
-  const handleInputChange = (quality: string, value: string) => {
-    const fieldName = `donation_amount_${quality}`;
-    const numValue = parseFloat(value) || 0;
-    const maxValue = getMaxAmount(quality);
-    const clampedValue = Math.max(0, Math.min(maxValue, numValue));
-    setFormData({ ...formData, [fieldName]: [clampedValue] });
-  };
+    const handleInputChange = (quality: string, value: string) => {
+        const fieldName = `donation_amount_${quality}`;
+        const numValue = parseFloat(value) || 0;
+        const maxValue = getMaxAmount(quality);
+        const clampedValue = Math.max(0, Math.min(maxValue, numValue));
+        const next = { ...formData, [fieldName]: [clampedValue] };
+        setFormData(next);
+        onChange?.(next);
+    };
 
-  return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {QUALITY_CONFIGS.map((quality) => {
-        const fieldName = `donation_amount_${quality.id}`;
-        const value = formData[fieldName][0];
-        const maxValue = getMaxAmount(quality.id);
+    return (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {QUALITY_CONFIGS.map((quality) => {
+                const fieldName = `donation_amount_${quality.id}`;
+                const value = formData[fieldName][0];
+                const maxValue = getMaxAmount(quality.id);
 
-        return (
-          <div key={quality.id} className={CARD_CLASS}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <img
-                  src={quality.image}
-                  alt={`${quality.label} chest`}
-                  className="h-8 w-8 object-contain"
-                />
-                <div>
-                  <Label className="text-sm font-semibold leading-none">{quality.label}</Label>
-                  <p className="text-xs text-muted-foreground">От {value} ₽</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/70">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hover:bg-accent"
-                  onClick={() => handleAmountChange(quality.id, -1)}
-                >
-                  <Minus className="h-3 w-3" />
-                </Button>
-                <Input
-                  type="number"
-                  value={value}
-                  onChange={(e) => handleInputChange(quality.id, e.target.value)}
-                  className="h-8 w-20 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  min="0"
-                  max={maxValue}
-                  step="1"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0 hover:bg-accent"
-                  onClick={() => handleAmountChange(quality.id, 1)}
-                >
-                  <Plus className="h-3 w-3" />
-                </Button>
-              </div>
-            </div>
-            <div className="pt-3">
-              <Slider
-                value={formData[fieldName]}
-                onValueChange={(val) => setFormData({ ...formData, [fieldName]: val })}
-                min={0}
-                max={maxValue}
-                step={50}
-                className="w-full"
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+                return (
+                    <div key={quality.id} className={CARD_CLASS}>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <img
+                                    src={quality.image}
+                                    alt={`${quality.label} chest`}
+                                    className="h-8 w-8 object-contain"
+                                />
+                                <div>
+                                    <Label className="text-sm font-semibold leading-none">{quality.label}</Label>
+                                    <p className="text-xs text-muted-foreground">От {value} ₽</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/70">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-accent"
+                                    onClick={() => handleAmountChange(quality.id, -1)}
+                                >
+                                    <Minus className="h-3 w-3" />
+                                </Button>
+                                <Input
+                                    type="number"
+                                    value={value}
+                                    onChange={(e) => handleInputChange(quality.id, e.target.value)}
+                                    className="h-8 w-20 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    min="0"
+                                    max={maxValue}
+                                    step="1"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-accent"
+                                    onClick={() => handleAmountChange(quality.id, 1)}
+                                >
+                                    <Plus className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        </div>
+                        <div className="pt-3">
+                            <Slider
+                                value={formData[fieldName]}
+                                onValueChange={(val) => {
+                                    const next = { ...formData, [fieldName]: val };
+                                    setFormData(next);
+                                    onChange?.(next);
+                                }}
+                                min={0}
+                                max={maxValue}
+                                step={50}
+                                className="w-full"
+                            />
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
 };
 
 export default DonationGrid;

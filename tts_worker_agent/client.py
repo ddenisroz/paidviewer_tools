@@ -26,7 +26,6 @@ class ControlPlaneClient:
         pairing_code: str,
         label: str,
         supports_f5: bool,
-        supports_qwen: bool,
         capabilities: dict[str, Any],
         runtime_metadata: dict[str, Any],
     ) -> dict[str, Any]:
@@ -36,7 +35,6 @@ class ControlPlaneClient:
                 "pairing_code": pairing_code,
                 "label": label,
                 "supports_f5": supports_f5,
-                "supports_qwen": supports_qwen,
                 "capabilities": capabilities,
                 "runtime_metadata": runtime_metadata,
             },
@@ -55,7 +53,6 @@ class ControlPlaneClient:
         max_jobs: int,
         wait_for_jobs: bool,
         supports_f5: bool,
-        supports_qwen: bool,
         capabilities: dict[str, Any],
         runtime_metadata: dict[str, Any],
     ) -> dict[str, Any]:
@@ -65,7 +62,6 @@ class ControlPlaneClient:
                 "max_jobs": max_jobs,
                 "wait_for_jobs": wait_for_jobs,
                 "supports_f5": supports_f5,
-                "supports_qwen": supports_qwen,
                 "capabilities": capabilities,
                 "runtime_metadata": runtime_metadata,
             },

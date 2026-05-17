@@ -1,6 +1,6 @@
 /**
  * Toast Manager - Умное управление уведомлениями
- * 
+ *
  * Возможности:
  * - Группировка похожих уведомлений
  * - Приоритизация (error > warning > success > info)
@@ -35,7 +35,7 @@ class ToastManager {
     private readonly maxVisible = 3;
     private readonly groupingWindow = 2000; // 2 секунды
     private readonly defaultDuration = 2000; // 2 секунды (короче чем раньше)
-    
+
     // Приоритеты типов уведомлений
     private readonly priorities: Record<ToastType, number> = {
         error: 3,
@@ -99,10 +99,8 @@ class ToastManager {
             // Группируем похожие уведомления
             existingToast.count++;
             existingToast.timestamp = Date.now();
-            
-            const groupedMessage = existingToast.count > 1 
-                ? `${message} (${existingToast.count})`
-                : message;
+
+            const groupedMessage = existingToast.count > 1 ? `${message} (${existingToast.count})` : message;
 
             // Обновляем существующее уведомление
             sonnerToast[type](groupedMessage, {
@@ -180,7 +178,7 @@ class ToastManager {
      */
     dismiss(id: string): void {
         sonnerToast.dismiss(id);
-        
+
         // Удаляем из очереди
         for (const [key, toast] of this.queue.entries()) {
             if (toast.id === id) {

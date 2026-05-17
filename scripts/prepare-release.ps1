@@ -222,6 +222,7 @@ $fixedRelativePaths = @(
     "artifacts",
     ".benchmarks",
     ".pytest_tmp",
+    ".coverage",
     "tmp",
     "playwright-report",
     ".playwright",
@@ -240,7 +241,10 @@ $fixedRelativePaths = @(
     "bot_service/.mypy_cache",
     "bot_service/htmlcov",
     "bot_service/.benchmarks",
-    "bot_service/tmp"
+    "bot_service/tmp",
+    "tts_worker_agent/.venv",
+    "tts_worker_agent/tmp_agent_stdout.log",
+    "tts_worker_agent/tmp_agent_stderr.log"
 )
 
 if ($IncludeNodeModules) {

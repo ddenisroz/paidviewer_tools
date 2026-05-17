@@ -1,12 +1,12 @@
 ﻿/**
  * useDashboardInit - хук для загрузки данных дашборда одним запросом
- * 
+ *
  * Заменяет множественные запросы при загрузке главной страницы:
  * - /api/auth/status
  * - /api/integrations
  * - /api/tts/platform-settings
  * - /api/chat/history
- * 
+ *
  * Теперь всё загружается одним запросом: GET /api/dashboard/init
  */
 import { useQuery } from '@tanstack/react-query';
@@ -69,14 +69,14 @@ export const useDashboardInit = (enabled: boolean = true) => {
             logger.log('[DASHBOARD] Init data loaded:', {
                 user: response.data.user?.id,
                 integrations: Object.keys(response.data.integrations || {}),
-                chatMessages: response.data.chat_history?.length || 0
+                chatMessages: response.data.chat_history?.length || 0,
             });
             return response.data;
         },
         enabled,
         staleTime: 30 * 1000, // 30 секунд
         refetchOnWindowFocus: false,
-        retry: 1
+        retry: 1,
     });
 };
 

@@ -2,12 +2,15 @@
 import React, { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 /* eslint-disable react-refresh/only-export-components */
-import { API_BASE_URL } from '@/constants';
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
+import { apiClient } from '@/services/api/client';
+import { integrationsService } from '@/services/api/services/integrationsService';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
+
+import type { AxiosError } from 'axios';
 
 interface DonationAlertsContextValue {
     isConnected: boolean;
@@ -32,6 +35,29 @@ interface DonationAlertsProviderProps {
     children: ReactNode;
 }
 
+interface DonationAlertsStatusResponse {
+    connected?: boolean;
+}
+
+interface DonationAlertsConnectResponse {
+    auth_url?: string;
+}
+
+const getApiErrorMessage = (err: unknown, fallback: string): string => {
+    const axiosError = err as AxiosError<{ detail?: string; message?: string } | string>;
+    const data = axiosError.response?.data;
+    if (typeof data === 'string' && data.trim()) {
+        return data;
+    }
+    if (data && typeof data === 'object') {
+        return data.detail || data.message || fallback;
+    }
+    if (err instanceof Error && err.message) {
+        return err.message;
+    }
+    return fallback;
+};
+
 export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ children }) => {
     const { user } = useAuth();
     const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -48,19 +74,8 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             setIsLoading(true);
             setError(null);
 
-            const response = await fetch(`${API_BASE_URL}/api/donationalerts/status`, {
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                setIsConnected(data.connected || false);
-            } else {
-                setIsConnected(false);
-            }
+            const response = await apiClient.get<DonationAlertsStatusResponse>('/api/donationalerts/status');
+            setIsConnected(Boolean(response.data.connected));
         } catch (err) {
             logger.error('Error checking DonationAlerts status:', err);
             setIsConnected(false);
@@ -80,20 +95,8 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             setIsLoading(true);
             setError(null);
 
-            const response = await fetch(`${API_BASE_URL}/api/donationalerts/connect`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Ошибка подключения: ${response.status} - ${errorText}`);
-            }
-
-            const data = await response.json();
+            const response = await integrationsService.connectDonationAlerts();
+            const data = response.data as DonationAlertsConnectResponse;
 
             if (data.auth_url) {
                 const safeUrl = getSafeNavigationUrl(data.auth_url);
@@ -108,8 +111,7 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             }
         } catch (err: unknown) {
             logger.error('Error connecting to DonationAlerts:', err);
-            const error = err as { message?: string };
-            setError(error.message || 'Неизвестная ошибка');
+            setError(getApiErrorMessage(err, 'Не удалось подключить DonationAlerts'));
             return false;
         } finally {
             setIsLoading(false);
@@ -121,24 +123,12 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             setIsLoading(true);
             setError(null);
 
-            const response = await fetch(`${API_BASE_URL}/api/donationalerts/disconnect`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                setIsConnected(false);
-                return true;
-            } else {
-                throw new Error('Ошибка отключения');
-            }
+            await apiClient.post('/api/donationalerts/disconnect');
+            setIsConnected(false);
+            return true;
         } catch (err: unknown) {
             logger.error('Error disconnecting from DonationAlerts:', err);
-            const error = err as { message?: string };
-            setError(error.message || 'Неизвестная ошибка');
+            setError(getApiErrorMessage(err, 'Не удалось отключить DonationAlerts'));
             return false;
         } finally {
             setIsLoading(false);
@@ -171,13 +161,8 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
         error,
         connect,
         disconnect,
-        checkStatus
+        checkStatus,
     };
 
-    return (
-        <DonationAlertsContext.Provider value={value}>
-            {children}
-        </DonationAlertsContext.Provider>
-    );
+    return <DonationAlertsContext.Provider value={value}>{children}</DonationAlertsContext.Provider>;
 };
-

@@ -30,6 +30,7 @@ class ConnectionManager(ConnectionManagerCore):
 
     def __init__(self):
         super().__init__()
+        self.youtube_obs_user_ids: dict[str, int] = {}
         logger.info("[CONNECTION] ConnectionManager initialized")
 
     @staticmethod
@@ -91,6 +92,7 @@ class ConnectionManager(ConnectionManagerCore):
             self.voice_volume_settings,
             self.youtube_settings,
             self.twitch_cache,
+            self.youtube_obs_user_ids,
         ):
             mapping.clear()
 
@@ -189,6 +191,73 @@ class ConnectionManager(ConnectionManagerCore):
 
         except Exception as e:
             logger.error(f"Error disconnecting OBS WebSocket: {e}")
+
+    async def connect_youtube_obs(self, websocket: WebSocket, token: str, user_id: int):
+        """Connect a YouTube OBS overlay WebSocket."""
+        try:
+            await websocket.accept()
+            self.youtube_obs_connections[token] = websocket
+            self.youtube_obs_user_ids[token] = int(user_id)
+            logger.info("YouTube OBS WebSocket connected: user=%s token=%s...", user_id, token[:10])
+        except Exception as e:
+            logger.error(f"Error connecting YouTube OBS WebSocket: {e}")
+
+    async def disconnect_youtube_obs(self, token: str):
+        """Disconnect a YouTube OBS overlay WebSocket."""
+        try:
+            websocket = self.youtube_obs_connections.pop(token, None)
+            self.youtube_obs_user_ids.pop(token, None)
+            if websocket and self._is_websocket_connected(websocket):
+                await websocket.close()
+            logger.info("YouTube OBS WebSocket disconnected: %s...", token[:10])
+        except Exception as e:
+            logger.error(f"Error disconnecting YouTube OBS WebSocket: {e}")
+
+    async def send_youtube_obs_to_user(self, user_id: int, message: dict):
+        """Send a message to all YouTube OBS overlay clients for a user."""
+        sent = 0
+        disconnected: list[str] = []
+        for token, websocket in list(self.youtube_obs_connections.items()):
+            if self.youtube_obs_user_ids.get(token) != int(user_id):
+                continue
+            try:
+                await websocket.send_json(message)
+                sent += 1
+            except WebSocketDisconnect:
+                disconnected.append(token)
+            except Exception as e:
+                logger.warning("Failed to send YouTube OBS update to %s...: %s", token[:10], e)
+                disconnected.append(token)
+
+        for token in disconnected:
+            self.youtube_obs_connections.pop(token, None)
+            self.youtube_obs_user_ids.pop(token, None)
+        return sent
+
+    async def send_youtube_to_obs(self, channel_name: str = "", action: str = "queue_update", data: dict | None = None):
+        """Backward-compatible YouTube OBS sender used by older queue code."""
+        message = {
+            "type": "youtube_obs_event",
+            "action": action,
+            "channel_name": channel_name,
+            "data": data or {},
+        }
+        sent = 0
+        disconnected: list[str] = []
+        for token, websocket in list(self.youtube_obs_connections.items()):
+            try:
+                await websocket.send_json(message)
+                sent += 1
+            except WebSocketDisconnect:
+                disconnected.append(token)
+            except Exception as e:
+                logger.warning("Failed to send legacy YouTube OBS update to %s...: %s", token[:10], e)
+                disconnected.append(token)
+
+        for token in disconnected:
+            self.youtube_obs_connections.pop(token, None)
+            self.youtube_obs_user_ids.pop(token, None)
+        return sent
 
     async def connect_audio(self, websocket: WebSocket, channel: str):
         """Connect an audio WebSocket."""
@@ -440,6 +509,8 @@ class ConnectionManager(ConnectionManagerCore):
                         continue
 
                     mapping.pop(key, None)
+                    if mapping is self.youtube_obs_connections:
+                        self.youtube_obs_user_ids.pop(key, None)
                     removed_clients += 1
 
             logger.info("Inactive client cleanup removed %s websocket connection(s)", removed_clients)

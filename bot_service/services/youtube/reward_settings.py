@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Literal, Mapping, Optional
 
 RewardPlatform = Literal["twitch", "vk"]
+ObsOverlayMode = Literal["video", "track"]
 
 LEGACY_REWARD_KEYS = (
     "requests_reward_enabled",
@@ -27,6 +28,12 @@ def clean_optional_reward_value(value: object) -> Optional[str]:
         normalized = value.strip()
         return normalized or None
     return None
+
+
+def normalize_obs_overlay_mode(value: object) -> ObsOverlayMode:
+    """Normalize YouTube OBS overlay mode."""
+
+    return "video" if value == "video" else "track"
 
 
 def normalize_reward_settings(youtube_settings: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -113,6 +120,7 @@ def build_youtube_settings_response(youtube_settings: Mapping[str, Any] | None) 
     reward_settings = normalize_reward_settings(canonical)
     return {
         "playback_mode": canonical.get("playback_mode", "browser"),
+        "obs_overlay_mode": normalize_obs_overlay_mode(canonical.get("obs_overlay_mode", "track")),
         "volume_level": canonical.get("volume_level", 100),
         "requests_command_enabled": canonical.get("requests_command_enabled", True),
         **reward_settings,

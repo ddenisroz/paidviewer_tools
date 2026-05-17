@@ -234,7 +234,7 @@ const CommandCard: React.FC<CommandCardProps> = React.memo(({ command, type, onT
     const getTagConfig = (tag: string): TagConfig => {
         const tagConfig: Record<string, TagConfig> = {
             Общее: { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
-            'Медиа и интерактивность': { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+            Медиа: { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
             'TTS ИИ озвучка': { icon: Mic, color: 'bg-green-500/10 text-green-600 border-green-500/20' },
             'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
             'Управление чатом': { icon: MessageSquare, color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20' },
@@ -464,16 +464,8 @@ const CommandsPage: React.FC = () => {
     const customCommands = useMemo<ChatCommand[]>(() => {
         return commandsData?.custom_commands || [];
     }, [commandsData?.custom_commands]);
-    const editingPrimaryTag = useMemo(() => {
-        if (!editingCommand || !Array.isArray(editingCommand.tags) || editingCommand.tags.length === 0) {
-            return '';
-        }
-        const firstTag = editingCommand.tags[0];
-        return normalizeTag(typeof firstTag === 'string' ? firstTag : String(firstTag));
-    }, [editingCommand]);
-    const isStreamControlCommand =
-        editingPrimaryTag === 'Управление трансляцией' &&
-        (editingCommand?.name === 'title' || editingCommand?.name === 'game');
+    const isGlobalLikeEditingCommand =
+        editingCommand?.command_type === 'global' || editingCommand?.command_type === 'override';
 
     // Все хуки должны быть вызваны до любых условных return (правило React Hooks)
     const basicTags = useMemo(() => {
@@ -532,7 +524,7 @@ const CommandsPage: React.FC = () => {
 
     const tagConfig: Record<string, TagConfig> = {
         Общее: { icon: Info, color: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
-        'Медиа и интерактивность': { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
+        Медиа: { icon: Play, color: 'bg-purple-500/10 text-purple-600 border-purple-500/20' },
         'TTS ИИ озвучка': { icon: Mic, color: 'bg-green-500/10 text-green-600 border-green-500/20' },
         'Управление трансляцией': { icon: Radio, color: 'bg-orange-500/10 text-orange-600 border-orange-500/20' },
         'Управление чатом': { icon: MessageSquare, color: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20' },
@@ -636,7 +628,7 @@ const CommandsPage: React.FC = () => {
     const handleUpdateCommand = (commandId: number | undefined): void => {
         if (!commandId || !editingCommand) return;
 
-        if (editingCommand.command_type === 'global') {
+        if (editingCommand.command_type === 'global' || editingCommand.command_type === 'override') {
             createOverrideMutation.mutate(
                 {
                     command_name: editingCommand.name,
@@ -832,7 +824,7 @@ const CommandsPage: React.FC = () => {
                                             >
                                                 <span className="inline-flex items-center gap-2">
                                                     <Filter className="h-4 w-4" />
-                                                    Фильтр по тегам
+                                                    Категории
                                                 </span>
                                                 <span className="inline-flex items-center gap-1 min-w-[42px] justify-end">
                                                     <Badge
@@ -853,7 +845,7 @@ const CommandsPage: React.FC = () => {
                                         >
                                             <div className="p-3 border-b border-sky-500/20">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <h4 className="font-medium text-sm">Фильтр по тегам</h4>
+                                                    <h4 className="font-medium text-sm">Категории</h4>
                                                     {selectedBasicTags.length > 0 && (
                                                         <Button
                                                             variant="ghost"
@@ -866,7 +858,7 @@ const CommandsPage: React.FC = () => {
                                                     )}
                                                 </div>
                                                 <Input
-                                                    placeholder="Поиск тегов..."
+                                                    placeholder="Поиск категории..."
                                                     value={tagSearchTerm}
                                                     onChange={(e) => setTagSearchTerm(e.target.value)}
                                                     className="h-8 border-sky-500/25 bg-background/70 text-xs text-sky-100 placeholder:text-sky-200/50"
@@ -1361,57 +1353,32 @@ const CommandsPage: React.FC = () => {
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>!{editingCommand?.name}</DialogTitle>
+                        <DialogTitle>Настройка команды</DialogTitle>
                     </DialogHeader>
                     {editingCommand && (
                         <div className="space-y-4">
-                            {editingPrimaryTag && (
-                                <div className="rounded-md border border-border/70 bg-card/60 px-3 py-2 text-sm">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-200">
-                                            {editingPrimaryTag}
-                                        </Badge>
-                                        {isStreamControlCommand && (
-                                            <span className="text-muted-foreground">
-                                                {editingCommand.name === 'title'
-                                                    ? 'Использование: !title Новое название стрима'
-                                                    : 'Использование: !game Just Chatting'}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="edit_command_name">
-                                        {editingCommand.command_type === 'global' ? 'Основная команда' : 'Название команды'}
-                                    </Label>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm text-muted-foreground">!</span>
-                                        <Input
-                                            id="edit_command_name"
-                                            value={
-                                                editingCommand.command_type === 'global'
-                                                    ? editingCommand.name
-                                                    : editForm.command_name
-                                            }
-                                            disabled={editingCommand.command_type === 'global'}
-                                            onChange={(e) =>
-                                                setEditForm((prev) => ({
-                                                    ...prev,
-                                                    command_name: e.target.value,
-                                                }))
-                                            }
-                                            placeholder="например, hello"
-                                        />
+                                {!isGlobalLikeEditingCommand && (
+                                    <div>
+                                        <Label htmlFor="edit_command_name">Имя</Label>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm text-muted-foreground">!</span>
+                                            <Input
+                                                id="edit_command_name"
+                                                value={editForm.command_name}
+                                                onChange={(e) =>
+                                                    setEditForm((prev) => ({
+                                                        ...prev,
+                                                        command_name: e.target.value,
+                                                    }))
+                                                }
+                                                placeholder="например, hello"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div>
-                                    <Label htmlFor="edit_command_alias">
-                                        {editingCommand.command_type === 'global'
-                                            ? 'Alias для этой команды'
-                                            : 'Дополнительный alias'}
-                                    </Label>
+                                    <Label htmlFor="edit_command_alias">Псевдоним</Label>
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-muted-foreground">!</span>
                                         <Input
@@ -1423,18 +1390,9 @@ const CommandsPage: React.FC = () => {
                                                     alias: e.target.value,
                                                 }))
                                             }
-                                            placeholder={
-                                                editingCommand.command_type === 'global'
-                                                    ? 'например, игра'
-                                                    : 'например, привет'
-                                            }
+                                            placeholder={isGlobalLikeEditingCommand ? 'например, игра' : 'например, привет'}
                                         />
                                     </div>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        {editingCommand.command_type === 'global'
-                                            ? 'Основное имя остаётся системным, а alias даёт вам короткий вызов этой команды.'
-                                            : 'Alias работает как второе имя для вашей кастомной команды.'}
-                                    </p>
                                 </div>
                             </div>
 

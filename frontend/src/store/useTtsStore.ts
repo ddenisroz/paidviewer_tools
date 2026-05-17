@@ -1,7 +1,7 @@
 // frontend/src/store/useTtsStore.ts
 /**
  * Zustand store for TTS state management.
- * 
+ *
  * Manages:
  * - TTS enabled/disabled status
  * - Engine health status
@@ -82,4 +82,3 @@ export const useTtsEnabled = () => useTtsStore((state) => state.ttsEnabled);
 export const useIsWhitelisted = () => useTtsStore((state) => state.isWhitelisted);
 export const useEngineStatus = () => useTtsStore((state) => state.engineStatus);
 export const useIsToggling = () => useTtsStore((state) => state.isToggling);
-

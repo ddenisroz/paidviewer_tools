@@ -31,9 +31,7 @@ function loadBaseline(): ComplexityBaseline {
     try {
         const raw = fs.readFileSync(BASELINE_PATH, 'utf-8').replace(/^\uFEFF/, '');
         const parsed = JSON.parse(raw) as unknown;
-        return typeof parsed === 'object' && parsed !== null
-            ? (parsed as ComplexityBaseline)
-            : {};
+        return typeof parsed === 'object' && parsed !== null ? (parsed as ComplexityBaseline) : {};
     } catch {
         return {};
     }
@@ -76,7 +74,9 @@ function runComplexityLint(): ComplexityViolation[] {
         results = JSON.parse(payload);
     } catch (error) {
         const preview = stdout.slice(0, 400).replace(/\n/g, '\\n');
-        throw new Error(`Failed to parse ESLint JSON output for complexity check: ${String(error)}; preview=${preview}`);
+        throw new Error(
+            `Failed to parse ESLint JSON output for complexity check: ${String(error)}; preview=${preview}`
+        );
     }
 
     const violations: ComplexityViolation[] = [];
@@ -108,7 +108,7 @@ describe('Cyclomatic Complexity Compliance', () => {
         const baseline = loadBaseline();
         const violations = runComplexityLint();
 
-        const regressions = violations.filter(violation => {
+        const regressions = violations.filter((violation) => {
             const baselineValue = baseline[violation.file];
             if (baselineValue === undefined) {
                 return true; // new file/function above threshold
@@ -128,9 +128,10 @@ describe('Cyclomatic Complexity Compliance', () => {
             console.log('\n[ERROR] Complexity regressions detected:');
             for (const [file, fileViolations] of grouped) {
                 const baselineValue = baseline[file];
-                const baselineHint = baselineValue === undefined
-                    ? 'no baseline (new high-complexity file)'
-                    : `baseline=${baselineValue}`;
+                const baselineHint =
+                    baselineValue === undefined
+                        ? 'no baseline (new high-complexity file)'
+                        : `baseline=${baselineValue}`;
                 console.log(`  ${file} (${baselineHint})`);
                 for (const v of fileViolations) {
                     console.log(`    Line ${v.line}: actual=${v.actual}; ${v.message}`);
@@ -140,7 +141,7 @@ describe('Cyclomatic Complexity Compliance', () => {
         }
 
         expect(regressions).toHaveLength(0);
-    }, 120000);
+    }, 180000);
 
     it('should have helper modules extracted for complex logic', () => {
         const helperFiles = [
@@ -153,7 +154,7 @@ describe('Cyclomatic Complexity Compliance', () => {
             'src/features/drops/utils/rarityHelpers.ts',
         ];
 
-        const missingHelpers = helperFiles.filter(helperFile => !fs.existsSync(path.join(process.cwd(), helperFile)));
+        const missingHelpers = helperFiles.filter((helperFile) => !fs.existsSync(path.join(process.cwd(), helperFile)));
         expect(missingHelpers).toEqual([]);
     });
 
@@ -167,4 +168,3 @@ describe('Cyclomatic Complexity Compliance', () => {
         }
     });
 });
-

@@ -120,6 +120,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if path in ["/health", "/metrics", "/ping"]:
             return False
 
+        if path == "/api/worker-agent/poll":
+            return status_code >= 400
+
         if status_code == 401:
             polling_endpoints = [
                 "/api/user-settings/",

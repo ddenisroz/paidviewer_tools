@@ -15,11 +15,11 @@ export function shouldShowMessage(
     if (message.platform === 'twitch') {
         return twitchEnabled && twitchVisible;
     }
-    
+
     if (message.platform === 'vk') {
         return vkEnabled && vkVisible;
     }
-    
+
     return false;
 }
 
@@ -35,17 +35,14 @@ export function filterMessagesByPlatform(
     limit = 50
 ): ChatMessage[] {
     return messages
-        .filter(msg => shouldShowMessage(msg, twitchEnabled, vkEnabled, twitchVisible, vkVisible))
+        .filter((msg) => shouldShowMessage(msg, twitchEnabled, vkEnabled, twitchVisible, vkVisible))
         .slice(-limit);
 }
 
 /**
  * Check if message author is blocked
  */
-export function isMessageAuthorBlocked(
-    message: ChatMessage,
-    blockedUsers: Set<string>
-): boolean {
+export function isMessageAuthorBlocked(message: ChatMessage, blockedUsers: Set<string>): boolean {
     const username = (message.author_name || message.author || '').toLowerCase();
     const key = `${message.platform}:${username}`;
     return blockedUsers.has(key);

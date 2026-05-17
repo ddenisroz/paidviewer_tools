@@ -5,6 +5,42 @@ param(
     [switch]$ConfirmVolumes
 )
 
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+Set-Location -LiteralPath $PSScriptRoot
+
+function Get-LogWatcherStatePath {
+    return Join-Path $PSScriptRoot "logs\docker\.watchers.json"
+}
+
+function Stop-LogWatchers {
+    $statePath = Get-LogWatcherStatePath
+    if (-not (Test-Path -LiteralPath $statePath)) {
+        return
+    }
+
+    try {
+        $entries = Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json
+    } catch {
+        Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue
+        return
+    }
+
+    foreach ($entry in @($entries)) {
+        if ($null -eq $entry.pid) {
+            continue
+        }
+
+        try {
+            $process = Get-Process -Id ([int]$entry.pid) -ErrorAction Stop
+            Stop-Process -Id $process.Id -Force -ErrorAction Stop
+        } catch {
+        }
+    }
+
+    Remove-Item -LiteralPath $statePath -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "[STOP] Stopping Paidviewer local Docker stack..." -ForegroundColor Yellow
 
 $envFiles = @(
@@ -29,6 +65,9 @@ if (-not (Test-Path "bot_service/.env")) {
     Write-Host "[ERROR] Missing bot_service/.env. Run from paidviewer_tools and keep env files in place." -ForegroundColor Red
     exit 1
 }
+
+Stop-LogWatchers
+Write-Host "[LOG] Local log watchers stopped" -ForegroundColor Cyan
 
 try {
     docker version | Out-Null
@@ -67,4 +106,3 @@ if ($PruneVolumes) {
 Write-Host ""
 Write-Host "[STATUS] Docker disk usage:" -ForegroundColor Cyan
 docker system df
-

@@ -27,7 +27,7 @@ const BlacklistManager: React.FC = React.memo(() => {
 
     // Используем useCallback для стабильной ссылки на функцию
     const toggleBlacklistExpanded = useCallback(() => {
-        setIsBlacklistExpanded(prev => !prev);
+        setIsBlacklistExpanded((prev) => !prev);
     }, []);
 
     const { integrations } = useIntegrations();
@@ -100,9 +100,10 @@ const BlacklistManager: React.FC = React.memo(() => {
             return;
         }
 
-        const isAlreadyBlocked = blacklist.some((blockedUser) =>
-            blockedUser.platform === selectedPlatform &&
-            blockedUser.username.trim().toLowerCase() === normalizedUsername
+        const isAlreadyBlocked = blacklist.some(
+            (blockedUser) =>
+                blockedUser.platform === selectedPlatform &&
+                blockedUser.username.trim().toLowerCase() === normalizedUsername
         );
         if (isAlreadyBlocked) {
             toast.error('Пользователь уже находится в черном списке');
@@ -119,7 +120,7 @@ const BlacklistManager: React.FC = React.memo(() => {
         blockUserMutation.mutate({
             channel_name: channelName,
             platform: selectedPlatform as 'youtube' | 'twitch' | 'vk',
-            username: normalizedUsername
+            username: normalizedUsername,
         });
     };
 
@@ -135,7 +136,7 @@ const BlacklistManager: React.FC = React.memo(() => {
         unblockUserMutation.mutate({
             channel_name: channelName,
             platform: platform as 'youtube' | 'twitch' | 'vk',
-            username: username
+            username: username,
         });
     };
 
@@ -143,9 +144,8 @@ const BlacklistManager: React.FC = React.memo(() => {
     const hasPlatforms = availablePlatforms.length > 0;
 
     // Фильтруем черный список по выбранной платформе
-    const filteredBlacklist = selectedPlatform === 'all'
-        ? blacklist
-        : blacklist.filter(user => user.platform === selectedPlatform);
+    const filteredBlacklist =
+        selectedPlatform === 'all' ? blacklist : blacklist.filter((user) => user.platform === selectedPlatform);
 
     // Получаем иконку для платформы
     const getPlatformIcon = (platform: string): string => {
@@ -187,13 +187,10 @@ const BlacklistManager: React.FC = React.memo(() => {
                         <UserX className="h-5 w-5 text-red-500" />
                         Черный список
                     </CardTitle>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleBlacklistExpanded}
-                        className="gap-2"
-                    >
-                        <ChevronDown className={`h-4 w-4 transition-transform ${isBlacklistExpanded ? 'rotate-180' : ''}`} />
+                    <Button variant="ghost" size="sm" onClick={toggleBlacklistExpanded} className="gap-2">
+                        <ChevronDown
+                            className={`h-4 w-4 transition-transform ${isBlacklistExpanded ? 'rotate-180' : ''}`}
+                        />
                     </Button>
                 </div>
             </CardHeader>
@@ -233,10 +230,7 @@ const BlacklistManager: React.FC = React.memo(() => {
                                     )}
                                 </SelectContent>
                             </Select>
-                            <Button
-                                onClick={addToBlacklist}
-                                disabled={adding || !newUsername.trim()}
-                            >
+                            <Button onClick={addToBlacklist} disabled={adding || !newUsername.trim()}>
                                 <Plus className="h-4 w-4 mr-2" />
                                 Добавить
                             </Button>
@@ -255,24 +249,22 @@ const BlacklistManager: React.FC = React.memo(() => {
                         ) : (
                             <div className="flex flex-wrap gap-2">
                                 {filteredBlacklist.map((user) => (
-                                    <Badge
-                                        key={user.id}
-                                        variant="destructive"
-                                        className="flex items-center gap-2"
-                                    >
+                                    <Badge key={user.id} variant="destructive" className="flex items-center gap-2">
                                         <UserX className="h-3 w-3" />
                                         <span>{user.username}</span>
-                                        <span className={`px-2 py-0.5 rounded text-xs ${getPlatformColor(user.platform)} text-white`}>
+                                        <span
+                                            className={`px-2 py-0.5 rounded text-xs ${getPlatformColor(user.platform)} text-white`}
+                                        >
                                             {getPlatformIcon(user.platform)}
                                         </span>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                                        onClick={() => removeFromBlacklist(user.username, user.platform)}
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-4 w-4 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                                            onClick={() => removeFromBlacklist(user.username, user.platform)}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </Button>
                                     </Badge>
                                 ))}
                             </div>
@@ -287,6 +279,3 @@ const BlacklistManager: React.FC = React.memo(() => {
 BlacklistManager.displayName = 'BlacklistManager';
 
 export default BlacklistManager;
-
-
-

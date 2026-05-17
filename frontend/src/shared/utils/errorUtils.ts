@@ -1,6 +1,6 @@
 /**
  * Error Utilities - Типизация и обработка ошибок
- * 
+ *
  * Решает проблему с типом 'unknown' в catch блоках
  * Соответствует backend core/exceptions.py AppException.to_dict()
  */
@@ -12,10 +12,12 @@ import { ApiErrorCode, ApiError as ApiErrorType } from '@/types/api';
 // Типы ошибок
 export interface AxiosApiError {
     response?: {
-        data?: ApiErrorType | {
-            detail?: string;
-            message?: string;
-        };
+        data?:
+            | ApiErrorType
+            | {
+                  detail?: string;
+                  message?: string;
+              };
         status?: number;
     };
     message?: string;
@@ -46,11 +48,7 @@ export function isApiError(error: unknown): error is ApiErrorType {
  * Проверяет, является ли ошибка Axios ошибкой с response
  */
 export function isAxiosApiError(error: unknown): error is AxiosApiError {
-    return (
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error
-    );
+    return typeof error === 'object' && error !== null && 'response' in error;
 }
 
 export function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
@@ -179,7 +177,10 @@ export function getStatusMessage(status: number): string {
  */
 export function getOperationMessage(operation: string, error: unknown): string {
     const operationMessages: Record<string, Record<string, string>> = {
-        save_settings: { default: 'Ошибка при сохранении настроек.', '409': 'Настройки были изменены. Перезагружаю...' },
+        save_settings: {
+            default: 'Ошибка при сохранении настроек.',
+            '409': 'Настройки были изменены. Перезагружаю...',
+        },
         delete_item: { default: 'Ошибка при удалении.', '404': 'Элемент уже был удален.' },
         create_item: { default: 'Ошибка при создании.', '400': 'Проверьте данные и попробуйте снова.' },
         upload_file: { default: 'Ошибка при загрузке файла.', '413': 'Файл слишком большой. Максимум 50 МБ.' },
@@ -199,10 +200,7 @@ export function getOperationMessage(operation: string, error: unknown): string {
  * Обработка ошибок в Error Boundary
  * Логирует ошибку и отправляет в систему мониторинга
  */
-export function handleBoundaryError(
-    error: Error,
-    errorInfo: ErrorInfo
-): void {
+export function handleBoundaryError(error: Error, errorInfo: ErrorInfo): void {
     // Log to console in development
     if (import.meta.env.DEV) {
         console.error('Error Boundary caught:', error);
@@ -214,20 +212,13 @@ export function handleBoundaryError(
 }
 
 // Утилита для безопасного доступа к свойствам объекта
-export function hasProperty<T extends object, K extends PropertyKey>(
-    obj: T,
-    key: K
-): obj is T & Record<K, unknown> {
+export function hasProperty<T extends object, K extends PropertyKey>(obj: T, key: K): obj is T & Record<K, unknown> {
     return key in obj;
 }
 
 // Утилита для проверки наличия data в response
 export function hasData<T>(response: unknown): response is { data: T } {
-    return (
-        typeof response === 'object' &&
-        response !== null &&
-        'data' in response
-    );
+    return typeof response === 'object' && response !== null && 'data' in response;
 }
 
 // Утилита для безопасного приведения типов

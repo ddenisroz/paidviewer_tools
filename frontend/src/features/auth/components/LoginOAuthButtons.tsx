@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { Button } from '@/shared/components/ui/button';
 
 import type { OAuthAvailability, OAuthPlatform } from '../hooks/useOAuthAvailability';
 
@@ -19,13 +20,13 @@ const LOGIN_BUTTONS = [
         platform: 'twitch',
         label: 'Войти через Twitch',
         Icon: TwitchIcon,
-        enabledClassName: 'bg-[#9146FF] hover:bg-[#7a3adc] text-white',
+        enabledClassName: 'border-[#a970ff]/80 bg-[#9146ff] text-white hover:border-[#c7a6ff] hover:bg-[#7a3adc]',
     },
     {
         platform: 'vk',
         label: 'Войти через VK Live',
         Icon: VKIcon,
-        enabledClassName: 'bg-[#FF4444] hover:bg-[#d93a3a] text-white',
+        enabledClassName: 'border-[#ff6868]/80 bg-[#ff4444] text-white hover:border-[#ff9494] hover:bg-[#d93a3a]',
     },
 ] as const;
 
@@ -40,25 +41,25 @@ const LoginOAuthButtons: React.FC<LoginOAuthButtonsProps> = ({ availability, onL
                 const buttonLabel = isLoading
                     ? 'Проверка входа...'
                     : isAvailable
-                        ? label
-                        : OAUTH_UNAVAILABLE_LABELS[platform];
+                      ? label
+                      : OAUTH_UNAVAILABLE_LABELS[platform];
 
                 return (
-                    <button
+                    <Button
                         key={platform}
                         type="button"
+                        variant={isDisabled ? 'outline' : 'default'}
+                        size="lg"
                         onClick={() => onLogin(platform)}
                         disabled={isDisabled}
                         title={isDisabled ? 'OAuth не настроен на сервере' : undefined}
-                        className={`w-full font-semibold py-3 px-5 rounded-lg transition-colors duration-300 flex items-center justify-center text-base ${
-                            isDisabled
-                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                                : enabledClassName
+                        className={`w-full text-base font-semibold ${
+                            isDisabled ? 'border-border/70 bg-[#0b0712] text-muted-foreground' : enabledClassName
                         }`}
                     >
                         <Icon className="mr-2 h-5 w-5" />
                         {buttonLabel}
-                    </button>
+                    </Button>
                 );
             })}
         </div>

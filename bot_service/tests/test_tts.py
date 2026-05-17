@@ -26,8 +26,8 @@ class TestTTSManager:
         manager = TTSManager()
         # Verify it uses settings instead of hardcoded values
         assert manager.f5_tts_service_url == settings.f5_tts_service_url
-        assert manager.qwen_tts_service_url == settings.qwen_tts_service_url
-        assert manager.backend_url == settings.backend_url
+        from services.tts import tts_manager as tts_manager_module
+        assert manager.backend_url == tts_manager_module.settings.backend_url
         assert manager.basic_tts is not None
     
     @pytest.mark.asyncio

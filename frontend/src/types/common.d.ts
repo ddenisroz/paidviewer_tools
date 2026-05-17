@@ -41,20 +41,20 @@ export type Validator<T = unknown> = (value: T, ...args: unknown[]) => string | 
  * Конфигурация cookie
  */
 export interface CookieOptions {
-  path?: string;
-  domain?: string;
-  maxAge?: number;
-  expires?: Date;
-  secure?: boolean;
-  sameSite?: 'strict' | 'lax' | 'none';
+    path?: string;
+    domain?: string;
+    maxAge?: number;
+    expires?: Date;
+    secure?: boolean;
+    sameSite?: 'strict' | 'lax' | 'none';
 }
 
 /**
  * Результат проверки доступности
  */
 export interface AvailabilityResult {
-  available: boolean;
-  message?: string;
+    available: boolean;
+    message?: string;
 }
 
 /**
@@ -67,6 +67,6 @@ export type BaseConfig = Record<string, string | number | boolean | null | undef
  */
 export type JsonValue = string | number | boolean | null | JsonObject | JsonArray;
 export interface JsonObject {
-  [key: string]: JsonValue;
+    [key: string]: JsonValue;
 }
 export type JsonArray = JsonValue[];

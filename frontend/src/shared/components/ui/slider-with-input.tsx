@@ -15,6 +15,7 @@ interface SliderWithInputProps {
     inputWidth?: number;
     inputClassName?: string;
     sliderClassName?: string;
+    ariaLabel?: string;
 }
 
 export const SliderWithInput: React.FC<SliderWithInputProps> = ({
@@ -27,7 +28,8 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
     unit = '',
     inputWidth = 72,
     inputClassName,
-    sliderClassName
+    sliderClassName,
+    ariaLabel = 'Значение',
 }) => {
     const [localInputValue, setLocalInputValue] = useState(String(value));
 
@@ -68,30 +70,31 @@ export const SliderWithInput: React.FC<SliderWithInputProps> = ({
     };
 
     return (
-        <div className={cn("flex flex-col gap-2 md:flex-row md:items-center md:gap-3 min-w-0", className)}>
+        <div className={cn('flex flex-col gap-2 md:flex-row md:items-center md:gap-3 min-w-0', className)}>
             <Slider
                 value={[value]}
                 min={min}
                 max={max}
                 step={step}
                 onValueChange={handleSliderChange}
-                className={cn("w-full flex-1 min-w-0 py-2", sliderClassName)}
+                aria-label={ariaLabel}
+                className={cn('w-full flex-1 min-w-0 py-2', sliderClassName)}
             />
             <div className="flex items-center gap-2 justify-end shrink-0">
                 <Input
                     value={localInputValue}
                     onChange={handleInputChange}
                     onBlur={handleBlur}
-                    className={cn("h-9 px-2 text-right bg-card/70 border-border/70 text-foreground text-sm font-normal font-base focus-visible:ring-0 focus-visible:ring-offset-0", inputClassName)}
+                    className={cn(
+                        'h-9 px-2 text-right bg-card/70 border-border/70 text-foreground text-sm font-normal font-base focus-visible:ring-0 focus-visible:ring-offset-0',
+                        inputClassName
+                    )}
                     style={{ width: inputWidth }}
                     step={step}
                     inputMode="decimal"
+                    aria-label={ariaLabel}
                 />
-                {unit && (
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {unit}
-                    </span>
-                )}
+                {unit && <span className="text-xs text-muted-foreground whitespace-nowrap">{unit}</span>}
             </div>
         </div>
     );

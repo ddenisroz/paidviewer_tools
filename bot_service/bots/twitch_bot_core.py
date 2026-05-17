@@ -1,5 +1,6 @@
 # bot_service/bots/twitch_bot_core.py
 """Основной класс Twitch бота"""
+import asyncio
 import logging
 from typing import List, Optional
 from twitchio.ext import commands
@@ -25,6 +26,7 @@ class TwitchBotCore(commands.Bot):
         logger.info(f"[DEBUG] Number of channels: {len(initial_channels)}")
 
         self.connection_manager = connection_manager
+        self.ready_event = asyncio.Event()
         self.tts_api = TTSAPI()
         # self.youtube_api is deprecated, use services.youtube.youtube_service if needed
         # Initializing service here if needed, or in specific handlers
@@ -52,6 +54,7 @@ class TwitchBotCore(commands.Bot):
         logger.info(f'[CHANNELS] Connected to channels: {self.connected_channels}')
         logger.info('[BOT] BOT IS NOW LISTENING FOR MESSAGES IN ALL CHANNELS!')
         logger.info('[BOT] BOT IS NOW LISTENING FOR MESSAGES IN THESE CHANNELS')
+        self.ready_event.set()
 
         for channel in self.connected_channels:
             logger.info(f'[OK] MONITORING CHAT: {channel.name}')
@@ -156,6 +159,23 @@ class TwitchBotCore(commands.Bot):
                                 viewer_id=str(message.author.id) if hasattr(message.author, 'id') else message.author.name.lower(),
                                 viewer_name=message.author.name
                             )
+                            try:
+                                result = drops_service.process_streak_drops_for_user(
+                                    user_id=channel_owner.id,
+                                    channel_name=message.channel.name.lower(),
+                                    platform="twitch",
+                                    viewer_id=str(message.author.id) if hasattr(message.author, 'id') else message.author.name.lower(),
+                                    viewer_name=message.author.name,
+                                    source_event_id=source_message_id,
+                                )
+                                if result:
+                                    logger.info(
+                                        f"[REWARD] [DROPS TWITCH] {result['viewer_name']} получил {result['reward']} ({result['quality']})"
+                                    )
+                                    from utils.websocket_helper import broadcast_drops_event
+                                    await broadcast_drops_event(result)
+                            except Exception as drops_err:
+                                logger.debug(f"Could not process streak drops for Twitch: {drops_err}")
                 finally:
                     db.close()
             except Exception as streak_err:

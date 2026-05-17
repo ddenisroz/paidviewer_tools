@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/chatbox", tags=["chatbox"])
 class ChatBoxSettingsCreate(BaseModel):
     """Model for creating or updating ChatBox settings."""
     # Font settings
-    font_family: str = Field(default='Inter, system-ui, sans-serif')
+    font_family: str = Field(default='Tektur')
     font_size: int = Field(default=16, ge=8, le=32)
     font_weight: str = Field(default='normal')
     text_stroke_width: int = Field(default=0, ge=0, le=3)

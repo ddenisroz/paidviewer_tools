@@ -43,10 +43,7 @@ export const buildUrlWithParams = (
 /**
  * Extract query parameter from URL.
  */
-export const getQueryParam = (
-    name: string,
-    url: string = window.location.href
-): string | null => {
+export const getQueryParam = (name: string, url: string = window.location.href): string | null => {
     const urlObj = new URL(url);
     return urlObj.searchParams.get(name);
 };
@@ -118,12 +115,7 @@ export const getAndClearReturnUrl = (): string | null => {
     }
 
     // Avoid redirect loops/no-op redirects.
-    if (
-        url === '/' ||
-        url === '/dashboard' ||
-        url.startsWith('/dashboard?') ||
-        url.startsWith('/login')
-    ) {
+    if (url === '/' || url === '/dashboard' || url.startsWith('/dashboard?') || url.startsWith('/login')) {
         return null;
     }
 

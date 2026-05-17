@@ -35,9 +35,7 @@ function loadBaseline(): ComponentSizeBaseline {
     try {
         const raw = readFileSync(BASELINE_PATH, 'utf-8').replace(/^\uFEFF/, '');
         const parsed = JSON.parse(raw) as unknown;
-        return typeof parsed === 'object' && parsed !== null
-            ? (parsed as ComponentSizeBaseline)
-            : {};
+        return typeof parsed === 'object' && parsed !== null ? (parsed as ComponentSizeBaseline) : {};
     } catch {
         return {};
     }
@@ -139,10 +137,10 @@ describe('Component Size Compliance', () => {
         }
 
         const oversizedFiles = allFiles
-            .filter(file => file.codeLines > MAX_LINES)
+            .filter((file) => file.codeLines > MAX_LINES)
             .sort((a, b) => a.path.localeCompare(b.path));
 
-        const regressions = oversizedFiles.filter(file => {
+        const regressions = oversizedFiles.filter((file) => {
             const baselineValue = baseline[file.path];
             if (baselineValue === undefined) {
                 return true; // new oversized file
@@ -152,11 +150,10 @@ describe('Component Size Compliance', () => {
 
         if (regressions.length > 0) {
             console.log('\n[ERROR] Component size regressions:');
-            regressions.forEach(file => {
+            regressions.forEach((file) => {
                 const baselineValue = baseline[file.path];
-                const baselineHint = baselineValue === undefined
-                    ? 'new oversized file (no baseline)'
-                    : `baseline=${baselineValue}`;
+                const baselineHint =
+                    baselineValue === undefined ? 'new oversized file (no baseline)' : `baseline=${baselineValue}`;
                 console.log(`  - ${file.path}: ${file.codeLines} code lines, ${baselineHint}`);
             });
             console.log('');
@@ -180,8 +177,8 @@ describe('Component Size Compliance', () => {
         const totalFiles = allFiles.length;
         const totalCodeLines = allFiles.reduce((sum, file) => sum + file.codeLines, 0);
         const averageLines = Math.round(totalCodeLines / totalFiles);
-        const maxFile = allFiles.reduce((max, file) => file.codeLines > max.codeLines ? file : max);
-        const minFile = allFiles.reduce((min, file) => file.codeLines < min.codeLines ? file : min);
+        const maxFile = allFiles.reduce((max, file) => (file.codeLines > max.codeLines ? file : max));
+        const minFile = allFiles.reduce((min, file) => (file.codeLines < min.codeLines ? file : min));
 
         console.log('\n[INFO] Component Size Statistics:');
         console.log(`  Total components: ${totalFiles}`);
@@ -193,4 +190,3 @@ describe('Component Size Compliance', () => {
         expect(totalFiles).toBeGreaterThan(0);
     });
 });
-

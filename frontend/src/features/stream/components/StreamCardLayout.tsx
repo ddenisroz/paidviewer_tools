@@ -26,7 +26,7 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
     bothEnabled,
     children,
     footer,
-    className
+    className,
 }) => {
     const [isLinking, setIsLinking] = useState(false);
 
@@ -48,10 +48,12 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
     };
 
     return (
-        <Card className={cn(
-            "flex flex-col overflow-hidden h-full card-glass border-border/70 bg-card/80 backdrop-blur-sm shadow-sm shadow-black/10 transition-colors duration-200",
-            className
-        )}>
+        <Card
+            className={cn(
+                'flex flex-col overflow-hidden h-full border-border/70 bg-card/90 shadow-sm shadow-black/10 transition-colors duration-200',
+                className
+            )}
+        >
             <CardHeader className="flex-shrink-0 pb-3 border-b border-border/50">
                 <CardTitle className="flex items-center gap-2 text-lg font-medium text-foreground">
                     {icon}
@@ -88,17 +90,11 @@ export const StreamCardLayout: React.FC<StreamCardLayoutProps> = ({
                 )}
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col">
-                    {children}
-                </div>
+                <div className="flex-1 flex flex-col">{children}</div>
             </CardContent>
 
             {/* Footer / Action Area */}
-            {footer && (
-                <div className="p-4 pt-0 mt-auto border-t border-transparent">
-                    {footer}
-                </div>
-            )}
+            {footer && <div className="p-4 pt-0 mt-auto border-t border-transparent">{footer}</div>}
         </Card>
     );
 };

@@ -5,16 +5,13 @@
 ## Активные документы
 
 1. [QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md)
-2. [PROJECT_CONTEXT.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/PROJECT_CONTEXT.md)
-3. [architecture/TTS_ARCHITECTURE.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/architecture/TTS_ARCHITECTURE.md)
-4. [release/RELEASE_CHECKLIST.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
-5. [setup/LIVE_SMOKE_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
-6. [setup/TTS_SUPPORT_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/TTS_SUPPORT_RUNBOOK.md)
+2. [release/RELEASE_CHECKLIST.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/release/RELEASE_CHECKLIST.md)
+3. [setup/LIVE_SMOKE_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/LIVE_SMOKE_RUNBOOK.md)
+4. [setup/TTS_SUPPORT_RUNBOOK.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/setup/TTS_SUPPORT_RUNBOOK.md)
 
 ## Что где искать
 
 - полный локальный запуск всего контура: `QUICKSTART.md`
-- текущее устройство продукта и TTS: `PROJECT_CONTEXT.md`
 - релизный стоп-лист: `release/RELEASE_CHECKLIST.md`
 - обязательный staging/live smoke: `setup/LIVE_SMOKE_RUNBOOK.md`
 - типовые проблемы TTS/self-host/VK: `setup/TTS_SUPPORT_RUNBOOK.md`
@@ -24,5 +21,4 @@
 - один документ на одну задачу
 - без производных аудитов и промежуточных планов в активном слое
 - без параллельных инструкций с разными словами для одного и того же процесса
-
-Всё производное, спорное или историческое должно жить только в `docs/backlog/`.
+- исторический backlog не является частью release tree; если он нужен для исследования, хранить его вне активной документации

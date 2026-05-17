@@ -16,11 +16,14 @@ const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, chec
     const [checkingDuration, setCheckingDuration] = useState(0);
 
     // Используем современный хук useInterval вместо ручного setInterval
-    useInterval(() => {
-        if (isChecking) {
-            setCheckingDuration(prev => prev + 1);
-        }
-    }, isChecking ? 1000 : null);
+    useInterval(
+        () => {
+            if (isChecking) {
+                setCheckingDuration((prev) => prev + 1);
+            }
+        },
+        isChecking ? 1000 : null
+    );
 
     // Сбрасываем счетчик при начале проверки
     useEffect(() => {
@@ -38,9 +41,7 @@ const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, chec
                 <div className="flex items-start gap-3">
                     <div className="w-5 h-5 bg-blue-500 rounded-full flex-shrink-0 mt-0.5 animate-pulse"></div>
                     <div className="flex-1">
-                        <h3 className="text-md font-semibold text-blue-400 mb-1">
-                            Проверка состояния TTS
-                        </h3>
+                        <h3 className="text-md font-semibold text-blue-400 mb-1">Проверка состояния TTS</h3>
                         <p className="text-sm text-blue-300">
                             Проверяем доступность TTS сервера... {checkingDuration > 0 && `(${checkingDuration}с)`}
                         </p>
@@ -64,7 +65,8 @@ const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, chec
                             Ваш канал не в белом списке (whitelist). Доступна только базовая озвучка (gTTS).
                         </p>
                         <p className="text-xs text-gray-400 mt-2">
-          Для использования F5-TTS настройте локальный TTS (`tts_service`, single-node профиль) или обратитесь к администратору для whitelist.
+                            Для использования F5-TTS настройте локальный TTS (`tts_service`, single-node профиль) или
+                            обратитесь к администратору для whitelist.
                         </p>
                     </div>
                 </div>
@@ -110,5 +112,3 @@ const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy, isChecking, chec
 };
 
 export default HealthStatus;
-
-
