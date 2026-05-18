@@ -274,37 +274,27 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
                     <button
                         onClick={() => onModeChange('all_messages')}
                         disabled={isSaving}
-                        className={`rounded-lg border p-3 text-left transition-colors ${
+                        className={`flex h-11 items-center rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
                             ttsMode === 'all_messages'
                                 ? 'border-sky-500/50 bg-sky-500/10 text-sky-50'
                                 : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
                         }`}
                     >
-                        <div className="font-semibold text-sm mb-0.5">Все сообщения</div>
-                        <div
-                            className={`text-xs ${ttsMode === 'all_messages' ? 'text-sky-200/80' : 'text-muted-foreground'}`}
-                        >
-                            Стандартный режим
-                        </div>
+                        Все сообщения
                     </button>
 
                     <button
                         onClick={() => onModeChange('channel_points')}
                         disabled={isSaving || !hasRewardPlatforms}
-                        className={`rounded-lg border p-3 text-left transition-colors ${
+                        className={`flex h-11 items-center rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
                             !hasRewardPlatforms
                                 ? 'cursor-not-allowed border-border/60 bg-background/20 text-muted-foreground/70 opacity-40'
                                 : ttsMode === 'channel_points'
                                   ? 'border-sky-500/50 bg-sky-500/10 text-sky-50'
                                   : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
-                        }`}
+                                }`}
                     >
-                        <div className="font-semibold text-sm mb-0.5">За баллы канала</div>
-                        <div
-                            className={`text-xs ${ttsMode === 'channel_points' && hasRewardPlatforms ? 'text-sky-200/80' : 'text-muted-foreground'}`}
-                        >
-                            {!hasRewardPlatforms ? 'Подключите Twitch или VK Live' : 'Только с наградой'}
-                        </div>
+                        За баллы канала
                     </button>
                 </div>
             )}

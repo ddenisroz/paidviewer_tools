@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from urllib.parse import urlparse
 
 import httpx
@@ -270,16 +271,25 @@ _INJECTED_SCRIPT = """
 
   function readStorageToken() {
     try {
+      var stores = [];
+      try { stores.push({ name: "localStorage", store: localStorage }); } catch (e) {}
+      try { stores.push({ name: "sessionStorage", store: sessionStorage }); } catch (e) {}
       var fallbackStreamerId = "";
-      for (var scanIdx = 0; scanIdx < localStorage.length; scanIdx += 1) {
-        var scanKey = localStorage.key(scanIdx);
-        if (!scanKey || !isProfileStorageKey(scanKey)) continue;
-        var scanValue = localStorage.getItem(scanKey);
-        var scanned = extractFromUnknown(scanValue || "", scanKey);
-        if (scanned.streamer_id) {
-          fallbackStreamerId = scanned.streamer_id;
-          break;
+      var scannedKeys = 0;
+      for (var storeIdx = 0; storeIdx < stores.length; storeIdx += 1) {
+        var profileStore = stores[storeIdx].store;
+        for (var scanIdx = 0; scanIdx < profileStore.length; scanIdx += 1) {
+          var scanKey = profileStore.key(scanIdx);
+          if (!scanKey || !isProfileStorageKey(scanKey)) continue;
+          scannedKeys += 1;
+          var scanValue = profileStore.getItem(scanKey);
+          var scanned = extractFromUnknown(scanValue || "", scanKey);
+          if (scanned.streamer_id) {
+            fallbackStreamerId = scanned.streamer_id;
+            break;
+          }
         }
+        if (fallbackStreamerId) break;
       }
 
       var knownKeys = [
@@ -289,46 +299,72 @@ _INJECTED_SCRIPT = """
         "authToken",
         "jwt",
         "jwtToken",
+        "id_token",
+        "ma.auth.token",
+        "memealerts.token",
+        "memealerts.access_token",
+        "memealerts.auth",
         "ma_token",
         "ma_access_token",
       ];
-      for (var i = 0; i < knownKeys.length; i += 1) {
-        var directValue = localStorage.getItem(knownKeys[i]);
-        var extractedDirect = extractFromUnknown(directValue || "", knownKeys[i]);
-        if (extractedDirect.access_token) {
-          return {
-            access_token: extractedDirect.access_token,
-            refresh_token:
-              extractedDirect.refresh_token ||
-              localStorage.getItem("refreshToken") ||
-              localStorage.getItem("refresh_token") ||
-              undefined,
-            streamer_id: extractedDirect.streamer_id || fallbackStreamerId || undefined,
-          };
+      for (var storeKnownIdx = 0; storeKnownIdx < stores.length; storeKnownIdx += 1) {
+        var knownStore = stores[storeKnownIdx].store;
+        for (var i = 0; i < knownKeys.length; i += 1) {
+          var directValue = knownStore.getItem(knownKeys[i]);
+          var extractedDirect = extractFromUnknown(directValue || "", knownKeys[i]);
+          if (extractedDirect.access_token) {
+            notifyClient("memealerts_auth_state", {
+              state: "token_found",
+              source: stores[storeKnownIdx].name + ":" + knownKeys[i],
+            });
+            return {
+              access_token: extractedDirect.access_token,
+              refresh_token:
+                extractedDirect.refresh_token ||
+                knownStore.getItem("refreshToken") ||
+                knownStore.getItem("refresh_token") ||
+                undefined,
+              streamer_id: extractedDirect.streamer_id || fallbackStreamerId || undefined,
+            };
+          }
         }
       }
 
       var profileStreamerId = fallbackStreamerId;
-      for (var idx = 0; idx < localStorage.length; idx += 1) {
-        var key = localStorage.key(idx);
-        if (!key) continue;
-        if (!isAuthStorageKey(key) && !isProfileStorageKey(key)) continue;
-        var value = localStorage.getItem(key);
-        var extracted = extractFromUnknown(value || "", key);
-        if (extracted.access_token) {
-          return {
-            access_token: extracted.access_token,
-            refresh_token:
-              extracted.refresh_token ||
-              localStorage.getItem("refreshToken") ||
-              localStorage.getItem("refresh_token") ||
-              undefined,
-            streamer_id: extracted.streamer_id || profileStreamerId || undefined,
-          };
+      for (var storeFullIdx = 0; storeFullIdx < stores.length; storeFullIdx += 1) {
+        var fullStore = stores[storeFullIdx].store;
+        for (var idx = 0; idx < fullStore.length; idx += 1) {
+          var key = fullStore.key(idx);
+          if (!key) continue;
+          if (!isAuthStorageKey(key) && !isProfileStorageKey(key)) continue;
+          scannedKeys += 1;
+          var value = fullStore.getItem(key);
+          var extracted = extractFromUnknown(value || "", key);
+          if (extracted.access_token) {
+            notifyClient("memealerts_auth_state", {
+              state: "token_found",
+              source: stores[storeFullIdx].name + ":" + key,
+            });
+            return {
+              access_token: extracted.access_token,
+              refresh_token:
+                extracted.refresh_token ||
+                fullStore.getItem("refreshToken") ||
+                fullStore.getItem("refresh_token") ||
+                undefined,
+              streamer_id: extracted.streamer_id || profileStreamerId || undefined,
+            };
+          }
+          if (!profileStreamerId && extracted.streamer_id) {
+            profileStreamerId = extracted.streamer_id;
+          }
         }
-        if (!profileStreamerId && extracted.streamer_id) {
-          profileStreamerId = extracted.streamer_id;
-        }
+      }
+      if (tries === 1 || tries % 20 === 0) {
+        notifyClient("memealerts_auth_state", {
+          state: "storage_scanned",
+          scanned_keys: scannedKeys,
+        });
       }
       return {};
     } catch (e) {
@@ -413,6 +449,12 @@ _INJECTED_SCRIPT = """
     lastAttemptKey = attemptKey;
 
     var persistResult = await persistToken(payload);
+    notifyClient("memealerts_auth_state", {
+      state: "connect_posted",
+      ok: !!persistResult.ok,
+      status: persistResult.status || 0,
+      source: source || "unknown",
+    });
     notifyClient("memealerts_proxy_result", {
       ok: !!persistResult.ok,
       status: persistResult.status || 0,
@@ -889,6 +931,7 @@ async def proxy_path(
 async def _proxy(request: Request, path: str, *, user: dict | None = None, db: Session | None = None) -> Response:
     upstream_url = _build_upstream_url(path)
     proxy_prefix = PROXY_PREFIX
+    request_started = time.monotonic()
 
     fwd_headers = _filter_headers(request.headers)
     fwd_headers["host"] = "memealerts.com"
@@ -965,7 +1008,49 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
                         has_explicit_return_url,
                     )
     except httpx.TimeoutException:
-        logger.warning(f"[PROXY] MemeAlerts upstream timeout: {upstream_url}")
+        elapsed_ms = int((time.monotonic() - request_started) * 1000)
+        logger.warning(
+            "[PROXY] MemeAlerts upstream timeout path=%s upstream=%s elapsed_ms=%s",
+            path,
+            upstream_url,
+            elapsed_ms,
+        )
+        if _is_auth_proxy_path(path):
+            detail = "MemeAlerts auth proxy timeout"
+            html = f"""
+<!doctype html>
+<html><head><meta charset=\"utf-8\"><title>MemeAlerts</title></head>
+<body>
+<script>
+(function() {{
+  var payload = {{
+    type: 'memealerts_auth_state',
+    state: 'proxy_timeout',
+    detail: {detail!r},
+    upstream_path: {path!r},
+    elapsed_ms: {elapsed_ms}
+  }};
+  try {{ if (window.opener) window.opener.postMessage(payload, window.location.origin); }} catch (e) {{}}
+  try {{
+    if ('BroadcastChannel' in window) {{
+      var channel = new BroadcastChannel('memealerts-auth');
+      channel.postMessage(payload);
+      channel.postMessage({{
+        type: 'memealerts_proxy_result',
+        ok: false,
+        status: 504,
+        source: 'proxy-timeout',
+        detail: {detail!r}
+      }});
+      channel.close();
+    }}
+  }} catch (e) {{}}
+}})();
+</script>
+<p>MemeAlerts auth proxy timeout. Please close this window and try again.</p>
+</body></html>
+"""
+            return HTMLResponse(content=html, status_code=504)
         return Response(content="Gateway Timeout", status_code=504)
     except httpx.RequestError:
         logger.exception("[PROXY] MemeAlerts upstream error")

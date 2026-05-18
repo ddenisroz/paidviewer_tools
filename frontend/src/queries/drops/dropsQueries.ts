@@ -338,6 +338,32 @@ export const useToggleDropsReward = (
     });
 };
 
+export const useUploadDropsRewardSound = (
+    channelName: string,
+    options?: UseMutationOptions<
+        ApiResponse<{ sound_file?: string; filename?: string }>,
+        AxiosError,
+        { rewardId: number; file: File },
+        unknown
+    >
+) => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ rewardId, file }: { rewardId: number; file: File }) =>
+            unwrapResponse(dropsService.uploadRewardSound(rewardId, file)),
+        onSuccess: (response) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.drops.rewards(channelName) });
+            toast.success(response?.message || 'Звук награды загружен');
+        },
+        onError: (error: AxiosError) => {
+            logger.error('Error uploading reward sound:', error);
+            toast.error('Не удалось загрузить звук награды');
+        },
+        ...options,
+    });
+};
+
 /**
  * Получить историю Drops
  */

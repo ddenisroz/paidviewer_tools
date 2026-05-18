@@ -20,6 +20,7 @@ from services.memory_websocket_manager import get_memory_websocket_manager
 from repositories.chatbox_repository import ChatBoxRepository
 from repositories.user_repository import UserRepository
 from auth.auth import verify_jwt_token
+from services.notification_service import notification_service
 from services.youtube.obs_overlay import build_youtube_obs_state
 
 logger = logging.getLogger(__name__)
@@ -432,6 +433,50 @@ async def websocket_youtube_obs(websocket: WebSocket, token: str):
             logger.warning("[WS] YouTube OBS error for user %s: %s", user_id, exc)
     finally:
         await conn_mgr.disconnect_youtube_obs(token)
+
+
+@router.websocket("/ws/tts/{token}")
+async def websocket_tts_obs(websocket: WebSocket, token: str):
+    """Public OBS browser-source websocket for TTS audio playback."""
+    token_preview = (token or "")[:8]
+    user_id = _resolve_obs_token_user_id(token)
+    if not user_id:
+        logger.warning("[WS] Invalid TTS OBS token %s..., closing", token_preview)
+        await websocket.close(code=4401)
+        return
+
+    conn_mgr = get_connection_manager()
+    await conn_mgr.connect_obs(websocket, token)
+
+    try:
+        while True:
+            raw_message = await websocket.receive_text()
+            try:
+                message = json.loads(raw_message)
+            except json.JSONDecodeError:
+                continue
+
+            message_type = message.get("type")
+            if message_type == "ping":
+                await websocket.send_json({"type": "pong"})
+                continue
+
+            if message_type == "tts_status":
+                await notification_service.broadcast_tts_status(
+                    user_id=user_id,
+                    source_message_id=message.get("source_message_id"),
+                    status=message.get("status") or "queued",
+                    reason_code=message.get("reason_code"),
+                )
+
+    except Exception as exc:
+        exc_text = str(exc).lower()
+        if "1000" in exc_text or "1001" in exc_text or "disconnect" in exc_text or "closed" in exc_text:
+            logger.info("[WS] TTS OBS disconnected cleanly: user=%s", user_id)
+        else:
+            logger.warning("[WS] TTS OBS error for user %s: %s", user_id, exc)
+    finally:
+        await conn_mgr.disconnect_obs(token)
 
 
 async def _schedule_tts_disconnect(user_id: int) -> None:

@@ -71,10 +71,16 @@ export interface TtsSettings {
     // Backend specific fields that might match now
     enableLexiconFilter?: boolean;
     enableCustomLexicon?: boolean;
+    filterBanwords?: boolean;
+    disableVoiceSelection?: boolean;
+    speakSenderName?: boolean;
     enable_7tv?: boolean;
     enable_twitch?: boolean;
     enable_lexicon_filter?: boolean;
     enable_custom_lexicon?: boolean;
+    filter_banwords?: boolean;
+    disable_voice_selection?: boolean;
+    speak_sender_name?: boolean;
     engine?: string;
     voice?: string;
     listeningMode?: string;

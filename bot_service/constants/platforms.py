@@ -3,8 +3,8 @@
 This module defines platform-related constants to avoid hardcoded values.
 """
 
-# Default platforms enabled for new users
-DEFAULT_ENABLED_PLATFORMS = ["twitch", "vk"]
+# TTS platform toggles start disabled until the integration is authorized.
+DEFAULT_ENABLED_PLATFORMS = []
 
 # All supported platforms
 SUPPORTED_PLATFORMS = ["twitch", "vk", "youtube"]

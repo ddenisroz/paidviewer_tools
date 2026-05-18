@@ -44,7 +44,7 @@ class TTSUserSettings(Base):
     gcloud_mood = Column(String, nullable=False, default="neutral")
 
     # Enabled platforms for playback.
-    enabled_platforms = Column(JSON, nullable=False, default=lambda: ["twitch", "vk"])
+    enabled_platforms = Column(JSON, nullable=False, default=list)
 
     # TTS execution mode.
     tts_mode = Column(String, nullable=False, default="all_messages")
@@ -64,6 +64,9 @@ class TTSUserSettings(Base):
     # Message filters.
     filter_replies = Column(Boolean, nullable=False, default=False)
     filter_mentions = Column(Boolean, nullable=False, default=False)
+    filter_banwords = Column(Boolean, nullable=False, default=True)
+    disable_voice_selection = Column(Boolean, nullable=False, default=False)
+    speak_sender_name = Column(Boolean, nullable=False, default=False)
 
     # YouTube playback settings.
     youtube_settings = Column(JSON, nullable=False, default=lambda: {"playback_mode": "browser", "volume_level": 100})

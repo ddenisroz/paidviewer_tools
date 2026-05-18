@@ -390,11 +390,16 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                     .chatbox-preview-scroll::-webkit-scrollbar {
                         display: none;
                     }
+                    .chatbox-preview-font-scope,
+                    .chatbox-preview-font-scope * {
+                        font-family: var(--chatbox-preview-font) !important;
+                    }
                 `}
             </style>
             <div
-                className="flex-1 overflow-hidden border border-white/10 rounded-md"
+                className="chatbox-preview-font-scope flex-1 overflow-hidden border border-white/10 rounded-md"
                 style={{
+                    ['--chatbox-preview-font' as string]: resolvedFontFamily,
                     background: panelBackground,
                     fontFamily: resolvedFontFamily,
                     fontSize: `${settings.font_size}px`,

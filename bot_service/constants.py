@@ -59,7 +59,7 @@ MAX_YOUTUBE_QUEUE_SIZE = 10
 
 # Platforms
 SUPPORTED_PLATFORMS = ["twitch", "vk"]
-DEFAULT_ENABLED_PLATFORMS = ["twitch", "vk"]
+DEFAULT_ENABLED_PLATFORMS = []
 ALL_SUPPORTED_PLATFORMS = ["twitch", "vk", "youtube"]
 
 PLATFORM_NAMES = {

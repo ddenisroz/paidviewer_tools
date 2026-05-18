@@ -37,14 +37,12 @@ export const TtsForbiddenWordsCard = ({
     return (
         <Card className="card-glass flex flex-col border-gray-800/60">
             <CardHeader className="border-b border-white/5 pb-2.5">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-base font-bold">
-                        <div className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-400">
-                            <ShieldAlert className="h-4 w-4" strokeWidth={1.8} />
-                        </div>
-                        Запрещенные слова
-                    </CardTitle>
-                </div>
+                <CardTitle className="flex items-center gap-2 text-base font-bold">
+                    <div className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-400">
+                        <ShieldAlert className="h-4 w-4" strokeWidth={1.8} />
+                    </div>
+                    Запрещенные слова
+                </CardTitle>
             </CardHeader>
 
             <CardContent className="space-y-3.5 p-3.5">

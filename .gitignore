@@ -52,6 +52,9 @@ coverage.xml
 .hypothesis/
 .pytest_cache/
 .pytest_tmp/
+_pytest_tmp/
+**/_pytest_tmp/
+bot_service/_pytest_tmp/
 pytest-cache-files-*/
 
 # Test databases
@@ -235,6 +238,7 @@ temp/
 artifacts/
 *.tmp
 *.fixed
+.agent/
 tts_worker_agent/config.json
 tts_worker_agent/paidviewer-worker-provisioning*.json
 tts_worker_agent/tmp_*/
@@ -305,7 +309,7 @@ tts_service/temp/
 tts_service/user_configs/
 bot_service/core/data/
 
-# TTS Models and Cache (большие файлы моделей)
+# TTS models and cache (large local files)
 **/f5_tts_cache/
 **/models--*/
 **/snapshots/

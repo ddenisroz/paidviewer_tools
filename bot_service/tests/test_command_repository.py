@@ -264,6 +264,62 @@ class TestCommandRepository:
         assert result.alias == "sr"
         assert result.command_name == "songrequest"
 
+    def test_find_custom_command_by_alias(self, db: Session, test_user):
+        """Should find custom command by optional alias."""
+        repo = CommandRepository(db)
+
+        db.add(BotCommand(
+            command_name="main",
+            command_type="custom",
+            user_id=test_user.id,
+            alias="extra",
+            response_text="Hello",
+            is_enabled=True,
+            platforms="all",
+        ))
+        db.commit()
+
+        result = repo.find_command("extra", test_user.id, "twitch")
+
+        assert result is not None
+        assert result.command_name == "main"
+        assert result.alias == "extra"
+
+    def test_command_invocation_history(self, db: Session, test_user):
+        """Should store and return concrete command usage events."""
+        repo = CommandRepository(db)
+        cmd = BotCommand(
+            command_name="hello",
+            command_type="custom",
+            user_id=test_user.id,
+            response_text="Hi",
+            is_enabled=True,
+            platforms="all",
+        )
+        db.add(cmd)
+        db.commit()
+
+        repo.create_invocation(
+            user_id=test_user.id,
+            command_id=cmd.id,
+            canonical_command_name="hello",
+            used_trigger="hi",
+            platform="twitch",
+            channel_name="demo",
+            viewer_name="Viewer",
+            viewer_id="123",
+            message_text="!hi there",
+        )
+        db.commit()
+
+        history = repo.get_invocation_history(test_user.id)
+
+        assert len(history) == 1
+        assert history[0].canonical_command_name == "hello"
+        assert history[0].used_trigger == "hi"
+        assert history[0].viewer_name == "Viewer"
+        assert history[0].message_text == "!hi there"
+
     # === Existence Checks ===
 
     def test_command_exists(self, db: Session, test_user):

@@ -1322,24 +1322,31 @@ const CommandsPage: React.FC = () => {
                                     {commandHistory.map((cmd) => (
                                         <div
                                             key={`hist-${cmd.id}`}
-                                            className="flex items-center justify-between rounded-md border border-border/70 bg-card/60 p-2.5"
+                                            className="grid gap-2 rounded-md border border-border/70 bg-card/60 p-2.5 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_auto]"
                                         >
                                             <div className="min-w-0">
                                                 <div className="font-mono text-sm text-foreground truncate">
-                                                    !{cmd.name}
+                                                    !{cmd.canonical_command_name}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground">
-                                                    Последний вызов:{' '}
-                                                    {cmd.last_used
-                                                        ? new Date(cmd.last_used).toLocaleString('ru-RU')
-                                                        : 'нет'}
+                                                    Триггер: !{cmd.used_trigger}
+                                                </div>
+                                            </div>
+                                            <div className="min-w-0 text-xs text-muted-foreground">
+                                                <div className="truncate text-foreground">
+                                                    {cmd.viewer_name || 'Система'} · {cmd.platform || 'чат'}
+                                                </div>
+                                                <div className="truncate">
+                                                    {cmd.has_platform_message || cmd.message_text
+                                                        ? cmd.message_text || 'Есть сообщение платформы'
+                                                        : 'Без сообщения платформы'}
                                                 </div>
                                             </div>
                                             <Badge
                                                 variant="outline"
-                                                className="border-sky-500/30 bg-sky-500/10 text-sky-200"
+                                                className="w-fit border-sky-500/30 bg-sky-500/10 text-sky-200 md:justify-self-end"
                                             >
-                                                {cmd.usage_count || 0}
+                                                {cmd.created_at ? new Date(cmd.created_at).toLocaleString('ru-RU') : 'сейчас'}
                                             </Badge>
                                         </div>
                                     ))}
@@ -1358,27 +1365,26 @@ const CommandsPage: React.FC = () => {
                     {editingCommand && (
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                {!isGlobalLikeEditingCommand && (
-                                    <div>
-                                        <Label htmlFor="edit_command_name">Имя</Label>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm text-muted-foreground">!</span>
-                                            <Input
-                                                id="edit_command_name"
-                                                value={editForm.command_name}
-                                                onChange={(e) =>
-                                                    setEditForm((prev) => ({
-                                                        ...prev,
-                                                        command_name: e.target.value,
-                                                    }))
-                                                }
-                                                placeholder="например, hello"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
                                 <div>
-                                    <Label htmlFor="edit_command_alias">Псевдоним</Label>
+                                    <Label htmlFor="edit_command_name">Основная команда</Label>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-muted-foreground">!</span>
+                                        <Input
+                                            id="edit_command_name"
+                                            value={editForm.command_name}
+                                            disabled={isGlobalLikeEditingCommand}
+                                            onChange={(e) =>
+                                                setEditForm((prev) => ({
+                                                    ...prev,
+                                                    command_name: e.target.value,
+                                                }))
+                                            }
+                                            placeholder="например, hello"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label htmlFor="edit_command_alias">Дополнительный алиас</Label>
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm text-muted-foreground">!</span>
                                         <Input

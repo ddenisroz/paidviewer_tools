@@ -30,6 +30,7 @@ const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 
 const CommandsPage = lazy(() => import('./pages/CommandsPage'));
 const ObsTtsPage = lazy(() => import('./features/tts/pages/ObsTtsPage'));
+const TtsObsDockPage = lazy(() => import('./features/tts/pages/TtsObsDockPage'));
 const TtsPlayerPage = lazy(() => import('./features/tts/pages/TtsPlayerPage'));
 
 const ChatOverlay = lazy(() => import('./pages/ChatOverlay'));
@@ -166,6 +167,17 @@ const App: React.FC = () => {
                                 <RouteErrorBoundary routeName="TTS Player">
                                     <Suspense fallback={<MinimalFallback />}>
                                         <TtsPlayerPage />
+                                    </Suspense>
+                                </RouteErrorBoundary>
+                            }
+                        />
+
+                        <Route
+                            path="tts/obs-dock"
+                            element={
+                                <RouteErrorBoundary routeName="TTS OBS Dock">
+                                    <Suspense fallback={<MinimalFallback />}>
+                                        <TtsObsDockPage />
                                     </Suspense>
                                 </RouteErrorBoundary>
                             }

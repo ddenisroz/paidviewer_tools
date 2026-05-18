@@ -1,29 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ChevronDown, Sparkles, Volume2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 
 import { dropsService } from '@/services/api/services/dropsService';
 import { logger } from '@/shared/utils/prodLogger';
 import { getChatWebSocketUrl } from '@/shared/utils/urlUtils';
-
-import CommonOpened from '../../images/lootboxes/common/common_opened.png';
-import EpicOpened from '../../images/lootboxes/epic/epic_opened.png';
-import LegendaryOpened from '../../images/lootboxes/legendary/legendary_opened.png';
-import MythycOpened from '../../images/lootboxes/mythyc/mythyc_opened.png';
-import RareOpened from '../../images/lootboxes/rare/rare_opened_.png';
-
-const QUALITY_IMAGES: Record<string, string> = {
-    common: CommonOpened,
-    rare: RareOpened,
-    epic: EpicOpened,
-    legendary: LegendaryOpened,
-    mythical: MythycOpened,
-    mythyc: MythycOpened,
-};
-
-const CARD_WIDTH = 184;
-const CARD_GAP = 16;
-const CARD_STEP = CARD_WIDTH + CARD_GAP;
 
 interface Reward {
     id: number;
@@ -34,6 +16,7 @@ interface Reward {
     reward_value?: string | number;
     sound_file?: string | null;
     sound_volume?: number;
+    weight?: number;
     quality?: {
         name: string;
     };
@@ -64,14 +47,6 @@ interface WebSocketMessage {
     data?: RewardData;
 }
 
-type AnimationPhase = 'idle' | 'opening' | 'roulette' | 'result';
-
-interface WidgetConfig {
-    spinning_duration: number;
-    opening_duration: number;
-    result_duration: number;
-}
-
 interface UserTokenResponse {
     user_id?: number;
     channel_name?: string;
@@ -89,119 +64,158 @@ interface DropsApiResponse<T = unknown> {
     data?: T;
 }
 
+interface ReelItem {
+    id: string;
+    quality: string;
+    reward?: Reward;
+}
+
+type AnimationPhase = 'idle' | 'opening' | 'spinning' | 'result';
+
+interface WidgetConfig {
+    spinning_duration: number;
+    opening_duration: number;
+    result_duration: number;
+}
+
+const CARD_WIDTH = 188;
+const CARD_GAP = 16;
+const CARD_STEP = CARD_WIDTH + CARD_GAP;
+const WINNER_SLOT_INDEX = 26;
+const REEL_LENGTH = 38;
+
 const qualityLabel = (quality?: string): string => {
     switch ((quality || '').toLowerCase()) {
         case 'common':
-            return 'Обычная';
+            return 'Обычный';
         case 'rare':
-            return 'Редкая';
+            return 'Редкий';
         case 'epic':
-            return 'Эпическая';
+            return 'Эпический';
         case 'legendary':
-            return 'Легендарная';
+            return 'Легендарный';
         case 'mythical':
         case 'mythyc':
-            return 'Мифическая';
+            return 'Мифический';
         default:
             return 'Награда';
     }
 };
 
-const qualityBadgeClass = (quality?: string): string => {
+const qualityTone = (quality?: string): string => {
     switch ((quality || '').toLowerCase()) {
         case 'common':
-            return 'border-slate-400/35 bg-slate-500/10 text-slate-200';
+            return 'border-slate-400/35 bg-slate-500/12 text-slate-100';
         case 'rare':
-            return 'border-sky-400/35 bg-sky-500/10 text-sky-200';
+            return 'border-sky-400/35 bg-sky-500/12 text-sky-100';
         case 'epic':
-            return 'border-violet-400/35 bg-violet-500/10 text-violet-200';
+            return 'border-violet-400/35 bg-violet-500/12 text-violet-100';
         case 'legendary':
-            return 'border-amber-400/35 bg-amber-500/10 text-amber-200';
+            return 'border-amber-400/35 bg-amber-500/12 text-amber-100';
         case 'mythical':
         case 'mythyc':
-            return 'border-pink-400/35 bg-pink-500/10 text-pink-200';
+            return 'border-pink-400/35 bg-pink-500/12 text-pink-100';
         default:
-            return 'border-slate-400/35 bg-slate-500/10 text-slate-200';
+            return 'border-slate-400/35 bg-slate-500/12 text-slate-100';
     }
 };
 
 const qualityGlowClass = (quality?: string): string => {
     switch ((quality || '').toLowerCase()) {
         case 'common':
-            return 'from-slate-500/20 via-slate-200/10 to-transparent';
+            return 'from-slate-500/22 via-slate-100/4 to-transparent';
         case 'rare':
-            return 'from-sky-500/25 via-sky-200/10 to-transparent';
+            return 'from-sky-500/28 via-sky-100/5 to-transparent';
         case 'epic':
-            return 'from-violet-500/25 via-fuchsia-200/10 to-transparent';
+            return 'from-violet-500/28 via-fuchsia-100/5 to-transparent';
         case 'legendary':
-            return 'from-amber-500/25 via-yellow-200/10 to-transparent';
+            return 'from-amber-500/30 via-yellow-100/7 to-transparent';
         case 'mythical':
         case 'mythyc':
-            return 'from-pink-500/25 via-fuchsia-200/10 to-transparent';
+            return 'from-pink-500/30 via-fuchsia-100/6 to-transparent';
         default:
-            return 'from-slate-500/20 via-slate-200/10 to-transparent';
+            return 'from-slate-500/22 via-slate-100/4 to-transparent';
     }
 };
 
-const getQualityImage = (quality?: string): string => QUALITY_IMAGES[(quality || '').toLowerCase()] || QUALITY_IMAGES.common;
+const weightedPick = (rewards: Reward[]): Reward | null => {
+    if (rewards.length === 0) return null;
+    const totalWeight = rewards.reduce((sum, reward) => sum + Math.max(1, Number(reward.weight) || 1), 0);
+    let roll = Math.random() * totalWeight;
+    for (const reward of rewards) {
+        roll -= Math.max(1, Number(reward.weight) || 1);
+        if (roll <= 0) return reward;
+    }
+    return rewards[rewards.length - 1] || null;
+};
+
+const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 const DropsWidget: React.FC = () => {
     const { token } = useParams<{ token: string }>();
     const [currentReward, setCurrentReward] = useState<RewardData | null>(null);
-    const [carouselRewards, setCarouselRewards] = useState<Reward[]>([]);
+    const [reelItems, setReelItems] = useState<ReelItem[]>([]);
     const [previewRewards, setPreviewRewards] = useState<Reward[]>([]);
-    const [isAnimating, setIsAnimating] = useState(false);
-    const [animationPhase, setAnimationPhase] = useState<AnimationPhase>('idle');
-    const [status, setStatus] = useState('Подключение...');
+    const [phase, setPhase] = useState<AnimationPhase>('idle');
     const [isPreviewMode, setIsPreviewMode] = useState(false);
-    const [roulettePosition, setRoulettePosition] = useState(0);
-    const [winningIndex, setWinningIndex] = useState<number | null>(null);
+    const [status, setStatus] = useState('Подключение...');
+    const [translateX, setTranslateX] = useState('translate3d(0px, 0, 0)');
+    const [pointerKick, setPointerKick] = useState(false);
     const [mythicalSession, setMythicalSession] = useState<MythicalSession | null>(null);
     const [mythicalTimer, setMythicalTimer] = useState<number | null>(null);
 
     const ws = useRef<WebSocket | null>(null);
+    const widgetConfig = useRef<WidgetConfig>({
+        spinning_duration: 1800,
+        opening_duration: 700,
+        result_duration: 5000,
+    });
     const channelNameRef = useRef<string | null>(null);
     const platformRef = useRef<string | null>(null);
-    const mythicalTimerInterval = useRef<NodeJS.Timeout | null>(null);
     const animationFrameRef = useRef<number | null>(null);
-    const animationTimeoutsRef = useRef<NodeJS.Timeout[]>([]);
-    const widgetConfig = useRef<WidgetConfig>({
-        spinning_duration: 1500,
-        opening_duration: 1000,
-        result_duration: 5500,
-    });
+    const animationTimeoutsRef = useRef<number[]>([]);
+    const mythicalIntervalRef = useRef<number | null>(null);
+    const timerIntervalRef = useRef<number | null>(null);
+    const lastTickSlotRef = useRef<number>(-1);
 
-    const clearAnimationTimers = useCallback((): void => {
+    const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+    const idleBackground = searchParams.get('background') === 'green' ? 'bg-[#00ff00]' : 'bg-transparent';
+
+    const clearAnimations = useCallback(() => {
         if (animationFrameRef.current !== null) {
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = null;
         }
-
-        animationTimeoutsRef.current.forEach((timeoutId) => clearTimeout(timeoutId));
+        animationTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
         animationTimeoutsRef.current = [];
+        lastTickSlotRef.current = -1;
     }, []);
 
-    const startMythicalTimer = useCallback((initialSeconds: number): void => {
-        if (mythicalTimerInterval.current) {
-            clearInterval(mythicalTimerInterval.current);
+    const clearMythicalTimer = useCallback(() => {
+        if (timerIntervalRef.current !== null) {
+            window.clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
         }
-
-        let remaining = initialSeconds;
-        setMythicalTimer(remaining);
-
-        mythicalTimerInterval.current = setInterval(() => {
-            remaining -= 1;
-            if (remaining <= 0) {
-                setMythicalTimer(0);
-                setMythicalSession(null);
-                if (mythicalTimerInterval.current) {
-                    clearInterval(mythicalTimerInterval.current);
-                }
-            } else {
-                setMythicalTimer(remaining);
-            }
-        }, 1000);
     }, []);
+
+    const startMythicalTimer = useCallback(
+        (seconds: number) => {
+            clearMythicalTimer();
+            let remaining = Math.max(0, seconds);
+            setMythicalTimer(remaining);
+            timerIntervalRef.current = window.setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    clearMythicalTimer();
+                    setMythicalTimer(0);
+                    setMythicalSession(null);
+                } else {
+                    setMythicalTimer(remaining);
+                }
+            }, 1000);
+        },
+        [clearMythicalTimer]
+    );
 
     const formatTimer = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
@@ -209,39 +223,16 @@ const DropsWidget: React.FC = () => {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const loadMythicalSession = useCallback(
-        async (channel?: string | null): Promise<void> => {
-            const targetChannel = channel ?? channelNameRef.current;
-            if (!targetChannel || !token) return;
-
-            try {
-                const response = await dropsService.getMythicalSession(targetChannel, token);
-                const data = response.data as DropsApiResponse<MythicalSession>;
-
-                if (data.success && data.data) {
-                    setMythicalSession(data.data);
-                    startMythicalTimer(data.data.time_remaining_seconds);
-                    return;
-                }
-
-                setMythicalSession(null);
-                setMythicalTimer(null);
-                if (mythicalTimerInterval.current) {
-                    clearInterval(mythicalTimerInterval.current);
-                }
-            } catch (error) {
-                logger.error('Error loading mythical session:', error);
-            }
-        },
-        [startMythicalTimer, token]
-    );
+    const playRewardSound = useCallback((rewardData: RewardData): void => {
+        if (!rewardData.sound_file) return;
+        const audio = new Audio(rewardData.sound_file);
+        audio.volume = clamp(rewardData.sound_volume ?? 1, 0, 1);
+        audio.play().catch((error) => logger.error('Error playing reward sound:', error));
+    }, []);
 
     const loadRewardsForQuality = useCallback(
         async (quality: string, channelName: string, platform: string): Promise<Reward[]> => {
-            if (!channelName || !token) {
-                return [];
-            }
-
+            if (!channelName || !token) return [];
             try {
                 const response = await dropsService.getRewardsForWidget(channelName, {
                     platform: platform || undefined,
@@ -262,7 +253,6 @@ const DropsWidget: React.FC = () => {
     const loadPreviewRewards = useCallback(
         async (channelName: string, platform: string): Promise<void> => {
             if (!channelName || !token) return;
-
             try {
                 const response = await dropsService.getRewardsForWidget(channelName, {
                     platform: platform || undefined,
@@ -279,92 +269,26 @@ const DropsWidget: React.FC = () => {
         [token]
     );
 
-    const playRewardSound = useCallback((rewardData: RewardData): void => {
-        if (!rewardData.sound_file) return;
-
-        const audio = new Audio(rewardData.sound_file);
-        audio.volume = rewardData.sound_volume ?? 1;
-        audio.play().catch((error) => logger.error('Error playing reward sound:', error));
-    }, []);
-
-    const showReward = useCallback(
-        async (rewardData: RewardData): Promise<void> => {
-            const quality = (rewardData.quality || rewardData.quality_name || 'common').toLowerCase();
-            const channelName = channelNameRef.current || '';
-            const platform = platformRef.current || '';
-            const rewards = await loadRewardsForQuality(quality, channelName, platform);
-            const baseRewards =
-                rewards.length > 0
-                    ? rewards
-                    : [
-                          {
-                              id: rewardData.reward_id || -1,
-                              name: rewardData.reward_name || 'Награда',
-                              description: rewardData.description,
-                              reward_type: rewardData.reward_type,
-                              reward_value: rewardData.reward_value,
-                              sound_file: rewardData.sound_file,
-                              sound_volume: rewardData.sound_volume,
-                              quality: { name: quality },
-                              is_active: true,
-                          },
-                      ];
-
-            clearAnimationTimers();
-
-            const repeatedRewards = Array.from({ length: Math.max(baseRewards.length * 6, 18) }, (_, index) => {
-                return baseRewards[index % baseRewards.length];
-            });
-
-            const baseWinnerIndex = baseRewards.findIndex(
-                (reward) => reward.id === rewardData.reward_id || reward.name === rewardData.reward_name
-            );
-            const winnerIndex = (baseWinnerIndex >= 0 ? baseWinnerIndex : 0) + baseRewards.length * 3;
-
-            setCurrentReward(rewardData);
-            setCarouselRewards(repeatedRewards);
-            setWinningIndex(winnerIndex);
-            setRoulettePosition(0);
-            setIsAnimating(true);
-            setAnimationPhase('opening');
-
-            const openingTimeout = setTimeout(() => {
-                setAnimationPhase('roulette');
-
-                const duration = widgetConfig.current.spinning_duration;
-                const startTime = performance.now();
-                const targetPosition = winnerIndex;
-
-                const animate = (currentTime: number): void => {
-                    const progress = Math.min((currentTime - startTime) / duration, 1);
-                    const easedProgress = 1 - Math.pow(1 - progress, 4);
-                    setRoulettePosition(targetPosition * easedProgress);
-
-                    if (progress < 1) {
-                        animationFrameRef.current = requestAnimationFrame(animate);
-                        return;
-                    }
-
-                    setRoulettePosition(targetPosition);
-                    setAnimationPhase('result');
-                    playRewardSound(rewardData);
-                };
-
-                animationFrameRef.current = requestAnimationFrame(animate);
-            }, widgetConfig.current.opening_duration);
-
-            const finishTimeout = setTimeout(() => {
-                setAnimationPhase('idle');
-                setRoulettePosition(0);
-                setWinningIndex(null);
-                setIsAnimating(false);
-                setCurrentReward(null);
-                setCarouselRewards([]);
-            }, widgetConfig.current.opening_duration + widgetConfig.current.spinning_duration + widgetConfig.current.result_duration);
-
-            animationTimeoutsRef.current = [openingTimeout, finishTimeout];
+    const loadMythicalSession = useCallback(
+        async (channel?: string | null): Promise<void> => {
+            const currentChannel = channel ?? channelNameRef.current;
+            if (!currentChannel || !token) return;
+            try {
+                const response = await dropsService.getMythicalSession(currentChannel, token);
+                const payload = response.data as DropsApiResponse<MythicalSession>;
+                if (payload.success && payload.data) {
+                    setMythicalSession(payload.data);
+                    startMythicalTimer(payload.data.time_remaining_seconds);
+                } else {
+                    setMythicalSession(null);
+                    setMythicalTimer(null);
+                    clearMythicalTimer();
+                }
+            } catch (error) {
+                logger.error('Error loading mythical session:', error);
+            }
         },
-        [clearAnimationTimers, loadRewardsForQuality, playRewardSound]
+        [clearMythicalTimer, startMythicalTimer, token]
     );
 
     const buildPreviewRewardData = useCallback((reward: Reward): RewardData => {
@@ -372,7 +296,7 @@ const DropsWidget: React.FC = () => {
         return {
             quality: rewardQuality,
             quality_name: rewardQuality,
-            viewer_name: 'Тестовый зритель',
+            viewer_name: 'Тест',
             reward_name: reward.name,
             reward_id: reward.id,
             reward_type: reward.reward_type,
@@ -383,37 +307,122 @@ const DropsWidget: React.FC = () => {
         };
     }, []);
 
-    const testAnimation = useCallback(
-        async (quality: string = 'epic'): Promise<void> => {
-            const matchingReward = previewRewards.find((reward) => (reward.quality?.name || 'common').toLowerCase() === quality);
-            if (matchingReward) {
-                await showReward(buildPreviewRewardData(matchingReward));
+    const runRewardAnimation = useCallback(
+        async (rewardData: RewardData): Promise<void> => {
+            const quality = (rewardData.quality || rewardData.quality_name || 'common').toLowerCase();
+            const channelName = channelNameRef.current || '';
+            const platform = platformRef.current || '';
+            const rewardPool = await loadRewardsForQuality(quality, channelName, platform);
+            const fallbackReward: Reward = {
+                id: rewardData.reward_id || -1,
+                name: rewardData.reward_name || 'Награда',
+                description: rewardData.description,
+                reward_type: rewardData.reward_type,
+                reward_value: rewardData.reward_value,
+                sound_file: rewardData.sound_file,
+                sound_volume: rewardData.sound_volume,
+                weight: 1,
+                quality: { name: quality },
+                is_active: true,
+            };
+            const winnerReward =
+                rewardPool.find((item) => item.id === rewardData.reward_id) ||
+                rewardPool.find((item) => item.name === rewardData.reward_name) ||
+                fallbackReward;
+
+            const fillerPool = rewardPool.length > 0 ? rewardPool : [fallbackReward];
+            const strip = Array.from({ length: REEL_LENGTH }, (_, index) => {
+                const reward = index === WINNER_SLOT_INDEX ? winnerReward : weightedPick(fillerPool) || winnerReward;
+                return {
+                    id: `${reward.id}-${index}`,
+                    quality: (reward.quality?.name || quality).toLowerCase(),
+                    reward,
+                } satisfies ReelItem;
+            });
+
+            clearAnimations();
+            setCurrentReward(rewardData);
+            setReelItems(strip);
+            setPointerKick(false);
+            setPhase('opening');
+
+            const targetOffset = WINNER_SLOT_INDEX * CARD_STEP;
+
+            const openingTimeout = window.setTimeout(() => {
+                setPhase('spinning');
+                const duration = widgetConfig.current.spinning_duration;
+                const start = performance.now();
+
+                const animate = (timestamp: number): void => {
+                    const progress = clamp((timestamp - start) / duration, 0, 1);
+                    const eased = 1 - Math.pow(1 - progress, 4);
+                    const offset = targetOffset * eased;
+                    const slotIndex = Math.floor(offset / CARD_STEP);
+
+                    if (slotIndex !== lastTickSlotRef.current) {
+                        lastTickSlotRef.current = slotIndex;
+                        setPointerKick(true);
+                        window.setTimeout(() => setPointerKick(false), 70);
+                    }
+
+                    setTranslateX(`translate3d(calc(50% - ${offset + CARD_WIDTH / 2}px), 0, 0)`);
+
+                    if (progress < 1) {
+                        animationFrameRef.current = requestAnimationFrame(animate);
+                        return;
+                    }
+
+                    setTranslateX(`translate3d(calc(50% - ${targetOffset + CARD_WIDTH / 2}px), 0, 0)`);
+                    setPhase('result');
+                    playRewardSound(rewardData);
+                };
+
+                animationFrameRef.current = requestAnimationFrame(animate);
+            }, widgetConfig.current.opening_duration);
+
+            const finishTimeout = window.setTimeout(() => {
+                setPhase('idle');
+                setCurrentReward(null);
+                setReelItems([]);
+                setTranslateX('translate3d(0px, 0, 0)');
+                setPointerKick(false);
+            }, widgetConfig.current.opening_duration + widgetConfig.current.spinning_duration + widgetConfig.current.result_duration);
+
+            animationTimeoutsRef.current = [openingTimeout, finishTimeout];
+        },
+        [clearAnimations, loadRewardsForQuality, playRewardSound]
+    );
+
+    const triggerPreviewChest = useCallback(
+        async (quality: string): Promise<void> => {
+            const candidates = previewRewards.filter((reward) => (reward.quality?.name || 'common').toLowerCase() === quality);
+            const selectedReward = weightedPick(candidates);
+            if (selectedReward) {
+                await runRewardAnimation(buildPreviewRewardData(selectedReward));
                 return;
             }
 
-            await showReward({
+            await runRewardAnimation({
                 quality,
                 quality_name: quality,
-                viewer_name: 'Тестовый зритель',
-                reward_name: `${qualityLabel(quality)} награда`,
+                viewer_name: 'Тест',
+                reward_name: `${qualityLabel(quality)} сундук`,
                 reward_id: -1,
-                reward_type: 'points',
+                reward_type: 'custom',
                 reward_value: '',
-                description: 'Тестовый сценарий',
+                description: 'Тестовое открытие сундука',
                 sound_file: null,
                 sound_volume: 1,
             });
         },
-        [buildPreviewRewardData, previewRewards, showReward]
+        [buildPreviewRewardData, previewRewards, runRewardAnimation]
     );
 
     const resolveWidgetContext = useCallback(async (): Promise<UserTokenResponse | null> => {
         if (!token) return null;
-
         const response = await dropsService.getUserFromToken(token);
         const apiData = response.data as DropsApiResponse<UserTokenResponse>;
         const data = apiData.data || (apiData as unknown as UserTokenResponse);
-
         if (!data.user_id || !data.channel_name) {
             return null;
         }
@@ -430,15 +439,14 @@ const DropsWidget: React.FC = () => {
                 const configData = configResponse.data as DropsApiResponse<WidgetConfigData>;
                 if (configData.success && configData.data) {
                     widgetConfig.current = {
-                        spinning_duration: configData.data.widget_spinning_duration_ms || 1500,
-                        opening_duration: configData.data.widget_opening_duration_ms || 1000,
-                        result_duration: configData.data.widget_result_duration_ms || 5500,
+                        spinning_duration: configData.data.widget_spinning_duration_ms || 1800,
+                        opening_duration: configData.data.widget_opening_duration_ms || 700,
+                        result_duration: configData.data.widget_result_duration_ms || 5000,
                     };
                 }
             } catch (error) {
                 logger.error('Error loading widget config:', error);
             }
-
             await loadPreviewRewards(data.channel_name, data.platform);
             await loadMythicalSession(data.channel_name);
         }
@@ -447,49 +455,44 @@ const DropsWidget: React.FC = () => {
     }, [loadMythicalSession, loadPreviewRewards, token]);
 
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const preview = urlParams.get('preview') === 'true';
-        setIsPreviewMode(preview);
+        setIsPreviewMode(searchParams.get('preview') === 'true');
+    }, [searchParams]);
 
+    useEffect(() => {
         if (!token) {
             setStatus('Ошибка: отсутствует токен');
             return;
         }
 
-        let reconnectTimeout: NodeJS.Timeout | null = null;
         let isMounted = true;
+        let reconnectTimeout: number | null = null;
 
         const connect = async (): Promise<void> => {
             try {
                 const widgetContext = await resolveWidgetContext();
                 if (!widgetContext?.user_id) {
-                    if (isMounted) {
-                        setStatus('Ошибка: токен виджета недействителен');
-                    }
+                    if (isMounted) setStatus('Ошибка: токен виджета недействителен');
                     return;
                 }
 
-                if (preview) {
-                    if (isMounted) {
-                        setStatus('Тестовый режим: выберите награду');
-                    }
+                if (isPreviewMode) {
+                    if (isMounted) setStatus('Тест сундуков');
                     return;
                 }
 
-                const wsUrl = getChatWebSocketUrl(widgetContext.user_id);
-                const websocket = new WebSocket(wsUrl);
+                const websocket = new WebSocket(getChatWebSocketUrl(widgetContext.user_id));
 
                 websocket.onopen = () => {
                     if (!isMounted) return;
                     ws.current = websocket;
-                    setStatus('Ожидание наград...');
+                    setStatus('Ожидание события');
                 };
 
                 websocket.onmessage = (event: MessageEvent) => {
                     try {
                         const data = JSON.parse(event.data) as WebSocketMessage;
                         if (data.type === 'drops' && data.event === 'reward_received' && data.data) {
-                            void showReward(data.data);
+                            void runRewardAnimation(data.data);
                             return;
                         }
                         if (data.type === 'drops' && data.event === 'mythical_session_started') {
@@ -499,6 +502,7 @@ const DropsWidget: React.FC = () => {
                         if (data.type === 'drops' && data.event === 'mythical_session_ended') {
                             setMythicalSession(null);
                             setMythicalTimer(null);
+                            clearMythicalTimer();
                         }
                     } catch (error) {
                         logger.error('Error parsing drops widget message:', error);
@@ -506,238 +510,180 @@ const DropsWidget: React.FC = () => {
                 };
 
                 websocket.onclose = () => {
-                    if (!isMounted) return;
                     ws.current = null;
+                    if (!isMounted) return;
                     setStatus('Переподключение...');
-                    reconnectTimeout = setTimeout(() => {
-                        void connect();
-                    }, 3000);
+                    reconnectTimeout = window.setTimeout(() => void connect(), 3000);
                 };
 
-                websocket.onerror = () => {
-                    logger.error('Drops widget WebSocket error');
-                };
+                websocket.onerror = () => logger.error('Drops widget WebSocket error');
             } catch (error) {
                 logger.error('Error connecting drops widget:', error);
-                if (isMounted) {
-                    setStatus('Ошибка подключения к drops');
-                }
+                if (isMounted) setStatus('Ошибка подключения к drops');
             }
         };
 
         void connect();
 
-        const mythicalCheckInterval = setInterval(() => {
-            const currentChannel = channelNameRef.current;
-            if (currentChannel) {
-                void loadMythicalSession(currentChannel);
+        mythicalIntervalRef.current = window.setInterval(() => {
+            if (channelNameRef.current) {
+                void loadMythicalSession(channelNameRef.current);
             }
         }, 10000);
 
         return () => {
             isMounted = false;
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-            }
-            if (ws.current) {
-                ws.current.close();
-            }
-            if (mythicalTimerInterval.current) {
-                clearInterval(mythicalTimerInterval.current);
-            }
-            clearInterval(mythicalCheckInterval);
-            clearAnimationTimers();
+            if (reconnectTimeout !== null) window.clearTimeout(reconnectTimeout);
+            if (ws.current) ws.current.close();
+            if (mythicalIntervalRef.current !== null) window.clearInterval(mythicalIntervalRef.current);
+            clearMythicalTimer();
+            clearAnimations();
         };
-    }, [clearAnimationTimers, loadMythicalSession, resolveWidgetContext, showReward, token]);
+    }, [clearAnimations, clearMythicalTimer, isPreviewMode, loadMythicalSession, resolveWidgetContext, runRewardAnimation, token]);
 
     const currentQuality = (currentReward?.quality || currentReward?.quality_name || 'common').toLowerCase();
-    const chestImage = useMemo(() => getQualityImage(currentQuality), [currentQuality]);
-    const translateX = `translateX(calc(50% - ${roulettePosition * CARD_STEP + CARD_WIDTH / 2}px))`;
+    const previewByQuality = useMemo(
+        () =>
+            ['common', 'rare', 'epic', 'legendary', 'mythical'].map((quality) => ({
+                quality,
+                count: previewRewards.filter((reward) => (reward.quality?.name || 'common').toLowerCase() === quality).length,
+            })),
+        [previewRewards]
+    );
 
     if (mythicalSession && mythicalTimer !== null && mythicalTimer > 0) {
         return (
-            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_top,_rgba(236,72,153,0.28),_transparent_40%),linear-gradient(160deg,_rgba(18,11,35,0.96),_rgba(6,8,18,0.98))]">
-                <div className="rounded-[30px] border border-pink-400/30 bg-black/20 px-10 py-8 text-center text-white shadow-[0_30px_120px_rgba(236,72,153,0.18)] backdrop-blur-xl">
-                    <img src={QUALITY_IMAGES.mythical} alt="Мифический drops" className="mx-auto mb-5 h-36 w-36 animate-pulse object-contain" />
-                    <p className="text-xs uppercase tracking-[0.34em] text-pink-200/70">Мифический drops</p>
-                    <h2 className="mt-3 text-3xl font-semibold text-white">Окно награды открыто</h2>
-                    <p className="mt-3 text-lg text-pink-100">Минимальный донат: {mythicalSession.donation_amount}₽</p>
-                    <div className="mt-6 text-5xl font-semibold tracking-[0.12em] text-amber-300">{formatTimer(mythicalTimer)}</div>
+            <div className="flex h-full w-full items-center justify-center bg-transparent">
+                <div className="rounded-[26px] border border-pink-400/35 bg-[#12071dcc] px-8 py-7 text-center text-white shadow-[0_24px_80px_rgba(236,72,153,0.22)] backdrop-blur-md">
+                    <p className="text-xs uppercase tracking-[0.32em] text-pink-200/75">Мифический сундук</p>
+                    <h2 className="mt-3 text-3xl font-semibold">Окно награды открыто</h2>
+                    <p className="mt-3 text-base text-pink-100">Минимальный донат: {mythicalSession.donation_amount}₽</p>
+                    <div className="mt-5 text-5xl font-bold tracking-[0.12em] text-amber-300">{formatTimer(mythicalTimer)}</div>
                 </div>
             </div>
         );
     }
 
-    if (!isAnimating || !currentReward) {
+    if (phase === 'idle' || !currentReward) {
+        if (!isPreviewMode) {
+            return <div className={`h-full w-full ${idleBackground}`} />;
+        }
+
         return (
-            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.08),_transparent_38%),linear-gradient(160deg,_rgba(11,15,28,0.98),_rgba(2,6,16,1))] p-6">
-                <div className="w-full max-w-[980px] rounded-[28px] border border-white/10 bg-white/[0.04] p-6 text-white shadow-[0_40px_140px_rgba(0,0,0,0.4)] backdrop-blur-xl">
-                    <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-center">
-                        <div className="rounded-[24px] border border-white/10 bg-black/20 p-6 text-center">
-                            <img src={QUALITY_IMAGES.common} alt="Drops" className="mx-auto h-36 w-36 object-contain opacity-70" />
-                            <p className="mt-4 text-xs uppercase tracking-[0.32em] text-sky-100/50">
-                                {isPreviewMode ? 'Тестовый режим' : 'Drops widget'}
-                            </p>
-                            <p className="mt-3 text-base text-white/80">{status}</p>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <p className="text-xs uppercase tracking-[0.32em] text-white/45">Сценарии проверки</p>
-                                <h2 className="mt-2 text-2xl font-semibold text-white">
-                                    {isPreviewMode ? 'Проверка реальных наград' : 'Ожидание живых событий'}
-                                </h2>
-                                <p className="mt-2 max-w-2xl text-sm leading-6 text-white/60">
-                                    {isPreviewMode
-                                        ? 'Кнопки ниже запускают именно ваши активные награды. Если у награды есть звук, он тоже проиграется после остановки колеса.'
-                                        : 'Виджет слушает реальные события из подключенного чата и показывает выпадение награды без перезагрузки.'}
-                                </p>
-                            </div>
-
-                            {isPreviewMode ? (
-                                previewRewards.length > 0 ? (
-                                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                                        {previewRewards.slice(0, 9).map((reward) => {
-                                            const rewardQuality = reward.quality?.name || 'common';
-                                            return (
-                                                <button
-                                                    key={reward.id}
-                                                    onClick={() => void showReward(buildPreviewRewardData(reward))}
-                                                    className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-left transition-transform duration-200 hover:-translate-y-0.5 hover:border-sky-300/40 hover:bg-sky-400/5"
-                                                >
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <span
-                                                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${qualityBadgeClass(rewardQuality)}`}
-                                                        >
-                                                            {qualityLabel(rewardQuality)}
-                                                        </span>
-                                                        {reward.sound_file ? (
-                                                            <span className="text-[11px] uppercase tracking-[0.22em] text-sky-200/70">
-                                                                звук
-                                                            </span>
-                                                        ) : null}
-                                                    </div>
-                                                    <p className="mt-3 line-clamp-2 text-sm font-semibold text-white">{reward.name}</p>
-                                                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/50">
-                                                        {reward.description || 'Без описания'}
-                                                    </p>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                                        {['common', 'rare', 'epic', 'legendary', 'mythical'].map((quality) => (
-                                            <button
-                                                key={quality}
-                                                onClick={() => void testAnimation(quality)}
-                                                className={`rounded-2xl border px-4 py-3 text-left transition-transform duration-200 hover:-translate-y-0.5 ${qualityBadgeClass(quality)}`}
-                                            >
-                                                <p className="text-sm font-semibold">{qualityLabel(quality)}</p>
-                                                <p className="mt-1 text-xs opacity-80">Запуск базового теста</p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )
-                            ) : (
-                                <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-sm text-white/55">
-                                    Виджет подключен к чату канала и ждет реальную выдачу награды.
-                                </div>
-                            )}
-                        </div>
+            <div className={`relative h-full w-full ${idleBackground}`}>
+                <div className="absolute left-5 top-5 z-20 w-[360px] rounded-2xl border border-white/10 bg-[#0f1421e6] p-4 text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-white/45">
+                        <Sparkles className="h-4 w-4" />
+                        Preview
                     </div>
+                    <div className="mt-2 text-lg font-semibold">Тест открытия сундука</div>
+                    <p className="mt-1 text-sm text-white/60">
+                        В OBS виджет будет пустым до события. Здесь можно вручную запустить тест по типу сундука.
+                    </p>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        {previewByQuality.map(({ quality, count }) => (
+                            <button
+                                key={quality}
+                                type="button"
+                                onClick={() => void triggerPreviewChest(quality)}
+                                className={`rounded-xl border px-3 py-3 text-left transition-transform hover:-translate-y-0.5 ${qualityTone(quality)}`}
+                            >
+                                <div className="text-sm font-semibold">{qualityLabel(quality)}</div>
+                                <div className="mt-1 text-xs opacity-80">{count > 0 ? `${count} наград в пуле` : 'Тестовый сценарий'}</div>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="mt-4 text-xs text-white/45">{status}</div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-3xl bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.1),_transparent_38%),linear-gradient(160deg,_rgba(10,14,26,0.98),_rgba(3,6,16,1))] p-6">
+        <div className={`relative h-full w-full overflow-hidden ${idleBackground}`}>
             <div className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${qualityGlowClass(currentQuality)}`} />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <img src={chestImage} alt={qualityLabel(currentQuality)} className="h-[440px] w-[440px] object-contain opacity-[0.14]" />
-            </div>
+            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
+                <div className="relative mx-auto w-full max-w-[1260px] px-8">
+                    <div
+                        className={`pointer-events-none absolute left-1/2 top-[-30px] z-30 h-0 w-0 -translate-x-1/2 border-l-[18px] border-r-[18px] border-t-[24px] border-l-transparent border-r-transparent border-t-amber-300 drop-shadow-[0_6px_14px_rgba(251,191,36,0.55)] transition-transform duration-75 ${
+                            pointerKick ? 'rotate-[8deg]' : 'rotate-0'
+                        }`}
+                    />
+                    <div className="pointer-events-none absolute left-1/2 top-[-6px] z-20 h-[280px] w-[3px] -translate-x-1/2 bg-gradient-to-b from-amber-200 via-amber-300 to-transparent opacity-75" />
 
-            <div className="relative z-10 w-full max-w-[1040px]">
-                <div className="mb-5 flex flex-wrap items-center justify-between gap-3 text-white">
-                    <div>
-                        <p className="text-xs uppercase tracking-[0.34em] text-white/45">Награда</p>
-                        <h2 className="mt-2 text-2xl font-semibold">{currentReward.viewer_name || 'Зритель'}</h2>
-                    </div>
-                    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${qualityBadgeClass(currentQuality)}`}>
-                        {qualityLabel(currentQuality)}
-                    </span>
-                </div>
-
-                <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.04] px-4 py-8 shadow-[0_40px_140px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-                    <div className="pointer-events-none absolute inset-y-6 left-1/2 z-30 w-[2px] -translate-x-1/2 bg-gradient-to-b from-transparent via-amber-300/90 to-transparent" />
-                    <div className="pointer-events-none absolute left-1/2 top-1/2 z-30 h-[244px] w-[220px] -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-amber-300/35 bg-amber-200/5 shadow-[0_0_80px_rgba(251,191,36,0.22)]" />
-
-                    <div className="relative h-[248px] overflow-hidden">
-                        <div
-                            className="absolute top-1/2 flex -translate-y-1/2 items-stretch gap-4"
-                            style={{ transform: translateX, transition: animationPhase === 'roulette' ? 'none' : 'transform 200ms ease-out' }}
-                        >
-                            {carouselRewards.map((reward, index) => {
-                                const rewardQuality = reward.quality?.name || 'common';
-                                const isWinner = animationPhase === 'result' && winningIndex === index;
-                                return (
-                                    <div
-                                        key={`${reward.id}-${index}`}
-                                        className={`flex h-[228px] w-[184px] shrink-0 flex-col overflow-hidden rounded-[24px] border bg-[#07111f]/95 transition-all duration-300 ${
-                                            isWinner
-                                                ? 'border-amber-300 shadow-[0_0_60px_rgba(251,191,36,0.28)] scale-[1.04]'
-                                                : 'border-white/10 opacity-65'
-                                        }`}
-                                    >
-                                        <div className="h-[118px] overflow-hidden bg-black/20">
-                                            {reward.image_url ? (
-                                                <img
-                                                    src={reward.image_url}
-                                                    alt={reward.name}
-                                                    className="h-full w-full object-cover"
-                                                    onError={(event) => {
-                                                        (event.target as HTMLImageElement).style.display = 'none';
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_45%),linear-gradient(180deg,_rgba(17,24,39,0.9),_rgba(3,7,18,0.95))]">
-                                                    <img
-                                                        src={getQualityImage(rewardQuality)}
-                                                        alt={qualityLabel(rewardQuality)}
-                                                        className="h-16 w-16 object-contain opacity-80"
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-1 flex-col px-4 py-3">
-                                            <span
-                                                className={`inline-flex w-fit rounded-full border px-2 py-1 text-[11px] font-medium ${qualityBadgeClass(rewardQuality)}`}
+                    <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#08101acf] px-5 py-8 shadow-[0_30px_120px_rgba(0,0,0,0.45)] backdrop-blur-md">
+                        <div className="absolute inset-y-0 left-1/2 z-10 w-[236px] -translate-x-1/2 border-x border-amber-300/20 bg-amber-200/[0.03]" />
+                        {phase === 'opening' ? (
+                            <div className="flex h-[236px] items-center justify-center">
+                                <div className={`rounded-3xl border px-8 py-7 text-center ${qualityTone(currentQuality)}`}>
+                                    <p className="text-xs uppercase tracking-[0.3em] opacity-75">Сундук активирован</p>
+                                    <h2 className="mt-3 text-2xl font-semibold">{currentReward.viewer_name || 'Зритель'}</h2>
+                                    <p className="mt-2 text-sm opacity-80">{qualityLabel(currentQuality)} сундук открывается</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="relative h-[236px] overflow-hidden">
+                                <div
+                                    className="absolute left-0 top-1/2 flex -translate-y-1/2 items-stretch gap-4"
+                                    style={{ transform: translateX, willChange: 'transform' }}
+                                >
+                                    {reelItems.map((item, index) => {
+                                        const isWinner = phase === 'result' && index === WINNER_SLOT_INDEX;
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className={`flex h-[220px] w-[188px] shrink-0 flex-col rounded-[24px] border bg-[#07111fee] transition-all duration-300 ${
+                                                    isWinner
+                                                        ? 'scale-[1.04] border-amber-300 shadow-[0_0_70px_rgba(251,191,36,0.28)]'
+                                                        : 'border-white/8 opacity-85'
+                                                }`}
                                             >
-                                                {qualityLabel(rewardQuality)}
-                                            </span>
-                                            <p className="mt-3 line-clamp-2 text-sm font-semibold text-white">{reward.name}</p>
-                                            <p className="mt-2 line-clamp-3 text-xs leading-5 text-white/50">
-                                                {reward.description || 'Награда из вашего активного пула'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                                                <div className="flex h-[116px] items-center justify-center rounded-t-[24px] bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.09),_transparent_50%),linear-gradient(180deg,_rgba(14,23,39,0.95),_rgba(7,12,24,0.98))]">
+                                                    <span className="text-6xl font-black text-white/88">?</span>
+                                                </div>
+                                                <div className="flex flex-1 flex-col px-4 py-3">
+                                                    <span className={`inline-flex w-fit rounded-full border px-2 py-1 text-[11px] font-medium ${qualityTone(item.quality)}`}>
+                                                        {qualityLabel(item.quality)}
+                                                    </span>
+                                                    <p className="mt-4 text-lg font-semibold text-white">{isWinner ? item.reward?.name || 'Награда' : '???'}</p>
+                                                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-white/50">
+                                                        {isWinner ? item.reward?.description || 'Содержимое сундука раскрыто.' : 'Содержимое скрыто до остановки барабана.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {phase === 'result' ? (
+                        <div className="mx-auto mt-5 max-w-[780px] rounded-[24px] border border-white/10 bg-[#0c121ddd] px-6 py-5 text-center text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
+                            <div className="text-xs uppercase tracking-[0.3em] text-white/45">Содержимое сундука</div>
+                            <div className="mt-3 text-3xl font-semibold">{currentReward.reward_name || 'Награда'}</div>
+                            {currentReward.description ? (
+                                <p className="mt-3 text-sm leading-6 text-white/65">{currentReward.description}</p>
+                            ) : null}
+                            {currentReward.sound_file ? (
+                                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-100">
+                                    <Volume2 className="h-3.5 w-3.5" />
+                                    Звук награды проигран
+                                </div>
+                            ) : null}
                         </div>
+                    ) : null}
+                </div>
+            </div>
+
+            {isPreviewMode ? (
+                <div className="absolute bottom-5 left-5 rounded-xl border border-white/10 bg-[#0c121dd8] px-3 py-2 text-xs text-white/55 backdrop-blur-sm">
+                    <div className="flex items-center gap-2">
+                        <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
+                        Тестовый режим активен
                     </div>
                 </div>
-
-                {animationPhase === 'result' ? (
-                    <div className="mt-5 rounded-[26px] border border-white/10 bg-black/25 px-6 py-5 text-white shadow-[0_20px_90px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-                        <p className="text-xs uppercase tracking-[0.34em] text-white/45">Получено</p>
-                        <h3 className="mt-3 text-3xl font-semibold">{currentReward.reward_name || 'Награда'}</h3>
-                        {currentReward.description ? (
-                            <p className="mt-2 max-w-2xl text-sm leading-6 text-white/65">{currentReward.description}</p>
-                        ) : null}
-                    </div>
-                ) : null}
-            </div>
+            ) : null}
         </div>
     );
 };

@@ -29,6 +29,9 @@ interface HistoryEntry {
     streak_days?: number;
     donation_amount?: number;
     messages_count?: number;
+    trigger_label?: string;
+    message_text?: string;
+    has_platform_message?: boolean;
     created_at?: string;
 }
 
@@ -88,7 +91,8 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                 const query = searchQuery.toLowerCase();
                 const matchesSearch =
                     entry.viewer_name.toLowerCase().includes(query) ||
-                    (entry.reward_name?.toLowerCase() ?? '').includes(query);
+                    (entry.reward_name?.toLowerCase() ?? '').includes(query) ||
+                    (entry.message_text?.toLowerCase() ?? '').includes(query);
                 const matchesType = typeFilter === 'all' || (entry.drops_type || '').toLowerCase() === typeFilter;
                 const matchesPlatform =
                     platformFilter === 'all' || (entry.platform || '').toLowerCase() === platformFilter;
@@ -201,9 +205,9 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                         filteredHistory.map((entry) => (
                             <div
                                 key={entry.id}
-                                className="grid items-center gap-3 rounded-xl border border-border/70 bg-transparent p-3 md:grid-cols-[minmax(0,1fr)_220px]"
+                                className="grid items-center gap-3 rounded-lg border border-border/70 bg-transparent p-2.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_190px]"
                             >
-                                <div className="min-w-0 space-y-1.5">
+                                <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <p className="truncate text-sm font-semibold text-foreground">
                                             {entry.viewer_name}
@@ -212,26 +216,26 @@ const DropsHistory: React.FC<DropsHistoryProps> = React.memo(({ user, channelNam
                                             variant="outline"
                                             className="border-border/70 bg-transparent text-sky-300"
                                         >
-                                            {getDropsTypeLabel(entry.drops_type)}
-                                        </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            className="border-border/70 bg-transparent text-muted-foreground"
-                                        >
-                                            {getPlatformLabel(entry.platform)}
+                                            {entry.trigger_label || getDropsTypeLabel(entry.drops_type)}
                                         </Badge>
                                     </div>
-                                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                                        {entry.reward_name || 'Награда без названия'}
+                                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                                        {getPlatformLabel(entry.platform)}
                                     </p>
-                                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                        {entry.streak_days ? <span>Стрик: {entry.streak_days}</span> : null}
-                                        {entry.donation_amount ? <span>Донат: {entry.donation_amount}₽</span> : null}
-                                        {entry.messages_count ? <span>Сообщений: {entry.messages_count}</span> : null}
-                                    </div>
                                 </div>
 
-                                <div className="space-y-1 text-right">
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-semibold text-foreground">
+                                        {entry.reward_name || 'Награда без названия'}
+                                    </p>
+                                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                                        {entry.has_platform_message || entry.message_text
+                                            ? entry.message_text || 'Есть сообщение платформы'
+                                            : 'Без сообщения платформы'}
+                                    </p>
+                                </div>
+
+                                <div className="space-y-1 text-left md:text-right">
                                     <p className="text-sm text-foreground">{formatDate(entry.created_at)}</p>
                                     <Badge
                                         variant="outline"

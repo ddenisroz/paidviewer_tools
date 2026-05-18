@@ -9,7 +9,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
-from core.database import get_db, DropsHistory
+from core.database import get_db, DropsHistory, ChatMessage
 from auth.auth import get_current_user, get_current_user_optional
 from utils.enhanced_logger import drops_logger
 logger = logging.getLogger(__name__)
@@ -85,7 +85,42 @@ async def get_drops_history(channel_name: str, platform: Optional[str]=None, vie
             filtered_history = [h for h in filtered_history if h.created_at and h.created_at <= parsed_date_to]
         quality_ids = {e.quality_id for e in filtered_history if e.quality_id}
         qualities = service.get_qualities_by_ids(list(quality_ids))
-        return {'success': True, 'data': [{'id': entry.id, 'viewer_name': entry.viewer_name, 'platform': entry.platform, 'drops_type': entry.lootbox_type, 'quality': qualities.get(entry.quality_id, {}), 'reward_name': entry.reward_name, 'reward_type': entry.reward_type, 'donation_amount': entry.donation_amount, 'streak_days': entry.streak_days, 'messages_count': entry.messages_count, 'created_at': entry.created_at} for entry in filtered_history]}
+        chat_message_ids = [entry.chat_message_id for entry in filtered_history if entry.chat_message_id]
+        chat_messages = {}
+        if chat_message_ids:
+            chat_messages = {
+                message.id: message
+                for message in db.query(ChatMessage).filter(ChatMessage.id.in_(chat_message_ids)).all()
+            }
+
+        def _trigger_label(entry: DropsHistory) -> str:
+            kind = (entry.lootbox_type or '').lower()
+            if kind == 'donation':
+                return 'Донат'
+            if kind == 'mythical':
+                return 'Мифический сундук'
+            if kind == 'streak':
+                return 'Стрик'
+            return entry.lootbox_type or 'Drops'
+
+        return {'success': True, 'data': [{
+            'id': entry.id,
+            'viewer_name': entry.viewer_name,
+            'platform': entry.platform,
+            'drops_type': entry.lootbox_type,
+            'source_type': entry.lootbox_type,
+            'trigger_label': _trigger_label(entry),
+            'quality': qualities.get(entry.quality_id, {}),
+            'reward_name': entry.reward_name,
+            'reward_type': entry.reward_type,
+            'donation_amount': entry.donation_amount,
+            'streak_days': entry.streak_days,
+            'messages_count': entry.messages_count,
+            'chat_message_id': entry.chat_message_id,
+            'message_text': getattr(chat_messages.get(entry.chat_message_id), 'message', None) if entry.chat_message_id else None,
+            'has_platform_message': bool(entry.chat_message_id),
+            'created_at': entry.created_at,
+        } for entry in filtered_history]}
     except HTTPException:
         raise
     except Exception:

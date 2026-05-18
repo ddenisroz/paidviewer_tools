@@ -60,7 +60,7 @@ const getWidgetFormData = (config: Partial<DropsConfig> | null | undefined): For
 
 const getSpinProfile = (duration: number): string => {
     if (duration <= 1100) return 'Быстрый';
-    if (duration <= 1800) return 'Сбалансированный';
+    if (duration <= 1800) return 'Средняя скорость';
     return 'Шоу-режим';
 };
 

@@ -145,6 +145,7 @@ const VoiceSection: React.FC<{
     isLoading: boolean;
     isMutating: boolean;
     emptyLabel: string;
+    action?: React.ReactNode;
     onTogglePool: (voiceId: number, inPool: boolean) => void;
     onPlay: (voice: TtsVoice) => void;
     onSettings: (voice: TtsVoice) => void;
@@ -157,6 +158,7 @@ const VoiceSection: React.FC<{
     isLoading,
     isMutating,
     emptyLabel,
+    action,
     onTogglePool,
     onPlay,
     onSettings,
@@ -164,7 +166,10 @@ const VoiceSection: React.FC<{
 }) => (
     <Card className="border-border/70 bg-card/85">
         <CardHeader className="border-b border-white/5 px-4 py-3">
-            <CardTitle className="text-base font-bold">{title}</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+                <CardTitle className="text-base font-bold">{title}</CardTitle>
+                {action}
+            </div>
         </CardHeader>
         <CardContent className="p-4">
             {isLoading ? (
@@ -176,7 +181,7 @@ const VoiceSection: React.FC<{
                     {emptyLabel}
                 </div>
             ) : (
-                <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2.5">
                     {voices.map((voice) => (
                         <VoiceCard
                             key={`${isMine ? 'user' : 'global'}-${voice.id}`}
@@ -383,7 +388,7 @@ const VoiceManagementPage: React.FC = () => {
             );
         },
         onSuccess: async () => {
-            await Promise.all([refetchGlobalVoices(), refetchUserVoices()]);
+            await Promise.all([refetchGlobalVoices(), refetchUserVoices(), refetchEnabledVoices()]);
             setSettingsOpen(false);
             toast.success('Настройки сохранены');
         },
@@ -431,13 +436,6 @@ const VoiceManagementPage: React.FC = () => {
 
     return (
         <PageWrapper contentClassName="space-y-3">
-            <div className="flex justify-end">
-                <Button type="button" className="h-9 gap-2" onClick={() => setUploadOpen(true)}>
-                    <Upload className="h-4 w-4" />
-                    Загрузить голос
-                </Button>
-            </div>
-
             <div className="space-y-3">
                 <VoiceSection
                     title="Глобальные голоса"
@@ -459,6 +457,12 @@ const VoiceManagementPage: React.FC = () => {
                     isLoading={isLoadingUser}
                     isMutating={isMutating}
                     emptyLabel="Загрузите первый голос"
+                    action={
+                        <Button type="button" size="sm" className="h-8 gap-2" onClick={() => setUploadOpen(true)}>
+                            <Upload className="h-4 w-4" />
+                            Загрузить голос
+                        </Button>
+                    }
                     onTogglePool={(voiceId, inPool) => togglePoolMutation.mutate({ voiceId, inPool })}
                     onPlay={(voice) => playVoiceMutation.mutate(voice)}
                     onSettings={openVoiceSettings}

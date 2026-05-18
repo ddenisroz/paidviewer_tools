@@ -22,13 +22,29 @@ interface TtsQueueItem {
     timestamp: Date;
 }
 
+type TtsMessageStatus = 'not_voiced' | 'queued' | 'playing' | 'played' | 'failed';
+
+interface TtsLiveChatMessage {
+    id: string;
+    sourceMessageId?: string;
+    username?: string;
+    platform?: string;
+    text: string;
+    status: TtsMessageStatus;
+    reasonCode?: string;
+    audioUrl?: string;
+    timestamp: Date;
+}
+
 interface TtsPlayerContextValue {
     queue: TtsQueueItem[];
     currentItem: TtsQueueItem | null;
+    liveMessages: TtsLiveChatMessage[];
     isPlaying: boolean;
     isPaused: boolean;
     isPrimaryPlayerTab: boolean;
     isAudioUnlocked: boolean;
+    isSocketConnected: boolean;
     addToQueue: (item: Omit<TtsQueueItem, 'id' | 'timestamp' | 'status'>) => void;
     clearQueue: () => void;
     skipCurrent: () => void;
@@ -71,12 +87,14 @@ const getStoredAudioUnlocked = (): boolean => {
 export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }) => {
     const [queue, setQueue] = useState<TtsQueueItem[]>([]);
     const [currentItem, setCurrentItem] = useState<TtsQueueItem | null>(null);
+    const [liveMessages, setLiveMessages] = useState<TtsLiveChatMessage[]>([]);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [listeningMode, setListeningMode] = useState<'website' | 'obs'>(getStoredListeningMode);
     const [isPrimaryPlayerTab, setIsPrimaryPlayerTab] = useState<boolean>(false);
     const [ttsEnabled, setTtsEnabled] = useState<boolean>(getStoredTtsEnabled);
     const [isAudioUnlocked, setIsAudioUnlocked] = useState<boolean>(getStoredAudioUnlocked);
+    const [isSocketConnected, setIsSocketConnected] = useState<boolean>(false);
 
     const audioContext = useRef<AudioContext | null>(null);
     const currentSource = useRef<AudioBufferSourceNode | null>(null);
@@ -166,6 +184,108 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         return resolveBackendAudioUrl(rawAudioUrl);
     }, []);
 
+    const findLiveMessageIndex = (
+        messages: TtsLiveChatMessage[],
+        payload: {
+            source_message_id?: string;
+            id?: string;
+            message_id?: string;
+            username?: string;
+            author?: string;
+            author_name?: string;
+            platform?: string;
+            text?: string;
+            message?: string;
+            content?: string;
+        }
+    ): number => {
+        const sourceMessageId = String(payload.source_message_id || payload.message_id || payload.id || '').trim();
+        if (sourceMessageId) {
+            const byId = messages.findIndex(
+                (message) => message.sourceMessageId === sourceMessageId || message.id === sourceMessageId
+            );
+            if (byId >= 0) return byId;
+        }
+
+        const text = String(payload.text || payload.message || payload.content || '').trim();
+        const username = String(payload.username || payload.author_name || payload.author || '').trim().toLowerCase();
+        const platform = String(payload.platform || '').trim().toLowerCase();
+        if (!text) return -1;
+
+        return messages.findIndex((message) => {
+            const sameText = message.text.trim() === text;
+            const sameUser = !username || (message.username || '').toLowerCase() === username;
+            const samePlatform = !platform || (message.platform || '').toLowerCase() === platform;
+            return sameText && sameUser && samePlatform;
+        });
+    };
+
+    const upsertLiveMessageStatus = useCallback(
+        (
+            payload: {
+                source_message_id?: string;
+                id?: string;
+                message_id?: string;
+                username?: string;
+                author?: string;
+                author_name?: string;
+                platform?: string;
+                text?: string;
+                message?: string;
+                content?: string;
+                original_text?: string;
+                spoken_text?: string;
+                audio_url?: string;
+            },
+            status: TtsMessageStatus,
+            reasonCode?: string
+        ) => {
+            const text = String(
+                payload.original_text || payload.text || payload.message || payload.content || payload.spoken_text || ''
+            ).trim();
+            const sourceMessageId = String(payload.source_message_id || payload.message_id || payload.id || '').trim();
+
+            setLiveMessages((prev) => {
+                const index = findLiveMessageIndex(prev, {
+                    ...payload,
+                    text,
+                    source_message_id: sourceMessageId,
+                });
+                if (index >= 0) {
+                    return prev.map((message, messageIndex) =>
+                        messageIndex === index
+                            ? {
+                                  ...message,
+                                  status,
+                                  reasonCode,
+                                  audioUrl: payload.audio_url ? resolveAudioUrl(payload.audio_url) : message.audioUrl,
+                                  sourceMessageId: sourceMessageId || message.sourceMessageId,
+                              }
+                            : message
+                    );
+                }
+
+                if (!text) return prev;
+
+                return [
+                    {
+                        id: sourceMessageId || `${Date.now()}-${Math.random()}`,
+                        sourceMessageId: sourceMessageId || undefined,
+                        username: payload.username || payload.author_name || payload.author,
+                        platform: payload.platform,
+                        text,
+                        status,
+                        reasonCode,
+                        audioUrl: payload.audio_url ? resolveAudioUrl(payload.audio_url) : undefined,
+                        timestamp: new Date(),
+                    },
+                    ...prev,
+                ].slice(0, 24);
+            });
+        },
+        [resolveAudioUrl]
+    );
+
     const enqueueSocketAudio = useCallback(
         (payload: {
             audio_url?: string;
@@ -203,6 +323,19 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             if (eventKey) {
                 recentSocketEventsRef.current.set(eventKey, now);
             }
+
+            upsertLiveMessageStatus(
+                {
+                    source_message_id: payload.source_message_id,
+                    username: payload.username,
+                    platform: payload.platform,
+                    text: payload.original_text || payload.spoken_text || payload.text,
+                    original_text: payload.original_text,
+                    spoken_text: payload.spoken_text,
+                    audio_url: payload.audio_url,
+                },
+                'queued'
+            );
 
             if (!ttsEnabledRef.current) {
                 return;
@@ -245,7 +378,67 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 original_text: newItem.originalText,
             });
         },
-        [resolveAudioUrl]
+        [resolveAudioUrl, upsertLiveMessageStatus]
+    );
+
+    const addLiveChatMessage = useCallback(
+        (payload: {
+            id?: string;
+            message_id?: string;
+            username?: string;
+            author?: string;
+            author_name?: string;
+            platform?: string;
+            text?: string;
+            message?: string;
+            content?: string;
+            timestamp?: number | string;
+        }) => {
+            const text = String(payload.text || payload.message || payload.content || '').trim();
+            if (!text) return;
+
+            const rawTimestamp = payload.timestamp;
+            const parsedTimestamp =
+                typeof rawTimestamp === 'number'
+                    ? new Date(rawTimestamp)
+                    : typeof rawTimestamp === 'string'
+                      ? new Date(rawTimestamp)
+                      : new Date();
+
+            const sourceMessageId = String(payload.message_id || payload.id || '').trim();
+            const item: TtsLiveChatMessage = {
+                id: sourceMessageId || `${Date.now()}-${Math.random()}`,
+                sourceMessageId: sourceMessageId || undefined,
+                username: payload.username || payload.author_name || payload.author,
+                platform: payload.platform,
+                text,
+                status: 'not_voiced',
+                timestamp: Number.isNaN(parsedTimestamp.getTime()) ? new Date() : parsedTimestamp,
+            };
+
+            setLiveMessages((prev) => {
+                const existingIndex = prev.findIndex(
+                    (existing) =>
+                        existing.id === item.id ||
+                        Boolean(item.sourceMessageId && existing.sourceMessageId === item.sourceMessageId)
+                );
+                if (existingIndex >= 0) {
+                    return prev.map((existing) =>
+                        existing.id === item.id ||
+                        Boolean(item.sourceMessageId && existing.sourceMessageId === item.sourceMessageId)
+                            ? {
+                                  ...existing,
+                                  username: existing.username || item.username,
+                                  platform: existing.platform || item.platform,
+                                  text: existing.text || item.text,
+                              }
+                            : existing
+                    );
+                }
+                return [item, ...prev].slice(0, 24);
+            });
+        },
+        []
     );
 
     useEffect(() => {
@@ -428,6 +621,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
 
         const closePresenceSocket = () => {
             clearReconnectTimer();
+            setIsSocketConnected(false);
             if (presenceWebSocketRef.current) {
                 const ws = presenceWebSocketRef.current;
                 presenceWebSocketRef.current = null;
@@ -435,7 +629,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             }
         };
 
-        const shouldConnect = Boolean(isAuthenticated && user?.id && listeningMode === 'website');
+        const shouldConnect = Boolean(isAuthenticated && user?.id);
 
         presenceShouldReconnectRef.current = shouldConnect;
 
@@ -473,6 +667,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             presenceWebSocketRef.current = ws;
 
             ws.onopen = () => {
+                setIsSocketConnected(true);
                 logger.info('[TTS Player] Presence WebSocket connected');
             };
 
@@ -490,6 +685,15 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                             original_text?: string;
                             trace_id?: string;
                             source_message_id?: string;
+                            status?: TtsMessageStatus;
+                            reason_code?: string;
+                            id?: string;
+                            message_id?: string;
+                            message?: string;
+                            content?: string;
+                            author?: string;
+                            author_name?: string;
+                            timestamp?: number | string;
                         };
                         audio_url?: string;
                         text?: string;
@@ -500,6 +704,15 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                         original_text?: string;
                         trace_id?: string;
                         source_message_id?: string;
+                        status?: TtsMessageStatus;
+                        reason_code?: string;
+                        id?: string;
+                        message_id?: string;
+                        message?: string;
+                        content?: string;
+                        author?: string;
+                        author_name?: string;
+                        timestamp?: number | string;
                     };
                     if (message.type === 'ping') {
                         ws.send(JSON.stringify({ type: 'ping' }));
@@ -509,6 +722,33 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                     if (message.type === 'tts_audio') {
                         const payload = message.data || message;
                         enqueueSocketAudio(payload);
+                        return;
+                    }
+
+                    if (message.type === 'tts_status') {
+                        const payload = message.data || message;
+                        upsertLiveMessageStatus(
+                            {
+                                source_message_id: payload.source_message_id,
+                                id: payload.id,
+                                message_id: payload.message_id,
+                                text: payload.text,
+                                message: payload.message,
+                                content: payload.content,
+                                username: payload.username,
+                                author: payload.author,
+                                author_name: payload.author_name,
+                                platform: payload.platform,
+                            },
+                            payload.status || 'not_voiced',
+                            payload.reason_code
+                        );
+                        return;
+                    }
+
+                    if (message.type === 'message') {
+                        const payload = message.data || message;
+                        addLiveChatMessage(payload);
                     }
                 } catch {
                     // ignore malformed presence payloads
@@ -520,6 +760,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             };
 
             ws.onclose = () => {
+                setIsSocketConnected(false);
                 if (presenceWebSocketRef.current === ws) {
                     presenceWebSocketRef.current = null;
                 }
@@ -541,7 +782,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             presenceShouldReconnectRef.current = false;
             closePresenceSocket();
         };
-    }, [isAuthenticated, user?.id, listeningMode, enqueueSocketAudio]);
+    }, [isAuthenticated, user?.id, enqueueSocketAudio, addLiveChatMessage, upsertLiveMessageStatus]);
 
     useEffect(() => {
         if (!isAuthenticated || listeningMode !== 'website' || !isPrimaryPlayerTab) {
@@ -675,6 +916,15 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                     retryCount.current = 0;
                     currentSource.current = null;
                     playbackActiveRef.current = false;
+                    upsertLiveMessageStatus(
+                        {
+                            source_message_id: nextItem.sourceMessageId,
+                            username: nextItem.username,
+                            platform: nextItem.platform,
+                            text: nextItem.originalText || nextItem.spokenText || nextItem.text,
+                        },
+                        'played'
+                    );
                     setIsPlaying(false);
                     setIsPaused(false);
                     setCurrentItem(null);
@@ -717,6 +967,15 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 retryCount.current = 0;
                 audioElement.current = null;
                 playbackActiveRef.current = false;
+                upsertLiveMessageStatus(
+                    {
+                        source_message_id: nextItem.sourceMessageId,
+                        username: nextItem.username,
+                        platform: nextItem.platform,
+                        text: nextItem.originalText || nextItem.spokenText || nextItem.text,
+                    },
+                    'played'
+                );
                 setIsPlaying(false);
                 setIsPaused(false);
                 setCurrentItem(null);
@@ -728,6 +987,16 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 logger.error('[TTS Player] Audio playback error');
                 audioElement.current = null;
                 playbackActiveRef.current = false;
+                upsertLiveMessageStatus(
+                    {
+                        source_message_id: nextItem.sourceMessageId,
+                        username: nextItem.username,
+                        platform: nextItem.platform,
+                        text: nextItem.originalText || nextItem.spokenText || nextItem.text,
+                    },
+                    'failed',
+                    'playback_error'
+                );
                 setIsPlaying(false);
                 setIsPaused(false);
                 setCurrentItem(null);
@@ -765,6 +1034,16 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 logger.error('[TTS Player] Failed to play audio:', playErr);
                 audioElement.current = null;
                 playbackActiveRef.current = false;
+                upsertLiveMessageStatus(
+                    {
+                        source_message_id: nextItem.sourceMessageId,
+                        username: nextItem.username,
+                        platform: nextItem.platform,
+                        text: nextItem.originalText || nextItem.spokenText || nextItem.text,
+                    },
+                    'failed',
+                    'playback_blocked'
+                );
                 setIsPlaying(false);
                 setIsPaused(false);
                 setCurrentItem(null);
@@ -782,7 +1061,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 isStartingPlaybackRef.current = false;
             }
         }
-    }, [stopActivePlayback]);
+    }, [stopActivePlayback, upsertLiveMessageStatus]);
 
     const clearQueue = useCallback(() => {
         invalidatePlaybackRequests();
@@ -854,6 +1133,18 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     }, []);
 
     const skipCurrent = useCallback(() => {
+        if (currentItem) {
+            upsertLiveMessageStatus(
+                {
+                    source_message_id: currentItem.sourceMessageId,
+                    username: currentItem.username,
+                    platform: currentItem.platform,
+                    text: currentItem.originalText || currentItem.spokenText || currentItem.text,
+                },
+                'failed',
+                'skipped'
+            );
+        }
         invalidatePlaybackRequests();
         stopActivePlayback();
 
@@ -862,7 +1153,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         setIsPaused(false);
         setTimeout(() => playNext(), 100);
         logger.info('[SKIP] [TTS Player] Skipped current item');
-    }, [invalidatePlaybackRequests, stopActivePlayback, playNext]);
+    }, [currentItem, invalidatePlaybackRequests, playNext, stopActivePlayback, upsertLiveMessageStatus]);
 
     const playFromQueue = useCallback(
         (index: number) => {
@@ -932,10 +1223,12 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     const value: TtsPlayerContextValue = {
         queue,
         currentItem,
+        liveMessages,
         isPlaying,
         isPaused,
         isPrimaryPlayerTab,
         isAudioUnlocked,
+        isSocketConnected,
         addToQueue,
         clearQueue,
         skipCurrent,

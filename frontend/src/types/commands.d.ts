@@ -37,6 +37,23 @@ export interface ChatCommand {
  */
 export type Command = ChatCommand;
 
+export interface CommandInvocation {
+    id: number;
+    command_id?: number;
+    canonical_command_name: string;
+    used_trigger: string;
+    viewer_name?: string;
+    viewer_id?: string;
+    platform?: 'twitch' | 'vk' | 'youtube' | 'all' | string;
+    channel_name?: string;
+    message_text?: string;
+    chat_message_id?: number;
+    has_platform_message?: boolean;
+    status?: string;
+    error?: string;
+    created_at?: string;
+}
+
 /**
  * Override команды
  */

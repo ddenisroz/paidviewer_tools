@@ -5,7 +5,6 @@ import React, { createContext, ReactNode, useCallback, useContext, useEffect, us
 import { saveReturnUrl } from '@/features/auth/utils/oauthRedirect';
 import { apiClient } from '@/services/api/client';
 import { integrationsService } from '@/services/api/services/integrationsService';
-import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
 import { useAuth } from './AuthContext';
@@ -37,10 +36,6 @@ interface DonationAlertsProviderProps {
 
 interface DonationAlertsStatusResponse {
     connected?: boolean;
-}
-
-interface DonationAlertsConnectResponse {
-    auth_url?: string;
 }
 
 const getApiErrorMessage = (err: unknown, fallback: string): string => {
@@ -95,20 +90,9 @@ export const DonationAlertsProvider: React.FC<DonationAlertsProviderProps> = ({ 
             setIsLoading(true);
             setError(null);
 
-            const response = await integrationsService.connectDonationAlerts();
-            const data = response.data as DonationAlertsConnectResponse;
-
-            if (data.auth_url) {
-                const safeUrl = getSafeNavigationUrl(data.auth_url);
-                if (!safeUrl) {
-                    throw new Error('Небезопасный URL авторизации');
-                }
-                saveReturnUrl();
-                window.location.href = safeUrl;
-                return true;
-            } else {
-                throw new Error('URL авторизации не получен');
-            }
+            saveReturnUrl();
+            integrationsService.connectDonationAlertsRedirect();
+            return true;
         } catch (err: unknown) {
             logger.error('Error connecting to DonationAlerts:', err);
             setError(getApiErrorMessage(err, 'Не удалось подключить DonationAlerts'));

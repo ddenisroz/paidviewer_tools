@@ -175,4 +175,17 @@ async def build_provider_success_result(
         "audio_path": localized_audio.get("audio_path"),
         "duration": result_payload.get("duration"),
         "spoken_text": result_payload.get("spoken_text"),
+        "meta": result_payload.get("meta") if isinstance(result_payload.get("meta"), dict) else {},
+        "speed_preset": result_payload.get("speed_preset")
+        or (
+            result_payload.get("meta", {}).get("speed_preset")
+            if isinstance(result_payload.get("meta"), dict)
+            else None
+        ),
+        "speed_factor": result_payload.get("speed_factor")
+        or (
+            result_payload.get("meta", {}).get("speed_factor")
+            if isinstance(result_payload.get("meta"), dict)
+            else None
+        ),
     }

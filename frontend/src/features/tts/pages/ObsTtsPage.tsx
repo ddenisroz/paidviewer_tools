@@ -1,115 +1,153 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useParams } from 'react-router-dom';
 
 import { WS_BASE_URL } from '@/constants';
 import { resolveAudioUrl } from '@/shared/utils/urlUtils';
 
+interface ObsQueueItem {
+    id: string;
+    audioUrl: string;
+    sourceMessageId?: string;
+}
+
 const ObsTtsPage: React.FC = () => {
     const { token } = useParams<{ token: string }>();
-    const [audioQueue, setAudioQueue] = useState<string[]>([]);
-    const [isPlaying, setIsPlaying] = useState<boolean>(false);
-    const [status, setStatus] = useState<string>('Initializing...');
+    const [audioQueue, setAudioQueue] = useState<ObsQueueItem[]>([]);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [status, setStatus] = useState(token ? 'connecting' : 'missing token');
     const ws = useRef<WebSocket | null>(null);
+    const reconnectTimerRef = useRef<number | null>(null);
+
+    useEffect(() => {
+        const root = document.getElementById('root');
+        const previousHtmlBackground = document.documentElement.style.background;
+        const previousBodyBackground = document.body.style.background;
+        const previousBodyMargin = document.body.style.margin;
+        const previousRootBackground = root?.style.background;
+
+        document.documentElement.style.background = 'transparent';
+        document.body.style.background = 'transparent';
+        document.body.style.margin = '0';
+        if (root) {
+            root.style.background = 'transparent';
+        }
+
+        return () => {
+            document.documentElement.style.background = previousHtmlBackground;
+            document.body.style.background = previousBodyBackground;
+            document.body.style.margin = previousBodyMargin;
+            if (root) {
+                root.style.background = previousRootBackground || '';
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!token) {
-            setStatus('Error: No authentication token provided in URL.');
+            setStatus('missing token');
             return;
         }
 
         const connect = (): void => {
             const wsUrl = `${WS_BASE_URL}/ws/tts/${token}`;
-            setStatus(`Connecting to ${wsUrl}...`);
-
+            setStatus('connecting');
             ws.current = new WebSocket(wsUrl);
 
             ws.current.onopen = (): void => {
-                setStatus(`Connection established. Waiting for TTS messages...`);
+                setStatus('connected');
             };
 
             ws.current.onmessage = (event: MessageEvent): void => {
                 try {
-                    const message = JSON.parse(event.data) as { type: string; audio_url?: string; message?: string };
-                    if (message.type === 'tts_synthesized' && message.audio_url) {
-                        const audioUrl = resolveAudioUrl(message.audio_url);
-                        setAudioQueue((prevQueue) => [...prevQueue, audioUrl]);
+                    const message = JSON.parse(event.data) as {
+                        type?: string;
+                        data?: {
+                            audio_url?: string;
+                            source_message_id?: string;
+                        };
+                        audio_url?: string;
+                        source_message_id?: string;
+                        message?: string;
+                    };
+
+                    const payload = message.data || message;
+                    if ((message.type === 'tts_audio' || message.type === 'tts_synthesized') && payload.audio_url) {
+                        const audioUrl = resolveAudioUrl(payload.audio_url);
+                        setAudioQueue((prevQueue) => [
+                            ...prevQueue,
+                            {
+                                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                                audioUrl,
+                                sourceMessageId: payload.source_message_id,
+                            },
+                        ]);
+                        setStatus('queued');
                     } else if (message.type === 'tts_error') {
-                        setStatus(`Error: ${message.message || 'Unknown error'}`);
+                        setStatus(message.message || 'tts error');
                     }
                 } catch {
-                    // Ошибка обработки WebSocket сообщения
+                    // OBS source should stay silent on malformed events.
                 }
             };
 
             ws.current.onerror = (): void => {
-                setStatus('WebSocket Error. Reconnecting...');
+                setStatus('socket error');
             };
 
             ws.current.onclose = (): void => {
-                setStatus('WebSocket Disconnected. Reconnecting in 5 seconds...');
-                setTimeout(connect, 5000);
+                setStatus('reconnecting');
+                reconnectTimerRef.current = window.setTimeout(connect, 5000);
             };
         };
 
         connect();
 
         return () => {
-            if (ws.current) {
-                ws.current.close();
+            if (reconnectTimerRef.current) {
+                window.clearTimeout(reconnectTimerRef.current);
             }
+            ws.current?.close();
         };
     }, [token]);
 
     useEffect(() => {
-        if (audioQueue.length > 0 && !isPlaying) {
-            const nextAudioUrl = audioQueue[0];
-            setIsPlaying(true);
+        if (audioQueue.length === 0 || isPlaying) return;
 
-            const audio = new Audio(nextAudioUrl);
+        const nextItem = audioQueue[0];
+        const audio = new Audio(nextItem.audioUrl);
+        audio.preload = 'auto';
+        setIsPlaying(true);
+        setStatus('playing');
 
-            audio.oncanplaythrough = (): void => {
-                audio.play().catch(() => {
-                    setIsPlaying(false);
-                    setAudioQueue((prevQueue) => prevQueue.slice(1));
-                });
-            };
+        const sendPlaybackStatus = (statusValue: 'playing' | 'played' | 'failed'): void => {
+            const socket = ws.current;
+            if (!socket || socket.readyState !== WebSocket.OPEN || !nextItem.sourceMessageId) return;
+            socket.send(
+                JSON.stringify({
+                    type: 'tts_status',
+                    source_message_id: nextItem.sourceMessageId,
+                    status: statusValue,
+                })
+            );
+        };
+        sendPlaybackStatus('playing');
 
-            audio.onended = (): void => {
-                setIsPlaying(false);
-                setAudioQueue((prevQueue) => prevQueue.slice(1));
-            };
+        const finish = (statusValue: 'played' | 'failed' = 'played'): void => {
+            setIsPlaying(false);
+            setAudioQueue((prevQueue) => prevQueue.slice(1));
+            setStatus('connected');
+            sendPlaybackStatus(statusValue);
+        };
 
-            audio.onerror = (): void => {
-                setIsPlaying(false);
-                setAudioQueue((prevQueue) => prevQueue.slice(1));
-            };
-
-            audio.load();
-        }
+        audio.onended = () => finish('played');
+        audio.onerror = (): void => {
+            finish('failed');
+        };
+        audio.play().catch(() => finish('failed'));
     }, [audioQueue, isPlaying]);
 
-    return (
-        <div
-            style={{
-                fontFamily: 'sans-serif',
-                color: 'white',
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                padding: '20px',
-                borderRadius: '10px',
-                position: 'absolute',
-                top: '10px',
-                left: '10px',
-            }}
-        >
-            <h1>OBS TTS Player</h1>
-            <p>
-                <strong>Status:</strong> {status}
-            </p>
-            <p>This is a browser source for OBS. It will automatically play TTS audio from your chat when enabled.</p>
-            <p>Queue length: {audioQueue.length}</p>
-        </div>
-    );
+    return <div className="min-h-screen bg-transparent" data-tts-source-status={status} />;
 };
 
 export default ObsTtsPage;

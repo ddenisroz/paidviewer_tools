@@ -379,6 +379,7 @@ const ChatOverlay: React.FC = () => {
             : `${CHATBOX_BRAND_FONT}, sans-serif`;
 
         return {
+            ['--chatbox-overlay-font' as string]: resolvedFontFamily,
             width: `${settings?.chat_width || 100}vw`,
             height: '100vh',
             padding: '16px',
@@ -950,10 +951,14 @@ const ChatOverlay: React.FC = () => {
                             transform: scale(0.98);
                         }
                     }
+                    .chatbox-overlay-font-scope,
+                    .chatbox-overlay-font-scope * {
+                        font-family: var(--chatbox-overlay-font) !important;
+                    }
                 `}
             </style>
 
-            <div style={containerStyle}>
+            <div className="chatbox-overlay-font-scope" style={containerStyle}>
                 {messages.length === 0 ? (
                     <div
                         style={{

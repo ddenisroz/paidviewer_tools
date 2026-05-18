@@ -165,6 +165,10 @@ export const ttsService = {
         return apiClient.get('/api/tts/obs-url');
     },
 
+    async getObsStatus(): Promise<AxiosResponse<ApiResponse>> {
+        return apiClient.get('/api/tts/obs-status');
+    },
+
     /**
      * Установить режим прослушивания TTS
      * @param data - Данные режима

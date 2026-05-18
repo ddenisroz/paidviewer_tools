@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-
-import { Edit, Loader2, Music, Power, Save, Trash2 } from 'lucide-react';
+import { Edit, Loader2, Music, Power, Save, Trash2, Upload } from 'lucide-react';
+import { useRef } from 'react';
 
 import {
     useCreateDropsReward,
@@ -8,6 +8,7 @@ import {
     useDropsQualities,
     useDropsRewards,
     useToggleDropsReward,
+    useUploadDropsRewardSound,
     useUpdateDropsReward,
 } from '@/queries/drops/dropsQueries';
 import { Badge } from '@/shared/components/ui/badge';
@@ -171,6 +172,8 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
         const updateRewardMutation = useUpdateDropsReward(channelName);
         const deleteRewardMutation = useDeleteDropsReward(channelName);
         const toggleRewardMutation = useToggleDropsReward(channelName);
+        const uploadRewardSoundMutation = useUploadDropsRewardSound(channelName);
+        const soundInputRef = useRef<HTMLInputElement | null>(null);
 
         const firstQualityId = useMemo(() => {
             if (Array.isArray(qualitiesData) && qualitiesData.length > 0) {
@@ -292,6 +295,25 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
             });
         };
 
+        const handleSoundSelect = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+            const file = event.target.files?.[0];
+            if (!file || !selectedReward) return;
+
+            uploadRewardSoundMutation.mutate(
+                {
+                    rewardId: Number(selectedReward.id),
+                    file,
+                },
+                {
+                    onSettled: () => {
+                        if (soundInputRef.current) {
+                            soundInputRef.current.value = '';
+                        }
+                    },
+                }
+            );
+        };
+
         const handleSave = (): void => {
             if (!form.name.trim()) {
                 toast.error('Укажите название награды');
@@ -353,6 +375,9 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
                     <div className="space-y-4">
                         {QUALITIES.map((qualityItem) => {
                             const qualityRewards = rewardsByQuality(qualityItem.name);
+                            const activeQualityWeight = qualityRewards
+                                .filter((reward) => reward.is_active !== false)
+                                .reduce((sum, reward) => sum + Math.max(1, Number(reward.weight) || 1), 0);
                             const qualityData = Array.isArray(qualitiesData)
                                 ? (qualitiesData as unknown as QualityConfig[]).find((q) => q.name === qualityItem.name)
                                 : null;
@@ -396,10 +421,15 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
                                                 {qualityRewards.map((reward) => {
                                                     const isSelected =
                                                         editorMode === 'edit' && Number(reward.id) === selectedRewardId;
+                                                    const rewardWeight = Math.max(1, Number(reward.weight) || 1);
+                                                    const rewardChance =
+                                                        reward.is_active === false || activeQualityWeight <= 0
+                                                            ? 0
+                                                            : (rewardWeight / activeQualityWeight) * 100;
                                                     return (
                                                         <div
                                                             key={reward.id}
-                                                            className={`rounded-xl border p-3 transition-colors ${reward.is_active ? (isSelected ? 'border-sky-500/50' : 'border-border/70') : 'border-red-500/40'} ${reward.is_active ? 'bg-transparent' : 'bg-transparent opacity-70'}`}
+                                                            className={`flex min-h-[122px] flex-col rounded-xl border p-3 transition-colors ${reward.is_active ? (isSelected ? 'border-sky-500/50' : 'border-border/70') : 'border-red-500/40'} ${reward.is_active ? 'bg-transparent' : 'bg-transparent opacity-70'}`}
                                                         >
                                                             <div className="mb-2 flex items-start justify-between gap-2">
                                                                 <h4 className="line-clamp-2 text-sm font-semibold text-foreground">
@@ -409,15 +439,19 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
                                                                     variant="outline"
                                                                     className="shrink-0 border-border/70 bg-transparent text-sky-300"
                                                                 >
-                                                                    Вес {reward.weight}
+                                                                    Вес {reward.weight} · {getWeightChanceLabel(rewardChance)}
                                                                 </Badge>
                                                             </div>
 
-                                                            {reward.description && (
-                                                                <p className="mb-2 line-clamp-2 text-xs text-muted-foreground">
-                                                                    {reward.description}
+                                                            <div className="mb-2 min-h-[36px]">
+                                                                <p
+                                                                    className={`line-clamp-2 text-xs text-muted-foreground ${
+                                                                        reward.description ? '' : 'invisible'
+                                                                    }`}
+                                                                >
+                                                                    {reward.description || 'Описание награды'}
                                                                 </p>
-                                                            )}
+                                                            </div>
 
                                                             {reward.sound_file && (
                                                                 <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -425,7 +459,7 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
                                                                 </div>
                                                             )}
 
-                                                            <div className="flex items-center justify-between border-t border-border/70 pt-2">
+                                                            <div className="mt-auto flex items-center justify-between border-t border-border/70 pt-2">
                                                                 <Button
                                                                     variant="ghost"
                                                                     size="sm"
@@ -581,6 +615,43 @@ const RewardsManager: React.FC<RewardsManagerProps> = React.memo(
                                     checked={form.is_active}
                                     onCheckedChange={(checked) => setForm((prev) => ({ ...prev, is_active: checked }))}
                                 />
+                            </div>
+
+                            <div className="space-y-2 rounded-md border border-border/70 px-3 py-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <Label className="text-sm">Звук награды</Label>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Проигрывается после остановки рулетки.
+                                        </p>
+                                    </div>
+                                    {selectedReward?.sound_file ? (
+                                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Music className="h-3 w-3" /> Загружен
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <input
+                                    ref={soundInputRef}
+                                    type="file"
+                                    accept="audio/*,.mp3,.wav,.ogg,.m4a"
+                                    className="hidden"
+                                    onChange={(event) => void handleSoundSelect(event)}
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full border-border/70 bg-transparent text-sky-300 hover:bg-transparent hover:text-sky-200"
+                                    disabled={editorMode !== 'edit' || !selectedReward || uploadRewardSoundMutation.isPending}
+                                    onClick={() => soundInputRef.current?.click()}
+                                >
+                                    {uploadRewardSoundMutation.isPending ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Upload className="mr-2 h-4 w-4" />
+                                    )}
+                                    {selectedReward?.sound_file ? 'Заменить звук' : 'Загрузить звук'}
+                                </Button>
                             </div>
 
                             <div className="flex flex-wrap gap-2 pt-2">

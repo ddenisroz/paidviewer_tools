@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { Download, ExternalLink, HeartPulse, Link2, Monitor, Settings2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Download, HeartPulse, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/context/AuthContext';
@@ -147,19 +146,13 @@ const LocalTTSSettingsPage: React.FC = () => {
     };
 
     return (
-        <PageWrapper
-            description="Только F5 self-host: один endpoint, одна схема health-check, одна понятная цепочка подключения."
-            contentClassName="space-y-5"
-        >
+        <PageWrapper contentClassName="space-y-5">
             <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                 <Card className="border-border/70 bg-card/85 shadow-sm">
                     <CardHeader className="pb-3">
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <CardTitle className="text-xl">F5 Self-Host</CardTitle>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    Подключите локальный F5 runtime и при желании переведите TTS на self-host без отдельного движка.
-                                </p>
                             </div>
                             <Badge variant={isHealthy ? 'default' : 'secondary'}>{statusLabel}</Badge>
                         </div>
@@ -178,7 +171,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                             <div className="flex items-center justify-between rounded-2xl border border-border/70 bg-muted/20 px-4 py-3 md:min-w-[220px]">
                                 <div>
                                     <div className="text-sm font-medium text-foreground">Использовать self-host</div>
-                                    <div className="text-xs text-muted-foreground">Переключает активный F5-режим</div>
                                 </div>
                                 <Switch checked={useLocal} onCheckedChange={handleToggleLocal} disabled={toggleLocalMutation.isPending} />
                             </div>
@@ -191,9 +183,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 onChange={(event) => setApiKey(event.target.value)}
                                 placeholder={localConfig?.api_key_redacted || 'Если runtime защищен ключом, укажите его здесь'}
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Ключ можно оставить пустым, если ваш локальный F5 работает без авторизации.
-                            </p>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
@@ -204,12 +193,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                             <Button onClick={handleSave} disabled={saveConfigMutation.isPending}>
                                 <Settings2 className="mr-2 h-4 w-4" />
                                 Сохранить
-                            </Button>
-                            <Button type="button" variant="outline" asChild>
-                                <Link to="/dashboard/tts/voices">
-                                    <Link2 className="mr-2 h-4 w-4" />
-                                    Голоса и пул
-                                </Link>
                             </Button>
                         </div>
 
@@ -246,7 +229,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
                                         <div className="text-sm font-medium text-foreground">Активные агенты</div>
-                                        <div className="text-xs text-muted-foreground">Подключенные F5 self-host воркеры</div>
                                     </div>
                                     <Badge variant="outline">{activeWorkers.length}</Badge>
                                 </div>
@@ -260,7 +242,7 @@ const LocalTTSSettingsPage: React.FC = () => {
                             <div className="space-y-2">
                                 {workers.length === 0 ? (
                                     <div className="rounded-2xl border border-dashed border-border/70 bg-muted/15 px-4 py-5 text-sm text-muted-foreground">
-                                        Пока нет подключенных воркеров. Скачайте bundle и импортируйте его в `tts_worker_agent`.
+                                        Нет подключенных воркеров
                                     </div>
                                 ) : (
                                     workers.map((worker) => (
@@ -281,36 +263,6 @@ const LocalTTSSettingsPage: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    <Card className="border-border/70 bg-card/85 shadow-sm">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-lg">Полезное</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <a
-                                href="https://github.com/SWivid/F5-TTS"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex items-center justify-between rounded-2xl border border-border/70 bg-muted/20 px-4 py-3 text-sm text-foreground transition-colors hover:bg-muted/35"
-                            >
-                                <span className="inline-flex items-center gap-2">
-                                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                                    Официальный F5-TTS
-                                </span>
-                                <Monitor className="h-4 w-4 text-muted-foreground" />
-                            </a>
-
-                            <Link
-                                to="/dashboard/tts"
-                                className="flex items-center justify-between rounded-2xl border border-border/70 bg-muted/20 px-4 py-3 text-sm text-foreground transition-colors hover:bg-muted/35"
-                            >
-                                <span className="inline-flex items-center gap-2">
-                                    <Monitor className="h-4 w-4 text-muted-foreground" />
-                                    Вернуться к настройкам TTS
-                                </span>
-                                <ExternalLink className="h-4 w-4 text-muted-foreground" />
-                            </Link>
-                        </CardContent>
-                    </Card>
                 </div>
             </div>
         </PageWrapper>

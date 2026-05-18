@@ -1,6 +1,6 @@
 ﻿"""Bot command model."""
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text
 
 from core.datetime_utils import utcnow_naive
 from models.base import Base
@@ -37,3 +37,25 @@ class BotCommand(Base):
     extra_settings = Column(JSON, nullable=True, default=dict)
     created_at = Column(DateTime, default=utcnow_naive)
     updated_at = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
+
+
+class CommandInvocation(Base):
+    """Concrete command usage event for activity/history screens."""
+
+    __tablename__ = "command_invocations"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    command_id = Column(Integer, ForeignKey("bot_commands.id"), nullable=True, index=True)
+    canonical_command_name = Column(String, nullable=False, index=True)
+    used_trigger = Column(String, nullable=False, index=True)
+    viewer_name = Column(String, nullable=True, index=True)
+    viewer_id = Column(String, nullable=True, index=True)
+    platform = Column(String, nullable=False, index=True)
+    channel_name = Column(String, nullable=True, index=True)
+    message_text = Column(Text, nullable=True)
+    chat_message_id = Column(Integer, nullable=True, index=True)
+    status = Column(String, nullable=False, default="success", index=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=utcnow_naive, index=True)

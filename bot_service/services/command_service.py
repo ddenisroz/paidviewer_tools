@@ -189,9 +189,9 @@ class CommandService:
         limit: int,
         db: Session,
     ) -> Dict[str, Any]:
-        """Return usage history for user commands."""
+        """Return concrete command invocation history for the user."""
         repo = self._get_repo(db)
-        commands = repo.get_command_history(
+        invocations = repo.get_invocation_history(
             user_id=user_id,
             platform=platform,
             command_type=command_type,
@@ -200,7 +200,27 @@ class CommandService:
         )
         return {
             "success": True,
-            "data": [self._command_to_dict(cmd) for cmd in commands],
+            "data": [self._invocation_to_dict(item) for item in invocations],
+        }
+
+    @staticmethod
+    def _invocation_to_dict(invocation: Any) -> Dict[str, Any]:
+        """Convert invocation history row to API shape."""
+        return {
+            "id": invocation.id,
+            "command_id": invocation.command_id,
+            "canonical_command_name": invocation.canonical_command_name,
+            "used_trigger": invocation.used_trigger,
+            "viewer_name": invocation.viewer_name,
+            "viewer_id": invocation.viewer_id,
+            "platform": invocation.platform,
+            "channel_name": invocation.channel_name,
+            "message_text": invocation.message_text,
+            "chat_message_id": invocation.chat_message_id,
+            "has_platform_message": bool(invocation.message_text or invocation.chat_message_id),
+            "status": invocation.status,
+            "error": invocation.error,
+            "created_at": invocation.created_at.isoformat() if invocation.created_at else None,
         }
 
     # === CRUD Methods ===

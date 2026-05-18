@@ -58,6 +58,17 @@ cd H:\Programming\raw_code\AI\Python\paidviewer_tools
 Дальше смотри [docs/QUICKSTART.md](/H:/Programming/raw_code/AI/Python/paidviewer_tools/docs/QUICKSTART.md): там описан актуальный запуск всего контура, путь к зеркальным Docker-логам и безопасная очистка Docker.
 Локальный OAuth теперь должен жить только на `http://localhost`: не смешивай `localhost` и `127.0.0.1`, иначе провайдерские callback/cookies будут ломать `state`.
 
+## Уборка рабочей копии
+
+Для безопасной локальной уборки есть dry-run скрипт:
+
+```powershell
+.\scripts\dev\cleanup_worktree.ps1
+.\scripts\dev\cleanup_worktree.ps1 -Apply
+```
+
+Скрипт чистит только allowlist runtime-мусора: `__pycache__`, pytest/cache-директории, `frontend/dist`, временные backend-логи и runtime data. Он не удаляет `.env`, `.venv`, `node_modules`, локальные конфиги и пользовательские данные.
+
 ## Документация
 
 В `docs/` оставлен только активный операционный слой. Исторические планы, внутренние заметки и промежуточные материалы не должны быть источником правды для запуска или релиза.

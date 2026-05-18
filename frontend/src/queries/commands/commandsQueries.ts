@@ -10,7 +10,7 @@ import { logger } from '@/shared/utils/prodLogger';
 import { queryKeys } from '../queryKeys';
 import { unwrapResponse } from '../queryUtils';
 
-import type { ApiResponse, Command as ChatCommand } from '../../types';
+import type { ApiResponse, Command as ChatCommand, CommandInvocation } from '../../types';
 import type { AxiosError } from 'axios';
 
 interface CommandsData {
@@ -112,14 +112,13 @@ export const useCommands = (options?: Omit<UseQueryOptions<CommandsData, AxiosEr
 
 export const useCommandsHistory = (
     params: Record<string, unknown> = {},
-    options?: Omit<UseQueryOptions<ChatCommand[], AxiosError>, 'queryKey' | 'queryFn'>
+    options?: Omit<UseQueryOptions<CommandInvocation[], AxiosError>, 'queryKey' | 'queryFn'>
 ) => {
-    return useQuery<ChatCommand[], AxiosError>({
+    return useQuery<CommandInvocation[], AxiosError>({
         queryKey: queryKeys.commands.history(params),
         queryFn: async () => {
             const response = await unwrapResponse(commandsService.getHistory(params));
-            const raw = (response?.data || []) as unknown as ApiCommandResponse[];
-            return raw.map(mapApiCommandToFrontend);
+            return (response?.data || []) as unknown as CommandInvocation[];
         },
         staleTime: 15 * 1000,
         gcTime: 5 * 60 * 1000,

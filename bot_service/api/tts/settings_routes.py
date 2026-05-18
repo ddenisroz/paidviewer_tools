@@ -11,7 +11,6 @@ from core.database import get_db
 from auth.auth import get_current_user
 from core.config import settings
 from core.internal_service_auth import TTSAuthConfigError, build_tts_auth_headers, build_tts_httpx_client_kwargs
-from constants import DEFAULT_ENABLED_PLATFORMS
 from repositories.local_tts_repository import LocalTTSRepository
 from services.voice_management_upstream import provider_admin_api_base
 from services.tts.tts_service import TTSService
@@ -227,6 +226,9 @@ async def update_tts_settings(
         "useLocalTTS": "use_local_tts",
         "filterReplies": "filter_replies",
         "filterMentions": "filter_mentions",
+        "filterBanwords": "filter_banwords",
+        "disableVoiceSelection": "disable_voice_selection",
+        "speakSenderName": "speak_sender_name",
         "gcloudVoices": "gcloud_voices",
         "gcloudMood": "gcloud_mood",
     }
@@ -595,11 +597,13 @@ async def update_audio_settings(
     """Update audio settings."""
     success = await service.save_audio_settings(
         user_id=user['id'],
-        website_volume=settings_req.websiteVolume
+        website_volume=settings_req.websiteVolume,
+        obs_volume=settings_req.obsVolume,
     )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to save audio settings")
-    return {"success": True}
+    updated = await service.get_audio_settings(user_id=user["id"])
+    return {"success": True, "data": updated, **updated}
 
 # ============================================================================
 # FILTERS
@@ -897,10 +901,7 @@ async def get_platform_settings(
     service: TTSService = Depends(get_tts_service)
 ):
     """Get enabled platforms for TTS."""
-    settings = await service.get_tts_settings(user_id=user['id'])
-    return {
-        "enabled_platforms": settings.get("enabled_platforms", DEFAULT_ENABLED_PLATFORMS)
-    }
+    return await service.get_platform_settings(user_id=user['id'])
 
 @router.post("/platform-settings")
 async def set_platform_settings(
@@ -915,7 +916,27 @@ async def set_platform_settings(
     )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update platform settings")
-    return {"success": True}
+    return {"success": True, **await service.get_platform_settings(user_id=user['id'])}
+
+
+@router.get("/obs-status")
+async def get_obs_status(
+    user: dict = Depends(get_current_user),
+    service: TTSService = Depends(get_tts_service)
+):
+    """Return OBS source and dock connection state."""
+    from core.connection_manager import get_connection_manager
+    from services.memory_websocket_manager import get_memory_websocket_manager
+
+    user_row = service.user_repo.get_by_id(user["id"])
+    obs_token = getattr(user_row, "obs_token", None) if user_row else None
+    source_connected = bool(obs_token and obs_token in get_connection_manager().obs_connections)
+    dock_connected = get_memory_websocket_manager().has_user_connection_for_role(user["id"], "tts_player")
+    return {
+        "has_token": bool(obs_token),
+        "source_connected": source_connected,
+        "dock_connected": dock_connected,
+    }
 
 @router.post("/listening-mode")
 async def set_listening_mode(

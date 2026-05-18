@@ -27,7 +27,7 @@ from models.youtube import YouTubeQueue
 from models.points import ChannelPoints, ChannelReward, PointsTransaction, RewardQueue
 
 # Bot commands.
-from models.commands import BotCommand
+from models.commands import BotCommand, CommandInvocation
 
 # Moderation.
 from models.moderation import BlockedBot, BlockedChannel, WhitelistedChannel
@@ -88,6 +88,7 @@ __all__ = [
     "PointsTransaction",
     "RewardQueue",
     "BotCommand",
+    "CommandInvocation",
     "BlockedBot",
     "BlockedChannel",
     "WhitelistedChannel",

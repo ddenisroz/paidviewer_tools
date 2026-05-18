@@ -130,12 +130,21 @@ class NotificationService:
                 return False
 
             manager = get_memory_websocket_manager()
+            await self.broadcast_tts_status(
+                user_id=target_user_id,
+                source_message_id=audio_data.get("source_message_id"),
+                status="queued",
+            )
             sent_count = await manager.send_to_user(
                 target_user_id,
                 tts_event,
                 client_roles={"tts_player"},
             )
-            if sent_count == 0 and listening_mode != "website":
+            obs_sent_count = 0
+            if listening_mode == "obs":
+                obs_sent_count = await self._send_tts_audio_to_obs(target_user_id, tts_event)
+
+            if sent_count == 0 and obs_sent_count == 0 and listening_mode != "website":
                 # OBS mode doesn't require dedicated tts_player tab; keep legacy delivery path.
                 sent_count = await manager.send_to_user(
                     target_user_id,
@@ -143,16 +152,69 @@ class NotificationService:
                     exclude_presence_only=True
                 )
             logger.info(
-                "[VOLUME] TTS audio sent to %s connections (user=%s, mode=%s)",
+                "[VOLUME] TTS audio sent to %s player connection(s), %s OBS source(s) (user=%s, mode=%s)",
                 sent_count,
+                obs_sent_count,
                 target_user_id,
                 listening_mode,
             )
-            return sent_count > 0
+            return (sent_count + obs_sent_count) > 0
 
         except Exception:
             logger.exception("[ERROR] WebSocket TTS audio broadcast error")
             return False
+
+    async def broadcast_tts_status(
+        self,
+        user_id: int,
+        source_message_id: Optional[str],
+        status: str,
+        reason_code: Optional[str] = None,
+    ) -> bool:
+        """Broadcast TTS status for a chat message to player/dock panels."""
+        if not user_id:
+            return False
+
+        event = {
+            "type": "tts_status",
+            "data": {
+                "source_message_id": source_message_id,
+                "status": status,
+                "reason_code": reason_code,
+                "timestamp": datetime.now().isoformat(),
+            },
+        }
+        sent_count = await get_memory_websocket_manager().send_to_user(
+            user_id,
+            event,
+            client_roles={"tts_player"},
+        )
+        return sent_count > 0
+
+    async def _send_tts_audio_to_obs(self, user_id: int, event: Dict[str, Any]) -> int:
+        """Send synthesized TTS directly to the OBS audio source websocket."""
+        try:
+            from core.connection_manager import get_connection_manager
+
+            db = SessionLocal()
+            try:
+                user = db.query(User).filter(User.id == user_id).first()
+                obs_token = getattr(user, "obs_token", None) if user else None
+            finally:
+                db.close()
+
+            if not obs_token:
+                return 0
+
+            websocket = get_connection_manager().obs_connections.get(obs_token)
+            if not websocket:
+                return 0
+
+            await websocket.send_json(event)
+            return 1
+        except Exception:
+            logger.exception("[ERROR] OBS TTS audio send failed for user=%s", user_id)
+            return 0
 
     async def broadcast_drops_event(self, drops_data: Dict[str, Any]) -> bool:
         """Broadcast drops event."""

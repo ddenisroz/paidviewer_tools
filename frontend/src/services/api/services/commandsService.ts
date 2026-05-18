@@ -3,7 +3,7 @@
  */
 import { apiClient } from '../client';
 
-import type { ApiResponse, Command } from '../../../types';
+import type { ApiResponse, Command, CommandInvocation } from '../../../types';
 import type { AxiosResponse } from 'axios';
 
 /**
@@ -18,7 +18,7 @@ export const commandsService = {
         return apiClient.get('/api/commands');
     },
 
-    async getHistory(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse<Command[]>>> {
+    async getHistory(params: Record<string, unknown> = {}): Promise<AxiosResponse<ApiResponse<CommandInvocation[]>>> {
         return apiClient.get('/api/commands/history', { params });
     },
 

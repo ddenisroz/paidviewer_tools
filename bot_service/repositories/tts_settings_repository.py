@@ -83,9 +83,12 @@ class TTSSettingsRepository(BaseRepository[TTSUserSettings]):
             "use_local_tts": use_local_tts,
             "filter_replies": settings.filter_replies,
             "filter_mentions": settings.filter_mentions,
+            "filter_banwords": getattr(settings, "filter_banwords", True),
+            "disable_voice_selection": getattr(settings, "disable_voice_selection", False),
+            "speak_sender_name": getattr(settings, "speak_sender_name", False),
             "tts_mode": settings.tts_mode,
             "tts_reward_ids": settings.tts_reward_ids or {},
-            "enabled_platforms": settings.enabled_platforms or ["twitch", "vk"],
+            "enabled_platforms": settings.enabled_platforms or [],
         }
     
     def delete_by_user_id(self, user_id: int) -> int:

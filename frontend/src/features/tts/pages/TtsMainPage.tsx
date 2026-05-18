@@ -1,19 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { Cloud, Copy, ExternalLink, Monitor, Sparkles } from 'lucide-react';
+import { Cloud, Copy, ExternalLink, Monitor, Sparkles, Volume2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/context/AuthContext';
+import { useIntegrations } from '@/context/IntegrationsContext';
 import TtsChannelPointsMode from '@/features/tts/components/TtsChannelPointsMode';
 import TtsFilterManager from '@/features/tts/components/TtsFilterManager';
 import {
+    useSaveTtsAudioSettings,
     useSaveTtsModeSettings,
     useSaveTtsPlatformSettings,
     useSaveTtsSettings,
     useSetTtsEngine,
     useSetTtsListeningMode,
     useToggleTts,
+    useTtsAudioSettings,
     useTtsModeSettings,
     useTtsPlatformSettings,
     useTtsSettings,
@@ -26,19 +29,21 @@ import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
+import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { getApiBaseUrl } from '@/shared/utils/urlUtils';
 
 import type { ApiResponse } from '@/types';
-import type { TtsSettings, TtsStatus } from '@/types/tts';
+import type { TtsSettings, TtsStatus, TtsVoice } from '@/types/tts';
 
 type ListeningMode = 'website' | 'obs';
 type TriggerMode = 'all_messages' | 'channel_points';
 type EngineType = 'f5_cloud' | 'f5_local' | 'gcloud';
-type Platform = 'twitch' | 'vk' | 'youtube';
+type Platform = 'twitch' | 'vk';
 
 interface PlatformSettingsData {
     enabled_platforms?: Platform[];
+    available_platforms?: Platform[];
 }
 
 interface GcloudVoice {
@@ -49,13 +54,20 @@ interface GcloudVoice {
 }
 
 interface SettingsState {
-    enable7TV: boolean;
-    enableTwitch: boolean;
     filterReplies: boolean;
     filterMentions: boolean;
     skipCommands: boolean;
     enableLexiconFilter: boolean;
+    filterBanwords: boolean;
+    disableVoiceSelection: boolean;
+    speakSenderName: boolean;
     maxMessageLength: number;
+}
+
+interface ObsStatus {
+    has_token?: boolean;
+    source_connected?: boolean;
+    dock_connected?: boolean;
 }
 
 const unwrapPayload = <T,>(payload: ApiResponse<T> | T | undefined | null): T | undefined => {
@@ -64,6 +76,19 @@ const unwrapPayload = <T,>(payload: ApiResponse<T> | T | undefined | null): T | 
         return (payload as ApiResponse<T>).data;
     }
     return payload as T;
+};
+
+const unwrapVoiceList = (payload: unknown): TtsVoice[] => {
+    if (!payload || typeof payload !== 'object') return [];
+    const candidate = payload as { data?: unknown; voices?: unknown };
+    if (Array.isArray(candidate.voices)) return candidate.voices as TtsVoice[];
+    if (Array.isArray(candidate.data)) return candidate.data as TtsVoice[];
+    if (candidate.data && typeof candidate.data === 'object') {
+        const nested = candidate.data as { voices?: unknown; data?: unknown };
+        if (Array.isArray(nested.voices)) return nested.voices as TtsVoice[];
+        if (Array.isArray(nested.data)) return nested.data as TtsVoice[];
+    }
+    return [];
 };
 
 const buildTtsObsUrl = (token?: string | null): string => {
@@ -78,16 +103,24 @@ const ENGINE_COPY: Record<EngineType, { label: string; icon: React.ElementType }
     gcloud: { label: 'Google Cloud', icon: Sparkles },
 };
 
+const platformConfig: Array<{ platform: Platform; label: string; Icon: React.ElementType }> = [
+    { platform: 'twitch', label: 'Twitch', Icon: TwitchIcon },
+    { platform: 'vk', label: 'VK Live', Icon: VKIcon },
+];
+
 const TtsMainPage: React.FC = () => {
     const { user } = useAuth();
+    const { integrations } = useIntegrations();
     const userId = user?.id;
 
     const { data: statusResponse } = useTtsStatus(null, { enabled: Boolean(userId) });
     const { data: settingsResponse } = useTtsSettings({ enabled: Boolean(userId) });
+    const { data: audioSettingsResponse } = useTtsAudioSettings({ enabled: Boolean(userId) });
     const { data: platformResponse } = useTtsPlatformSettings({ enabled: Boolean(userId) });
     const { data: modeResponse } = useTtsModeSettings({ enabled: Boolean(userId) });
 
     const saveSettingsMutation = useSaveTtsSettings();
+    const saveAudioSettingsMutation = useSaveTtsAudioSettings();
     const savePlatformMutation = useSaveTtsPlatformSettings();
     const saveModeMutation = useSaveTtsModeSettings();
     const toggleTtsMutation = useToggleTts();
@@ -105,6 +138,9 @@ const TtsMainPage: React.FC = () => {
     );
     const modeSettings = unwrapPayload<{ tts_mode?: TriggerMode }>(
         modeResponse as ApiResponse<{ tts_mode?: TriggerMode }> | { tts_mode?: TriggerMode } | undefined
+    );
+    const audioSettings = unwrapPayload<{ websiteVolume?: number; obsVolume?: number }>(
+        audioSettingsResponse as ApiResponse<{ websiteVolume?: number; obsVolume?: number }> | undefined
     );
 
     const { data: gcloudVoices = [] } = useQuery<GcloudVoice[]>({
@@ -130,40 +166,69 @@ const TtsMainPage: React.FC = () => {
             );
         },
     });
+    const { data: obsStatusResponse } = useQuery<ApiResponse<ObsStatus> | ObsStatus>({
+        queryKey: ['tts', 'obs-status'],
+        enabled: Boolean(userId),
+        refetchInterval: 3000,
+        queryFn: async () => {
+            const response = await ttsService.getObsStatus();
+            return response.data as ApiResponse<ObsStatus> | ObsStatus;
+        },
+    });
 
     const [settingsState, setSettingsState] = useState<SettingsState>({
-        enable7TV: false,
-        enableTwitch: false,
         filterReplies: false,
         filterMentions: false,
         skipCommands: true,
         enableLexiconFilter: true,
+        filterBanwords: true,
+        disableVoiceSelection: false,
+        speakSenderName: false,
         maxMessageLength: 500,
     });
+    const [websiteVolume, setWebsiteVolume] = useState(50);
+    const [obsVolume, setObsVolume] = useState(50);
     const [selectedEngine, setSelectedEngine] = useState<EngineType>('f5_cloud');
     const [listeningMode, setListeningMode] = useState<ListeningMode>('website');
     const [ttsMode, setTtsMode] = useState<TriggerMode>('all_messages');
-    const [enabledPlatforms, setEnabledPlatforms] = useState<Platform[]>(['twitch', 'vk']);
+    const [enabledPlatforms, setEnabledPlatforms] = useState<Platform[]>([]);
+    const [defaultVoice, setDefaultVoice] = useState('default_voice');
     const [selectedGcloudVoice, setSelectedGcloudVoice] = useState('');
     const [gcloudMood, setGcloudMood] = useState<'neutral' | 'sad' | 'happy'>('neutral');
+
+    const connectedPlatforms = useMemo(
+        () =>
+            platformConfig
+                .filter(({ platform }) => (platform === 'twitch' ? integrations.twitch.enabled : integrations.vk.enabled))
+                .map(({ platform }) => platform),
+        [integrations.twitch.enabled, integrations.vk.enabled]
+    );
 
     useEffect(() => {
         if (!settings) return;
         setSettingsState({
-            enable7TV: Boolean(settings.enable7TV ?? settings.enable_7tv ?? false),
-            enableTwitch: Boolean(settings.enableTwitch ?? settings.enable_twitch ?? false),
             filterReplies: Boolean(settings.filterReplies ?? settings.filter_replies ?? false),
             filterMentions: Boolean(settings.filterMentions ?? settings.filter_mentions ?? false),
             skipCommands: Boolean(settings.skipCommands ?? settings.skip_commands ?? true),
             enableLexiconFilter: Boolean(settings.enableLexiconFilter ?? settings.enable_lexicon_filter ?? true),
+            filterBanwords: Boolean(settings.filterBanwords ?? settings.filter_banwords ?? true),
+            disableVoiceSelection: Boolean(settings.disableVoiceSelection ?? settings.disable_voice_selection ?? false),
+            speakSenderName: Boolean(settings.speakSenderName ?? settings.speak_sender_name ?? false),
             maxMessageLength: Number(settings.maxMessageLength ?? settings.max_message_length ?? 500),
         });
         setListeningMode(
             (settings.listeningMode as ListeningMode) || (settings.listening_mode as ListeningMode) || 'website'
         );
+        setDefaultVoice(settings.voice || 'default_voice');
         setSelectedGcloudVoice(settings.gcloudVoices?.[0] || settings.gcloud_voices?.[0] || '');
         setGcloudMood(settings.gcloudMood || settings.gcloud_mood || 'neutral');
     }, [settings]);
+
+    useEffect(() => {
+        if (!audioSettings) return;
+        setWebsiteVolume(Number(audioSettings.websiteVolume ?? 50));
+        setObsVolume(Number(audioSettings.obsVolume ?? 50));
+    }, [audioSettings]);
 
     useEffect(() => {
         if (!status) return;
@@ -185,11 +250,12 @@ const TtsMainPage: React.FC = () => {
     }, [modeSettings]);
 
     useEffect(() => {
-        if (Array.isArray(platformSettings?.enabled_platforms) && platformSettings.enabled_platforms.length > 0) {
-            setEnabledPlatforms(platformSettings.enabled_platforms);
-        }
-    }, [platformSettings]);
+        const available = platformSettings?.available_platforms?.length ? platformSettings.available_platforms : connectedPlatforms;
+        const nextPlatforms = (platformSettings?.enabled_platforms || []).filter((platform) => available.includes(platform));
+        setEnabledPlatforms(nextPlatforms);
+    }, [connectedPlatforms, platformSettings]);
 
+    const obsStatus = unwrapPayload<ObsStatus>(obsStatusResponse as ApiResponse<ObsStatus> | ObsStatus | undefined) || {};
     const isSaving = saveSettingsMutation.isPending || savePlatformMutation.isPending || saveModeMutation.isPending;
     const isEngineBusy = setEngineMutation.isPending;
     const isEnabled = Boolean(status?.enabled);
@@ -206,13 +272,44 @@ const TtsMainPage: React.FC = () => {
             })),
         [gcloudVoices]
     );
+    const { data: f5VoiceOptions = [] } = useQuery<Array<{ value: string; label: string }>>({
+        queryKey: ['tts', 'main-default-voices', userId],
+        enabled: Boolean(userId && selectedEngine !== 'gcloud'),
+        staleTime: 5 * 60 * 1000,
+        queryFn: async () => {
+            if (!userId) return [];
+            const [globalResponse, userResponse] = await Promise.all([
+                ttsService.getGlobalVoices('f5'),
+                ttsService.getUserVoices(userId, 'f5'),
+            ]);
+            const voices = [...unwrapVoiceList(globalResponse.data), ...unwrapVoiceList(userResponse.data)];
+            const seen = new Set<string>();
+            return voices
+                .map((voice) => {
+                    const value = String(voice.name || '').trim();
+                    if (!value || seen.has(value)) return null;
+                    seen.add(value);
+                    return { value, label: value };
+                })
+                .filter(Boolean) as Array<{ value: string; label: string }>;
+        },
+    });
+    const f5VoiceSelectOptions = useMemo(() => {
+        const currentVoice = String(defaultVoice || '').trim();
+        if (
+            !currentVoice ||
+            currentVoice === 'default_voice' ||
+            f5VoiceOptions.some((voice) => voice.value === currentVoice)
+        ) {
+            return f5VoiceOptions;
+        }
+        return [{ value: currentVoice, label: currentVoice }, ...f5VoiceOptions];
+    }, [defaultVoice, f5VoiceOptions]);
 
-    const handleBooleanSettingChange = (key: keyof SettingsState, value: boolean): void => {
+    const saveBoolean = (key: keyof SettingsState, value: boolean): void => {
         const nextState = { ...settingsState, [key]: value };
         setSettingsState(nextState);
-        saveSettingsMutation.mutate({
-            [key]: key === 'maxMessageLength' ? nextState.maxMessageLength : value,
-        } as Partial<TtsSettings>);
+        saveSettingsMutation.mutate({ [key]: value } as Partial<TtsSettings>);
     };
 
     const handleMaxLengthChange = (value: number): void => {
@@ -221,7 +318,19 @@ const TtsMainPage: React.FC = () => {
         saveSettingsMutation.mutate({ maxMessageLength: nextValue });
     };
 
+    const handleVolumeChange = (scope: 'website' | 'obs', value: number): void => {
+        const nextValue = Math.max(0, Math.min(100, Number.isFinite(value) ? Math.round(value) : 50));
+        if (scope === 'website') {
+            setWebsiteVolume(nextValue);
+            saveAudioSettingsMutation.mutate({ websiteVolume: nextValue });
+            return;
+        }
+        setObsVolume(nextValue);
+        saveAudioSettingsMutation.mutate({ obsVolume: nextValue });
+    };
+
     const handlePlatformToggle = (platform: Platform, enabled: boolean): void => {
+        if (!connectedPlatforms.includes(platform)) return;
         const nextPlatforms = enabled
             ? Array.from(new Set([...enabledPlatforms, platform]))
             : enabledPlatforms.filter((item) => item !== platform);
@@ -241,19 +350,8 @@ const TtsMainPage: React.FC = () => {
             toast.error('Сначала настройте локальный F5 на вкладке Self-Host.');
             return;
         }
-
         setSelectedEngine(engine);
-        setEngineMutation.mutate(engine, {
-            onSuccess: () => {
-                if (engine === 'gcloud') {
-                    saveSettingsMutation.mutate({
-                        advancedProvider: 'gcloud',
-                        gcloudVoices: selectedGcloudVoice ? [selectedGcloudVoice] : [],
-                        gcloudMood,
-                    });
-                }
-            },
-        });
+        setEngineMutation.mutate(engine);
     };
 
     const handleTtsToggle = (): void => {
@@ -274,6 +372,12 @@ const TtsMainPage: React.FC = () => {
         });
     };
 
+    const handleDefaultVoiceChange = (voiceName: string): void => {
+        const nextVoice = voiceName || 'default_voice';
+        setDefaultVoice(nextVoice);
+        saveSettingsMutation.mutate({ voice: nextVoice });
+    };
+
     const handleGcloudMoodChange = (mood: 'neutral' | 'sad' | 'happy'): void => {
         setGcloudMood(mood);
         saveSettingsMutation.mutate({
@@ -287,9 +391,9 @@ const TtsMainPage: React.FC = () => {
         try {
             await ttsService.generateObsUrl();
             await refetchObsUrl();
-            toast.success('OBS ссылка готова');
+            toast.success('OBS source создан');
         } catch {
-            toast.error('Не удалось создать OBS ссылку');
+            toast.error('Не удалось создать OBS source');
         }
     };
 
@@ -297,11 +401,58 @@ const TtsMainPage: React.FC = () => {
         if (!obsUrl) return;
         try {
             await navigator.clipboard.writeText(obsUrl);
-            toast.success('OBS ссылка скопирована');
+            toast.success('Ссылка скопирована');
         } catch {
             toast.error('Не удалось скопировать ссылку');
         }
     };
+
+    const renderToggle = (label: string, checked: boolean, onChange: (value: boolean) => void) => (
+        <div className="flex h-12 items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/35 px-3">
+            <span className="text-sm font-bold text-foreground">{label}</span>
+            <Switch checked={checked} onCheckedChange={onChange} disabled={saveSettingsMutation.isPending} />
+        </div>
+    );
+
+    const audioControls: Array<{
+        label: string;
+        value: number;
+        onChange: (value: number) => void;
+        suffix: string;
+        min: number;
+        max: number;
+        step: number;
+        icon?: React.ReactNode;
+    }> = [
+        {
+            label: 'Браузер',
+            value: websiteVolume,
+            onChange: (value) => handleVolumeChange('website', value),
+            suffix: '%',
+            min: 0,
+            max: 100,
+            step: 1,
+            icon: <Volume2 className="h-4 w-4 text-emerald-300" />,
+        },
+        {
+            label: 'OBS',
+            value: obsVolume,
+            onChange: (value) => handleVolumeChange('obs', value),
+            suffix: '%',
+            min: 0,
+            max: 100,
+            step: 1,
+        },
+        {
+            label: 'Макс. длина',
+            value: settingsState.maxMessageLength,
+            onChange: handleMaxLengthChange,
+            suffix: ' символов',
+            min: 50,
+            max: 2000,
+            step: 50,
+        },
+    ];
 
     return (
         <PageWrapper contentClassName="space-y-3">
@@ -315,44 +466,60 @@ const TtsMainPage: React.FC = () => {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-3 xl:grid-cols-[1fr_1fr]">
-                <Card className="card-glass border-border/70">
-                    <CardHeader className="border-b border-white/5 pb-3">
-                        <CardTitle className="text-base font-bold">Озвучка</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3.5 p-4">
-                        <TtsChannelPointsMode
-                            ttsMode={ttsMode}
-                            onModeChange={handleModeChange}
-                            isSaving={isSaving}
-                            showRewards={false}
-                        />
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.85fr)]">
+                <div className="space-y-3">
+                    <Card className="card-glass border-border/70">
+                        <CardHeader className="border-b border-white/5 pb-3">
+                            <CardTitle className="text-base font-bold">Озвучка</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3.5 p-4">
+                            <TtsChannelPointsMode
+                                ttsMode={ttsMode}
+                                onModeChange={handleModeChange}
+                                isSaving={isSaving}
+                                showRewards={false}
+                            />
 
-                        <div className="grid grid-cols-3 gap-2">
-                            {(Object.entries(ENGINE_COPY) as Array<[EngineType, (typeof ENGINE_COPY)[EngineType]]>).map(
-                                ([engine, meta]) => {
-                                    const disabled = engine === 'f5_local' && !hasLocalSetup;
-                                    const active = selectedEngine === engine;
-                                    return (
-                                        <button
-                                            key={engine}
-                                            type="button"
-                                            onClick={() => handleEngineChange(engine)}
-                                            disabled={disabled || isEngineBusy}
-                                            className={`h-11 rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
-                                                active
-                                                    ? 'border-sky-500/60 bg-sky-500/10 text-sky-50'
-                                                    : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
-                                            } ${disabled ? 'cursor-not-allowed opacity-35' : ''}`}
-                                        >
-                                            {meta.label}
-                                        </button>
-                                    );
-                                }
-                            )}
-                        </div>
+                            <div className="grid gap-2 sm:grid-cols-3">
+                                {(Object.entries(ENGINE_COPY) as Array<[EngineType, (typeof ENGINE_COPY)[EngineType]]>).map(
+                                    ([engine, meta]) => {
+                                        const disabled = engine === 'f5_local' && !hasLocalSetup;
+                                        const active = selectedEngine === engine;
+                                        return (
+                                            <button
+                                                key={engine}
+                                                type="button"
+                                                onClick={() => handleEngineChange(engine)}
+                                                disabled={disabled || isEngineBusy}
+                                                className={`h-11 rounded-lg border px-3 text-left text-sm font-bold transition-colors ${
+                                                    active
+                                                        ? 'border-sky-500/60 bg-sky-500/10 text-sky-50'
+                                                        : 'border-border/70 bg-background/25 text-muted-foreground hover:border-border hover:text-foreground'
+                                                } ${disabled ? 'cursor-not-allowed opacity-35' : ''}`}
+                                            >
+                                                {meta.label}
+                                            </button>
+                                        );
+                                    }
+                                )}
+                            </div>
 
-                        <div className="mt-6 border-t border-white/5 pt-5">
+                            {selectedEngine !== 'gcloud' ? (
+                                <Select value={defaultVoice || 'default_voice'} onValueChange={handleDefaultVoiceChange}>
+                                    <SelectTrigger className="h-10 rounded-lg">
+                                        <SelectValue placeholder="Голос по умолчанию" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="default_voice">Голос по умолчанию</SelectItem>
+                                        {f5VoiceSelectOptions.map((voice) => (
+                                            <SelectItem key={voice.value} value={voice.value}>
+                                                {voice.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : null}
+
                             <div className="grid gap-3 md:grid-cols-[128px_minmax(0,1fr)] md:items-center">
                                 <div className="text-sm font-bold leading-tight text-foreground">Режим подключения</div>
                                 <div className="grid grid-cols-2 gap-2">
@@ -373,42 +540,51 @@ const TtsMainPage: React.FC = () => {
                                     ))}
                                 </div>
                             </div>
+
                             {listeningMode === 'obs' ? (
-                                <div className="mt-3 flex items-center gap-2 rounded-lg border border-border/70 bg-background/35 p-2">
-                                    <Input value={obsUrl || 'OBS ссылка не создана'} readOnly className="h-9 min-w-0 font-mono text-xs" />
-                                    {obsUrl ? (
-                                        <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyObsUrl()}>
-                                            <Copy className="h-4 w-4" />
-                                        </Button>
-                                    ) : (
-                                        <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void handleGenerateObsUrl()}>
-                                            Создать
-                                        </Button>
-                                    )}
+                                <div className="space-y-3 rounded-lg border border-border/70 bg-background/35 p-3">
+                                    <div className="flex items-center gap-2">
+                                        <Input value={obsUrl || 'OBS source не создан'} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                        {obsUrl ? (
+                                            <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyObsUrl()}>
+                                                <Copy className="h-4 w-4" />
+                                            </Button>
+                                        ) : (
+                                            <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void handleGenerateObsUrl()}>
+                                                Создать
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
+                                        <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
+                                            <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.source_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
+                                            Source
+                                        </span>
+                                        <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
+                                            <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.dock_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
+                                            Dock
+                                        </span>
+                                    </div>
                                 </div>
                             ) : (
-                                <div className="mt-3 flex justify-center">
-                            
-                                <a
-                                    href="/tts/player"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-400/60 bg-emerald-500/15 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/25"
-                                >
-                                    <ExternalLink className="h-4 w-4" />
-                                    Открыть TTS Player
-                                </a>
-                            </div>
+                                <div className="flex justify-center">
+                                    <a
+                                        href="/tts/player"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-400/60 bg-emerald-500/15 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/25"
+                                    >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Открыть TTS Player
+                                    </a>
+                                </div>
                             )}
-                        </div>
 
-                        {selectedEngine === 'gcloud' ? (
-                            <div className="grid gap-3 rounded-xl border border-border/70 bg-background/35 p-4 md:grid-cols-2">
-                                <div className="space-y-2">
-                                    <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Голос</div>
+                            {selectedEngine === 'gcloud' ? (
+                                <div className="grid gap-3 rounded-lg border border-border/70 bg-background/35 p-3 md:grid-cols-2">
                                     <Select value={selectedGcloudVoice} onValueChange={handleGcloudVoiceChange}>
                                         <SelectTrigger className="h-10 rounded-lg">
-                                            <SelectValue placeholder="Выберите голос" />
+                                            <SelectValue placeholder="Голос" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {gcloudVoiceOptions.map((voice) => (
@@ -418,11 +594,6 @@ const TtsMainPage: React.FC = () => {
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                                        Настроение
-                                    </div>
                                     <div className="grid grid-cols-3 gap-1.5">
                                         {(['neutral', 'happy', 'sad'] as const).map((mood) => (
                                             <Button
@@ -432,45 +603,70 @@ const TtsMainPage: React.FC = () => {
                                                 onClick={() => handleGcloudMoodChange(mood)}
                                                 className="h-10 px-2 text-xs"
                                             >
-                                                {mood === 'neutral' ? 'Нейтр.' : mood === 'happy' ? 'Happy' : 'Sad'}
+                                                {mood === 'neutral' ? 'Neutral' : mood === 'happy' ? 'Happy' : 'Sad'}
                                             </Button>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
-                        ) : null}
-                    </CardContent>
-                </Card>
+                            ) : null}
+                        </CardContent>
+                    </Card>
 
-                <div className="grid gap-3">
+                    <Card className="card-glass border-border/70">
+                        <CardHeader className="border-b border-white/5 pb-3">
+                            <CardTitle className="text-base font-bold">Аудио</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid gap-4 p-4 md:grid-cols-3">
+                            {audioControls.map((control) => (
+                                <div key={control.label} className="rounded-lg border border-border/70 bg-background/35 p-3">
+                                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-foreground">
+                                        <span className="inline-flex items-center gap-2">
+                                            {control.icon}
+                                            {control.label}
+                                        </span>
+                                        <span>
+                                            {control.value}
+                                            {control.suffix}
+                                        </span>
+                                    </div>
+                                    <Slider
+                                        value={[control.value]}
+                                        min={control.min}
+                                        max={control.max}
+                                        step={control.step}
+                                        onValueChange={(values) => control.onChange(values[0])}
+                                        disabled={saveSettingsMutation.isPending || saveAudioSettingsMutation.isPending}
+                                    />
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="space-y-3">
                     <Card className="card-glass border-border/70">
                         <CardHeader className="border-b border-white/5 pb-3">
                             <CardTitle className="text-base font-bold">Источники озвучки</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2.5 p-4">
-                            {[
-                                { platform: 'twitch' as const, label: 'Twitch', Icon: TwitchIcon },
-                                { platform: 'vk' as const, label: 'VK Live', Icon: VKIcon },
-                            ].map(({ platform, label, Icon }) => {
-                                const enabled = enabledPlatforms.includes(platform);
+                            {platformConfig.map(({ platform, label, Icon }) => {
+                                const connected = connectedPlatforms.includes(platform);
+                                const enabled = connected && enabledPlatforms.includes(platform);
                                 return (
                                     <div
                                         key={platform}
-                                        className="flex items-center justify-between rounded-lg border border-border/70 bg-background/35 px-4 py-3"
+                                        className={`flex items-center justify-between rounded-lg border border-border/70 bg-background/35 px-4 py-3 ${
+                                            connected ? '' : 'opacity-40'
+                                        }`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <Icon
-                                                className={`h-5 w-5 ${platform === 'twitch' ? 'text-purple-400' : 'text-[#FF4444]'}`}
-                                            />
-                                            <div>
-                                                <div className="text-sm font-bold text-foreground">{label}</div>
-                                                {!enabled && <div className="text-xs text-muted-foreground">Не подключена</div>}
-                                            </div>
+                                            <Icon className={`h-5 w-5 ${platform === 'twitch' ? 'text-purple-400' : 'text-[#FF4444]'}`} />
+                                            <div className="text-sm font-bold text-foreground">{label}</div>
                                         </div>
                                         <Switch
                                             checked={enabled}
                                             onCheckedChange={(value) => handlePlatformToggle(platform, value)}
-                                            disabled={savePlatformMutation.isPending}
+                                            disabled={!connected || savePlatformMutation.isPending}
                                         />
                                     </div>
                                 );
@@ -482,54 +678,28 @@ const TtsMainPage: React.FC = () => {
                         <CardHeader className="border-b border-white/5 pb-3">
                             <CardTitle className="text-base font-bold">Фильтры озвучки</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2.5 p-4">
-                            {[
-                                {
-                                    label: '7TV смайлы',
-                                    checked: settingsState.enable7TV,
-                                    onChange: (value: boolean) => handleBooleanSettingChange('enable7TV', value),
-                                },
-                                {
-                                    label: 'Twitch смайлы',
-                                    checked: settingsState.enableTwitch,
-                                    onChange: (value: boolean) => handleBooleanSettingChange('enableTwitch', value),
-                                },
-                                {
-                                    label: 'Озвучивать «@»',
-                                    checked: !settingsState.filterMentions,
-                                    onChange: (value: boolean) => handleBooleanSettingChange('filterMentions', !value),
-                                },
-                            ].map((item) => (
-                                <div
-                                    key={item.label}
-                                    className="flex items-center justify-between rounded-lg border border-border/70 bg-background/35 px-4 py-3"
-                                >
-                                    <span className="text-sm font-bold text-foreground">{item.label}</span>
-                                    <Switch
-                                        checked={item.checked}
-                                        onCheckedChange={item.onChange}
-                                        disabled={saveSettingsMutation.isPending}
-                                    />
-                                </div>
-                            ))}
-
-                            <div className="rounded-lg border border-border/70 bg-background/35 px-4 py-3">
-                                <div className="flex items-center justify-between gap-3">
-                                    <span className="text-sm font-bold text-foreground">Длина сообщения</span>
-                                    <div className="flex items-center gap-2">
-                                        <Input
-                                            type="number"
-                                            min={50}
-                                            max={2000}
-                                            step={50}
-                                            value={settingsState.maxMessageLength}
-                                            onChange={(event) => handleMaxLengthChange(Number(event.target.value))}
-                                            disabled={saveSettingsMutation.isPending}
-                                            className="h-8 w-24 text-right"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
+                        <CardContent className="grid gap-2 p-4 sm:grid-cols-2">
+                            {renderToggle('Не озвучивать мат', settingsState.enableLexiconFilter, (value) =>
+                                saveBoolean('enableLexiconFilter', value)
+                            )}
+                            {renderToggle('Не озвучивать банворды', settingsState.filterBanwords, (value) =>
+                                saveBoolean('filterBanwords', value)
+                            )}
+                            {renderToggle('Не озвучивать ники', settingsState.filterMentions, (value) =>
+                                saveBoolean('filterMentions', value)
+                            )}
+                            {renderToggle('Не озвучивать ответы', settingsState.filterReplies, (value) =>
+                                saveBoolean('filterReplies', value)
+                            )}
+                            {renderToggle('Не озвучивать команды', settingsState.skipCommands, (value) =>
+                                saveBoolean('skipCommands', value)
+                            )}
+                            {renderToggle('Отключить выбор голоса', settingsState.disableVoiceSelection, (value) =>
+                                saveBoolean('disableVoiceSelection', value)
+                            )}
+                            {renderToggle('Озвучивать ник отправителя', settingsState.speakSenderName, (value) =>
+                                saveBoolean('speakSenderName', value)
+                            )}
                         </CardContent>
                     </Card>
                 </div>

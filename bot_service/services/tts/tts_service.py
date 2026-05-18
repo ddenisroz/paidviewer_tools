@@ -345,12 +345,18 @@ class TTSService:
 
     async def get_audio_settings(self, user_id: int) -> dict:
         settings = self.audio_repo.get_or_create(user_id)
-        return {"websiteVolume": settings.website_volume}
+        return {"websiteVolume": settings.website_volume, "obsVolume": settings.obs_volume}
 
-    async def save_audio_settings(self, website_volume: int, user_id: int) -> bool:
+    async def save_audio_settings(self, website_volume: int = None, user_id: int = None, obs_volume: int = None) -> bool:
         try:
             settings = self.audio_repo.get_or_create(user_id)
-            self.audio_repo.update(settings, {"website_volume": website_volume})
+            payload = {}
+            if website_volume is not None:
+                payload["website_volume"] = website_volume
+            if obs_volume is not None:
+                payload["obs_volume"] = obs_volume
+            if payload:
+                self.audio_repo.update(settings, payload)
             return True
         except Exception:
             logger.exception("Error saving audio settings")
@@ -661,12 +667,44 @@ class TTSService:
 
     # === Platform Settings ===
 
+    def get_available_tts_platforms(self, user_id: int) -> list[str]:
+        """Return platforms that are actually linked for the user."""
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return []
+
+        platforms: list[str] = []
+        if getattr(user, "twitch_username", None):
+            platforms.append("twitch")
+        if getattr(user, "vk_channel_name", None) or getattr(user, "vk_username", None):
+            platforms.append("vk")
+        return platforms
+
+    async def get_platform_settings(self, user_id: int) -> dict:
+        """Get enabled TTS platforms, stripped to authorized integrations."""
+        settings = self.settings_repo.get_or_create(user_id=user_id)
+        available_platforms = self.get_available_tts_platforms(user_id)
+        enabled_platforms = [
+            platform
+            for platform in (getattr(settings, "enabled_platforms", None) or [])
+            if platform in available_platforms
+        ]
+        return {
+            "enabled_platforms": enabled_platforms,
+            "available_platforms": available_platforms,
+        }
+
     async def set_platform_settings(self, user_id: int, enabled_platforms: list) -> bool:
         """Set enabled platforms for TTS."""
         try:
             settings = self.settings_repo.get_or_create(user_id=user_id)
-            # Repository handles commit
-            self.settings_repo.update_settings(settings, {"enabled_platforms": enabled_platforms})
+            available_platforms = set(self.get_available_tts_platforms(user_id))
+            normalized = []
+            for platform in enabled_platforms or []:
+                value = str(platform or "").strip().lower()
+                if value in available_platforms and value not in normalized:
+                    normalized.append(value)
+            self.settings_repo.update_settings(settings, {"enabled_platforms": normalized})
             return True
         except Exception:
             logger.exception("Error setting platform settings")

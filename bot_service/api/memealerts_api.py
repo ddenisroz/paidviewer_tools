@@ -79,7 +79,7 @@ def _is_safe_memealerts_auth_url(url: str) -> bool:
 def _build_memealerts_connect_payload(provider: str | None) -> dict:
     normalized_provider = _normalize_memealerts_provider(provider)
     callback_url = _resolve_memealerts_callback_url(normalized_provider)
-    provider_auth_path = f"/api/auth/{normalized_provider}"
+    provider_auth_path = f"/auth/{normalized_provider}"
     direct_auth_url = f"{MEMEALERTS_API_BASE}{provider_auth_path}?{urlencode({'return_url': callback_url})}"
     proxy_auth_url = f"/api/memealerts/proxy{provider_auth_path}?{urlencode({'return_url': callback_url})}"
     if not _is_safe_memealerts_auth_url(direct_auth_url):

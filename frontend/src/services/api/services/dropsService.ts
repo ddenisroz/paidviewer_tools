@@ -216,4 +216,17 @@ export const dropsService = {
     ): Promise<AxiosResponse<ApiResponse<DropsReward[]>>> {
         return apiClient.get(`/api/drops/rewards/${channelName}`, { params: compactParams(params) });
     },
+
+    async uploadRewardSound(
+        rewardId: number,
+        soundFile: File
+    ): Promise<AxiosResponse<ApiResponse<{ sound_file?: string; filename?: string }>>> {
+        const formData = new FormData();
+        formData.append('sound_file', soundFile);
+        return apiClient.post(`/api/drops/rewards/${rewardId}/sound`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    },
 };

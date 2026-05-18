@@ -156,38 +156,46 @@ class ConnectionManager(ConnectionManagerCore):
 
     async def disconnect_obs(self, token: str):
         """Disconnect an OBS WebSocket."""
+        websocket = self.obs_connections.pop(token, None)
+        if not websocket:
+            return
+
         try:
-            if token in self.obs_connections:
-                websocket = self.obs_connections[token]
+            try:
                 await websocket.close()
-                del self.obs_connections[token]
-                logger.info(f"OBS WebSocket disconnected: {token[:10]}...")
+            except RuntimeError as exc:
+                if "websocket.close" not in str(exc):
+                    raise
+            except Exception as exc:
+                logger.debug("OBS WebSocket close skipped for %s...: %s", token[:10], exc)
 
-                # Schedule TTS disconnect if no other active listeners remain.
-                from auth.auth import verify_jwt_token
-                from core.database import get_db, User
+            logger.info(f"OBS WebSocket disconnected: {token[:10]}...")
 
-                try:
-                    payload = verify_jwt_token(token, expected_type="obs")
-                    if payload and 'user_id' in payload:
-                        user_id = payload['user_id']
-                        db = next(get_db())
-                        try:
-                            user = db.query(User).filter(User.id == user_id).first()
-                            if user:
-                                username = user.twitch_username or user.vk_username or f"user_{user_id}"
-                                # Actual listener checks are handled inside _delayed_tts_disable.
-                                self.schedule_tts_disconnect(user_id, username)
-                                try:
-                                    from services.memory_websocket_manager import get_memory_websocket_manager
-                                    await get_memory_websocket_manager().sync_user_tts_generation(user_id)
-                                except Exception as sync_error:
-                                    logger.warning(f"Failed to sync TTS generation after OBS disconnect: {sync_error}")
-                                logger.info(f"⏱️ [OBS DISCONNECT] Scheduled TTS disconnect for user {user_id} (OBS disconnected)")
-                        finally:
-                            db.close()
-                except Exception as e:
-                    logger.debug(f"Could not extract user_id from OBS token: {e}")
+            # Schedule TTS disconnect if no other active listeners remain.
+            from auth.auth import verify_jwt_token
+            from core.database import get_db, User
+
+            try:
+                payload = verify_jwt_token(token, expected_type="obs")
+                if payload and 'user_id' in payload:
+                    user_id = payload['user_id']
+                    db = next(get_db())
+                    try:
+                        user = db.query(User).filter(User.id == user_id).first()
+                        if user:
+                            username = user.twitch_username or user.vk_username or f"user_{user_id}"
+                            # Actual listener checks are handled inside _delayed_tts_disable.
+                            self.schedule_tts_disconnect(user_id, username)
+                            try:
+                                from services.memory_websocket_manager import get_memory_websocket_manager
+                                await get_memory_websocket_manager().sync_user_tts_generation(user_id)
+                            except Exception as sync_error:
+                                logger.warning(f"Failed to sync TTS generation after OBS disconnect: {sync_error}")
+                            logger.info(f"[OBS DISCONNECT] Scheduled TTS disconnect for user {user_id} (OBS disconnected)")
+                    finally:
+                        db.close()
+            except Exception as e:
+                logger.debug(f"Could not extract user_id from OBS token: {e}")
 
         except Exception as e:
             logger.error(f"Error disconnecting OBS WebSocket: {e}")

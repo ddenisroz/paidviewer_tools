@@ -112,11 +112,23 @@ class TTSHandlerService:
                     return {"success": False, "error": "Channel owner not found"}
                 
                 if user_data.get("error"):
+                    await self._broadcast_status(
+                        user_data,
+                        source_message_id,
+                        "not_voiced",
+                        self._status_reason(user_data["error"]),
+                    )
                     return {"success": False, "error": user_data["error"]}
 
                 # 3.1 Sink guard: do not synthesize without an active playback sink.
                 sink_result = self._check_active_tts_sink(user_data, connection_manager, platform)
                 if sink_result:
+                    await self._broadcast_status(
+                        user_data,
+                        source_message_id,
+                        "not_voiced",
+                        self._status_reason(sink_result.get("error")),
+                    )
                     return sink_result
 
                 # 4. Filter Logic (Bots, Blocked, Shield)
@@ -124,6 +136,12 @@ class TTSHandlerService:
                     db, text, username, platform, is_reply, mentioned_users, reward_id, user_data
                 )
                 if filter_result.get("error"):
+                    await self._broadcast_status(
+                        user_data,
+                        source_message_id,
+                        "not_voiced",
+                        self._status_reason(filter_result["error"]),
+                    )
                     return {"success": False, "error": filter_result["error"]}
                 
                 text_for_tts = filter_result["filtered_text"]
@@ -132,6 +150,12 @@ class TTSHandlerService:
                 async with request_lock:
                     sink_result = self._check_active_tts_sink(user_data, connection_manager, platform)
                     if sink_result:
+                        await self._broadcast_status(
+                            user_data,
+                            source_message_id,
+                            "not_voiced",
+                            self._status_reason(sink_result.get("error")),
+                        )
                         return sink_result
 
                     # 5. Determine TTS Engine & Volume
@@ -218,6 +242,41 @@ class TTSHandlerService:
             self._user_request_locks[user_id] = lock
         return lock
 
+    @staticmethod
+    def _status_reason(error: Optional[str]) -> str:
+        normalized = str(error or "unknown").strip().lower()
+        if "sink" in normalized:
+            return "no_sink"
+        if "disabled" in normalized:
+            return "tts_disabled"
+        if "reply" in normalized:
+            return "filtered_reply"
+        if "mention" in normalized:
+            return "filtered_mention"
+        if "blocked" in normalized:
+            return "blocked"
+        if "command" in normalized:
+            return "command"
+        if "reward" in normalized or "channel points" in normalized:
+            return "wrong_reward"
+        return normalized.replace(" ", "_")[:64] or "unknown"
+
+    async def _broadcast_status(
+        self,
+        user_data: Optional[Dict[str, Any]],
+        source_message_id: Optional[str],
+        status: str,
+        reason_code: Optional[str] = None,
+    ) -> None:
+        if not user_data or not user_data.get("user_id"):
+            return
+        await notification_service.broadcast_tts_status(
+            user_id=user_data["user_id"],
+            source_message_id=source_message_id,
+            status=status,
+            reason_code=reason_code,
+        )
+
     def _check_initial_conditions(self, text, username, channel_identifier, platform, connection_manager, skip_if_command):
         # Skip commands
         if skip_if_command and text.strip().startswith('!'):
@@ -243,7 +302,7 @@ class TTSHandlerService:
 
         if not channel_owner.tts_enabled:
              logger.info(f"[INFO] [{platform.upper()} TTS] TTS is DISABLED GLOBALLY for user {channel_owner.id}")
-             return {"error": "TTS is disabled for this user"}
+             return {"user": channel_owner, "user_id": channel_owner.id, "error": "TTS is disabled for this user"}
 
         user_id = channel_owner.id
         tts_settings_repo = TTSSettingsRepository(db)
@@ -345,7 +404,14 @@ class TTSHandlerService:
             return {"error": "Messages with mentions are filtered"}
 
         # Apply Word Filters
-        filtered_text = await self._apply_word_filters(tts_service, user_id, platform, text)
+        if getattr(tts_settings, "filter_banwords", True):
+            filtered_text = await self._apply_word_filters(tts_service, user_id, platform, text)
+        else:
+            filtered_text = text
+
+        if getattr(tts_settings, "speak_sender_name", False):
+            filtered_text = f"{username}: {filtered_text}"
+
         return {"filtered_text": filtered_text}
 
     def _determine_engine_and_volume(self, db, user_data, connection_manager, channel_identifier, platform):
@@ -395,6 +461,8 @@ class TTSHandlerService:
         final_volume = base_volume_level
         voice_settings_dict = {}
         selected_voice = str(tts_settings.voice or "").strip()
+        if getattr(tts_settings, "disable_voice_selection", False):
+            selected_voice = "default_voice"
 
         # Voice Specific Settings
         if use_ai_tts:
@@ -488,6 +556,17 @@ class TTSHandlerService:
             original_text[:200],
             text[:200],
         )
+        logger.info(
+            "[TRACE] [%s TTS] settings trace_id=%s source_message_id=%s engine=%s provider=%s voice_id=%s speed_preset=%s speed_factor=%s",
+            platform.upper(),
+            resolved_trace_id,
+            source_message_id or "-",
+            engine_config.get("engine"),
+            engine_config.get("advanced_provider"),
+            tts_settings_dict.get("voice") or "-",
+            (tts_settings_dict.get("voice_settings") or {}).get("speed_preset") or tts_settings_dict.get("speed_preset") or "-",
+            "-",
+        )
 
         result = await tts_api.send_tts_request(
             channel_name=channel_identifier,
@@ -520,6 +599,12 @@ class TTSHandlerService:
                 source_message_id or "-",
                 result.get("requested_provider"),
                 result.get("fallback_reason"),
+            )
+            await self._broadcast_status(
+                user_data,
+                source_message_id,
+                "failed",
+                self._status_reason(result.get("fallback_reason")),
             )
             return {
                 "error": result.get("fallback_reason")
@@ -564,7 +649,7 @@ class TTSHandlerService:
                 platform=platform
             )
             logger.info(
-                "[TRACE] [%s TTS] trace_id=%s source_message_id=%s requested_provider=%s actual_provider=%s fallback=%s voice=%s audio_url=%s",
+                "[TRACE] [%s TTS] trace_id=%s source_message_id=%s requested_provider=%s actual_provider=%s fallback=%s voice=%s speed_preset=%s speed_factor=%s audio_url=%s",
                 platform.upper(),
                 resolved_trace_id,
                 source_message_id or "-",
@@ -572,6 +657,11 @@ class TTSHandlerService:
                 result.get("actual_provider") or result.get("tts_type", "unknown"),
                 bool(result.get("fallback_used")),
                 result.get("voice", "unknown"),
+                result.get("speed_preset")
+                or (result.get("meta") or {}).get("speed_preset")
+                or (tts_settings_dict.get("voice_settings") or {}).get("speed_preset")
+                or "-",
+                result.get("speed_factor") or (result.get("meta") or {}).get("speed_factor") or "-",
                 result.get("audio_url"),
             )
         else:
@@ -589,6 +679,12 @@ class TTSHandlerService:
                 resolved_trace_id,
                 source_message_id or "-",
                 result.get("error"),
+            )
+            await self._broadcast_status(
+                user_data,
+                source_message_id,
+                "failed",
+                self._status_reason(result.get("error")),
             )
 
         return result

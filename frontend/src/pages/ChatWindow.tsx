@@ -68,6 +68,12 @@ const normalizeVkAssetUrl = (url?: string): string => {
     return url;
 };
 
+const resolveChatWindowFontFamily = (fontFamily?: string): string => {
+    const safeFontFamily = (fontFamily || CHATBOX_BRAND_FONT).replace(/[^a-zA-Z0-9,\s-]/g, '').trim();
+    if (!safeFontFamily) return `${CHATBOX_BRAND_FONT}, sans-serif`;
+    return safeFontFamily.includes(',') ? safeFontFamily : `${safeFontFamily}, sans-serif`;
+};
+
 const ChatWindow: React.FC = () => {
     const { user, isAuthenticated } = useAuth();
     const { messages, isConnected } = useChat();
@@ -220,6 +226,7 @@ const ChatWindow: React.FC = () => {
         backgroundOpacity >= 1
             ? settings.background_color
             : `${settings.background_color}${Math.round(backgroundOpacity * 255).toString(16).padStart(2, '0')}`;
+    const resolvedFontFamily = resolveChatWindowFontFamily(settings.font_family);
 
     if (!isAuthenticated) {
         return (
@@ -245,14 +252,25 @@ const ChatWindow: React.FC = () => {
     }
 
     return (
-        <div
+        <>
+            <style>
+                {`
+                    .chat-window-font-scope,
+                    .chat-window-font-scope * {
+                        font-family: var(--chat-window-font) !important;
+                    }
+                `}
+            </style>
+            <div
+            className="chat-window-font-scope"
             style={{
+                ['--chat-window-font' as string]: resolvedFontFamily,
                 width: '100vw',
                 height: '100vh',
                 display: 'flex',
                 flexDirection: 'column',
                 backgroundColor: windowBackground,
-                fontFamily: settings.font_family,
+                fontFamily: resolvedFontFamily,
                 fontSize: `${settings.font_size}px`,
                 color: settings.text_color,
                 overflow: 'hidden',
@@ -695,7 +713,8 @@ const ChatWindow: React.FC = () => {
             >
                 Это окно использует общее WebSocket соединение (Leader Election)
             </div>
-        </div>
+            </div>
+        </>
     );
 };
 

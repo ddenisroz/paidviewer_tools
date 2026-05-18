@@ -45,7 +45,8 @@ class AddWordRequest(BaseModel):
 
 
 class AudioSettingsRequest(BaseModel):
-    websiteVolume: int = Field(..., ge=0, le=100)
+    websiteVolume: Optional[int] = Field(None, ge=0, le=100)
+    obsVolume: Optional[int] = Field(None, ge=0, le=100)
 
 
 class TtsSettingsRequest(BaseModel):
@@ -63,6 +64,9 @@ class TtsSettingsRequest(BaseModel):
     useLocalTTS: bool = Field(False)
     filterReplies: bool = Field(False)
     filterMentions: bool = Field(False)
+    filterBanwords: bool = Field(True)
+    disableVoiceSelection: bool = Field(False)
+    speakSenderName: bool = Field(False)
     gcloudVoices: Optional[List[str]] = None
     gcloudMood: Optional[str] = None
     version: int = Field(1, ge=1)

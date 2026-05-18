@@ -144,6 +144,8 @@ class UniversalCommandHandler(
                     ctx=ctx,
                     bot=bot,
                     args=command_args,
+                    used_trigger=command_name,
+                    owner_id=channel_owner_id,
                     platform='twitch',
                     db=db,
                     channel_key=f"twitch:{ctx.channel.name}",
@@ -256,6 +258,8 @@ class UniversalCommandHandler(
                     author_name=author_data['name'],
                     author_id=author_id,
                     args=command_args,
+                    used_trigger=command_name,
+                    owner_id=channel_owner_id,
                     vk_bot=vk_bot,
                     message_data=message_data,
                     db=db,
@@ -274,6 +278,8 @@ class UniversalCommandHandler(
         ctx: Any,
         bot: Any,
         args: str,
+        used_trigger: str,
+        owner_id: int,
         platform: str,
         db: Any,
         channel_key: str,
@@ -286,7 +292,17 @@ class UniversalCommandHandler(
                     return
                 await ctx.send(command.response_text)
                 self._mark_response_sent(command, channel_key)
-                self._mark_command_used(command, db)
+                self._mark_command_used(
+                    command,
+                    db,
+                    owner_id=owner_id,
+                    used_trigger=used_trigger,
+                    platform=platform,
+                    channel_name=getattr(ctx.channel, "name", None),
+                    viewer_name=getattr(ctx.author, "name", None),
+                    viewer_id=str(getattr(ctx.author, "id", "")),
+                    message_text=getattr(ctx.message, "content", None),
+                )
                 self.logger.info(f"[OK] Executed text command: !{command.command_name}")
                 return
 
@@ -295,7 +311,17 @@ class UniversalCommandHandler(
             if hasattr(self, handler_name):
                 handler = getattr(self, handler_name)
                 await handler(ctx, bot, args, platform, db)
-                self._mark_command_used(command, db)
+                self._mark_command_used(
+                    command,
+                    db,
+                    owner_id=owner_id,
+                    used_trigger=used_trigger,
+                    platform=platform,
+                    channel_name=getattr(ctx.channel, "name", None),
+                    viewer_name=getattr(ctx.author, "name", None),
+                    viewer_id=str(getattr(ctx.author, "id", "")),
+                    message_text=getattr(ctx.message, "content", None),
+                )
             else:
                 self.logger.warning(f"No handler for command: !{command.command_name}")
 
@@ -310,6 +336,8 @@ class UniversalCommandHandler(
         author_name: str,
         author_id: str,
         args: str,
+        used_trigger: str,
+        owner_id: int,
         vk_bot: Any,
         message_data: Dict,
         db: Any,
@@ -323,7 +351,17 @@ class UniversalCommandHandler(
                     return
                 await vk_bot.send_message(channel_name, command.response_text)
                 self._mark_response_sent(command, channel_key)
-                self._mark_command_used(command, db)
+                self._mark_command_used(
+                    command,
+                    db,
+                    owner_id=owner_id,
+                    used_trigger=used_trigger,
+                    platform="vk",
+                    channel_name=channel_name,
+                    viewer_name=author_name,
+                    viewer_id=author_id,
+                    message_text=message_data.get("message"),
+                )
                 self.logger.info(f"[OK] Executed text command: !{command.command_name}")
                 return
 
@@ -332,7 +370,17 @@ class UniversalCommandHandler(
             if hasattr(self, handler_name):
                 handler = getattr(self, handler_name)
                 await handler(channel_name, author_name, author_id, args, vk_bot, message_data, db)
-                self._mark_command_used(command, db)
+                self._mark_command_used(
+                    command,
+                    db,
+                    owner_id=owner_id,
+                    used_trigger=used_trigger,
+                    platform="vk",
+                    channel_name=channel_name,
+                    viewer_name=author_name,
+                    viewer_id=author_id,
+                    message_text=message_data.get("message"),
+                )
             else:
                 self.logger.warning(f"No handler for command: !{command.command_name}")
 
@@ -467,9 +515,41 @@ class UniversalCommandHandler(
         return True
 
     @staticmethod
-    def _mark_command_used(command: BotCommand, db: Any):
+    def _mark_command_used(
+        command: BotCommand,
+        db: Any,
+        *,
+        owner_id: Optional[int] = None,
+        used_trigger: Optional[str] = None,
+        platform: Optional[str] = None,
+        channel_name: Optional[str] = None,
+        viewer_name: Optional[str] = None,
+        viewer_id: Optional[str] = None,
+        message_text: Optional[str] = None,
+        chat_message_id: Optional[int] = None,
+        status: str = "success",
+        error: Optional[str] = None,
+    ):
         command.last_used = utcnow_naive()
         command.usage_count = int(command.usage_count or 0) + 1
+        if owner_id:
+            try:
+                CommandRepository(db).create_invocation(
+                    user_id=owner_id,
+                    command_id=command.id,
+                    canonical_command_name=command.command_name,
+                    used_trigger=used_trigger or command.command_name,
+                    platform=platform or "",
+                    channel_name=channel_name,
+                    viewer_name=viewer_name,
+                    viewer_id=viewer_id,
+                    message_text=message_text,
+                    chat_message_id=chat_message_id,
+                    status=status,
+                    error=error,
+                )
+            except Exception:
+                logger.exception("Failed to record command invocation for !%s", command.command_name)
         db.commit()
 
     async def handle_twitch_message(self, message: Any, bot: Any):
@@ -515,7 +595,17 @@ class UniversalCommandHandler(
                     self.command_service.update_cooldown(command, str(message.author.id))
                     await message.channel.send(command.response_text or "")
                     self._mark_response_sent(command, f"twitch:{channel_name}")
-                    self._mark_command_used(command, db)
+                    self._mark_command_used(
+                        command,
+                        db,
+                        owner_id=channel_owner_id,
+                        used_trigger=keyword,
+                        platform="twitch",
+                        channel_name=channel_name,
+                        viewer_name=getattr(message.author, "name", None),
+                        viewer_id=str(getattr(message.author, "id", "")),
+                        message_text=text,
+                    )
                     return
                 if mode == "timer":
                     if not self._should_run_timer(command, f"twitch:{channel_name}", interval_seconds):
@@ -524,7 +614,17 @@ class UniversalCommandHandler(
                         continue
                     await message.channel.send(command.response_text or "")
                     self._mark_response_sent(command, f"twitch:{channel_name}")
-                    self._mark_command_used(command, db)
+                    self._mark_command_used(
+                        command,
+                        db,
+                        owner_id=channel_owner_id,
+                        used_trigger="timer",
+                        platform="twitch",
+                        channel_name=channel_name,
+                        viewer_name=None,
+                        viewer_id=None,
+                        message_text=None,
+                    )
                     return
         finally:
             db.close()
@@ -578,7 +678,17 @@ class UniversalCommandHandler(
                     self.command_service.update_cooldown(command, author_id)
                     await vk_bot.send_message(channel_name, command.response_text or "")
                     self._mark_response_sent(command, f"vk:{channel_name}")
-                    self._mark_command_used(command, db)
+                    self._mark_command_used(
+                        command,
+                        db,
+                        owner_id=channel_owner_id,
+                        used_trigger=keyword,
+                        platform="vk",
+                        channel_name=channel_name,
+                        viewer_name=author_data["name"],
+                        viewer_id=author_id,
+                        message_text=text,
+                    )
                     return
                 if mode == "timer":
                     if not self._should_run_timer(command, f"vk:{channel_name}", interval_seconds):
@@ -587,7 +697,17 @@ class UniversalCommandHandler(
                         continue
                     await vk_bot.send_message(channel_name, command.response_text or "")
                     self._mark_response_sent(command, f"vk:{channel_name}")
-                    self._mark_command_used(command, db)
+                    self._mark_command_used(
+                        command,
+                        db,
+                        owner_id=channel_owner_id,
+                        used_trigger="timer",
+                        platform="vk",
+                        channel_name=channel_name,
+                        viewer_name=None,
+                        viewer_id=None,
+                        message_text=None,
+                    )
                     return
         finally:
             db.close()

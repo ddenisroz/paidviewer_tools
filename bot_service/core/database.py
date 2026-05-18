@@ -48,6 +48,7 @@ from models import (
     RewardQueue,
     # Commands
     BotCommand,
+    CommandInvocation,
     # Moderation
     BlockedBot,
     BlockedChannel,
@@ -117,6 +118,7 @@ __all__ = [
     "RewardQueue",
     # Commands
     "BotCommand",
+    "CommandInvocation",
     # Moderation
     "BlockedBot",
     "BlockedChannel",
