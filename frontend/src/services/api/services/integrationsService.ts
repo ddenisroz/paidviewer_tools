@@ -57,13 +57,14 @@ export const integrationsService = {
     /**
      * Подключить DonationAlerts (редирект)
      */
-    connectDonationAlertsRedirect(): void {
+    connectDonationAlertsRedirect(): boolean {
         const safeUrl = getSafeBackendAuthUrl(API_BASE_URL, '/auth/donationalerts/login');
         if (!safeUrl) {
             logger.error('Blocked unsafe DonationAlerts integration redirect URL', { API_BASE_URL });
-            return;
+            return false;
         }
         window.location.href = safeUrl;
+        return true;
     },
 
     /**
@@ -83,7 +84,7 @@ export const integrationsService = {
     },
 
     /**
-     * Подключить DonationAlerts (получить URL для подключения)
+     * Подключить DonationAlerts (legacy JSON flow kept for compatibility)
      * @returns Promise с ответом API
      */
     async connectDonationAlerts(): Promise<AxiosResponse<ApiResponse>> {

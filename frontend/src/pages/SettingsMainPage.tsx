@@ -1,4 +1,3 @@
-/* eslint-disable no-alert */
 import React, { useState } from 'react';
 
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -12,6 +11,7 @@ import SettingsAccessCard from '@/pages/settings/components/SettingsAccessCard';
 import SettingsDashboard from '@/pages/settings/components/SettingsDashboard';
 import { getSafeBackendAuthUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
+import { toast } from '@/utils/toastManager';
 
 const MAIN_PLATFORM_REQUIRED_MESSAGE = 'Сначала подключите хотя бы одну основную платформу: Twitch или VK Live.';
 
@@ -78,7 +78,7 @@ const SettingsMainPage: React.FC = () => {
 
     const handleDonationAlertsToggle = async (checked: boolean): Promise<void> => {
         if (!hasMainIntegration) {
-            alert(MAIN_PLATFORM_REQUIRED_MESSAGE);
+            toast.error(MAIN_PLATFORM_REQUIRED_MESSAGE);
             return;
         }
 

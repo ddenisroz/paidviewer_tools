@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 
-/* eslint-disable no-alert */
 import { AlertTriangle, Edit, Gift, Loader2, Plus, Power, PowerOff, Trash2 } from 'lucide-react';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -11,6 +10,7 @@ import {
     useTogglePlatformReward,
     useUpdatePlatformReward,
 } from '@/queries/points/pointsQueries';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
@@ -78,6 +78,7 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
     const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
     const [showDialog, setShowDialog] = useState(false);
     const [editingReward, setEditingReward] = useState<Reward | null>(null);
+    const [rewardToDelete, setRewardToDelete] = useState<string | null>(null);
     const [partnerRequired, setPartnerRequired] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [formData, setFormData] = useState<FormData>({
@@ -216,8 +217,13 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
     };
 
     const handleDelete = (rewardId: string) => {
-        if (!confirm('Удалить эту награду с платформы?')) return;
-        deleteRewardMutation.mutate(rewardId);
+        setRewardToDelete(rewardId);
+    };
+
+    const confirmDeleteReward = (): void => {
+        if (!rewardToDelete) return;
+        deleteRewardMutation.mutate(rewardToDelete);
+        setRewardToDelete(null);
     };
 
     const handleToggle = (rewardId: string, enabled: boolean) => {
@@ -609,6 +615,18 @@ const PointsRewards: React.FC<PointsRewardsProps> = ({ user, platform, channelNa
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ConfirmDialog
+                open={rewardToDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) setRewardToDelete(null);
+                }}
+                title="Удалить награду"
+                description="Награда будет удалена с выбранной платформы."
+                confirmLabel="Удалить"
+                variant="destructive"
+                loading={deleteRewardMutation.isPending}
+                onConfirm={confirmDeleteReward}
+            />
         </div>
     );
 };

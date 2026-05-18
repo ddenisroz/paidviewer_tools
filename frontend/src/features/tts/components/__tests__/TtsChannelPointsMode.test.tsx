@@ -111,8 +111,7 @@ describe('TtsChannelPointsMode', () => {
 
         renderComponent();
 
-        const channelPointsDescription = screen.getByText('Только с наградой');
-        const channelPointsButton = channelPointsDescription.closest('button');
+        const channelPointsButton = screen.getByRole('button', { name: 'За баллы канала' });
 
         expect(channelPointsButton).not.toBeDisabled();
     });
@@ -120,8 +119,7 @@ describe('TtsChannelPointsMode', () => {
     it('keeps channel points mode disabled when no connected reward platform exists', () => {
         renderComponent();
 
-        const disabledDescription = screen.getByText('Подключите Twitch или VK Live');
-        const channelPointsButton = disabledDescription.closest('button');
+        const channelPointsButton = screen.getByRole('button', { name: 'За баллы канала' });
 
         expect(channelPointsButton).toBeDisabled();
     });

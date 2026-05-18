@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 
-/* eslint-disable no-alert */
 import { ChevronDown, ChevronUp, GripVertical, History, MoreHorizontal, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -13,6 +12,7 @@ import {
     useYoutubeQueue,
 } from '@/queries/youtube/youtubeQueries';
 import { Button } from '@/shared/components/ui/button';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -73,6 +73,7 @@ const YouTubeQueueCarousel: React.FC = () => {
     const [showAddForm, setShowAddForm] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [visibleItems, setVisibleItems] = useState(ITEMS_PER_PAGE);
+    const [clearQueueConfirmOpen, setClearQueueConfirmOpen] = useState(false);
 
     const { data: queueResponse, isLoading: loading } = useYoutubeQueue({
         refetchInterval: 60 * 1000,
@@ -145,8 +146,12 @@ const YouTubeQueueCarousel: React.FC = () => {
     };
 
     const clearQueue = () => {
-        if (!confirm('Вы уверены, что хотите очистить всю очередь?')) return;
+        setClearQueueConfirmOpen(true);
+    };
+
+    const confirmClearQueue = (): void => {
         clearQueueMutation.mutate();
+        setClearQueueConfirmOpen(false);
     };
 
     const showMore = () => {
@@ -180,6 +185,7 @@ const YouTubeQueueCarousel: React.FC = () => {
     }
 
     return (
+        <>
         <div className="bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
             {/* Header */}
             <div
@@ -411,6 +417,17 @@ const YouTubeQueueCarousel: React.FC = () => {
                 </>
             )}
         </div>
+        <ConfirmDialog
+            open={clearQueueConfirmOpen}
+            onOpenChange={setClearQueueConfirmOpen}
+            title="Очистить очередь"
+            description="Все видео будут удалены из очереди."
+            confirmLabel="Очистить"
+            variant="destructive"
+            loading={clearQueueMutation.isPending}
+            onConfirm={confirmClearQueue}
+        />
+        </>
     );
 };
 

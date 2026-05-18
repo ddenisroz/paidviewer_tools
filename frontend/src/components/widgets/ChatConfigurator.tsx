@@ -1,5 +1,4 @@
 ﻿// src/components/widgets/ChatConfigurator.tsx
-/* eslint-disable no-alert */
 import React, { useState } from 'react';
 
 import { chatboxService } from '@/services/api/services/chatboxService';
@@ -11,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
+import { toast } from '@/utils/toastManager';
 
 interface WidgetConfig {
     width: number;
@@ -111,9 +111,9 @@ const ChatConfigurator: React.FC = () => {
             const data = responseData.data || responseData;
             // URL теперь включает user_id
             setPreviewUrl(data.url || '');
-            alert('Конфигурация сохранена!');
+            toast.success('Конфигурация сохранена');
         } catch {
-            alert('Ошибка при сохранении конфигурации');
+            toast.error('Ошибка при сохранении конфигурации');
         } finally {
             setIsLoading(false);
         }
@@ -139,7 +139,7 @@ const ChatConfigurator: React.FC = () => {
                     const importedConfig = JSON.parse(e.target?.result as string) as WidgetConfig;
                     setConfig(importedConfig);
                 } catch {
-                    alert('Ошибка при импорте конфигурации');
+                    toast.error('Ошибка при импорте конфигурации');
                 }
             };
             reader.readAsText(file);

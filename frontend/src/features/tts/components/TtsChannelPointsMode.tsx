@@ -1,9 +1,9 @@
 ﻿import React, { useState } from 'react';
 
-/* eslint-disable no-alert */
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Trash2 } from 'lucide-react';
 
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
@@ -125,6 +125,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
     const queryClient = useQueryClient();
     const [showCreateDialog, setShowCreateDialog] = useState(false);
     const [selectedPlatform, setSelectedPlatform] = useState<RewardPlatformKey | null>(null);
+    const [platformToDelete, setPlatformToDelete] = useState<RewardPlatformKey | null>(null);
     const [saving, setSaving] = useState(false);
 
     // Форма создания награды
@@ -238,10 +239,11 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
 
     // Удалить награду TTS
     const handleDeleteReward = (platform: RewardPlatformKey) => {
-        if (!confirm(`Удалить TTS награду для ${platform.toUpperCase()}?`)) {
-            return;
-        }
+        setPlatformToDelete(platform);
+    };
 
+    const confirmDeleteReward = (): void => {
+        if (!platformToDelete) return;
         if (deleteTtsRewardMutation.isPending) return;
 
         // Оптимистичное обновление - сразу удаляем reward_id из кэша
@@ -249,7 +251,7 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
             queryClient.setQueryData(queryKeys.tts.modeSettings(), (oldData: Record<string, unknown> | undefined) => {
                 if (!oldData) return oldData;
                 const oldRewardIds = { ...((oldData.tts_reward_ids || {}) as Record<string, unknown>) };
-                delete oldRewardIds[platform];
+                delete oldRewardIds[platformToDelete];
                 return {
                     ...oldData,
                     tts_reward_ids: oldRewardIds,
@@ -257,7 +259,8 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
             });
         }
 
-        deleteTtsRewardMutation.mutate(platform);
+        deleteTtsRewardMutation.mutate(platformToDelete);
+        setPlatformToDelete(null);
     };
 
     const connectedPlatforms = React.useMemo(
@@ -402,6 +405,22 @@ const TtsChannelPointsMode: React.FC<TtsChannelPointsModeProps> = ({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ConfirmDialog
+                open={platformToDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) setPlatformToDelete(null);
+                }}
+                title="Удалить TTS награду"
+                description={
+                    platformToDelete
+                        ? `Награда для ${platformToDelete.toUpperCase()} перестанет запускать TTS.`
+                        : 'Награда перестанет запускать TTS.'
+                }
+                confirmLabel="Удалить"
+                variant="destructive"
+                loading={deleteTtsRewardMutation.isPending}
+                onConfirm={confirmDeleteReward}
+            />
         </div>
     );
 };

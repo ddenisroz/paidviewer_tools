@@ -1,6 +1,5 @@
 ﻿import React, { useState } from 'react';
 
-/* eslint-disable no-alert */
 import { useLootboxData } from '@/features/drops/hooks/useLootboxData';
 import { animateLootboxOpening, createSparkleEffect } from '@/features/drops/utils/lootboxImages';
 import { CardSkeleton } from '@/shared/components/ui/skeleton';

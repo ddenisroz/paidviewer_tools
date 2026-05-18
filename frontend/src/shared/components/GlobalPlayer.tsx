@@ -7,6 +7,7 @@ import { useLocation } from 'react-router-dom';
 
 import { usePlayer } from '@/context/PlayerContext';
 import { youtubeService } from '@/services/api/services/youtubeService';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { toast } from '@/utils/toastManager';
@@ -49,6 +50,7 @@ const GlobalPlayer: React.FC = () => {
     } = usePlayer();
 
     const [showQueue, setShowQueue] = useState(false);
+    const [clearQueueConfirmOpen, setClearQueueConfirmOpen] = useState(false);
     const [miniPlayerContainer, setMiniPlayerContainer] = useState<HTMLElement | null>(null);
     const [playerRoot] = useState<HTMLDivElement | null>(() => {
         if (typeof document === 'undefined') return null;
@@ -120,15 +122,18 @@ const GlobalPlayer: React.FC = () => {
     };
 
     const handleClearQueue = async (): Promise<void> => {
-        // eslint-disable-next-line no-alert
-        const confirmed = window.confirm('Очистить очередь треков?');
-        if (!confirmed) return;
+        setClearQueueConfirmOpen(true);
+    };
+
+    const confirmClearQueue = async (): Promise<void> => {
         try {
             await youtubeService.clearQueue();
             toast.success('Очередь очищена');
             loadQueue(true);
         } catch {
             toast.error('Не удалось очистить очередь');
+        } finally {
+            setClearQueueConfirmOpen(false);
         }
     };
 
@@ -342,6 +347,15 @@ const GlobalPlayer: React.FC = () => {
                     </TooltipProvider>
                 </div>
             )}
+            <ConfirmDialog
+                open={clearQueueConfirmOpen}
+                onOpenChange={setClearQueueConfirmOpen}
+                title="Очистить очередь"
+                description="Все треки будут удалены из очереди."
+                confirmLabel="Очистить"
+                variant="destructive"
+                onConfirm={confirmClearQueue}
+            />
         </>
     );
 };

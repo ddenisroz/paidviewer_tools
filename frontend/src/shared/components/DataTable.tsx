@@ -1,5 +1,4 @@
 ﻿import React, { useMemo, useState } from 'react';
-/* eslint-disable no-alert */
 
 import {
     ArrowDown,
@@ -13,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Button } from '@/shared/components/ui/button';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Input } from '@/shared/components/ui/input';
@@ -125,6 +125,10 @@ export function DataTable<T>({
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [currentPage, setCurrentPage] = useState(1);
     const [currentPageSize, setCurrentPageSize] = useState(pageSize);
+    const [pendingBulkAction, setPendingBulkAction] = useState<{
+        action: DataTableBulkAction;
+        ids: string[];
+    } | null>(null);
 
     const filteredData = useMemo(() => {
         let result = [...data];
@@ -256,12 +260,21 @@ export function DataTable<T>({
     const handleBulkAction = async (action: DataTableBulkAction) => {
         if (selectedCount === 0) return;
 
-        if (action.confirmMessage && !window.confirm(action.confirmMessage)) {
+        const ids = Array.from(selectedIds);
+        if (action.confirmMessage) {
+            setPendingBulkAction({ action, ids });
             return;
         }
 
-        await action.onClick(Array.from(selectedIds));
+        await action.onClick(ids);
         setSelectedIds(new Set());
+    };
+
+    const confirmBulkAction = async (): Promise<void> => {
+        if (!pendingBulkAction) return;
+        await pendingBulkAction.action.onClick(pendingBulkAction.ids);
+        setSelectedIds(new Set());
+        setPendingBulkAction(null);
     };
 
     const resetFilters = () => {
@@ -533,6 +546,17 @@ export function DataTable<T>({
                     </div>
                 </div>
             )}
+            <ConfirmDialog
+                open={pendingBulkAction !== null}
+                onOpenChange={(open) => {
+                    if (!open) setPendingBulkAction(null);
+                }}
+                title="Подтвердите действие"
+                description={pendingBulkAction?.action.confirmMessage || ''}
+                confirmLabel={pendingBulkAction?.action.label || 'Подтвердить'}
+                variant={pendingBulkAction?.action.variant === 'destructive' ? 'destructive' : 'default'}
+                onConfirm={confirmBulkAction}
+            />
         </div>
     );
 }

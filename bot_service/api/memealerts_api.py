@@ -25,8 +25,9 @@ _MEMEALERTS_SUPPORTED_AUTH_PROVIDERS = ("twitch", "google", "vk")
 MemeAlertsAuthProvider = Literal["twitch", "google", "vk"]
 
 
-def _normalize_memealerts_provider(provider: str | None) -> MemeAlertsAuthProvider:
-    normalized = str(provider or "twitch").strip().lower()
+def _normalize_memealerts_provider(provider: object | None) -> MemeAlertsAuthProvider:
+    raw_provider = provider if isinstance(provider, str) else None
+    normalized = str(raw_provider or "twitch").strip().lower()
     if normalized not in _MEMEALERTS_SUPPORTED_AUTH_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unsupported MemeAlerts provider")
     return cast(MemeAlertsAuthProvider, normalized)
@@ -79,7 +80,7 @@ def _is_safe_memealerts_auth_url(url: str) -> bool:
 def _build_memealerts_connect_payload(provider: str | None) -> dict:
     normalized_provider = _normalize_memealerts_provider(provider)
     callback_url = _resolve_memealerts_callback_url(normalized_provider)
-    provider_auth_path = f"/auth/{normalized_provider}"
+    provider_auth_path = f"/api/auth/{normalized_provider}"
     direct_auth_url = f"{MEMEALERTS_API_BASE}{provider_auth_path}?{urlencode({'return_url': callback_url})}"
     proxy_auth_url = f"/api/memealerts/proxy{provider_auth_path}?{urlencode({'return_url': callback_url})}"
     if not _is_safe_memealerts_auth_url(direct_auth_url):

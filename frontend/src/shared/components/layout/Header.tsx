@@ -1,6 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 
-/* eslint-disable no-alert */
 import { ChevronDown, LogOut, Settings } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
@@ -10,8 +9,8 @@ import { authService } from '@/services/api/services/authService';
 import { integrationsService } from '@/services/api/services/integrationsService';
 import { DonationAlertsIcon, TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
 import { Badge } from '@/shared/components/ui/badge';
-import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
+import { toast } from '@/utils/toastManager';
 import { saveReturnUrl } from '@/utils/urlUtils';
 
 import { Button } from '../ui/button';
@@ -101,29 +100,10 @@ const Header: React.FC = () => {
                     await integrationsService.disconnectDonationAlerts();
                     await refreshAuthStatus();
                 } else {
-                    try {
-                        const response = await integrationsService.connectDonationAlerts();
-                        const responseData = response.data as {
-                            data?: { success?: boolean; auth_url?: string };
-                            success?: boolean;
-                            auth_url?: string;
-                        };
-                        const data = responseData.data || responseData;
-                        if (data.success && data.auth_url) {
-                            const safeUrl = getSafeNavigationUrl(data.auth_url);
-                            if (!safeUrl) {
-                                throw new Error('Небезопасный URL авторизации DonationAlerts');
-                            }
-                            saveReturnUrl();
-                            window.location.href = safeUrl;
-                        } else {
-                            logger.error('URL авторизации DonationAlerts не получен:', data);
-                            alert('Ошибка: URL авторизации DonationAlerts не получен');
-                        }
-                    } catch (error) {
-                        logger.error('Ошибка подключения DonationAlerts:', error);
-                        const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-                        alert(`Ошибка подключения DonationAlerts: ${errorMessage}`);
+                    saveReturnUrl();
+                    const redirected = integrationsService.connectDonationAlertsRedirect();
+                    if (!redirected) {
+                        toast.error('Не удалось открыть авторизацию DonationAlerts');
                     }
                 }
             }

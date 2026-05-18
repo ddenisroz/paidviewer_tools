@@ -1,6 +1,5 @@
 ﻿import React, { useMemo, useState } from 'react';
 
-/* eslint-disable no-alert */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {
     AlertCircle,
@@ -43,6 +42,7 @@ import {
     useToggleCommand,
     useUpdateCommand,
 } from '@/queries/commands/commandsQueries';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
@@ -423,6 +423,7 @@ const CommandsPage: React.FC = () => {
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState<boolean>(false);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState<boolean>(false);
     const [editingCommand, setEditingCommand] = useState<ChatCommand | null>(null);
+    const [commandToDelete, setCommandToDelete] = useState<number | null>(null);
 
     const [createForm, setCreateForm] = useState<CreateForm>({
         command_name: '',
@@ -699,8 +700,13 @@ const CommandsPage: React.FC = () => {
     };
 
     const handleDeleteCommand = (commandId: number): void => {
-        if (!confirm('Вы уверены, что хотите удалить эту команду?')) return;
-        deleteCommandMutation.mutate(commandId);
+        setCommandToDelete(commandId);
+    };
+
+    const confirmDeleteCommand = (): void => {
+        if (commandToDelete === null) return;
+        deleteCommandMutation.mutate(commandToDelete);
+        setCommandToDelete(null);
     };
 
     const openEditDialog = (command: ChatCommand): void => {
@@ -1675,6 +1681,18 @@ const CommandsPage: React.FC = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+            <ConfirmDialog
+                open={commandToDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) setCommandToDelete(null);
+                }}
+                title="Удалить команду"
+                description="Команда будет удалена из списка кастомных команд."
+                confirmLabel="Удалить"
+                variant="destructive"
+                loading={deleteCommandMutation.isPending}
+                onConfirm={confirmDeleteCommand}
+            />
         </PageWrapper>
     );
 };

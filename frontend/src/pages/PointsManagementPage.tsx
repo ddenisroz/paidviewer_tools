@@ -1,6 +1,5 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 
-/* eslint-disable no-alert */
 import {
     CheckCircle2,
     Clock,
@@ -21,6 +20,7 @@ import { useIntegrations } from '@/context/IntegrationsContext';
 import { cn } from '@/lib/utils';
 import pointsApi from '@/services/pointsApi';
 import { TwitchIcon, VKIcon } from '@/shared/components/PlatformIcons';
+import { ConfirmDialog } from '@/shared/components/ConfirmDialog';
 import RewardDialog from '@/shared/components/points/RewardDialog';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
@@ -56,11 +56,14 @@ const PLATFORM_TAB_BASE =
 
 const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRefresh }) => {
     const [deleting, setDeleting] = useState<boolean>(false);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
     const [toggling, setToggling] = useState<boolean>(false);
 
     const handleDelete = async (): Promise<void> => {
-        if (!confirm('Вы уверены, что хотите удалить эту награду?')) return;
+        setDeleteConfirmOpen(true);
+    };
 
+    const confirmDelete = async (): Promise<void> => {
         setDeleting(true);
         try {
             if (platform === 'vk' && reward.is_enabled) {
@@ -82,6 +85,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
             toast.error(errorMessage);
         } finally {
             setDeleting(false);
+            setDeleteConfirmOpen(false);
         }
     };
 
@@ -104,6 +108,7 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
     const bgColor = reward.background_color || (platform === 'vk' ? PLATFORM_COLORS.VK_LIVE : PLATFORM_COLORS.TWITCH);
 
     return (
+        <>
         <Card className={`${SURFACE_CARD_CLASS} transition-all hover:ring-2 hover:ring-primary/30`}>
             <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-3 mb-3">
@@ -172,6 +177,17 @@ const RewardCard: React.FC<RewardCardProps> = ({ reward, platform, onEdit, onRef
                 </div>
             </CardContent>
         </Card>
+        <ConfirmDialog
+            open={deleteConfirmOpen}
+            onOpenChange={setDeleteConfirmOpen}
+            title="Удалить награду"
+            description="Награда будет удалена с выбранной платформы."
+            confirmLabel="Удалить"
+            variant="destructive"
+            loading={deleting}
+            onConfirm={confirmDelete}
+        />
+        </>
     );
 };
 
