@@ -5,7 +5,7 @@ import { useParams } from 'react-router-dom';
 
 import { dropsService } from '@/services/api/services/dropsService';
 import { logger } from '@/shared/utils/prodLogger';
-import { getChatWebSocketUrl } from '@/shared/utils/urlUtils';
+import { getDropsWidgetWebSocketUrl } from '@/shared/utils/urlUtils';
 
 interface Reward {
     id: number;
@@ -177,6 +177,7 @@ const DropsWidget: React.FC = () => {
     const mythicalIntervalRef = useRef<number | null>(null);
     const timerIntervalRef = useRef<number | null>(null);
     const lastTickSlotRef = useRef<number>(-1);
+    const autoPreviewStartedRef = useRef(false);
 
     const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
     const idleBackground = searchParams.get('background') === 'green' ? 'bg-[#00ff00]' : 'bg-transparent';
@@ -329,6 +330,16 @@ const DropsWidget: React.FC = () => {
                 rewardPool.find((item) => item.id === rewardData.reward_id) ||
                 rewardPool.find((item) => item.name === rewardData.reward_name) ||
                 fallbackReward;
+            const resolvedRewardData: RewardData = {
+                ...rewardData,
+                reward_id: rewardData.reward_id || winnerReward.id,
+                reward_name: rewardData.reward_name || winnerReward.name,
+                reward_type: rewardData.reward_type || winnerReward.reward_type,
+                reward_value: rewardData.reward_value ?? winnerReward.reward_value,
+                description: rewardData.description || winnerReward.description,
+                sound_file: rewardData.sound_file ?? winnerReward.sound_file ?? null,
+                sound_volume: rewardData.sound_volume ?? winnerReward.sound_volume ?? 1,
+            };
 
             const fillerPool = rewardPool.length > 0 ? rewardPool : [fallbackReward];
             const strip = Array.from({ length: REEL_LENGTH }, (_, index) => {
@@ -341,7 +352,7 @@ const DropsWidget: React.FC = () => {
             });
 
             clearAnimations();
-            setCurrentReward(rewardData);
+            setCurrentReward(resolvedRewardData);
             setReelItems(strip);
             setPointerKick(false);
             setPhase('opening');
@@ -374,7 +385,7 @@ const DropsWidget: React.FC = () => {
 
                     setTranslateX(`translate3d(calc(50% - ${targetOffset + CARD_WIDTH / 2}px), 0, 0)`);
                     setPhase('result');
-                    playRewardSound(rewardData);
+                    playRewardSound(resolvedRewardData);
                 };
 
                 animationFrameRef.current = requestAnimationFrame(animate);
@@ -480,7 +491,7 @@ const DropsWidget: React.FC = () => {
                     return;
                 }
 
-                const websocket = new WebSocket(getChatWebSocketUrl(widgetContext.user_id));
+                const websocket = new WebSocket(getDropsWidgetWebSocketUrl(token || ''));
 
                 websocket.onopen = () => {
                     if (!isMounted) return;
@@ -550,6 +561,18 @@ const DropsWidget: React.FC = () => {
             })),
         [previewRewards]
     );
+
+    useEffect(() => {
+        if (!isPreviewMode || autoPreviewStartedRef.current || phase !== 'idle') return;
+        const quality = (searchParams.get('quality') || '').toLowerCase();
+        if (!['common', 'rare', 'epic', 'legendary', 'mythical'].includes(quality)) return;
+
+        const timer = window.setTimeout(() => {
+            autoPreviewStartedRef.current = true;
+            void triggerPreviewChest(quality);
+        }, 350);
+        return () => window.clearTimeout(timer);
+    }, [isPreviewMode, phase, searchParams, triggerPreviewChest]);
 
     if (mythicalSession && mythicalTimer !== null && mythicalTimer > 0) {
         return (

@@ -57,7 +57,7 @@ class TTSUserSettings(Base):
     enable_custom_lexicon = Column(Boolean, nullable=False, default=False)
 
     # Additional behavior settings.
-    max_message_length = Column(Integer, nullable=False, default=500)
+    max_message_length = Column(Integer, nullable=False, default=150)
     skip_commands = Column(Boolean, nullable=False, default=True)
     use_local_tts = Column(Boolean, nullable=False, default=False)
 

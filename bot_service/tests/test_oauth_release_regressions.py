@@ -267,6 +267,81 @@ async def test_twitch_bot_validator_rejects_user_token_without_chat_scopes(monke
     assert result["missing_scopes"] == ["chat:edit", "chat:read"]
 
 
+@pytest.mark.asyncio
+async def test_twitch_bot_validator_retries_transient_network_errors(monkeypatch):
+    from services import bot_token_validator as validator_module
+
+    async def get_bot_token():
+        return {"access_token": "bot-token", "bot_login": "paidviewer_bot"}
+
+    async def noop_sleep(_delay):
+        return None
+
+    class FlakyValidateClient:
+        attempts = 0
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, **kwargs):
+            FlakyValidateClient.attempts += 1
+            if FlakyValidateClient.attempts < 3:
+                raise httpx.ConnectError("dns failure", request=httpx.Request("GET", url))
+            return httpx.Response(
+                200,
+                json={
+                    "user_id": "bot-user",
+                    "login": "paidviewer_bot",
+                    "expires_in": 3600,
+                    "scopes": ["chat:read", "chat:edit"],
+                },
+                request=httpx.Request("GET", url),
+            )
+
+    monkeypatch.setattr(validator_module.twitch_bot_oauth_service, "get_bot_token", get_bot_token)
+    monkeypatch.setattr(validator_module.asyncio, "sleep", noop_sleep)
+    monkeypatch.setattr(validator_module.httpx, "AsyncClient", lambda *args, **kwargs: FlakyValidateClient())
+
+    result = await bot_token_validator.validate_twitch_bot_token()
+
+    assert result["valid"] is True
+    assert FlakyValidateClient.attempts == 3
+
+
+@pytest.mark.asyncio
+async def test_twitch_bot_validator_marks_exhausted_network_error_transient(monkeypatch):
+    from services import bot_token_validator as validator_module
+
+    async def get_bot_token():
+        return {"access_token": "bot-token", "bot_login": "paidviewer_bot"}
+
+    async def noop_sleep(_delay):
+        return None
+
+    class BrokenValidateClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url, **kwargs):
+            raise httpx.ConnectError("dns failure", request=httpx.Request("GET", url))
+
+    monkeypatch.setattr(validator_module.twitch_bot_oauth_service, "get_bot_token", get_bot_token)
+    monkeypatch.setattr(validator_module.asyncio, "sleep", noop_sleep)
+    monkeypatch.setattr(validator_module.httpx, "AsyncClient", lambda *args, **kwargs: BrokenValidateClient())
+
+    result = await bot_token_validator.validate_twitch_bot_token()
+
+    assert result["valid"] is False
+    assert result["transient"] is True
+    assert result["error"] == "Twitch token validation temporarily unavailable"
+
+
 def test_logout_preserves_platform_tokens(authenticated_client, db_session, test_user):
     db_session.add(
         UserToken(

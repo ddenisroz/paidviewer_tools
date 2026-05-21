@@ -60,7 +60,7 @@
 - `GET /api/tts/health?provider=f5`
 - `GET /api/voices/providers/capabilities`
 - открыть `/dashboard/admin?tab=overview` и убедиться, что admin read-models загружаются
-- открыть `/tts-player`, потому что website-mode воспроизведение без него не стартует
+- открыть `/tts/player`, потому что website-mode воспроизведение без него не стартует
 
 ## Сценарии
 
@@ -106,15 +106,15 @@
 - успешный callback поднимает bot runtime или честно возвращает `restart_failed`
 - VK работает как GA-интеграция; отсутствующие возможности должны отражаться capability flags, а не beta-статусом
 
-### S6. MemeAlerts provider auth
+### S6. MemeAlerts auth and rewards
 
 Ожидаемо:
 
-- подключение стартует сразу в `provider` popup flow, без открытия проксированного лендинга `MemeAlerts`
-- кнопки `Twitch`, `Google`, `VK` ведут в прямой `/api/auth/{provider}` auth chain
-- успешный возврат приходит либо в `/memealerts/callback`, либо в proxy callback fallback, и в обоих случаях токен сохраняется
+- подключение показывает текстовый статус `Запущена авторизация...`, без лишних provider/status блоков и резервного ввода
+- `Twitch`, `Google`, `VK` идут через same-origin proxy flow, чтобы callback мог сохранить токен без CORS/localStorage-ловушек
+- успешный возврат приходит в `/memealerts/callback` или proxy callback fallback, токен сохраняется без показа token/id пользователю
 - popup не закрывается молча при ошибке; пользователь видит явный status/error state
-- ручной ввод ссылки остаётся только как резервный сценарий
+- ручная выдача, награды Twitch/VK и donation cashback отображаются на одной минимальной странице
 
 ## Критерий успеха
 

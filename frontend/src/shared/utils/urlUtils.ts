@@ -80,6 +80,11 @@ export const getLootboxWidgetWebSocketUrl = (userId: string | number): string =>
     return `${wsBaseUrl}/ws/lootbox-widget/${userId}`;
 };
 
+export const getDropsWidgetWebSocketUrl = (token: string): string => {
+    const wsBaseUrl = getWebSocketBaseUrl();
+    return `${wsBaseUrl}/ws/drops-widget/${token}`;
+};
+
 export const getYoutubeObsWebSocketUrl = (token: string): string => {
     const wsBaseUrl = getWebSocketBaseUrl();
     return `${wsBaseUrl}/ws/youtube-obs/${token}`;

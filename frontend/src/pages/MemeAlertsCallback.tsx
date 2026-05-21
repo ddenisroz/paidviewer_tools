@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { parseMemeAlertsTokenPayload } from '@/features/drops/utils/memealertsToken';
+import { MemeAlertsCallbackStatus } from '@/pages/MemeAlertsCallbackStatus';
 import apiClient from '@/services/api/client';
-import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
-import { Loader } from '@/shared/components/ui/loader';
 
-const extractTokenFromUrl = (): { accessToken?: string; refreshToken?: string; streamerId?: string } => {
-    return parseMemeAlertsTokenPayload(window.location.href);
+const extractTokenFromUrl = (href: string): { accessToken?: string; refreshToken?: string; streamerId?: string } => {
+    return parseMemeAlertsTokenPayload(href);
 };
 
 const normalizeProvider = (value: string | null): 'google' | 'twitch' | 'vk' => {
@@ -19,6 +17,20 @@ const providerLabel = (provider: 'google' | 'twitch' | 'vk') => {
     if (provider === 'google') return 'Google';
     if (provider === 'vk') return 'VK';
     return 'Twitch';
+};
+
+const readCallbackState = () => {
+    const href = window.location.href;
+    const url = new URL(href);
+    const provider = normalizeProvider(url.searchParams.get('provider'));
+    const tokens = extractTokenFromUrl(href);
+
+    if (tokens.accessToken || tokens.refreshToken) {
+        const cleanUrl = `${window.location.origin}${window.location.pathname}?provider=${encodeURIComponent(provider)}`;
+        window.history.replaceState({}, '', cleanUrl);
+    }
+
+    return { provider, tokens };
 };
 
 const notifyClients = (data: Record<string, unknown>) => {
@@ -42,13 +54,19 @@ const notifyClients = (data: Record<string, unknown>) => {
 };
 
 const MemeAlertsCallback = () => {
+    const initialState = useMemo(() => readCallbackState(), []);
+    const hasPostedRef = useRef(false);
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-    const provider = useMemo(() => normalizeProvider(new URLSearchParams(window.location.search).get('provider')), []);
+    const provider = initialState.provider;
+    const tokens = initialState.tokens;
     const [message, setMessage] = useState<string>(`Сохраняем вход ${providerLabel(provider)}...`);
 
-    const tokens = useMemo(() => extractTokenFromUrl(), []);
-
     useEffect(() => {
+        if (hasPostedRef.current) {
+            return;
+        }
+        hasPostedRef.current = true;
+
         const accessToken = tokens.accessToken || '';
         const refreshToken = tokens.refreshToken;
         const streamerId = tokens.streamerId;
@@ -84,6 +102,7 @@ const MemeAlertsCallback = () => {
                     access_token: accessToken,
                     refresh_token: refreshToken,
                     streamer_id: streamerId,
+                    auth_provider: provider,
                 });
 
                 const data = response.data;
@@ -105,9 +124,6 @@ const MemeAlertsCallback = () => {
                     status: response.status,
                     source: 'frontend-callback',
                 });
-
-                const cleanUrl = `${window.location.origin}${window.location.pathname}?provider=${encodeURIComponent(provider)}`;
-                window.history.replaceState({}, '', cleanUrl);
 
                 window.setTimeout(() => {
                     if (window.opener) {
@@ -140,33 +156,7 @@ const MemeAlertsCallback = () => {
         void connect();
     }, [provider, tokens]);
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-background px-4">
-            <Card className="w-full max-w-md card-glass">
-                <CardHeader>
-                    <CardTitle>MemeAlerts</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {status === 'loading' ? (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Loader className="h-4 w-4" />
-                            <span>{message}</span>
-                        </div>
-                    ) : (
-                        <p className={status === 'success' ? 'text-green-400' : 'text-red-400'}>{message}</p>
-                    )}
-                    <Button
-                        variant="outline"
-                        onClick={() => {
-                            window.location.href = '/dashboard/media?tab=memealerts';
-                        }}
-                    >
-                        Вернуться
-                    </Button>
-                </CardContent>
-            </Card>
-        </div>
-    );
+    return <MemeAlertsCallbackStatus status={status} message={message} />;
 };
 
 export default MemeAlertsCallback;

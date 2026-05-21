@@ -403,11 +403,7 @@ class TTSHandlerService:
             logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping message with mentions")
             return {"error": "Messages with mentions are filtered"}
 
-        # Apply Word Filters
-        if getattr(tts_settings, "filter_banwords", True):
-            filtered_text = await self._apply_word_filters(tts_service, user_id, platform, text)
-        else:
-            filtered_text = text
+        filtered_text = await self._apply_word_filters(tts_service, user_id, platform, text)
 
         if getattr(tts_settings, "speak_sender_name", False):
             filtered_text = f"{username}: {filtered_text}"
@@ -526,8 +522,8 @@ class TTSHandlerService:
         tts_settings_dict = {
             "enable7TV": tts_settings.enable_7tv,
             "enableTwitch": tts_settings.enable_twitch,
-            "enableProfanity": tts_settings.enable_lexicon_filter,
-            "maxLength": tts_settings.max_message_length,
+            "enableProfanity": False,
+            "maxLength": max(50, min(250, int(tts_settings.max_message_length or 150))),
             "skipCommands": tts_settings.skip_commands,
             "voice": engine_config.get("voice") or tts_settings.voice,
             "advanced_provider": getattr(tts_settings, "advanced_provider", engine_config.get("advanced_provider", "f5")),
@@ -728,7 +724,11 @@ class TTSHandlerService:
     async def _apply_word_filters(self, tts_service, user_id, platform, text) -> str:
         words = await tts_service.get_filtered_words(user_id)
         # Filter by platform
-        filtered_words = [w['word'] for w in words if w['platform'] in ('all', platform)]
+        filtered_words = sorted(
+            {w["word"] for w in words if w.get("word") and w.get("platform") in ("all", platform)},
+            key=len,
+            reverse=True,
+        )
         
         if not filtered_words:
             return text

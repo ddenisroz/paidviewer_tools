@@ -304,6 +304,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                   { value: 'none', label: 'Без анимации' },
               ]
             : ANIMATION_OPTIONS;
+    const isHorizontalPreview = settings.chat_direction === 'horizontal';
 
     const handleChange = (key: keyof ChatBoxSettings, value: string | number | boolean) => {
         setSettings((prev) => {
@@ -393,10 +394,22 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 overflow-auto p-5 flex flex-col lg:flex-row gap-6 min-h-0 bg-background">
+                    <div
+                        className={`flex-1 overflow-auto p-5 flex gap-6 min-h-0 bg-background ${
+                            isHorizontalPreview ? 'flex-col' : 'flex-col lg:flex-row'
+                        }`}
+                    >
                         {/* Left: Preview */}
-                        <div className="lg:w-80 w-full flex-shrink-0 flex flex-col gap-3 min-h-0 overflow-y-auto pr-1">
-                            <div className="flex-1 border border-border/60 rounded-lg overflow-hidden bg-card/60 min-h-[240px]">
+                        <div
+                            className={`w-full flex-shrink-0 flex flex-col gap-3 min-h-0 ${
+                                isHorizontalPreview ? 'order-2' : 'lg:w-80 overflow-y-auto pr-1'
+                            }`}
+                        >
+                            <div
+                                className={`border border-border/60 rounded-lg overflow-hidden bg-card/60 ${
+                                    isHorizontalPreview ? 'h-[220px] min-h-[180px] flex-none' : 'flex-1 min-h-[240px]'
+                                }`}
+                            >
                                 <PreviewPanel
                                     settings={settings}
                                     previewMessages={PREVIEW_MESSAGES}
@@ -439,7 +452,7 @@ const ChatBoxSettingsModal: React.FC<ChatBoxSettingsModalProps> = ({ isOpen, onC
                         </div>
 
                         {/* Right: Settings Tabs */}
-                        <div className="flex-1 min-w-0 min-h-0">
+                        <div className={`${isHorizontalPreview ? 'order-1' : ''} flex-1 min-w-0 min-h-0`}>
                             <Tabs defaultValue="appearance" className="h-full flex flex-col overflow-hidden min-h-0">
                                 <TabsList className="mb-4 grid grid-cols-3 gap-2 bg-transparent p-0 font-base">
                                     <TabsTrigger

@@ -10,7 +10,7 @@ import {
     useUpdateDropsConfig,
 } from '@/queries/drops/dropsQueries';
 import { Button } from '@/shared/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { SliderWithInput } from '@/shared/components/ui/slider-with-input';
@@ -58,11 +58,13 @@ const getWidgetFormData = (config: Partial<DropsConfig> | null | undefined): For
     ),
 });
 
-const getSpinProfile = (duration: number): string => {
-    if (duration <= 1100) return 'Быстрый';
-    if (duration <= 1800) return 'Средняя скорость';
-    return 'Шоу-режим';
-};
+const PREVIEW_QUALITIES = [
+    { value: 'common', label: 'Обычный' },
+    { value: 'rare', label: 'Редкий' },
+    { value: 'epic', label: 'Эпический' },
+    { value: 'legendary', label: 'Легендарный' },
+    { value: 'mythical', label: 'Мифический' },
+] as const;
 
 const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) => {
     const [widgetUrl, setWidgetUrl] = useState<string | null>(null);
@@ -126,17 +128,9 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
         });
     }, [config, formData, configFormData, autoSave, clearAutoSave]);
 
-    const activeRewardsCount = useMemo(
-        () => rewards.filter((reward) => reward.is_active !== false).length,
-        [rewards]
-    );
+    const activeRewardsCount = useMemo(() => rewards.filter((reward) => reward.is_active !== false).length, [rewards]);
 
-    const spinProfile = useMemo(
-        () => getSpinProfile(formData.widget_spinning_duration_ms),
-        [formData.widget_spinning_duration_ms]
-    );
-
-    const getPreviewWidgetUrl = (): string | null => {
+    const getWidgetUrlWithParams = (params: Record<string, string>): string | null => {
         if (!widgetUrl) return null;
 
         const safeUrl = getSafeNavigationUrl(widgetUrl);
@@ -144,7 +138,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
         try {
             const previewUrl = new URL(safeUrl);
-            previewUrl.searchParams.set('preview', 'true');
+            Object.entries(params).forEach(([key, value]) => previewUrl.searchParams.set(key, value));
             return previewUrl.toString();
         } catch {
             return null;
@@ -161,12 +155,12 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
         toast.success('Ссылка виджета скопирована');
     };
 
-    const openWidgetUrl = (preview: boolean) => {
-        const targetUrl = preview ? getPreviewWidgetUrl() : widgetUrl;
+    const openWidgetUrl = (params?: Record<string, string>) => {
+        const targetUrl = params ? getWidgetUrlWithParams(params) : widgetUrl;
         const safeUrl = targetUrl ? getSafeNavigationUrl(targetUrl) : null;
 
         if (!safeUrl) {
-            toast.error(preview ? 'Не удалось подготовить тестовый режим' : 'Некорректная ссылка виджета');
+            toast.error(params ? 'Не удалось подготовить тестовый режим' : 'Некорректная ссылка виджета');
             return;
         }
 
@@ -179,17 +173,13 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                 <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
                         <Sparkles className="h-5 w-5" />
-                        Колесо награды
+                        Рулетка сундука
                     </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground/90">
-                        Эти параметры сразу влияют и на тестовый режим, и на реальный OBS-виджет.
-                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="grid gap-3 xl:grid-cols-3">
-                        <div className="rounded-2xl border border-border/70 bg-background/40 p-4">
+                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
                             <Label className="text-sm font-medium text-foreground">Скорость прокрутки</Label>
-                            <p className="mt-1 text-xs text-muted-foreground">Главная скорость вращения колеса.</p>
                             <div className="mt-4">
                                 <SliderWithInput
                                     value={formData.widget_spinning_duration_ms}
@@ -208,9 +198,8 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-border/70 bg-background/40 p-4">
+                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
                             <Label className="text-sm font-medium text-foreground">Подготовка</Label>
-                            <p className="mt-1 text-xs text-muted-foreground">Короткий вход перед стартом прокрутки.</p>
                             <div className="mt-4">
                                 <SliderWithInput
                                     value={formData.widget_opening_duration_ms}
@@ -229,11 +218,8 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             </div>
                         </div>
 
-                        <div className="rounded-2xl border border-border/70 bg-background/40 p-4">
+                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
                             <Label className="text-sm font-medium text-foreground">Финальный кадр</Label>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                                Сколько результат остается на экране после остановки.
-                            </p>
                             <div className="mt-4">
                                 <SliderWithInput
                                     value={formData.widget_result_duration_ms}
@@ -252,21 +238,6 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             </div>
                         </div>
                     </div>
-
-                    <div className="grid gap-3 md:grid-cols-3">
-                        <div className="rounded-xl border border-border/70 bg-background/30 px-4 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Профиль</p>
-                            <p className="mt-1 text-sm font-semibold text-foreground">{spinProfile}</p>
-                        </div>
-                        <div className="rounded-xl border border-border/70 bg-background/30 px-4 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Активные награды</p>
-                            <p className="mt-1 text-sm font-semibold text-foreground">{activeRewardsCount}</p>
-                        </div>
-                        <div className="rounded-xl border border-border/70 bg-background/30 px-4 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Сохранение</p>
-                            <p className="mt-1 text-sm font-semibold text-foreground">Автоматически</p>
-                        </div>
-                    </div>
                 </CardContent>
             </Card>
 
@@ -276,9 +247,6 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                         <Monitor className="h-5 w-5" />
                         OBS-виджет
                     </CardTitle>
-                    <CardDescription className="text-xs text-muted-foreground/90">
-                        Тестовый режим использует ваши активные награды, их изображения и звук.
-                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {widgetUrl ? (
@@ -295,7 +263,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                                         <Copy className="h-4 w-4" />
                                         Копировать
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => openWidgetUrl(false)} className={ACTION_CLASS}>
+                                    <Button variant="outline" size="sm" onClick={() => openWidgetUrl()} className={ACTION_CLASS}>
                                         <ExternalLink className="h-4 w-4" />
                                         Открыть
                                     </Button>
@@ -303,10 +271,18 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                             </div>
 
                             <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" size="sm" onClick={() => openWidgetUrl(true)} className={ACTION_CLASS}>
-                                    <TestTube2 className="h-4 w-4" />
-                                    Открыть тестовый режим
-                                </Button>
+                                {PREVIEW_QUALITIES.map((quality) => (
+                                    <Button
+                                        key={quality.value}
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => openWidgetUrl({ preview: 'true', quality: quality.value })}
+                                        className={ACTION_CLASS}
+                                    >
+                                        <TestTube2 className="h-4 w-4" />
+                                        {quality.label}
+                                    </Button>
+                                ))}
                                 <Button
                                     variant="outline"
                                     size="sm"
@@ -328,14 +304,31 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                                 </Button>
                             </div>
 
-                            <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
-                                {activeRewardsCount > 0
-                                    ? `Сейчас готово ${activeRewardsCount} активных наград для теста.`
-                                    : 'Добавьте хотя бы одну активную награду, чтобы тестовый режим показывал реальные результаты.'}
+                            <div className="flex flex-wrap gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openWidgetUrl({ background: 'transparent' })}
+                                    className={ACTION_CLASS}
+                                >
+                                    Прозрачный
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openWidgetUrl({ background: 'green' })}
+                                    className={ACTION_CLASS}
+                                >
+                                    Зеленый фон
+                                </Button>
+                            </div>
+
+                            <div className="rounded-lg border border-border/70 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
+                                Активных наград: {activeRewardsCount}
                             </div>
                         </>
                     ) : (
-                        <div className="rounded-2xl border border-border/70 bg-background/30 px-4 py-5 text-sm text-muted-foreground">
+                        <div className="rounded-lg border border-border/70 bg-background/30 px-4 py-5 text-sm text-muted-foreground">
                             Ссылка виджета загружается...
                         </div>
                     )}

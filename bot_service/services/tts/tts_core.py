@@ -59,7 +59,7 @@ class TtsSettingsRequest(BaseModel):
     f5Mode: Optional[str] = Field(None)
     voice: str = Field('default_voice')
     listeningMode: str = Field('website')
-    maxMessageLength: int = Field(500, ge=50, le=2000)
+    maxMessageLength: int = Field(150, ge=50, le=250)
     skipCommands: bool = Field(True)
     useLocalTTS: bool = Field(False)
     filterReplies: bool = Field(False)

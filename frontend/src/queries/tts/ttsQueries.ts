@@ -4,6 +4,7 @@
 import { QueryClient, useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { STORAGE_KEYS } from '@/constants';
 import { ttsService } from '@/services/api/services/ttsService';
 import { logger } from '@/shared/utils/prodLogger';
 
@@ -526,8 +527,17 @@ export const useSetTtsListeningMode = (options?: UseMutationOptions<ApiResponse,
     return useMutation({
         mutationFn: (mode: string) => unwrapResponse(ttsService.setListeningMode({ listeningMode: mode })),
         onSuccess: (_response, mode) => {
+            const normalizedMode = mode === 'obs' ? 'obs' : 'website';
             patchExactApiCache<TtsSettings>(queryClient, queryKeys.tts.settings(), { listeningMode: mode });
-            patchStatusCaches(queryClient, { listening_mode: mode as TtsStatus['listening_mode'] });
+            patchStatusCaches(queryClient, { listening_mode: normalizedMode as TtsStatus['listening_mode'] });
+            if (typeof window !== 'undefined') {
+                window.localStorage.setItem(STORAGE_KEYS.TTS_LISTENING_MODE, normalizedMode);
+                window.dispatchEvent(
+                    new CustomEvent('tts-listening-mode-changed', {
+                        detail: { mode: normalizedMode },
+                    })
+                );
+            }
             if (!options?.onSuccess) {
                 toast.success('Режим прослушивания обновлен');
             }
@@ -824,7 +834,7 @@ export const useToggleLocalTts = (options?: UseMutationOptions<ApiResponse, Axio
             await queryClient.cancelQueries({ queryKey: queryKeys.tts.localTtsConfig(provider) });
             const previousConfig = queryClient.getQueryData<LocalTtsConfig | null>(queryKeys.tts.localTtsConfig(provider));
             const previousStatus = queryClient.getQueriesData({ queryKey: ['tts', 'status'] });
-            const nextUseLocal = !Boolean(previousConfig?.use_local);
+            const nextUseLocal = !previousConfig?.use_local;
 
             patchLocalTtsConfigCache(queryClient, provider, { use_local: nextUseLocal, provider });
             patchStatusCaches(queryClient, {

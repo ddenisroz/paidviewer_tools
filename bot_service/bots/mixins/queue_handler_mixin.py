@@ -126,23 +126,9 @@ class QueueHandlerMixin:
                 return
 
             skip_votes_required = self._get_skip_votes_required(CommandRepository(db), user.id)
-            if skip_votes_required <= 1:
-                user_roles = self.role_checker.get_twitch_roles(ctx.author, ctx.channel.name)
-                if not self.role_checker.has_mod_access(user_roles):
-                    await ctx.send(f"@{ctx.author.name} [ERROR] Only moderators can use !skip")
-                    return
-
-                result = await queue_service.skip_current(user.id, db=db)
-                if result.get("success"):
-                    skip_vote_store.clear_owner(user.id)
-                    await ctx.send(f"@{ctx.author.name} [SKIP] Video skipped: {current_video['title']}")
-                    self.logger.info(f"[OK] Video skipped for {ctx.channel.name}")
-                else:
-                    await ctx.send(f"@{ctx.author.name} [ERROR] {result.get('error', 'Failed to skip video')}")
-                return
-
             video_key = current_video.get("id") or current_video.get("video_id")
-            current_votes, added = skip_vote_store.add_vote(user.id, video_key, ctx.author.name)
+            voter_id = getattr(ctx.author, "id", None) or ctx.author.name
+            current_votes, added = skip_vote_store.add_vote(user.id, video_key, voter_id)
             if not added:
                 await ctx.send(f"@{ctx.author.name} [INFO] You already voted to skip")
                 return
@@ -188,30 +174,9 @@ class QueueHandlerMixin:
                 return
 
             skip_votes_required = self._get_skip_votes_required(CommandRepository(db), user.id)
-            if skip_votes_required <= 1:
-                user_roles = self.role_checker.get_vk_roles(
-                    {
-                        "is_owner": message_data.get("is_owner", False),
-                        "is_moderator": message_data.get("is_moderator", False),
-                        "name": author_name,
-                    },
-                    channel_name,
-                )
-                if not self.role_checker.has_mod_access(user_roles):
-                    await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] Only moderators can use !skip")
-                    return
-
-                result = await queue_service.skip_current(user.id, db=db)
-                if result.get("success"):
-                    skip_vote_store.clear_owner(user.id)
-                    await vk_bot.send_message(channel_name, f"@{author_name} [SKIP] Video skipped: {current_video['title']}")
-                    self.logger.info(f"[OK] Video skipped for VK {channel_name}")
-                else:
-                    await vk_bot.send_message(channel_name, f"@{author_name} [ERROR] {result.get('error', 'Failed to skip video')}")
-                return
-
             video_key = current_video.get("id") or current_video.get("video_id")
-            current_votes, added = skip_vote_store.add_vote(user.id, video_key, author_name)
+            voter_id = author_id or author_name
+            current_votes, added = skip_vote_store.add_vote(user.id, video_key, voter_id)
             if not added:
                 await vk_bot.send_message(channel_name, f"@{author_name} [INFO] You already voted to skip")
                 return

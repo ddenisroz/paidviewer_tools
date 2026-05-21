@@ -674,9 +674,11 @@ class TTSService:
             return []
 
         platforms: list[str] = []
-        if getattr(user, "twitch_username", None):
+        twitch_token = self.token_repo.get_active_token(user_id, "twitch")
+        vk_token = self.token_repo.get_active_token(user_id, "vk")
+        if twitch_token and getattr(user, "twitch_username", None):
             platforms.append("twitch")
-        if getattr(user, "vk_channel_name", None) or getattr(user, "vk_username", None):
+        if vk_token and (getattr(user, "vk_channel_name", None) or getattr(user, "vk_username", None)):
             platforms.append("vk")
         return platforms
 

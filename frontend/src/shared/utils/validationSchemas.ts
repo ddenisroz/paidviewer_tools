@@ -155,8 +155,8 @@ export const ttsSettingsSchema = z.object({
     max_message_length: z
         .number()
         .int('Должно быть целое число')
-        .min(1, 'Минимум 1 символ')
-        .max(500, 'Максимум 500 символов')
+        .min(50, 'Минимум 50 символов')
+        .max(250, 'Максимум 250 символов')
         .optional(),
     min_donation_amount: z.number().min(0, 'Не может быть отрицательным').optional(),
 });

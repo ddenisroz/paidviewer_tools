@@ -240,6 +240,11 @@ async def update_tts_settings(
         value = getattr(settings_req, request_field, None)
         if value is None and request_field in {"gcloudVoices", "gcloudMood"}:
             continue
+        if request_field == "maxMessageLength":
+            try:
+                value = max(50, min(250, int(value)))
+            except (TypeError, ValueError):
+                value = 150
         save_payload[payload_field] = value
 
     if "version" in model_fields_set:

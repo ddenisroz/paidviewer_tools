@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 
-const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm shadow-black/10';
+const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm';
 
 export const StepBadge: React.FC<{ value: string }> = ({ value }) => (
     <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-sky-400/30 bg-sky-500/10 font-brand text-xs font-bold text-sky-200">
@@ -20,12 +20,12 @@ export const AutomationCard: React.FC<{
     disabled?: boolean;
 }> = ({ step, icon: Icon, title, description, children, disabled }) => (
     <Card className={cn(SURFACE_CARD_CLASS, disabled && 'opacity-70')}>
-        <CardHeader className="pb-3">
+        <CardHeader className="px-4 pb-2 pt-4">
             <div className="flex items-start gap-3">
                 {step ? <StepBadge value={step} /> : null}
                 <div className="min-w-0 flex-1">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <Icon className="h-4 w-4 text-sky-300" strokeWidth={1.8} />
+                    <CardTitle className="flex items-center gap-2 text-sm">
+                        <Icon className="h-4 w-4 text-muted-foreground" strokeWidth={1.8} />
                         {title}
                     </CardTitle>
                     {description ? (
@@ -34,7 +34,7 @@ export const AutomationCard: React.FC<{
                 </div>
             </div>
         </CardHeader>
-        <CardContent className="space-y-3">{children}</CardContent>
+        <CardContent className="space-y-3 px-4 pb-4">{children}</CardContent>
     </Card>
 );
 

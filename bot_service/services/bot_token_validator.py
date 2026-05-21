@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 REQUIRED_TWITCH_CHAT_SCOPES = {"chat:read", "chat:edit"}
+TWITCH_TOKEN_VALIDATE_RETRIES = 3
 
 
 class BotTokenValidator:
@@ -85,12 +86,19 @@ class BotTokenValidator:
             token_to_check = token_to_check.split("oauth:", 1)[1]
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    "https://id.twitch.tv/oauth2/validate",
-                    headers={"Authorization": f"Bearer {token_to_check}"},
-                )
+            response = await self._request_twitch_token_validation(token_to_check)
+        except httpx.TransportError as exc:
+            logger.warning("[BOT TOKEN] Twitch token validation temporarily unavailable: %s", exc)
+            return {
+                "valid": False,
+                "transient": True,
+                "error": "Twitch token validation temporarily unavailable",
+            }
+        except Exception:
+            logger.exception("[ERROR] [BOT TOKEN] Failed to validate Twitch token")
+            return {"valid": False, "error": "Internal server error"}
 
+        try:
             if response.status_code == 200:
                 data = response.json()
                 scopes = set(data.get("scopes", []))
@@ -166,6 +174,30 @@ class BotTokenValidator:
         except Exception:
             logger.exception("[ERROR] [BOT TOKEN] Failed to validate Twitch token")
             return {"valid": False, "error": "Internal server error"}
+
+    async def _request_twitch_token_validation(self, token_to_check: str) -> httpx.Response:
+        last_error: Optional[httpx.TransportError] = None
+        for attempt in range(1, TWITCH_TOKEN_VALIDATE_RETRIES + 1):
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    return await client.get(
+                        "https://id.twitch.tv/oauth2/validate",
+                        headers={"Authorization": f"Bearer {token_to_check}"},
+                    )
+            except httpx.TransportError as exc:
+                last_error = exc
+                logger.warning(
+                    "[BOT TOKEN] Twitch token validation network error attempt %s/%s: %s",
+                    attempt,
+                    TWITCH_TOKEN_VALIDATE_RETRIES,
+                    exc,
+                )
+                if attempt < TWITCH_TOKEN_VALIDATE_RETRIES:
+                    await asyncio.sleep(min(attempt, 3))
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("Twitch token validation failed without a response")
 
     async def validate_vk_bot_token(self) -> Dict[str, Any]:
         """Validate VK bot token from DB."""

@@ -215,6 +215,37 @@ class Bot(TwitchBotCore):
                             reward_id=reward_id,
                         )
                         if meme_reward_result.get("handled"):
+                            try:
+                                from services.platform_rewards_service import get_platform_rewards_service
+
+                                rewards_service = get_platform_rewards_service()
+                                redemptions = await rewards_service.get_redemptions(
+                                    user.id,
+                                    "twitch",
+                                    reward_id,
+                                    "UNFULFILLED",
+                                    db,
+                                )
+                                target_status = "FULFILLED" if meme_reward_result.get("success") else "CANCELED"
+                                for redemption in redemptions:
+                                    if str(redemption.get("user_name", "")).lower() != message.author.name.lower():
+                                        continue
+                                    if str(redemption.get("user_input", "")).strip() != message.content.strip():
+                                        continue
+                                    redemption_id = str(redemption.get("id") or "").strip()
+                                    if redemption_id:
+                                        await rewards_service.update_redemption_status(
+                                            user.id,
+                                            "twitch",
+                                            reward_id,
+                                            redemption_id,
+                                            target_status,
+                                            db,
+                                        )
+                                    break
+                            except Exception:
+                                logger.warning("Failed to update MemeAlerts Twitch redemption status", exc_info=True)
+
                             if meme_reward_result.get("success"):
                                 await message.channel.send(
                                     f"@{message.author.name}, выдано {meme_reward_result.get('amount')} "

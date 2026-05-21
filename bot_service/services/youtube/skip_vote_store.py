@@ -19,8 +19,8 @@ class SkipVoteStore:
         return str(video_id)
 
     @staticmethod
-    def _normalize_voter(voter_name: str) -> str:
-        return (voter_name or "").strip().lower()
+    def _normalize_voter(voter_name: str | int | None) -> str:
+        return str(voter_name or "").strip().lower()
 
     def get_vote_count(self, owner_id: int, video_id: str | int | None) -> int:
         video_key = self._normalize_video_key(video_id)
@@ -29,7 +29,7 @@ class SkipVoteStore:
         with self._lock:
             return len(self._votes.get(owner_id, {}).get(video_key, set()))
 
-    def add_vote(self, owner_id: int, video_id: str | int, voter_name: str) -> tuple[int, bool]:
+    def add_vote(self, owner_id: int, video_id: str | int, voter_name: str | int | None) -> tuple[int, bool]:
         video_key = self._normalize_video_key(video_id)
         voter_key = self._normalize_voter(voter_name)
         if not video_key or not voter_key:

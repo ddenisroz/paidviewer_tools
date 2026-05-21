@@ -206,6 +206,27 @@ async def _resolve_chatbox_token_user_id(token: str) -> Optional[int]:
     return await asyncio.to_thread(_db_query)
 
 
+async def _resolve_drops_widget_token_user_id(token: str) -> Optional[int]:
+    """Resolve a public OBS drops widget token to its owner user_id."""
+    cleaned_token = (token or "").strip()
+    if not cleaned_token:
+        return None
+
+    def _db_query() -> Optional[int]:
+        db = next(get_db())
+        try:
+            from repositories.drops_config_repository import DropsConfigRepository
+
+            config = DropsConfigRepository(db).get_by_widget_token(cleaned_token)
+            if not config or not config.user_id:
+                return None
+            return int(config.user_id)
+        finally:
+            db.close()
+
+    return await asyncio.to_thread(_db_query)
+
+
 async def _run_chat_connection(
     websocket: WebSocket,
     user_id_int: int,
@@ -362,6 +383,28 @@ async def websocket_chat_overlay(websocket: WebSocket, token: str):
         client_role="overlay",
         presence_only=False,
         display_user_id=f"overlay:{user_id_int}",
+        manage_tts_disconnect=False,
+    )
+
+
+@router.websocket("/ws/drops-widget/{token}")
+async def websocket_drops_widget(websocket: WebSocket, token: str):
+    """Token-scoped OBS drops widget websocket; no session cookie required."""
+    token_preview = (token or "")[:8]
+    logger.info("[WS] Drops widget connection request for token %s...", token_preview)
+
+    user_id_int = await _resolve_drops_widget_token_user_id(token)
+    if not user_id_int:
+        logger.warning("[WS] Invalid drops widget token %s..., closing", token_preview)
+        await websocket.close(code=4401)
+        return
+
+    await _run_chat_connection(
+        websocket,
+        user_id_int,
+        client_role="drops_widget",
+        presence_only=True,
+        display_user_id=f"drops-widget:{user_id_int}",
         manage_tts_disconnect=False,
     )
 

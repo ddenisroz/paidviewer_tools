@@ -152,21 +152,17 @@ async def donationalerts_callback(
         logger.info("DonationAlerts callback for user %s", user_id)
 
         async with httpx.AsyncClient(timeout=30.0) as client:
-            import base64
-
-            credentials = f"{client_id}:{client_secret}"
-            base64_credentials = base64.b64encode(credentials.encode()).decode()
-
             token_response = await client.post(
                 "https://www.donationalerts.com/oauth/token",
                 data={
                     "grant_type": "authorization_code",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
                     "redirect_uri": redirect_uri,
                     "code": code,
                 },
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "Authorization": f"Basic {base64_credentials}",
                 },
             )
 
@@ -177,9 +173,12 @@ async def donationalerts_callback(
                     else token_response.text
                 )
                 logger.error(
-                    "DonationAlerts token exchange failed: %s - %s",
+                    "DonationAlerts token exchange failed: %s - %s. redirect_uri=%s client_id_len=%s secret_len=%s",
                     token_response.status_code,
                     error_data,
+                    redirect_uri,
+                    len(str(client_id)),
+                    len(str(client_secret)),
                 )
                 return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=token_exchange")
 

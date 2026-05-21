@@ -1161,6 +1161,39 @@ def test_memealerts_proxy_allows_provider_redirect_for_auth():
     assert location.startswith("https://accounts.google.com/o/oauth2/v2/auth")
 
 
+def test_memealerts_proxy_auth_uses_safe_upstream_return_url():
+    query = [("return_url", "https://app.local/api/memealerts/proxy/auth/redirect")]
+    normalized = memealerts_proxy._build_upstream_auth_fallback_query("api/auth/twitch", query)
+
+    assert normalized == [("return_url", memealerts_proxy.MEMEALERTS_SAFE_AUTH_RETURN_URL)]
+
+
+def test_memealerts_proxy_patches_json_oauth_state_to_proxy_callback():
+    proxy_return_url = "https://app.local/api/memealerts/proxy/auth/redirect"
+    location = (
+        "https://id.twitch.tv/oauth2/authorize?client_id=test"
+        '&state={"return_url":"https://memealerts.com/auth/redirect"}'
+    )
+
+    patched = memealerts_proxy._patch_external_auth_state_location(location, proxy_return_url)
+    state = parse_qs(urlparse(patched).query)["state"][0]
+
+    assert json.loads(state)["return_url"] == proxy_return_url
+
+
+def test_memealerts_proxy_patches_vk_oauth_state_to_proxy_callback():
+    proxy_return_url = "https://app.local/api/memealerts/proxy/auth/redirect"
+    location = (
+        "https://oauth.vk.com/authorize?client_id=test"
+        "&state=https%3A%2F%2Fmemealerts.com%2Fauth%2Fredirect"
+    )
+
+    patched = memealerts_proxy._patch_external_auth_state_location(location, proxy_return_url)
+    state = parse_qs(urlparse(patched).query)["state"][0]
+
+    assert state == proxy_return_url
+
+
 def test_memealerts_proxy_postmessage_uses_same_origin_target():
     assert 'postMessage(data, window.location.origin)' in memealerts_proxy._INJECTED_SCRIPT
 

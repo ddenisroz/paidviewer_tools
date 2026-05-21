@@ -105,9 +105,9 @@ class TtsSettingsUpdateRequest(BaseValidationModel):
     voice_id: Optional[int] = Field(None, gt=0, description="Voice ID")
     max_message_length: Optional[int] = Field(
         None,
-        ge=1,
-        le=500,
-        description="Max message length (1-500)"
+        ge=50,
+        le=250,
+        description="Max message length (50-250)"
     )
     min_donation_amount: Optional[float] = Field(
         None,

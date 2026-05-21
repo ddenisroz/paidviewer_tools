@@ -20,9 +20,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 
 type TabType = 'streak' | 'donation' | 'points' | 'rewards' | 'history' | 'widget';
 const TAB_TRIGGER_CLASS =
-    'rounded-none -mb-px whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none gap-2';
+    'relative h-10 rounded-none whitespace-nowrap border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground shadow-none transition-colors hover:text-sky-300 data-[state=active]:border-sky-500 data-[state=active]:bg-transparent data-[state=active]:text-sky-400 data-[state=active]:shadow-none gap-2';
 const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm shadow-black/10';
-const TAB_LIST_CONTAINER_CLASS = 'mb-4 border-b border-border';
+const TAB_LIST_CONTAINER_CLASS = 'mb-4 border-b border-border/80';
 
 const DropsMainPage: React.FC = () => {
     const navigate = useNavigate();
@@ -142,7 +142,7 @@ const DropsMainPage: React.FC = () => {
         <PageWrapper title="Drops система">
             <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabType)} className="w-full">
                 <div className={TAB_LIST_CONTAINER_CLASS}>
-                    <TabsList className="h-auto w-full justify-start overflow-x-auto overflow-y-hidden hide-scrollbar rounded-none bg-transparent p-0">
+                    <TabsList className="h-10 w-full items-stretch justify-start overflow-x-auto overflow-y-hidden hide-scrollbar rounded-none bg-transparent p-0">
                         <TabsTrigger value="streak" className={TAB_TRIGGER_CLASS}>
                             <Users className="w-4 h-4" />
                             Стрик

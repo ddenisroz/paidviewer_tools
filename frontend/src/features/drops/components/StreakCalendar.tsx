@@ -27,6 +27,9 @@ const QUALITY_CONFIGS: QualityConfig[] = [
     { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed },
 ];
 
+const CARD_CLASS =
+    'flex min-h-[132px] flex-col justify-between rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm';
+
 interface StreakCalendarFormData {
     streak_days_common: number[];
     streak_days_rare: number[];
@@ -58,63 +61,58 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
     };
 
     return (
-        <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {QUALITY_CONFIGS.map((quality) => {
-                    const fieldName = `streak_days_${quality.id}`;
-                    const value = formData[fieldName][0];
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {QUALITY_CONFIGS.map((quality) => {
+                const fieldName = `streak_days_${quality.id}`;
+                const value = formData[fieldName][0];
 
-                    return (
-                        <div
-                            key={quality.id}
-                            className="space-y-4 rounded-2xl border border-border/70 bg-card/70 p-4 shadow-sm"
-                        >
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <img
-                                        src={quality.image}
-                                        alt={`${quality.label} chest`}
-                                        className="w-8 h-8 object-contain flex-shrink-0"
-                                    />
-                                    <div className="min-w-0">
-                                        <Label className="text-sm font-semibold leading-none whitespace-nowrap">
-                                            {quality.label}
-                                        </Label>
-                                        <p className="text-xs text-muted-foreground">После {value} стримов</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-1 border border-border/70 bg-card/70 rounded-lg">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-accent"
-                                        onClick={() => handleDayChange(quality.id, -1)}
-                                    >
-                                        <Minus className="w-3 h-3" />
-                                    </Button>
-                                    <Input
-                                        type="number"
-                                        value={value}
-                                        onChange={(e) => handleInputChange(quality.id, e.target.value)}
-                                        className="w-16 h-8 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                        min="1"
-                                        max={maxStreakDays}
-                                        step="1"
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-accent"
-                                        onClick={() => handleDayChange(quality.id, 1)}
-                                    >
-                                        <Plus className="w-3 h-3" />
-                                    </Button>
+                return (
+                    <div key={quality.id} className={CARD_CLASS}>
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <img
+                                    src={quality.image}
+                                    alt={`${quality.label} chest`}
+                                    className="h-8 w-8 object-contain"
+                                />
+                                <div>
+                                    <Label className="text-sm font-semibold leading-none">{quality.label}</Label>
+                                    <p className="text-xs text-muted-foreground">После {value} стримов</p>
                                 </div>
                             </div>
 
+                            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/70">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-accent"
+                                    onClick={() => handleDayChange(quality.id, -1)}
+                                >
+                                    <Minus className="h-3 w-3" />
+                                </Button>
+                                <Input
+                                    type="number"
+                                    value={value}
+                                    onChange={(e) => handleInputChange(quality.id, e.target.value)}
+                                    className="h-8 w-20 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    min="1"
+                                    max={maxStreakDays}
+                                    step="1"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 hover:bg-accent"
+                                    onClick={() => handleDayChange(quality.id, 1)}
+                                >
+                                    <Plus className="h-3 w-3" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="pt-3">
                             <Slider
                                 value={formData[fieldName]}
                                 onValueChange={(val) => setFormData({ ...formData, [fieldName]: val })}
@@ -124,9 +122,9 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ formData, setFormData }
                                 className="w-full"
                             />
                         </div>
-                    );
-                })}
-            </div>
+                    </div>
+                );
+            })}
         </div>
     );
 };

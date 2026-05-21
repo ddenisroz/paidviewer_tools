@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -51,6 +52,7 @@ DEFAULT_MEMEALERTS_SETTINGS: Dict[str, Any] = {
             "reward_cost": 500,
         },
     },
+    "points_rewards": [],
     "donation_auto": {
         "enabled": False,
         "coins_per_currency": 1.0,
@@ -97,9 +99,59 @@ class MemeAlertsService:
         return parsed
 
     @staticmethod
+    def _normalize_reward_item(raw: Dict[str, Any], fallback_platform: Optional[str] = None) -> Dict[str, Any]:
+        platform = str(raw.get("platform") or fallback_platform or "").strip().lower()
+        if platform not in ("twitch", "vk"):
+            platform = "twitch"
+        title_default = "MemeCoins" if platform == "twitch" else "Награда MemeCoins"
+        return {
+            "local_id": MemeAlertsService._clean_optional_str(raw.get("local_id")) or uuid.uuid4().hex,
+            "platform": platform,
+            "enabled": bool(raw.get("enabled", False)),
+            "reward_id": MemeAlertsService._clean_optional_str(raw.get("reward_id")),
+            "reward_title": MemeAlertsService._clean_optional_str(raw.get("reward_title")) or title_default,
+            "coins_amount": MemeAlertsService._safe_int(raw.get("coins_amount"), 10, minimum=1),
+            "reward_cost": MemeAlertsService._safe_int(raw.get("reward_cost"), 500, minimum=1),
+            "cooldown_seconds": MemeAlertsService._safe_int(
+                raw.get("cooldown_seconds"),
+                0,
+                minimum=0,
+                maximum=86_400,
+            ),
+        }
+
+    @staticmethod
+    def _empty_platform_settings() -> Dict[str, Any]:
+        return {
+            "twitch": dict(DEFAULT_MEMEALERTS_SETTINGS["points_reward"]["twitch"]),
+            "vk": dict(DEFAULT_MEMEALERTS_SETTINGS["points_reward"]["vk"]),
+        }
+
+    @staticmethod
+    def _sync_legacy_points_reward(settings_payload: Dict[str, Any]) -> None:
+        legacy = MemeAlertsService._empty_platform_settings()
+        for item in settings_payload.get("points_rewards", []):
+            if not isinstance(item, dict):
+                continue
+            platform = item.get("platform")
+            if platform not in legacy:
+                continue
+            if legacy[platform].get("reward_id"):
+                continue
+            legacy[platform] = {
+                "enabled": bool(item.get("enabled")),
+                "reward_id": MemeAlertsService._clean_optional_str(item.get("reward_id")),
+                "reward_title": MemeAlertsService._clean_optional_str(item.get("reward_title")),
+                "coins_amount": MemeAlertsService._safe_int(item.get("coins_amount"), 10, minimum=1),
+                "reward_cost": MemeAlertsService._safe_int(item.get("reward_cost"), 500, minimum=1),
+            }
+        settings_payload["points_reward"] = legacy
+
+    @staticmethod
     def _normalize_settings(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         data = raw if isinstance(raw, dict) else {}
         points_raw = data.get("points_reward") if isinstance(data.get("points_reward"), dict) else {}
+        points_rewards_raw = data.get("points_rewards") if isinstance(data.get("points_rewards"), list) else []
         donation_raw = data.get("donation_auto") if isinstance(data.get("donation_auto"), dict) else {}
         twitch_raw = points_raw.get("twitch") if isinstance(points_raw.get("twitch"), dict) else {}
         vk_raw = points_raw.get("vk") if isinstance(points_raw.get("vk"), dict) else {}
@@ -137,6 +189,7 @@ class MemeAlertsService:
                     ),
                 },
             },
+            "points_rewards": [],
             "donation_auto": {
                 "enabled": bool(donation_raw.get("enabled", False)),
                 "coins_per_currency": MemeAlertsService._safe_float(
@@ -152,6 +205,34 @@ class MemeAlertsService:
             },
         }
 
+        normalized_items: List[Dict[str, Any]] = []
+        seen_local_ids: set[str] = set()
+        for raw_item in points_rewards_raw:
+            if not isinstance(raw_item, dict):
+                continue
+            item = MemeAlertsService._normalize_reward_item(raw_item)
+            if item["local_id"] in seen_local_ids:
+                item["local_id"] = uuid.uuid4().hex
+            seen_local_ids.add(item["local_id"])
+            normalized_items.append(item)
+            if len(normalized_items) >= 3:
+                break
+
+        if not normalized_items:
+            for platform in ("twitch", "vk"):
+                legacy_item = normalized["points_reward"][platform]
+                if legacy_item.get("reward_id") or legacy_item.get("enabled"):
+                    normalized_items.append(
+                        MemeAlertsService._normalize_reward_item(
+                            {**legacy_item, "platform": platform},
+                            platform,
+                        )
+                    )
+                if len(normalized_items) >= 3:
+                    break
+
+        normalized["points_rewards"] = normalized_items
+        MemeAlertsService._sync_legacy_points_reward(normalized)
         return normalized
 
     def _read_settings_from_tts(self, user_id: int) -> Dict[str, Any]:
@@ -196,6 +277,22 @@ class MemeAlertsService:
                         minimum=1,
                     )
 
+        points_rewards_patch = payload.get("points_rewards")
+        if isinstance(points_rewards_patch, list):
+            normalized_items: List[Dict[str, Any]] = []
+            seen_local_ids: set[str] = set()
+            for raw_item in points_rewards_patch:
+                if not isinstance(raw_item, dict):
+                    continue
+                item = self._normalize_reward_item(raw_item)
+                if item["local_id"] in seen_local_ids:
+                    item["local_id"] = uuid.uuid4().hex
+                seen_local_ids.add(item["local_id"])
+                normalized_items.append(item)
+                if len(normalized_items) >= 3:
+                    break
+            next_settings["points_rewards"] = normalized_items
+
         donation_patch = payload.get("donation_auto")
         if isinstance(donation_patch, dict):
             donation_current = next_settings["donation_auto"]
@@ -223,11 +320,46 @@ class MemeAlertsService:
             if not da_token or not da_token.access_token:
                 raise ValueError("DonationAlerts integration must be connected before enabling auto grants")
 
+        self._sync_legacy_points_reward(next_settings)
         tts_settings = self.tts_repo.get_or_create(user_id=user_id)
         youtube_settings = dict(getattr(tts_settings, "youtube_settings", None) or {})
         youtube_settings["memealerts_settings"] = next_settings
         self.tts_repo.update_settings(tts_settings, {"youtube_settings": youtube_settings})
         return next_settings
+
+    @staticmethod
+    def _build_platform_reward_payload(
+        normalized_platform: str,
+        reward_title: str,
+        reward_cost: int,
+        reward_cooldown: int,
+    ) -> Dict[str, Any]:
+        if normalized_platform == "twitch":
+            return {
+                "title": reward_title,
+                "cost": reward_cost,
+                "is_user_input_required": True,
+                "prompt": "Введите ник MemeAlerts, которому выдать мемкоины",
+                "global_cooldown_seconds": reward_cooldown,
+                "is_global_cooldown_enabled": reward_cooldown > 0,
+                "should_redemptions_skip_request_queue": False,
+            }
+        return {
+            "name": reward_title,
+            "description": "Введите ник MemeAlerts, которому выдать мемкоины",
+            "price": reward_cost,
+            "is_message_required": True,
+            "repair_timeout": reward_cooldown,
+        }
+
+    def _find_reward_item(self, settings: Dict[str, Any], local_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        normalized_id = self._clean_optional_str(local_id)
+        if not normalized_id:
+            return None
+        for item in settings.get("points_rewards", []):
+            if isinstance(item, dict) and item.get("local_id") == normalized_id:
+                return item
+        return None
 
     async def create_points_reward(
         self,
@@ -238,6 +370,7 @@ class MemeAlertsService:
         cost: int,
         coins_amount: int,
         cooldown_seconds: int = 0,
+        local_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         normalized_platform = (platform or "").strip().lower()
         if normalized_platform not in ("twitch", "vk"):
@@ -249,9 +382,7 @@ class MemeAlertsService:
         if not token or not token.access_token:
             raise ValueError(f"{normalized_platform} integration is not connected")
 
-        reward_title = (title or "").strip() or (
-            "MemeCoins reward"
-        )
+        reward_title = (title or "").strip() or "MemeCoins"
         reward_cost = self._safe_int(cost, 500, minimum=1)
         reward_coins = self._safe_int(coins_amount, 10, minimum=1)
         reward_cooldown = self._safe_int(cooldown_seconds, 0, minimum=0)
@@ -262,50 +393,96 @@ class MemeAlertsService:
         if not platform_impl:
             raise RuntimeError(f"Platform {normalized_platform} is not initialized")
 
-        if normalized_platform == "twitch":
-            reward_payload = {
-                "title": reward_title,
-                "cost": reward_cost,
-                "is_user_input_required": True,
-                "prompt": "Enter the supporter nickname that should receive MemeCoins",
-                "global_cooldown_seconds": reward_cooldown,
-            }
-        else:
-            reward_payload = {
-                "name": reward_title,
-                "description": "Enter the supporter nickname that should receive MemeCoins",
-                "price": reward_cost,
-                "is_message_required": True,
-                "repair_timeout": reward_cooldown,
-            }
-
-        reward_id = await platform_impl.create_reward(user_id, reward_payload)
-        if not reward_id:
-            raise RuntimeError("Failed to create reward on platform")
-
-        self.save_settings(
-            user_id,
-            {
-                "points_reward": {
-                    normalized_platform: {
-                        "enabled": True,
-                        "reward_id": str(reward_id),
-                        "reward_title": reward_title,
-                        "coins_amount": reward_coins,
-                        "reward_cost": reward_cost,
-                    }
-                }
-            },
-        )
         settings = self.get_settings(user_id)
+        items = list(settings.get("points_rewards", []))
+        existing_item = self._find_reward_item(settings, local_id)
+        reward_payload = self._build_platform_reward_payload(
+            normalized_platform,
+            reward_title,
+            reward_cost,
+            reward_cooldown,
+        )
+
+        if existing_item and existing_item.get("reward_id"):
+            updated = await platform_impl.update_reward(user_id, str(existing_item["reward_id"]), reward_payload)
+            if not updated:
+                raise RuntimeError("Failed to update reward on platform")
+            reward_id = str(existing_item["reward_id"])
+            local_reward_id = str(existing_item["local_id"])
+        else:
+            if len(items) >= 3:
+                raise ValueError("Можно создать не больше 3 наград MemeAlerts")
+            reward_id = await platform_impl.create_reward(user_id, reward_payload)
+            if not reward_id:
+                raise RuntimeError("Failed to create reward on platform")
+            local_reward_id = self._clean_optional_str(local_id) or uuid.uuid4().hex
+
+        next_item = {
+            "local_id": local_reward_id,
+            "platform": normalized_platform,
+            "enabled": True,
+            "reward_id": str(reward_id),
+            "reward_title": reward_title,
+            "coins_amount": reward_coins,
+            "reward_cost": reward_cost,
+            "cooldown_seconds": reward_cooldown,
+        }
+        replaced = False
+        next_items: List[Dict[str, Any]] = []
+        for item in items:
+            if isinstance(item, dict) and item.get("local_id") == local_reward_id:
+                next_items.append(next_item)
+                replaced = True
+            else:
+                next_items.append(item)
+        if not replaced:
+            next_items.append(next_item)
+
+        settings = self.save_settings(user_id, {"points_rewards": next_items})
         return {
             "platform": normalized_platform,
             "reward_id": str(reward_id),
             "reward_title": reward_title,
             "coins_amount": reward_coins,
             "reward_cost": reward_cost,
-            "settings": settings["points_reward"][normalized_platform],
+            "local_id": local_reward_id,
+            "settings": next_item,
+            "all_settings": settings,
         }
+
+    async def update_points_reward_enabled(self, *, user_id: int, local_id: str, enabled: bool) -> Dict[str, Any]:
+        settings = self.get_settings(user_id)
+        items = list(settings.get("points_rewards", []))
+        found = False
+        for item in items:
+            if isinstance(item, dict) and item.get("local_id") == local_id:
+                item["enabled"] = bool(enabled)
+                found = True
+                break
+        if not found:
+            raise ValueError("Reward not found")
+        return self.save_settings(user_id, {"points_rewards": items})
+
+    async def delete_points_reward(self, *, user_id: int, local_id: str) -> Dict[str, Any]:
+        settings = self.get_settings(user_id)
+        items = list(settings.get("points_rewards", []))
+        target = self._find_reward_item(settings, local_id)
+        if not target:
+            raise ValueError("Reward not found")
+
+        reward_id = self._clean_optional_str(target.get("reward_id"))
+        platform = str(target.get("platform") or "").strip().lower()
+        if reward_id and platform in ("twitch", "vk"):
+            from platforms.registry import platform_registry
+
+            platform_impl = platform_registry.get(platform)
+            if platform_impl:
+                deleted = await platform_impl.delete_reward(user_id, reward_id)
+                if not deleted:
+                    raise RuntimeError("Failed to delete reward on platform")
+
+        next_items = [item for item in items if not (isinstance(item, dict) and item.get("local_id") == local_id)]
+        return self.save_settings(user_id, {"points_rewards": next_items})
 
     @staticmethod
     def _extract_supporter_nickname(value: Optional[str]) -> Optional[str]:
@@ -336,24 +513,34 @@ class MemeAlertsService:
             return {"handled": False}
 
         settings = self.get_settings(user_id)
-        platform_settings = settings["points_reward"][normalized_platform]
-        if not platform_settings.get("enabled"):
+        platform_rewards = [
+            item
+            for item in settings.get("points_rewards", [])
+            if isinstance(item, dict)
+            and item.get("platform") == normalized_platform
+            and item.get("enabled")
+        ]
+        if not platform_rewards:
             return {"handled": False}
 
+        platform_settings = None
         if normalized_platform == "twitch":
-            configured_reward_id = self._clean_optional_str(platform_settings.get("reward_id"))
             incoming_reward_id = self._clean_optional_str(reward_id)
-            if not configured_reward_id or not incoming_reward_id:
-                return {"handled": False}
-            if configured_reward_id != incoming_reward_id:
-                return {"handled": False}
+            for item in platform_rewards:
+                configured_reward_id = self._clean_optional_str(item.get("reward_id"))
+                if configured_reward_id and incoming_reward_id and configured_reward_id == incoming_reward_id:
+                    platform_settings = item
+                    break
         else:
-            configured_title = (platform_settings.get("reward_title") or "").strip().lower()
             incoming_title = (reward_title or "").strip().lower()
-            if not configured_title or not incoming_title:
-                return {"handled": False}
-            if configured_title != incoming_title:
-                return {"handled": False}
+            for item in platform_rewards:
+                configured_title = (item.get("reward_title") or "").strip().lower()
+                if configured_title and incoming_title and configured_title == incoming_title:
+                    platform_settings = item
+                    break
+
+        if not platform_settings:
+            return {"handled": False}
 
         nickname = self._extract_supporter_nickname(reward_input)
         if not nickname:
@@ -451,7 +638,7 @@ class MemeAlertsService:
             amount=coins_amount,
             platform="donationalerts",
             channel_name=channel_name,
-            issued_by="donationalerts",
+            issued_by=nickname,
             source="donation_auto",
         )
 
@@ -487,6 +674,20 @@ class MemeAlertsService:
             return {}
 
     @staticmethod
+    def _resolve_streamer_id(decoded: Dict[str, Any], platform_user_id: Optional[str]) -> Optional[str]:
+        return (
+            decoded.get("streamer_id")
+            or decoded.get("streamerId")
+            or decoded.get("tid")
+            or platform_user_id
+            or decoded.get("id")
+            or decoded.get("_id")
+            or decoded.get("user_id")
+            or decoded.get("uid")
+            or decoded.get("sub")
+        )
+
+    @staticmethod
     def _safe_iso(value: Any) -> Optional[str]:
         if value is None:
             return None
@@ -512,10 +713,15 @@ class MemeAlertsService:
         return [
             {
                 "id": row.id,
-                "type": "grant",
+                "type": row.source or "ui",
                 "amount": row.amount,
                 "user_id": row.target_user_id,
                 "user_name": row.target_user_name,
+                "memealerts_name": row.target_user_name,
+                "platform": row.platform,
+                "platform_user_name": row.issued_by,
+                "source": row.source,
+                "channel_name": row.channel_name,
                 "created_at": self._safe_iso(row.created_at),
             }
             for row in rows
@@ -590,7 +796,13 @@ class MemeAlertsService:
             "POST",
             "/supporters",
             access_token,
-            json={"streamerId": normalized_streamer_id, "limit": 1, "skip": 0},
+            json={
+                "streamerId": normalized_streamer_id,
+                "limit": 1,
+                "skip": 0,
+                "query": "",
+                "filters": [],
+            },
         )
         if response.status_code in (200, 201):
             return {"streamer_id": normalized_streamer_id}
@@ -598,10 +810,31 @@ class MemeAlertsService:
         if response.status_code in (401, 403):
             raise ValueError("MemeAlerts token validation failed")
 
+        # The public MemeAlerts client calls /supporters without streamerId.
+        # Use that as a token-only fallback so API shape changes do not block
+        # login when the JWT claim already gives us the streamer id.
+        token_only_response = await self._request(
+            "POST",
+            "/supporters",
+            access_token,
+            json={"limit": 1, "skip": 0, "query": "", "filters": []},
+        )
+        if token_only_response.status_code in (200, 201):
+            logger.info(
+                "MemeAlerts token validated via token-only supporters request for streamer_id=%s",
+                normalized_streamer_id,
+            )
+            return {"streamer_id": normalized_streamer_id}
+
+        if token_only_response.status_code in (401, 403):
+            raise ValueError("MemeAlerts token validation failed")
+
         logger.warning(
-            "MemeAlerts token validation unavailable: status=%s body=%s",
+            "MemeAlerts token validation unavailable: streamer_status=%s streamer_body=%s token_status=%s token_body=%s",
             response.status_code,
             response.text[:500],
+            token_only_response.status_code,
+            token_only_response.text[:500],
         )
         raise RuntimeError("MemeAlerts token validation is temporarily unavailable")
 
@@ -683,7 +916,13 @@ class MemeAlertsService:
         max_pages = 30
 
         for _ in range(max_pages):
-            payload = {"streamerId": streamer_id, "limit": limit, "skip": skip}
+            payload = {
+                "streamerId": streamer_id,
+                "limit": limit,
+                "skip": skip,
+                "query": nickname,
+                "filters": [],
+            }
             response: Optional[httpx.Response] = None
 
             for attempt in range(2):
@@ -720,7 +959,30 @@ class MemeAlertsService:
 
             supporters = self._extract_list(response_payload)
             if not supporters:
-                return None
+                payload_without_query = {
+                    "streamerId": streamer_id,
+                    "limit": limit,
+                    "skip": skip,
+                    "query": "",
+                    "filters": [],
+                }
+                response_without_query = await self._request(
+                    "POST",
+                    "/supporters",
+                    access_token,
+                    json=payload_without_query,
+                    client=client,
+                )
+                if response_without_query.status_code not in (200, 201):
+                    return None
+                try:
+                    response_payload = response_without_query.json()
+                except Exception:
+                    logger.exception("MemeAlerts supporters fallback JSON decode failed")
+                    return None
+                supporters = self._extract_list(response_payload)
+                if not supporters:
+                    return None
 
             for supporter in supporters:
                 if not isinstance(supporter, dict):
@@ -862,7 +1124,10 @@ class MemeAlertsService:
         if not nickname:
             return None
 
-        request_options = [("POST", {"username": nickname})]
+        request_options = [
+            ("POST", {"username": nickname}),
+            ("GET", {"username": nickname}),
+        ]
 
         for method, payload in request_options:
             for attempt in range(2):
@@ -919,6 +1184,16 @@ class MemeAlertsService:
                     logger.exception("MemeAlerts user lookup failed")
                     break
 
+        if streamer_id:
+            supporter_id = await self._resolve_user_id_via_supporters(
+                access_token,
+                streamer_id=str(streamer_id),
+                nickname=nickname,
+                client=client,
+            )
+            if supporter_id:
+                return supporter_id
+
         streamer_lookup_id = await self._resolve_user_id_via_streamer_lookup(
             access_token,
             nickname=nickname,
@@ -945,15 +1220,7 @@ class MemeAlertsService:
         except ValueError as exc:
             return {"success": False, "error": str(exc)}
         decoded = self._decode_token(access_token)
-        streamer_id = (
-            platform_user_id
-            or decoded.get("id")
-            or decoded.get("tid")
-            or decoded.get("streamer_id")
-            or decoded.get("streamerId")
-            or decoded.get("user_id")
-            or decoded.get("sub")
-        )
+        streamer_id = self._resolve_streamer_id(decoded, platform_user_id)
 
         if not streamer_id:
             return {"success": False, "error": "Streamer ID not found in token"}
@@ -966,7 +1233,14 @@ class MemeAlertsService:
                 client=shared_client,
             )
             if not target_user_id:
-                return {"success": False, "error": "User not found in MemeAlerts"}
+                return {
+                    "success": False,
+                    "error": "Пользователь MemeAlerts не найден",
+                    "detail": (
+                        "Укажите MemeAlerts user ID или ник пользователя, который уже есть "
+                        "в MemeAlerts/supporters. Twitch/VK ник может не совпадать с MemeAlerts."
+                    ),
+                }
 
             payload = {
                 "userId": target_user_id,
@@ -1060,15 +1334,7 @@ class MemeAlertsService:
 
         grants = self._read_local_grants(user_id=user_id, limit=limit)
         decoded = self._decode_token(access_token)
-        streamer_id = (
-            platform_user_id
-            or decoded.get("id")
-            or decoded.get("tid")
-            or decoded.get("streamer_id")
-            or decoded.get("streamerId")
-            or decoded.get("user_id")
-            or decoded.get("sub")
-        )
+        streamer_id = self._resolve_streamer_id(decoded, platform_user_id)
         purchases: List[Dict[str, Any]] = []
 
         if not streamer_id:
@@ -1114,7 +1380,13 @@ class MemeAlertsService:
                 break
 
             request_limit = min(page_limit, remaining)
-            payload = {"streamerId": streamer_id, "limit": request_limit, "skip": skip}
+            payload = {
+                "streamerId": streamer_id,
+                "limit": request_limit,
+                "skip": skip,
+                "query": "",
+                "filters": [],
+            }
             response: Optional[httpx.Response] = None
 
             for attempt in range(2):

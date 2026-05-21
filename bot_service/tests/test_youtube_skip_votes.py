@@ -98,6 +98,63 @@ async def test_vote_skip_requires_threshold(db, test_user):
     assert skip_vote_store.get_vote_count(test_user.id, queue_after_second_vote.id) == 0
 
 
+@pytest.mark.asyncio
+async def test_one_skip_vote_allows_regular_viewer(db, test_user):
+    db.add(
+        BotCommand(
+            user_id=test_user.id,
+            command_name="skip",
+            command_type="override",
+            platforms="twitch,vk",
+            allowed_roles="all",
+            extra_settings={"skip_votes_required": 1},
+        )
+    )
+    db.add(_queue_item(user_id=test_user.id, video_id="oneskip1", title="One Skip Video"))
+    db.commit()
+
+    handler = _DummyQueueHandler()
+    ctx = _DummyContext(test_user.twitch_username, "regular_viewer", is_mod=False)
+
+    await handler._handle_skip(ctx, None, "", "twitch", db)
+    db.expire_all()
+    queue_after_vote = db.query(YouTubeQueue).filter(YouTubeQueue.user_id == test_user.id).first()
+
+    assert "[SKIP]" in ctx.sent_messages[-1]
+    assert "Only moderators" not in ctx.sent_messages[-1]
+    assert queue_after_vote.status == "played"
+
+
+@pytest.mark.asyncio
+async def test_skip_votes_dedupe_by_viewer_id(db, test_user):
+    db.add(
+        BotCommand(
+            user_id=test_user.id,
+            command_name="skip",
+            command_type="override",
+            platforms="twitch,vk",
+            allowed_roles="all",
+            extra_settings={"skip_votes_required": 2},
+        )
+    )
+    queue_item = _queue_item(user_id=test_user.id, video_id="dedupe1", title="Dedupe Video")
+    db.add(queue_item)
+    db.commit()
+    db.refresh(queue_item)
+
+    handler = _DummyQueueHandler()
+    first_ctx = _DummyContext(test_user.twitch_username, "viewer_name_a")
+    second_ctx = _DummyContext(test_user.twitch_username, "viewer_name_b")
+    first_ctx.author.id = "same-viewer-id"
+    second_ctx.author.id = "same-viewer-id"
+
+    await handler._handle_skip(first_ctx, None, "", "twitch", db)
+    await handler._handle_skip(second_ctx, None, "", "twitch", db)
+
+    assert "[INFO] You already voted" in second_ctx.sent_messages[-1]
+    assert skip_vote_store.get_vote_count(test_user.id, queue_item.id) == 1
+
+
 def test_youtube_queue_api_returns_skip_votes(authenticated_client, db, test_user):
     db.add(
         BotCommand(

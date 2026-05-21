@@ -120,7 +120,8 @@ class MemoryWebSocketManager:
             self.channel_connections[channel] = set()
         self.channel_connections[channel].add(conn_id)
 
-        await self.sync_user_tts_generation(user_id)
+        if role == "tts_player":
+            await self.sync_user_tts_generation(user_id)
 
         logger.info(
             "WebSocket connection added: %s (role=%s, presence_only=%s)",
@@ -151,8 +152,9 @@ class MemoryWebSocketManager:
         del self.connections[conn_id]
         self._last_server_ping.pop(conn_id, None)
 
-        await self.sync_user_tts_generation(user_id)
-        await self._schedule_tts_disconnect_if_needed(user_id)
+        if connection.client_role == "tts_player":
+            await self.sync_user_tts_generation(user_id)
+            await self._schedule_tts_disconnect_if_needed(user_id)
 
         logger.info("WebSocket connection removed: %s", conn_id)
 
@@ -415,9 +417,11 @@ class MemoryWebSocketManager:
         try:
             user = db.query(User).filter(User.id == user_id).first()
             if not user:
+                logger.debug("TTS generation disabled for user %s: user_not_found", user_id)
                 return False
 
             if not getattr(user, "tts_enabled", False):
+                logger.debug("TTS generation disabled for user %s: tts_disabled", user_id)
                 return False
 
             listening_mode = getattr(user, "tts_listening_mode", "website")
@@ -426,11 +430,24 @@ class MemoryWebSocketManager:
                 listening_mode = tts_settings.listening_mode
 
             if listening_mode == "obs":
-                return self._has_active_obs_sink(user)
+                has_sink = self._has_active_obs_sink(user)
+                logger.debug(
+                    "TTS generation decision for user %s: mode=obs source_connected=%s",
+                    user_id,
+                    has_sink,
+                )
+                return has_sink
 
             if listening_mode == "website":
-                return self.has_user_connection_for_role(user_id, "tts_player")
+                has_player = self.has_user_connection_for_role(user_id, "tts_player")
+                logger.debug(
+                    "TTS generation decision for user %s: mode=website player_connected=%s",
+                    user_id,
+                    has_player,
+                )
+                return has_player
 
+            logger.debug("TTS generation disabled for user %s: unsupported_mode=%s", user_id, listening_mode)
             return False
         finally:
             db.close()

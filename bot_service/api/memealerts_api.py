@@ -23,6 +23,7 @@ MEMEALERTS_API_BASE = "https://memealerts.com"
 _MEMEALERTS_ALLOWED_AUTH_HOSTS = {"memealerts.com", "www.memealerts.com"}
 _MEMEALERTS_SUPPORTED_AUTH_PROVIDERS = ("twitch", "google", "vk")
 MemeAlertsAuthProvider = Literal["twitch", "google", "vk"]
+_MEMEALERTS_AUTH_SCOPE_PREFIX = "auth_provider:"
 
 
 def _normalize_memealerts_provider(provider: object | None) -> MemeAlertsAuthProvider:
@@ -31,6 +32,38 @@ def _normalize_memealerts_provider(provider: object | None) -> MemeAlertsAuthPro
     if normalized not in _MEMEALERTS_SUPPORTED_AUTH_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unsupported MemeAlerts provider")
     return cast(MemeAlertsAuthProvider, normalized)
+
+
+def _normalize_optional_memealerts_provider(provider: object | None) -> Optional[MemeAlertsAuthProvider]:
+    raw_provider = provider if isinstance(provider, str) else None
+    normalized = str(raw_provider or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized not in _MEMEALERTS_SUPPORTED_AUTH_PROVIDERS:
+        return None
+    return cast(MemeAlertsAuthProvider, normalized)
+
+
+def _extract_saved_auth_provider(scopes: object) -> Optional[MemeAlertsAuthProvider]:
+    if not isinstance(scopes, list):
+        return None
+    for item in scopes:
+        if not isinstance(item, str):
+            continue
+        if not item.startswith(_MEMEALERTS_AUTH_SCOPE_PREFIX):
+            continue
+        return _normalize_optional_memealerts_provider(item.removeprefix(_MEMEALERTS_AUTH_SCOPE_PREFIX))
+    return None
+
+
+def _build_memealerts_token_scopes(provider: Optional[str], token_scope: object) -> list[str]:
+    scopes: list[str] = []
+    normalized_provider = _normalize_optional_memealerts_provider(provider)
+    if normalized_provider:
+        scopes.append(f"{_MEMEALERTS_AUTH_SCOPE_PREFIX}{normalized_provider}")
+    if token_scope is not None:
+        scopes.append(f"scope:{token_scope}")
+    return scopes
 
 
 def _resolve_memealerts_callback_url(provider: str | None = None) -> str:
@@ -115,10 +148,12 @@ def _extract_memealerts_streamer_id(decoded: dict, trusted_fallback: Optional[st
         decoded.get("streamer_id")
         or decoded.get("streamerId")
         or decoded.get("tid")
-        or decoded.get("user_id")
-        or decoded.get("sub")
         or trusted_fallback
         or decoded.get("id")
+        or decoded.get("_id")
+        or decoded.get("user_id")
+        or decoded.get("uid")
+        or decoded.get("sub")
     )
 
 
@@ -128,6 +163,9 @@ class PlatformRewardSettingsPatch(BaseModel):
     reward_title: Optional[str] = None
     coins_amount: Optional[int] = Field(default=None, ge=1, le=1_000_000)
     reward_cost: Optional[int] = Field(default=None, ge=1, le=1_000_000)
+    local_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    platform: Optional[Literal["twitch", "vk"]] = None
+    cooldown_seconds: Optional[int] = Field(default=None, ge=0, le=86_400)
 
 
 class DonationAutoSettingsPatch(BaseModel):
@@ -139,10 +177,12 @@ class DonationAutoSettingsPatch(BaseModel):
 class MemeAlertsSettingsPatch(BaseModel):
     twitch: Optional[PlatformRewardSettingsPatch] = None
     vk: Optional[PlatformRewardSettingsPatch] = None
+    points_rewards: Optional[list[PlatformRewardSettingsPatch]] = None
     donation_auto: Optional[DonationAutoSettingsPatch] = None
 
 
 class CreatePointsRewardRequest(BaseModel):
+    local_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
     platform: Literal["twitch", "vk"]
     title: str = Field(default="MemeCoins", min_length=1, max_length=80)
     cost: int = Field(default=500, ge=1, le=1_000_000)
@@ -150,10 +190,15 @@ class CreatePointsRewardRequest(BaseModel):
     cooldown_seconds: int = Field(default=0, ge=0, le=86_400)
 
 
+class TogglePointsRewardRequest(BaseModel):
+    enabled: bool
+
+
 class ConnectMemeAlertsRequest(BaseModel):
     access_token: str = Field(min_length=16, max_length=8192)
     refresh_token: Optional[str] = Field(default=None, min_length=1, max_length=8192)
     streamer_id: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    auth_provider: Optional[MemeAlertsAuthProvider] = None
 
 
 class GrantCoinsRequest(BaseModel):
@@ -186,7 +231,11 @@ async def get_memealerts_status(
                     "success": True, 
                     "connected": True,
                     "streamer_id": streamer_id,
-                    "platform_user_id": token.platform_user_id
+                    "platform_user_id": token.platform_user_id,
+                    "auth_provider": _extract_saved_auth_provider(token.scopes),
+                    "token_id": decoded.get("tid"),
+                    "connected_at": token.created_at.isoformat() if token.created_at else None,
+                    "updated_at": token.updated_at.isoformat() if token.updated_at else None,
                 }
             except ValueError:
                 if token.platform_user_id:
@@ -195,6 +244,10 @@ async def get_memealerts_status(
                         "connected": True,
                         "streamer_id": token.platform_user_id,
                         "platform_user_id": token.platform_user_id,
+                        "auth_provider": _extract_saved_auth_provider(token.scopes),
+                        "token_id": None,
+                        "connected_at": token.created_at.isoformat() if token.created_at else None,
+                        "updated_at": token.updated_at.isoformat() if token.updated_at else None,
                     }
                 return {
                     "success": True,
@@ -293,13 +346,18 @@ async def save_memealerts_settings(
             points_patch["vk"] = payload.vk.model_dump(exclude_unset=True)
         if points_patch:
             patch["points_reward"] = points_patch
+        if payload.points_rewards is not None:
+            patch["points_rewards"] = [
+                item.model_dump(exclude_unset=True)
+                for item in payload.points_rewards[:3]
+            ]
         if payload.donation_auto is not None:
             patch["donation_auto"] = payload.donation_auto.model_dump(exclude_unset=True)
 
         settings = service.save_settings(user_id, patch)
         return {"success": True, "settings": settings}
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid settings payload")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Invalid settings payload")
     except HTTPException:
         raise
     except Exception:
@@ -319,6 +377,7 @@ async def create_memealerts_points_reward(
         service = MemeAlertsService(db)
         result = await service.create_points_reward(
             user_id=user_id,
+            local_id=payload.local_id,
             platform=payload.platform,
             title=payload.title,
             cost=payload.cost,
@@ -326,13 +385,56 @@ async def create_memealerts_points_reward(
             cooldown_seconds=payload.cooldown_seconds,
         )
         return {"success": True, "data": result}
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid reward parameters")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Invalid reward parameters")
     except HTTPException:
         raise
-    except Exception:
+    except Exception as exc:
         logger.exception("Error creating MemeAlerts points reward")
+        raise HTTPException(status_code=500, detail=str(exc) or "Internal server error")
+
+
+@router.patch("/rewards/{local_id}")
+async def toggle_memealerts_points_reward(
+    local_id: str,
+    payload: TogglePointsRewardRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Enable or disable one configured MemeAlerts platform reward."""
+    try:
+        user_id = user.get("id")
+        service = MemeAlertsService(db)
+        settings = await service.update_points_reward_enabled(
+            user_id=user_id,
+            local_id=local_id,
+            enabled=payload.enabled,
+        )
+        return {"success": True, "settings": settings}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc) or "Reward not found")
+    except Exception:
+        logger.exception("Error toggling MemeAlerts points reward")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/rewards/{local_id}")
+async def delete_memealerts_points_reward(
+    local_id: str,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete one configured MemeAlerts platform reward and remove it from settings."""
+    try:
+        user_id = user.get("id")
+        service = MemeAlertsService(db)
+        settings = await service.delete_points_reward(user_id=user_id, local_id=local_id)
+        return {"success": True, "settings": settings}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc) or "Reward not found")
+    except Exception as exc:
+        logger.exception("Error deleting MemeAlerts points reward")
+        raise HTTPException(status_code=500, detail=str(exc) or "Internal server error")
 
 
 @router.post("/connect")
@@ -353,11 +455,13 @@ async def connect_memealerts(
         access_token = token_data.access_token
         refresh_token = token_data.refresh_token
         hinted_streamer_id = str(token_data.streamer_id or "").strip() or None
+        auth_provider = _normalize_optional_memealerts_provider(token_data.auth_provider)
 
         if not access_token:
             raise HTTPException(status_code=400, detail="access_token is required")
 
-        # Keep existing DB streamer_id as trusted source when present.
+        # Keep existing DB streamer_id as a fallback, but prefer current token
+        # claims because older local rows may have stored the token id (`tid`).
         existing = UserTokenRepository(db).get_by_user_and_platform(user_id, "memealerts")
         trusted_streamer_id = existing.platform_user_id if existing and existing.platform_user_id else None
 
@@ -370,7 +474,7 @@ async def connect_memealerts(
             logger.warning("MemeAlerts token is not a decodable JWT; validation requires an existing streamer id")
 
         claimed_streamer_id = _extract_memealerts_streamer_id(decoded)
-        streamer_id = trusted_streamer_id or hinted_streamer_id or claimed_streamer_id
+        streamer_id = claimed_streamer_id or hinted_streamer_id or trusted_streamer_id
         token_scope = decoded.get("scope")
 
         if not streamer_id:
@@ -396,9 +500,10 @@ async def connect_memealerts(
             )
         else:
             logger.info(
-                "MemeAlerts token validated for streamer_id=%s, scope=%s",
+                "MemeAlerts token validated for streamer_id=%s, scope=%s, auth_provider=%s",
                 streamer_id,
                 token_scope,
+                auth_provider or "unknown",
             )
 
         # Store token in database
@@ -409,6 +514,7 @@ async def connect_memealerts(
             access_token=encrypt_token(access_token),
             refresh_token=encrypt_token(refresh_token) if refresh_token else None,
             platform_user_id=str(streamer_id),
+            scopes=_build_memealerts_token_scopes(auth_provider, token_scope),
         )
 
         logger.info(f"[OK] MemeAlerts connected for user {user_id}, streamer_id={streamer_id}")
@@ -475,7 +581,14 @@ async def grant_coins(
         )
 
         if not result.get("success"):
-            raise HTTPException(status_code=400, detail="MemeAlerts grant failed")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": result.get("error") or "MemeAlerts grant failed",
+                    "detail": result.get("detail"),
+                    "status_code": result.get("status_code"),
+                },
+            )
 
         logger.info(f"[OK] MemeAlerts grant successful: {result}")
         return {"success": True, "data": result}

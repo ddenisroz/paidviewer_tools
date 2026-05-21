@@ -1639,11 +1639,8 @@ const CommandsPage: React.FC = () => {
                             {editingCommand.name === 'skip' && (
                                 <div className="border border-zinc-700 rounded-lg p-4 bg-zinc-800/50 mt-4">
                                     <Label htmlFor="skip_votes" className="text-base font-medium">
-                                        Голосов для скипа
+                                        Количество разных зрителей для !skip
                                     </Label>
-                                    <p className="text-xs text-muted-foreground mb-3">
-                                        1 = мгновенный скип (только модераторы), 2+ = голосование всех зрителей
-                                    </p>
                                     <Input
                                         id="skip_votes"
                                         type="number"

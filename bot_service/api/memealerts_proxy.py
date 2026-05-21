@@ -7,10 +7,11 @@ access token data back to dashboard via postMessage.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 from fastapi import APIRouter, Depends, Request, Response
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/memealerts/proxy", tags=["memealerts-proxy"])
 
 MEMEALERTS_ORIGIN = "https://memealerts.com"
 MEMEALERTS_WWW_ORIGIN = "https://www.memealerts.com"
+MEMEALERTS_SAFE_AUTH_RETURN_URL = f"{MEMEALERTS_ORIGIN}/auth/redirect"
 PROXY_PREFIX = "/api/memealerts/proxy"
 _ALLOWED_EXTERNAL_AUTH_REDIRECT_HOSTS = {
     "accounts.google.com",
@@ -164,6 +166,34 @@ _INJECTED_SCRIPT = """
         channel.close();
       }
     } catch (e) {}
+
+    try {
+      if (type === "memealerts_auth_state" || type === "memealerts_proxy_result") {
+        var debugPayload = {
+          type: type,
+          state: data.state || undefined,
+          source: data.source || undefined,
+          status: data.status || undefined,
+          ok: typeof data.ok === "boolean" ? data.ok : undefined,
+          scanned_keys: data.scanned_keys || undefined,
+          upstream_path: data.upstream_path || undefined,
+          elapsed_ms: data.elapsed_ms || undefined,
+          href_path: window.location.pathname,
+        };
+        var body = JSON.stringify(debugPayload);
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/api/memealerts/proxy/debug", new Blob([body], { type: "application/json" }));
+        } else {
+          fetch("/api/memealerts/proxy/debug", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: body,
+            keepalive: true,
+          }).catch(function () {});
+        }
+      }
+    } catch (e) {}
   }
 
   function pickToken(params) {
@@ -240,8 +270,13 @@ _INJECTED_SCRIPT = """
         var access =
           parsed.access_token ||
           parsed.accessToken ||
+          parsed.auth_token ||
+          parsed.authToken ||
           parsed.token ||
           parsed.jwt ||
+          parsed.access ||
+          parsed.bearer ||
+          parsed.sessionToken ||
           "";
         if (looksLikeToken(access)) {
           return {
@@ -306,6 +341,13 @@ _INJECTED_SCRIPT = """
         "memealerts.auth",
         "ma_token",
         "ma_access_token",
+        "memealerts_access_token",
+        "memealertsAccessToken",
+        "auth.token",
+        "auth.accessToken",
+        "auth.access_token",
+        "sessionToken",
+        "session.token",
       ];
       for (var storeKnownIdx = 0; storeKnownIdx < stores.length; storeKnownIdx += 1) {
         var knownStore = stores[storeKnownIdx].store;
@@ -405,6 +447,46 @@ _INJECTED_SCRIPT = """
     return "";
   }
 
+  function readCookieToken() {
+    try {
+      var rawCookie = document.cookie || "";
+      if (!rawCookie) return {};
+      var parts = rawCookie.split("; ");
+      var names = [
+        "accessToken",
+        "access_token",
+        "token",
+        "authToken",
+        "auth_token",
+        "jwt",
+        "jwtToken",
+        "memealerts.token",
+        "memealerts_access_token",
+        "ma_access_token",
+        "sessionToken",
+      ];
+      for (var i = 0; i < parts.length; i += 1) {
+        var item = parts[i];
+        var separator = item.indexOf("=");
+        var rawKey = separator >= 0 ? item.slice(0, separator) : item;
+        var key = decodeURIComponent(rawKey || "");
+        if (!key) continue;
+        if (names.indexOf(key) < 0 && !isAuthStorageKey(key)) continue;
+        var rawValue = separator >= 0 ? item.slice(separator + 1) : "";
+        var value = decodeURIComponent(rawValue || "");
+        var extracted = extractFromUnknown(value, key);
+        if (extracted.access_token) {
+          notifyClient("memealerts_auth_state", {
+            state: "token_found",
+            source: "cookie:" + key,
+          });
+          return extracted;
+        }
+      }
+    } catch (e) {}
+    return {};
+  }
+
   async function persistToken(payload) {
     try {
       var headers = { "Content-Type": "application/json" };
@@ -483,6 +565,12 @@ _INJECTED_SCRIPT = """
     return;
   }
 
+  notifyClient("memealerts_auth_state", {
+    state: "storage_scanned",
+    source: "inject",
+    scanned_keys: 0,
+  });
+
   var interval = setInterval(function () {
     tries += 1;
 
@@ -490,6 +578,13 @@ _INJECTED_SCRIPT = """
     if (fromUrl.access_token) {
       clearInterval(interval);
       processToken(fromUrl, "url");
+      return;
+    }
+
+    var fromCookie = readCookieToken();
+    if (fromCookie.access_token) {
+      clearInterval(interval);
+      processToken(fromCookie, "cookie");
       return;
     }
 
@@ -642,42 +737,72 @@ def _build_upstream_auth_fallback_query(
     for key, value in query:
         if key == "return_url":
             has_return_url = True
-            normalized.append((key, f"{MEMEALERTS_ORIGIN}/auth/redirect"))
+            normalized.append((key, MEMEALERTS_SAFE_AUTH_RETURN_URL))
         else:
             normalized.append((key, value))
 
     if not has_return_url:
-        normalized.append(("return_url", f"{MEMEALERTS_ORIGIN}/auth/redirect"))
+        normalized.append(("return_url", MEMEALERTS_SAFE_AUTH_RETURN_URL))
 
     return normalized
+
+
+def _extract_proxy_auth_callback_params(request: Request) -> dict[str, str]:
+    """Extract callback values without logging token contents."""
+    params = request.query_params
+    access_token = (
+        params.get("accessToken")
+        or params.get("access_token")
+        or params.get("token")
+        or params.get("auth_token")
+        or params.get("jwt")
+        or ""
+    ).strip()
+    refresh_token = (params.get("refreshToken") or params.get("refresh_token") or "").strip()
+    streamer_id = (
+        params.get("streamerId")
+        or params.get("streamer_id")
+        or params.get("tid")
+        or params.get("user_id")
+        or params.get("userId")
+        or ""
+    ).strip()
+    provider = (params.get("provider") or "").strip().lower()
+    if provider not in {"twitch", "google", "vk"}:
+        provider = "twitch"
+
+    result = {"provider": provider}
+    if access_token:
+        result["accessToken"] = access_token
+    if refresh_token:
+        result["refreshToken"] = refresh_token
+    if streamer_id:
+        result["streamerId"] = streamer_id
+    return result
+
+
+def _is_proxy_auth_callback(path: str, request: Request) -> bool:
+    normalized_path = (path or "").lstrip("/")
+    if normalized_path != "auth/redirect":
+        return False
+    return bool(_extract_proxy_auth_callback_params(request).get("accessToken"))
+
+
+def _redirect_proxy_auth_callback(request: Request) -> RedirectResponse:
+    callback_params = _extract_proxy_auth_callback_params(request)
+    logger.info(
+        "[PROXY] MemeAlerts auth callback captured provider=%s access=%s refresh=%s streamer_id=%s",
+        callback_params.get("provider"),
+        bool(callback_params.get("accessToken")),
+        bool(callback_params.get("refreshToken")),
+        bool(callback_params.get("streamerId")),
+    )
+    target = f"/memealerts/callback?{urlencode(callback_params)}"
+    return RedirectResponse(url=target, status_code=303)
 
 
 def _normalize_upstream_path(path: str) -> str:
     return (path or "").lstrip("/")
-
-
-def _build_proxy_auth_fallback_query(
-    path: str,
-    query: list[tuple[str, str]] | None,
-    *,
-    proxy_return_url: str,
-) -> list[tuple[str, str]] | None:
-    if not (path.startswith("auth/") or path.startswith("api/auth/")):
-        return query
-
-    normalized: list[tuple[str, str]] = []
-    has_return_url = False
-    for key, value in (query or []):
-        if key == "return_url":
-            has_return_url = True
-            normalized.append((key, proxy_return_url))
-        else:
-            normalized.append((key, value))
-
-    if not has_return_url:
-        normalized.append(("return_url", proxy_return_url))
-
-    return normalized
 
 
 def _build_upstream_url(path: str) -> str:
@@ -769,6 +894,7 @@ def _rewrite_body(body: bytes, content_type: str, proxy_prefix: str, *, path: st
                 text = f"{_PATH_FIX_SCRIPT}{text}"
 
     if is_html and 'data-ma-proxy="1"' not in text:
+        logger.info("[PROXY] MemeAlerts auth script injected path=%s", path or "/")
         if "</body>" in text:
             text = text.replace("</body>", f"{_INJECTED_SCRIPT}</body>")
         elif "</html>" in text:
@@ -830,6 +956,67 @@ def _resolve_proxy_access_token(raw_stored_token: str | None) -> str | None:
         logger.warning("[PROXY] Empty decrypted token; using legacy plain token")
         return raw_value
     return None
+
+
+def _is_allowed_external_auth_redirect(parsed) -> bool:
+    scheme = (parsed.scheme or "").lower()
+    host = (parsed.hostname or "").strip().lower()
+    if scheme != "https" or not host:
+        return False
+    return host in _ALLOWED_EXTERNAL_AUTH_REDIRECT_HOSTS or any(
+        host.endswith(suffix) for suffix in (".google.com", ".twitch.tv", ".vk.com", ".vk.ru")
+    )
+
+
+def _patch_memealerts_oauth_state_value(state: str, proxy_return_url: str) -> str:
+    raw_state = (state or "").strip()
+    if raw_state.startswith("{"):
+        try:
+            payload = json.loads(raw_state)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            payload["return_url"] = proxy_return_url
+            return json.dumps(payload, separators=(",", ":"))
+    return proxy_return_url
+
+
+def _patch_external_auth_state_location(location: str, proxy_return_url: str) -> str:
+    """Point third-party OAuth state back to our proxy without asking MemeAlerts to accept localhost upfront."""
+    if not location or any(ch in location for ch in ("\r", "\n", "\t")):
+        return location
+
+    parsed = urlparse(location)
+    if not _is_allowed_external_auth_redirect(parsed):
+        return location
+
+    query = parse_qsl(parsed.query, keep_blank_values=True)
+    if not query:
+        return location
+
+    patched: list[tuple[str, str]] = []
+    changed = False
+    for key, value in query:
+        if key == "state":
+            patched.append((key, _patch_memealerts_oauth_state_value(value, proxy_return_url)))
+            changed = True
+        else:
+            patched.append((key, value))
+
+    if not changed:
+        return location
+
+    patched_query = urlencode(patched, doseq=True)
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            patched_query,
+            parsed.fragment,
+        )
+    )
 
 
 def _sanitize_redirect_location(
@@ -902,6 +1089,32 @@ def _sanitize_redirect_location(
     return proxy_prefix
 
 
+@router.post("/debug")
+async def memealerts_proxy_debug(request: Request) -> dict:
+    """Receive non-secret diagnostics from the same-origin MemeAlerts proxy popup."""
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    if not isinstance(payload, dict):
+        payload = {}
+
+    safe_payload = {
+        "type": str(payload.get("type") or "")[:64],
+        "state": str(payload.get("state") or "")[:64],
+        "source": str(payload.get("source") or "")[:160],
+        "status": payload.get("status") if isinstance(payload.get("status"), int) else None,
+        "ok": payload.get("ok") if isinstance(payload.get("ok"), bool) else None,
+        "scanned_keys": payload.get("scanned_keys") if isinstance(payload.get("scanned_keys"), int) else None,
+        "upstream_path": str(payload.get("upstream_path") or "")[:240],
+        "elapsed_ms": payload.get("elapsed_ms") if isinstance(payload.get("elapsed_ms"), int) else None,
+        "href_path": str(payload.get("href_path") or "")[:240],
+    }
+    logger.info("[PROXY] MemeAlerts auth debug %s", safe_payload)
+    return {"ok": True}
+
+
 @router.get("/", response_class=HTMLResponse)
 async def proxy_root(
     request: Request,
@@ -918,6 +1131,9 @@ async def proxy_path(
     user: dict = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
 ):
+    if _is_proxy_auth_callback(path, request):
+        return _redirect_proxy_auth_callback(request)
+
     canonical_path = _normalize_upstream_path(path)
     if canonical_path != (path or "").lstrip("/"):
         query_string = f"?{request.url.query}" if request.url.query else ""
@@ -969,6 +1185,7 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
     query = _normalize_query(path, query)
     proxy_return_url = f"{_resolve_proxy_public_base(request)}{PROXY_PREFIX}/auth/redirect"
     query = _normalize_auth_query(path, query, proxy_return_url=proxy_return_url)
+    upstream_query = _build_upstream_auth_fallback_query(path, query)
 
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=False, verify=True) as client:
@@ -977,36 +1194,17 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
                 url=upstream_url,
                 headers=fwd_headers,
                 content=body if body else None,
-                params=query,
+                params=upstream_query,
             )
-            # Retry auth with proxy callback first, then with upstream callback.
-            # This keeps automatic token handoff working when possible and falls
-            # back to upstream redirect only as a last resort.
+            # MemeAlerts auth hangs when return_url points to localhost. Ask
+            # upstream for its own return URL, then patch OAuth state below so
+            # the final callback lands back on our proxy.
             if _is_auth_proxy_path(path) and upstream_resp.status_code >= 400:
-                retried_query = query
-                proxy_fallback_query = _build_proxy_auth_fallback_query(
-                    path,
-                    query,
-                    proxy_return_url=proxy_return_url,
+                logger.warning(
+                    "[PROXY] Auth flow returned status=%s with safe upstream return_url (explicit=%s)",
+                    upstream_resp.status_code,
+                    has_explicit_return_url,
                 )
-                if proxy_fallback_query != retried_query:
-                    logger.warning(
-                        "[PROXY] Auth flow rejected return_url (explicit=%s), retrying with proxy return_url",
-                        has_explicit_return_url,
-                    )
-                    upstream_resp = await client.request(
-                        method=request.method,
-                        url=upstream_url,
-                        headers=fwd_headers,
-                        content=body if body else None,
-                        params=proxy_fallback_query,
-                    )
-                    retried_query = proxy_fallback_query
-                else:
-                    logger.info(
-                        "[PROXY] Auth flow accepted proxy return_url after fallback (explicit=%s)",
-                        has_explicit_return_url,
-                    )
     except httpx.TimeoutException:
         elapsed_ms = int((time.monotonic() - request_started) * 1000)
         logger.warning(
@@ -1058,6 +1256,8 @@ async def _proxy(request: Request, path: str, *, user: dict | None = None, db: S
 
     if upstream_resp.is_redirect:
         location = upstream_resp.headers.get("location", "")
+        if _is_auth_proxy_path(path):
+            location = _patch_external_auth_state_location(location, proxy_return_url)
         location = _sanitize_redirect_location(
             location,
             proxy_prefix,

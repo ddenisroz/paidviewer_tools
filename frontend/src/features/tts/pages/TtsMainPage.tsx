@@ -1,26 +1,31 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQuery } from '@tanstack/react-query';
-import { Cloud, Copy, ExternalLink, Monitor, Sparkles, Volume2 } from 'lucide-react';
+import { Cloud, Copy, ExternalLink, Monitor, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/context/AuthContext';
 import { useIntegrations } from '@/context/IntegrationsContext';
 import TtsChannelPointsMode from '@/features/tts/components/TtsChannelPointsMode';
-import TtsFilterManager from '@/features/tts/components/TtsFilterManager';
+import { TtsBlockedUsersCard } from '@/features/tts/components/TtsBlockedUsersCard';
+import { TtsForbiddenWordsCard } from '@/features/tts/components/TtsForbiddenWordsCard';
 import {
-    useSaveTtsAudioSettings,
+    useAddFilteredWord,
+    useBlockUser,
+    useBlockedUsers,
+    useDeleteFilteredWord,
+    useFilteredWords,
     useSaveTtsModeSettings,
     useSaveTtsPlatformSettings,
     useSaveTtsSettings,
     useSetTtsEngine,
     useSetTtsListeningMode,
     useToggleTts,
-    useTtsAudioSettings,
     useTtsModeSettings,
     useTtsPlatformSettings,
     useTtsSettings,
     useTtsStatus,
+    useUnblockUser,
 } from '@/queries/tts/ttsQueries';
 import { ttsService } from '@/services/api/services/ttsService';
 import PageWrapper from '@/shared/components/PageWrapper';
@@ -34,12 +39,13 @@ import { Switch } from '@/shared/components/ui/switch';
 import { getApiBaseUrl } from '@/shared/utils/urlUtils';
 
 import type { ApiResponse } from '@/types';
-import type { TtsSettings, TtsStatus, TtsVoice } from '@/types/tts';
+import type { TtsSettings, TtsStatus } from '@/types/tts';
 
 type ListeningMode = 'website' | 'obs';
 type TriggerMode = 'all_messages' | 'channel_points';
 type EngineType = 'f5_cloud' | 'f5_local' | 'gcloud';
 type Platform = 'twitch' | 'vk';
+type BlockedPlatform = 'twitch' | 'vk' | 'youtube';
 
 interface PlatformSettingsData {
     enabled_platforms?: Platform[];
@@ -57,8 +63,6 @@ interface SettingsState {
     filterReplies: boolean;
     filterMentions: boolean;
     skipCommands: boolean;
-    enableLexiconFilter: boolean;
-    filterBanwords: boolean;
     disableVoiceSelection: boolean;
     speakSenderName: boolean;
     maxMessageLength: number;
@@ -76,19 +80,6 @@ const unwrapPayload = <T,>(payload: ApiResponse<T> | T | undefined | null): T | 
         return (payload as ApiResponse<T>).data;
     }
     return payload as T;
-};
-
-const unwrapVoiceList = (payload: unknown): TtsVoice[] => {
-    if (!payload || typeof payload !== 'object') return [];
-    const candidate = payload as { data?: unknown; voices?: unknown };
-    if (Array.isArray(candidate.voices)) return candidate.voices as TtsVoice[];
-    if (Array.isArray(candidate.data)) return candidate.data as TtsVoice[];
-    if (candidate.data && typeof candidate.data === 'object') {
-        const nested = candidate.data as { voices?: unknown; data?: unknown };
-        if (Array.isArray(nested.voices)) return nested.voices as TtsVoice[];
-        if (Array.isArray(nested.data)) return nested.data as TtsVoice[];
-    }
-    return [];
 };
 
 const buildTtsObsUrl = (token?: string | null): string => {
@@ -115,17 +106,19 @@ const TtsMainPage: React.FC = () => {
 
     const { data: statusResponse } = useTtsStatus(null, { enabled: Boolean(userId) });
     const { data: settingsResponse } = useTtsSettings({ enabled: Boolean(userId) });
-    const { data: audioSettingsResponse } = useTtsAudioSettings({ enabled: Boolean(userId) });
     const { data: platformResponse } = useTtsPlatformSettings({ enabled: Boolean(userId) });
     const { data: modeResponse } = useTtsModeSettings({ enabled: Boolean(userId) });
 
     const saveSettingsMutation = useSaveTtsSettings();
-    const saveAudioSettingsMutation = useSaveTtsAudioSettings();
     const savePlatformMutation = useSaveTtsPlatformSettings();
     const saveModeMutation = useSaveTtsModeSettings();
     const toggleTtsMutation = useToggleTts();
     const setEngineMutation = useSetTtsEngine();
     const setListeningModeMutation = useSetTtsListeningMode();
+    const addFilteredWordMutation = useAddFilteredWord();
+    const deleteFilteredWordMutation = useDeleteFilteredWord();
+    const blockUserMutation = useBlockUser();
+    const unblockUserMutation = useUnblockUser();
 
     const status =
         unwrapPayload<TtsStatus>(statusResponse as ApiResponse<TtsStatus> | TtsStatus | undefined) ||
@@ -139,10 +132,6 @@ const TtsMainPage: React.FC = () => {
     const modeSettings = unwrapPayload<{ tts_mode?: TriggerMode }>(
         modeResponse as ApiResponse<{ tts_mode?: TriggerMode }> | { tts_mode?: TriggerMode } | undefined
     );
-    const audioSettings = unwrapPayload<{ websiteVolume?: number; obsVolume?: number }>(
-        audioSettingsResponse as ApiResponse<{ websiteVolume?: number; obsVolume?: number }> | undefined
-    );
-
     const { data: gcloudVoices = [] } = useQuery<GcloudVoice[]>({
         queryKey: ['tts', 'gcloud-voices', 'ru-RU'],
         enabled: Boolean(userId),
@@ -175,26 +164,29 @@ const TtsMainPage: React.FC = () => {
             return response.data as ApiResponse<ObsStatus> | ObsStatus;
         },
     });
+    const { data: filteredWords = [], isLoading: filteredWordsLoading } = useFilteredWords({ enabled: Boolean(userId) });
+    const { data: blockedUsers = [], isLoading: blockedUsersLoading } = useBlockedUsers({ enabled: Boolean(userId) });
 
     const [settingsState, setSettingsState] = useState<SettingsState>({
         filterReplies: false,
         filterMentions: false,
         skipCommands: true,
-        enableLexiconFilter: true,
-        filterBanwords: true,
         disableVoiceSelection: false,
         speakSenderName: false,
-        maxMessageLength: 500,
+        maxMessageLength: 150,
     });
-    const [websiteVolume, setWebsiteVolume] = useState(50);
-    const [obsVolume, setObsVolume] = useState(50);
     const [selectedEngine, setSelectedEngine] = useState<EngineType>('f5_cloud');
     const [listeningMode, setListeningMode] = useState<ListeningMode>('website');
     const [ttsMode, setTtsMode] = useState<TriggerMode>('all_messages');
     const [enabledPlatforms, setEnabledPlatforms] = useState<Platform[]>([]);
-    const [defaultVoice, setDefaultVoice] = useState('default_voice');
     const [selectedGcloudVoice, setSelectedGcloudVoice] = useState('');
     const [gcloudMood, setGcloudMood] = useState<'neutral' | 'sad' | 'happy'>('neutral');
+    const [newForbiddenWord, setNewForbiddenWord] = useState('');
+    const [forbiddenWordsOpen, setForbiddenWordsOpen] = useState(false);
+    const [blockedUsername, setBlockedUsername] = useState('');
+    const [blockedPlatform, setBlockedPlatform] = useState<BlockedPlatform>('twitch');
+    const [blockedUsersOpen, setBlockedUsersOpen] = useState(false);
+    const forbiddenWordFormRef = useRef<HTMLDivElement | null>(null);
 
     const connectedPlatforms = useMemo(
         () =>
@@ -210,25 +202,16 @@ const TtsMainPage: React.FC = () => {
             filterReplies: Boolean(settings.filterReplies ?? settings.filter_replies ?? false),
             filterMentions: Boolean(settings.filterMentions ?? settings.filter_mentions ?? false),
             skipCommands: Boolean(settings.skipCommands ?? settings.skip_commands ?? true),
-            enableLexiconFilter: Boolean(settings.enableLexiconFilter ?? settings.enable_lexicon_filter ?? true),
-            filterBanwords: Boolean(settings.filterBanwords ?? settings.filter_banwords ?? true),
             disableVoiceSelection: Boolean(settings.disableVoiceSelection ?? settings.disable_voice_selection ?? false),
             speakSenderName: Boolean(settings.speakSenderName ?? settings.speak_sender_name ?? false),
-            maxMessageLength: Number(settings.maxMessageLength ?? settings.max_message_length ?? 500),
+            maxMessageLength: Math.max(50, Math.min(250, Number(settings.maxMessageLength ?? settings.max_message_length ?? 150))),
         });
         setListeningMode(
             (settings.listeningMode as ListeningMode) || (settings.listening_mode as ListeningMode) || 'website'
         );
-        setDefaultVoice(settings.voice || 'default_voice');
         setSelectedGcloudVoice(settings.gcloudVoices?.[0] || settings.gcloud_voices?.[0] || '');
         setGcloudMood(settings.gcloudMood || settings.gcloud_mood || 'neutral');
     }, [settings]);
-
-    useEffect(() => {
-        if (!audioSettings) return;
-        setWebsiteVolume(Number(audioSettings.websiteVolume ?? 50));
-        setObsVolume(Number(audioSettings.obsVolume ?? 50));
-    }, [audioSettings]);
 
     useEffect(() => {
         if (!status) return;
@@ -272,40 +255,6 @@ const TtsMainPage: React.FC = () => {
             })),
         [gcloudVoices]
     );
-    const { data: f5VoiceOptions = [] } = useQuery<Array<{ value: string; label: string }>>({
-        queryKey: ['tts', 'main-default-voices', userId],
-        enabled: Boolean(userId && selectedEngine !== 'gcloud'),
-        staleTime: 5 * 60 * 1000,
-        queryFn: async () => {
-            if (!userId) return [];
-            const [globalResponse, userResponse] = await Promise.all([
-                ttsService.getGlobalVoices('f5'),
-                ttsService.getUserVoices(userId, 'f5'),
-            ]);
-            const voices = [...unwrapVoiceList(globalResponse.data), ...unwrapVoiceList(userResponse.data)];
-            const seen = new Set<string>();
-            return voices
-                .map((voice) => {
-                    const value = String(voice.name || '').trim();
-                    if (!value || seen.has(value)) return null;
-                    seen.add(value);
-                    return { value, label: value };
-                })
-                .filter(Boolean) as Array<{ value: string; label: string }>;
-        },
-    });
-    const f5VoiceSelectOptions = useMemo(() => {
-        const currentVoice = String(defaultVoice || '').trim();
-        if (
-            !currentVoice ||
-            currentVoice === 'default_voice' ||
-            f5VoiceOptions.some((voice) => voice.value === currentVoice)
-        ) {
-            return f5VoiceOptions;
-        }
-        return [{ value: currentVoice, label: currentVoice }, ...f5VoiceOptions];
-    }, [defaultVoice, f5VoiceOptions]);
-
     const saveBoolean = (key: keyof SettingsState, value: boolean): void => {
         const nextState = { ...settingsState, [key]: value };
         setSettingsState(nextState);
@@ -313,20 +262,9 @@ const TtsMainPage: React.FC = () => {
     };
 
     const handleMaxLengthChange = (value: number): void => {
-        const nextValue = Math.max(50, Math.min(2000, Number.isFinite(value) ? Math.round(value) : 500));
+        const nextValue = Math.max(50, Math.min(250, Number.isFinite(value) ? Math.round(value) : 150));
         setSettingsState((prev) => ({ ...prev, maxMessageLength: nextValue }));
         saveSettingsMutation.mutate({ maxMessageLength: nextValue });
-    };
-
-    const handleVolumeChange = (scope: 'website' | 'obs', value: number): void => {
-        const nextValue = Math.max(0, Math.min(100, Number.isFinite(value) ? Math.round(value) : 50));
-        if (scope === 'website') {
-            setWebsiteVolume(nextValue);
-            saveAudioSettingsMutation.mutate({ websiteVolume: nextValue });
-            return;
-        }
-        setObsVolume(nextValue);
-        saveAudioSettingsMutation.mutate({ obsVolume: nextValue });
     };
 
     const handlePlatformToggle = (platform: Platform, enabled: boolean): void => {
@@ -372,12 +310,6 @@ const TtsMainPage: React.FC = () => {
         });
     };
 
-    const handleDefaultVoiceChange = (voiceName: string): void => {
-        const nextVoice = voiceName || 'default_voice';
-        setDefaultVoice(nextVoice);
-        saveSettingsMutation.mutate({ voice: nextVoice });
-    };
-
     const handleGcloudMoodChange = (mood: 'neutral' | 'sad' | 'happy'): void => {
         setGcloudMood(mood);
         saveSettingsMutation.mutate({
@@ -385,6 +317,21 @@ const TtsMainPage: React.FC = () => {
             gcloudVoices: selectedGcloudVoice ? [selectedGcloudVoice] : [],
             gcloudMood: mood,
         });
+    };
+
+    const handleAddForbiddenWord = (): void => {
+        const word = newForbiddenWord.trim();
+        if (!word || addFilteredWordMutation.isPending) return;
+        addFilteredWordMutation.mutate({ word }, { onSuccess: () => setNewForbiddenWord('') });
+    };
+
+    const handleAddBlockedUser = (): void => {
+        const username = blockedUsername.trim();
+        if (!username || blockUserMutation.isPending) return;
+        blockUserMutation.mutate(
+            { username, platform: blockedPlatform },
+            { onSuccess: () => setBlockedUsername('') }
+        );
     };
 
     const handleGenerateObsUrl = async (): Promise<void> => {
@@ -414,46 +361,6 @@ const TtsMainPage: React.FC = () => {
         </div>
     );
 
-    const audioControls: Array<{
-        label: string;
-        value: number;
-        onChange: (value: number) => void;
-        suffix: string;
-        min: number;
-        max: number;
-        step: number;
-        icon?: React.ReactNode;
-    }> = [
-        {
-            label: 'Браузер',
-            value: websiteVolume,
-            onChange: (value) => handleVolumeChange('website', value),
-            suffix: '%',
-            min: 0,
-            max: 100,
-            step: 1,
-            icon: <Volume2 className="h-4 w-4 text-emerald-300" />,
-        },
-        {
-            label: 'OBS',
-            value: obsVolume,
-            onChange: (value) => handleVolumeChange('obs', value),
-            suffix: '%',
-            min: 0,
-            max: 100,
-            step: 1,
-        },
-        {
-            label: 'Макс. длина',
-            value: settingsState.maxMessageLength,
-            onChange: handleMaxLengthChange,
-            suffix: ' символов',
-            min: 50,
-            max: 2000,
-            step: 50,
-        },
-    ];
-
     return (
         <PageWrapper contentClassName="space-y-3">
             <Card className="card-glass border-border/70">
@@ -472,7 +379,7 @@ const TtsMainPage: React.FC = () => {
                         <CardHeader className="border-b border-white/5 pb-3">
                             <CardTitle className="text-base font-bold">Озвучка</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3.5 p-4">
+                        <CardContent className="min-h-[284px] space-y-3.5 p-4">
                             <TtsChannelPointsMode
                                 ttsMode={ttsMode}
                                 onModeChange={handleModeChange}
@@ -503,22 +410,6 @@ const TtsMainPage: React.FC = () => {
                                     }
                                 )}
                             </div>
-
-                            {selectedEngine !== 'gcloud' ? (
-                                <Select value={defaultVoice || 'default_voice'} onValueChange={handleDefaultVoiceChange}>
-                                    <SelectTrigger className="h-10 rounded-lg">
-                                        <SelectValue placeholder="Голос по умолчанию" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="default_voice">Голос по умолчанию</SelectItem>
-                                        {f5VoiceSelectOptions.map((voice) => (
-                                            <SelectItem key={voice.value} value={voice.value}>
-                                                {voice.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : null}
 
                             <div className="grid gap-3 md:grid-cols-[128px_minmax(0,1fr)] md:items-center">
                                 <div className="text-sm font-bold leading-tight text-foreground">Режим подключения</div>
@@ -612,35 +503,6 @@ const TtsMainPage: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    <Card className="card-glass border-border/70">
-                        <CardHeader className="border-b border-white/5 pb-3">
-                            <CardTitle className="text-base font-bold">Аудио</CardTitle>
-                        </CardHeader>
-                        <CardContent className="grid gap-4 p-4 md:grid-cols-3">
-                            {audioControls.map((control) => (
-                                <div key={control.label} className="rounded-lg border border-border/70 bg-background/35 p-3">
-                                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-foreground">
-                                        <span className="inline-flex items-center gap-2">
-                                            {control.icon}
-                                            {control.label}
-                                        </span>
-                                        <span>
-                                            {control.value}
-                                            {control.suffix}
-                                        </span>
-                                    </div>
-                                    <Slider
-                                        value={[control.value]}
-                                        min={control.min}
-                                        max={control.max}
-                                        step={control.step}
-                                        onValueChange={(values) => control.onChange(values[0])}
-                                        disabled={saveSettingsMutation.isPending || saveAudioSettingsMutation.isPending}
-                                    />
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
                 </div>
 
                 <div className="space-y-3">
@@ -679,33 +541,73 @@ const TtsMainPage: React.FC = () => {
                             <CardTitle className="text-base font-bold">Фильтры озвучки</CardTitle>
                         </CardHeader>
                         <CardContent className="grid gap-2 p-4 sm:grid-cols-2">
-                            {renderToggle('Не озвучивать мат', settingsState.enableLexiconFilter, (value) =>
-                                saveBoolean('enableLexiconFilter', value)
+                            {renderToggle('Озвучивать упоминания', !settingsState.filterMentions, (value) =>
+                                saveBoolean('filterMentions', !value)
                             )}
-                            {renderToggle('Не озвучивать банворды', settingsState.filterBanwords, (value) =>
-                                saveBoolean('filterBanwords', value)
+                            {renderToggle('Озвучивать ответы', !settingsState.filterReplies, (value) =>
+                                saveBoolean('filterReplies', !value)
                             )}
-                            {renderToggle('Не озвучивать ники', settingsState.filterMentions, (value) =>
-                                saveBoolean('filterMentions', value)
+                            {renderToggle('Озвучивать команды', !settingsState.skipCommands, (value) =>
+                                saveBoolean('skipCommands', !value)
                             )}
-                            {renderToggle('Не озвучивать ответы', settingsState.filterReplies, (value) =>
-                                saveBoolean('filterReplies', value)
-                            )}
-                            {renderToggle('Не озвучивать команды', settingsState.skipCommands, (value) =>
-                                saveBoolean('skipCommands', value)
-                            )}
-                            {renderToggle('Отключить выбор голоса', settingsState.disableVoiceSelection, (value) =>
-                                saveBoolean('disableVoiceSelection', value)
+                            {renderToggle('Выбор голоса', !settingsState.disableVoiceSelection, (value) =>
+                                saveBoolean('disableVoiceSelection', !value)
                             )}
                             {renderToggle('Озвучивать ник отправителя', settingsState.speakSenderName, (value) =>
                                 saveBoolean('speakSenderName', value)
                             )}
+                            <div className="rounded-lg border border-border/70 bg-background/35 px-3 py-3 sm:col-span-2">
+                                <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold text-foreground">
+                                    <span>Макс. длина</span>
+                                    <span>{settingsState.maxMessageLength} символов</span>
+                                </div>
+                                <Slider
+                                    value={[settingsState.maxMessageLength]}
+                                    min={50}
+                                    max={250}
+                                    step={10}
+                                    onValueChange={(values) => handleMaxLengthChange(values[0])}
+                                    disabled={saveSettingsMutation.isPending}
+                                />
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
             </div>
 
-            <TtsFilterManager />
+            <div className="grid items-start gap-3 xl:grid-cols-2">
+                <TtsForbiddenWordsCard
+                    words={filteredWords}
+                    isLoading={filteredWordsLoading}
+                    isOpen={forbiddenWordsOpen}
+                    newWord={newForbiddenWord}
+                    addingWord={addFilteredWordMutation.isPending}
+                    formRef={forbiddenWordFormRef}
+                    onOpenChange={setForbiddenWordsOpen}
+                    onWordChange={setNewForbiddenWord}
+                    onAdd={handleAddForbiddenWord}
+                    onRemove={(wordId) => deleteFilteredWordMutation.mutate(wordId)}
+                />
+                <TtsBlockedUsersCard
+                    users={blockedUsers}
+                    isLoading={blockedUsersLoading}
+                    isOpen={blockedUsersOpen}
+                    username={blockedUsername}
+                    platform={blockedPlatform}
+                    addingUser={blockUserMutation.isPending}
+                    onOpenChange={setBlockedUsersOpen}
+                    onUsernameChange={setBlockedUsername}
+                    onPlatformChange={setBlockedPlatform}
+                    onAdd={handleAddBlockedUser}
+                    onRemove={(blockedUser) =>
+                        unblockUserMutation.mutate({
+                            username: blockedUser.username,
+                            platform: blockedUser.platform,
+                            channel_name: blockedUser.channel_name,
+                        })
+                    }
+                />
+            </div>
         </PageWrapper>
     );
 };

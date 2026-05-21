@@ -211,13 +211,6 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
         return base;
     }, [globalEmotes, settings.show_7tv_emotes]);
 
-    const truncateWords = (text: string, maxWords: number = 6): string => {
-        if (!text) return '';
-        const words = text.trim().split(/\s+/);
-        if (words.length <= maxWords) return text;
-        return `${words.slice(0, maxWords).join(' ')}...`;
-    };
-
     useEffect(() => {
         let isActive = true;
         const fontFamily = sanitizeFontFamily(settings.font_family);
@@ -464,7 +457,7 @@ const PreviewPanel: React.FC<PreviewPanelProps> = ({ settings, previewMessages, 
                                         (msg.vk_role_icon_url || msg.role))
                                 );
                                 const messageText = msg.message;
-                                const previewText = isHorizontal ? truncateWords(messageText, 6) : messageText;
+                                const previewText = messageText;
                                 const vkInlineEmotes = new Map<string, EmoteData>();
                                 if (msg.platform === 'vk' && Array.isArray(msg.emotes)) {
                                     msg.emotes.forEach((emote) => {

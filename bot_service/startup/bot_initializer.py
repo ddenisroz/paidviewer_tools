@@ -64,6 +64,10 @@ async def initialize_twitch_bot(channels: Optional[List[str]] = None) -> bool:
 
     validation_result = await bot_token_validator.validate_twitch_bot_token()
     if not validation_result.get("valid"):
+        if validation_result.get("transient"):
+            logger.warning("[TWITCH] Bot token validation is temporarily unavailable; bot startup will retry later")
+            logger.warning(f"[TWITCH] Reason: {validation_result.get('error', 'Unknown')}")
+            return False
         logger.error("[ERROR] [TWITCH] Cannot start bot with invalid token!")
         logger.error(f"[ERROR] Reason: {validation_result.get('error', 'Unknown')}")
         logger.error("[FIX] Re-authorize bot via /auth/twitch/bot/login")

@@ -9,5 +9,5 @@ export interface FilteredWord {
     id: number;
     word?: string;
     text?: string;
-    platform: string;
+    platform?: string;
 }
