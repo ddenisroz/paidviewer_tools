@@ -3,7 +3,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
 
-const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm';
+const SURFACE_CARD_CLASS = 'flex h-full flex-col border-border/70 bg-card shadow-sm shadow-black/10';
 
 export const StepBadge: React.FC<{ value: string }> = ({ value }) => (
     <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-sky-400/30 bg-sky-500/10 font-brand text-xs font-bold text-sky-200">
@@ -34,7 +34,7 @@ export const AutomationCard: React.FC<{
                 </div>
             </div>
         </CardHeader>
-        <CardContent className="space-y-3 px-4 pb-4">{children}</CardContent>
+        <CardContent className="flex flex-1 flex-col gap-3 px-4 pb-4">{children}</CardContent>
     </Card>
 );
 

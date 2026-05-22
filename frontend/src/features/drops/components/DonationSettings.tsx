@@ -93,7 +93,7 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         const enabledByDa = donationAlertsConnected;
 
         return {
-            donation_enabled: enabledByDa ? Boolean(typedConfig.donation_enabled) : false,
+            donation_enabled: enabledByDa,
             donation_amount_common: [typedConfig.donation_amount_common ?? DROPS_CONSTANTS.DONATION.DEFAULT_COMMON],
             donation_amount_rare: [typedConfig.donation_amount_rare ?? DROPS_CONSTANTS.DONATION.DEFAULT_RARE],
             donation_amount_epic: [typedConfig.donation_amount_epic ?? DROPS_CONSTANTS.DONATION.DEFAULT_EPIC],
@@ -146,8 +146,15 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         validateMythical
     );
 
+    useEffect(() => {
+        if (!donationAlertsConnected || !config || isInitialLoad || saveMutation.isPending) return;
+        if (!(config as DropsConfig).donation_enabled) {
+            saveMutation.mutate({ donation_enabled: true });
+        }
+    }, [config, donationAlertsConnected, isInitialLoad, saveMutation]);
+
     const createPayload = (next = formData): Partial<DropsConfig> => ({
-        donation_enabled: next.donation_enabled,
+        donation_enabled: donationAlertsConnected,
         donation_amount_common: next.donation_amount_common[0],
         donation_amount_rare: next.donation_amount_rare[0],
         donation_amount_epic: next.donation_amount_epic[0],
@@ -172,15 +179,6 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
         if (!redirected) {
             navigate('/dashboard/settings?focus=donationalerts');
         }
-    };
-
-    const handleDonationToggle = async (checked: boolean): Promise<void> => {
-        if (checked && !donationAlertsConnected) {
-            await openDonationAlertsSetup();
-            return;
-        }
-        const next = { ...formData, donation_enabled: checked };
-        saveNext(next, { donation_enabled: checked });
     };
 
     const handleMythicalToggle = async (checked: boolean): Promise<void> => {
@@ -256,14 +254,6 @@ const DonationSettings: React.FC<DonationSettingsProps> = ({ user, channelName, 
                 <CardHeader className="pb-3">
                     <div className="flex min-h-10 items-center justify-between gap-3">
                         <CardTitle className="text-lg">Платные вознаграждения</CardTitle>
-                        <div className="flex items-center gap-2">
-                            <Label className="text-sm font-medium">Включить donation drops</Label>
-                            <Switch
-                                variant="donation"
-                                checked={donationAlertsConnected ? formData.donation_enabled : false}
-                                onCheckedChange={(checked) => void handleDonationToggle(checked)}
-                            />
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>

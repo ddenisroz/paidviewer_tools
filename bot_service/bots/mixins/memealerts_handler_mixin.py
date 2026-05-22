@@ -12,15 +12,15 @@ class MemeAlertsHandlerMixin:
     logger: logging.Logger
 
     async def _handle_memegrant(self, ctx, bot, args, platform, db):
-        """Handler for !memegrant (Twitch)."""
+        """Handler for !givema/!memegrant (Twitch)."""
         try:
             if not args:
-                await ctx.send(f"@{ctx.author.name} Напишите: !memegrant <ник> <количество>")
+                await ctx.send(f"@{ctx.author.name} Напишите: !givema <ник> <количество>")
                 return
 
             parts = args.split()
             if len(parts) < 2:
-                await ctx.send(f"@{ctx.author.name} Напишите: !memegrant <ник> <количество>")
+                await ctx.send(f"@{ctx.author.name} Напишите: !givema <ник> <количество>")
                 return
 
             nickname = parts[0].lstrip("@")
@@ -60,16 +60,16 @@ class MemeAlertsHandlerMixin:
                 )
 
         except Exception as e:
-            self.logger.error(f"Error in !memegrant handler: {e}", exc_info=True)
+            self.logger.error(f"Error in !givema handler: {e}", exc_info=True)
             await ctx.send(f"@{ctx.author.name} Не удалось выдать мемкоины")
 
     async def _handle_memegrant_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):
-        """Handler for !memegrant (VK)."""
+        """Handler for !givema/!memegrant (VK)."""
         try:
             if not args:
                 await vk_bot.send_message(
                     channel_name,
-                    f"@{author_name} Напишите: !memegrant <ник> <количество>",
+                    f"@{author_name} Напишите: !givema <ник> <количество>",
                 )
                 return
 
@@ -77,7 +77,7 @@ class MemeAlertsHandlerMixin:
             if len(parts) < 2:
                 await vk_bot.send_message(
                     channel_name,
-                    f"@{author_name} Напишите: !memegrant <ник> <количество>",
+                    f"@{author_name} Напишите: !givema <ник> <количество>",
                 )
                 return
 
@@ -122,11 +122,11 @@ class MemeAlertsHandlerMixin:
                 )
 
         except Exception as e:
-            self.logger.error(f"Error in !memegrant VK handler: {e}", exc_info=True)
+            self.logger.error(f"Error in !givema VK handler: {e}", exc_info=True)
             await vk_bot.send_message(channel_name, f"@{author_name} Не удалось выдать мемкоины")
 
     async def _handle_givema(self, ctx, bot, args, platform, db):
-        """Alias handler for !givema."""
+        """Primary handler for !givema."""
         await self._handle_memegrant(ctx, bot, args, platform, db)
 
     async def _handle_givema_vk(self, channel_name, author_name, author_id, args, vk_bot, message_data, db):

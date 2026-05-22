@@ -5,7 +5,6 @@ import { Copy, ExternalLink, Loader2, Monitor, Sparkles, TestTube2 } from 'lucid
 import { DROPS_CONSTANTS } from '@/constants/drops';
 import {
     useDropsConfig,
-    useDropsRewards,
     useGenerateDropsWidgetUrl,
     useUpdateDropsConfig,
 } from '@/queries/drops/dropsQueries';
@@ -27,7 +26,6 @@ interface WidgetSettingsProps {
 
 interface FormData {
     widget_spinning_duration_ms: number;
-    widget_opening_duration_ms: number;
     widget_result_duration_ms: number;
 }
 
@@ -37,7 +35,6 @@ const ACTION_CLASS = 'gap-2 border-border/70 bg-transparent text-sky-300 hover:b
 const clampDuration = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 const areDurationsEqual = (left: FormData, right: FormData): boolean =>
     left.widget_spinning_duration_ms === right.widget_spinning_duration_ms &&
-    left.widget_opening_duration_ms === right.widget_opening_duration_ms &&
     left.widget_result_duration_ms === right.widget_result_duration_ms;
 
 const getWidgetFormData = (config: Partial<DropsConfig> | null | undefined): FormData => ({
@@ -45,11 +42,6 @@ const getWidgetFormData = (config: Partial<DropsConfig> | null | undefined): For
         config?.widget_spinning_duration_ms ?? 1500,
         500,
         DROPS_CONSTANTS.WIDGET.MAX_SPINNING_MS
-    ),
-    widget_opening_duration_ms: clampDuration(
-        config?.widget_opening_duration_ms ?? 1000,
-        500,
-        DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS
     ),
     widget_result_duration_ms: clampDuration(
         config?.widget_result_duration_ms ?? 5500,
@@ -72,9 +64,6 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
     const { data: config } = useDropsConfig(channelName, {
         enabled: !!user && !!channelName,
     });
-    const { data: rewards = [] } = useDropsRewards(channelName, {
-        enabled: !!user && !!channelName,
-    });
 
     const updateConfigMutation = useUpdateDropsConfig(channelName);
     const generateWidgetUrlMutation = useGenerateDropsWidgetUrl({
@@ -88,7 +77,6 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
     const [formData, setFormData] = useState<FormData>({
         widget_spinning_duration_ms: 1500,
-        widget_opening_duration_ms: 1000,
         widget_result_duration_ms: 5500,
     });
 
@@ -123,12 +111,9 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
 
         autoSave({
             widget_spinning_duration_ms: formData.widget_spinning_duration_ms,
-            widget_opening_duration_ms: formData.widget_opening_duration_ms,
             widget_result_duration_ms: formData.widget_result_duration_ms,
         });
     }, [config, formData, configFormData, autoSave, clearAutoSave]);
-
-    const activeRewardsCount = useMemo(() => rewards.filter((reward) => reward.is_active !== false).length, [rewards]);
 
     const getWidgetUrlWithParams = (params: Record<string, string>): string | null => {
         if (!widgetUrl) return null;
@@ -177,7 +162,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-3 xl:grid-cols-3">
+                    <div className="grid gap-3 md:grid-cols-2">
                         <div className="rounded-lg border border-border/70 bg-background/40 p-4">
                             <Label className="text-sm font-medium text-foreground">Скорость прокрутки</Label>
                             <div className="mt-4">
@@ -194,26 +179,6 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                                     step={100}
                                     unit="мс"
                                     ariaLabel="Скорость прокрутки"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="rounded-lg border border-border/70 bg-background/40 p-4">
-                            <Label className="text-sm font-medium text-foreground">Подготовка</Label>
-                            <div className="mt-4">
-                                <SliderWithInput
-                                    value={formData.widget_opening_duration_ms}
-                                    onChange={(value) =>
-                                        handleDurationChange(
-                                            'widget_opening_duration_ms',
-                                            clampDuration(value, 500, DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS)
-                                        )
-                                    }
-                                    min={500}
-                                    max={DROPS_CONSTANTS.WIDGET.MAX_OPENING_MS}
-                                    step={100}
-                                    unit="мс"
-                                    ariaLabel="Подготовка"
                                 />
                             </div>
                         </div>
@@ -323,9 +288,6 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                                 </Button>
                             </div>
 
-                            <div className="rounded-lg border border-border/70 bg-background/30 px-4 py-3 text-sm text-muted-foreground">
-                                Активных наград: {activeRewardsCount}
-                            </div>
                         </>
                     ) : (
                         <div className="rounded-lg border border-border/70 bg-background/30 px-4 py-5 text-sm text-muted-foreground">

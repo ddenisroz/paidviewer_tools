@@ -11,6 +11,7 @@ interface MemeAlertsDonationCardProps {
     enabled: boolean;
     courseRub: number;
     saving: boolean;
+    authStarted: boolean;
     onConnectDonationAlerts: () => void;
     onCourseRubChange: (value: number) => void;
     onToggleEnabled: () => void;
@@ -22,6 +23,7 @@ export const MemeAlertsDonationCard: React.FC<MemeAlertsDonationCardProps> = ({
     enabled,
     courseRub,
     saving,
+    authStarted,
     onConnectDonationAlerts,
     onCourseRubChange,
     onToggleEnabled,
@@ -29,15 +31,18 @@ export const MemeAlertsDonationCard: React.FC<MemeAlertsDonationCardProps> = ({
 }) => (
     <AutomationCard icon={MemeAlertsMark} title="Выдача за донаты" disabled={!donationAlertsConnected}>
         {!donationAlertsConnected ? (
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onConnectDonationAlerts}
-                className="h-9 w-full border-orange-500/35 bg-orange-500/10 text-orange-100 hover:bg-orange-500/15"
-            >
-                Подключить DonationAlerts
-            </Button>
+            <div className="space-y-1.5">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onConnectDonationAlerts}
+                    className="h-9 w-full border-orange-500/35 bg-orange-500/10 text-orange-100 hover:bg-orange-500/15"
+                >
+                    Подключить DonationAlerts
+                </Button>
+                {authStarted ? <p className="text-xs text-muted-foreground">Запущена авторизация...</p> : null}
+            </div>
         ) : null}
         <div className="space-y-1.5">
             <Label className="text-xs">Курс, ₽ за 1 мемкоин</Label>
@@ -58,12 +63,12 @@ export const MemeAlertsDonationCard: React.FC<MemeAlertsDonationCardProps> = ({
                 enabled ? 'bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20' : 'bg-card/70 hover:bg-accent'
             }`}
         >
-            {enabled ? 'Автовыдача включена' : 'Автовыдача выключена'}
+            {enabled ? 'Выдача за донаты включена' : 'Выдача за донаты выключена'}
         </Button>
         <Button
             onClick={onSave}
             disabled={saving || !donationAlertsConnected}
-            className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
+            className="mt-auto h-9 w-full bg-blue-700 text-white hover:bg-blue-800"
         >
             {saving ? 'Сохраняю...' : 'Сохранить'}
         </Button>

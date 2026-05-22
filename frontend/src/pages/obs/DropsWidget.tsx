@@ -1,11 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ChevronDown, Sparkles, Volume2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 
 import { dropsService } from '@/services/api/services/dropsService';
 import { logger } from '@/shared/utils/prodLogger';
 import { getDropsWidgetWebSocketUrl } from '@/shared/utils/urlUtils';
+
+import {
+    DropsWidgetOpeningStage,
+    DropsWidgetPreviewBadge,
+    DropsWidgetPreviewPanel,
+    DropsWidgetReelStage,
+    DropsWidgetResultPanel,
+    qualityGlowClass,
+    qualityLabel,
+} from './dropsWidgetVisuals';
 
 interface Reward {
     id: number;
@@ -83,60 +92,6 @@ const CARD_GAP = 16;
 const CARD_STEP = CARD_WIDTH + CARD_GAP;
 const WINNER_SLOT_INDEX = 26;
 const REEL_LENGTH = 38;
-
-const qualityLabel = (quality?: string): string => {
-    switch ((quality || '').toLowerCase()) {
-        case 'common':
-            return 'Обычный';
-        case 'rare':
-            return 'Редкий';
-        case 'epic':
-            return 'Эпический';
-        case 'legendary':
-            return 'Легендарный';
-        case 'mythical':
-        case 'mythyc':
-            return 'Мифический';
-        default:
-            return 'Награда';
-    }
-};
-
-const qualityTone = (quality?: string): string => {
-    switch ((quality || '').toLowerCase()) {
-        case 'common':
-            return 'border-slate-400/35 bg-slate-500/12 text-slate-100';
-        case 'rare':
-            return 'border-sky-400/35 bg-sky-500/12 text-sky-100';
-        case 'epic':
-            return 'border-violet-400/35 bg-violet-500/12 text-violet-100';
-        case 'legendary':
-            return 'border-amber-400/35 bg-amber-500/12 text-amber-100';
-        case 'mythical':
-        case 'mythyc':
-            return 'border-pink-400/35 bg-pink-500/12 text-pink-100';
-        default:
-            return 'border-slate-400/35 bg-slate-500/12 text-slate-100';
-    }
-};
-
-const qualityGlowClass = (quality?: string): string => {
-    switch ((quality || '').toLowerCase()) {
-        case 'common':
-            return 'from-slate-500/22 via-slate-100/4 to-transparent';
-        case 'rare':
-            return 'from-sky-500/28 via-sky-100/5 to-transparent';
-        case 'epic':
-            return 'from-violet-500/28 via-fuchsia-100/5 to-transparent';
-        case 'legendary':
-            return 'from-amber-500/30 via-yellow-100/7 to-transparent';
-        case 'mythical':
-        case 'mythyc':
-            return 'from-pink-500/30 via-fuchsia-100/6 to-transparent';
-        default:
-            return 'from-slate-500/22 via-slate-100/4 to-transparent';
-    }
-};
 
 const weightedPick = (rewards: Reward[]): Reward | null => {
     if (rewards.length === 0) return null;
@@ -594,30 +549,11 @@ const DropsWidget: React.FC = () => {
 
         return (
             <div className={`relative h-full w-full ${idleBackground}`}>
-                <div className="absolute left-5 top-5 z-20 w-[360px] rounded-2xl border border-white/10 bg-[#0f1421e6] p-4 text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
-                    <div className="flex items-center gap-2 text-xs uppercase tracking-[0.28em] text-white/45">
-                        <Sparkles className="h-4 w-4" />
-                        Preview
-                    </div>
-                    <div className="mt-2 text-lg font-semibold">Тест открытия сундука</div>
-                    <p className="mt-1 text-sm text-white/60">
-                        В OBS виджет будет пустым до события. Здесь можно вручную запустить тест по типу сундука.
-                    </p>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        {previewByQuality.map(({ quality, count }) => (
-                            <button
-                                key={quality}
-                                type="button"
-                                onClick={() => void triggerPreviewChest(quality)}
-                                className={`rounded-xl border px-3 py-3 text-left transition-transform hover:-translate-y-0.5 ${qualityTone(quality)}`}
-                            >
-                                <div className="text-sm font-semibold">{qualityLabel(quality)}</div>
-                                <div className="mt-1 text-xs opacity-80">{count > 0 ? `${count} наград в пуле` : 'Тестовый сценарий'}</div>
-                            </button>
-                        ))}
-                    </div>
-                    <div className="mt-4 text-xs text-white/45">{status}</div>
-                </div>
+                <DropsWidgetPreviewPanel
+                    previewByQuality={previewByQuality}
+                    status={status}
+                    onTriggerPreview={(quality) => void triggerPreviewChest(quality)}
+                />
             </div>
         );
     }
@@ -637,76 +573,23 @@ const DropsWidget: React.FC = () => {
                     <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[#08101acf] px-5 py-8 shadow-[0_30px_120px_rgba(0,0,0,0.45)] backdrop-blur-md">
                         <div className="absolute inset-y-0 left-1/2 z-10 w-[236px] -translate-x-1/2 border-x border-amber-300/20 bg-amber-200/[0.03]" />
                         {phase === 'opening' ? (
-                            <div className="flex h-[236px] items-center justify-center">
-                                <div className={`rounded-3xl border px-8 py-7 text-center ${qualityTone(currentQuality)}`}>
-                                    <p className="text-xs uppercase tracking-[0.3em] opacity-75">Сундук активирован</p>
-                                    <h2 className="mt-3 text-2xl font-semibold">{currentReward.viewer_name || 'Зритель'}</h2>
-                                    <p className="mt-2 text-sm opacity-80">{qualityLabel(currentQuality)} сундук открывается</p>
-                                </div>
-                            </div>
+                            <DropsWidgetOpeningStage quality={currentQuality} viewerName={currentReward.viewer_name} />
                         ) : (
-                            <div className="relative h-[236px] overflow-hidden">
-                                <div
-                                    className="absolute left-0 top-1/2 flex -translate-y-1/2 items-stretch gap-4"
-                                    style={{ transform: translateX, willChange: 'transform' }}
-                                >
-                                    {reelItems.map((item, index) => {
-                                        const isWinner = phase === 'result' && index === WINNER_SLOT_INDEX;
-                                        return (
-                                            <div
-                                                key={item.id}
-                                                className={`flex h-[220px] w-[188px] shrink-0 flex-col rounded-[24px] border bg-[#07111fee] transition-all duration-300 ${
-                                                    isWinner
-                                                        ? 'scale-[1.04] border-amber-300 shadow-[0_0_70px_rgba(251,191,36,0.28)]'
-                                                        : 'border-white/8 opacity-85'
-                                                }`}
-                                            >
-                                                <div className="flex h-[116px] items-center justify-center rounded-t-[24px] bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.09),_transparent_50%),linear-gradient(180deg,_rgba(14,23,39,0.95),_rgba(7,12,24,0.98))]">
-                                                    <span className="text-6xl font-black text-white/88">?</span>
-                                                </div>
-                                                <div className="flex flex-1 flex-col px-4 py-3">
-                                                    <span className={`inline-flex w-fit rounded-full border px-2 py-1 text-[11px] font-medium ${qualityTone(item.quality)}`}>
-                                                        {qualityLabel(item.quality)}
-                                                    </span>
-                                                    <p className="mt-4 text-lg font-semibold text-white">{isWinner ? item.reward?.name || 'Награда' : '???'}</p>
-                                                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-white/50">
-                                                        {isWinner ? item.reward?.description || 'Содержимое сундука раскрыто.' : 'Содержимое скрыто до остановки барабана.'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            <DropsWidgetReelStage
+                                phase={phase}
+                                quality={currentQuality}
+                                reelItems={reelItems}
+                                translateX={translateX}
+                                winnerSlotIndex={WINNER_SLOT_INDEX}
+                            />
                         )}
                     </div>
 
-                    {phase === 'result' ? (
-                        <div className="mx-auto mt-5 max-w-[780px] rounded-[24px] border border-white/10 bg-[#0c121ddd] px-6 py-5 text-center text-white shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-md">
-                            <div className="text-xs uppercase tracking-[0.3em] text-white/45">Содержимое сундука</div>
-                            <div className="mt-3 text-3xl font-semibold">{currentReward.reward_name || 'Награда'}</div>
-                            {currentReward.description ? (
-                                <p className="mt-3 text-sm leading-6 text-white/65">{currentReward.description}</p>
-                            ) : null}
-                            {currentReward.sound_file ? (
-                                <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-100">
-                                    <Volume2 className="h-3.5 w-3.5" />
-                                    Звук награды проигран
-                                </div>
-                            ) : null}
-                        </div>
-                    ) : null}
+                    {phase === 'result' ? <DropsWidgetResultPanel reward={currentReward} quality={currentQuality} /> : null}
                 </div>
             </div>
 
-            {isPreviewMode ? (
-                <div className="absolute bottom-5 left-5 rounded-xl border border-white/10 bg-[#0c121dd8] px-3 py-2 text-xs text-white/55 backdrop-blur-sm">
-                    <div className="flex items-center gap-2">
-                        <ChevronDown className="h-3.5 w-3.5 rotate-[-90deg]" />
-                        Тестовый режим активен
-                    </div>
-                </div>
-            ) : null}
+            {isPreviewMode ? <DropsWidgetPreviewBadge /> : null}
         </div>
     );
 };

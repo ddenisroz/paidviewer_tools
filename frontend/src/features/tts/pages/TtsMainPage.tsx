@@ -379,12 +379,11 @@ const TtsMainPage: React.FC = () => {
                         <CardHeader className="border-b border-white/5 pb-3">
                             <CardTitle className="text-base font-bold">Озвучка</CardTitle>
                         </CardHeader>
-                        <CardContent className="min-h-[284px] space-y-3.5 p-4">
+                        <CardContent className="h-[360px] space-y-3.5 overflow-y-auto p-4">
                             <TtsChannelPointsMode
                                 ttsMode={ttsMode}
                                 onModeChange={handleModeChange}
                                 isSaving={isSaving}
-                                showRewards={false}
                             />
 
                             <div className="grid gap-2 sm:grid-cols-3">
@@ -432,44 +431,46 @@ const TtsMainPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            {listeningMode === 'obs' ? (
-                                <div className="space-y-3 rounded-lg border border-border/70 bg-background/35 p-3">
-                                    <div className="flex items-center gap-2">
-                                        <Input value={obsUrl || 'OBS source не создан'} readOnly className="h-9 min-w-0 font-mono text-xs" />
-                                        {obsUrl ? (
-                                            <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyObsUrl()}>
-                                                <Copy className="h-4 w-4" />
-                                            </Button>
-                                        ) : (
-                                            <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void handleGenerateObsUrl()}>
-                                                Создать
-                                            </Button>
-                                        )}
+                            <div className="min-h-[96px]">
+                                {listeningMode === 'obs' ? (
+                                    <div className="space-y-3 rounded-lg border border-border/70 bg-background/35 p-3">
+                                        <div className="flex items-center gap-2">
+                                            <Input value={obsUrl || 'OBS source не создан'} readOnly className="h-9 min-w-0 font-mono text-xs" />
+                                            {obsUrl ? (
+                                                <Button type="button" variant="outline" size="icon" onClick={() => void handleCopyObsUrl()}>
+                                                    <Copy className="h-4 w-4" />
+                                                </Button>
+                                            ) : (
+                                                <Button type="button" variant="secondary" className="h-9 px-3" onClick={() => void handleGenerateObsUrl()}>
+                                                    Создать
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
+                                            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
+                                                <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.source_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
+                                                OBS Source
+                                            </span>
+                                            <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
+                                                <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.dock_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
+                                                Док-панель
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-2 text-xs font-bold text-muted-foreground">
-                                        <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
-                                            <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.source_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
-                                            Source
-                                        </span>
-                                        <span className="inline-flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
-                                            <span className={`h-2.5 w-2.5 rounded-full ${obsStatus.dock_connected ? 'bg-emerald-400' : 'bg-muted-foreground/45'}`} />
-                                            Dock
-                                        </span>
+                                ) : (
+                                    <div className="flex h-full items-center justify-center">
+                                        <a
+                                            href="/tts/player"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-400/60 bg-emerald-500/15 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/25"
+                                        >
+                                            <ExternalLink className="h-4 w-4" />
+                                            Открыть TTS Player
+                                        </a>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="flex justify-center">
-                                    <a
-                                        href="/tts/player"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-400/60 bg-emerald-500/15 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/25"
-                                    >
-                                        <ExternalLink className="h-4 w-4" />
-                                        Открыть TTS Player
-                                    </a>
-                                </div>
-                            )}
+                                )}
+                            </div>
 
                             {selectedEngine === 'gcloud' ? (
                                 <div className="grid gap-3 rounded-lg border border-border/70 bg-background/35 p-3 md:grid-cols-2">

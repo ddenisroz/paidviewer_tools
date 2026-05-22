@@ -68,7 +68,7 @@ export const DEFAULT_AUTOMATION_SETTINGS: MemeAlertsAutomationSettings = {
 };
 
 export const SURFACE_CARD_CLASS = 'border-border/70 bg-card/90 shadow-sm';
-export const FIELD_CLASS = 'h-9 border-border/60 bg-background/45 text-foreground placeholder:text-muted-foreground';
+export const FIELD_CLASS = 'h-9 border-border/60 bg-background/80 text-foreground placeholder:text-muted-foreground';
 export const MUTED_PANEL_CLASS = 'rounded-md border border-border/60 bg-background/45';
 
 export const MEMEALERTS_PROVIDER_LABELS: Record<MemeAlertsAuthProvider, string> = {

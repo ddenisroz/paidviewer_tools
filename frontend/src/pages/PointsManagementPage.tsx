@@ -918,7 +918,7 @@ const PointsManagementPage: React.FC = () => {
                         <div>
                             {rewards.length === 0 ? (
                                 <Card className={SURFACE_CARD_CLASS}>
-                                    <CardContent className="grid min-h-52 place-items-center py-10">
+                                    <CardContent className="grid min-h-52 place-items-center px-5 py-10 text-center">
                                         {canCreateReward ? (
                                             <Button
                                                 onClick={() => setShowCreateDialog(true)}
@@ -930,7 +930,10 @@ const PointsManagementPage: React.FC = () => {
                                                 Первая награда
                                             </Button>
                                         ) : (
-                                            <Gift className="h-12 w-12 text-muted-foreground/30" strokeWidth={1.5} />
+                                            <div className="mx-auto flex max-w-md flex-col items-center gap-3 text-sm text-muted-foreground">
+                                                <Gift className="h-12 w-12 text-muted-foreground/30" strokeWidth={1.5} />
+                                                {rewardCapability.reason ? <p>{rewardCapability.reason}</p> : null}
+                                            </div>
                                         )}
                                     </CardContent>
                                 </Card>

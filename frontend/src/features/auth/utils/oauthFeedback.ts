@@ -1,6 +1,7 @@
 export const OAUTH_PLATFORM_LABELS: Record<string, string> = {
     twitch: 'Twitch',
     vk: 'VK Live',
+    donationalerts: 'DonationAlerts',
 };
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
@@ -15,6 +16,10 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
     invalid_state: 'Сессия авторизации устарела. Начните вход заново.',
     identity_conflict: 'Найдены конфликтующие данные аккаунта. Мы уже их вычищаем, попробуйте вход еще раз.',
     internal_error: 'Во время авторизации произошла внутренняя ошибка.',
+    invalid_client:
+        'DonationAlerts отклонил client_id/client_secret. Проверьте настройки приложения и redirect URI.',
+    token_exchange:
+        'Не удалось обменять код авторизации на токен. Проверьте настройки DonationAlerts и попробуйте еще раз.',
 };
 
 export function getOAuthErrorMessage(platform: string | null, errorCode: string | null): string | null {

@@ -123,15 +123,9 @@ GLOBAL_COMMAND_CATALOG: tuple[dict[str, object], ...] = (
         "cooldown_seconds": 60,
     },
     {
-        "command_name": "memegrant",
-        "description": "Выдать мемкоины (MemeAlerts) через чат",
-        "tags": "MemeAlerts",
-        "allowed_roles": "broadcaster,moderator",
-        "cooldown_seconds": 5,
-    },
-    {
         "command_name": "givema",
-        "description": "Alias для memegrant: !givema <nick> <amount>",
+        "alias": "memegrant",
+        "description": "Выдать мемкоины (MemeAlerts) через чат",
         "tags": "MemeAlerts",
         "allowed_roles": "broadcaster,moderator",
         "cooldown_seconds": 5,
@@ -165,6 +159,7 @@ def sync_global_commands(db) -> tuple[int, int]:
             existing.tags = str(cmd_data["tags"])
             existing.allowed_roles = str(cmd_data["allowed_roles"])
             existing.cooldown_seconds = int(cmd_data["cooldown_seconds"])
+            existing.alias = str(cmd_data.get("alias") or "") or None
             existing.response_text = ""
             existing.platforms = "twitch,vk"
             existing.is_enabled = True
@@ -178,6 +173,7 @@ def sync_global_commands(db) -> tuple[int, int]:
                 channel_name=None,
                 command_name=str(cmd_data["command_name"]),
                 command_type="global",
+                alias=str(cmd_data.get("alias") or "") or None,
                 description=str(cmd_data["description"]),
                 response_text="",
                 is_enabled=True,
@@ -190,6 +186,21 @@ def sync_global_commands(db) -> tuple[int, int]:
             )
         )
         commands_created += 1
+
+    legacy_memegrant = (
+        db.query(BotCommand)
+        .filter(
+            BotCommand.user_id.is_(None),
+            BotCommand.command_type == "global",
+            BotCommand.command_name == "memegrant",
+        )
+        .first()
+    )
+    if legacy_memegrant:
+        legacy_memegrant.is_enabled = False
+        legacy_memegrant.alias = None
+        legacy_memegrant.updated_at = utcnow_naive()
+        commands_updated += 1
 
     db.commit()
     return commands_created, commands_updated

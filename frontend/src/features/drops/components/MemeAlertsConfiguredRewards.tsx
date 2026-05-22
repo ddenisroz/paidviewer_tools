@@ -79,7 +79,7 @@ const ConfiguredRewardRow: React.FC<ConfiguredRewardRowProps> = ({
                         reward.enabled ? 'bg-emerald-500/15 text-emerald-200' : 'bg-muted/40 text-muted-foreground'
                     )}
                 >
-                    {reward.enabled ? 'Автовыдача' : 'Выключена'}
+                    {reward.enabled ? 'Включена' : 'Выключена'}
                 </span>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">

@@ -54,6 +54,7 @@ interface TtsPlayerContextValue {
     togglePause: () => void;
     requestPrimaryPlayerTab: () => void;
     unlockAudio: () => Promise<void>;
+    setOutputVolume: (value: number) => void;
 }
 
 const TtsPlayerContext = createContext<TtsPlayerContextValue | undefined>(undefined);
@@ -103,6 +104,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
 
     const audioContext = useRef<AudioContext | null>(null);
     const currentSource = useRef<AudioBufferSourceNode | null>(null);
+    const currentGainNode = useRef<GainNode | null>(null);
     const audioElement = useRef<HTMLAudioElement | null>(null);
     const queueRef = useRef<TtsQueueItem[]>([]);
     const isStartingPlaybackRef = useRef<boolean>(false);
@@ -112,6 +114,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
     const isPrimaryPlayerTabRef = useRef<boolean>(isPrimaryPlayerTab);
     const ttsEnabledRef = useRef<boolean>(ttsEnabled);
     const isAudioUnlockedRef = useRef<boolean>(isAudioUnlocked);
+    const outputVolumeRef = useRef<number>(50);
     const tabIdRef = useRef<string>(`tts-player-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
     const presenceWebSocketRef = useRef<WebSocket | null>(null);
     const presenceReconnectTimerRef = useRef<number | null>(null);
@@ -137,6 +140,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 // no-op: source could already be stopped
             }
             currentSource.current = null;
+            currentGainNode.current = null;
         }
         if (audioElement.current) {
             try {
@@ -148,6 +152,17 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 // no-op: element could already be detached
             }
             audioElement.current = null;
+        }
+    }, []);
+
+    const setOutputVolume = useCallback((value: number): void => {
+        const nextVolume = Math.max(0, Math.min(100, Math.round(Number.isFinite(value) ? value : 50)));
+        outputVolumeRef.current = nextVolume;
+        if (currentGainNode.current) {
+            currentGainNode.current.gain.value = nextVolume / 100;
+        }
+        if (audioElement.current) {
+            audioElement.current.volume = nextVolume / 100;
         }
     }, []);
 
@@ -422,8 +437,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
                 return;
             }
 
-            const normalizedVolume =
-                typeof payload.volume === 'number' ? Math.max(0, Math.min(100, Math.round(payload.volume))) : 50;
+            const normalizedVolume = outputVolumeRef.current;
             const spokenText = payload.spoken_text || payload.text || 'TTS Message';
 
             const newItem: TtsQueueItem = {
@@ -444,6 +458,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             const nextQueue = [...queueRef.current, newItem];
             queueRef.current = nextQueue;
             setQueue(nextQueue);
+            window.setTimeout(() => playNextRef.current?.(), 0);
             logger.info('[TTS Player] Enqueued socket audio', {
                 trace_id: newItem.traceId,
                 source_message_id: newItem.sourceMessageId,
@@ -936,6 +951,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             logger.debug(fallback ? '[AUDIO] [TTS Player] Audio finished (fallback)' : '[AUDIO] [TTS Player] Audio finished');
             retryCount.current = 0;
             currentSource.current = null;
+            currentGainNode.current = null;
             audioElement.current = null;
             playbackActiveRef.current = false;
             updateQueueItemLiveStatus(item, 'played');
@@ -962,11 +978,12 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             const source = context.createBufferSource();
             const gainNode = context.createGain();
             source.buffer = audioBuffer;
-            gainNode.gain.value = nextItem.volume / 100;
+            gainNode.gain.value = outputVolumeRef.current / 100;
             source.connect(gainNode);
             gainNode.connect(context.destination);
             source.onended = () => finishPlaybackItem(nextItem, requestId);
             currentSource.current = source;
+            currentGainNode.current = gainNode;
             source.start(0);
             logger.info('[OK] [TTS Player] Playing TTS via Web Audio API');
             return true;
@@ -979,7 +996,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
             if (requestId !== playbackRequestIdRef.current || listeningModeRef.current !== 'website') return false;
             stopActivePlayback();
             const audio = new Audio(nextItem.audioUrl);
-            audio.volume = nextItem.volume / 100;
+            audio.volume = outputVolumeRef.current / 100;
             audio.onended = () => finishPlaybackItem(nextItem, requestId, true);
             audio.onerror = () => {
                 if (requestId !== playbackRequestIdRef.current) return;
@@ -1266,6 +1283,7 @@ export const TtsPlayerProvider: React.FC<TtsPlayerProviderProps> = ({ children }
         togglePause,
         requestPrimaryPlayerTab,
         unlockAudio,
+        setOutputVolume,
     };
 
     return <TtsPlayerContext.Provider value={value}>{children}</TtsPlayerContext.Provider>;

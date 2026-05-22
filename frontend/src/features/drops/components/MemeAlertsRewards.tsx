@@ -1,6 +1,5 @@
 ﻿import React, { useCallback, useEffect, useState } from 'react';
 
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
@@ -28,13 +27,13 @@ import {
     type PopupAuthState,
 } from '@/features/drops/components/memealertsTypes';
 import apiClient from '@/services/api/client';
+import { integrationsService } from '@/services/api/services/integrationsService';
 import { getSafeNavigationUrl } from '@/shared/utils/navigationSafety';
 import { logger } from '@/shared/utils/prodLogger';
 
 import type { AxiosError } from 'axios';
 
 export const MemeAlertsRewards: React.FC = () => {
-    const navigate = useNavigate();
     const { integrations } = useIntegrations();
     const donationAlertsConnected = !!integrations?.donationalerts?.enabled;
 
@@ -51,6 +50,7 @@ export const MemeAlertsRewards: React.FC = () => {
     const [historyLoading, setHistoryLoading] = useState(false);
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsSaving, setSettingsSaving] = useState(false);
+    const [donationAuthStarted, setDonationAuthStarted] = useState(false);
     const [rewardCreating, setRewardCreating] = useState(false);
     const [rewardDeletingId, setRewardDeletingId] = useState<string | null>(null);
     const [editingRewardId, setEditingRewardId] = useState<string | null>(null);
@@ -550,7 +550,7 @@ export const MemeAlertsRewards: React.FC = () => {
 
     const handleGrant = async () => {
         if (!grantTarget || !grantValue) {
-            toast.error('Укажите никнейм/ID и количество монет');
+            toast.error('Укажите nickname и количество мемкоинов');
             return;
         }
 
@@ -562,8 +562,8 @@ export const MemeAlertsRewards: React.FC = () => {
             });
 
             if (data.success) {
-                toast.success(`Отправлено ${grantValue} монет пользователю ${grantTarget}`, {
-                    description: 'Монеты выданы!',
+                toast.success(`Отправлено ${grantValue} мемкоинов пользователю ${grantTarget}`, {
+                    description: 'Мемкоины выданы',
                 });
                 fetchHistory();
             } else {
@@ -612,7 +612,7 @@ export const MemeAlertsRewards: React.FC = () => {
             const { data } = await apiClient.patch(`${MEMEALERTS_API_BASE}/rewards/${reward.local_id}`, { enabled });
             if (!data?.success) throw new Error(data?.detail || 'Не удалось изменить награду');
             setAutomationSettings(normalizeAutomationSettings(data.settings));
-            toast.success(enabled ? 'Автовыдача включена' : 'Автовыдача выключена');
+            toast.success(enabled ? 'Выдача за донаты включена' : 'Выдача за донаты выключена');
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Не удалось изменить награду';
             toast.error(message);
@@ -642,7 +642,7 @@ export const MemeAlertsRewards: React.FC = () => {
 
     const handleSaveDonationAuto = async () => {
         if (automationSettings.donation_auto.enabled && !donationAlertsConnected) {
-            toast.error('Подключите DonationAlerts перед включением автоконвертации');
+            toast.error('Подключите DonationAlerts перед включением выдачи за донаты');
             return;
         }
 
@@ -655,6 +655,15 @@ export const MemeAlertsRewards: React.FC = () => {
         });
         if (success) {
             toast.success('Настройки донатов сохранены');
+        }
+    };
+
+    const handleConnectDonationAlerts = () => {
+        setDonationAuthStarted(true);
+        const redirected = integrationsService.connectDonationAlertsRedirect();
+        if (!redirected) {
+            setDonationAuthStarted(false);
+            toast.error('Не удалось открыть авторизацию DonationAlerts');
         }
     };
 
@@ -738,7 +747,8 @@ export const MemeAlertsRewards: React.FC = () => {
                                 enabled={automationSettings.donation_auto.enabled}
                                 courseRub={donationCourseRub}
                                 saving={settingsSaving}
-                                onConnectDonationAlerts={() => navigate('/dashboard/settings?focus=donationalerts')}
+                                authStarted={donationAuthStarted}
+                                onConnectDonationAlerts={handleConnectDonationAlerts}
                                 onCourseRubChange={(rub) => {
                                     setAutomationSettings((prev) => ({
                                         ...prev,

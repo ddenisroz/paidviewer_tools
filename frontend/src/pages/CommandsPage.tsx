@@ -49,7 +49,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui
 import {
     Dialog,
     DialogContent,
-    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -944,9 +943,6 @@ const CommandsPage: React.FC = () => {
                                 <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
                                     <DialogHeader>
                                         <DialogTitle>Создать кастомную команду</DialogTitle>
-                                        <DialogDescription>
-                                            Создайте новую кастомную команду для вашего бота
-                                        </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4">
                                         <div>

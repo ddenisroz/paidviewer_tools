@@ -547,7 +547,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "Specify the supporter nickname in the reward message",
+                "error": "Укажите ник MemeAlerts в сообщении награды",
             }
 
         coins_amount = self._safe_int(platform_settings.get("coins_amount"), 0, minimum=0)
@@ -555,7 +555,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "Invalid MemeCoins amount configuration",
+                "error": "Некорректное количество мемкоинов в настройках награды",
             }
 
         result = await self.grant_coins(
@@ -603,7 +603,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "DonationAlerts integration is not connected",
+                "error": "DonationAlerts не подключен",
             }
 
         nickname = self._extract_supporter_nickname(donor_name)
@@ -611,7 +611,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "Donation does not contain supporter nickname",
+                "error": "В донате нет ника для выдачи",
             }
 
         amount_value = self._safe_float(donation_amount, 0.0, minimum=0.0)
@@ -620,7 +620,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "Donation below minimal threshold",
+                "error": "Донат меньше минимального порога",
             }
 
         coins_per_currency = self._safe_float(donation_settings.get("coins_per_currency"), 1.0, minimum=0.01)
@@ -629,7 +629,7 @@ class MemeAlertsService:
             return {
                 "handled": True,
                 "success": False,
-                "error": "Calculated MemeCoins amount is zero",
+                "error": "По текущему курсу получается 0 мемкоинов",
             }
 
         result = await self.grant_coins(
@@ -848,7 +848,7 @@ class MemeAlertsService:
     @staticmethod
     def _extract_user_id(payload: Any) -> Optional[str]:
         if isinstance(payload, dict):
-            for key in ("_id", "id", "userId", "uid"):
+            for key in ("supporterId", "supporter_id", "_id", "id", "userId", "uid"):
                 value = payload.get(key)
                 if value:
                     return str(value)
@@ -916,73 +916,90 @@ class MemeAlertsService:
         max_pages = 30
 
         for _ in range(max_pages):
-            payload = {
-                "streamerId": streamer_id,
-                "limit": limit,
-                "skip": skip,
-                "query": nickname,
-                "filters": [],
-            }
-            response: Optional[httpx.Response] = None
-
-            for attempt in range(2):
-                response = await self._request(
-                    "POST",
-                    "/supporters",
-                    access_token,
-                    json=payload,
-                    client=client,
-                )
-                if response.status_code in (200, 201):
-                    break
-                if attempt == 0 and self._has_antibot_cookie(response):
-                    logger.info(
-                        "MemeAlerts supporters scan anti-bot challenge detected, retrying once"
-                    )
-                    continue
-                return None
-
-            if response is None:
-                return None
-
-            raw_body = (response.text or "").strip()
-            if not raw_body:
-                if self._has_antibot_cookie(response):
-                    continue
-                return None
-
-            try:
-                response_payload = response.json()
-            except Exception:
-                logger.exception("MemeAlerts supporters scan JSON decode failed")
-                return None
-
-            supporters = self._extract_list(response_payload)
-            if not supporters:
-                payload_without_query = {
+            payload_variants = [
+                {
+                    "streamerId": streamer_id,
+                    "limit": limit,
+                    "skip": skip,
+                    "query": nickname,
+                    "filters": [],
+                },
+                {
+                    "limit": limit,
+                    "skip": skip,
+                    "query": nickname,
+                    "filters": [],
+                },
+                {
                     "streamerId": streamer_id,
                     "limit": limit,
                     "skip": skip,
                     "query": "",
                     "filters": [],
-                }
-                response_without_query = await self._request(
-                    "POST",
-                    "/supporters",
-                    access_token,
-                    json=payload_without_query,
-                    client=client,
-                )
-                if response_without_query.status_code not in (200, 201):
-                    return None
+                },
+                {
+                    "limit": limit,
+                    "skip": skip,
+                    "query": "",
+                    "filters": [],
+                },
+            ]
+
+            response_payload: Any = None
+            supporters: List[Dict[str, Any]] = []
+
+            for payload in payload_variants:
+                response: Optional[httpx.Response] = None
+
+                for attempt in range(2):
+                    response = await self._request(
+                        "POST",
+                        "/supporters",
+                        access_token,
+                        json=payload,
+                        client=client,
+                    )
+                    if response.status_code in (200, 201):
+                        break
+                    if attempt == 0 and self._has_antibot_cookie(response):
+                        logger.info(
+                            "MemeAlerts supporters scan anti-bot challenge detected, retrying once"
+                        )
+                        continue
+                    break
+
+                if response is None or response.status_code not in (200, 201):
+                    logger.debug(
+                        "MemeAlerts supporters scan variant failed: status=%s has_streamer_id=%s has_query=%s",
+                        response.status_code if response else None,
+                        bool(payload.get("streamerId")),
+                        bool(payload.get("query")),
+                    )
+                    continue
+
+                raw_body = (response.text or "").strip()
+                if not raw_body:
+                    logger.debug(
+                        "MemeAlerts supporters scan variant returned empty body: has_streamer_id=%s has_query=%s",
+                        bool(payload.get("streamerId")),
+                        bool(payload.get("query")),
+                    )
+                    continue
+
                 try:
-                    response_payload = response_without_query.json()
+                    response_payload = response.json()
                 except Exception:
-                    logger.exception("MemeAlerts supporters fallback JSON decode failed")
-                    return None
-                supporters = self._extract_list(response_payload)
-                if not supporters:
-                    return None
+                    logger.exception("MemeAlerts supporters scan JSON decode failed")
+                    continue
+
+                extracted = self._extract_list(response_payload)
+                if extracted:
+                    supporters = [item for item in extracted if isinstance(item, dict)]
+                    if supporters:
+                        break
+
+            if not supporters:
+                return None
 
             for supporter in supporters:
                 if not isinstance(supporter, dict):
@@ -1124,66 +1141,6 @@ class MemeAlertsService:
         if not nickname:
             return None
 
-        request_options = [
-            ("POST", {"username": nickname}),
-            ("GET", {"username": nickname}),
-        ]
-
-        for method, payload in request_options:
-            for attempt in range(2):
-                try:
-                    if method == "POST":
-                        response = await self._request(
-                            "POST",
-                            "/user/find",
-                            access_token,
-                            json=payload,
-                            client=client,
-                        )
-                    else:
-                        response = await self._request(
-                            "GET",
-                            "/user/find",
-                            access_token,
-                            params=payload,
-                            client=client,
-                        )
-
-                    if response.status_code not in (200, 201):
-                        if attempt == 0 and self._has_antibot_cookie(response):
-                            logger.info(
-                                "MemeAlerts user lookup anti-bot challenge detected, retrying once: "
-                                f"method={method}, payload={payload}"
-                            )
-                            continue
-                        break
-
-                    raw_body = (response.text or "").strip()
-                    if not raw_body:
-                        logger.warning(
-                            f"MemeAlerts user lookup returned empty body: method={method}, payload={payload}"
-                        )
-                        if attempt == 0 and self._has_antibot_cookie(response):
-                            continue
-                        break
-
-                    try:
-                        response_payload = response.json()
-                    except Exception:
-                        logger.exception(
-                            "MemeAlerts user lookup JSON decode failed"
-                        )
-                        break
-
-                    user_id = self._extract_user_id(response_payload)
-                    if user_id:
-                        return user_id
-
-                    break
-                except Exception:
-                    logger.exception("MemeAlerts user lookup failed")
-                    break
-
         if streamer_id:
             supporter_id = await self._resolve_user_id_via_supporters(
                 access_token,
@@ -1193,14 +1150,6 @@ class MemeAlertsService:
             )
             if supporter_id:
                 return supporter_id
-
-        streamer_lookup_id = await self._resolve_user_id_via_streamer_lookup(
-            access_token,
-            nickname=nickname,
-            client=client,
-        )
-        if streamer_lookup_id:
-            return streamer_lookup_id
 
         return None
 
@@ -1237,8 +1186,8 @@ class MemeAlertsService:
                     "success": False,
                     "error": "Пользователь MemeAlerts не найден",
                     "detail": (
-                        "Укажите MemeAlerts user ID или ник пользователя, который уже есть "
-                        "в MemeAlerts/supporters. Twitch/VK ник может не совпадать с MemeAlerts."
+                        "Укажите nickname пользователя, который уже есть в MemeAlerts supporters. "
+                        "Twitch/VK ник может не совпадать с MemeAlerts."
                     ),
                 }
 
@@ -1270,10 +1219,9 @@ class MemeAlertsService:
                 status_code = response.status_code if response else None
                 detail = response.text if response else None
                 error_message = f"API Error: {status_code if status_code is not None else 'unknown'}"
-                if status_code in (401, 403):
+                if status_code in (401, 403, 404):
                     error_message = (
-                        "MemeAlerts rejected grant for this user. "
-                        "User may not be present in supporters yet."
+                        "Пользователь не найден в MemeAlerts supporters или недоступен для выдачи"
                     )
                 return {
                     "success": False,

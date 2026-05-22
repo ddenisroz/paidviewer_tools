@@ -126,27 +126,27 @@ async def donationalerts_callback(
             bool(state),
             bool(expected_state),
         )
-        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=invalid_state")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=invalid_state")
 
     if error:
         logger.warning("DonationAlerts OAuth cancelled: %s - %s", error, error_description)
-        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=cancelled")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=cancelled")
 
     if not code:
         logger.error("No authorization code received from DonationAlerts")
-        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=no_code")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=no_code")
 
     client_id = settings.donationalerts_client_id
     client_secret = settings.donationalerts_client_secret
     redirect_uri = settings.donationalerts_redirect_uri
     if not all([client_id, client_secret, redirect_uri]):
         logger.error("DonationAlerts credentials not configured")
-        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=not_configured")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=not_configured")
 
     user_id = current_user.get("id") if current_user else None
     if not user_id or user_id <= 0:
         logger.info("DonationAlerts callback without authenticated session")
-        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=not_authenticated")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=not_authenticated")
 
     try:
         logger.info("DonationAlerts callback for user %s", user_id)
@@ -172,15 +172,18 @@ async def donationalerts_callback(
                     if token_response.headers.get("content-type") == "application/json"
                     else token_response.text
                 )
+                error_code = error_data.get("error") if isinstance(error_data, dict) else None
+                auth_error = "invalid_client" if error_code == "invalid_client" else "token_exchange"
                 logger.error(
-                    "DonationAlerts token exchange failed: %s - %s. redirect_uri=%s client_id_len=%s secret_len=%s",
+                    "DonationAlerts token exchange failed: status=%s error=%s body=%s redirect_uri=%s client_id_len=%s secret_len=%s",
                     token_response.status_code,
+                    error_code,
                     error_data,
                     redirect_uri,
                     len(str(client_id)),
                     len(str(client_secret)),
                 )
-                return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=token_exchange")
+                return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error={auth_error}")
 
             token_data = token_response.json()
             access_token = token_data.get("access_token")
@@ -188,7 +191,7 @@ async def donationalerts_callback(
 
             if not access_token:
                 logger.error("DonationAlerts token response did not contain access token")
-                return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=no_access_token")
+                return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=no_access_token")
 
             logger.info("[OK] DonationAlerts access token received for user %s", user_id)
 
@@ -199,7 +202,7 @@ async def donationalerts_callback(
 
             if user_info_response.status_code != 200:
                 logger.error("Failed to get user info: %s", user_info_response.status_code)
-                return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=user_info")
+                return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=user_info")
 
             user_info = user_info_response.json()
             da_user_id = str(user_info.get("data", {}).get("id"))
@@ -236,12 +239,12 @@ async def donationalerts_callback(
 
             db.commit()
             logger.info("[OK] DonationAlerts integration completed for user %s", user_id)
-            return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?da_connected=true")
+            return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&da_connected=true")
 
     except HTTPException as exc:
         logger.error("DonationAlerts callback HTTP error: %s", exc.detail)
-        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=callback")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=callback")
     except Exception as exc:
         logger.error("Error in DonationAlerts callback: %s", exc, exc_info=True)
-        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?auth_error=callback")
+        return _redirect_with_state_cleanup(url=f"{settings.frontend_url}/dashboard?platform=donationalerts&auth_error=callback")
 

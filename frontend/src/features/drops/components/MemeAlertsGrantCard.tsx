@@ -24,12 +24,12 @@ export const MemeAlertsGrantCard: React.FC<MemeAlertsGrantCardProps> = ({
     onGrant,
 }) => (
     <AutomationCard icon={HandCoins} title="Ручная выдача">
-        <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
+        <div className="grid gap-2">
             <Input
                 placeholder="nickname"
                 value={grantTarget}
                 onChange={(event) => onGrantTargetChange(event.target.value)}
-                className={FIELD_CLASS}
+                className={`${FIELD_CLASS} w-full`}
             />
             <Input
                 type="number"
@@ -37,10 +37,10 @@ export const MemeAlertsGrantCard: React.FC<MemeAlertsGrantCardProps> = ({
                 max={1_000_000}
                 value={grantValue}
                 onChange={(event) => onGrantValueChange(Math.max(1, Number(event.target.value) || 1))}
-                className={FIELD_CLASS}
+                className={`${FIELD_CLASS} w-full`}
             />
         </div>
-        <Button onClick={onGrant} disabled={granting} className="h-9 w-full bg-blue-700 text-white hover:bg-blue-800">
+        <Button onClick={onGrant} disabled={granting} className="mt-auto h-9 w-full bg-blue-700 text-white hover:bg-blue-800">
             {granting ? 'Выдаю...' : 'Выдать мемкоины'}
         </Button>
     </AutomationCard>

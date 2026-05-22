@@ -21,10 +21,14 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
         clearQueue,
         skipCurrent,
         unlockAudio,
+        setOutputVolume,
     } = useTtsPlayer();
 
     const { data: audioSettingsResponse } = useTtsAudioSettings();
-    const saveAudioSettingsMutation = useSaveTtsAudioSettings();
+    const saveAudioSettingsMutation = useSaveTtsAudioSettings({
+        onSuccess: () => undefined,
+        onError: () => undefined,
+    });
     const [websiteVolume, setWebsiteVolume] = useState<number>(50);
     const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -32,8 +36,9 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
         const settings = audioSettingsResponse?.data as { websiteVolume?: number } | undefined;
         if (typeof settings?.websiteVolume === 'number') {
             setWebsiteVolume(settings.websiteVolume);
+            setOutputVolume(settings.websiteVolume);
         }
-    }, [audioSettingsResponse]);
+    }, [audioSettingsResponse, setOutputVolume]);
 
     useEffect(() => {
         return () => {
@@ -45,6 +50,7 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
 
     const handleVolumeChange = (value: number): void => {
         setWebsiteVolume(value);
+        setOutputVolume(value);
         if (volumeDebounceRef.current) {
             clearTimeout(volumeDebounceRef.current);
         }
@@ -72,7 +78,10 @@ const TtsPlayerSurface: React.FC<TtsPlayerSurfaceProps> = ({ variant = 'full' })
                 isSocketConnected={isSocketConnected}
                 websiteVolume={websiteVolume}
                 onClearQueue={clearQueue}
-                onSkipCurrent={skipCurrent}
+                onSkipCurrent={() => {
+                    void unlockAudio();
+                    skipCurrent();
+                }}
                 onUnlockAudio={() => void unlockAudio()}
                 onVolumeChange={handleVolumeChange}
             />

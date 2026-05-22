@@ -148,12 +148,12 @@ class CommandRepository(BaseRepository[BotCommand]):
         if override_alias_cmd and self._check_platform(override_alias_cmd, platform):
             return override_alias_cmd
 
-        # 5. Global
+        # 5. Global command or built-in compat alias
         global_cmd = self.db.query(BotCommand).filter(
             and_(
                 BotCommand.command_type == 'global',
                 BotCommand.user_id.is_(None),
-                BotCommand.command_name == command_name,
+                or_(BotCommand.command_name == command_name, BotCommand.alias == command_name),
                 BotCommand.is_enabled == True
             )
         ).first()
