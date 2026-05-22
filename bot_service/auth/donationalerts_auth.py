@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 _DONATIONALERTS_ALLOWED_AUTH_HOSTS = {"www.donationalerts.com", "donationalerts.com"}
 _DONATIONALERTS_SCOPES = "oauth-user-show oauth-donation-subscribe oauth-donation-index"
+_DONATIONALERTS_AUTH_ERROR_PATH = "/dashboard/media?tab=memealerts&platform=donationalerts&auth_error="
 
 def _is_safe_donationalerts_auth_url(url: str) -> bool:
     if not isinstance(url, str) or any(ch in url for ch in ("\r", "\n", "\t")):
@@ -50,6 +51,71 @@ def _build_donationalerts_auth_url(state: str) -> str:
         logger.error("Unsafe DonationAlerts auth URL generated")
         raise HTTPException(status_code=500, detail="Failed to generate secure auth URL")
     return auth_url
+
+
+def _mask_config_value(value: object) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    if len(text) <= 4:
+        return "***"
+    return f"{text[:2]}***{text[-2:]}"
+
+
+def _donationalerts_error_redirect(error_code: str) -> str:
+    return f"{settings.frontend_url}{_DONATIONALERTS_AUTH_ERROR_PATH}{error_code}"
+
+
+async def _preflight_donationalerts_authorize(auth_url: str) -> str | None:
+    """
+    DonationAlerts returns raw JSON for invalid authorize requests before our callback
+    can run. Probe once so the app can show a local Russian error instead.
+    """
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(8.0, connect=5.0),
+            follow_redirects=False,
+            headers={
+                "Accept": "application/json,text/html,*/*",
+                "User-Agent": "PaidViewerTools/DonationAlerts-OAuth-Preflight",
+            },
+        ) as client:
+            response = await client.get(auth_url)
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "DonationAlerts authorize preflight skipped: %s redirect_uri=%s client_id_len=%s secret_len=%s",
+            exc.__class__.__name__,
+            settings.donationalerts_redirect_uri,
+            len(str(settings.donationalerts_client_id or "")),
+            len(str(settings.donationalerts_client_secret or "")),
+        )
+        return None
+
+    if response.status_code < 400:
+        return None
+
+    body: object
+    error_code: str | None = None
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            raw_error = body.get("error") or body.get("message")
+            error_code = str(raw_error) if raw_error else None
+    except ValueError:
+        body = (response.text or "")[:500]
+
+    auth_error = "invalid_client" if error_code == "invalid_client" else "provider_rejected"
+    logger.error(
+        "DonationAlerts authorize preflight failed: status=%s error=%s body=%s redirect_uri=%s client_id_len=%s client_id_mask=%s secret_len=%s",
+        response.status_code,
+        error_code,
+        body,
+        settings.donationalerts_redirect_uri,
+        len(str(settings.donationalerts_client_id or "")),
+        _mask_config_value(settings.donationalerts_client_id),
+        len(str(settings.donationalerts_client_secret or "")),
+    )
+    return auth_error
 
 
 def _redirect_with_state_cleanup(url: str) -> RedirectResponse:
@@ -88,7 +154,20 @@ async def donationalerts_login(
         return RedirectResponse(url=f"{settings.frontend_url}/login?auth_error=not_authenticated")
 
     state = secrets.token_urlsafe(16)
-    response = RedirectResponse(url=_build_donationalerts_auth_url(state))
+    auth_url = _build_donationalerts_auth_url(state)
+    logger.info(
+        "DonationAlerts OAuth login redirect prepared: redirect_uri=%s client_id_len=%s client_id_mask=%s secret_len=%s scope=%s",
+        settings.donationalerts_redirect_uri,
+        len(str(settings.donationalerts_client_id or "")),
+        _mask_config_value(settings.donationalerts_client_id),
+        len(str(settings.donationalerts_client_secret or "")),
+        _DONATIONALERTS_SCOPES,
+    )
+    auth_error = await _preflight_donationalerts_authorize(auth_url)
+    if auth_error:
+        return RedirectResponse(url=_donationalerts_error_redirect(auth_error))
+
+    response = RedirectResponse(url=auth_url)
     response.set_cookie(
         key="oauth_state_da",
         value=state,

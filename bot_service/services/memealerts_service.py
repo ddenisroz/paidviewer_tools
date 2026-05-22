@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import jwt
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.drops import MemeAlertsGrantHistory
@@ -726,6 +727,38 @@ class MemeAlertsService:
             }
             for row in rows
         ]
+
+    def read_known_balances(self, user_id: int, limit: int = 200) -> List[Dict[str, Any]]:
+        rows = (
+            self.db.query(
+                MemeAlertsGrantHistory.target_user_id,
+                MemeAlertsGrantHistory.target_user_name,
+                func.sum(MemeAlertsGrantHistory.amount).label("amount"),
+                func.max(MemeAlertsGrantHistory.created_at).label("last_grant_at"),
+            )
+            .filter(MemeAlertsGrantHistory.user_id == user_id)
+            .group_by(
+                MemeAlertsGrantHistory.target_user_id,
+                MemeAlertsGrantHistory.target_user_name,
+            )
+            .order_by(func.max(MemeAlertsGrantHistory.created_at).desc())
+            .limit(limit)
+            .all()
+        )
+
+        balances: List[Dict[str, Any]] = []
+        for row in rows:
+            name = row.target_user_name or row.target_user_id or "Пользователь"
+            balances.append(
+                {
+                    "user_id": row.target_user_id,
+                    "memealerts_name": name,
+                    "amount": int(row.amount or 0),
+                    "last_grant_at": self._safe_iso(row.last_grant_at),
+                    "source": "local_grants",
+                }
+            )
+        return balances
 
     def _record_local_grant(
         self,

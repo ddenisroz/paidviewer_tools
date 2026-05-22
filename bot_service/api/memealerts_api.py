@@ -620,3 +620,26 @@ async def get_memealerts_history(
         logger.exception("Error loading MemeAlerts history")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+@router.get("/balances")
+async def get_memealerts_balances(
+    limit: int = Query(200, ge=1, le=500),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get locally known MemeAlerts balances by successful grants."""
+    try:
+        user_id = user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        service = MemeAlertsService(db)
+        return {
+            "success": True,
+            "balances": service.read_known_balances(user_id=user_id, limit=limit),
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Error loading MemeAlerts balances")
+        raise HTTPException(status_code=500, detail="Internal server error")
+

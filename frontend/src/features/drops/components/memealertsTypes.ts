@@ -30,6 +30,14 @@ export type MemeAlertsHistoryItem = {
     type?: string;
 };
 
+export type MemeAlertsBalanceItem = {
+    user_id?: string | number | null;
+    memealerts_name?: string | null;
+    amount?: number | null;
+    last_grant_at?: string | null;
+    source?: string | null;
+};
+
 export type PlatformRewardSettings = {
     local_id?: string;
     platform?: 'twitch' | 'vk';

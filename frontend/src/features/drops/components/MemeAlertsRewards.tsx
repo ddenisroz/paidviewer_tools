@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { MemeAlertsConfiguredRewards } from '@/features/drops/components/MemeAlertsConfiguredRewards';
+import { MemeAlertsBalancesDialog } from '@/features/drops/components/MemeAlertsBalancesDialog';
 import { MemeAlertsConnectPanel } from '@/features/drops/components/MemeAlertsConnectPanel';
 import { MemeAlertsDonationCard } from '@/features/drops/components/MemeAlertsDonationCard';
 import { MemeAlertsGrantCard } from '@/features/drops/components/MemeAlertsGrantCard';
@@ -20,6 +21,7 @@ import {
     normalizeAutomationSettings,
     type MemeAlertsAuthProvider,
     type MemeAlertsAutomationSettings,
+    type MemeAlertsBalanceItem,
     type MemeAlertsConnectionInfo,
     type MemeAlertsHistoryItem,
     type MemeAlertsProxyState,
@@ -48,6 +50,9 @@ export const MemeAlertsRewards: React.FC = () => {
     const [grantValue, setGrantValue] = useState<number>(10);
     const [granting, setGranting] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
+    const [balancesOpen, setBalancesOpen] = useState(false);
+    const [balancesLoading, setBalancesLoading] = useState(false);
+    const [balances, setBalances] = useState<MemeAlertsBalanceItem[]>([]);
     const [settingsLoading, setSettingsLoading] = useState(false);
     const [settingsSaving, setSettingsSaving] = useState(false);
     const [donationAuthStarted, setDonationAuthStarted] = useState(false);
@@ -248,6 +253,26 @@ export const MemeAlertsRewards: React.FC = () => {
             setHistoryLoading(false);
         }
     };
+
+    const fetchBalances = useCallback(async () => {
+        try {
+            setBalancesLoading(true);
+            const { data } = await apiClient.get(`${MEMEALERTS_API_BASE}/balances`, {
+                params: { limit: 200 },
+            });
+            setBalances(Array.isArray(data?.balances) ? data.balances : []);
+        } catch (error) {
+            logger.error('MemeAlerts balances load error', error);
+            toast.error('Не удалось загрузить баланс мемкоинов');
+        } finally {
+            setBalancesLoading(false);
+        }
+    }, []);
+
+    const openBalances = useCallback(() => {
+        setBalancesOpen(true);
+        void fetchBalances();
+    }, [fetchBalances]);
 
     const fetchSettings = useCallback(async () => {
         if (!isConnected) return;
@@ -566,6 +591,9 @@ export const MemeAlertsRewards: React.FC = () => {
                     description: 'Мемкоины выданы',
                 });
                 fetchHistory();
+                if (balancesOpen) {
+                    void fetchBalances();
+                }
             } else {
                 toast.error(data.error || 'Не удалось выдать монеты', {
                     description: 'Ошибка',
@@ -676,7 +704,7 @@ export const MemeAlertsRewards: React.FC = () => {
     const selectedPlatformName = selectedRewardPlatform === 'twitch' ? 'Twitch' : 'VK Live';
     const canCreateMoreRewards = configuredRewards.length < 3 || Boolean(editingRewardId);
     const donationCourseRub = getDonationCourseRub(automationSettings.donation_auto.coins_per_currency);
-    const historyRows = [...history.grants, ...history.purchases].sort((a, b) => {
+    const historyRows = [...history.grants].sort((a, b) => {
         const left = a.created_at ? new Date(a.created_at).getTime() : 0;
         const right = b.created_at ? new Date(b.created_at).getTime() : 0;
         return right - left;
@@ -710,7 +738,7 @@ export const MemeAlertsRewards: React.FC = () => {
                     onConnect={handleConnect}
                 />
             ) : (
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
                     <div className="space-y-4">
                         <div className="grid gap-3 lg:grid-cols-3">
                             <MemeAlertsGrantCard
@@ -782,7 +810,19 @@ export const MemeAlertsRewards: React.FC = () => {
                         />
                     </div>
 
-                    <MemeAlertsHistoryCard rows={historyRows} loading={historyLoading} onRefresh={fetchHistory} />
+                    <MemeAlertsHistoryCard
+                        rows={historyRows}
+                        loading={historyLoading}
+                        onRefresh={fetchHistory}
+                        onOpenBalances={openBalances}
+                    />
+                    <MemeAlertsBalancesDialog
+                        open={balancesOpen}
+                        rows={balances}
+                        loading={balancesLoading}
+                        onOpenChange={setBalancesOpen}
+                        onRefresh={fetchBalances}
+                    />
                 </div>
             )}
         </div>
