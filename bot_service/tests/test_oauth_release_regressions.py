@@ -493,13 +493,13 @@ def test_stream_info_service_normalizes_vk_category_without_real_id(db_session):
     }
 
 
-def test_memealerts_streamer_id_prefers_tid_claim():
+def test_memealerts_streamer_id_prefers_id_claim():
     from api.memealerts_api import _extract_memealerts_streamer_id
 
-    assert _extract_memealerts_streamer_id({"id": "token-record-id", "tid": "streamer-id"}) == "streamer-id"
+    assert _extract_memealerts_streamer_id({"id": "streamer-id", "tid": "token-record-id"}) == "streamer-id"
 
 
-def test_memealerts_streamer_id_uses_trusted_fallback_before_id():
+def test_memealerts_streamer_id_uses_trusted_fallback_when_id_missing():
     from api.memealerts_api import _extract_memealerts_streamer_id
 
-    assert _extract_memealerts_streamer_id({"id": "token-record-id"}, "trusted-streamer-id") == "trusted-streamer-id"
+    assert _extract_memealerts_streamer_id({"tid": "token-record-id"}, "trusted-streamer-id") == "trusted-streamer-id"

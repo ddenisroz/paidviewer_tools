@@ -253,6 +253,8 @@ class TTSHandlerService:
             return "filtered_reply"
         if "mention" in normalized:
             return "filtered_mention"
+        if "forbidden phrase" in normalized or "filtered word" in normalized:
+            return "filtered_word"
         if "blocked" in normalized:
             return "blocked"
         if "command" in normalized:
@@ -403,7 +405,16 @@ class TTSHandlerService:
             logger.info(f"[SKIP] [{platform.upper()} TTS] Skipping message with mentions")
             return {"error": "Messages with mentions are filtered"}
 
-        filtered_text = await self._apply_word_filters(tts_service, user_id, platform, text)
+        matched_filtered_word = await self._match_filtered_word(tts_service, user_id, platform, text)
+        if matched_filtered_word:
+            logger.info(
+                "[SKIP] [%s TTS] Message contains forbidden phrase: %r",
+                platform.upper(),
+                matched_filtered_word,
+            )
+            return {"error": "Message contains forbidden phrase"}
+
+        filtered_text = text
 
         if getattr(tts_settings, "speak_sender_name", False):
             filtered_text = f"{username}: {filtered_text}"
@@ -721,28 +732,26 @@ class TTSHandlerService:
         
         return True
 
-    async def _apply_word_filters(self, tts_service, user_id, platform, text) -> str:
+    async def _match_filtered_word(self, tts_service, user_id, platform, text) -> Optional[str]:
         words = await tts_service.get_filtered_words(user_id)
-        # Filter by platform
         filtered_words = sorted(
-            {w["word"] for w in words if w.get("word") and w.get("platform") in ("all", platform)},
+            {
+                str(w["word"]).strip().lower()
+                for w in words
+                if w.get("word") and w.get("platform") in ("all", platform)
+            },
             key=len,
             reverse=True,
         )
-        
+
         if not filtered_words:
-            return text
-        
-        filtered_text = text
-        words_pattern = '|'.join(re.escape(word.lower()) for word in filtered_words)
-        if words_pattern:
-             filtered_text = re.sub(
-                words_pattern,
-                lambda m: '*' * len(m.group(0)),
-                filtered_text,
-                flags=re.IGNORECASE
-            )
-        return filtered_text
+            return None
+
+        normalized_text = str(text or "").lower()
+        for word in filtered_words:
+            if word and word in normalized_text:
+                return word
+        return None
 
     def _has_mentions(self, text, mentioned_users) -> bool:
         if mentioned_users and len(mentioned_users) > 0:

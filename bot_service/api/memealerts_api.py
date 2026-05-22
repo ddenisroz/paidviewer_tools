@@ -147,13 +147,13 @@ def _extract_memealerts_streamer_id(decoded: dict, trusted_fallback: Optional[st
     return (
         decoded.get("streamer_id")
         or decoded.get("streamerId")
-        or decoded.get("tid")
-        or trusted_fallback
         or decoded.get("id")
         or decoded.get("_id")
         or decoded.get("user_id")
         or decoded.get("uid")
         or decoded.get("sub")
+        or trusted_fallback
+        or decoded.get("tid")
     )
 
 

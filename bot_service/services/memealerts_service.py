@@ -678,13 +678,13 @@ class MemeAlertsService:
         return (
             decoded.get("streamer_id")
             or decoded.get("streamerId")
-            or decoded.get("tid")
-            or platform_user_id
             or decoded.get("id")
             or decoded.get("_id")
             or decoded.get("user_id")
             or decoded.get("uid")
             or decoded.get("sub")
+            or platform_user_id
+            or decoded.get("tid")
         )
 
     @staticmethod
@@ -792,6 +792,22 @@ class MemeAlertsService:
         if not access_token or not normalized_streamer_id:
             raise ValueError("MemeAlerts token validation requires a streamer id")
 
+        token_only_response = await self._request(
+            "POST",
+            "/supporters",
+            access_token,
+            json={"limit": 1, "skip": 0, "query": ""},
+        )
+        if token_only_response.status_code in (200, 201):
+            logger.info(
+                "MemeAlerts token validated via token-only supporters request for streamer_id=%s",
+                normalized_streamer_id,
+            )
+            return {"streamer_id": normalized_streamer_id}
+
+        if token_only_response.status_code in (401, 403):
+            raise ValueError("MemeAlerts token validation failed")
+
         response = await self._request(
             "POST",
             "/supporters",
@@ -808,25 +824,6 @@ class MemeAlertsService:
             return {"streamer_id": normalized_streamer_id}
 
         if response.status_code in (401, 403):
-            raise ValueError("MemeAlerts token validation failed")
-
-        # The public MemeAlerts client calls /supporters without streamerId.
-        # Use that as a token-only fallback so API shape changes do not block
-        # login when the JWT claim already gives us the streamer id.
-        token_only_response = await self._request(
-            "POST",
-            "/supporters",
-            access_token,
-            json={"limit": 1, "skip": 0, "query": "", "filters": []},
-        )
-        if token_only_response.status_code in (200, 201):
-            logger.info(
-                "MemeAlerts token validated via token-only supporters request for streamer_id=%s",
-                normalized_streamer_id,
-            )
-            return {"streamer_id": normalized_streamer_id}
-
-        if token_only_response.status_code in (401, 403):
             raise ValueError("MemeAlerts token validation failed")
 
         logger.warning(
@@ -918,11 +915,9 @@ class MemeAlertsService:
         for _ in range(max_pages):
             payload_variants = [
                 {
-                    "streamerId": streamer_id,
                     "limit": limit,
                     "skip": skip,
                     "query": nickname,
-                    "filters": [],
                 },
                 {
                     "limit": limit,
@@ -931,13 +926,25 @@ class MemeAlertsService:
                     "filters": [],
                 },
                 {
-                    "streamerId": streamer_id,
+                    "limit": limit,
+                    "skip": skip,
+                    "query": "",
+                },
+                {
                     "limit": limit,
                     "skip": skip,
                     "query": "",
                     "filters": [],
                 },
                 {
+                    "streamerId": streamer_id,
+                    "limit": limit,
+                    "skip": skip,
+                    "query": nickname,
+                    "filters": [],
+                },
+                {
+                    "streamerId": streamer_id,
                     "limit": limit,
                     "skip": skip,
                     "query": "",
@@ -1328,40 +1335,58 @@ class MemeAlertsService:
                 break
 
             request_limit = min(page_limit, remaining)
-            payload = {
-                "streamerId": streamer_id,
-                "limit": request_limit,
-                "skip": skip,
-                "query": "",
-                "filters": [],
-            }
+            payload_variants = [
+                {
+                    "limit": request_limit,
+                    "skip": skip,
+                    "query": "",
+                },
+                {
+                    "limit": request_limit,
+                    "skip": skip,
+                    "query": "",
+                    "filters": [],
+                },
+                {
+                    "streamerId": streamer_id,
+                    "limit": request_limit,
+                    "skip": skip,
+                    "query": "",
+                    "filters": [],
+                },
+            ]
             response: Optional[httpx.Response] = None
 
-            for attempt in range(2):
-                try:
-                    response = await self._request(
-                        "POST",
-                        "/supporters",
-                        access_token,
-                        json=payload,
-                        client=client,
+            for payload in payload_variants:
+                for attempt in range(2):
+                    try:
+                        response = await self._request(
+                            "POST",
+                            "/supporters",
+                            access_token,
+                            json=payload,
+                            client=client,
+                        )
+                    except Exception:
+                        logger.exception("MemeAlerts supporters fetch failed")
+                        response = None
+                        break
+
+                    if response.status_code in (200, 201):
+                        break
+                    if attempt == 0 and self._has_antibot_cookie(response):
+                        continue
+                    logger.debug(
+                        "MemeAlerts supporters fetch variant failed with status=%s has_streamer_id=%s has_filters=%s",
+                        response.status_code,
+                        bool(payload.get("streamerId")),
+                        "filters" in payload,
                     )
-                except Exception:
-                    logger.exception("MemeAlerts supporters fetch failed")
                     response = None
                     break
 
-                if response.status_code in (200, 201):
+                if response is not None and response.status_code in (200, 201):
                     break
-                if attempt == 0 and self._has_antibot_cookie(response):
-                    continue
-                logger.warning(
-                    "MemeAlerts supporters fetch failed with status=%s, payload=%s",
-                    response.status_code,
-                    payload,
-                )
-                response = None
-                break
 
             if response is None:
                 break
