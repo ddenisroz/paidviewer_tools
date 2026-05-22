@@ -100,7 +100,8 @@ class DropsConfigRepository(BaseRepository[DropsConfig]):
 
     def get_quality_by_name(self, name: str) -> Optional[DropsQuality]:
         """Get quality by name."""
-        return self.db.query(DropsQuality).filter(DropsQuality.name == name).first()
+        normalized_name = (name or "").strip().lower()
+        return self.db.query(DropsQuality).filter(func.lower(DropsQuality.name) == normalized_name).first()
     
     def get_qualities_by_ids(self, ids: List[int]) -> List[DropsQuality]:
         """Get qualities by IDs."""

@@ -407,3 +407,25 @@ export const useGenerateDropsWidgetUrl = (options?: UseMutationOptions<ApiRespon
         ...options,
     });
 };
+
+export const useSendDropsWidgetTestEvent = (
+    channelName: string,
+    options?: UseMutationOptions<ApiResponse, AxiosError, string, unknown>
+) => {
+    return useMutation({
+        mutationFn: (quality: string) => unwrapResponse(dropsService.sendWidgetTestEvent(channelName, quality)),
+        onSuccess: (response) => {
+            const delivered = Number((response?.data as { delivered?: number } | undefined)?.delivered ?? 0);
+            if (delivered > 0) {
+                toast.success('Тестовое событие отправлено в виджет');
+                return;
+            }
+            toast.warning('Виджет не подключен. Открой URL в OBS или браузере и повтори тест');
+        },
+        onError: (error: AxiosError) => {
+            logger.error('Error sending drops widget test event:', error);
+            toast.error('Не удалось запустить тест виджета');
+        },
+        ...options,
+    });
+};

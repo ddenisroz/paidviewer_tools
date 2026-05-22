@@ -6,6 +6,7 @@ import { DROPS_CONSTANTS } from '@/constants/drops';
 import {
     useDropsConfig,
     useGenerateDropsWidgetUrl,
+    useSendDropsWidgetTestEvent,
     useUpdateDropsConfig,
 } from '@/queries/drops/dropsQueries';
 import { Button } from '@/shared/components/ui/button';
@@ -74,6 +75,7 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
             }
         },
     });
+    const sendTestEventMutation = useSendDropsWidgetTestEvent(channelName);
 
     const [formData, setFormData] = useState<FormData>({
         widget_spinning_duration_ms: 1500,
@@ -241,10 +243,15 @@ const WidgetSettings: React.FC<WidgetSettingsProps> = ({ user, channelName }) =>
                                         key={quality.value}
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => openWidgetUrl({ preview: 'true', quality: quality.value })}
+                                        onClick={() => sendTestEventMutation.mutate(quality.value)}
+                                        disabled={sendTestEventMutation.isPending}
                                         className={ACTION_CLASS}
                                     >
-                                        <TestTube2 className="h-4 w-4" />
+                                        {sendTestEventMutation.isPending ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                            <TestTube2 className="h-4 w-4" />
+                                        )}
                                         {quality.label}
                                     </Button>
                                 ))}

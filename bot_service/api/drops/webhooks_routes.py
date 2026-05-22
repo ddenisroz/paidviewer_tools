@@ -1,7 +1,11 @@
 """API for webhook events, widget tokens, and internal drops triggers."""
 import logging
+import random
 import secrets
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from core.database import get_db, DonationAlert
 from core.config import settings
@@ -10,6 +14,95 @@ from repositories.user_repository import UserRepository
 from repositories.drops_reward_repository import DropsRewardRepository
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/drops', tags=['drops'])
+
+
+class DropsWidgetTestEventRequest(BaseModel):
+    """Request body for sending a test case-opening event to the OBS widget."""
+
+    quality: str = Field(..., min_length=1, max_length=32)
+    platform: Optional[str] = Field(default="global", max_length=32)
+
+
+_QUALITY_ALIASES = {
+    "common": "Common",
+    "rare": "Rare",
+    "epic": "Epic",
+    "legendary": "Legendary",
+    "mythical": "Mythical",
+    "mythyc": "Mythical",
+}
+
+_QUALITY_LABELS = {
+    "common": "Обычный",
+    "rare": "Редкий",
+    "epic": "Эпический",
+    "legendary": "Легендарный",
+    "mythical": "Мифический",
+}
+
+
+def _normalize_widget_quality(quality: str) -> tuple[str, str]:
+    normalized = (quality or "").strip().lower()
+    canonical = _QUALITY_ALIASES.get(normalized)
+    if not canonical:
+        raise HTTPException(status_code=400, detail="Unknown drops quality.")
+    return normalized if normalized != "mythyc" else "mythical", canonical
+
+
+def _weighted_reward_choice(rewards):
+    if not rewards:
+        return None
+
+    total_weight = sum(max(1, int(getattr(reward, "weight", 1) or 1)) for reward in rewards)
+    roll = random.uniform(0, total_weight)
+    cursor = 0
+    for reward in rewards:
+        cursor += max(1, int(getattr(reward, "weight", 1) or 1))
+        if roll <= cursor:
+            return reward
+    return rewards[-1]
+
+
+def _build_widget_reward_payload(*, quality_key: str, quality, reward, channel_name: str) -> dict:
+    if reward:
+        reward_name = reward.name
+        return {
+            "type": "test",
+            "viewer_name": "Тест",
+            "quality": quality_key,
+            "quality_name": quality_key,
+            "quality_color": getattr(quality, "color", None),
+            "reward": reward_name,
+            "reward_name": reward_name,
+            "reward_id": reward.id,
+            "reward_type": reward.reward_type,
+            "reward_value": reward.reward_value,
+            "description": reward.description,
+            "image_url": reward.image_url,
+            "sound_file": reward.sound_file,
+            "sound_volume": reward.sound_volume,
+            "channel_name": channel_name,
+        }
+
+    label = _QUALITY_LABELS.get(quality_key, "Тестовый")
+    reward_name = f"{label} сундук"
+    return {
+        "type": "test",
+        "viewer_name": "Тест",
+        "quality": quality_key,
+        "quality_name": quality_key,
+        "quality_color": getattr(quality, "color", None) if quality else None,
+        "reward": reward_name,
+        "reward_name": reward_name,
+        "reward_id": -1,
+        "reward_type": "custom",
+        "reward_value": "",
+        "description": "Тестовое событие виджета",
+        "image_url": None,
+        "sound_file": None,
+        "sound_volume": 1,
+        "channel_name": channel_name,
+    }
 
 
 def _extract_donationalerts_webhook_secret(request: Request) -> str:
@@ -175,6 +268,70 @@ async def generate_widget_url(regenerate: bool=False, current_user: dict=Depends
     except Exception:
         logger.exception('Error generating widget URL')
         db.rollback()
+        raise HTTPException(status_code=500, detail='Internal server error.')
+
+
+@router.post('/widget/test-event/{channel_name}')
+async def send_widget_test_event(
+    channel_name: str,
+    request: DropsWidgetTestEventRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Send a test case-opening event to the current user's connected drops widget."""
+    try:
+        quality_key, quality_name = _normalize_widget_quality(request.quality)
+        reward_repo = DropsRewardRepository(db)
+        quality = reward_repo.get_quality_by_name(quality_name)
+        if not quality:
+            raise HTTPException(status_code=400, detail='Drops quality was not found.')
+
+        rewards = reward_repo.get_active_by_user_and_channel(
+            user_id=current_user['id'],
+            channel_name=channel_name,
+            quality_id=quality.id,
+        )
+        selected_reward = _weighted_reward_choice(rewards)
+        payload = _build_widget_reward_payload(
+            quality_key=quality_key,
+            quality=quality,
+            reward=selected_reward,
+            channel_name=channel_name,
+        )
+        event_data = {
+            "type": "drops",
+            "event": "reward_received",
+            "data": payload,
+        }
+
+        from services.memory_websocket_manager import get_memory_websocket_manager
+
+        sent = await get_memory_websocket_manager().send_to_user(
+            current_user['id'],
+            event_data,
+            client_roles={"drops_widget"},
+        )
+        logger.info(
+            "[DROPS WIDGET] Test event sent user_id=%s channel=%s quality=%s reward=%s delivered=%s",
+            current_user['id'],
+            channel_name,
+            quality_name,
+            payload.get("reward_name"),
+            sent,
+        )
+        return {
+            "success": True,
+            "message": "Test event sent.",
+            "data": {
+                "delivered": sent,
+                "quality": quality_key,
+                "reward_name": payload.get("reward_name"),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception('Error sending drops widget test event')
         raise HTTPException(status_code=500, detail='Internal server error.')
 
 @router.post('/donationalerts/webhook')

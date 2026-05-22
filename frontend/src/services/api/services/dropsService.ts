@@ -148,6 +148,15 @@ export const dropsService = {
         });
     },
 
+    async sendWidgetTestEvent(
+        channelName: string,
+        quality: string
+    ): Promise<AxiosResponse<ApiResponse<{ delivered: number; quality: string; reward_name?: string }>>> {
+        return apiClient.post(`/api/drops/widget/test-event/${channelName}`, {
+            quality,
+        });
+    },
+
     /**
      * Сбросить стрик для канала
      * @param channelName - Имя канала

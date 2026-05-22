@@ -6,6 +6,7 @@ Clean Architecture: abstracts DB access for drops rewards.
 
 import logging
 from typing import List, Optional, Dict, Any
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from repositories.base_repository import BaseRepository
@@ -31,7 +32,8 @@ class DropsRewardRepository(BaseRepository[DropsReward]):
     
     def get_quality_by_name(self, name: str) -> Optional[DropsQuality]:
         """Get DropsQuality by name."""
-        return self.db.query(DropsQuality).filter(DropsQuality.name == name).first()
+        normalized_name = (name or "").strip().lower()
+        return self.db.query(DropsQuality).filter(func.lower(DropsQuality.name) == normalized_name).first()
     
     def get_all_qualities(self) -> List[DropsQuality]:
         """Get all DropsQuality records."""

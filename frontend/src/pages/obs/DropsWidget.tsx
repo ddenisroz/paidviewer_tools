@@ -36,6 +36,7 @@ interface RewardData {
     quality?: string;
     quality_name?: string;
     viewer_name?: string;
+    reward?: string;
     reward_name?: string;
     reward_id?: number;
     reward_type?: string;
@@ -269,9 +270,10 @@ const DropsWidget: React.FC = () => {
             const channelName = channelNameRef.current || '';
             const platform = platformRef.current || '';
             const rewardPool = await loadRewardsForQuality(quality, channelName, platform);
+            const incomingRewardName = rewardData.reward_name || rewardData.reward;
             const fallbackReward: Reward = {
                 id: rewardData.reward_id || -1,
-                name: rewardData.reward_name || 'Награда',
+                name: incomingRewardName || 'Награда',
                 description: rewardData.description,
                 reward_type: rewardData.reward_type,
                 reward_value: rewardData.reward_value,
@@ -283,12 +285,12 @@ const DropsWidget: React.FC = () => {
             };
             const winnerReward =
                 rewardPool.find((item) => item.id === rewardData.reward_id) ||
-                rewardPool.find((item) => item.name === rewardData.reward_name) ||
+                rewardPool.find((item) => item.name === incomingRewardName) ||
                 fallbackReward;
             const resolvedRewardData: RewardData = {
                 ...rewardData,
                 reward_id: rewardData.reward_id || winnerReward.id,
-                reward_name: rewardData.reward_name || winnerReward.name,
+                reward_name: incomingRewardName || winnerReward.name,
                 reward_type: rewardData.reward_type || winnerReward.reward_type,
                 reward_value: rewardData.reward_value ?? winnerReward.reward_value,
                 description: rewardData.description || winnerReward.description,
@@ -457,6 +459,10 @@ const DropsWidget: React.FC = () => {
                 websocket.onmessage = (event: MessageEvent) => {
                     try {
                         const data = JSON.parse(event.data) as WebSocketMessage;
+                        if (data.type === 'ping' && websocket.readyState === WebSocket.OPEN) {
+                            websocket.send(JSON.stringify({ type: 'ping' }));
+                            return;
+                        }
                         if (data.type === 'drops' && data.event === 'reward_received' && data.data) {
                             void runRewardAnimation(data.data);
                             return;
@@ -531,7 +537,7 @@ const DropsWidget: React.FC = () => {
 
     if (mythicalSession && mythicalTimer !== null && mythicalTimer > 0) {
         return (
-            <div className="flex h-full w-full items-center justify-center bg-transparent">
+            <div className="fixed inset-0 flex items-center justify-center bg-transparent">
                 <div className="rounded-[26px] border border-pink-400/35 bg-[#12071dcc] px-8 py-7 text-center text-white shadow-[0_24px_80px_rgba(236,72,153,0.22)] backdrop-blur-md">
                     <p className="text-xs uppercase tracking-[0.32em] text-pink-200/75">Мифический сундук</p>
                     <h2 className="mt-3 text-3xl font-semibold">Окно награды открыто</h2>
@@ -544,11 +550,11 @@ const DropsWidget: React.FC = () => {
 
     if (phase === 'idle' || !currentReward) {
         if (!isPreviewMode) {
-            return <div className={`h-full w-full ${idleBackground}`} />;
+            return <div className={`fixed inset-0 ${idleBackground}`} />;
         }
 
         return (
-            <div className={`relative h-full w-full ${idleBackground}`}>
+            <div className={`fixed inset-0 ${idleBackground}`}>
                 <DropsWidgetPreviewPanel
                     previewByQuality={previewByQuality}
                     status={status}
@@ -559,7 +565,7 @@ const DropsWidget: React.FC = () => {
     }
 
     return (
-        <div className={`relative h-full w-full overflow-hidden ${idleBackground}`}>
+        <div className={`fixed inset-0 overflow-hidden ${idleBackground}`}>
             <div className={`pointer-events-none absolute inset-0 bg-gradient-to-b ${qualityGlowClass(currentQuality)}`} />
             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2">
                 <div className="relative mx-auto w-full max-w-[1260px] px-8">
