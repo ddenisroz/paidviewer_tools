@@ -1,68 +1,120 @@
+import React from 'react';
+
 import { RefreshCw } from 'lucide-react';
 
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui/tabs';
 
 import {
     SURFACE_CARD_CLASS,
     formatMemeAlertsAmount,
     formatMemeAlertsTimestamp,
     getSourceLabel,
+    type MemeAlertsBalanceItem,
     type MemeAlertsHistoryItem,
 } from './memealertsTypes';
 
 interface MemeAlertsHistoryCardProps {
-    rows: MemeAlertsHistoryItem[];
-    loading: boolean;
-    onRefresh: () => void;
-    onOpenBalances: () => void;
+    historyRows: MemeAlertsHistoryItem[];
+    historyLoading: boolean;
+    balanceRows: MemeAlertsBalanceItem[];
+    balancesLoading: boolean;
+    onRefreshHistory: () => void;
+    onRefreshBalances: () => void;
 }
 
 export const MemeAlertsHistoryCard: React.FC<MemeAlertsHistoryCardProps> = ({
-    rows,
-    loading,
-    onRefresh,
-    onOpenBalances,
-}) => (
-    <Card className={`${SURFACE_CARD_CLASS} flex h-[460px] min-w-0 flex-col xl:w-[380px]`}>
-        <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-base">История выдачи</CardTitle>
-                <div className="flex items-center gap-1.5">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onOpenBalances}
-                        className="h-8 border-border/70 bg-card/70 px-2.5 hover:bg-accent"
-                    >
-                        Балансы
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={onRefresh}
-                        disabled={loading}
-                        className="h-8 border-border/70 bg-card/70 px-2.5 hover:bg-accent"
-                    >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        <span className="sr-only">{loading ? 'Обновляю...' : 'Обновить'}</span>
-                    </Button>
-                </div>
-            </div>
-        </CardHeader>
-        <CardContent className="min-h-0 flex-1 pt-0">
-            <div className="h-full space-y-1.5 overflow-y-auto pr-1">
-                {rows.length === 0 ? (
-                    <p className="rounded-lg border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
-                        История пока пустая.
-                    </p>
-                ) : (
-                    rows.map((item, index) => <MemeAlertsHistoryRow key={`${item.id || index}`} item={item} />)
-                )}
-            </div>
-        </CardContent>
-    </Card>
-);
+    historyRows,
+    historyLoading,
+    balanceRows,
+    balancesLoading,
+    onRefreshHistory,
+    onRefreshBalances,
+}) => {
+    const [activeTab, setActiveTab] = React.useState<'history' | 'balances'>('history');
+    const loading = activeTab === 'history' ? historyLoading : balancesLoading;
+
+    const refreshActiveTab = () => {
+        if (activeTab === 'history') {
+            onRefreshHistory();
+            return;
+        }
+        onRefreshBalances();
+    };
+
+    return (
+        <Card className={`${SURFACE_CARD_CLASS} flex h-[460px] min-w-0 flex-col xl:w-[380px]`}>
+            <Tabs
+                value={activeTab}
+                onValueChange={(value) => {
+                    const nextTab = value === 'balances' ? 'balances' : 'history';
+                    setActiveTab(nextTab);
+                    if (nextTab === 'balances') {
+                        onRefreshBalances();
+                    }
+                }}
+                className="flex min-h-0 flex-1 flex-col"
+            >
+                <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-base">MemeAlerts</CardTitle>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={refreshActiveTab}
+                            disabled={loading}
+                            className="h-8 border-border/70 bg-card/70 px-2.5 hover:bg-accent"
+                        >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            <span className="sr-only">{loading ? 'Обновляю...' : 'Обновить'}</span>
+                        </Button>
+                    </div>
+                    <TabsList className="mt-3 grid h-9 w-full grid-cols-2 rounded-md border border-border/70 bg-background/40 p-0.5">
+                        <TabsTrigger
+                            value="history"
+                            className="rounded-sm text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        >
+                            История
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="balances"
+                            className="rounded-sm text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        >
+                            Баланс
+                        </TabsTrigger>
+                    </TabsList>
+                </CardHeader>
+
+                <CardContent className="min-h-0 flex-1 pt-0">
+                    <TabsContent value="history" className="mt-0 h-full space-y-1.5 overflow-y-auto pr-1">
+                        {historyRows.length === 0 ? (
+                            <p className="rounded-lg border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
+                                История пока пустая.
+                            </p>
+                        ) : (
+                            historyRows.map((item, index) => (
+                                <MemeAlertsHistoryRow key={`${item.id || index}`} item={item} />
+                            ))
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="balances" className="mt-0 h-full space-y-1.5 overflow-y-auto pr-1">
+                        {balanceRows.length === 0 ? (
+                            <p className="rounded-lg border border-border/70 bg-card/60 px-3 py-4 text-xs text-muted-foreground">
+                                MemeAlerts пока не вернул список балансов.
+                            </p>
+                        ) : (
+                            balanceRows.map((item, index) => (
+                                <MemeAlertsBalanceRow key={`${item.id || item.user_id || index}`} item={item} />
+                            ))
+                        )}
+                    </TabsContent>
+                </CardContent>
+            </Tabs>
+        </Card>
+    );
+};
 
 const MemeAlertsHistoryRow: React.FC<{ item: MemeAlertsHistoryItem }> = ({ item }) => {
     const platformName = item.platform_user_name || item.user_name || 'Пользователь';
@@ -80,3 +132,15 @@ const MemeAlertsHistoryRow: React.FC<{ item: MemeAlertsHistoryItem }> = ({ item 
         </div>
     );
 };
+
+const MemeAlertsBalanceRow: React.FC<{ item: MemeAlertsBalanceItem }> = ({ item }) => (
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 rounded-lg border border-border/70 bg-card/70 px-3 py-2">
+        <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">{item.memealerts_name || 'Пользователь'}</p>
+            <p className="text-[11px] text-muted-foreground">
+                Последняя активность: {formatMemeAlertsTimestamp(item.last_grant_at || undefined)}
+            </p>
+        </div>
+        <p className="text-sm font-semibold text-emerald-300">{formatMemeAlertsAmount(item.amount)}</p>
+    </div>
+);

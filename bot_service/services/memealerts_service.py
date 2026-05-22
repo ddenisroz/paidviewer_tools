@@ -13,7 +13,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import jwt
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from models.drops import MemeAlertsGrantHistory
@@ -728,38 +727,6 @@ class MemeAlertsService:
             for row in rows
         ]
 
-    def read_known_balances(self, user_id: int, limit: int = 200) -> List[Dict[str, Any]]:
-        rows = (
-            self.db.query(
-                MemeAlertsGrantHistory.target_user_id,
-                MemeAlertsGrantHistory.target_user_name,
-                func.sum(MemeAlertsGrantHistory.amount).label("amount"),
-                func.max(MemeAlertsGrantHistory.created_at).label("last_grant_at"),
-            )
-            .filter(MemeAlertsGrantHistory.user_id == user_id)
-            .group_by(
-                MemeAlertsGrantHistory.target_user_id,
-                MemeAlertsGrantHistory.target_user_name,
-            )
-            .order_by(func.max(MemeAlertsGrantHistory.created_at).desc())
-            .limit(limit)
-            .all()
-        )
-
-        balances: List[Dict[str, Any]] = []
-        for row in rows:
-            name = row.target_user_name or row.target_user_id or "Пользователь"
-            balances.append(
-                {
-                    "user_id": row.target_user_id,
-                    "memealerts_name": name,
-                    "amount": int(row.amount or 0),
-                    "last_grant_at": self._safe_iso(row.last_grant_at),
-                    "source": "local_grants",
-                }
-            )
-        return balances
-
     def _record_local_grant(
         self,
         *,
@@ -1346,6 +1313,41 @@ class MemeAlertsService:
             "unknown": [],
         }
 
+    async def fetch_balances(self, user_id: int, limit: int = 200) -> Dict[str, Any]:
+        try:
+            access_token, platform_user_id = self._get_token(user_id)
+        except ValueError as exc:
+            return {
+                "success": False,
+                "error": str(exc),
+                "balances": [],
+                "source": "memealerts_supporters",
+            }
+
+        decoded = self._decode_token(access_token)
+        streamer_id = self._resolve_streamer_id(decoded, platform_user_id)
+        if not streamer_id:
+            logger.warning("MemeAlerts balances: streamer_id is missing")
+            return {
+                "success": True,
+                "balances": [],
+                "source": "memealerts_supporters",
+            }
+
+        async with httpx.AsyncClient(timeout=30.0) as shared_client:
+            supporters = await self._fetch_supporters(
+                access_token=access_token,
+                streamer_id=str(streamer_id),
+                limit=limit,
+                client=shared_client,
+            )
+
+        return {
+            "success": True,
+            "balances": self._normalize_supporter_balances(supporters),
+            "source": "memealerts_supporters",
+        }
+
     async def _fetch_supporters(
         self,
         access_token: str,
@@ -1532,24 +1534,65 @@ class MemeAlertsService:
         return str(raw_value)
 
     @staticmethod
+    def _extract_supporter_name(item: Dict[str, Any]) -> Optional[str]:
+        user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
+        viewer_info = item.get("viewer") if isinstance(item.get("viewer"), dict) else {}
+        channel_info = item.get("channel") if isinstance(item.get("channel"), dict) else {}
+        return (
+            item.get("supporterName")
+            or item.get("userName")
+            or item.get("nickname")
+            or user_info.get("nickname")
+            or viewer_info.get("nickname")
+            or channel_info.get("name")
+        )
+
+    @staticmethod
+    def _extract_supporter_balance(item: Dict[str, Any]) -> Optional[float]:
+        for key in ("balance", "bonus", "memeCoins", "memecoins", "coins"):
+            value = item.get(key)
+            if value in (None, ""):
+                continue
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    @staticmethod
+    def _normalize_supporter_balances(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        balances: List[Dict[str, Any]] = []
+        for item in items:
+            user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
+            viewer_info = item.get("viewer") if isinstance(item.get("viewer"), dict) else {}
+            supporter_id = (
+                item.get("supporterId")
+                or item.get("userId")
+                or item.get("uid")
+                or user_info.get("id")
+                or viewer_info.get("id")
+            )
+            balances.append(
+                {
+                    "id": item.get("id") or item.get("_id") or supporter_id,
+                    "user_id": supporter_id,
+                    "memealerts_name": MemeAlertsService._extract_supporter_name(item),
+                    "amount": MemeAlertsService._extract_supporter_balance(item),
+                    "spent": MemeAlertsService._safe_float(item.get("spent"), 0.0),
+                    "purchased": MemeAlertsService._safe_float(item.get("purchased"), 0.0),
+                    "last_grant_at": MemeAlertsService._normalize_supporter_timestamp(item),
+                    "source": "memealerts_supporters",
+                }
+            )
+        return balances
+
+    @staticmethod
     def _normalize_supporters(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         purchases: List[Dict[str, Any]] = []
         for item in items:
             user_info = item.get("user") if isinstance(item.get("user"), dict) else {}
-            viewer_info = (
-                item.get("viewer") if isinstance(item.get("viewer"), dict) else {}
-            )
-            channel_info = (
-                item.get("channel") if isinstance(item.get("channel"), dict) else {}
-            )
-            user_name = (
-                item.get("supporterName")
-                or item.get("userName")
-                or item.get("nickname")
-                or user_info.get("nickname")
-                or viewer_info.get("nickname")
-                or channel_info.get("name")
-            )
+            viewer_info = item.get("viewer") if isinstance(item.get("viewer"), dict) else {}
+            user_name = MemeAlertsService._extract_supporter_name(item)
             purchases.append(
                 {
                     "id": item.get("id") or item.get("_id"),

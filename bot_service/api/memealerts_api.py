@@ -633,10 +633,7 @@ async def get_memealerts_balances(
         if not user_id:
             raise HTTPException(status_code=401, detail="Unauthorized")
         service = MemeAlertsService(db)
-        return {
-            "success": True,
-            "balances": service.read_known_balances(user_id=user_id, limit=limit),
-        }
+        return await service.fetch_balances(user_id=user_id, limit=limit)
     except HTTPException:
         raise
     except Exception:

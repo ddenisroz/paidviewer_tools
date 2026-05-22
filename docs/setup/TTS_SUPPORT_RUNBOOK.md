@@ -113,7 +113,7 @@
 - `http://localhost/auth/twitch/bot/callback`
 - `http://localhost/auth/vk/callback`
 - `http://localhost/auth/vk/bot/callback`
-- `http://localhost/auth/donationalerts/callback`
+- `http://localhost/donationalerts/callback`
 
 Что делать:
 - открыть UI через тот же origin, который указан в OAuth-приложении

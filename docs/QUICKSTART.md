@@ -131,7 +131,7 @@ Gateway-only профиль нужен для проверки UI и маршр�
 - `http://localhost/auth/twitch/bot/callback`
 - `http://localhost/auth/vk/callback`
 - `http://localhost/auth/vk/bot/callback`
-- `http://localhost/auth/donationalerts/callback`
+- `http://localhost/donationalerts/callback`
 
 Если запускаешь backend напрямую без nginx, можно использовать `http://localhost:8000/auth/...`, но тогда тот же origin должен быть указан в настройках OAuth-приложений.
 

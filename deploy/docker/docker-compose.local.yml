@@ -75,7 +75,7 @@ services:
       TWITCH_BOT_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/twitch/bot/callback
       VK_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/vk/callback
       VK_BOT_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/vk/bot/callback
-      DONATIONALERTS_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/auth/donationalerts/callback
+      DONATIONALERTS_REDIRECT_URI: ${LOCAL_AUTH_ORIGIN:-http://localhost}/donationalerts/callback
       CORS_ORIGINS: ${LOCAL_APP_ORIGIN:-http://localhost},http://localhost:3000,http://localhost:5173
       RATE_LIMIT_LOGIN: 60/minute
       SESSION_COOKIE_SECURE: "false"

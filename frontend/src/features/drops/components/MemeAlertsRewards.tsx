@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 
 import { useIntegrations } from '@/context/IntegrationsContext';
 import { MemeAlertsConfiguredRewards } from '@/features/drops/components/MemeAlertsConfiguredRewards';
-import { MemeAlertsBalancesDialog } from '@/features/drops/components/MemeAlertsBalancesDialog';
 import { MemeAlertsConnectPanel } from '@/features/drops/components/MemeAlertsConnectPanel';
 import { MemeAlertsDonationCard } from '@/features/drops/components/MemeAlertsDonationCard';
 import { MemeAlertsGrantCard } from '@/features/drops/components/MemeAlertsGrantCard';
@@ -50,7 +49,6 @@ export const MemeAlertsRewards: React.FC = () => {
     const [grantValue, setGrantValue] = useState<number>(10);
     const [granting, setGranting] = useState(false);
     const [historyLoading, setHistoryLoading] = useState(false);
-    const [balancesOpen, setBalancesOpen] = useState(false);
     const [balancesLoading, setBalancesLoading] = useState(false);
     const [balances, setBalances] = useState<MemeAlertsBalanceItem[]>([]);
     const [settingsLoading, setSettingsLoading] = useState(false);
@@ -268,11 +266,6 @@ export const MemeAlertsRewards: React.FC = () => {
             setBalancesLoading(false);
         }
     }, []);
-
-    const openBalances = useCallback(() => {
-        setBalancesOpen(true);
-        void fetchBalances();
-    }, [fetchBalances]);
 
     const fetchSettings = useCallback(async () => {
         if (!isConnected) return;
@@ -493,9 +486,10 @@ export const MemeAlertsRewards: React.FC = () => {
     useEffect(() => {
         if (isConnected) {
             fetchHistory();
+            void fetchBalances();
             fetchSettings();
         }
-    }, [fetchSettings, isConnected]);
+    }, [fetchBalances, fetchSettings, isConnected]);
 
     useEffect(() => {
         const platformSettings = editingRewardId
@@ -591,9 +585,7 @@ export const MemeAlertsRewards: React.FC = () => {
                     description: 'Мемкоины выданы',
                 });
                 fetchHistory();
-                if (balancesOpen) {
-                    void fetchBalances();
-                }
+                void fetchBalances();
             } else {
                 toast.error(data.error || 'Не удалось выдать монеты', {
                     description: 'Ошибка',
@@ -811,17 +803,12 @@ export const MemeAlertsRewards: React.FC = () => {
                     </div>
 
                     <MemeAlertsHistoryCard
-                        rows={historyRows}
-                        loading={historyLoading}
-                        onRefresh={fetchHistory}
-                        onOpenBalances={openBalances}
-                    />
-                    <MemeAlertsBalancesDialog
-                        open={balancesOpen}
-                        rows={balances}
-                        loading={balancesLoading}
-                        onOpenChange={setBalancesOpen}
-                        onRefresh={fetchBalances}
+                        historyRows={historyRows}
+                        historyLoading={historyLoading}
+                        balanceRows={balances}
+                        balancesLoading={balancesLoading}
+                        onRefreshHistory={fetchHistory}
+                        onRefreshBalances={fetchBalances}
                     />
                 </div>
             )}

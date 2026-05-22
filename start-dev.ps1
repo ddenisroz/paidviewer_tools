@@ -351,7 +351,7 @@ Write-Host ""
 Write-Host "[OK] Local stack started" -ForegroundColor Green
 Write-Host "[WEB] Frontend: http://localhost" -ForegroundColor Cyan
 Write-Host "[API] Bot API: http://localhost:8000" -ForegroundColor Cyan
-Write-Host "[AUTH] Local Docker callbacks use http://localhost/auth/... for Twitch, VK and DonationAlerts." -ForegroundColor Cyan
+Write-Host "[AUTH] Local Docker callbacks use http://localhost/auth/... for Twitch/VK and http://localhost/donationalerts/callback for DonationAlerts." -ForegroundColor Cyan
 Write-Host "[AUTH] Backend-direct http://localhost:8000/auth/... callbacks are only for explicit non-nginx runs." -ForegroundColor Cyan
 Write-Host "[LOG] Mirrored service logs: $((Get-LogMirrorRoot))" -ForegroundColor Cyan
 

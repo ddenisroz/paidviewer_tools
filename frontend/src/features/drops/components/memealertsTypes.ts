@@ -31,9 +31,12 @@ export type MemeAlertsHistoryItem = {
 };
 
 export type MemeAlertsBalanceItem = {
+    id?: string | number | null;
     user_id?: string | number | null;
     memealerts_name?: string | null;
     amount?: number | null;
+    spent?: number | null;
+    purchased?: number | null;
     last_grant_at?: string | null;
     source?: string | null;
 };
