@@ -13,18 +13,25 @@ import EpicClosed from '../../../images/lootboxes/epic/epic_closed.png';
 import LegendaryClosed from '../../../images/lootboxes/legendary/legendary_closed.png';
 import RareClosed from '../../../images/lootboxes/rare/rare_closed.png';
 
+import {
+    QUALITY_THRESHOLD_CARD_CLASS,
+    QUALITY_THRESHOLD_GRID_CLASS,
+    QUALITY_THRESHOLD_IMAGE_CLASS,
+    QUALITY_THRESHOLD_INPUT_CLASS,
+    QUALITY_THRESHOLD_STEPPER_CLASS,
+} from './qualityThresholdLayout';
+
 interface QualityConfig {
     id: string;
     label: string;
-    color: string;
     image: string;
 }
 
 const QUALITY_CONFIGS: QualityConfig[] = [
-    { id: 'common', label: 'Обычный', color: '#6B7280', image: CommonClosed },
-    { id: 'rare', label: 'Редкий', color: '#3B82F6', image: RareClosed },
-    { id: 'epic', label: 'Эпический', color: '#8B5CF6', image: EpicClosed },
-    { id: 'legendary', label: 'Легендарный', color: '#F59E0B', image: LegendaryClosed },
+    { id: 'common', label: 'Обычный', image: CommonClosed },
+    { id: 'rare', label: 'Редкий', image: RareClosed },
+    { id: 'epic', label: 'Эпический', image: EpicClosed },
+    { id: 'legendary', label: 'Легендарный', image: LegendaryClosed },
 ];
 
 interface DonationGridFormData {
@@ -40,9 +47,6 @@ interface DonationGridProps {
     setFormData: React.Dispatch<React.SetStateAction<DonationGridFormData>>;
     onChange?: (next: DonationGridFormData) => void;
 }
-
-const CARD_CLASS =
-    'flex min-h-[132px] flex-col justify-between rounded-lg border border-border/70 bg-card/70 p-4 shadow-sm';
 
 const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData, onChange }) => {
     const getMaxAmount = (quality: string): number => {
@@ -72,27 +76,27 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData, onCh
     };
 
     return (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className={QUALITY_THRESHOLD_GRID_CLASS}>
             {QUALITY_CONFIGS.map((quality) => {
                 const fieldName = `donation_amount_${quality.id}`;
                 const value = formData[fieldName][0];
                 const maxValue = getMaxAmount(quality.id);
 
                 return (
-                    <div key={quality.id} className={CARD_CLASS}>
+                    <div key={quality.id} className={QUALITY_THRESHOLD_CARD_CLASS}>
                         <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex min-w-0 items-center gap-2">
                                 <img
                                     src={quality.image}
                                     alt={`${quality.label} chest`}
-                                    className="h-8 w-8 object-contain"
+                                    className={QUALITY_THRESHOLD_IMAGE_CLASS}
                                 />
-                                <div>
+                                <div className="min-w-0">
                                     <Label className="text-sm font-semibold leading-none">{quality.label}</Label>
-                                    <p className="text-xs text-muted-foreground">От {value} ₽</p>
+                                    <p className="truncate text-xs text-muted-foreground">От {value} ₽</p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1 rounded-lg border border-border/70 bg-card/70">
+                            <div className={QUALITY_THRESHOLD_STEPPER_CLASS}>
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -106,7 +110,7 @@ const DonationGrid: React.FC<DonationGridProps> = ({ formData, setFormData, onCh
                                     type="number"
                                     value={value}
                                     onChange={(e) => handleInputChange(quality.id, e.target.value)}
-                                    className="h-8 w-20 border-0 bg-transparent text-center text-sm font-semibold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    className={QUALITY_THRESHOLD_INPUT_CLASS}
                                     min="0"
                                     max={maxValue}
                                     step="1"
